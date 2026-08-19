@@ -87,6 +87,30 @@ if (process.env.SHOT_COOKIE) {
     });
 }
 
+// ── AND SOME OF THEM CANNOT BE CLICKED AWAY ──────────────────────────────────────────────────────────────────
+// The daily check-in is server-driven, not a localStorage marker, so SHOT_SEEN cannot pre-empt it — and the
+// CLICK below returns early whenever WAIT already matches, which it does, because the page IS rendered
+// underneath. SHOT_HIDE takes a comma-separated list of selectors and hides them before anything is captured.
+//
+//   SHOT_HIDE=".checkin-overlay,.promo" node scripts/shot.mjs …
+if (process.env.SHOT_HIDE) {
+    const sel = process.env.SHOT_HIDE.split(",").map((x) => x.trim()).filter(Boolean).join(", ");
+    const css = `${sel} { display: none !important; }`;
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `(() => {
+            const put = () => {
+                const s = document.createElement("style");
+                s.textContent = ${JSON.stringify(css)};
+                (document.head || document.documentElement).appendChild(s);
+            };
+            put();
+            // Announcements mount after hydration and some replace the head, so the rule is re-applied once
+            // the document is ready rather than only at document-start.
+            document.addEventListener("DOMContentLoaded", put);
+        })();`,
+    });
+}
+
 // LAUNCH MODALS COVER EVERYTHING. Every new feature ships a full-screen "X is open" announcement that shows
 // once per browser, and a fresh headless profile is always a fresh browser — so the shot is of the modal, not
 // the page. Dismissing it with a click does not work reliably either: the CLICK below returns early when WAIT

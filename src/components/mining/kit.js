@@ -32,11 +32,13 @@ export const PART_SPRITE = Object.fromEntries(PART_TIERS.map((p) => [p.tier, p.s
 export const PART_COLOR = Object.fromEntries(PART_TIERS.map((p) => [p.tier, p.color]));
 
 // The same rarity language the chest opener uses, so a Legendary out of the rock reads exactly like a
+import { describeStats } from "@/lib/marketplace/items.js";
+
 // Legendary out of a chest — one game, one vocabulary.
 export const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 export const RARITY_LABEL = { common: "COMMON", rare: "RARE", epic: "EPIC", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
-const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
-export const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+// One vocabulary for stats too — the local six-stat map here printed `+9 base_damage` for anything newer.
+export const statLine = (stats) => describeStats(stats);
 
 // ── SOUND ────────────────────────────────────────────────────────────────────────────────────────────────────
 let _ac = null;

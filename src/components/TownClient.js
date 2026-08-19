@@ -9,7 +9,7 @@ import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
 import { bandLeftPct, bandPct, gradeKeyForDist } from "@/lib/marketplace/timing.js";
-import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
+import { STAT_META, statParts, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import NoticeBody from "@/components/NoticeBody";
 
@@ -72,7 +72,7 @@ const RARITY_META = {
 
 // The item's real stat block for a reveal — combat stats as chips, its signature ability, elemental affinity,
 // and any spin-off (sea/farm) affinities. So the win shows exactly what you got, not just a name.
-function RevealStats({ item }) {
+export function RevealStats({ item }) {
     if (!item) return null;
     const stats = Object.entries(item.stats || {}).filter(([k]) => STAT_META[k]);
     const els = item.elements || [];
@@ -82,9 +82,10 @@ function RevealStats({ item }) {
         <div className="tw-reveal-stats">
             {stats.length ? (
                 <div className="tw-reveal-chips">
-                    {stats.map(([k, v]) => (
-                        <span key={k} className="tw-reveal-chip" title={STAT_META[k].desc || ""}>{STAT_META[k].icon} +{v}{STAT_META[k].suffix || ""} {STAT_META[k].label}</span>
-                    ))}
+                    {stats.map(([k, v]) => {
+                        const p = statParts(k, v);
+                        return <span key={k} className={`tw-reveal-chip${p.intrinsic ? " is-own" : ""}`} title={p.desc}>{p.icon} {p.value} {p.label}</span>;
+                    })}
                 </div>
             ) : null}
             {els.length ? (
@@ -2993,6 +2994,7 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-reveal-stats { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; align-items: center; margin-top: 10px; width: 100%; max-width: 320px; }
 .tw-reveal-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
 .tw-reveal-chip { font-size: .72rem; font-weight: 800; color: #f2ead9; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 3px 9px; }
+.tw-reveal-chip.is-own { color: #ffd08a; background: rgba(255,176,71,0.14); border-color: rgba(255,176,71,0.42); }
 .tw-reveal-els { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
 .tw-reveal-el { font-size: .68rem; font-weight: 900; border: 1px solid; border-radius: 999px; padding: 2px 8px; background: rgba(0,0,0,0.25); }
 .tw-reveal-sig { font-size: .72rem; font-weight: 800; color: #e0c8ff; text-align: center; line-height: 1.3; text-wrap: balance; }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, describeFarm, describeSea, describeDepth, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeFarm, describeSea, describeDepth, statParts, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -59,7 +59,12 @@ function buildCompare(listItem, listEffective, equippedMap) {
     for (const k of new Set([...Object.keys(listEffective), ...Object.keys(eqStats)])) {
         if (!STAT_META[k]) continue;
         const delta = (Number(listEffective[k]) || 0) - (Number(eqStats[k]) || 0);
-        if (delta !== 0) diffs.push({ key: k, label: STAT_META[k].label, icon: STAT_META[k].icon, delta, suffix: STAT_META[k].suffix || "" });
+        // Formatted where every other surface formats — a block-chance delta is a fraction and a speed delta
+        // wants its /s, neither of which a raw number and a bare suffix could say.
+        if (delta !== 0) {
+            const p = statParts(k, Math.abs(delta));
+            diffs.push({ key: k, label: p.label, icon: p.icon, delta, text: p.value.replace(/^\+/, "") });
+        }
     }
     const farmDiffs = [];
     for (const k of new Set([...Object.keys(listFarm), ...Object.keys(eqFarm)])) {

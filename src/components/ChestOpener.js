@@ -14,8 +14,9 @@ import ChestIcon from "@/components/ChestIcon";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
-const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
-const statLine = (stats = {}) => Object.entries(stats).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+// Shared, so a stat added to STAT_META shows up here without anyone remembering to come back.
+import { describeStats } from "@/lib/marketplace/items.js";
+const statLine = (stats = {}) => describeStats(stats);
 const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46, ascendant: 58, eternal: 72 };
 const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal"]);

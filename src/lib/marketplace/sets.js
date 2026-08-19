@@ -1,6 +1,6 @@
 import "server-only";
 
-import { itemById, describeStats, describeSea, describeFarm, describeDepth, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeStat, describeSea, describeFarm, describeDepth, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
 
 // A set's members are gear OR trophies, and after the collection migration the two live in different tables.
@@ -45,7 +45,7 @@ function tierText(t) {
     for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${SEA_META[k]?.label || k}`);
     for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${WHEEL_META[k]?.label || k} chance`);
     for (const [k, v] of Object.entries(t.forge || {})) parts.push(`+${v}% ${FORGE_META[k]?.label || k} chance`);
-    for (const [k, v] of Object.entries(t.stats || {})) parts.push(`+${v} ${k.replace(/_/g, " ")}`);
+    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v));
     return parts.join(" · ") || "—";
 }
 

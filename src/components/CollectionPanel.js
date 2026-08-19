@@ -3,6 +3,7 @@
 import { GiWheat, GiMiningHelmet, GiPirateFlag, GiCartwheel } from "react-icons/gi";
 
 import ItemArt from "@/components/ItemArt";
+import { describeStat } from "@/lib/marketplace/items.js";
 
 // The panel's own themed glyph per feature — an emoji here is the operating system's artwork, not the Den's.
 const PANEL_ICONS = { farm: GiWheat, depths: GiMiningHelmet, sea: GiPirateFlag, wheel: GiCartwheel };
@@ -94,7 +95,7 @@ function tierText(t) {
     for (const [k, v] of Object.entries(t.depth || {})) parts.push(`+${v} ${label(k)}`);
     for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${label(k)}`);
     for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${label(k)}`);
-    for (const [k, v] of Object.entries(t.stats || {})) parts.push(`+${v} ${label(k)}`);
+    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v));
     return parts.join(" · ") || "—";
 }
 const label = (k) => k.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();

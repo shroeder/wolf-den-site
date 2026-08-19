@@ -31,12 +31,12 @@ function ago(iso) {
 }
 
 // Side-by-side comparison vs the viewer's equipped piece: green ▲ upgrades, red ▼ downgrades, per stat + farm affix.
-function CompareBlock({ c }) {
+export function CompareBlock({ c }) {
     if (!c) return null;
     if (c.none && !c.diffs.length && !c.farmDiffs.length) return null;
     const chip = (d, isFarm) => (
         <span key={(isFarm ? "f-" : "") + d.key} className={`ah-cmp-chip ${d.delta > 0 ? "up" : "down"}`}>
-            {d.icon} {d.delta > 0 ? "▲" : "▼"}{Math.abs(d.delta)}{d.suffix === "%" ? "%" : ""} {d.label}
+            {d.icon} {d.delta > 0 ? "▲" : "▼"}{d.text ?? Math.abs(d.delta)} {d.label}
         </span>
     );
     return (

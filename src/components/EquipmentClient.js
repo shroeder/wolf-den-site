@@ -11,7 +11,7 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
@@ -468,7 +468,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 {statEntries.length ? (
                     <div className="equip-stat-grid">
                         {statEntries.map(([k, v]) => (
-                            <span key={k} className="equip-stat" title={STAT_META[k]?.desc || ""}>{STAT_META[k]?.icon || ""} <strong>+{v}{STAT_META[k]?.suffix || ""}</strong> {STAT_META[k]?.label || k}</span>
+                            // Formatted by the SAME helper the item cards use. This panel did its own `+{v}{suffix}`,
+                            // which printed a shield's 0.2 block chance as "+0.2%" instead of 20%, and put a plus on
+                            // Damage and Armour — which are the totals you HAVE, not a bonus on top of something.
+                            <span key={k} className="equip-stat" title={STAT_META[k]?.desc || ""}>{STAT_META[k]?.icon || ""} <strong>{describeStat(k, v).replace(` ${STAT_META[k]?.label || k}`, "")}</strong> {STAT_META[k]?.label || k}</span>
                         ))}
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>Equip gear to boost your boss fight — Might, crit, ferocity and more.</p>}

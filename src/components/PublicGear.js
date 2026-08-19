@@ -1,5 +1,5 @@
 import InspectableGear from "@/components/InspectableGear";
-import { EQUIP_SLOTS, STAT_META, itemById, describeStats } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, itemById, describeStats, statParts } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { setForItem } from "@/lib/marketplace/sets.js";
@@ -80,9 +80,10 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
             <h2 style={{ marginTop: 0 }}>⚔️ Gear</h2>
             {statEntries.length ? (
                 <div className="equip-stat-grid" style={{ marginBottom: 10 }}>
-                    {statEntries.map(([k, v]) => (
-                        <span key={k} className="equip-stat"><strong>+{v}{STAT_META[k]?.suffix || ""}</strong> {STAT_META[k]?.label || k}</span>
-                    ))}
+                    {statEntries.map(([k, v]) => {
+                        const p = statParts(k, v);
+                        return <span key={k} className={`equip-stat${p.intrinsic ? " is-own" : ""}`} title={p.desc}><strong>{p.value}</strong> {p.label}</span>;
+                    })}
                 </div>
             ) : null}
             {setProgress.length ? (

@@ -647,8 +647,12 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     if ((ec?.n || 0) >= 50) grantEventBadge(buyerId, "forge_master").catch(() => {});
     // statLines let the reveal show the additive math plainly (base + forge = total) for every stat — INCLUDING
     // stats this forge just ADDED (base 0), flagged isNew so the reveal can call them out.
-    const statKeys = Array.from(new Set([...existing, ...forgedKeys]));
-    const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k) }));
+    // The piece's OWN numbers lead, flagged so the reveal can say "the weapon got better" rather than listing
+    // its damage as though it were one more affix.
+    const INTRINSIC = new Set(["base_damage", "armor", "speed", "block_chance"]);
+    const statKeys = Array.from(new Set([...existing, ...forgedKeys]))
+        .sort((a, z) => (INTRINSIC.has(a) ? 0 : 1) - (INTRINSIC.has(z) ? 0 : 1));
+    const statLines = statKeys.map((k) => ({ key: k, label: STAT_META[k]?.label || k, icon: STAT_META[k]?.icon || "", suffix: STAT_META[k]?.suffix || "", base: item.stats?.[k] || 0, forge: nextBonus[k] || 0, gained: gained[k] || 0, isNew: !existing.includes(k), intrinsic: INTRINSIC.has(k) }));
     // The attunement outcome for the reveal: what (if anything) got rolled, plus the item's resulting affix.
     const attune = utilRoll ? { ...describeUtil(nextUtil), isNew: Boolean(utilRoll.isNew), upgraded: Boolean(utilRoll.upgraded) } : null;
     if (attune) grantEventBadge(buyerId, "forge_attuned").catch(() => {});

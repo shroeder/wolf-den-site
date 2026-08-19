@@ -5,9 +5,9 @@ import { useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
-import { STAT_META } from "@/lib/marketplace/items.js";
+import { statParts } from "@/lib/marketplace/items.js";
 
-function ItemToggle({ item, on, onClick, blocked = false, bound = false }) {
+export function ItemToggle({ item, on, onClick, blocked = false, bound = false }) {
     const stats = item.stats && typeof item.stats === "object" ? Object.entries(item.stats) : [];
     return (
         <button
@@ -23,9 +23,10 @@ function ItemToggle({ item, on, onClick, blocked = false, bound = false }) {
             <span className="equip-card-name">{item.name}</span>
             {stats.length ? (
                 <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 7px", justifyContent: "center", fontSize: "0.66rem", fontWeight: 800, color: "#dfe8d6", lineHeight: 1.3, margin: "1px 0 2px" }}>
-                    {stats.map(([k, v]) => (
-                        <span key={k} title={STAT_META[k]?.label || k}>{STAT_META[k]?.icon || "•"} {v}{STAT_META[k]?.suffix || ""}</span>
-                    ))}
+                    {stats.map(([k, v]) => {
+                        const p = statParts(k, v);
+                        return <span key={k} title={`${p.value} ${p.label}`} style={p.intrinsic ? { color: "#ffd98a" } : undefined}>{p.icon} {p.value}</span>;
+                    })}
                 </span>
             ) : <span style={{ fontSize: "0.62rem", opacity: 0.55, margin: "1px 0 2px" }}>cosmetic</span>}
             {item.enhanceLevel > 0 ? <span style={{ fontSize: "0.6rem", color: "#8fe39a", fontWeight: 800 }}>⚒️ +{item.enhanceLevel} forged</span> : null}

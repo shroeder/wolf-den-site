@@ -60,8 +60,13 @@ export async function markBadgeSeen(buyerId, slug) {
 // The stat keys are the engine's vocabulary, not a player's. Everything here reads like the sentence somebody
 // would say about it; anything unmapped falls back to the key with its underscores knocked out rather than
 // being dropped, so a new stat shows up looking plain instead of not showing up at all.
-const WORDS = {
+// Exported so scripts/check-stat-labels.mjs can ask whether it names every stat a badge can grant.
+export const WORDS = {
     might: "Might", crit_chance: "Crit chance", crit_power: "Crit power",
+    vitality: "Vitality", ferocity: "Ferocity", tenacity: "Tenacity", pierce: "Pierce",
+    lifesteal: "Lifedrink", counter: "Riposte", doublestrike: "Double strike",
+    stun: "Chance to stun", haste: "Chance to haste", armor: "Armour", base_damage: "Damage",
+    fortune: "Fortune", angling: "Angling",
     broadside: "Broadside", ironclad: "Ironclad", plunder: "Plunder", bounty: "Bounty",
     dredge: "Dredge", trove: "Trove", tailwind: "Tailwind",
     growSpeed: "Grow speed", seedLuck: "Seed luck", harvestLuck: "Harvest luck",

@@ -32,9 +32,9 @@ const SLOT_LABEL = {
     main_hand: "Weapon", off_hand: "Off-hand", helmet: "Helmet", chest: "Chest", belt: "Belt",
     boots: "Boots", back: "Back", amulet: "Amulet", ring: "Ring",
 };
-const STAT = { might: "Might", ferocity: "Ferocity", fortune: "Fortune", crit_chance: "Crit chance", crit_power: "Crit power", extra_strike: "Extra strike" };
+import { describeStats } from "@/lib/marketplace/items.js";
 const tint = (r) => RARITY_META[r]?.color || "#9aa0a6";
-const describe = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT[k] || k}`).join(" · ");
+const describe = (stats) => describeStats(stats);
 
 export default function CompendiumClient() {
     const [data, setData] = useState(null);

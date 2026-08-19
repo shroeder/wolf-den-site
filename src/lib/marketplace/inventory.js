@@ -363,6 +363,9 @@ export async function getInventory(buyerId) {
             const set = setForItem(def.id);
             const enh = enhById.get(def.id);
             return { ...def, owned: true, equipped: equippedIds.has(def.id), bound: isTradeLocked(def.rarity), enhanceLevel: enh?.level || 0,
+                // The shop list has always carried this and an owned item never did, so any screen reading
+                // `statsText` rather than calling describeStats itself showed a blank line for your own gear.
+                statsText: describeStats(def.stats || {}),
                 // The forge bonus ALONE, phrased like every other stat line, so "+1" can finally say what it
                 // bought. The Auction House has shown this on a listing for ages; your own bag never did, so
                 // the one place you inspect your own gear was the one place the enhancement was invisible.

@@ -243,8 +243,9 @@ export function FishingLog({ log, known, total, records, onClose }) {
 // `fishing` is the server's fishing view. `onCast`/`onLand` post to the sailing endpoint and resolve with the
 // server's reply; the parent owns the state refresh.
 // RARITY_COLOR already lives at the top of this file — the fish log uses it.
-const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
-const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+// Shared, so a stat added to STAT_META shows up here without anyone remembering to come back.
+import { describeStats } from "@/lib/marketplace/items.js";
+const statLine = (stats) => describeStats(stats);
 
 
 // ── THE BAIT STEP, WHEREVER YOU ARE ──────────────────────────────────────────────────────────────────────────

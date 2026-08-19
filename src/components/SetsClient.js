@@ -5,12 +5,12 @@ import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
-import { describeSea, describeFarm } from "@/lib/marketplace/items.js";
+import { describeSea, describeFarm, describeStats } from "@/lib/marketplace/items.js";
 
 const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 // Null-safe: the sailing/farm/wheel sets' tiers grant affinity (no combat stats), so `stats` can be null — guard it
 // (an unguarded Object.entries(null) here 500'd the whole /marketplace/sets page).
-const statText = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${k.replace(/_/g, " ")}`).join(" · ");
+const statText = (stats) => describeStats(stats);
 // Wheelwarden set bonus: a % chance per spin to trigger a Lucky Spin (charge burst + bonus gold).
 // No Lucky Charge line any more — the pity bar it fed was removed from the wheel entirely (see spin.js).
 const describeWheel = (w) => [w.luck ? `${w.luck}% Lucky Spin chance` : "", w.goldPct ? `+${w.goldPct}% spin gold` : ""].filter(Boolean).join(" · ");

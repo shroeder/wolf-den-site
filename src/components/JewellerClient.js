@@ -34,9 +34,9 @@ function GemArt({ gem, className = "" }) {
 
 const RARITY = { common: "#c9d1d9", rare: "#6bb8ff", epic: "#c98bff", legendary: "#ffb648", mythic: "#ff6b8a",
     ascendant: "#ff8ad8", eternal: "#ffce6b" };
-const STAT = { might: "Might", ferocity: "Ferocity", fortune: "Fortune", crit_chance: "Crit chance", crit_power: "Crit power" };
+import { STAT_SHORT as STAT, describeStats } from "@/lib/marketplace/items.js";
 const money = (n) => (Number(n) || 0).toLocaleString();
-const describe = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT[k] || k}`).join(" · ");
+const describe = (stats) => describeStats(stats);
 
 export default function JewellerClient({ initial }) {
     const [st, setSt] = useState(initial);

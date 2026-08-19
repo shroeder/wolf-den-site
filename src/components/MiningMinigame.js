@@ -31,8 +31,9 @@ const KIND_ART = {
 // out of a chest — one game, one vocabulary.
 const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const RARITY_LABEL = { common: "COMMON", rare: "RARE", epic: "EPIC", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
-const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
-const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+// Shared, so a stat added to STAT_META shows up here without anyone remembering to come back.
+import { describeStats } from "@/lib/marketplace/items.js";
+const statLine = (stats) => describeStats(stats);
 
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
 // THE SWEEP, and how it TIGHTENS. Every swing you land makes the next one faster, the way the kitchen's bar

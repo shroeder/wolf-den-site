@@ -74,50 +74,35 @@ export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
 // Each stat carries a plain-English `desc` (what it does for a player, no jargon) + an icon, so the gear
 // screen can teach what every stat means instead of just showing a number.
 export const STAT_META = {
-    might: { label: "Might", icon: "⚔️", desc: "How hard you hit — powers BOTH your 24/7 passive auto-damage and your manual daily strike.", suffix: "%" },
-    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical — on both your passive auto-damage and your manual strike.", suffix: "%" },
-    crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra your critical hits deal — on both passive auto-damage and your manual strike.", suffix: "%" },
-    stun: { label: "Chance to Stun", icon: "💫", desc: "Each point is a 0.5% chance a blow stuns — the target loses their next attack.", suffix: "" },
-    haste: { label: "Chance to Haste", icon: "🌀", desc: "Each point is a 0.5% chance a swing hastes you: five swings at double speed.", suffix: "" },
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "PASSIVE only: auto-damage your hero deals 24/7 on its own (doesn't affect your manual strike).", suffix: "%" },
-    fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize.", suffix: "%" },
-    // ── VITALITY ─────────────────────────────────────────────────────────────────────────────────────────
-    // Health, and ONLY health. Ferocity used to buy health, accuracy, initiative and 24/7 boss damage all at
-    // once, which meant every armour piece was the same decision wearing a different name and the only
-    // question between two chest pieces was whose number was bigger.
-    //
-    // It is also the first combat stat NO BADGE GRANTS. Badges are worth +356 Might against +202 for a
-    // best-in-slot loadout, so a collection could simply out-vote a wardrobe; a stat that only armour carries
-    // is one a collection cannot substitute for.
-    vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Health in the Arena — and only armour carries it.", suffix: "" },
-    // ── TENACITY ─────────────────────────────────────────────────────────────────────────────────────────
-    // Damage reduction, from the two slots that are literally protection: the helm and what you wear on your
-    // back. Like Vitality, no badge grants it — it is a wardrobe stat, not a collection stat.
-    tenacity: { label: "Tenacity", icon: "🛡️", desc: "Turns aside a share of every blow in the Arena. Helm and back only — no badge grants it.", suffix: "" },
-    // ── PRECISION ────────────────────────────────────────────────────────────────────────────────────────
-    // Accuracy, split off Ferocity. Ferocity was buying health, accuracy, initiative AND boss damage; Vitality
-    // took the health and this takes the aim, leaving Ferocity to mean initiative and passive boss damage.
-    precision: { label: "Precision", icon: "🎯", desc: "How often your swings connect at all in the Arena.", suffix: "" },
-    // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────────────
-    // Ignores a share of what they turn aside. The mirror of Tenacity and the only offensive stat that is
-    // worth MORE against a tankier opponent — so building into it is a read on who you fight, not a bigger
-    // number that is always correct. The engine already consumed `pierce` from the skill tree; this is the
-    // same term reaching it from a weapon.
-    pierce: { label: "Pierce", icon: "🗡️", desc: "Cuts through a share of their damage reduction in the Arena.", suffix: "" },
-    // ── LIFEDRINK ────────────────────────────────────────────────────────────────────────────────────────
-    // A share of everything you deal comes back as health. The Warden has 15% of this inherently; a ring can
-    // now buy a slice of it for anyone, which is the point — the class fantasy stops being class-exclusive
-    // and becomes something you can build toward.
-    lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you deal comes back as health.", suffix: "%" },
-    // ── RIPOSTE ──────────────────────────────────────────────────────────────────────────────────────────
-    // A chance to hit back the instant their blow lands. It is the off-hand's stat because that is the hand
-    // that parries — and it gives the off-hand an identity beyond being a second weapon.
-    counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands.", suffix: "%" },
-    // ── DOUBLE STRIKE ────────────────────────────────────────────────────────────────────────────────────
-    // A whole extra swing, not a damage bonus. It multiplies everything the swing carries — another crit
-    // roll, another chance to pierce, another chance to set a burn — which is why a modest percentage is
-    // priced as the rarest thing in the pool alongside Lifedrink.
-    doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your attack swings twice — a whole extra hit, with everything that comes with it.", suffix: "%" },
+    // ── WHAT THE PIECE ITSELF IS ─────────────────────────────────────────────────────────────────────────
+    // These three are not affixes — they are the item. A weapon's damage and speed and a piece of armour's
+    // armour rating are what the thing IS before a single stat is rolled on it, and they were missing from
+    // this table entirely, which meant nothing anywhere in the game printed them.
+    base_damage: { label: "Damage", icon: "⚔️", desc: "The weapon's own damage. Might multiplies it — this is the number every swing starts from.", suffix: "" },
+    speed: { label: "Attack Speed", icon: "⏱️", desc: "How many times a second this weapon swings. Ferocity adds to it.", suffix: "/s" },
+    armor: { label: "Armour", icon: "🛡️", desc: "Comes off every blow, flat, before anything else. Tenacity multiplies it.", suffix: "" },
+    block_chance: { label: "Block Chance", icon: "🛡️", desc: "How often this shield blocks — a block takes 35% off the blow.", suffix: "%" },
+
+    // ── THE FOUR YOU BUILD ───────────────────────────────────────────────────────────────────────────────
+    might: { label: "Might", icon: "⚔️", desc: "Multiplies your weapon's damage. The whole of what you hit for.", suffix: "" },
+    vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Your health in the Arena.", suffix: "" },
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "Adds to your attack speed — how often you swing.", suffix: "" },
+    tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing. 500 tenacity doubles it.", suffix: "" },
+
+    // ── THE CRITS ────────────────────────────────────────────────────────────────────────────────────────
+    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical. Past 100% every swing crits and the surplus doubles it.", suffix: "" },
+    crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra a critical deals. Each point is +1%.", suffix: "" },
+
+    // ── THE RARE ONES ────────────────────────────────────────────────────────────────────────────────────
+    pierce: { label: "Pierce", icon: "🗡️", desc: "Thins their armour. Each point ignores 0.5% of it.", suffix: "" },
+    lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you land comes back as health. Each point is 0.25%.", suffix: "" },
+    counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands. Each point is 0.25%.", suffix: "" },
+    doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your swing lands twice — a whole extra hit, with its own crit roll. Each point is 0.5%.", suffix: "" },
+    stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stuns — they lose the swing that was due. Each point is 0.5%.", suffix: "" },
+    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing hastes you: five swings at double speed. Each point is 0.5%.", suffix: "" },
+
+    // ── OUTSIDE THE RING ─────────────────────────────────────────────────────────────────────────────────
+    fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize. Does nothing in a fight.", suffix: "" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -949,13 +934,65 @@ export function sumItemStats(itemIds = []) {
 }
 
 // A short human summary of an item's stats, e.g. "+12% Might · +5% Crit Chance".
+// ── HOW A STAT READS ─────────────────────────────────────────────────────────────────────────────────────────
+// Three kinds, and treating them all as "+N" is why a sword's own damage read as "+19 Damage" like an affix,
+// and a shield's block chance read as "+0.2% Block Chance".
+//
+//   INTRINSIC   base damage, armour, attack speed. What the piece IS, not a bonus on top of it, so no plus.
+//   FRACTION    block chance is stored 0..1 and shown as a percentage.
+//   AFFIX       everything else — a bonus, and it gets its plus.
+const INTRINSIC = new Set(["base_damage", "armor", "speed"]);
+const FRACTION = new Set(["block_chance"]);
+
+// ── SHORT LABELS, FROM ONE PLACE ─────────────────────────────────────────────────────────────────────────────
+// Five components each kept their own hand-written {might, crit_chance, crit_power, ferocity, fortune} map, so
+// every stat added since — vitality, tenacity, pierce, lifedrink, riposte, double strike, stun, haste, armour,
+// damage, attack speed — rendered as a raw key or as nothing at all in the chest reveal, the compendium, the
+// fishing haul, the jeweller and the mine. Derived from STAT_META now, so adding a stat there is enough.
+export const STAT_SHORT = Object.fromEntries(
+    Object.entries(STAT_META).map(([k, m]) => [k, m.short || m.label])
+);
+
+export function statValue(k, v) {
+    const n = Number(v) || 0;
+    if (FRACTION.has(k)) return `${Math.round(n * 100)}%`;
+    if (k === "speed") return `${n.toFixed(2)}`;
+    return String(Math.round(n * 100) / 100);
+}
+
+// ── ONE RENDERER FOR ONE STAT ────────────────────────────────────────────────────────────────────────────────
+// Seven surfaces each built the same string by hand — `+${v} ${label}${suffix}` — which was right for the eleven
+// affixes that existed when they were written and wrong for every stat added since. A weapon's own damage came
+// out as "+24" as though it were a bonus somebody granted you, and a shield's block chance came out as "+0.2%"
+// because it is stored as a fraction. So the pieces of a stat line are cut in ONE place and every surface asks
+// for them: icon, label, the value already formatted, and whether it takes a plus.
+export function statParts(k, v) {
+    const m = STAT_META[k] || {};
+    const own = INTRINSIC.has(k) || FRACTION.has(k);
+    // block_chance's percent already comes off statValue; anything else wears its own suffix.
+    const suffix = FRACTION.has(k) ? "" : (m.suffix || "");
+    return {
+        key: k,
+        icon: m.icon || "•",
+        label: m.label || k,
+        desc: m.desc || "",
+        value: `${own ? "" : "+"}${statValue(k, v)}${suffix}`,
+        intrinsic: own,   // the piece itself, not a bonus on top of it
+    };
+}
+
+export function describeStat(k, v) {
+    const p = statParts(k, v);
+    return `${p.value} ${p.label}`;
+}
+
 export function describeStats(stats = {}) {
-    return Object.entries(stats || {})
-        .map(([k, v]) => {
-            const m = STAT_META[k];
-            return m ? `+${v}${m.suffix} ${m.label}` : `+${v} ${k}`;
-        })
-        .join(" · ");
+    // The piece's own numbers lead, because they are the thing you are looking at; the affixes follow.
+    const keys = Object.keys(stats || {}).sort((a, z) => {
+        const rank = (k) => (INTRINSIC.has(k) ? 0 : FRACTION.has(k) ? 1 : 2);
+        return rank(a) - rank(z);
+    });
+    return keys.filter((k) => Number(stats[k])).map((k) => describeStat(k, stats[k])).join(" · ");
 }
 
 // ── SEA AFFINITY ── a separate effect layer that ONLY the Sailing systems read (raids/digging/voyages) — kept

@@ -939,7 +939,7 @@ function SalvageModal({ item, parts, odds = {}, equipped = null, onConfirm, onCl
 }
 
 // ── The juiced post-enhance reveal (fires after you Temper the item) ────────────────────────────────────────
-function EnhanceResultModal({ res, onClose }) {
+export function EnhanceResultModal({ res, onClose }) {
     const gradeMeta = { pixel: { label: "PIXEL-PERFECT", color: "#ffd75e" }, perfect: { label: "PERFECT", color: "#8fe3ff" }, great: { label: "GREAT", color: "#8fe39a" }, good: { label: "FORGED", color: "#d7c48a" } }[res.grade] || { label: "FORGED", color: "#d7c48a" };
     // Peak dopamine: first TALLY the mini-game performance — every strike's tier, the best combo, the score — then
     // CONNECT the dots (performance → grade → forge yield) so the player sees exactly how their run drove the
@@ -1025,8 +1025,12 @@ function EnhanceResultModal({ res, onClose }) {
                     {Array.isArray(res.statLines) && res.statLines.length ? (
                         <div className="forge-er-stats">
                             {res.statLines.map((s) => (
-                                <div key={s.key} className={`forge-er-statrow${s.gained ? " up" : ""}`}>
-                                    <span className="forge-er-stat-label">{s.icon} {s.label}{s.isNew && s.gained ? <span className="forge-er-newtag">NEW</span> : null}</span>
+                                <div key={s.key} className={`forge-er-statrow${s.gained ? " up" : ""}${s.intrinsic ? " is-own" : ""}`}>
+                                    <span className="forge-er-stat-label">{s.icon} {s.label}
+                                        {s.isNew && s.gained ? <span className="forge-er-newtag">NEW</span> : null}
+                                        {/* The item's OWN number going up is the headline of an enhance now, so it
+                                            says so rather than being one row among eight. */}
+                                        {s.intrinsic && s.gained ? <span className="forge-er-uptag">SHARPER</span> : null}</span>
                                     <span className="forge-er-stat-calc">
                                         <span className="base">{s.base}{s.suffix}</span>
                                         {s.forge > 0 ? <span className="add">+{s.forge}{s.suffix}</span> : null}
@@ -1221,7 +1225,7 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     );
 }
 
-const FORGE_CSS = `
+export const FORGE_CSS = `
 /* ── The hearth scene — an immersive banner (like the farm pasture / sailing sea) ── */
 .forge-scene { position: relative; border-radius: 16px; overflow: hidden; height: min(34vh, 260px); min-height: 168px;
     display: flex; flex-direction: column; justify-content: flex-end;
@@ -1526,7 +1530,10 @@ const FORGE_CSS = `
 .forge-er-stats { margin: 12px 0 2px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.08); text-align: left; }
 .forge-er-statrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 13px; }
 .forge-er-statrow + .forge-er-statrow { border-top: 1px solid rgba(255,255,255,0.05); }
-.forge-er-statrow.up .total { animation: forgeStatPulse .7s ease-out both; }
+.forge-er-statrow.is-own { background: rgba(255,215,94,0.07); border-left: 2px solid #ffd75e; padding-left: 8px; }
+            .forge-er-uptag { margin-left: 6px; font-size: .58rem; font-weight: 900; letter-spacing: .08em;
+                color: #0a0a0c; background: linear-gradient(#ffe27a, #ffb347); border-radius: 4px; padding: 1px 5px; }
+            .forge-er-statrow.up .total { animation: forgeStatPulse .7s ease-out both; }
 .forge-er-stat-label { color: #e6d7c2; font-weight: 700; }
 .forge-er-stat-calc { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
 .forge-er-stat-calc .base { color: #b9a892; }

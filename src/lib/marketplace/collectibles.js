@@ -96,6 +96,11 @@ export const PET_STAT_META = {
     crit_power: { label: "Crit Power", icon: "💥", desc: "Your critical hits on the boss deal more damage." },
     ferocity: { label: "Ferocity", icon: "🔥", desc: "More base damage on your boss strike." },
     fortune: { label: "Fortune", icon: "🍀", desc: "Banks extra weekly-boss raffle tickets every day — better odds to win the prize." },
+    // Three stats pets have been granting with no entry here, so the pet card printed the raw key —
+    // "+2 tenacity" — under a generic blurb. They are all ring stats, so they say what they do in the ring.
+    vitality: { label: "Vitality", icon: "❤️", desc: "More health in the Arena — you last longer in a fight." },
+    tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing, so every blow lands lighter." },
+    pierce: { label: "Pierce", icon: "🗡️", desc: "Thins your opponent's armour so more of your damage gets through." },
     xp_gain: { label: "XP Gain", icon: "✨", desc: "You level up faster — more XP from everything you do." },
     gold_find: { label: "Gold Find", icon: "💰", desc: "More gold from everything you earn (boss, spins, sales)." },
     // FARM passives (pastoral pets) — these help your FARM, not the boss. Equip the pet to apply its farm bonus.

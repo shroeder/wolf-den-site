@@ -9971,6 +9971,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
 .equip-stat { font-size: 0.9rem; color: #cdbfa6; }
 .equip-stat strong { color: #ffd75e; }
+/* The piece's own damage/armour/speed, marked apart from the bonuses stacked on top of it. */
+.equip-stat.is-own { color: #f0e2c2; }
+.equip-stat.is-own strong { color: #ffb347; }
 
 /* Bag + picker cards */
 .equip-picker-head { display: flex; align-items: center; justify-content: space-between; }
