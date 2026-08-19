@@ -243,39 +243,51 @@ export const TREES = {
             desc: "+1% chance on any swing to fire one of doublestrike, counter or haste at random.",
             sprite: "/images/arena/node/rv_wild.webp" }),
     ],
+    // ── WARDEN ── blocks, counters and sustain. It wins by still being standing, and by making the swing that
+    // hit it the reason it wins. Twelve nodes, four tiers of three, five ranks each.
     warden: [
-        N({ id: "wd_vigour", tier: 0, name: "Conditioning", ranks: 5, stat: "health", per: 12,
-            desc: "+12 max Health per rank.", sprite: "/images/arena/node/wd_vigour.webp" }),
-        // `stat` renamed block -> dr with the node id, rank count and value untouched, so five points spent
-        // on Footwork are still five points of the same thing. Only the word changed.
-        N({ id: "wd_block", tier: 0, name: "Footwork", ranks: 5, stat: "dr", per: 0.02,
-            desc: "+2% damage reduction per rank.", sprite: "/images/arena/node/wd_block.webp" }),
-        N({ id: "wd_ward", tier: 0, kind: "active", ability: "ward", name: "Bulwark", cd: 4,
-            desc: "Brace against the next blow — on either beat, and it never costs you a swing.", sprite: "/images/arena/node/wd_ward.webp" }),
+        // TIER 1 — stand there.
+        N({ id: "wd_bulwark", tier: 0, name: "Bulwark", ranks: 5, stat: "blockChance", per: 0.03,
+            desc: "+3% chance to block a blow. A block takes 35% off it before armour is even asked.",
+            sprite: "/images/arena/node/wd_block.webp" }),
+        N({ id: "wd_ironhide", tier: 0, name: "Ironhide", ranks: 5, stat: "armorPct", per: 0.06,
+            desc: "+6% to your total armour. Armour comes off every blow, flat.",
+            sprite: "/images/arena/node/wd_fort.webp" }),
+        N({ id: "wd_const", tier: 0, name: "Constitution", ranks: 5, stat: "healthPct", per: 0.04,
+            desc: "+4% maximum health.", sprite: "/images/arena/node/wd_health.webp" }),
 
-        N({ id: "wd_soak", tier: 1, name: "Deep Guard", ranks: 4, stat: "wardSoak", per: 0.02, needs: 3,
-            desc: "Wards soak 2% more of your health per rank.", sprite: "/images/arena/node/wd_soak.webp" }),
-        N({ id: "wd_riposte", tier: 1, kind: "active", ability: "riposte", name: "Answer", cd: 5, needs: 3,
-            desc: "Their next blow comes back at them — and you still act.", sprite: "/images/arena/node/wd_riposte.webp" }),
-        N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.07, needs: 3,
-            desc: "Return 7% of every blow you take, per rank.", sprite: "/images/arena/node/wd_thorns.webp" }),
+        // TIER 2 — turn it back.
+        N({ id: "wd_deflect", tier: 1, name: "Deflection", ranks: 5, stat: "blockReductionBonus", per: 0.03, needs: 3,
+            desc: "+3% taken off a blocked blow, on top of the usual 35%.",
+            sprite: "/images/arena/node/wd_deflect.webp" }),
+        N({ id: "wd_retrib", tier: 1, name: "Retribution", ranks: 5, stat: "counterBonus", per: 0.04, needs: 3,
+            desc: "+4% chance to answer a blow with one of your own. A counter is a real swing and rolls its own crit.",
+            sprite: "/images/arena/node/wd_counter.webp" }),
+        N({ id: "wd_mend", tier: 1, name: "Mending", ranks: 5, stat: "regen", per: 0.005, needs: 3,
+            desc: "Heal 0.5% of your maximum health every time you swing.",
+            sprite: "/images/arena/node/wd_regen.webp" }),
 
-        N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.55, acc: -0.07, cd: 3, needs: 7,
-            desc: "You keep half of what it takes off them.", sprite: "/images/arena/node/wd_drain.webp" }),
-        N({ id: "wd_regen", tier: 2, name: "Second Wind", ranks: 4, stat: "regen", per: 0.015, needs: 7,
-            desc: "Recover 1.5% of your health each round, per rank.", sprite: "/images/arena/node/wd_regen.webp" }),
-        N({ id: "wd_shieldcap", tier: 2, name: "Unyielding", ranks: 3, stat: "shieldCap", per: 0.06, needs: 7,
-            desc: "+6% to the ceiling on stacked wards, per rank.", sprite: "/images/arena/node/wd_shieldcap.webp" }),
+        // TIER 3 — the guard.
+        N({ id: "wd_bastion", tier: 2, name: "Bastion", ranks: 5, stat: "guardChance", per: 0.04, needs: 7,
+            desc: "+4% chance on your swing to raise a guard worth a tenth of your health. A guard eats damage before your health does.",
+            sprite: "/images/arena/node/wd_guard.webp" }),
+        N({ id: "wd_grudge", tier: 2, name: "Grudge", ranks: 5, stat: "grudge", per: 0.03, needs: 7,
+            desc: "+3% of everything done to you since your last swing is added to your next one.",
+            sprite: "/images/arena/node/wd_grudge.webp" }),
+        N({ id: "wd_blood", tier: 2, name: "Bloodwarden", ranks: 5, stat: "lifestealBonus", per: 0.02, needs: 7,
+            desc: "+2% of what you land, healed back.", sprite: "/images/arena/node/wd_drain.webp" }),
 
-        N({ id: "wd_reprisal", tier: 3, name: "Reprisal", ranks: 3, stat: "riposteShare", per: 0.08, needs: 12,
-            desc: "Ripostes send back 8% more per rank.", sprite: "/images/arena/node/wd_reprisal.webp" }),
-        N({ id: "wd_stand", tier: 3, name: "Last Stand", ranks: 1, stat: "lastStand", per: 1, needs: 12,
-            desc: "Once a bout, survive a blow that would end you on 1 health.", sprite: "/images/arena/node/wd_stand.webp" }),
-        N({ id: "wd_fort", tier: 3, name: "Fortress", ranks: 3, stat: "guardSoak", per: 0.05, needs: 12,
-            desc: "Guard braces 5% more per rank.", sprite: "/images/arena/node/wd_fort.webp" }),
+        // TIER 4 — capstones.
+        N({ id: "wd_concuss", tier: 3, name: "Concussion", ranks: 5, stat: "stunBonus", per: 0.02, needs: 12,
+            desc: "+2% chance a blow stuns — they lose the swing that was due.",
+            sprite: "/images/arena/node/wd_stun.webp" }),
+        N({ id: "wd_thorns", tier: 3, name: "Thornmail", ranks: 5, stat: "thorns", per: 0.04, needs: 12,
+            desc: "+4% of the damage your BLOCK turns aside is sent back down the blade.",
+            sprite: "/images/arena/node/wd_thorns.webp" }),
+        N({ id: "wd_unbreak", tier: 3, name: "Unbreakable", ranks: 5, stat: "guardSize", per: 0.20, needs: 12,
+            desc: "+20% to the size of every guard you raise. Bastion decides how often; this decides how much.",
+            sprite: "/images/arena/node/wd_aegis.webp" }),
     ],
-
-    // ── RUNECALLER ── affinity, burns, broken armour.
     runecaller: [
         N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.05,
             desc: "+5% spell damage per rank.", sprite: "/images/arena/node/rc_power.webp" }),

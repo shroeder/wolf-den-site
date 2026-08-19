@@ -327,6 +327,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         bleedDamage: Math.max(0, Number(f.bleedDamage) || 0),
         bleedLeech: Math.max(0, Math.min(1, Number(f.bleedLeech) || 0)),
         wildProc: Math.max(0, Math.min(1, Number(f.wildProc) || 0)),
+        // ── THE WARDEN'S FOUR ────────────────────────────────────────────────────────────────────────
+        // guardChance raises a shield that eats damage before health does; regen heals a share of your own
+        // maximum every time you swing; thorns sends part of what you BLOCK back down the blade; and grudge
+        // banks what has been done to you since your last swing and puts a share of it into the next one.
+        guardChance: Math.max(0, Math.min(1, Number(f.guardChance) || 0)),
+        guardSize: Math.max(0, Number(f.guardSize) || 0),
+        regen: Math.max(0, Number(f.regen) || 0),
+        thorns: Math.max(0, Number(f.thorns) || 0),
+        grudge: Math.max(0, Number(f.grudge) || 0),
+        shield: 0,
+        banked: 0,
         // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
         // from an affix.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
@@ -362,10 +373,14 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         let dealt = 0;
         let anyCrit = false;
         let blocked = 0;
+        let thornsBack = 0;
+        // The grudge is spent on THIS swing and the bank cleared, whether or not the blow lands well.
+        const grudgeBonus = att.grudge > 0 ? att.banked * att.grudge : 0;
+        att.banked = 0;
         for (let i = 0; i < hits; i += 1) {
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
-            const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
+            const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1);
             // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────
             // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour
             // in full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter
@@ -378,7 +393,10 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
             const chance = def.blockChance + def.blockStack * def.stacks;
             if (chance > 0 && rng() < chance) {
+                const before = blow;
                 blow = Math.max(1, Math.round(blow * (1 - def.blockReduction)));
+                // THORNS ANSWER THE BLOCK, not the blow: what the shield turned aside is what comes back.
+                if (def.thorns > 0) thornsBack += Math.round((before - blow) * def.thorns);
                 def.stacks = 0;
                 blocked += 1;
             } else if (def.blockStackMax > 0) {
@@ -386,7 +404,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             }
             dealt += blow;
         }
+        // A GUARD EATS IT FIRST. Whatever the shield can absorb never reaches health, and what is left of
+        // the blow carries on through.
+        if (def.shield > 0) {
+            const eaten = Math.min(def.shield, dealt);
+            def.shield -= eaten;
+            dealt -= eaten;
+        }
         def.hp -= dealt;
+        // THE GRUDGE. What was done to them since their own last swing is banked, and a share of it rides on
+        // that swing when it comes.
+        if (def.grudge > 0) def.banked += dealt;
         // Lifedrink is off what you ACTUALLY inflict, not what you swung for — armour eats the healing too.
         if (att.lifesteal > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(dealt * att.lifesteal));
         // ── STUN AND HASTE ───────────────────────────────────────────────────────────────────────────
@@ -417,6 +445,13 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         }
         log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
             meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+        // Thorns are logged AFTER the blow that set them off — they are the answer to it, and playing them
+        // first put the reply on screen before the question.
+        if (thornsBack > 0 && att.hp > 0) {
+            att.hp -= thornsBack;
+            log.push({ t, who: who === "me" ? "foe" : "me", dmg: thornsBack, thorns: true,
+                meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+        }
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
@@ -461,6 +496,12 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             att.stunned -= 1;
             log.push({ t, who, stunnedSkip: true });
             return;
+        }
+        // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
+        if (att.regen > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(att.maxHp * att.regen));
+        if (att.guardChance > 0 && rng() < att.guardChance) {
+            att.shield += Math.round(att.maxHp * att.guardSize);
+            log.push({ t, who, guard: true, shield: att.shield, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
         }
         swing(att, def, who);
         if (att.hasteLeft > 0) att.hasteLeft -= 1;

@@ -8,7 +8,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
-    BLOCK_REDUCTION, guardSoakFrom, speedOf,
+    BLOCK_REDUCTION, GUARD_BASE_SHARE, guardSoakFrom, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
@@ -418,14 +418,14 @@ export async function kitFor(buyerId, opts = {}) {
         // base.health is gone from here: HEALTH_BASE is flat and identical for every class now, and it lives
         // inside healthFrom. A class's identity is its DR, guard and accuracy, not a hidden lump of hit points.
         // Vitality only. Ferocity is unhooked from health.
-        health: healthFrom(Number(stats.vitality) || 0) + Math.round(perks.health || 0),
+        health: Math.round((healthFrom(Number(stats.vitality) || 0) + Math.round(perks.health || 0)) * (1 + (perks.healthPct || 0))),
         // `base_damage` rides in on the equipped main hand (see items.js), so it arrives here summed with
         // everything else — and only one weapon can be worn, so the sum IS that weapon's base.
         // ── ARMOUR, SHARPENED BY TENACITY ────────────────────────────────────────────────────────────────
         // Flat armour off every worn piece, added up, then multiplied by tenacity: armor x (1 + tenacity/500).
         // Tenacity is not its own damage reduction any more — it is what makes the armour you are already
         // wearing worth more, so 500 tenacity doubles the plate rather than granting a separate percentage.
-        armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
+        armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500) * (1 + (perks.armorPct || 0))),
         // Raw points; the engine turns them into a share (PIERCE_PER_POINT).
         pierce: (Number(stats.pierce) || 0) + (perks.pierceStat || 0),
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
@@ -439,6 +439,14 @@ export async function kitFor(buyerId, opts = {}) {
         bleedDamage: perks.bleedDamage || 0,
         bleedLeech: perks.bleedLeech || 0,
         wildProc: perks.wildProc || 0,
+        // The Warden's four. `guardSize` is the base share of your health a guard is worth, raised by
+        // Unbreakable — so the node that makes shields BIGGER is separate from the one that makes them
+        // more frequent, and a Warden can build either.
+        guardChance: perks.guardChance || 0,
+        guardSize: (perks.guardChance || 0) > 0 ? GUARD_BASE_SHARE * (1 + (perks.guardSize || 0)) : 0,
+        regen: perks.regen || 0,
+        thorns: perks.thorns || 0,
+        grudge: perks.grudge || 0,
         counterBonus: perks.counterBonus || 0,
         stunBonus: perks.stunBonus || 0,
         doublestrikeBonus: perks.doublestrikeBonus || 0,
@@ -449,7 +457,7 @@ export async function kitFor(buyerId, opts = {}) {
         haste: Number(stats.haste) || 0,
         // A shield's block chance, as a share. Item-exclusive like counter.
         blockChance: (Number(stats.block_chance) || 0) + (perks.blockChance || 0),
-        blockReduction: base.blockReduction ?? BLOCK_REDUCTION,
+        blockReduction: (base.blockReduction ?? BLOCK_REDUCTION) + (perks.blockReductionBonus || 0),
         blockStack: base.blockStack || 0,
         blockStackMax: base.blockStackMax || 0,
         // Raw points; LIFESTEAL_PER_POINT turns them into a share of what you inflict.

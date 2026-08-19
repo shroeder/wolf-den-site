@@ -876,6 +876,8 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 // A bare-handed fighter (every NPC) swings at BARE_ATTACK_SPEED.
 // What a successful block takes off the blow. The Warden's own is higher — see arena-classes.js.
 export const BLOCK_REDUCTION = 0.35;
+// What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
+export const GUARD_BASE_SHARE = 0.10;
 export const BARE_ATTACK_SPEED = 1;
 export const FEROCITY_PER_SPEED = 500;
 export const speedOf = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
