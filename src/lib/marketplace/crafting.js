@@ -584,7 +584,28 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const apply = (k) => { if ((nextBonus[k] || 0) < capOf(k)) { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; } };
     if (scenario > 0) {
         // Reach `scenario` DISTINCT stats: existing first, then (T3+) add brand-new stats to fill the count.
-        const targets = existing.slice(0, scenario);
+        //
+        // ── WHICH ONES IS A ROLL, NOT A LIST ─────────────────────────────────────────────────────────
+        // This was `existing.slice(0, scenario)` — the first N affixes in the item's catalogue order, every
+        // single time. So a piece's fate was fixed the moment it was authored: affixes one and two grew on
+        // every enhance and affix five could never be touched at all, which on an eternal (born with five)
+        // or a primordial (six) meant a third of the piece was frozen for its whole life. Two identical
+        // swords forged twenty-one times came out identical, and the only decision the forge offered was
+        // how many stats moved, never which.
+        //
+        // Drawn at random instead, so forging a piece is a thing that can go well or badly on its own terms.
+        //
+        // AND IT DRAWS ONLY FROM THE ONES STILL UNDER THEIR CAP. Picking blind would spend a hard-won
+        // pixel-perfect run on a stat that is already finished — `apply` no-ops at the cap, so that is not a
+        // smaller gain, it is nothing at all. Drawing from the capped ones as a fallback would be worse than
+        // useless: it would FILL the target list, and a full list stops the T3+ branch below from filling an
+        // empty socket, so a nearly-finished piece would stop growing one enhance before it had to. Left
+        // short instead, so a maxed-out piece spends its good rolls adding lines rather than repeating them.
+        const draw = existing.filter((k) => (nextBonus[k] || 0) < capOf(k));
+        const targets = [];
+        while (targets.length < scenario && draw.length) {
+            targets.push(draw.splice(Math.floor(Math.random() * draw.length), 1)[0]);
+        }
         if (scenario >= 3) {
             const pool = [...newPool];
             // Same rule filling an empty socket as swapping one.
