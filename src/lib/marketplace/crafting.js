@@ -101,6 +101,7 @@ const REGALIA_DROP = 0.001; // per-salvage chance to receive an unowned Regalia 
 //
 // Imported rather than restated, so there is exactly one list and the forge can never fall behind the
 // catalogue when a stat is added.
+const ARMOUR_SLOTS = new Set(["helmet", "chest", "belt", "boots", "back", "off_hand"]);
 const addablePoolFor = () => AFFIX_POOL.filter((k) => k !== "extra_strike");
 
 function regaliaBonus(ownedCount) {
@@ -593,6 +594,23 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
             }
         }
         const stack = targets.length ? targets : (existing.length ? existing : ["might"]);
+        // ── AND THE PIECE ITSELF GETS BETTER ─────────────────────────────────────────────────────────
+        // Enhancing used to move only the AFFIXES — a +12 sword swung for exactly what a +0 sword swung for,
+        // because base damage was not something the forge could touch. Now every successful enhance adds a
+        // share of the piece's OWN BASE: 3-5% for a weapon's base damage, 5-8% for a piece of armour.
+        //
+        // Measured against the base, not the current value, so it is LINEAR — ten levels is ten times the
+        // step, not a compounding curve that runs away at the top. It is exempt from capOf for the same
+        // reason: that cap exists to stop an affix outgrowing the item, and this IS the item.
+        const baseKey = item.slot === "main_hand" ? "base_damage"
+            : ARMOUR_SLOTS.has(item.slot) ? "armor" : null;
+        if (baseKey) {
+            const [lo, hi] = baseKey === "base_damage" ? [0.03, 0.05] : [0.05, 0.08];
+            const base = Number(item.stats?.[baseKey]) || 0;
+            const step = Math.max(1, Math.round(base * (lo + Math.random() * (hi - lo))));
+            nextBonus[baseKey] = (nextBonus[baseKey] || 0) + step;
+            gained[baseKey] = (gained[baseKey] || 0) + step;
+        }
         targets.forEach(apply);
         for (let i = 0, extra = scenario - targets.length; i < extra; i += 1) apply(stack[i % stack.length]); // leftover points double up (e.g. a 1-stat item at T2)
     }
