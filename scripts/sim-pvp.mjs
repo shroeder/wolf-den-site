@@ -1,70 +1,72 @@
-// ── A HUNDRED FIGHTERS, A THOUSAND BOUTS ─────────────────────────────────────────────────────────────────────
-// Combat was rewritten from the ground up and then tuned against ONE pairing at a time — a mirror match, a
-// dummy, a scaled sparring partner. Every one of those answers a question about a fighter. None of them answers
-// the question the members are actually asking, which is: given the gear people wear and the ten points they
-// have to spend, does the ring reward what you built or what you rolled?
+// ── THE DAILY FIELD, A THOUSAND BOUTS ────────────────────────────────────────────────────────────────────────
+// Combat was rewritten from the ground up and then tuned one pairing at a time: a mirror match, a dummy, a
+// scaled sparring partner. Every one of those answers a question about a FIGHTER. None answers the question the
+// members are asking, which is whether the ring rewards what you built or what you happen to be wearing.
 //
-// So: a hundred characters, spread across four gear bands so the field is not uniform, each with a class and a
-// TEN-POINT allocation drawn from ten named strategies, and a thousand pairings between them.
+// WHOSE RING. Not everybody's. A field averaged over every account that ever signed up is a field of people who
+// are not here — half of them last logged in weeks ago, wearing whatever they were handed on day one, and their
+// numbers drag every average toward a player who does not exist. The ring is balanced for the people who turn
+// up, so the field is the people who turn up: everyone who has played at least DAYS_REQUIRED of the last
+// FOURTEEN days, fighting in the gear they have equipped RIGHT NOW.
 //
-// It runs the REAL code. `fighterFrom` is the same function kitFor spreads to build a member for a live bout,
-// and `autoBout` is the resolver the Arena calls. A sim that re-implements either is a sim of a game nobody is
+// So: their real wardrobes, their real pets, badges and compendium, crossed with the ten-point allocations they
+// could actually spend, and a thousand pairings between them run both ways.
+//
+// It runs the real code. `fighterFrom` is the same function kitFor spreads to build a member for a live bout,
+// and `autoBout` is the resolver the Arena calls. A sim that re-implements either measures a game nobody is
 // playing, which is exactly how the Long Road shipped mis-measured.
 //
-// DETERMINISTIC. Same seed, same field, same thousand fights, so a tuning change is measured against the same
-// tournament rather than against a fresh roll of the dice.
-//
-//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs [pairings=1000] [seed=7]
-import { ITEMS, sumItemStats, mergeStats } from "../src/lib/marketplace/items.js";
+//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs [pairings=1000] [seed=7] [days=12]
 import { CLASSES, treeFor, treeEffects } from "../src/lib/marketplace/arena-classes.js";
 import { fighterFrom, combatStats } from "../src/lib/marketplace/arena.js";
 import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+import { getEquippedStats, getEquippedIds } from "../src/lib/marketplace/inventory.js";
 import { db } from "../src/lib/db.js";
 
 const FIGHTS = Number(process.argv[2]) || 1000;
 const SEED = Number(process.argv[3]) || 7;
+const DAYS_REQUIRED = Number(process.argv[4]) || 12;   // of the last fourteen
+const CHARACTERS = 100;
 const POINTS = 10;
 
 // One generator for the whole run, so the field and the fights are reproducible together.
 let _s = SEED >>> 0;
 const rnd = () => { _s = (_s * 1664525 + 1013904223) >>> 0; return _s / 4294967296; };
-const pick = (a) => a[Math.floor(rnd() * a.length)];
 
-// ── THE FIELD ────────────────────────────────────────────────────────────────────────────────────────────────
-// Four bands, because a ladder where everyone wears the same thing tells you nothing about whether gear or
-// build decides a fight. Roughly the shape of the Den: most people mid-kit, a few at the top, a tail still in
-// starter gear.
-const BANDS = [
-    { name: "starter", rarities: ["common", "rare"], n: 25 },
-    { name: "geared", rarities: ["rare", "epic"], n: 35 },
-    { name: "endgame", rarities: ["epic", "legendary"], n: 28 },
-    { name: "bis", rarities: ["mythic", "ascendant", "eternal"], n: 12 },
-];
+// ── WHO PLAYS ────────────────────────────────────────────────────────────────────────────────────────────────
+// Distinct days with any activity at all in the last fortnight. Not `last_seen_at`, which one visit sets and
+// which would count somebody who looked in once three days ago as a regular.
+const daily = await db.query(`
+    SELECT b.id, b.display_name, b.login_streak,
+           COUNT(DISTINCT (e.created_at AT TIME ZONE 'America/Chicago')::date) AS days
+      FROM mkt_buyer b
+      JOIN mkt_activity_event e ON e.buyer_id = b.id
+     WHERE e.created_at > NOW() - INTERVAL '14 days' AND b.display_name IS NOT NULL
+     GROUP BY b.id, b.display_name, b.login_streak
+    HAVING COUNT(DISTINCT (e.created_at AT TIME ZONE 'America/Chicago')::date) >= $1
+     ORDER BY days DESC, b.display_name ASC`, [DAYS_REQUIRED]);
 
-const SLOTS = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring", "ring"];
-const bySlot = {};
-for (const it of ITEMS) {
-    if (!it.slot || !it.stats) continue;
-    (bySlot[it.slot] ||= []).push(it);
+// ── WHAT THEY ARE WEARING ────────────────────────────────────────────────────────────────────────────────────
+// getEquippedStats is what the boss and the Arena already fight them with — base, set bonuses, forge levels and
+// socketed jewels, merged. combatStats then folds in the other three sources the ring reads. Done ONCE per
+// member; the ten-point builds below are just a different perk bag over the same body.
+const members = [];
+for (const m of daily) {
+    const bySlot = await getEquippedIds(m.id).catch(() => ({}));
+    const ids = Object.values(bySlot || {}).filter(Boolean);
+    if (!ids.length) continue;                       // nothing equipped: not a fighter, however often they log in
+    const gear = await getEquippedStats(m.id).catch(() => ({}));
+    const stats = await combatStats(m.id, gear, ids).catch(() => null);
+    if (!stats) continue;
+    members.push({ id: m.id, who: m.display_name, days: Number(m.days), streak: Number(m.login_streak) || 0, stats, slots: ids.length });
 }
-
-function loadout(band) {
-    const ids = [];
-    for (const slot of SLOTS) {
-        const pool = (bySlot[slot] || []).filter((i) => band.rarities.includes(i.rarity));
-        // A band with nothing in a slot falls back to the whole slot rather than fighting bare-handed —
-        // there is no off-hand at every rarity, and a missing shield is a missing 300 armour.
-        const from = pool.length ? pool : (bySlot[slot] || []);
-        if (from.length) ids.push(pick(from).id);
-    }
-    return ids;
-}
+if (!members.length) throw new Error("nobody in the field — is DATABASE_URL set?");
 
 // ── THE TEN BUILDS ───────────────────────────────────────────────────────────────────────────────────────────
 // Ten points is what a real member has to spend, and how they spend it is the only decision the tree offers.
 // These are the shapes people actually reach for, not random allocations: pour everything into one node, take
-// the cheapest three, rush a gate, spread thin. A purely random spread would measure the AVERAGE build, and
-// nobody plays the average build — they play the one somebody told them was best.
+// the cheapest three, rush a gate, spread thin. A purely random spread measures the AVERAGE build, and nobody
+// plays the average build — they play the one somebody told them was best.
 const OFFENCE = new Set(["crit", "critMult", "critStat", "critPower", "dmgPct", "speed", "might",
     "bleedChance", "bleedDamage", "burnChance", "burnDamage", "doublestrikeBonus", "stunBonus",
     "hasteBonus", "pierceStat", "surge", "soulfire", "cataclysm"]);
@@ -72,8 +74,8 @@ const DEFENCE = new Set(["health", "healthPct", "armorPct", "guardChance", "guar
     "ward", "wardRefill", "iceThorns", "chill", "freeze", "blockChance", "blockReductionBonus",
     "lifestealStat", "lifesteal", "lifestealBonus", "grudge", "bleedLeech", "burnLeech"]);
 
-// Points go in ONE AT A TIME, respecting each node's rank ceiling and its gate, because that is the only way
-// the tree can actually be spent. A build that "takes" a tier-3 node it has not unlocked is not a build.
+// Points go in ONE AT A TIME, respecting each node's rank ceiling and its gate, because that is the only way the
+// tree can actually be spent. A build that "takes" a tier-3 node it has not unlocked is not a build.
 function spend(tree, wanted, points) {
     const taken = {};
     const total = () => Object.values(taken).reduce((a, n) => a + n, 0);
@@ -89,8 +91,8 @@ function spend(tree, wanted, points) {
             taken[n.id] = (taken[n.id] || 0) + 1;
             placed = true;
         }
-        // Nothing in the wanted list can take another point — fall back to anything legal, which is what a
-        // member does when their plan runs out of ranks before it runs out of points.
+        // Nothing wanted can take another point — fall back to anything legal, which is what a member does when
+        // their plan runs out of ranks before it runs out of points.
         if (!placed) {
             const any = tree.find((n) => (taken[n.id] || 0) < n.ranks && total() >= (n.needs || 0));
             if (!any) break;
@@ -113,69 +115,37 @@ const STRATEGIES = [
     { id: "shuffled", how: (t) => spend(t, [...t].sort(() => rnd() - 0.5), POINTS) },
 ];
 
-// ── THE OTHER THREE STAT SOURCES ─────────────────────────────────────────────────────────────────────────────
-// Combat reads FOUR: gear, pets, badges and the compendium. A field built from gear alone is a field of
-// fighters missing everything they earned outside the shop, and it makes everybody look damage-starved against
-// their own armour — a conclusion about a game nobody is playing.
+// A hundred characters over however many members turned up: every member gets builds, cycling class and shape
+// so no member is only ever seen as one class and no shape is only ever seen on one wardrobe.
 //
-// So the non-gear layer is not invented: it is READ OFF THE REAL MEMBERS. combatStats with an empty wardrobe
-// returns exactly that layer, and every character draws one from the real distribution, matched to their band
-// — the people with the best gear are also the people with the most badges, so pairing a top-band fighter with
-// a bottom-percentile layer would be as unrealistic as leaving it out.
-async function realLayers() {
-    const rows = await db.query(`SELECT id FROM mkt_buyer WHERE display_name IS NOT NULL`).catch(() => []);
-    const out = [];
-    for (const r of rows) {
-        const s = await combatStats(r.id, {}, []).catch(() => null);
-        if (!s) continue;
-        const sum = Object.values(s).reduce((a, v) => a + (Number(v) || 0), 0);
-        if (sum > 0) out.push(s);
-    }
-    out.sort((a, z) => Object.values(a).reduce((x, v) => x + v, 0) - Object.values(z).reduce((x, v) => x + v, 0));
-    return out;
-}
-const LAYERS = await realLayers();
-// Which slice of the real distribution each band draws from.
-const WINDOW = { starter: [0, 0.40], geared: [0.25, 0.70], endgame: [0.55, 0.92], bis: [0.85, 1] };
-function layerFor(band) {
-    if (!LAYERS.length) return {};
-    const [lo, hi] = WINDOW[band] || [0, 1];
-    const a = Math.floor(lo * (LAYERS.length - 1));
-    const b = Math.floor(hi * (LAYERS.length - 1));
-    return LAYERS[a + Math.floor(rnd() * Math.max(1, b - a + 1))] || {};
-}
-
+// THE CLASS COUNTS HAVE TO COME OUT EVEN. Walking the member list with `i % members.length` while taking the
+// class from the same `i` correlates the two whenever the counts share a factor — twenty-one members and three
+// classes gave 42/37/21, and a class with half the characters of another cannot be compared to it. The member
+// index walks one extra step each pass instead, which decorrelates it from the class cycle.
 const field = [];
-let made = 0;
-for (const band of BANDS) {
-    for (let i = 0; i < band.n; i += 1) {
-        const cls = CLASSES[made % CLASSES.length];              // classes split evenly across the field
-        const strat = STRATEGIES[made % STRATEGIES.length];      // and so do the ten shapes
-        const tree = treeFor(cls.id);
-        const taken = strat.how(tree);
-        const ids = loadout(band);
-        // Gear PLUS the pets/badges/compendium layer — the same four sources combatStats merges for a live bout.
-        const stats = mergeStats(sumItemStats(ids), layerFor(band.name));
-        const fighter = fighterFrom(stats, treeEffects(cls.id, taken), cls.id);
-        field.push({
-            id: `c${String(made + 1).padStart(3, "0")}`, band: band.name, cls: cls.id, clsName: cls.name,
-            strat: strat.id, taken, spent: Object.values(taken).reduce((a, x) => a + x, 0), stats, fighter,
-            // What the ring is worth before a punch is thrown, for asking whether gear or build decided it.
-            sheet: {
-                dmg: Math.round(fighter.damage), hp: fighter.health, armor: fighter.armor,
-                spd: Number(fighter.speed.toFixed(2)), crit: Math.round(fighter.critChance * 100),
-            },
-            w: 0, l: 0, draw: 0, bouts: 0,
-        });
-        made += 1;
-    }
+for (let i = 0; i < CHARACTERS; i += 1) {
+    const L = members.length;
+    const m = members[((i % L) + Math.floor(i / L)) % L];
+    const cls = CLASSES[i % CLASSES.length];
+    const strat = STRATEGIES[i % STRATEGIES.length];
+    const taken = strat.how(treeFor(cls.id));
+    const fighter = fighterFrom(m.stats, treeEffects(cls.id, taken), cls.id);
+    field.push({
+        id: `c${String(i + 1).padStart(3, "0")}`, who: m.who, days: m.days, streak: m.streak,
+        cls: cls.id, clsName: cls.name, strat: strat.id, taken,
+        spent: Object.values(taken).reduce((a, x) => a + x, 0), fighter,
+        sheet: {
+            dmg: Math.round(fighter.damage), hp: fighter.health, armor: fighter.armor,
+            spd: Number(fighter.speed.toFixed(2)), crit: Math.round(fighter.critChance * 100),
+        },
+        w: 0, l: 0, draw: 0, bouts: 0,
+    });
 }
 
 // ── THE TOURNAMENT ───────────────────────────────────────────────────────────────────────────────────────────
-// Random pairings across the whole field, which is what the Arena's own matchmaking produces — you challenge
-// who is there, not who is your size. Each pairing is run BOTH WAYS off the same seed and both results counted,
-// so whatever advantage the engine gives the fighter passed in first cancels out instead of quietly becoming
-// half of somebody's win rate.
+// Random pairings across the field, which is what the Arena's own matchmaking produces — you challenge who is
+// there, not who is your size. Each pairing runs BOTH WAYS off the same seed and both results count, so whatever
+// advantage the engine gives the fighter passed in first cancels instead of becoming half of someone's win rate.
 let unresolved = 0;
 let swingSum = 0;
 let bouts = 0;
@@ -208,22 +178,14 @@ const group = (key) => {
     }
     return g;
 };
+const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-console.log(`\n${field.length} characters · ${POINTS} points each · ${bouts} bouts (${FIGHTS} pairings, both ways) · seed ${SEED}\n`);
-
-console.log(LAYERS.length
-    ? `pets/badges/compendium layers sampled from ${LAYERS.length} real members\n`
-    : "NO DATABASE — gear only, so every fighter is missing what they earned outside the shop\n");
+console.log(`\n${field.length} characters built from ${members.length} members who played ${DAYS_REQUIRED}+ of the last 14 days`);
+console.log(`in the gear they have equipped right now · ${POINTS} points each · ${bouts} bouts · seed ${SEED}\n`);
 
 console.log("── BY CLASS ────────────────────────────────────────────────────");
 for (const [k, v] of Object.entries(group("cls")).sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts)) {
     console.log(`  ${k.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win`);
-}
-
-console.log("\n── BY GEAR BAND ────────────────────────────────────────────────");
-for (const b of BANDS) {
-    const v = group("band")[b.name];
-    if (v) console.log(`  ${b.name.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win`);
 }
 
 console.log("\n── BY BUILD SHAPE ──────────────────────────────────────────────");
@@ -231,29 +193,38 @@ for (const [k, v] of Object.entries(group("strat")).sort((a, z) => z[1].w / z[1]
     console.log(`  ${k.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win`);
 }
 
-// Build shape WITHIN a band, because a build's win rate across the whole field is mostly a readout of who
-// happened to be wearing what. Holding the gear still is the only way to see the ten points on their own.
-console.log("\n── BUILD SHAPE, GEAR HELD STILL ────────────────────────────────");
-for (const b of BANDS) {
-    const rows = [];
-    for (const s of STRATEGIES) {
-        const cs = field.filter((c) => c.band === b.name && c.strat === s.id);
-        if (!cs.length) continue;
-        rows.push([s.id, { w: cs.reduce((a, c) => a + c.w, 0), bouts: cs.reduce((a, c) => a + c.bouts, 0) }]);
-    }
-    rows.sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts);
-    if (!rows.length) continue;
-    const best = rows[0];
-    const worst = rows[rows.length - 1];
-    console.log(`  ${b.name.padEnd(9)} best ${best[0].padEnd(11)} ${pct(best[1].w, best[1].bouts).padStart(6)}   worst ${worst[0].padEnd(11)} ${pct(worst[1].w, worst[1].bouts).padStart(6)}`);
+// ── THE WARDROBE, WHICH IS THE THING THEY DID NOT CHOOSE TODAY ───────────────────────────────────────────────
+// Every member appears under several classes and several build shapes, so their line here is their GEAR's win
+// rate with the build averaged out. A field where this column runs 0% to 100% is a field where the ten points
+// are decoration.
+console.log("\n── BY MEMBER (their real equipped gear, builds averaged out) ───");
+const perMember = {};
+for (const c of field) {
+    perMember[c.who] ||= { w: 0, bouts: 0, n: 0, sheet: c.sheet, days: c.days, streak: c.streak };
+    perMember[c.who].w += c.w; perMember[c.who].bouts += c.bouts; perMember[c.who].n += 1;
+}
+const mrows = Object.entries(perMember).sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts);
+for (const [who, v] of mrows) {
+    console.log(`  ${pct(v.w, v.bouts).padStart(6)}  ${who.slice(0, 18).padEnd(20)} ${String(v.days).padStart(2)}/14 days  streak ${String(v.streak).padStart(2)}   dmg ${String(v.sheet.dmg).padStart(5)}  hp ${String(v.sheet.hp).padStart(4)}  arm ${String(v.sheet.armor).padStart(4)}  spd ${String(v.sheet.spd).padStart(5)}`);
 }
 
-const ranked = [...field].sort((a, z) => rate(z) - rate(a));
-const show = (c) => `  ${pct(c.w, c.bouts).padStart(6)}  ${c.id}  ${c.clsName.padEnd(11)} ${c.strat.padEnd(11)} ${c.band.padEnd(8)} dmg ${String(c.sheet.dmg).padStart(5)}  hp ${String(c.sheet.hp).padStart(4)}  arm ${String(c.sheet.armor).padStart(4)}  spd ${String(c.sheet.spd).padStart(5)}  crit ${c.sheet.crit}%`;
-console.log("\n── THE TOP TEN ─────────────────────────────────────────────────");
-ranked.slice(0, 10).forEach((c) => console.log(show(c)));
-console.log("\n── THE BOTTOM TEN ──────────────────────────────────────────────");
-ranked.slice(-10).forEach((c) => console.log(show(c)));
+// ── DOES THE BUILD MATTER AT ALL? ────────────────────────────────────────────────────────────────────────────
+// The honest version of the question: hold ONE member's gear still and see how far apart their best and worst
+// ten-point spends land. That gap is the whole of what a member controls today.
+console.log("\n── BUILD SPREAD, ONE WARDROBE AT A TIME ────────────────────────");
+const gaps = [];
+for (const [who] of mrows) {
+    const cs = field.filter((c) => c.who === who);
+    const best = cs.reduce((a, c) => (rate(c) > rate(a) ? c : a), cs[0]);
+    const worst = cs.reduce((a, c) => (rate(c) < rate(a) ? c : a), cs[0]);
+    const gap = (rate(best) - rate(worst)) * 100;
+    gaps.push(gap);
+    // Named by CLASS AND SHAPE. Labelled by shape alone this read "best rush-t2, worst rush-t2" — the same ten
+    // points under two different classes, which is a true fact about the tree and a useless line on a page.
+    const tag = (c) => `${c.clsName.slice(0, 4).toLowerCase()}/${c.strat}`;
+    console.log(`  ${who.slice(0, 18).padEnd(20)} best ${tag(best).padEnd(17)} ${pct(best.w, best.bouts).padStart(6)}   worst ${tag(worst).padEnd(17)} ${pct(worst.w, worst.bouts).padStart(6)}   gap ${gap.toFixed(0)} pts`);
+}
+console.log(`  ${"".padEnd(20)} the ten points are worth ${avg(gaps).toFixed(0)} points of win rate on average`);
 
 // ── IS IT THE GEAR OR THE BUILD? ─────────────────────────────────────────────────────────────────────────────
 // Pearson between a character's sheet and their win rate. A ladder where one number predicts the result is a
@@ -261,8 +232,8 @@ ranked.slice(-10).forEach((c) => console.log(show(c)));
 const corr = (get) => {
     const xs = field.map(get);
     const ys = field.map(rate);
-    const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
-    const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const mx = avg(xs);
+    const my = avg(ys);
     let num = 0, dx = 0, dy = 0;
     for (let i = 0; i < xs.length; i += 1) {
         const a = xs[i] - mx;
@@ -272,52 +243,43 @@ const corr = (get) => {
     return dx && dy ? num / Math.sqrt(dx * dy) : 0;
 };
 console.log("\n── WHAT PREDICTS A WIN ─────────────────────────────────────────");
-const PREDICTORS = [
+for (const [label, get] of [
     ["damage", (c) => c.sheet.dmg], ["health", (c) => c.sheet.hp], ["armour", (c) => c.sheet.armor],
     ["speed", (c) => c.sheet.spd], ["crit chance", (c) => c.sheet.crit],
-    ["dmg x speed", (c) => c.sheet.dmg * c.sheet.spd], ["points spent", (c) => c.spent],
-];
-for (const [label, get] of PREDICTORS) {
+    ["dmg x speed", (c) => c.sheet.dmg * c.sheet.spd],
+]) {
     const r = corr(get);
     console.log(`  ${label.padEnd(13)} r = ${r >= 0 ? " " : ""}${r.toFixed(3)}`);
 }
 
 // ── WHY A FIGHT RUNS AS LONG AS IT DOES ──────────────────────────────────────────────────────────────────────
-// Mitigation is FLAT — `blow = max(1, raw - armour)` — so what matters is not the ratio of damage to armour but
-// the DIFFERENCE, and a difference can go to nothing. When it does, the floor of 1 takes over and the bout is
-// decided by whose health bar is longer, several hundred swings later. This is invisible in a mirror match
-// (both sides scale together) and invisible against a tuned dummy, which is why it has to be asked of a field.
-console.log("\n── ARMOUR AGAINST DAMAGE, BY BAND ──────────────────────────────");
-const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-console.log("  band        avg swing   avg armour   a typical blow   as % of a health bar");
-for (const b of BANDS) {
-    const cs = field.filter((c) => c.band === b.name);
-    if (!cs.length) continue;
-    const dmg = avg(cs.map((c) => c.sheet.dmg));
-    const arm = avg(cs.map((c) => c.sheet.armor));
-    const hp = avg(cs.map((c) => c.sheet.hp));
-    const blow = Math.max(1, Math.round(dmg - arm));
-    console.log(`  ${b.name.padEnd(11)} ${String(Math.round(dmg)).padStart(8)} ${String(Math.round(arm)).padStart(12)} ${String(blow).padStart(15)}   ${((blow / hp) * 100).toFixed(2)}%`);
-}
-// How much of the field cannot meaningfully hurt how much of the field.
+// Mitigation is FLAT — `blow = max(1, raw - armour)` — so what decides a swing is not the RATIO of damage to
+// armour but the DIFFERENCE, and a difference can go to nothing. When it does, the floor of 1 takes over and the
+// bout is decided by whose health bar is longer several hundred swings later. A mirror match cannot show this
+// (both sides scale together) and neither can a tuned dummy. Only a field can.
+console.log("\n── DOES A BLOW GET THROUGH? ────────────────────────────────────");
 let floored = 0;
 let pairs = 0;
+const toKill = [];
 for (const a of field) {
     for (const b of field) {
         if (a === b) continue;
         pairs += 1;
-        if (a.sheet.dmg - b.sheet.armor <= 1) floored += 1;
+        const blow = Math.max(1, Math.round(a.sheet.dmg - b.sheet.armor * (1 - Math.min(1, (Number(a.fighter.pierce) || 0) * 0.005))));
+        if (blow <= 1) floored += 1;
+        toKill.push(b.sheet.hp / blow);
     }
 }
-console.log(`  ${pct(floored, pairs)} of every possible matchup lands the FLOOR of 1 damage a swing`);
+toKill.sort((x, y) => x - y);
+console.log(`  avg swing ${Math.round(avg(field.map((c) => c.sheet.dmg)))} · avg armour ${Math.round(avg(field.map((c) => c.sheet.armor)))} · avg health ${Math.round(avg(field.map((c) => c.sheet.hp)))}`);
+console.log(`  ${pct(floored, pairs)} of matchups land the FLOOR of 1 damage a swing`);
+console.log(`  median swings to kill ${Math.round(toKill[Math.floor(toKill.length / 2)])} · worst ${Math.round(toKill[toKill.length - 1])}`);
 
 console.log("\n── THE FIGHTS THEMSELVES ───────────────────────────────────────");
-console.log(`  ${(swingSum / bouts).toFixed(1)} swings on average`);
-const capped = field.reduce((a, c) => a + c.draw, 0);
-console.log(`  a swing is ~1s of ring time, so that is ~${Math.round(swingSum / bouts / 60)} minutes a bout`);
-console.log(`  ${capped} fighter-bouts hit the 10,000-swing ceiling without a result`);
+// A swing is roughly a second of ring time, so the swing count is also how long a member sits watching it.
+const secs = swingSum / bouts;
+console.log(`  ${secs.toFixed(1)} swings on average — about ${secs < 90 ? `${Math.round(secs)}s` : `${(secs / 60).toFixed(1)} min`} of ring time`);
 console.log(`  ${unresolved} of ${bouts} never resolved (${pct(unresolved, bouts)})`);
-const top = ranked[0];
-const floor = ranked[ranked.length - 1];
-console.log(`  best ${pct(top.w, top.bouts)} · worst ${pct(floor.w, floor.bouts)} — a spread of ${((rate(top) - rate(floor)) * 100).toFixed(0)} points`);
+const ranked = [...field].sort((a, z) => rate(z) - rate(a));
+console.log(`  best ${pct(ranked[0].w, ranked[0].bouts)} · worst ${pct(ranked[ranked.length - 1].w, ranked[ranked.length - 1].bouts)} — a spread of ${((rate(ranked[0]) - rate(ranked[ranked.length - 1])) * 100).toFixed(0)} points\n`);
 process.exit(0);
