@@ -399,7 +399,7 @@ export const SCENES = {
             const b = makeBout();
             const me = { ...b.me, damage: 210, health: 1600, critChance: 0.35, critMult: 2.4, speed: 1.3,
                 armor: 60, pierce: 20, counter: 40, doublestrike: 30, lifesteal: 20, blockChance: 0.15,
-                blockReduction: 0.35, stun: 30, haste: 30 };
+                blockReduction: 0.35, stun: 30, haste: 30, bleedChance: 0.55 };
             const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, speed: 1.0,
                 armor: 40, pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.25,
                 blockReduction: 0.5, stun: 0, haste: 0 };

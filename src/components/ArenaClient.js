@@ -415,11 +415,11 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 // the flip to the Final Fantasy arrangement (party right, enemy left) it meant `is-foe` marked YOU, so the
 // cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
 function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false,
-    stunned = false, hasted = false }) {
+    stunned = false, hasted = false, bleeding = false, bled = false }) {
     const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
         + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
         + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`
-        + `${stunned ? " is-stunned" : ""}${hasted ? " is-hasted" : ""}`;
+        + `${stunned ? " is-stunned" : ""}${hasted ? " is-hasted" : ""}${bleeding ? " is-bleeding" : ""}`;
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
@@ -450,6 +450,17 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
                 </span>
             ) : null}
             {hasted ? <b className="ar-haste-word" aria-hidden="true">HASTE!</b> : null}
+            {/* ── BLEEDING ── the drops fall while the wound is open; the word only fires on the blow that
+                opened it, so a three-tick bleed does not shout at you three times. */}
+            {bleeding ? (
+                <span className="ar-bleed" aria-hidden="true">
+                    <span className="ar-bleed-glow" />
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <span key={i} className="ar-bleed-drop" style={{ "--i": i }} />
+                    ))}
+                </span>
+            ) : null}
+            {bled ? <b className="ar-bleed-word" aria-hidden="true">BLEED!</b> : null}
         </div>
     );
 }
@@ -860,6 +871,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const mine = e.who === "me";
             const who = mine ? "you" : "them";
             const n = Number(e.dmg) || 0;
+            if (e.bleedTick) {
+                return { ...e, who, damage: n, grade: "bleed",
+                    text: mine ? `You bleed — ${n.toLocaleString()}.` : `${foeName} bleeds — ${n.toLocaleString()}.` };
+            }
             if (e.stunnedSkip) {
                 return { ...e, who, damage: 0, grade: "stun",
                     text: mine ? "You are stunned — the swing is lost." : `${foeName} is stunned and cannot swing.` };
@@ -906,7 +921,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         for (let i = 0; i < shown; i += 1) {
             const e = logAll[i];
             if (!e || !e.dmg) continue;
-            if (e.who === "me") foeHp -= e.dmg; else hp -= e.dmg;
+            // `who` is already translated to you/them by logAll above — testing for "me" here meant NOTHING
+            // ever matched and every blow in the fight, both sides, came off the player's bar. The verdict
+            // then announced a victory over a fighter at full health while your own bar read zero.
+            //
+            // And a BLEED TICK damages the fighter it is named for, not their opponent: it is their own wound
+            // opening on their own swing, which is the one entry in the log that does not cross the ring.
+            if (e.bleedTick) { if (e.who === "you") hp -= e.dmg; else foeHp -= e.dmg; continue; }
+            if (e.who === "you") foeHp -= e.dmg; else hp -= e.dmg;
         }
         const done = shown >= logAll.length;
         const cur = logAll[Math.max(0, shown - 1)] || null;
@@ -924,6 +946,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             hasted: Boolean(cur?.who === "me" && cur?.hasted),
             foeStunned: Boolean(cur?.who === "me" && cur?.stunned) || Boolean(cur?.who === "foe" && cur?.stunnedSkip),
             foeHasted: Boolean(cur?.who === "foe" && cur?.hasted),
+            // The engine stamps the ticks still owed on every entry, so "is this fighter bleeding right now"
+            // is read rather than reconstructed. The WORD fires only on the blow that opened the wound.
+            bleeding: (cur?.meBleed || 0) > 0,
+            foeBleeding: (cur?.foeBleed || 0) > 0,
+            bled: Boolean(cur?.who === "foe" && cur?.bled),
+            foeBled: Boolean(cur?.who === "me" && cur?.bled),
         };
     }, [raw, logAll, shown]);
 
@@ -1686,12 +1714,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             down={bout.over && !bout.won}
                             wind={counterWind === "left" ? COUNTER_WIND_MS : 0}
                             brace={false}
-                            stunned={Boolean(bout.stunned)} hasted={Boolean(bout.hasted)} />
+                            stunned={Boolean(bout.stunned)} hasted={Boolean(bout.hasted)}
+                            bleeding={Boolean(bout.bleeding)} bled={Boolean(bout.bled)} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
                             brace={false}
-                            stunned={Boolean(bout.foeStunned)} hasted={Boolean(bout.foeHasted)} />
+                            stunned={Boolean(bout.foeStunned)} hasted={Boolean(bout.foeHasted)}
+                            bleeding={Boolean(bout.foeBleeding)} bled={Boolean(bout.foeBled)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -2739,6 +2769,32 @@ function Styles() {
                still reads underneath. Wider than this and they crowd; narrower and they are back to being two
                small figures with an empty arena between them. */
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
+            /* ── BLEEDING ────────────────────────────────────────────────────────────────────────────────
+               A red wash under the body and drops running DOWN out of it — the opposite direction to haste's
+               motes, so the two states never read as the same effect in a different colour. */
+            .ar-bleed { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+            .ar-bleed-glow { position: absolute; left: 50%; bottom: 2%; width: 74%; height: 56%;
+                transform: translateX(-50%); border-radius: 50%;
+                background: radial-gradient(ellipse at center, rgba(224,60,60,.5), rgba(190,30,30,.16) 55%, transparent 74%);
+                animation: arBleedPulse 1.35s ease-in-out infinite; }
+            @keyframes arBleedPulse { 0%, 100% { opacity: .5; transform: translateX(-50%) scale(.95) }
+                50% { opacity: .9; transform: translateX(-50%) scale(1.05) } }
+            .ar-bleed-drop { position: absolute; top: 34%; left: calc(30% + (var(--i) * 8%));
+                width: 4px; height: 7px; border-radius: 0 0 50% 50%;
+                background: linear-gradient(#ff6b6b, #b41818);
+                box-shadow: 0 0 6px rgba(224,60,60,.85);
+                animation: arBleedFall 1.15s linear infinite; animation-delay: calc(var(--i) * -0.19s); }
+            @keyframes arBleedFall { 0% { opacity: 0; transform: translateY(-6px) scaleY(.7) }
+                20% { opacity: 1 } 100% { opacity: 0; transform: translateY(54px) scaleY(1.2) } }
+            .ar-bleed-word { position: absolute; left: 50%; bottom: 84%; transform: translateX(-50%); z-index: 8;
+                font-size: .84rem; font-weight: 900; letter-spacing: .1em; color: #ff7b7b; white-space: nowrap;
+                text-shadow: 0 2px 8px #000, 0 0 18px rgba(224,60,60,.95);
+                animation: arBleedWord .5s cubic-bezier(.2,1.5,.3,1) both; }
+            @keyframes arBleedWord { 0% { opacity: 0; transform: translateX(-50%) scale(.6) }
+                60% { opacity: 1; transform: translateX(-50%) scale(1.12) } 100% { opacity: 1; transform: translateX(-50%) scale(1) } }
+            /* The body itself runs red while the wound is open. */
+            .ar-fighter.is-bleeding .ar-hero { filter: drop-shadow(0 0 9px rgba(224,60,60,.7)) saturate(1.1); }
+
             /* ── STUNNED ─────────────────────────────────────────────────────────────────────────────────
                Three stars on a ring above the head, the ring turning, each star bobbing on its own offset so
                it reads as a wobble rather than a rigid spin. The word sits above them and pulses, because the

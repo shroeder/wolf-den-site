@@ -431,6 +431,8 @@ export async function kitFor(buyerId, opts = {}) {
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
         // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
         counter: Number(stats.counter) || 0,
+        // A share, from the tree — the Reaver opens wounds, nobody else does by default.
+        bleedChance: Math.max(0, Math.min(1, perks.bleedChance || 0)),
         // Raw points; the engine turns them into chances (STUN_PER_POINT / HASTE_PER_POINT).
         stun: Number(stats.stun) || 0,
         haste: Number(stats.haste) || 0,

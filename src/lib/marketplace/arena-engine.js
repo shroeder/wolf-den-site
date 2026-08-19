@@ -33,6 +33,12 @@ export const STUN_PER_POINT = 0.005;
 export const HASTE_PER_POINT = 0.005;
 export const HASTE_ATTACKS = 5;      // how many of your own swings a haste lasts
 export const HASTE_RATE = 2;         // and how much faster they come
+// ── BLEED ────────────────────────────────────────────────────────────────────────────────────────────────────
+// Three ticks at a fifth of the blow that opened it, and armour never sees a drop of it. It ticks on the
+// BLEEDING fighter's own swings, which is what "three turns" means when there are no turns: three more times
+// they step up to swing, they lose blood first.
+export const BLEED_TICKS = 3;
+export const BLEED_SHARE = 0.20;
 
 export function ringStats(stats = {}) {
     return {
@@ -53,6 +59,7 @@ export function ringStats(stats = {}) {
         blockChance: Number(stats.block_chance) || 0,
         stun: Number(stats.stun) || 0,
         haste: Number(stats.haste) || 0,
+        bleedChance: Number(stats.bleedChance) || 0,
         doublestrike: Number(stats.doublestrike) || 0,
         lifesteal: Number(stats.lifesteal) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
@@ -313,8 +320,13 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         // 1 point = 0.5% to stun on a landed blow, and 0.5% that a swing casts haste on yourself.
         stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT)),
         haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT)),
+        // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
+        // from an affix.
+        bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
         stunned: 0,      // swings this fighter must skip
         hasteLeft: 0,    // swings left at double rate
+        bleedLeft: 0,    // ticks of bleed still owed
+        bleedPer: 0,     // and what each one costs them
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -376,9 +388,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         // the callout and the effect on the right fighter at the right moment.
         let stunned = false;
         let hasted = false;
+        let bled = false;
         if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned += 1; stunned = true; }
         if (att.haste > 0 && rng() < att.haste) { att.hasteLeft = HASTE_ATTACKS; hasted = true; }
-        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted });
+        // A fresh wound REFRESHES rather than stacks — stacking is a Reaver tree node, not the base rule.
+        if (att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
+            def.bleedLeft = BLEED_TICKS;
+            def.bleedPer = dealt * BLEED_SHARE;
+            bled = true;
+        }
+        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted, bled,
+            meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
@@ -394,6 +414,16 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
 
     // A stunned fighter loses the swing that was due: the clock still turns, they just do not act.
     const take = (att, def, who) => {
+        // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
+        // not stop you bleeding — and it can kill, which is the whole point of a wound.
+        if (att.bleedLeft > 0) {
+            const tick = Math.max(1, Math.round(att.bleedPer));
+            att.hp -= tick;
+            att.bleedLeft -= 1;
+            log.push({ t, who, bleedTick: true, dmg: tick,
+                meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+            if (att.hp <= 0) return;
+        }
         if (att.stunned > 0) {
             att.stunned -= 1;
             log.push({ t, who, stunnedSkip: true });
