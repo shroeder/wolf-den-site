@@ -24,6 +24,8 @@ import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marke
 // ── WHAT A FIGHTER IS, IN RING TERMS ─────────────────────────────────────────────────────────────────────────
 // Moved here with the rest of the maths: the simulator has to build a fighter the same way the engine does, or
 // it is measuring a different creature. Pure — it reads a stat bag and returns numbers.
+export const DEFAULT_SPEED = 10;
+
 export function ringStats(stats = {}) {
     return {
         // `tough` is an NPC archetype's bulk — the old hidden armour percentage, expressed as health so the
@@ -41,13 +43,53 @@ export function ringStats(stats = {}) {
         guard: Number(stats.guard) || DEFAULT_GUARD,
         might: Number(stats.might) || 0,
         fortune: Number(stats.fortune) || 0,
+        // Speed is the attack CLOCK now (see autoBout), so it has to survive this function. It did not, and a
+        // foe built through here arrived with no speed at all — swinging once per unit of time against a
+        // member swinging forty-six times, which reads as every fight being won on the first blow.
+        speed: Number(stats.speed) || DEFAULT_SPEED,
     };
+}
+
+// ── PAST A HUNDRED PERCENT, A CRIT CRITS AGAIN ───────────────────────────────────────────────────────────────
+// Crit chance has no ceiling any more, so the question is what the surplus BUYS. Luke's rule, and it is the
+// same rule all the way up rather than a special case bolted on at 100:
+//
+//   below 100%   the ordinary roll — you crit that often, for your crit damage
+//   exactly 100  you crit every time
+//   150%         you crit every time, and half the time that crit lands DOUBLED
+//   200%         you crit every time, doubled, always
+//   250%         always doubled, and half the time trebled
+//
+// So: every whole 100% above the first is one more guaranteed multiple of your crit damage, and the remainder
+// is the chance of one more on top. A 212% crit damage build at 150% chance hits for 212% every swing and 424%
+// on half of them.
+//
+// Returns the number of MULTIPLES, so 0 means the blow did not crit at all and 2 means twice the crit damage.
+export function critStacks(critChance = 0, rng = Math.random) {
+    const cc = Number(critChance) || 0;
+    if (cc <= 0) return 0;
+    if (cc < 1) return rng() < cc ? 1 : 0;
+    const excess = cc - 1;
+    const guaranteed = Math.floor(excess);
+    return 1 + guaranteed + (rng() < excess - guaranteed ? 1 : 0);
+}
+
+// What a swing is worth ON AVERAGE, which is what the rating and every "expected damage" readout wants.
+// Below 100% it is the familiar `1 + chance x (mult - 1)`. At or above it the expected number of multiples is
+// just the chance itself (150% averages 1.5 multiples), so it is `mult x chance`. The two agree exactly at
+// 100%, so the curve has no step in it.
+export function critAverage(critChance = 0, critMult = 2.5) {
+    const cc = Math.max(0, Number(critChance) || 0);
+    const cm = Number(critMult) || 1;
+    return cc < 1 ? 1 + cc * (cm - 1) : cm * cc;
 }
 
 // A kit's RATING, used for matchmaking and for the ladder. Damage a round times how many rounds you last, which
 // is the only honest one-number summary of a fight — and it is computable by the player from the two cards.
 export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, health = 200 }) {
-    const perSwing = damage * (1 + critChance * (critMult - 1));
+    // critAverage, not the old inline `1 + cc*(cm-1)` — that formula flattens out above 100% chance and would
+    // have rated a 250%-crit build as though the surplus bought nothing.
+    const perSwing = damage * critAverage(critChance, critMult);
     return Math.round((perSwing * health) / 10);
 }
 
@@ -142,9 +184,10 @@ export function throwBlows({ attacker, hits = 1, power = 1, acc, critChance, cri
     for (let i = 0; i < total && power > 0; i += 1) {
         if (Math.random() >= acc) { each.push(0); continue; }
         hitsLanded += 1;
-        const c = Math.random() < critChance;
-        if (c) crit = true;
-        const raw = attacker.damage * power * mult * (c ? critMult : 1);
+        // One roll, but it can come back with more than one multiple of the crit damage — see critStacks.
+        const stacks = critStacks(critChance);
+        if (stacks > 0) crit = true;
+        const raw = attacker.damage * power * mult * (stacks > 0 ? critMult * stacks : 1);
         turned += Math.round(raw * guard);
         const landed = Math.max(1, Math.round(raw - raw * guard));
         each.push(landed);
@@ -212,3 +255,58 @@ export function counterBlow(b, mine) {
     return { dmg, crit, drank, burned, bled, doubled: roll.doubled, missed: false };
 }
 
+// ── AUTO-ATTACK COMBAT ───────────────────────────────────────────────────────────────────────────────────────
+// No turns, no commands, no skills. Two fighters swing on their own clocks and the fight resolves itself.
+//
+// SPEED IS WHEN YOU ATTACK. A fighter's `speed` is their rate, so the interval between their swings is 1/speed
+// and a fighter with twice the speed swings twice as often. Nothing else about speed matters — it is not a
+// tiebreak for who opens any more, it is the whole schedule.
+//
+// The clock is arbitrary units. Only the RATIO between the two intervals decides anything, so whether speed 30
+// means thirty swings a second or thirty a minute is a presentation question, not a mechanical one.
+//
+// Each swing is the ordinary one: accuracy, then crit through critStacks (so a fighter past 100% crit chance
+// gets their multiples here too), then the defender's damage reduction. Skills, guards, items and abilities
+// are deliberately not here.
+export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
+    const side = (f) => ({
+        damage: Number(f.damage) || 0,
+        critChance: Number(f.critChance) || 0,
+        critMult: Number(f.critMult) || 1,
+        acc: Math.max(0, Math.min(1, Number(f.accuracy ?? 1))),
+        dr: Math.max(0, Math.min(0.95, Number(f.dr) || 0)),
+        speed: Math.max(0.0001, Number(f.speed) || 1),
+        hp: Number(f.health) || 0,
+        maxHp: Number(f.health) || 0,
+    });
+    const A = side(me);
+    const B = side(foe);
+    const log = [];
+    let t = 0;
+    let nextA = 1 / A.speed;
+    let nextB = 1 / B.speed;
+    let swings = 0;
+
+    const swing = (att, def, who) => {
+        const hit = rng() < att.acc;
+        if (!hit) { log.push({ t, who, miss: true }); return; }
+        const stacks = critStacks(att.critChance, rng);
+        const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
+        const dealt = Math.max(1, Math.round(raw * (1 - def.dr)));
+        def.hp -= dealt;
+        log.push({ t, who, dmg: dealt, crit: stacks > 0, stacks });
+    };
+
+    while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
+        if (nextA <= nextB) { t = nextA; swing(A, B, "me"); nextA += 1 / A.speed; }
+        else { t = nextB; swing(B, A, "foe"); nextB += 1 / B.speed; }
+        swings += 1;
+    }
+    return {
+        won: B.hp <= 0 && A.hp > 0,
+        unresolved: A.hp > 0 && B.hp > 0,
+        time: t, swings, log,
+        hp: Math.max(0, A.hp), foeHp: Math.max(0, B.hp),
+        maxHp: A.maxHp, foeMaxHp: B.maxHp,
+    };
+}

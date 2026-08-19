@@ -858,7 +858,13 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     // Rolled AFTER the species and the treasure, and it overrides both: a cast is one thing, the way treasure
     // is one thing. `rareTilt` is passed so bait and a levelled Lure pull deeper — the water gives back what
     // it was asked for.
-    const monster = Math.random() < FISH_MONSTER_CHANCE ? rollFishMonster(rareTilt) : null;
+    // ── AND NOT AT ALL WHILE COMBAT IS SHUT ──────────────────────────────────────────────────────────────
+    // A hooked monster is an arena fight, so while fighting is off it must not even SPAWN — refusing it at
+    // the fight door would leave the cast dangling on a creature nobody can take. The cast turns up a fish
+    // instead, which is what it would have been.
+    const { combatOpenFor } = await import("@/lib/marketplace/arena.js");
+    const monster = (combatOpenFor(buyerId) && Math.random() < FISH_MONSTER_CHANCE)
+        ? rollFishMonster(rareTilt) : null;
     const state = {
         species: species.id,
         monster: monster ? monster.id : null,

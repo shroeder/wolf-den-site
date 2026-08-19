@@ -797,6 +797,74 @@ const statSig = (stats = {}) => DEDUP_STAT_KEYS.map((k) => `${k}:${stats[k] || 0
     }
 })();
 
+// ── VITALITY RIDES WITH FEROCITY ─────────────────────────────────────────────────────────────────────────────
+// Vitality was on 79 of 423 items (19%) against ferocity's 262 (62%), so most builds carried none of it at all
+// — the owner's ten equipped pieces totalled ONE point, which is why his health was a class constant and why
+// normalising health against a ceiling would have left him on nothing.
+//
+// Ferocity is the right place to take it from. On gear it buys exactly one thing, `speedOf` — who opens the
+// bout — while accuracy moved to Precision and health only ever read Vitality. So this trades a slice of turn
+// order for survivability, which is the better use of the points, and it lands vitality on every item that
+// carries ferocity, matching its coverage exactly.
+//
+// Done here rather than by editing 262 stat lines: one number to turn, nothing hand-authored, and the item
+// catalogue above stays readable as the thing a designer edits.
+const VITALITY_SHARE_OF_FEROCITY = 0.6;
+(() => {
+    for (const it of ITEMS) {
+        const f = Number(it.stats?.ferocity) || 0;
+        if (f <= 0) continue;
+        const move = Math.max(1, Math.round(f * VITALITY_SHARE_OF_FEROCITY));
+        const kept = f - move;
+        it.stats = { ...it.stats, vitality: (Number(it.stats.vitality) || 0) + move };
+        if (kept > 0) it.stats.ferocity = kept; else delete it.stats.ferocity;
+    }
+})();
+
+// ── WHAT A WEAPON, A PIECE OF ARMOUR AND A SHIELD ARE, BEFORE ANY AFFIX ──────────────────────────────────────
+// Four things every item of its kind carries, keyed off the rarity ladder so a top-tier piece is better than a
+// bottom-tier one before a single affix is rolled — and VARIED per item, because a tier where every sword is
+// the same sword is a tier with one sword in it.
+//
+//   base_damage    main hand only. Common ~10 up to primordial ~100.
+//   speed          main hand only. Every weapon has one. Nothing reads it yet.
+//   armor          every worn piece that is not a weapon, ring or amulet. A plain integer. A common chest is
+//                  ~40 and a primordial chest ~850; the other slots are a share of the chest by coverage.
+//   block_chance   shields only. Ranges to 0.75 on the best shield in the game, with most sitting near 0.30.
+//
+// THE VARIETY IS DETERMINISTIC. A hash of the item id gives each piece a spread of +/-25% around its tier's
+// number, so the catalogue has texture but a given item is the same every time the server starts and nothing
+// drifts between two processes reading the same item.
+const RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+const vary = (id, salt) => {
+    let h = 2166136261;
+    for (const ch of `${id}:${salt}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return 0.75 + ((h >>> 0) % 1000) / 1000 * 0.5;   // 0.75 .. 1.25
+};
+// Geometric ladders, so every tier is a real step rather than a flat addition.
+const lerpGeo = (lo, hi, tier) => lo * Math.pow(hi / lo, tier / 8);
+const ARMOR_SLOT_WEIGHT = { chest: 1.0, off_hand: 0.8, helmet: 0.7, back: 0.6, boots: 0.5, belt: 0.4 };
+const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test(`${it.name || ""} ${it.icon || ""}`);
+
+(() => {
+    for (const it of ITEMS) {
+        const tier = Math.max(0, RARITY_LADDER.indexOf(String(it.rarity || "common")));
+        const stats = { ...(it.stats || {}) };
+        if (it.slot === "main_hand") {
+            stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
+            stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;
+        } else if (ARMOR_SLOT_WEIGHT[it.slot]) {
+            stats.armor = Math.max(1, Math.round(lerpGeo(40, 850, tier) * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
+            // 0.13 at common to 0.64 at primordial, and the +25% end of the spread puts the best shield in
+            // the game at 0.75 — which is the number Luke set as the ceiling.
+            if (it.slot === "off_hand" && isShield(it)) {
+                stats.block_chance = Math.min(0.75, Math.round(lerpGeo(0.13, 0.64, tier) * vary(it.id, "blk") * 100) / 100);
+            }
+        }
+        it.stats = stats;
+    }
+})();
+
 export function itemById(id) {
     return ITEMS.find((i) => i.id === id) || null;
 }

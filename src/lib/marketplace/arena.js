@@ -69,6 +69,21 @@ const ROAD_OPEN = false;
 // walkable — the same reason `closed` is published off this flag rather than computed twice.
 const roadOpenFor = (buyerId) => ROAD_OPEN || isOwner(buyerId);
 
+// ── ONE SWITCH FOR ALL FIGHTING ──────────────────────────────────────────────────────────────────────────────
+// Combat is being rebuilt (auto-attack, new damage and health maths, new crit), and none of it can be tested
+// against live members while they are still fighting with it. This is the single place that stops that:
+// flip it and nobody but the owner can start ANY fight anywhere.
+//
+// It covers all four doors into the ring, because a switch that only shuts three of them is not a switch:
+//   · the Arena — a challenge, the Gauntlet, and the Long Road (which also has its own gate below)
+//   · the plaza — town raid skirmishes
+//   · the water — a hooked monster, which is refused AND stops spawning (see fishing.js, so a cast that would
+//     have turned up a monster turns up a fish instead rather than dangling a fight nobody can take)
+//
+// The owner is exempt so the rebuild can be walked through end to end on the live site.
+export const COMBAT_OPEN = false;
+export const combatOpenFor = (buyerId) => COMBAT_OPEN || isOwner(buyerId);
+
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
 // one rung. Your opponents are real members with their real level, real gear and real hero — but nobody has to
@@ -224,16 +239,30 @@ async function combatStats(buyerId, gearStats, ids) {
     const bs = badgeStats || {};
     return {
         ...gearStats,
-        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (bs.might || 0),
+        // `ps.ferocity` is gone from here — it buys vitality below rather than being a second helping of Might.
+        might: (gearStats.might || 0) + (ps.might || 0) * bb + (bs.might || 0),
         crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (bs.crit_chance || 0),
         crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (bs.crit_power || 0),
         // Fortune buys the brace now (see guardSoakFrom), so the pet's and the badges' share of it has to
         // reach the ring. It was spread through from gear alone because until now nothing in a bout read it.
         fortune: (gearStats.fortune || 0) + (ps.fortune || 0) * bb + (bs.fortune || 0),
-        // VITALITY IS GEAR-ONLY, ON PURPOSE. No pet term, no badge term. Badges are worth +356 Might against
-        // +202 for a whole best-in-slot loadout, so every stat they touch is a stat a collection can out-vote.
-        // This is the one a wardrobe wins outright — which is the entire point of adding it.
-        vitality: gearStats.vitality || 0,
+        // ── VITALITY IS NO LONGER GEAR-ONLY ──────────────────────────────────────────────────────────────
+        // It was, on purpose: badges were worth +356 Might against +202 for a best-in-slot loadout, so every
+        // stat they touched was a stat a collection could out-vote, and vitality was the one the wardrobe won
+        // outright. That reasoning was sound and it is being reversed knowingly.
+        //
+        // What it missed: across 131 badges with a combat bonus, the pet system and the compendium, vitality
+        // appeared NOWHERE. Every permanent point of power in the game was offence — might, crit chance, crit
+        // power. So a veteran hit harder every month and was no harder to kill, fights compressed as accounts
+        // aged, and "power" on the Long Road could only ever mean damage. A game with no permanent defensive
+        // progression cannot have a difficulty curve that reads as a climb.
+        //
+        // Tenacity stays gear-only, so the wardrobe keeps a stat no collection can out-vote.
+        //
+        // The pet term is FEROCITY, not a new field: a pet's ferocity used to be poured into Might along with
+        // its might (the line above), which is why nothing on a pet ever made you tougher. It buys health now,
+        // which is what the stat reads like it should do.
+        vitality: (gearStats.vitality || 0) + (ps.ferocity || 0) * bb + (bs.vitality || 0),
         // Gear-only for the same reason Vitality is: a stat a badge collection can grant is a stat a wardrobe
         // cannot win on.
         tenacity: gearStats.tenacity || 0,
@@ -382,9 +411,13 @@ export async function kitFor(buyerId, opts = {}) {
         // land in `perks` and are added on top, so the engine reads one set of numbers and does not care
         // which system paid for them.
         // VITALITY is the gear half; the tree's ferocity nodes still buy health so no node loses its effect.
-        health: healthFrom((Number(stats.vitality) || 0) + (perks.ferocity || 0))
-            + Math.round(perks.health || 0) + base.health,
-        damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0)),
+        // base.health is gone from here: HEALTH_BASE is flat and identical for every class now, and it lives
+        // inside healthFrom. A class's identity is its DR, guard and accuracy, not a hidden lump of hit points.
+        // Vitality only. Ferocity is unhooked from health.
+        health: healthFrom(Number(stats.vitality) || 0) + Math.round(perks.health || 0),
+        // `base_damage` rides in on the equipped main hand (see items.js), so it arrives here summed with
+        // everything else — and only one weapon can be worn, so the sum IS that weapon's base.
+        damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
         // `armour` is gone as a member concept and gone from NPCs too — see arena-npc.js. One name for one
@@ -424,7 +457,7 @@ export async function kitFor(buyerId, opts = {}) {
         accuracy: Math.min(ACCURACY_CAP, Math.max(ACCURACY_FLOOR,
             // PRECISION, not Ferocity. Seeded equal to it, so nobody's aim moved the day this shipped — but
             // from here aim and initiative are two stats that can be tuned apart, which was the point.
-            base.accuracy + accuracyFromFerocity((Number(stats.precision) || 0) + (perks.ferocity || 0)) + (perks.accuracy || 0))),
+            base.accuracy + accuracyFromFerocity(Number(stats.precision) || 0) + (perks.accuracy || 0))),
         // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
         // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
         // command lands, so the number the button prints and the number the engine banks are the same one.
@@ -1172,6 +1205,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
  * The bout carries a `town` rider, which is the only thing telling finishBout to pay it as a raid.
  */
 export async function startTownBout(buyerId, eventId, enemyId) {
+    if (!combatOpenFor(buyerId)) return { ok: false, error: "combat_closed" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
         return { ok: false, error: "bout_in_progress" };
@@ -1231,6 +1265,7 @@ export async function startTownBout(buyerId, eventId, enemyId) {
  * hooked monster is yours alone and is sized by its own power budget.
  */
 export async function startFishingBout(buyerId, monsterId) {
+    if (!combatOpenFor(buyerId)) return { ok: false, error: "combat_closed" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
         return { ok: false, error: "bout_in_progress" };
@@ -1255,6 +1290,7 @@ export async function startFishingBout(buyerId, monsterId) {
 }
 
 export async function startBout(buyerId, targetId = null) {
+    if (!combatOpenFor(buyerId)) return { ok: false, error: "combat_closed" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
         return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };

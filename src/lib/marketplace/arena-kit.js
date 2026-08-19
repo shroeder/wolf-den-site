@@ -474,8 +474,22 @@ export const HEALTH_BASE = 200;
 //
 // The RATE IS UNCHANGED (2.5 a point) and armour's vitality is seeded equal to its ferocity, so a set that
 // gave N health yesterday gives exactly N today. This is a split, not a nerf.
-export const HEALTH_PER_VITALITY = 2.5;
-export const healthFrom = (vitality = 0) => Math.round(HEALTH_BASE + (Number(vitality) || 0) * HEALTH_PER_VITALITY);
+// HEALTH_PER_VITALITY is retired — vitality is normalised against VITALITY_MAX now, not paid per point.
+// ── AND SO IS HEALTH ─────────────────────────────────────────────────────────────────────────────────────────
+// Same treatment, same reason: `HEALTH_BASE + vitality * 2.5` gave everybody 200 health for nothing, so the
+// stat only ever decided the part above it. A fighter with 93 vitality had 432 — barely twice the free floor.
+//
+// HEALTH_MAX has to be read against DAMAGE_MAX, because the two of them together are the LENGTH OF A FIGHT.
+// A swing takes HEALTH_MAX/DAMAGE_MAX of an equal opponent's bar, before crit and before damage reduction.
+// At Luke's first pair (10000 damage / 5000 health) a maxed fighter removes twice a maxed opponent's entire
+// health with one swing and every bout in the game is one beat long. The ratio in the live game today is
+// about 11:1, so this holds that: 110000 to 10000. One number to turn if bouts run long or short.
+export const VITALITY_MAX = 500;
+export const HEALTH_MAX = 5000;
+// HEALTH_BASE is flat and the same for every class — a body is a body. Vitality above VITALITY_MAX keeps
+// paying at the same rate rather than clamping: 1000 vitality is twice the ceiling and twice the health.
+export const healthFrom = (vitality = 0) =>
+    Math.round(HEALTH_BASE + (Math.max(0, Number(vitality) || 0) / VITALITY_MAX) * HEALTH_MAX);
 
 // One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
 // to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.
@@ -504,8 +518,8 @@ export const SWING_BASE = 11;
 //                     touching a single item, so no piece of gear has to be rebalanced by hand.
 // At 75 crit stat — the best loadout in the Den — that is 20 + 37.5 = 57.5%, under the cap with headroom left.
 // The median 16 goes from 41% to 28%. Nobody is pinned, and the spread is thirty points wide instead of four.
-export const CRIT_BASE = 0.20;
-export const CRIT_PER_POINT = 200;
+export const CRIT_BASE = 0.0;      // nobody crits for free any more
+export const CRIT_PER_POINT = 1000;   // 1 point of gear crit_chance = 0.1%
 // ── BOTH HALVES OF CRIT ARE CAPPED, AND THE SECOND ONE NEVER WAS ─────────────────────────────────────────────
 // Chance was capped at 0.9 and power was capped at nothing at all, which is the combination that makes a fight
 // stop being a fight: at 90% every swing is effectively a critical, so the multiplier is not a spike any more,
@@ -523,8 +537,9 @@ export const CRIT_PER_POINT = 200;
 // Applies to every arena-based fight, which is all of them: PvP, the Gauntlet, the Long Road and the plaza
 // skirmishes all resolve through these two functions, for the member AND the opponent. The fighter cards read
 // the same helpers, so what is printed before you commit is what the engine uses.
-export const CRIT_CAP = 0.65;
-export const CRIT_MULT_BASE = 2.5;
+// CRIT_CAP is retired — kept as a named number only because the fighter cards used to print it.
+export const CRIT_CAP = Infinity;
+export const CRIT_MULT_BASE = 1.25;   // 1 point of gear crit_power = +1% (the /100 below)
 // ── NO CEILING ON CRIT DAMAGE ────────────────────────────────────────────────────────────────────────────────
 // The 3x cap is gone. It was doing the job a cap does badly: gear crit power ran into it and stopped mattering,
 // and the Reaver — the class whose whole sentence is "hit hardest" — had no way to push past a number everyone
@@ -533,7 +548,16 @@ export const CRIT_MULT_BASE = 2.5;
 //
 // What holds the line instead: the chance cap above, and the fact that crit damage is the one stat with no
 // floor under it — a build that pours everything into a 2x-rarer bigger number is making a real trade.
-export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / CRIT_PER_POINT + bonus);
+// ── NO CEILING ON CRIT CHANCE EITHER ─────────────────────────────────────────────────────────────────────────
+// CRIT_CAP was 0.65 and the owner was sitting at 0.6495 — every point of crit chance he rolled, forged or
+// socketed from then on did exactly nothing, silently, on one of the main damage affixes in the game. That is
+// most of the answer to "why doesn't a maxed build feel maxed".
+//
+// So the cap is gone and going past 100% is a real build. See critStacks in arena-engine.js: at 100% you crit
+// every time, and every further 100% is another guaranteed multiple of your crit damage, with the remainder
+// rolled. 150% crits every time and doubles the crit half the time; 250% always doubles it and trebles it half
+// the time.
+export const critChanceFrom = (critStat = 0, bonus = 0) => Math.max(0, CRIT_BASE + (Number(critStat) || 0) / CRIT_PER_POINT + bonus);
 export const critMultFrom = (critPower = 0, bonus = 0) =>
     CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;
 
@@ -648,7 +672,35 @@ export const arenaWinXp = (power = 0) =>
     Math.round(ARENA_XP_BASE + ARENA_XP_PER_ROOT * Math.sqrt(Math.max(0, Number(power) || 0)));
 
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
-export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
+// ── DAMAGE IS A FRACTION OF A DECLARED CEILING ───────────────────────────────────────────────────────────────
+// Was `SWING_BASE * (1 + might/100)`. That `SWING_BASE *` was a floor everybody got for free, and it is what
+// made a fully forged build feel like an unforged one: at 5 might you did 11.6, at 500 you did 66 — a
+// hundredfold difference in the stat bought 5.7x the damage, because most of everyone's damage was handed out
+// before Might was consulted at all.
+//
+// Luke's shape instead: your damage is your share of the ceiling. No free baseline, so the stat is the whole
+// of it, and a hundredfold difference in Might is a hundredfold difference in damage.
+//
+// MIGHT_MAX is a DECLARED number, not a measured one, and it cancels: both fighters are divided by it, and a
+// bout is decided by the ratio between them. Raise it the day gear can carry more and nothing about any
+// existing matchup changes — only the size of the numbers on the card.
+export const MIGHT_MAX = 500;
+export const DAMAGE_MAX = 10000;
+// ── THE WEAPON CARRIES THE BASE ──────────────────────────────────────────────────────────────────────────────
+// SWING_BASE was one global number for every fighter in the game. It is the WEAPON's now: `base_damage` on the
+// main hand is what Might multiplies, so a tier-1 blade and a primordial one are different weapons before a
+// single stat is read. DAMAGE_MAX is what a top-tier weapon carries, and it is the fallback for anything
+// swinging bare-handed (every NPC, and a member with an empty main hand).
+//
+// NOT CLAMPED at MIGHT_MAX. 1000 Might is twice the ceiling and does twice the damage — the ceiling is a
+// reference point for the scale, not a wall.
+// the might calculation: might / MIGHT_MAX x DAMAGE_MAX
+export const mightMult = (might = 0) => (Math.max(0, Number(might) || 0) / MIGHT_MAX) * DAMAGE_MAX;
+
+// damage = base damage x the might calculation
+export const WEAPON_BASE_REF = 100;
+export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
+    (Number(baseDamage) || WEAPON_BASE_REF) * mightMult(might);
 
 // ── FEROCITY IS THE ACCURACY STAT ────────────────────────────────────────────────────────────────────────────
 // It used to buy four points at 200 Ferocity, which is not a stat, it is a rounding error — and that was the

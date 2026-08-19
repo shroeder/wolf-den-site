@@ -323,7 +323,25 @@ async function rewardBadgeEarned(buyerId, slug) {
 //   • farm    { growSpeed, seedLuck, harvestLuck, petXp, fertPower, goldHarvest } → your farm            (farm-bonus.js)
 //   • forge   { efficient, keen_eye, masters_touch, steady_hand }  → smithing odds (crafting.js)
 // Authoring helpers keep the map readable; zero args are dropped.
-const C = (might = 0, crit_chance = 0, crit_power = 0) => { const o = {}; if (might) o.might = might; if (crit_chance) o.crit_chance = crit_chance; if (crit_power) o.crit_power = crit_power; return { combat: o }; };
+// ── HALF OF WHAT A BADGE PAYS IS NOW TOUGHNESS ───────────────────────────────────────────────────────────────
+// 118 of the 131 badges carrying a combat bonus paid Might and nothing else; vitality appeared on none of them,
+// and neither did ferocity. So the entire permanent layer of the game was offence, and no collection ever made
+// anybody harder to kill.
+//
+// Rather than re-authoring 131 call sites, the split happens HERE: the first argument is still "what this badge
+// is worth", and it is divided between Might and Vitality. Might keeps the odd point, so a C(1) badge stays a
+// Might badge and nothing rounds away to nothing.
+const BADGE_VITALITY_SHARE = 0.5;
+const C = (might = 0, crit_chance = 0, crit_power = 0) => {
+    const o = {};
+    const vitality = Math.floor(might * BADGE_VITALITY_SHARE);
+    const mig = might - vitality;
+    if (mig) o.might = mig;
+    if (vitality) o.vitality = vitality;
+    if (crit_chance) o.crit_chance = crit_chance;
+    if (crit_power) o.crit_power = crit_power;
+    return { combat: o };
+};
 const S = (sea) => ({ sea });
 const F = (farm) => ({ farm });
 const G = (forge) => ({ forge });
