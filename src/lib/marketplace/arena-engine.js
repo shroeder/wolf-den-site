@@ -21,9 +21,20 @@ import {
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
 import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
-// ── WHAT A FIGHTER IS, IN RING TERMS ─────────────────────────────────────────────────────────────────────────
-// Moved here with the rest of the maths: the simulator has to build a fighter the same way the engine does, or
-// it is measuring a different creature. Pure — it reads a stat bag and returns numbers.
+// ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
+// `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
+// in arena.js. Two functions answering one question is two things to keep in step, and they had not been: this
+// one called swingFrom(might) with no weapon, so it fell back to WEAPON_BASE_REF — an invisible 100-base
+// weapon, four times better than the best one anybody owns. On identical stats an NPC hit for 2000 and a
+// member for 500, and no amount of tuning the tier curve could have found it, because the difference was not
+// in the curve.
+//
+// Every fighter in the game is built by fighterFrom now. An NPC is a made-up player: same vocabulary, same
+// converter, same engine.
+
+// ── THE PER-POINT RATES ──────────────────────────────────────────────────────────────────────────────────────
+// What one point of each affix converts into, in one place, because the card, the sim and the engine all have
+// to agree about it. DEFAULT_SPEED is the fallback clock for anything arriving without a weapon.
 export const DEFAULT_SPEED = 10;
 export const PIERCE_PER_POINT = 0.005;
 export const COUNTER_PER_POINT = 0.0025;
@@ -45,40 +56,6 @@ export const BURN_TICKS = 3;
 export const BURN_SHARE = 0.20;
 // Runic Overflow: every Nth swing of your own is a Surge.
 export const SURGE_EVERY = 5;
-
-export function ringStats(stats = {}) {
-    return {
-        // `tough` is an NPC archetype's bulk — the old hidden armour percentage, expressed as health so the
-        // bar tells the truth. A member has no tough and reads as 1.
-        health: Math.round(healthFrom(Number(stats.vitality) || 0) * (Number(stats.tough) || 1)),
-        damage: swingFrom(Number(stats.might) || 0),
-        critChance: critChanceFrom(Number(stats.crit_chance) || 0),
-        critMult: critMultFrom(Number(stats.crit_power) || 0),
-        // Damage reduction and accuracy are both retired. They are still emitted as constants so any older
-        // code path reading them gets a harmless answer rather than undefined: nothing is turned aside by a
-        // percentage any more, and nothing misses.
-        dr: 0,
-        accuracy: 1,
-        armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
-        pierce: Number(stats.pierce) || 0,
-        counter: Number(stats.counter) || 0,
-        blockChance: Number(stats.block_chance) || 0,
-        stun: Number(stats.stun) || 0,
-        haste: Number(stats.haste) || 0,
-        bleedChance: Number(stats.bleedChance) || 0,
-        doublestrike: Number(stats.doublestrike) || 0,
-        lifesteal: Number(stats.lifesteal) || 0,
-        // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
-        // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
-        guard: Number(stats.guard) || DEFAULT_GUARD,
-        might: Number(stats.might) || 0,
-        fortune: Number(stats.fortune) || 0,
-        // Speed is the attack CLOCK now (see autoBout), so it has to survive this function. It did not, and a
-        // foe built through here arrived with no speed at all — swinging once per unit of time against a
-        // member swinging forty-six times, which reads as every fight being won on the first blow.
-        speed: Number(stats.speed) || DEFAULT_SPEED,
-    };
-}
 
 // ── PAST A HUNDRED PERCENT, A CRIT CRITS AGAIN ───────────────────────────────────────────────────────────────
 // Crit chance has no ceiling any more, so the question is what the surplus BUYS. Luke's rule, and it is the

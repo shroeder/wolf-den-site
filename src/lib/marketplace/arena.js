@@ -31,7 +31,7 @@ import {
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
-import { arenaRating, autoBout, ringStats } from "@/lib/marketplace/arena-engine.js";
+import { arenaRating, autoBout } from "@/lib/marketplace/arena-engine.js";
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
@@ -186,7 +186,7 @@ async function ladderFor(buyerId) {
                 crit_power: (g.crit_power || 0) + (bs.crit_power || 0),
             };
             const gearPower = Object.values(s).reduce((n, v) => n + (Number(v) || 0), 0);
-            const ring = ringStats(s);
+            const ring = fighterFrom(s, {}, null);
             return {
                 id: r.id,
                 name: r.display_name || r.alias || "A member",
@@ -287,7 +287,7 @@ export async function arenaPower(buyerId) {
     const stats = await combatStats(buyerId, await getEquippedStats(buyerId).catch(() => ({})), ids);
     const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
     return {
-        level, gearPower, ...ringStats(stats), power: arenaRating(ringStats(stats)),
+        level, gearPower, ...fighterFrom(stats, {}, null), power: arenaRating(fighterFrom(stats, {}, null)),
         sprite: me?.avatar_sprite_url || null,
         name: me?.display_name || me?.alias || "You",
     };
@@ -613,7 +613,7 @@ async function standings() {
             crit_power: (g.crit_power || 0) + (bs.crit_power || 0),
         };
         const gearPower = Object.values(merged).reduce((n, v) => n + (Number(v) || 0), 0);
-        const ring = ringStats(merged);
+        const ring = fighterFrom(merged, {}, null);
         return {
             id: r.buyer_id,
             vp: Number(r.vp) || 0,
@@ -1087,14 +1087,14 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     for (let t = 1; t <= maxTier; t += 1) {
         const n = npcFor(t);
         if (!n) break;
-        // ── ringStats(), AND THIS ONE LINE IS WHY THE GAUNTLET NEVER APPEARED ────────────────────────────
+        // ── THE CONVERTER, AND THIS ONE LINE IS WHY THE GAUNTLET NEVER APPEARED ─────────────────────────
         // npcFor() returns a tier's RAW stat line — might, crit_chance, crit_power, ferocity — and
         // arenaRating() reads the RING stats: damage, critChance, critMult, health. Handed the raw object it
         // found none of them, took every default, and returned 0. For every tier. So every tier's distance
         // was a flat 0.95, nothing ever cleared the 0.5 fairness gate, `fairNpcs` was always empty, and the
         // Gauntlet has never once been offered by matchmaking since this function was written. Every other
-        // arenaRating() call in this file wraps its argument in ringStats(); only this one did not.
-        npcs.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(ringStats(n))) });
+        // arenaRating() call in this file wraps its argument in the converter; only this one did not.
+        npcs.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(fighterFrom(n, {}, null))) });
     }
     if (!members.length && !npcs.length) return null;
     members.sort((a, z) => a.d - z.d);
@@ -1338,7 +1338,7 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         blurb: prof.blurb, color: prof.tint, archetype: prof.archetype, archetypeName: prof.archetypeName,
         tell: prof.tell, level: null,
     };
-    const foeKit = { ...foe, ...st, ...ringStats(st), abilities: npcAbilities(prof.kitTier) };
+    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(prof.kitTier) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
@@ -1388,7 +1388,7 @@ export async function startFishingBout(buyerId, monsterId) {
         id: `fish:${m.id}`, name: m.name, sprite: m.art, npc: true, fishing: true,
         blurb: m.blurb, color: null, archetype: m.archetype, level: null,
     };
-    const foeKit = { ...foe, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, m.tier * 3)) };
+    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(Math.max(1, m.tier * 3)) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
@@ -1470,13 +1470,13 @@ export async function startBout(buyerId, targetId = null) {
         foe = f;
         const st = statsForPower(f.power, f.archetype, null, rung);
         // A Road fighter turns aside a share of every blow, rising with the house — see ladderDr. Set BEFORE
-        // ringStats, which is what reads `dr` onto the card and into the engine.
+        // the converter, which is what reads the stat line onto the card and into the engine.
         st.dr = ladderDr(rung);
         // A CHAMPION'S EDGE IS ITS KIT, NOT ITS STATS. The +35% power multiplier is gone (see ladderFoe) —
         // what makes the tenth fight of a house the tenth fight is that it brings deeper moves than the nine
         // before it. npcAbilities gets nastier with tier, so a champion is read a tier band up.
         const kitTier = Math.max(1, Math.round(rung * 0.9) + (f.champion ? 8 : 0));
-        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(kitTier, f.archetype) };
+        foeKit = { ...f, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(kitTier, f.archetype) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.
@@ -1489,7 +1489,7 @@ export async function startBout(buyerId, targetId = null) {
         // An NPC's kit is drawn from the same archetype catalog members use, so it fights with real named
         // moves rather than a bare swing — scaled by tier, and seeded off the tier so a given tier always
         // brings the same two moves and can be planned against.
-        foeKit = { ...n, ...ringStats(n), abilities: npcAbilities(npcTier) };
+        foeKit = { ...n, ...fighterFrom(n, {}, null), abilities: npcAbilities(npcTier) };
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };

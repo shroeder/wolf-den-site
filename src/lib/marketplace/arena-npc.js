@@ -1,5 +1,5 @@
-import { DEFAULT_ACCURACY } from "@/lib/marketplace/arena-classes.js";
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
+import { ITEMS, sumItemStats } from "@/lib/marketplace/items.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -179,13 +179,13 @@ export function npcFor(tier) {
         // The ferocity weight IS the health weight — it was authored as one, and the archetype note above
         // depends on it ("an eight-to-one health gap, so a Berserker died in two rounds and a Wall took
         // twenty"). So it buys Vitality. `ferocity` stays for anything else that reads it.
-        vitality: Math.round(budget * arch.w.ferocity),
-        might: Math.round(budget * arch.w.might),
-        crit_chance: Math.round(budget * arch.w.crit_chance),
-        crit_power: Math.round(budget * arch.w.crit_power),
-        ferocity: Math.round(budget * arch.w.ferocity),
-        // Toughness rides on the health the budget already bought, so an archetype is exactly as hard to kill
-        // as it was when the same figure was a hidden percentage — the difference is you can now see it.
+        // ── DRESSED, NOT TABULATED ───────────────────────────────────────────────────────────────────────
+        // Same builder the Road uses. A Gauntlet tier is a wardrobe now: a weapon with a base damage, six
+        // pieces of armour, a shield with a block chance, and whatever affixes those items carry — scaled to
+        // this tier's budget and biased by the archetype.
+        ...npcStats(budget, arch.key, t, t),
+        // Toughness is already folded into vitality by npcStats; kept on the line for the card only, and
+        // nothing downstream may multiply by it a second time.
         tough: arch.tough || 1,
         // ── HOW HARD THEY BRACE ──────────────────────────────────────────────────────────────────────────
         // Guard stopped being one flat share for every fighter, so an NPC that inherited the member default
@@ -193,15 +193,140 @@ export function npcFor(tier) {
         // was tuned. These are set per archetype instead, averaging what they used to get, which keeps the
         // curve where it was and makes the Wall's tell ("strip its guard") literally true.
         guard: arch.guard ?? 0.20,
-        // NPCs have no damage reduction at all, and no tree, so they hit at the neutral base.
-        dr: 0,
-        accuracy: DEFAULT_ACCURACY,
+        // Damage reduction and accuracy are both retired — armour is the whole of mitigation and every swing
+        // lands — so they are not emitted at all rather than emitted as zero and read by nothing.
         gearPower: power,
         // Element cycles so consecutive tiers are not all answerable with one affinity — the wheel stays a
         // reason to re-attune rather than something you solve once.
         element: ["fire", "water", "earth", "storm", "light", "shadow"][t % 6],
-        speed: Math.round(10 + power * 0.09),
+        // Speed comes off the weapon npcStats picked, in attacks per second, the same as a member's. It used
+        // to be `10 + power * 0.09` — the OLD clock, on a scale where a member reads about 1.1, so a mid-tier
+        // NPC arrived at 13 and swung a dozen times per member swing.
     };
+}
+
+
+// ── AN NPC IS A MADE-UP PLAYER ───────────────────────────────────────────────────────────────────────────────
+// Luke's call, and it removes a whole class of bug rather than a single one: every fight in the game — the
+// Gauntlet, the Road, a fishing encounter, a town raid — is a bout against a fighter built the way a member is
+// built. Same stat vocabulary, same converter, same engine.
+//
+// WHAT IT REPLACES. NPCs carried might/crit/vitality and nothing else, and were converted by ringStats() while
+// members went through fighterFrom(). The two had drifted: ringStats called swingFrom(might) with no weapon,
+// so it fell back to WEAPON_BASE_REF (100) — an invisible weapon four times better than the best one anybody
+// owns. On identical stat lines an NPC hit for 2000 and a member for 500. Nothing about that was visible from
+// either side of the ring, and no amount of tuning the tier curve could have found it.
+//
+// HOW A BUDGET BECOMES A LOADOUT. Rather than invent a base_damage and an armour figure per tier — two more
+// numbers on two more curves, drifting from the player field the moment either changes — the NPC is dressed
+// out of the real catalogue. A tier picks a rarity band, one item per slot is chosen deterministically from
+// it, and sumItemStats gives a stat block with a player's PROPORTIONS: a weapon's base damage, armour spread
+// over six pieces, a shield's block chance, the affixes those items happen to carry. The block is then scaled
+// to hit the tier's power budget exactly, so the curve stays smooth between rarity steps instead of stepping
+// nine times and stopping.
+//
+// The archetype still decides SHAPE, applied as a bias on top: a Brute's loadout is the same loadout with its
+// might multiplied up and its bulk down. What an archetype is has not changed; what it is made of has.
+const NPC_RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+// Tier 1 opens in common and the ladder tops out around the Gauntlet's Ascendant band. Beyond that the gear
+// stops climbing and only the scale below does, which is the honest version of "it keeps getting taller".
+const TIERS_PER_RARITY = 13;
+const rarityForTier = (t) => NPC_RARITY_LADDER[Math.min(NPC_RARITY_LADDER.length - 1, Math.floor(Math.max(1, t) / TIERS_PER_RARITY))];
+
+// Deterministic, so tier 40 is the same fighter every time the server starts and two members see one opponent.
+const hash = (str) => { let h = 2166136261; for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+const NPC_SLOTS = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring", "ring"];
+let _bySlot = null;
+function slotPool(slot, rarity) {
+    if (!_bySlot) {
+        _bySlot = {};
+        for (const it of ITEMS) {
+            if (!it.slot || !it.stats) continue;
+            (_bySlot[it.slot] ||= []).push(it);
+        }
+    }
+    const all = _bySlot[slot] || [];
+    const hit = all.filter((i) => i.rarity === rarity);
+    // Not every slot exists at every rarity — fall back to the whole slot rather than sending a fighter out
+    // with an empty hand, which would cost them their entire weapon rather than a tier of it.
+    return hit.length ? hit : all;
+}
+
+// How far through its rarity band a tier sits, 0..1. A band is TIERS_PER_RARITY wide.
+const bandProgress = (tier) => (Math.max(1, tier) % TIERS_PER_RARITY) / TIERS_PER_RARITY;
+
+/**
+ * The wardrobe a tier fights in. Deterministic per (tier, seed), one item per slot.
+ *
+ * RANKED, NOT ROLLED. Picking uniformly at random inside the band made the ladder non-monotonic: tier 5 rolled
+ * an 8-base weapon where tier 3 had a 10-base one, so the fifth rung hit softer than the third. That is fine
+ * for a member — gear is luck — and unacceptable for a difficulty curve, where the whole promise is that the
+ * next one is harder. Each slot's pool is sorted by the intrinsic that slot contributes and indexed by how far
+ * through the band the tier sits, so a wardrobe climbs steadily and steps up at every band boundary. The seed
+ * still chooses BETWEEN equals, so two fighters of the same tier need not be in identical kit.
+ */
+export function npcLoadout(tier, seed = 0) {
+    const rarity = rarityForTier(tier);
+    const p = bandProgress(tier);
+    const ids = [];
+    NPC_SLOTS.forEach((slot, i) => {
+        const pool = slotPool(slot, rarity);
+        if (!pool.length) return;
+        const key = (it) => (Number(it.stats?.base_damage) || 0) + (Number(it.stats?.armor) || 0)
+            + (Number(it.stats?.block_chance) || 0) * 100;
+        const ranked = [...pool].sort((a, b) => key(a) - key(b) || (a.id < b.id ? -1 : 1));
+        const at = Math.min(ranked.length - 1, Math.floor(p * ranked.length));
+        // Ties on the ranking key are broken by the seed, so identical-strength kit still varies.
+        const same = ranked.filter((x) => key(x) === key(ranked[at]));
+        ids.push(same[hash(`${tier}:${seed}:${slot}:${i}`) % same.length].id);
+    });
+    return ids;
+}
+
+/**
+ * A full, gear-shaped stat line for an opponent: what a member would have if they were wearing this.
+ * Everything the engine reads comes out of here in the same vocabulary a wardrobe uses.
+ */
+export function npcStats(power, archKey, seed = 0, tier = null) {
+    const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
+    // `bal` normalises what this archetype's power is WORTH (see ARCH_BAL) — how much budget it is HANDED,
+    // never how it spends it.
+    const budget = Math.max(1, Math.round(power * (arch.bal || 1)));
+    const t = tier ?? tierForPower(power);
+
+    // ── TWO HALVES, EXACTLY AS A MEMBER HAS ──────────────────────────────────────────────────────────────
+    // A member's sheet is their WEAPON and their PLATE — which come from the tier of gear they have reached —
+    // plus the points rolled on top of it, which are what they have earned. An NPC is built the same way.
+    //
+    //   the intrinsics come from a real wardrobe at this tier's rarity: a weapon's base damage and swing rate,
+    //   armour spread over six pieces, a shield's block chance. Nothing here scales with the budget, because
+    //   a clock is not a total and because damage is base x might, so scaling both makes it quadratic — which
+    //   it briefly was, and a tier-90 fighter swung for 39,610.
+    //
+    //   the points are the budget, spent through the archetype weights. Unchanged from what was tuned, so a
+    //   Wall is the Wall the calibration measured; it simply now carries the plate it always implied.
+    const gear = sumItemStats(npcLoadout(t, seed));
+    return {
+        base_damage: Math.round(Number(gear.base_damage) || 0) || undefined,
+        speed: Number(gear.speed) || undefined,
+        armor: Math.round(Number(gear.armor) || 0),
+        block_chance: Number(gear.block_chance) || 0,
+        // Vitality is what buys health; the ferocity weight was authored as the health weight and the
+        // archetype note still depends on it, so it is what vitality is spent on.
+        vitality: Math.round(budget * arch.w.ferocity * (arch.tough || 1)),
+        might: Math.round(budget * arch.w.might),
+        crit_chance: Math.round(budget * arch.w.crit_chance),
+        crit_power: Math.round(budget * arch.w.crit_power),
+        ferocity: Math.round(budget * arch.w.ferocity),
+        gearPower: budget,
+    };
+}
+
+// The inverse of npcPower, so a Road rung quoted only as a power still knows which wardrobe to wear.
+export function tierForPower(power) {
+    const p = Math.max(1, Number(power) || 1);
+    return Math.max(1, Math.round(Math.log(p / BASE_POWER) / Math.log(GROWTH)) + 1);
 }
 
 /**
@@ -217,22 +342,17 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
     // Road's own builder, so a rung's stated power means one difficulty whichever shape it rotated onto.
     // The Gauntlet's npcFor above carries the same latent spread and is deliberately NOT touched: it was not
     // measured for this and re-tuning it unasked would move a balance nobody complained about.
-    const budget = Math.max(1, Math.round(power * (arch.bal || 1)));
+    // ONE BUILDER FOR EVERY OPPONENT IN THE GAME. The Road used to spend a budget across four stats here while
+    // the Gauntlet did the same thing thirty lines up and a fishing monster did it a third way — three copies
+    // of "how a budget becomes a fighter", which is three chances to forget the stat that was added last week.
+    // npcStats dresses them all out of the real catalogue instead.
     return {
-        // Vitality, for the same reason as npcFor above — this is the Road's builder, and it was missing it
-        // too, which is why a rung had the same 212 health as the tutorial.
-        vitality: Math.round(budget * arch.w.ferocity),
-        might: Math.round(budget * arch.w.might),
-        crit_chance: Math.round(budget * arch.w.crit_chance),
-        crit_power: Math.round(budget * arch.w.crit_power),
-        ferocity: Math.round(budget * arch.w.ferocity),
+        ...npcStats(power, archKey, seed),
+        // `tough` and `guard` stay on the line for anything that reads them off the card. tough is already
+        // folded into vitality by npcStats, so nothing may multiply by it a second time.
         tough: arch.tough || 1,
         guard: arch.guard ?? 0.20,
-        dr: 0,
-        accuracy: DEFAULT_ACCURACY,
-        gearPower: budget,
         element: element || ["fire", "water", "earth", "storm", "light", "shadow"][seed % 6],
-        speed: Math.round(10 + budget * 0.09),
     };
 }
 
