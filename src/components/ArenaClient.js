@@ -2,7 +2,7 @@
 
 import PetStoneShelf from "@/components/PetStoneShelf";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
     GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
@@ -98,7 +98,13 @@ const CAST_MS = 700;
 // lands inside it, which is what makes the whole exchange feel immediate rather than merely faster.
 //
 // Guard drops least: it is the one command with no follow-through to watch, so it was already near the floor.
-const WINDUP = { attack: 220, skill: CAST_MS, guard: 180, item: 220 };
+// How the transcript is paced on screen. PLAY_SCALE turns fight-seconds into milliseconds; the clamps keep a
+// very slow or very fast pair watchable either way, and PLAY_OPEN_MS is the beat before the first blow so the
+// two fighters are on screen before anything happens to them.
+const PLAY_SCALE = 900;
+const PLAY_MIN_MS = 260;
+const PLAY_MAX_MS = 900;
+const PLAY_OPEN_MS = 620;
 
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
 // own result and their incoming telegraph from being on screen at the same time — which they were, in the same
@@ -833,7 +839,95 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         try { errRef.current.scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* older webviews */ }
     }, [err]);
 
-    const bout = st?.bout || null;
+    const raw = st?.bout || null;
+
+    // ── PLAYBACK ─────────────────────────────────────────────────────────────────────────────────────────
+    // A bout arrives already resolved: every crit, stun, block and counter was rolled server-side the moment
+    // it started, and `log` is the transcript. Nothing here re-rolls anything — it steps through that list and
+    // rebuilds the position as it goes, so what you watch is exactly what was scored.
+    //
+    // The log's `t` is in fight-seconds (1/speed), which is the RHYTHM: a fast fighter's blows genuinely come
+    // closer together and that is worth keeping. It is scaled to real time and each gap clamped, so a fight
+    // between two slow fighters does not become a slideshow and two fast ones do not blur into one frame.
+    // The engine's transcript speaks in `me`/`foe` and carries no prose. The screen has always read
+    // `you`/`them` with a sentence, a grade and a damage number — the floaters, the shake, the impact sounds
+    // and the callout all key off those. So the entries are translated ONCE here rather than teaching six
+    // render sites a second vocabulary.
+    const logAll = useMemo(() => {
+        const src = Array.isArray(raw?.log) ? raw.log : [];
+        const foeName = raw?.foe?.name || "They";
+        return src.map((e) => {
+            const mine = e.who === "me";
+            const who = mine ? "you" : "them";
+            const n = Number(e.dmg) || 0;
+            if (e.stunnedSkip) {
+                return { ...e, who, damage: 0, grade: "stun",
+                    text: mine ? "You are stunned — the swing is lost." : `${foeName} is stunned and cannot swing.` };
+            }
+            const hits = Number(e.hits) || 1;
+            const verb = hits > 1 ? `strikes ${hits} times` : "strikes";
+            const head = mine ? (hits > 1 ? `You strike ${hits} times` : "You strike") : `${foeName} ${verb}`;
+            const bits = [];
+            if (e.crit) bits.push("critical");
+            if (e.blocked) bits.push(e.blocked > 1 ? `${e.blocked} blocked` : "blocked");
+            if (e.stunned) bits.push("stunned");
+            if (e.hasted) bits.push("hasted");
+            const tail = bits.length ? ` (${bits.join(", ")})` : "";
+            return { ...e, who, damage: n, grade: e.crit ? "crit" : (e.blocked ? "block" : "hit"),
+                text: `${head} — ${n.toLocaleString()}${tail}` };
+        });
+    }, [raw?.log, raw?.foe?.name]);
+    const [shown, setShown] = useState(0);
+    const boutKey = `${raw?.foe?.id || ""}:${logAll.length}`;
+    const lastKey = useRef(null);
+    useEffect(() => {
+        if (lastKey.current === boutKey) return;
+        lastKey.current = boutKey;
+        setShown(0);   // a new fight always plays from the first blow
+    }, [boutKey]);
+
+    useEffect(() => {
+        if (!logAll.length || shown >= logAll.length) return undefined;
+        const here = logAll[shown];
+        const prevT = shown > 0 ? logAll[shown - 1].t : 0;
+        const gap = Math.max(0, (Number(here.t) || 0) - prevT);
+        const ms = Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, gap * PLAY_SCALE));
+        const id = setTimeout(() => setShown((n) => n + 1), shown === 0 ? PLAY_OPEN_MS : ms);
+        return () => clearTimeout(id);
+    }, [logAll, shown]);
+
+    // The position after the blows played so far. Recomputed rather than accumulated, so a scrub or a replay
+    // can land anywhere without the health bars drifting out of step with the transcript.
+    const played = useMemo(() => {
+        if (!raw) return null;
+        if (!logAll.length) return raw;
+        let hp = raw.maxHp || 0;
+        let foeHp = raw.foeMaxHp || 0;
+        for (let i = 0; i < shown; i += 1) {
+            const e = logAll[i];
+            if (!e || !e.dmg) continue;
+            if (e.who === "me") foeHp -= e.dmg; else hp -= e.dmg;
+        }
+        const done = shown >= logAll.length;
+        const cur = logAll[Math.max(0, shown - 1)] || null;
+        return {
+            ...raw,
+            hp: Math.max(0, hp),
+            foeHp: Math.max(0, foeHp),
+            // The verdict, the recap and every "it is finished" branch wait for the last blow to land.
+            over: done && raw.over,
+            log: logAll.slice(0, shown),
+            // The round counter counts what has PLAYED, not what the whole transcript came to — it read
+            // "Round 17" on the first blow of a seventeen-swing fight.
+            beat: shown,
+            stunned: Boolean(cur?.who === "foe" && cur?.stunned) || Boolean(cur?.who === "me" && cur?.stunnedSkip),
+            hasted: Boolean(cur?.who === "me" && cur?.hasted),
+            foeStunned: Boolean(cur?.who === "me" && cur?.stunned) || Boolean(cur?.who === "foe" && cur?.stunnedSkip),
+            foeHasted: Boolean(cur?.who === "foe" && cur?.hasted),
+        };
+    }, [raw, logAll, shown]);
+
+    const bout = played;
 
     // ── LEAVING A FINISHED FIGHT, FROM WHEREVER YOU CAME IN ──────────────────────────────────────────────
     // One handler because there are TWO ways off this screen — the recap's button and the bare verdict

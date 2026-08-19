@@ -1,6 +1,7 @@
 "use client";
 
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
+import { autoBout } from "@/lib/marketplace/arena-engine.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -386,6 +387,29 @@ export const SCENES = {
         state: () => baseState({
             bout: makeBout({ hasted: true, foeStunned: true, turn: "you" }),
         }),
+    },
+    // ── A REAL RESOLVED FIGHT, FOR WATCHING ──────────────────────────────────────────────────────────────
+    // Runs the actual engine over the fixture fighters and hands the screen the transcript it produces, so
+    // this scene exercises PLAYBACK rather than a hand-written log: the health bars, the pacing, the crits and
+    // the verdict all come from the same list the payout would have read.
+    playback: {
+        label: "Playback",
+        note: "A whole fight, resolved by the engine and played back blow by blow. This is what a bout looks like now.",
+        state: () => {
+            const b = makeBout();
+            const me = { ...b.me, damage: 210, health: 1600, critChance: 0.35, critMult: 2.4, speed: 1.3,
+                armor: 60, pierce: 20, counter: 40, doublestrike: 30, lifesteal: 20, blockChance: 0.15,
+                blockReduction: 0.35, stun: 30, haste: 30 };
+            const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, speed: 1.0,
+                armor: 40, pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.25,
+                blockReduction: 0.5, stun: 0, haste: 0 };
+            const r = autoBout(me, foe);
+            return baseState({
+                bout: { ...b, me, foe: { ...b.foe, ...foe }, log: r.log, beat: r.swings,
+                    maxHp: me.health, foeMaxHp: foe.health,
+                    hp: Math.max(0, r.hp), foeHp: Math.max(0, r.foeHp), over: true, won: r.won },
+            });
+        },
     },
     turn: {
         label: "Your turn",
