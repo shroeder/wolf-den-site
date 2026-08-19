@@ -310,7 +310,6 @@ export async function arenaPower(buyerId) {
 // game. Lifted out whole: kitFor spreads it, and scripts/sim-pvp.mjs calls it directly.
 export function fighterFrom(stats = {}, perks = {}, classId = null) {
     const base = classBase(classId);
-    const gearLifesteal = (Number(stats.lifesteal) || 0) / 100;
     return {
         // `speed` rides in on the equipped weapon (items.js) the way base_damage does — only one main hand is
         // worn, so the summed value IS that weapon's rate. Attacks per second, not a tiebreak.
@@ -370,7 +369,9 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         stunBonus: perks.stunBonus || 0,
         doublestrikeBonus: perks.doublestrikeBonus || 0,
         hasteBonus: perks.hasteBonus || 0,
-        lifestealBonus: perks.lifestealBonus || 0,
+        // Shares, added by the engine AFTER the per-point conversion: the tree's own Bloodletting/Bloodwarden,
+        // plus the class base and any perk that pays a flat percentage. Gear points are `lifesteal` above.
+        lifestealBonus: (perks.lifestealBonus || 0) + (base.lifesteal || 0) + (perks.lifesteal || 0),
         // Raw points; the engine turns them into chances (STUN_PER_POINT / HASTE_PER_POINT).
         stun: Number(stats.stun) || 0,
         haste: Number(stats.haste) || 0,
@@ -404,10 +405,17 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // and a percentage doing the same job alongside it was two systems for one idea. Emitted as 0 so
         // anything still reading it gets a harmless answer.
         dr: 0,
-        // A share of everything you deal comes back as health. Class base + skill tree + the wardrobe's
-        // Lifedrink — THE FIELD THE ENGINE ACTUALLY READS (`b.me.lifesteal`). The gear term was missing here,
-        // which is the whole of "I have 2% life leech and it doesn't work".
-        lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0) + gearLifesteal),
+        // ── THE SECOND `lifesteal:` IS GONE ──────────────────────────────────────────────────────────────
+        // It was assigned twice in this one object literal — once above as RAW POINTS, which is what the
+        // engine's LIFESTEAL_PER_POINT expects, and again here as a SHARE. The later assignment wins in a
+        // JavaScript object literal, so the share won, and then the engine multiplied that share by 0.0025 as
+        // though it were points. A wardrobe carrying "+3 Lifedrink" — which the card prints as 0.75% — paid
+        // 0.0075%. A hundredth of what it says, which is why the affix measured as doing literally nothing.
+        //
+        // This is the same bug, in the same file, in the same shape, that killed bleedChance and burnChance:
+        // two assignments of one key, and the one you can see is not the one that runs. The class and tree
+        // SHARES belong in `lifestealBonus`, which the engine adds after the per-point conversion, and they
+        // are folded in there now. Points stay points, shares stay shares, and neither is written twice.
         // The inherent class bleed and burn used to be set HERE, later in the same object literal than the
         // tree's own — so the second assignment won and Rend and Kindle, the two nodes that ARE those
         // mechanics, were overwritten by a class implicit every single time. Now that the implicits are gone
@@ -536,9 +544,9 @@ export async function kitFor(buyerId, opts = {}) {
         perks: gearPerks,
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
         // THE RAW TREE PERKS, not gearPerks. The flat fields below already fold the wardrobe in off `stats`
-        // (gear pierce is stats.pierce, gear Lifedrink is gearLifesteal inside fighterFrom); handing in the
-        // merged bag would count the wardrobe's Lifedrink twice — once in perks.lifesteal and again as
-        // gearLifesteal. gearPerks exists for `perks` above, which is a different consumer.
+        // — gear pierce is stats.pierce and gear Lifedrink is stats.lifesteal — so handing in the merged bag
+        // would count the wardrobe's contribution twice, once as a stat and again as a perk. gearPerks exists
+        // for `perks` above, which is a different consumer.
         ...fighterFrom(stats, perks, classId),
         element: kit.element, abilities,
     };

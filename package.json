@@ -37,7 +37,8 @@
     "check:damage": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-damage-sources.mjs",
     "check:statvalue": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-value.mjs",
     "check:ceiling": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-affix-ceiling.mjs",
-    "check:enhance": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-enhance-spread.mjs"
+    "check:enhance": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-enhance-spread.mjs",
+    "check:arith": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-arithmetic.mjs"
   },
   "keywords": [],
   "author": "",
