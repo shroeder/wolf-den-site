@@ -569,13 +569,11 @@ export const PIT_CLOSES_AT = 10;
 export const PIT_STEP = 0.05;
 export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP * (beat - PIT_CLOSES_AT + 1));
 
-// ── AND YOU ONLY GET SO MANY BRACES ──────────────────────────────────────────────────────────────────────────
-// A budget for the whole bout, per fighter, and the same number for everybody — a player, an absent member's
-// loadout, a ladder NPC and a plaza raider all get six. A brace eats the next blow whole, so a fighter whose
-// brace exceeds the incoming swing takes nothing and gives nothing; unlimited, that is not a stance, it is an
-// off switch for the fight. Six is more than any honest bout has ever wanted (the telemetry's longest real
-// fight braces four times) and it is a hard ceiling on how long anybody can refuse to play.
-export const BRACE_LIMIT = 6;
+// ── BRACES ARE NOT RATIONED ──────────────────────────────────────────────────────────────────────────────────
+// There was a BRACE_LIMIT of 6 here, per fighter per bout. Removed on Luke's call: running out of a defensive
+// command mid-fight has no explanation inside the fiction, and a player who wants to guard should be able to.
+// What stops the brace stall is the alternating rule (never twice running), which binds both sides and leaves
+// your blow landing on every other beat — plus pitFever below, which compounds damage until somebody drops.
 
 // ── WHAT A WIN IS WORTH, AND WHY IT STOPPED BEING LINEAR ─────────────────────────────────────────────────────
 // A win paid `40 + theirPower * 0.9` gold and `18 + theirPower * 0.4` XP, and the shape was the whole problem.
@@ -710,7 +708,9 @@ export const GUARD_COOL = 1;        // guarding also shaves a turn off everythin
 // this is three times that, so it can only ever be reached by two fighters who cannot hurt each other. Lives
 // here with the other balance numbers rather than as a literal in the engine, because the next person to tune
 // bout length will look here and nowhere else.
-export const BOUT_BEAT_CAP = 50;
+// BOUT_BEAT_CAP lived here — a fifty-beat call, decided on remaining health. Removed with the brace budget:
+// a fight is decided by the fight. pitFever is what guarantees one ends.
+
 
 // ── THE FIELD KIT ────────────────────────────────────────────────────────────────────────────────────────────
 // Both fighters get the same small kit every bout. It is deliberately NOT the consumable economy: these cost

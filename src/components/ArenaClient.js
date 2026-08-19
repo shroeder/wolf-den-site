@@ -63,7 +63,8 @@ const REFUSALS = {
     // these, so they are the belt to that brace — but a refusal with no words on it is what turns a rule
     // into a bug report, and that is precisely how the stall was reported.
     brace_cooling: "You braced last beat. Not twice in a row — swing, drink, or cast.",
-    no_braces: "You are out of braces for this bout. Six is all anybody gets.",
+    // Kept for any bout still in flight that was opened under the old six-a-bout rule.
+    no_braces: "You are out of braces for this bout.",
     recently_fought: "You just fought them. Five more bouts before a rematch.",
 };
 
@@ -1413,7 +1414,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const braceFor = Math.round((bout.maxHp || 0) * (bout.me?.guard || 0));
         // Older bouts, opened before the budget shipped, publish neither field. They get the full allowance
         // rather than a disabled button — a rule cannot be applied retroactively to a fight already running.
-        const bracesLeft = bout.braces == null ? 6 : Number(bout.braces) || 0;
+        // ── BRACES ARE NOT RATIONED ANY MORE ─────────────────────────────────────────────────────────
+        // publicBout sends null now, which means unlimited. It used to send a remaining count and null was
+        // an old bout with no counter, so the fallback was 6 — leave that in place and every button would
+        // sit there promising "6 left" forever, which is a number that never moves and never was true.
+        const braceRationed = bout.braces != null;
+        const bracesLeft = braceRationed ? (Number(bout.braces) || 0) : Infinity;
         // ── SHATTERED COUNTS AS "CANNOT GUARD" ───────────────────────────────────────────────────────────
         // It did not, so the button stayed lit while the server refused every press with guard_shattered.
         // Sunflower Jinxx, in global chat: "I think the guard is glitched when fighting the runecallers... I
@@ -1925,18 +1931,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         onClick={() => { unlock(); Sfx.ui(); setMenu("skill"); }}>
                                         <GiSpellBook aria-hidden="true" /><span>Skill</span>
                                     </button>
-                                    {/* ── THE BRACE IS RATIONED NOW ───────────────────────────────────────────
-                                        Six a bout and never twice running (see BRACE_LIMIT). Both halves are
-                                        on the button rather than discovered by pressing it: the count under
-                                        the shield is what the brace banks, and the pip beside the label is
-                                        how many you have left. Greyed with a title when it is unavailable,
-                                        because a button that silently refuses is the bug report. */}
+                                    {/* ── ONE RULE ON THE BRACE, NOT TWO ──────────────────────────────────────
+                                        The six-a-bout budget is gone; all that is left is never twice running.
+                                        The reason still has to be ON the button rather than discovered by
+                                        pressing it — a button that silently refuses is the bug report — but
+                                        there is no count to show any more, so the pip only appears if a bout
+                                        somehow still carries a ration. */}
                                     <button type="button" className={`ar-cmd is-guard${guardLocked ? " is-shattered" : ""}`}
                                         disabled={busy || !canBrace}
                                         title={guardLocked ? `Their Shatter broke your guard — ${bout.noGuard} turn${bout.noGuard === 1 ? "" : "s"} before you can raise one`
                                             : bracesLeft <= 0 ? "No braces left this bout"
                                             : !bout.braceReady ? "You braced last beat — not twice in a row"
-                                            : `Brace for ${braceFor} · ${bracesLeft} left`}
+                                            : braceRationed ? `Brace for ${braceFor} · ${bracesLeft} left`
+                                            : `Brace for ${braceFor}`}
                                         onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
                                         <GiShield aria-hidden="true" /><span>Guard</span>
                                         {/* ── SAY WHY IT IS OFF, ON THE BUTTON ────────────────────────────
@@ -1949,7 +1956,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             : bracesLeft <= 0 ? <em className="ar-cmd-sub is-off">none left</em>
                                             : !bout.braceReady ? <em className="ar-cmd-sub is-off">not twice</em>
                                             : braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
-                                        {bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
+                                        {braceRationed && bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
                                     </button>
                                     <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
                                         onClick={() => { unlock(); Sfx.ui(); setMenu("item"); }}>

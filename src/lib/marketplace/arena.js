@@ -8,7 +8,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
-    BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
+    BATTLE_ITEMS, BLOCK, BLOCK_CAP, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
@@ -850,7 +850,9 @@ function publicBout(b) {
         // Published because the button reads it. A limit the player cannot see is a button that stops
         // working for no stated reason, which is how a rule becomes a bug report. `braceReady` is the
         // alternating half of the same rule, resolved here so the screen never has to know the arithmetic.
-        braces: Math.max(0, BRACE_LIMIT - (b.braces || 0)),
+        // Braces are no longer rationed, so there is no remaining count to publish. Kept as a field the
+        // screen can still read (it renders a pip off it) with null meaning "unlimited" — see ArenaClient.
+        braces: null,
         braceReady: !((b.braceBeat || 0) > 0 && (b.braceBeat || 0) >= (b.beat || 0) - 1),
         // WHICH ROOM THIS FIGHT IS IN. Withheld until now, so the screen could not tell a plaza raider from a
         // ladder rung and offered "Back to the ladder" to somebody who had walked in from the town — which is
@@ -1645,14 +1647,16 @@ export async function fightRound(buyerId, opts = {}) {
             if ((b.braceBeat || 0) > 0 && (b.braceBeat || 0) >= b.beat - 1) {
                 return { ok: false, error: "brace_cooling", ...(await getArenaState(buyerId)) };
             }
-            // ── AND ONLY SO MANY, FULL STOP ──────────────────────────────────────────────────────────
-            // The budget (BRACE_LIMIT) is the ceiling the alternating rule above cannot give you: six a
-            // bout, the same six the defender gets. Refused rather than downgraded, for the same reason.
-            if ((b.braces || 0) >= BRACE_LIMIT) {
-                return { ok: false, error: "no_braces", ...(await getArenaState(buyerId)) };
-            }
+            // ── THE BUDGET IS GONE ───────────────────────────────────────────────────────────────────
+            // There used to be a hard six-a-bout ceiling here as well. Luke's call to remove it: a fighter
+            // who wants to guard should be allowed to guard, and running out of a defensive command with no
+            // in-fiction reason is the kind of limit that reads as the game refusing to play.
+            //
+            // The alternating rule above is what actually closes the stall, and it stays. A brace every
+            // other beat still leaves your blow landing on the beat in between, so damage keeps flowing
+            // both ways — and pitFever grows it 5% a beat from the tenth, so a mutual turtle still ends.
+            // The budget was a second belt on a rule that was already doing the work.
             b.braceBeat = b.beat;
-            b.braces = (b.braces || 0) + 1;
             // Fortress soaks more on a plain guard, which is the command a shield build spends turns on.
             // `b.me.guard` already has the class base, Fortune and Fortress folded in at kit time. The
             // fallback is for bouts written before guard was a built number — they carry no `me.guard`, and
@@ -2532,28 +2536,17 @@ export async function fightRound(buyerId, opts = {}) {
 
     if (b.foeHp <= 0 || b.hp <= 0) return finishBout(buyerId, row, b, b.foeHp <= 0 && b.hp > 0);
 
-    // ── AND A BOUT ENDS, WHATEVER ELSE HAPPENS ───────────────────────────────────────────────────────────
-    // The brace rules above close the stall that was actually found. This is the backstop for the one that
-    // has not been found yet: any pair of fighters who cannot finish each other now runs out of ring rather
-    // than out of patience. A member asked for exactly this — "a timer on each battle where it ends in a
-    // draw if the battle goes past a certain number of rounds" — after 70 beats against a foe that would not
-    // swing.
+    // ── THE RING IS NO LONGER CALLED ─────────────────────────────────────────────────────────────────
+    // A fifty-beat cap used to end a bout here and award it on remaining health. Luke's call to remove it:
+    // a fight should be decided by the fight, and a clock that hands the win to whoever is healthier is a
+    // different game than the one being played.
     //
-    // Decided on REMAINING HEALTH FRACTION rather than called a draw, because a draw pays nobody and most of
-    // these are a fight somebody was plainly winning. The challenger has to be genuinely ahead to take it: a
-    // dead-level ring goes to the defender, which is the same convention the rest of the game uses for a tie.
-    // Fifty beats is roughly three times the longest honest bout in the telemetry, so nothing that is
-    // actually progressing can reach it.
-    if (b.beat >= BOUT_BEAT_CAP) {
-        const myFrac = b.maxHp ? b.hp / b.maxHp : 0;
-        const theirFrac = b.foeMaxHp ? b.foeHp / b.foeMaxHp : 0;
-        b.calledAt = b.beat;
-        b.log.push({ beat: b.beat, who: "you", grade: "call", damage: 0,
-            text: myFrac > theirFrac
-                ? `The ring is called at ${b.beat} beats. You are the one still standing straighter — it goes to you.`
-                : `The ring is called at ${b.beat} beats. Neither of you could finish it, and it does not go to you.` });
-        return finishBout(buyerId, row, b, myFrac > theirFrac);
-    }
+    // What still guarantees an end: the alternating brace rule, and pitFever, which adds 5% damage a beat
+    // to BOTH sides from the tenth beat and compounds without limit — beat 30 is double, beat 50 is triple,
+    // and it keeps going. Two fighters who cannot finish each other simply hit harder until one of them
+    // does. And a member who wants out of a long one has the forfeit, which is reachable inside the fight
+    // screen behind a two-tap confirm and resolves as a loss.
+
     await saveBout(buyerId, b);
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
@@ -2987,8 +2980,9 @@ async function finishBout(buyerId, row, b, won) {
  * "I can't even help with the raid because of being stuck in that above mentioned battle", "it won't let me
  * leave the fight/surrender."
  *
- * The stalls that caused that are fixed above (BRACE_LIMIT, the alternating rule, the pit, the beat cap). This
- * exists because the next unforeseen way to get stuck should cost somebody one bout instead of their evening.
+ * Two rules now guarantee an end: the alternating brace rule and the pit. The six-a-bout brace budget and the
+ * fifty-beat call were both removed on Luke's call, which makes THIS the only guaranteed way out of a fight
+ * that will not finish — so it matters more than it did, not less.
  *
  * IT IS A LOSS, resolved through the same finishBout every other ending uses. Not a free exit: bailing out of
  * a bad matchup at no cost is a re-roll, and a re-roll makes the Road a slot machine. A raid foe goes back on

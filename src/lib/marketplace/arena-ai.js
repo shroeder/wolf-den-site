@@ -15,7 +15,7 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { BRACE_LIMIT, DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS, REND_TICK_CAP } from "@/lib/marketplace/arena-kit.js";
+import { DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS, REND_TICK_CAP } from "@/lib/marketplace/arena-kit.js";
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 
@@ -234,10 +234,11 @@ export function pickIncoming(b) {
     // gets to brace as often as every other beat, which is all any of those three rules actually wants, and
     // your blow always lands on the beat in between. The same rule binds the player (see arena.js), because a
     // brace that only one side can spam is the same stall pointed the other way.
-    // Two limits, and the second is the one that cannot be argued with: not on consecutive beats, and never
-    // more than BRACE_LIMIT times in the whole bout — the same budget the player is held to.
+    // ONE limit now, not two. The six-a-bout budget is gone on both sides (Luke's call — see arena.js), so
+    // all that binds either fighter is the alternating rule: brace as often as every other beat, never twice
+    // running. That is the rule that closes the stall; the budget was a second belt on it.
     const bracedLastBeat = (b.foeBraceBeat || 0) >= b.beat - 1 && (b.foeBraceBeat || 0) > 0;
-    const bracesSpent = (b.foeBraces || 0) >= BRACE_LIMIT;
+    const bracesSpent = false;
     const guard = () => {
         b.foeBraceBeat = b.beat;
         b.foeBraces = (b.foeBraces || 0) + 1;
