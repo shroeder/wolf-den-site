@@ -492,7 +492,7 @@ function Recap({ bout, busy, onClose }) {
     const haul = r?.fishing ? (r.haul || null) : null;
     const reward = raid ? raid.reward : haul || r?.reward || bout?.reward || null;
     const loot = raid ? (raid.loot || [])
-        : haul?.chest ? [{ kind: "chest", label: `${haul.chest} chest`, rarity: "off the line" }]
+        : haul?.chest ? [{ kind: "chest", label: `${haul.chest[0].toUpperCase()}${haul.chest.slice(1)} Chest`, rarity: "off the line" }]
             : [];
 
     return (
@@ -578,7 +578,11 @@ function Recap({ bout, busy, onClose }) {
                         {loot.map((l, i) => (
                             <span key={`${l.kind}-${l.itemId || l.tier || i}`} className="ar-feat" style={{ "--el": "#8fd6a2" }}>
                                 <b>{l.label || l.kind}</b>
-                                <em>{l.kind === "chest" ? "off the raid" : l.rarity || "salvage"}</em>
+                                {/* A chest was captioned "off the raid" unconditionally, so the one a hooked
+                                    monster pays — which arrives here carrying its own caption — was labelled
+                                    as coming from a plaza raid it had nothing to do with. The row's own
+                                    caption wins; the raid's chests carry none and read as they always did. */}
+                                <em>{l.rarity || (l.kind === "chest" ? "off the raid" : "salvage")}</em>
                             </span>
                         ))}
                     </div>

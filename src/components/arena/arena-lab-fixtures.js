@@ -202,6 +202,22 @@ const RECAP_LOSS = {
     streak: 0, bestStreak: 5, rounds: 7,
 };
 
+// ── A THING OFF THE LINE ─────────────────────────────────────────────────────────────────────────────────────
+// The same renderer, in the other room. A hooked monster is fought through the arena engine like every other
+// NPC, so the only things that differ are the foe, the backdrop the ring draws, and who pays for the win —
+// which is exactly what these two scenes are for: to look at the deck without having to hook a Kraken first.
+const KRAKEN = {
+    id: "fish:kraken_young", name: "Young Kraken", sprite: "/images/sailing/enc/kraken_young.png",
+    npc: true, fishing: true, level: null, color: null, element: "water", archetype: "berserker",
+    blurb: "Only one arm is aboard so far.",
+    abilities: FOE_ABILITIES,
+};
+
+// What payFishingMonster actually returns for a tier-4 monster: 120 gold and 40 XP per tier, and one chest at
+// the tier the fight earned. Written from that function rather than invented, so the recap in the lab is the
+// recap members get.
+const HAUL_KRAKEN = { gold: 480, xp: 160, chest: "gold", name: "Young Kraken" };
+
 const MY_POWER = 340;
 
 const TARGETS = [
@@ -423,6 +439,41 @@ export const SCENES = {
         note: "You held nothing. Has to land as a loss without feeling like a punishment.",
         state: () => baseState({
             bout: makeBout({ over: true, won: false, hp: 0, foeHp: 58, recap: RECAP_LOSS }),
+        }),
+    },
+    // ── ON THE DECK ──────────────────────────────────────────────────────────────────────────────────────
+    // One hardcoded colosseum used to serve every bout, so a Kraken you had just pulled over the rail was
+    // answered on hot sand under strung pennants. The backdrop is the only part of the ring that has to know
+    // where it is; everything else here is the ordinary fight.
+    deck: {
+        label: "Deck fight",
+        note: "A hooked monster, mid-bout, on the ship. Same ring as the Arena — the plate behind it is the deck.",
+        state: () => baseState({
+            bout: makeBout({
+                fishing: true, foe: KRAKEN,
+                foeHp: 268, foeMaxHp: 402, hp: 131, beat: 5,
+                clash: { mult: 0.75, note: "Its Water smothers your Fire" },
+                log: [
+                    { beat: 3, who: "you", grade: "skill", damage: 51, text: "Widow's Mercy — 51.", ability: "Widow's Mercy" },
+                    { beat: 3, who: "them", grade: "hit", damage: 27, text: "Young Kraken lashes — you turn aside 11, 27 lands.", ability: null },
+                    { beat: 4, who: "you", grade: "crit", damage: 68, text: "You strike clean — 68.", ability: null },
+                    { beat: 4, who: "them", grade: "hit", damage: 24, text: "Young Kraken lashes — you turn aside 9, 24 lands.", ability: null },
+                ],
+            }),
+        }),
+    },
+    // ── AND WHAT IT WAS CARRYING ─────────────────────────────────────────────────────────────────────────
+    // The recap read only the Arena's own economy, so this screen said "+0 Victory Points · Streak 0" over a
+    // fight that had just paid 480 gold, 160 XP and a gold chest. The haul is the headline here; there is no
+    // streak line, because the Arena's streak is not touched by something you pulled out of the sea.
+    deckwin: {
+        label: "Deck recap — the haul",
+        note: "What a landed monster pays. Gold is the headline, the chest is the loot, and no VP or streak appear.",
+        state: () => baseState({
+            bout: makeBout({
+                fishing: true, foe: KRAKEN, over: true, won: true, foeHp: 0, hp: 84,
+                recap: { won: true, foe: KRAKEN, fishing: true, haul: HAUL_KRAKEN, rounds: 7 },
+            }),
         }),
     },
 };
