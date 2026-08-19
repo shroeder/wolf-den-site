@@ -436,7 +436,21 @@ export async function getInventory(buyerId) {
                 setName: set?.name || null, setId: set?.id || null, collectionPiece: true }; })
         .filter(Boolean)
         .sort((a, z) => String(a.setName || "").localeCompare(String(z.setName || "")) || a.name.localeCompare(z.name));
-    return { items, pieces, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList, await equippedPowers(buyerId)), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
+    // ── THE COMBAT STATS PANEL HAS TO BE THE NUMBER YOU FIGHT WITH ──────────────────────────────────────
+    // This handed the screen `withSetBonuses` alone — base lines plus set bonuses, and nothing else. Every
+    // fight in the game reads `getEquippedStats`, which is that PLUS the compendium milestones, PLUS the
+    // forge enhancement, PLUS whatever is socketed. So the panel a member checks to see what their gear is
+    // worth was quietly the smallest of the numbers in play, and three of the four things they had spent
+    // most on were invisible in it.
+    //
+    // Kaishiern found it from the other end: the item cards on that same screen show EFFECTIVE stats, forge
+    // included, so adding his pieces up by hand came to more crit than the total underneath them. GrayKitsune
+    // named the cause in the next message — "forge upgrades aren't showing in stats". Both are this line.
+    //
+    // getEquippedStats re-reads the equipped ids and powers this function already has. That is a second
+    // couple of cheap queries on one screen, and it is the right trade: the alternative is a second way of
+    // adding gear up, which is exactly how the panel and the ring drifted apart in the first place.
+    return { items, pieces, equipped: bySlot, slots: EQUIP_SLOTS, stats: await getEquippedStats(buyerId), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.

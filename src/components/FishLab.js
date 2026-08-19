@@ -66,7 +66,10 @@ export default function FishLab({ monsters = [] }) {
             blurb: monster.blurb, abilities: SCENES.deck.state().bout.foe.abilities,
         };
         setFight(baseState({ bout: makeBout({ fishing: true, foe, foeHp: 268, foeMaxHp: 402, hp: 131, beat: 1, log: [] }) }));
-    }, [monster, wait]);
+        // `lag` BELONGS in here. Without it this callback closes over the lag it was built with — zero, on
+        // first render, before the effect above has read the query string — and the second round trip is
+        // silently never simulated. The reel then shows a seam a good deal kinder than the real one.
+    }, [lag, monster, wait]);
 
     return (
         <div style={{ minHeight: "100dvh", background: "#070b14" }}>
