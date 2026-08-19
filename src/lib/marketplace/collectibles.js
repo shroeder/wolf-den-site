@@ -2,6 +2,7 @@
 // boss drops). Every pet OWNED adds a small passive account bonus (they stack); the one you EQUIP (feature)
 // gives a stronger themed active buff. Crisp vector game-icons (react-icons/gi, CC BY 3.0). Keep ids STABLE.
 // (Export names stay `collectible*` for back-compat with existing importers — conceptually these are pets.)
+import { STAT_META } from "@/lib/marketplace/items.js";
 import {
     GiRabbit, GiFrog, GiChicken, GiCat, GiFox, GiWolfHead, GiOwl, GiBearFace, GiRaven, GiSnake, GiDeer,
     GiBat, GiScorpion, GiTigerHead, GiSeahorse, GiEagleEmblem, GiLion, GiGorilla, GiCrocJaws, GiHydra,
@@ -91,16 +92,21 @@ export const SHOP_PRICE_BY_RARITY = { common: 600, rare: 1400, epic: 3000, legen
 
 // Buff stats a pet can grant (combat + economy). Passive is always Fortune (a menagerie brings luck).
 export const PET_STAT_META = {
-    might: { label: "Might", icon: "⚔️", desc: "More base damage on your daily boss strike." },
-    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "Higher chance your boss strike lands a critical hit." },
-    crit_power: { label: "Crit Power", icon: "💥", desc: "Your critical hits on the boss deal more damage." },
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "More base damage on your boss strike." },
-    fortune: { label: "Fortune", icon: "🍀", desc: "Banks extra weekly-boss raffle tickets every day — better odds to win the prize." },
-    // Three stats pets have been granting with no entry here, so the pet card printed the raw key —
-    // "+2 tenacity" — under a generic blurb. They are all ring stats, so they say what they do in the ring.
-    vitality: { label: "Vitality", icon: "❤️", desc: "More health in the Arena — you last longer in a fight." },
-    tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing, so every blow lands lighter." },
-    pierce: { label: "Pierce", icon: "🗡️", desc: "Thins your opponent's armour so more of your damage gets through." },
+    // ── THE COMBAT STATS COME FROM ONE PLACE ─────────────────────────────────────────────────────────────
+    // These had their own hand-written descriptions, written when the only fight in the game was the daily
+    // boss strike. Ferocity's said "more base damage on your boss strike" — it has not done that since combat
+    // became an auto-attack and ferocity became attack speed, so the pets screen was quietly teaching people
+    // the wrong thing about a stat they were buying. Taken from STAT_META now, which is what the item screens
+    // read, so there is one description of what a stat does and it cannot drift from the game again.
+    // Three of these (vitality, tenacity, pierce) had no entry here AT ALL and printed as raw keys.
+    might: STAT_META.might,
+    crit_chance: STAT_META.crit_chance,
+    crit_power: STAT_META.crit_power,
+    ferocity: STAT_META.ferocity,
+    fortune: STAT_META.fortune,
+    vitality: STAT_META.vitality,
+    tenacity: STAT_META.tenacity,
+    pierce: STAT_META.pierce,
     xp_gain: { label: "XP Gain", icon: "✨", desc: "You level up faster — more XP from everything you do." },
     gold_find: { label: "Gold Find", icon: "💰", desc: "More gold from everything you earn (boss, spins, sales)." },
     // FARM passives (pastoral pets) — these help your FARM, not the boss. Equip the pet to apply its farm bonus.

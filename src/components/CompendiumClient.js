@@ -34,7 +34,7 @@ const SLOT_LABEL = {
 };
 import { describeStats } from "@/lib/marketplace/items.js";
 const tint = (r) => RARITY_META[r]?.color || "#9aa0a6";
-const describe = (stats) => describeStats(stats);
+const describe = (stats) => describeStats(stats, { bonus: true });
 
 export default function CompendiumClient() {
     const [data, setData] = useState(null);

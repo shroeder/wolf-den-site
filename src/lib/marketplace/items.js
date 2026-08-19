@@ -966,9 +966,12 @@ export function statValue(k, v) {
 // out as "+24" as though it were a bonus somebody granted you, and a shield's block chance came out as "+0.2%"
 // because it is stored as a fraction. So the pieces of a stat line are cut in ONE place and every surface asks
 // for them: icon, label, the value already formatted, and whether it takes a plus.
-export function statParts(k, v) {
+// `bonus: true` says this number is something ADDED to a piece rather than part of it — a forge gain, a set
+// tier, a gem. Damage and armour are the piece itself in one context and a bonus in the other, and only the
+// caller knows which, so "+4 Damage" off the forge and "23 Damage" on the weapon both come out right.
+export function statParts(k, v, { bonus = false } = {}) {
     const m = STAT_META[k] || {};
-    const own = INTRINSIC.has(k) || FRACTION.has(k);
+    const own = (INTRINSIC.has(k) || FRACTION.has(k)) && !bonus;
     // block_chance's percent already comes off statValue; anything else wears its own suffix.
     const suffix = FRACTION.has(k) ? "" : (m.suffix || "");
     return {
@@ -981,18 +984,26 @@ export function statParts(k, v) {
     };
 }
 
-export function describeStat(k, v) {
-    const p = statParts(k, v);
+export function describeStat(k, v, opts) {
+    const p = statParts(k, v, opts);
     return `${p.value} ${p.label}`;
 }
 
-export function describeStats(stats = {}) {
+// A piece's base numbers plus whatever the forge added, as one set of totals — what the item IS right now,
+// which is the only version of it a member cares about. Lived as three identical private copies.
+export function mergeStats(base = {}, bonus = {}) {
+    const m = { ...(base || {}) };
+    for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
+    return m;
+}
+
+export function describeStats(stats = {}, opts) {
     // The piece's own numbers lead, because they are the thing you are looking at; the affixes follow.
     const keys = Object.keys(stats || {}).sort((a, z) => {
         const rank = (k) => (INTRINSIC.has(k) ? 0 : FRACTION.has(k) ? 1 : 2);
         return rank(a) - rank(z);
     });
-    return keys.filter((k) => Number(stats[k])).map((k) => describeStat(k, stats[k])).join(" · ");
+    return keys.filter((k) => Number(stats[k])).map((k) => describeStat(k, stats[k], opts)).join(" · ");
 }
 
 // ── SEA AFFINITY ── a separate effect layer that ONLY the Sailing systems read (raids/digging/voyages) — kept

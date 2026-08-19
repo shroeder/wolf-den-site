@@ -45,7 +45,7 @@ function tierText(t) {
     for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${SEA_META[k]?.label || k}`);
     for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${WHEEL_META[k]?.label || k} chance`);
     for (const [k, v] of Object.entries(t.forge || {})) parts.push(`+${v}% ${FORGE_META[k]?.label || k} chance`);
-    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v));
+    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v, { bonus: true }));
     return parts.join(" · ") || "—";
 }
 

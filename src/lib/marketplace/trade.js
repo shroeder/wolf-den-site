@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, describeStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, mergeStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -18,11 +18,6 @@ import { syncPetAchievements } from "@/lib/marketplace/pets.js";
 const MAX_SIDE = 12; // items per side, sanity cap
 
 // Merge base item stats with a forge stat-bonus into effective totals (for showing real stats on trade cards).
-function mergeStats(base = {}, bonus = {}) {
-    const m = { ...(base || {}) };
-    for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
-    return m;
-}
 
 function cleanItemIds(list) {
     if (!Array.isArray(list)) return [];

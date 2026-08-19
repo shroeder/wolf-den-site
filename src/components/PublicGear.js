@@ -1,5 +1,5 @@
 import InspectableGear from "@/components/InspectableGear";
-import { EQUIP_SLOTS, itemById, describeStats, statParts } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, itemById, describeStats, mergeStats, statParts } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { setForItem } from "@/lib/marketplace/sets.js";
@@ -9,7 +9,7 @@ import { setForItem } from "@/lib/marketplace/sets.js";
 // the client <InspectableGear> so visitors can tap any piece to inspect it (and trade for un-equipped ones).
 // `owned` is every item id this member has, so a piece can say how far along its set they actually are —
 // which is the whole question you ask when you look at somebody else's loadout.
-function prep(id, equipped, owned, elMap, gemMap = new Map()) {
+function prep(id, equipped, owned, elMap, gemMap = new Map(), forgeMap = new Map()) {
     const d = itemById(id);
     if (!d) return null;
     const sig = signatureFor(id);
@@ -17,7 +17,12 @@ function prep(id, equipped, owned, elMap, gemMap = new Map()) {
     const set = setForItem(id);
     return {
         id, name: d.name, rarity: d.rarity, slot: d.slot, icon: d.icon,
-        statsText: describeStats(d.stats),
+        // WHAT THE PIECE IS NOW, not what it was born as. This read the base definition, so an enhanced
+        // sword showed the damage it had before anybody forged it — and now that the forge moves base damage
+        // and armour, that is the number you would compare loadouts on.
+        statsText: describeStats(mergeStats(d.stats, forgeMap.get(id)?.bonus || {})),
+        forgeStats: forgeMap.get(id)?.bonus ? describeStats(forgeMap.get(id).bonus, { bonus: true }) : null,
+        enhanceLevel: forgeMap.get(id)?.level || 0,
         signature: sig ? { label: sig.label, desc: sig.desc } : null,
         element: el && ELEMENTS[el] ? { label: ELEMENTS[el].label, emoji: ELEMENTS[el].emoji, color: ELEMENTS[el].color } : null,
         // The EFFECTIVE elements off the inventory payload, not the base one `element` above is derived from.
@@ -42,7 +47,7 @@ function prep(id, equipped, owned, elMap, gemMap = new Map()) {
             total: set.items.length,
             have: set.items.filter((x) => owned.has(x)).length,
             pieces: set.items.map((x) => ({ id: x, name: itemById(x)?.name || x, has: owned.has(x) })),
-            bonuses: (set.bonuses || []).map((b) => ({ need: b.need, text: describeStats(b.stats) })),
+            bonuses: (set.bonuses || []).map((b) => ({ need: b.need, text: describeStats(b.stats, { bonus: true }) })),
             capstone: set.capstone?.desc || null,
         } : null,
     };
@@ -61,8 +66,11 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
     // Sockets ride the same list — getInventory attaches them per row, so the equipped pieces borrow theirs
     // from the entry they also appear under, exactly as the elements do.
     const gemMap = new Map(items.filter((i) => i.socket || i.gem).map((i) => [i.id, { gem: i.gem || null }]));
-    const equippedData = equippedIds.map((id) => prep(id, true, owned, elMap, gemMap)).filter(Boolean);
-    const inventoryData = items.filter((i) => !i.equipped).map((i) => prep(i.id, false, owned, elMap, gemMap)).filter(Boolean);
+    // The forge bonus rides the same list, for the same reason.
+    const forgeMap = new Map(items.filter((i) => i.forgeBonus || i.enhanceLevel)
+        .map((i) => [i.id, { bonus: i.forgeBonus || null, level: i.enhanceLevel || 0 }]));
+    const equippedData = equippedIds.map((id) => prep(id, true, owned, elMap, gemMap, forgeMap)).filter(Boolean);
+    const inventoryData = items.filter((i) => !i.equipped).map((i) => prep(i.id, false, owned, elMap, gemMap, forgeMap)).filter(Boolean);
 
     // Every set this member has any progress in, best first — the summary you actually want when sizing
     // somebody up, rather than having to tap twelve pieces to work it out.

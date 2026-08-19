@@ -16,7 +16,7 @@ import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio";
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
 // Shared, so a stat added to STAT_META shows up here without anyone remembering to come back.
 import { describeStats } from "@/lib/marketplace/items.js";
-const statLine = (stats = {}) => describeStats(stats);
+const statLine = (stats = {}, opts) => describeStats(stats, opts);
 const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46, ascendant: 58, eternal: 72 };
 const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal"]);
@@ -258,7 +258,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         <>
                             <GemReveal gem={reveal.gem} />
                             <div className="chest-reward-name">{reveal.gem.name}</div>
-                            <div className="chest-reward-sub muted">{statLine(reveal.gem.stats)} &middot; socket it at the Jewelcutter</div>
+                            <div className="chest-reward-sub muted">{statLine(reveal.gem.stats, { bonus: true })} &middot; socket it at the Jewelcutter</div>
                         </>
                     ) : isConsumable ? (
                         <>

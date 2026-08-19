@@ -55,6 +55,13 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{detail.statsText || "No combat stats"}</p>
+                        {/* The line above is what the piece is NOW. This says how much of it the forge bought,
+                            which is the question you ask the moment you see somebody's numbers beat yours. */}
+                        {detail.forgeStats ? (
+                            <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "#8fe39a", fontWeight: 700 }}>
+                                ⚒️ +{detail.enhanceLevel} forged · {detail.forgeStats}
+                            </p>
+                        ) : null}
                         {detail.reqLevel ? <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.8rem" }}>Requires level {detail.reqLevel}</p> : null}
                         {detail.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detail.signature.label} — {detail.signature.desc}</p> : null}
 

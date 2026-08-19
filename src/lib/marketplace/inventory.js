@@ -369,7 +369,7 @@ export async function getInventory(buyerId) {
                 // The forge bonus ALONE, phrased like every other stat line, so "+1" can finally say what it
                 // bought. The Auction House has shown this on a listing for ages; your own bag never did, so
                 // the one place you inspect your own gear was the one place the enhancement was invisible.
-                forgeStats: enh?.statBonus && Object.keys(enh.statBonus).length ? describeStats(enh.statBonus) : null,
+                forgeStats: enh?.statBonus && Object.keys(enh.statBonus).length ? describeStats(enh.statBonus, { bonus: true }) : null,
                 // The forge bonus as NUMBERS as well as prose. The compare panel needs to add it to the base
                 // stats: without it, weighing a new piece against an enhanced one compared the new item to the
                 // equipped item's UNFORGED self and called a downgrade a sidegrade.

@@ -155,6 +155,12 @@ if (CLICKS.length) {
                 if (${JSON.stringify(!!proof)} && document.querySelector(${JSON.stringify(proof || "*")})) return "open";
                 const el = document.querySelector(${JSON.stringify(sel)});
                 if (!el || el.disabled) return "missing";
+                // A TAP, NOT JUST A CLICK. .click() dispatches a click and nothing else, so any control
+                // wired to onPointerDown — which is most of the ones that have to feel instant, the mine's
+                // swing among them — never hears it, and the step fails claiming the button did nothing.
+                for (const type of ["pointerdown", "pointerup"]) {
+                    el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: "touch", isPrimary: true }));
+                }
                 el.click();
                 return ${JSON.stringify(!!proof)} ? "clicked" : "open";
             })()`);

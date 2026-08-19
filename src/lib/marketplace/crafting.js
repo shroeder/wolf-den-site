@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -682,11 +682,6 @@ export async function getForgeState(buyerId) {
     for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade, util: r.util });
     // Effective totals = the item's base stats plus whatever the forge added. Local rather than imported: this is
     // three lines and auction.js keeps its own copy for the same reason.
-    const mergeStats = (base = {}, bonus = {}) => {
-        const out = { ...(base || {}) };
-        for (const [k, v] of Object.entries(bonus || {})) out[k] = (out[k] || 0) + Number(v || 0);
-        return out;
-    };
     // Fetched HERE rather than down by the Attune tab that used to be its only consumer: `dress` builds the
     // Enhance and Salvage lists too, and both of those now carry the element so the marker can ride the corner
     // of a forge card. Reading it after `dress` had already run would have shipped those two tabs the base

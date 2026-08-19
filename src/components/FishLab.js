@@ -24,6 +24,7 @@ export default function FishLab({ monsters = [] }) {
     const [fight, setFight] = useState(null);
     const [monsterId, setMonsterId] = useState("kraken_young");
     const [lag, setLag] = useState(0);
+    const [HAUL, setHaul] = useState(null); // ?haul=gear brings up a piece of gear instead of a monster
 
     // Read the address in an EFFECT, not during render — the same rule the Arena lab follows. The server has
     // no query string, so seeding state from `window` at render time renders one thing on the server and
@@ -36,6 +37,7 @@ export default function FishLab({ monsters = [] }) {
         const l = Number(q.get("lag"));
         if (m && monsters.some((x) => x.id === m)) setMonsterId(m);
         if (Number.isFinite(l) && l > 0) setLag(l);
+        setHaul(q.get("haul"));
     }, [monsters]);
 
     const monster = monsters.find((m) => m.id === monsterId) || monsters[0];
@@ -53,8 +55,19 @@ export default function FishLab({ monsters = [] }) {
     const onLand = useCallback(async ({ missed } = {}) => {
         await wait(lag);
         if (missed) return { ok: true, missed: true };
+        // ?haul=gear — the OTHER thing a cast can bring up. A piece of gear off the sea floor prints its stat
+        // line in the haul card, and that card is only reachable by playing a cast through, so there was no
+        // way to look at it. Same landed shape fishLand returns.
+        if (HAUL === "gear") {
+            return { ok: true, landed: true, catchResult: {
+                fish: { id: "tiger_prawn", name: "Tiger Prawn", lb: 3.2 }, gold: 42, xp: 30,
+                extras: [{ kind: "gear", id: "eternal_undying_wall", label: "Undying Wall", rarity: "eternal",
+                    slot: "off_hand", icon: "GiCheckedShield",
+                    stats: { armor: 313, block_chance: 0.39, vitality: 26, tenacity: 7, pierce: 7, lifesteal: 4, haste: 6 } }],
+            } };
+        }
         return { ok: true, monster: { id: monster.id, name: monster.name, art: monster.art, tier: monster.tier } };
-    }, [lag, monster, wait]);
+    }, [lag, monster, wait, HAUL]);
 
     // And this is the second round trip: fired 1150ms later, once the rise has finished, with the fight
     // mounting only when it answers.

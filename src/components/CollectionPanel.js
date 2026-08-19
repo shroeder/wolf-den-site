@@ -95,7 +95,7 @@ function tierText(t) {
     for (const [k, v] of Object.entries(t.depth || {})) parts.push(`+${v} ${label(k)}`);
     for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${label(k)}`);
     for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${label(k)}`);
-    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v));
+    for (const [k, v] of Object.entries(t.stats || {})) parts.push(describeStat(k, v, { bonus: true }));
     return parts.join(" · ") || "—";
 }
 const label = (k) => k.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();

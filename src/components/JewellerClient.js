@@ -36,7 +36,7 @@ const RARITY = { common: "#c9d1d9", rare: "#6bb8ff", epic: "#c98bff", legendary:
     ascendant: "#ff8ad8", eternal: "#ffce6b" };
 import { STAT_SHORT as STAT, describeStats } from "@/lib/marketplace/items.js";
 const money = (n) => (Number(n) || 0).toLocaleString();
-const describe = (stats) => describeStats(stats);
+const describe = (stats) => describeStats(stats, { bonus: true });
 
 export default function JewellerClient({ initial }) {
     const [st, setSt] = useState(initial);

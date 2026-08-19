@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, describeFarm, describeSea, describeDepth, statParts, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeFarm, describeSea, describeDepth, statParts, mergeStats, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -15,11 +15,6 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
-function mergeStats(base = {}, bonus = {}) {
-    const m = { ...(base || {}) };
-    for (const [k, v] of Object.entries(bonus || {})) m[k] = (m[k] || 0) + (Number(v) || 0);
-    return m;
-}
 const parseBonus = (v) => (typeof v === "string" ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : (v || {}));
 const statTotal = (stats = {}) => Object.values(stats).reduce((a, b) => a + (Number(b) || 0), 0);
 
@@ -103,7 +98,7 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
         itemId: row.item_id,
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
         stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
-        forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
+        forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus, { bonus: true }) : null, // the forge bonus alone
         farm: it.farm ? describeFarm(it.farm) : null, // 🌱 harvest/farm affinity (kept out of combat stats)
         sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, // ⚓ sailing affinity
         util: det?.util || null, // rare Forge attunement (spin-off bonus stat) that rides with the item
@@ -187,7 +182,7 @@ export async function getSellableItems(buyerId) {
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, elements: describeItemElements(id, elemOver[id]), stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, elements: describeItemElements(id, elemOver[id]), stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus, { bonus: true }) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -262,7 +257,7 @@ export async function getMyListings(buyerId) {
             elements: describeItemElements(r.item_id, elemOver[r.item_id]),
             price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at, soldAt: r.sold_at, buyerName, buyerAlias: r.status === "sold" ? r.buyer_alias : null,
             stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null,
-            forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
+            forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus, { bonus: true }) : null,
             farm: it.farm ? describeFarm(it.farm) : null,
             sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null,
             util: det?.util || null,
