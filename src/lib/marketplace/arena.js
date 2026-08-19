@@ -271,6 +271,8 @@ async function combatStats(buyerId, gearStats, ids) {
         pierce: (gearStats.pierce || 0) + (ps.pierce || 0) * bb + (bs.pierce || 0),
         lifesteal: gearStats.lifesteal || 0,
         counter: gearStats.counter || 0,
+        stun: gearStats.stun || 0,
+        haste: gearStats.haste || 0,
         doublestrike: gearStats.doublestrike || 0,
     };
 }
@@ -430,6 +432,9 @@ export async function kitFor(buyerId, opts = {}) {
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
         // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
         counter: Number(stats.counter) || 0,
+        // Raw points; the engine turns them into chances (STUN_PER_POINT / HASTE_PER_POINT).
+        stun: Number(stats.stun) || 0,
+        haste: Number(stats.haste) || 0,
         // A shield's block chance, as a share. Item-exclusive like counter.
         blockChance: (Number(stats.block_chance) || 0) + (perks.blockChance || 0),
         blockReduction: base.blockReduction ?? BLOCK_REDUCTION,

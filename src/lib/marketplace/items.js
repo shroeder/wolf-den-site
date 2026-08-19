@@ -77,6 +77,8 @@ export const STAT_META = {
     might: { label: "Might", icon: "⚔️", desc: "How hard you hit — powers BOTH your 24/7 passive auto-damage and your manual daily strike.", suffix: "%" },
     crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical — on both your passive auto-damage and your manual strike.", suffix: "%" },
     crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra your critical hits deal — on both passive auto-damage and your manual strike.", suffix: "%" },
+    stun: { label: "Chance to Stun", icon: "💫", desc: "Each point is a 0.5% chance a blow stuns — the target loses their next attack.", suffix: "" },
+    haste: { label: "Chance to Haste", icon: "🌀", desc: "Each point is a 0.5% chance a swing hastes you: five swings at double speed.", suffix: "" },
     ferocity: { label: "Ferocity", icon: "🔥", desc: "PASSIVE only: auto-damage your hero deals 24/7 on its own (doesn't affect your manual strike).", suffix: "%" },
     fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize.", suffix: "%" },
     // ── VITALITY ─────────────────────────────────────────────────────────────────────────────────────────
@@ -854,6 +856,13 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
         // Precision bought accuracy and accuracy no longer exists, so the affix is stripped rather than
         // left on 24 items as a number that does nothing.
         delete stats.precision;
+        // ── HASTE, ON A HANDFUL OF THE HIGH-TIER PIECES ──────────────────────────────────────────────
+        // Rollable like any affix, but ten of the mythic-through-eternal items carry it as part of what they
+        // ARE — the pieces you go looking for rather than reforge toward.
+        const hasteTier = RARITY_LADDER.indexOf(String(it.rarity || "common"));
+        if (hasteTier >= 4 && hasteTier <= 6 && vary(it.id, "haste") > 1.205) {
+            stats.haste = Math.max(1, Math.round(lerpGeo(3, 10, tier) * vary(it.id, "hasteval")));
+        }
         // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────
         // It was on 8 items. Weapons carry it as a matter of course from rare upward — going through armour
         // is what a weapon is for — and the rarest non-weapons can roll it too, about half of them, so it
@@ -1031,7 +1040,7 @@ export function describeDepth(depth = {}) {
 // The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
 // why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
 export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
-    "vitality", "tenacity", "pierce", "lifesteal", "counter", "doublestrike"];
+    "vitality", "tenacity", "pierce", "lifesteal", "counter", "doublestrike", "stun", "haste"];
 
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
 // more things at once.
@@ -1054,6 +1063,8 @@ export const affixCeiling = (rarity) => affixesBornWith(rarity) + FORGE_SLOTS;
 const AFFIX_RARITY = {
     might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1,
     tenacity: 1.5, pierce: 3, lifesteal: 5, counter: 7, doublestrike: 7,
+    // The two effect affixes sit level with the rarest of the rest.
+    stun: 7, haste: 7,
 };
 
 // ── AND THE SAME SCARCITY WHEN YOU REFORGE ───────────────────────────────────────────────────────────────────

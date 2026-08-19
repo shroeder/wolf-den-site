@@ -29,6 +29,10 @@ export const PIERCE_PER_POINT = 0.005;
 export const COUNTER_PER_POINT = 0.0025;
 export const DOUBLESTRIKE_PER_POINT = 0.005;
 export const LIFESTEAL_PER_POINT = 0.0025;
+export const STUN_PER_POINT = 0.005;
+export const HASTE_PER_POINT = 0.005;
+export const HASTE_ATTACKS = 5;      // how many of your own swings a haste lasts
+export const HASTE_RATE = 2;         // and how much faster they come
 
 export function ringStats(stats = {}) {
     return {
@@ -47,6 +51,8 @@ export function ringStats(stats = {}) {
         pierce: Number(stats.pierce) || 0,
         counter: Number(stats.counter) || 0,
         blockChance: Number(stats.block_chance) || 0,
+        stun: Number(stats.stun) || 0,
+        haste: Number(stats.haste) || 0,
         doublestrike: Number(stats.doublestrike) || 0,
         lifesteal: Number(stats.lifesteal) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
@@ -304,6 +310,11 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         blockStack: Math.max(0, Number(f.blockStack) || 0),
         blockStackMax: Math.max(0, Number(f.blockStackMax) || 0),
         stacks: 0,
+        // 1 point = 0.5% to stun on a landed blow, and 0.5% that a swing casts haste on yourself.
+        stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT)),
+        haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT)),
+        stunned: 0,      // swings this fighter must skip
+        hasteLeft: 0,    // swings left at double rate
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -312,8 +323,10 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     const B = side(foe);
     const log = [];
     let t = 0;
-    let nextA = 1 / A.speed;
-    let nextB = 1 / B.speed;
+    // A hasted fighter's swings come HASTE_RATE times as fast, for HASTE_ATTACKS of their own swings.
+    const gap = (f) => (1 / f.speed) / (f.hasteLeft > 0 ? HASTE_RATE : 1);
+    let nextA = gap(A);
+    let nextB = gap(B);
     let swings = 0;
 
     // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the
@@ -357,7 +370,15 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         def.hp -= dealt;
         // Lifedrink is off what you ACTUALLY inflict, not what you swung for — armour eats the healing too.
         if (att.lifesteal > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(dealt * att.lifesteal));
-        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked });
+        // ── STUN AND HASTE ───────────────────────────────────────────────────────────────────────────
+        // Stun is rolled on the blow and costs the defender their NEXT swing. Haste is rolled on your own
+        // swing and speeds up your next few. Both are emitted on the log line so the fight screen can put
+        // the callout and the effect on the right fighter at the right moment.
+        let stunned = false;
+        let hasted = false;
+        if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned += 1; stunned = true; }
+        if (att.haste > 0 && rng() < att.haste) { att.hasteLeft = HASTE_ATTACKS; hasted = true; }
+        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted });
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
@@ -371,9 +392,20 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         }
     };
 
+    // A stunned fighter loses the swing that was due: the clock still turns, they just do not act.
+    const take = (att, def, who) => {
+        if (att.stunned > 0) {
+            att.stunned -= 1;
+            log.push({ t, who, stunnedSkip: true });
+            return;
+        }
+        swing(att, def, who);
+        if (att.hasteLeft > 0) att.hasteLeft -= 1;
+    };
+
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        if (nextA <= nextB) { t = nextA; swing(A, B, "me"); nextA += 1 / A.speed; }
-        else { t = nextB; swing(B, A, "foe"); nextB += 1 / B.speed; }
+        if (nextA <= nextB) { t = nextA; take(A, B, "me"); nextA = t + gap(A); }
+        else { t = nextB; take(B, A, "foe"); nextB = t + gap(B); }
         swings += 1;
     }
     return {
