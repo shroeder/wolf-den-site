@@ -47,13 +47,13 @@ export async function collectedIds(buyerId) {
 // roughly a third of a whole kit for having played the entire game. That is a reward for breadth, not a
 // replacement for building.
 export const COMPENDIUM_MILESTONES = [
-    { at: 10, stats: { fortune: 2 }, label: "+2 Fortune" },
-    { at: 25, stats: { might: 3, fortune: 2 }, label: "+3 Might, +2 Fortune" },
-    { at: 50, stats: { might: 5, crit_chance: 2 }, label: "+5 Might, +2 Crit chance" },
-    { at: 100, stats: { might: 8, ferocity: 5, fortune: 3 }, label: "+8 Might, +5 Ferocity, +3 Fortune" },
-    { at: 250, stats: { might: 12, crit_power: 8, fortune: 5 }, label: "+12 Might, +8 Crit power, +5 Fortune" },
-    { at: 500, stats: { might: 18, ferocity: 12, crit_chance: 4 }, label: "+18 Might, +12 Ferocity, +4 Crit chance" },
-    { at: 1000, stats: { might: 25, ferocity: 18, crit_power: 15, fortune: 10 }, label: "+25 Might, +18 Ferocity, +15 Crit power, +10 Fortune" },
+    { at: 10, stats: { fortune: 2, vitality: 2 }, label: "+2 Fortune, +2 Vitality" },
+    { at: 25, stats: { might: 3, fortune: 2, tenacity: 2 }, label: "+3 Might, +2 Fortune, +2 Tenacity" },
+    { at: 50, stats: { might: 5, crit_chance: 2, vitality: 4 }, label: "+5 Might, +2 Crit chance, +4 Vitality" },
+    { at: 100, stats: { might: 8, ferocity: 5, fortune: 3, tenacity: 5 }, label: "+8 Might, +5 Ferocity, +3 Fortune, +5 Tenacity" },
+    { at: 250, stats: { might: 12, crit_power: 8, fortune: 5, vitality: 10, tenacity: 8 }, label: "+12 Might, +8 Crit power, +5 Fortune, +10 Vitality, +8 Tenacity" },
+    { at: 500, stats: { might: 18, ferocity: 12, crit_chance: 4, tenacity: 14 }, label: "+18 Might, +12 Ferocity, +4 Crit chance, +14 Tenacity" },
+    { at: 1000, stats: { might: 25, ferocity: 18, crit_power: 15, fortune: 10, vitality: 20, tenacity: 20 }, label: "+25 Might, +18 Ferocity, +15 Crit power, +10 Fortune, +20 Vitality, +20 Tenacity" },
 ];
 
 /** The stat total a given collection size has earned. Pure — the same maths the panel prints and the fight uses. */

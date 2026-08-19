@@ -331,15 +331,35 @@ async function rewardBadgeEarned(buyerId, slug) {
 // Rather than re-authoring 131 call sites, the split happens HERE: the first argument is still "what this badge
 // is worth", and it is divided between Might and Vitality. Might keeps the odd point, so a C(1) badge stays a
 // Might badge and nothing rounds away to nothing.
-const BADGE_VITALITY_SHARE = 0.5;
+// Half of what a badge is worth is offence and half is defence; the defensive half then splits again between
+// staying alive (vitality) and the armour multiplier (tenacity), which had no permanent source at all.
+// Half of what a badge is worth stays offence; the rest splits between the two defensive stats, vitality
+// first. Most badges are worth 1-3 points, so a share-of-a-share rounds badly at that size — carving the
+// remainder directly keeps both stats present instead of one of them taking every small badge.
+let CARVE_FLIP = 0;
 const C = (might = 0, crit_chance = 0, crit_power = 0) => {
     const o = {};
-    const vitality = Math.floor(might * BADGE_VITALITY_SHARE);
-    const mig = might - vitality;
+    const mig = Math.ceil(might * 0.5);
+    const rest = might - mig;
+    // Most badges are worth 1-3, so `rest` is usually a single point and whichever stat is written first
+    // takes every one of them — vitality ended up with 114 against tenacity's 35 for exactly that reason.
+    // Alternating who gets the odd point splits them evenly. Deterministic: the object literal below is
+    // evaluated once, in source order, so a given badge always lands the same way.
+    const odd = (CARVE_FLIP++ % 2) === 0;
+    const vitality = odd ? Math.ceil(rest / 2) : Math.floor(rest / 2);
+    const tenacity = rest - vitality;
     if (mig) o.might = mig;
     if (vitality) o.vitality = vitality;
+    if (tenacity) o.tenacity = tenacity;
     if (crit_chance) o.crit_chance = crit_chance;
     if (crit_power) o.crit_power = crit_power;
+    // ── A HARD BADGE PAYS ACROSS EVERYTHING ──────────────────────────────────────────────────────────────
+    // The first argument is what a badge is worth, and the big numbers are the ones nobody has — Living
+    // Legend, Veteran, the founding and tournament badges. Those should not be "some Might"; they should be
+    // felt in every column. At 4 and above a badge also carries ferocity and fortune, so the prestigious end
+    // of the collection touches all six combat stats rather than three.
+    if (might >= 4) { o.ferocity = Math.max(1, Math.round(might * 0.4)); o.fortune = Math.max(1, Math.round(might * 0.4)); }
+    else if (might >= 3) { o.ferocity = 1; }
     return { combat: o };
 };
 const S = (sea) => ({ sea });

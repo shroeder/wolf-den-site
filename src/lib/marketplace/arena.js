@@ -263,9 +263,10 @@ async function combatStats(buyerId, gearStats, ids) {
         // its might (the line above), which is why nothing on a pet ever made you tougher. It buys health now,
         // which is what the stat reads like it should do.
         vitality: (gearStats.vitality || 0) + (ps.ferocity || 0) * bb + (bs.vitality || 0),
-        // Gear-only for the same reason Vitality is: a stat a badge collection can grant is a stat a wardrobe
-        // cannot win on.
-        tenacity: gearStats.tenacity || 0,
+        // Badges pay tenacity now, so it has to reach the ring the way every other stat does. It was gear-only
+        // for the same reason vitality was, and it is being opened for the same reason: nothing permanent in
+        // the game made anybody harder to kill.
+        tenacity: (gearStats.tenacity || 0) + (ps.tenacity || 0) * bb + (bs.tenacity || 0),
         precision: gearStats.precision || 0,
         pierce: gearStats.pierce || 0,
         lifesteal: gearStats.lifesteal || 0,
@@ -417,6 +418,11 @@ export async function kitFor(buyerId, opts = {}) {
         health: healthFrom(Number(stats.vitality) || 0) + Math.round(perks.health || 0),
         // `base_damage` rides in on the equipped main hand (see items.js), so it arrives here summed with
         // everything else — and only one weapon can be worn, so the sum IS that weapon's base.
+        // ── ARMOUR, SHARPENED BY TENACITY ────────────────────────────────────────────────────────────────
+        // Flat armour off every worn piece, added up, then multiplied by tenacity: armor x (1 + tenacity/500).
+        // Tenacity is not its own damage reduction any more — it is what makes the armour you are already
+        // wearing worth more, so 500 tenacity doubles the plate rather than granting a separate percentage.
+        armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
@@ -436,7 +442,9 @@ export async function kitFor(buyerId, opts = {}) {
         // widening the exact matchup the telemetry says is 91/10. Scaling it by how much headroom you have
         // left inverts that: 12% for the Reaver, 8% for the Warden. Armour helps most those who have least,
         // and nobody sprints to the cap on gear alone.
-        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0) + drFromTenacity(base.dr + (perks.dr || 0), stats.tenacity)),
+        // Tenacity is UNWIRED from here. It multiplies armour now (see `armor` above) and granting a separate
+        // slice of damage reduction on top was the same stat paid twice. DR is the class trait plus the tree.
+        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
         // A share of everything you deal comes back as health. Class base + skill tree + the wardrobe's
         // Lifedrink — THE FIELD THE ENGINE ACTUALLY READS (`b.me.lifesteal`). The gear term was missing here,
         // which is the whole of "I have 2% life leech and it doesn't work".

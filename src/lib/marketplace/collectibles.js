@@ -54,12 +54,12 @@ export const PET_PASSIVE_STAT = {
     // Level
     bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
     wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",
-    fawn: "petXp", bat: "ferocity", scorpion: "might", tiger_cub: "crit_chance", seahorse: "seedLuck",
-    eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "ferocity", hydra: "crit_power",
+    fawn: "petXp", bat: "ferocity", scorpion: "tenacity", tiger_cub: "crit_chance", seahorse: "seedLuck",
+    eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "tenacity", hydra: "crit_power",
     griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "fortune", baby_rex: "might",
     sky_whale: "xp_gain", chameleon: "fortune", elder_dragon: "crit_power",
     // Shop
-    penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "growSpeed",
+    penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "tenacity", turtle: "growSpeed",
     parrot: "fortune", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
     // Achievement
     ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
@@ -73,8 +73,8 @@ export const PET_PASSIVE_STAT = {
     tropical_fish: "seafaring", axolotl: "reelStrength", butterfly: "xp_gain", squid: "seafaring", jellyfish: "seafaring", octopus: "seafaring",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
     // Boss
-    vulture: "might", minotaur: "ferocity", centaur: "might", imp: "crit_chance", polar_bear: "ferocity",
-    mammoth: "might", wyvern: "crit_power", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
+    vulture: "might", minotaur: "tenacity", centaur: "might", imp: "crit_chance", polar_bear: "tenacity",
+    mammoth: "tenacity", wyvern: "crit_power", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
     // Merchant (sailing-exclusive)
@@ -371,6 +371,30 @@ export function petSpecialPassive(pet) {
     const second = pet.activeStat && pet.activeStat !== passiveStat ? pet.activeStat : null; // dual affinity
     const base = PET_PASSIVE_BY_RARITY[pet.rarity] || 1;
     return { secondStat: second, secondValue: second ? Math.max(1, Math.round(base * t.secondFrac)) : 0, aura: t.aura };
+}
+
+// ── A HARD PET PAYS ACROSS MORE THAN ONE STAT ────────────────────────────────────────────────────────────────
+// A common Crab gives one thing. A mythic gives three, an ascendant four, and the handful at the very top pay
+// into EVERY combat stat there is — which is what a pet nobody has should feel like.
+//
+// The spread is deterministic per pet (a hash of its id picks where in the pool it starts) so two mythics are
+// not the same pet with a different picture, and so a given animal's spread never changes between restarts.
+// Each extra stat is worth half the pet's own passive, so breadth is a bonus rather than a multiplier on it.
+const PET_BREADTH = { mythic: 2, ascendant: 3, eternal: 6, celestial: 6, primordial: 6 };
+const BREADTH_POOL = ["might", "vitality", "tenacity", "crit_chance", "crit_power", "ferocity", "fortune"];
+
+export function petBroadPassives(pet) {
+    const n = PET_BREADTH[pet?.rarity] || 0;
+    if (!n) return [];
+    const base = PET_PASSIVE_BY_RARITY[pet.rarity] || 1;
+    const own = PET_PASSIVE_STAT[pet.id] || pet.activeStat || "fortune";
+    let h = 0;
+    for (const ch of String(pet.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const pool = BREADTH_POOL.filter((x) => x !== own);
+    const value = Math.max(1, Math.round(base * 0.5));
+    const out = [];
+    for (let i = 0; i < Math.min(n, pool.length); i += 1) out.push({ stat: pool[(h + i) % pool.length], value });
+    return out;
 }
 
 export function petPrice(pet) {

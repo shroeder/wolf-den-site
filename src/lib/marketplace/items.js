@@ -844,6 +844,7 @@ const vary = (id, salt) => {
 // Geometric ladders, so every tier is a real step rather than a flat addition.
 const lerpGeo = (lo, hi, tier) => lo * Math.pow(hi / lo, tier / 8);
 const ARMOR_SLOT_WEIGHT = { chest: 1.0, off_hand: 0.8, helmet: 0.7, back: 0.6, boots: 0.5, belt: 0.4 };
+const TENACITY_SHARE_OF_ARMOUR_FEROCITY = 0.4;
 const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test(`${it.name || ""} ${it.icon || ""}`);
 
 (() => {
@@ -854,6 +855,18 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
             stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
             stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;
         } else if (ARMOR_SLOT_WEIGHT[it.slot]) {
+            // ── ARMOUR TRADES SPEED FOR TOUGHNESS ────────────────────────────────────────────────────
+            // Tenacity was on 17 items in the whole catalogue and on NONE of the slots you would armour a
+            // fighter with — no helmet, no chest, no boots, no shield. It multiplies armour now, so it
+            // belongs on the pieces that carry armour, and ferocity is the right thing to take it from:
+            // ferocity is the attack clock, which is a weapon's business rather than a breastplate's.
+            const f0 = Number(stats.ferocity) || 0;
+            if (f0 > 0) {
+                const move = Math.max(1, Math.round(f0 * TENACITY_SHARE_OF_ARMOUR_FEROCITY));
+                const kept = f0 - move;
+                stats.tenacity = (Number(stats.tenacity) || 0) + move;
+                if (kept > 0) stats.ferocity = kept; else delete stats.ferocity;
+            }
             stats.armor = Math.max(1, Math.round(lerpGeo(40, 850, tier) * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
             // 0.13 at common to 0.64 at primordial, and the +25% end of the spread puts the best shield in
             // the game at 0.75 — which is the number Luke set as the ceiling.

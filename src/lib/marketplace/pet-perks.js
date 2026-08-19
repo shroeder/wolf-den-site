@@ -2,7 +2,7 @@
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
 import { effectFor } from "@/lib/marketplace/pet-ascension-effects.js";
-import { petPassive, petSpecialPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { petPassive, petSpecialPassive, petBroadPassives, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
 // Passive gold income rate: each gold_find point → this many gold/hour. Single source of truth shared by the
@@ -31,6 +31,7 @@ export const PERK_META = {
     crit_chance: { icon: "🎯", kind: "stat" },
     crit_power: { icon: "💥", kind: "stat" },
     ferocity: { icon: "🔥", kind: "stat" },
+    tenacity: { icon: "🛡️", kind: "stat" },
     fortune: { icon: "🍀", kind: "stat" },
     extra_strike: { icon: "⚡", kind: "strike" },
     first_hit: { icon: "🗡️", kind: "proc" },
@@ -267,6 +268,7 @@ function perkDesc(key, v, level = 1) {
         case "might": return `+${v}% damage — passive auto-damage AND your daily strike`;
         case "crit_chance": return `+${v}% crit chance — passive and your daily strike`;
         case "crit_power": return `+${v}% crit damage — passive and your daily strike`;
+        case "tenacity": return `+${v} Tenacity — multiplies the armour you are wearing`;
         case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
         case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
         case "extra_strike": { const c = Math.min(100, 20 + 20 * (Math.max(1, level) - 1)); return `${c}% chance for an extra daily strike${c < 100 ? " — rises to 100% by Lv 5" : " (maxed — every day!)"}`; }
@@ -431,7 +433,9 @@ export const SYSTEM_PERK_KEYS = new Set([
  * All three are conditional — take the gear off and the pack is ordinary again.
  */
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null, lingeringPet = null) {
-    const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
+    // `add()` drops anything not already a key here, so tenacity has to be seeded or the six pets
+    // carrying it would read beautifully on the card and grant nothing.
+    const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, tenacity: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
     // System perks land here rather than in stats/economy, which only know about combat. `add()` silently
@@ -448,6 +452,9 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     let aura = 0;
     for (const pet of ownedPets) {
         const p = petPassive(pet);
+        // The hard ones pay wider — see petBroadPassives. Added at the same level scaling as the pet's own
+        // passive, through the same `add()`, so nothing here can grant a stat the accumulator does not know.
+        for (const extra of petBroadPassives(pet)) add(extra.stat, extra.value);
         // The Second Bowl and The Shepherd's Crook each double ONE pet's passive — the one you carry, and the
         // ones you have enshrined. A pet that is both counts twice, not four times: they are the same promise
         // about the same pet, so the larger of the two applies rather than the product.
