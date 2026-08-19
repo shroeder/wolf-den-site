@@ -1,5 +1,5 @@
 import InspectableGear from "@/components/InspectableGear";
-import { EQUIP_SLOTS, itemById, describeStats, mergeStats, statParts } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, itemById, describeStats, mergeStats, statParts, sortStatKeys } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { setForItem } from "@/lib/marketplace/sets.js";
@@ -81,7 +81,7 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
     }
     setProgress.sort((a, b) => b.have / b.total - a.have / a.total || a.name.localeCompare(b.name));
     const stats = inventory?.stats || {};
-    const statEntries = Object.entries(stats).filter(([, v]) => v);
+    const statEntries = sortStatKeys(Object.keys(stats)).map((k) => [k, stats[k]]).filter(([, v]) => v);
 
     return (
         <section className="card">

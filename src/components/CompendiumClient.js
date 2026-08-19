@@ -34,7 +34,9 @@ const SLOT_LABEL = {
 };
 import { describeStats } from "@/lib/marketplace/items.js";
 const tint = (r) => RARITY_META[r]?.color || "#9aa0a6";
-const describe = (stats) => describeStats(stats, { bonus: true });
+// TWO DIFFERENT QUESTIONS on this screen: the milestone line is a bonus you have EARNED, and the sheet is
+// an ITEM, whose damage and armour are the thing itself. Only the caller can tell them apart.
+const describe = (stats, opts) => describeStats(stats, opts);
 
 export default function CompendiumClient() {
     const [data, setData] = useState(null);
@@ -119,7 +121,7 @@ export default function CompendiumClient() {
                     ))}
                 </div>
                 {Object.keys(data.bonus || {}).length ? (
-                    <p className="cmp-bonus">Currently earning <b>{describe(data.bonus)}</b> on everything you do.</p>
+                    <p className="cmp-bonus">Currently earning <b>{describe(data.bonus, { bonus: true })}</b> on everything you do.</p>
                 ) : null}
             </section>
 

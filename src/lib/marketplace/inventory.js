@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, mergeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { COLLECTION_PIECES, pieceById } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
@@ -365,7 +365,14 @@ export async function getInventory(buyerId) {
             return { ...def, owned: true, equipped: equippedIds.has(def.id), bound: isTradeLocked(def.rarity), enhanceLevel: enh?.level || 0,
                 // The shop list has always carried this and an owned item never did, so any screen reading
                 // `statsText` rather than calling describeStats itself showed a blank line for your own gear.
-                statsText: describeStats(def.stats || {}),
+                //
+                // WITH THE FORGE IN IT. This was the base definition, so every card on the gear screen showed
+                // the piece as it left the shop — a +12 sword and a +0 sword of the same name printed the same
+                // line. That was a footnote while the forge only moved affixes and the sheet listed those
+                // separately; it stopped being one when the forge started moving base damage and armour, which
+                // is the number you actually compare two pieces on. `forgeStats` below still says how much of
+                // it the forge bought.
+                statsText: describeStats(mergeStats(def.stats || {}, enh?.statBonus || {})),
                 // The forge bonus ALONE, phrased like every other stat line, so "+1" can finally say what it
                 // bought. The Auction House has shown this on a listing for ages; your own bag never did, so
                 // the one place you inspect your own gear was the one place the enhancement was invisible.

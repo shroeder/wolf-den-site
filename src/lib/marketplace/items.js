@@ -997,12 +997,17 @@ export function mergeStats(base = {}, bonus = {}) {
     return m;
 }
 
+// The piece's own numbers lead, because they are the thing you are looking at; the affixes follow. Exported
+// because the two totals PANELS lay their stats out in a grid rather than a sentence and were printing them in
+// whatever order the server happened to build the object — damage and attack speed landing below crit chance,
+// which is the last place you look for the number every swing starts from.
+export function sortStatKeys(keys = []) {
+    const rank = (k) => (INTRINSIC.has(k) ? 0 : FRACTION.has(k) ? 1 : 2);
+    return [...keys].sort((a, z) => rank(a) - rank(z));
+}
+
 export function describeStats(stats = {}, opts) {
-    // The piece's own numbers lead, because they are the thing you are looking at; the affixes follow.
-    const keys = Object.keys(stats || {}).sort((a, z) => {
-        const rank = (k) => (INTRINSIC.has(k) ? 0 : FRACTION.has(k) ? 1 : 2);
-        return rank(a) - rank(z);
-    });
+    const keys = sortStatKeys(Object.keys(stats || {}));
     return keys.filter((k) => Number(stats[k])).map((k) => describeStat(k, stats[k], opts)).join(" · ");
 }
 

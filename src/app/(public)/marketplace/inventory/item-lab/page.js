@@ -80,6 +80,7 @@ export default async function ItemLabPage({ searchParams }) {
     return (
         <ItemLab
             who={buyer.display_name}
+            inventory={inventory}
             equipped={equippedRows}
             bag={bagRows}
             sets={sets}

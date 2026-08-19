@@ -11,7 +11,7 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, sortStatKeys, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
@@ -404,7 +404,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
     const equipped = data.equipped || {};
     const stats = data.stats || {};
-    const statEntries = Object.entries(stats).filter(([, v]) => v);
+    const statEntries = sortStatKeys(Object.keys(stats)).map((k) => [k, stats[k]]).filter(([, v]) => v);
     const charged = (data.items || []).filter((i) => i.charge);
     // Trophies are not gear. They live in their own section below the bag: you cannot wear, sell, salvage or
     // trade one, so listing them among the things you can is the screen telling you something untrue.
@@ -843,7 +843,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 inside the comparison's "you'd gain" box. */}
                             <div className="eqtraits">
                                 {it.enhanceLevel > 0 && it.forgeStats ? (
-                                    <div className="eqtrait t-forge"><span aria-hidden="true"><ForgeRank level={it.enhanceLevel} size={15} /></span><span><b>Forged to +{it.enhanceLevel}</b><em>{it.forgeStats} — on top of the stats above</em></span></div>
+                                    <div className="eqtrait t-forge"><span aria-hidden="true"><ForgeRank level={it.enhanceLevel} size={15} /></span><span><b>Forged to +{it.enhanceLevel}</b><em>{it.forgeStats} — already counted in the stats above</em></span></div>
                                 ) : null}
                                 {it.util ? (
                                     <div className="eqtrait t-att"><span aria-hidden="true">🔮</span><span><b>+{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</b><em>attunement — a bonus rolled at the Forge</em></span></div>

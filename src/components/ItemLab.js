@@ -8,6 +8,7 @@ import SetsClient from "@/components/SetsClient";
 import CollectionPanel from "@/components/CollectionPanel";
 import InspectableGear from "@/components/InspectableGear";
 import PetsClient from "@/components/PetsClient";
+import EquipmentClient from "@/components/EquipmentClient";
 import ChestOpener from "@/components/ChestOpener";
 import MiningMinigame from "@/components/MiningMinigame";
 
@@ -27,6 +28,7 @@ if (typeof window !== "undefined" && !window.__itemLabStub) {
     window.fetch = (url, opts) => {
         const u = String(url);
         const p = PAYLOADS || {};
+        if (u.includes("/api/marketplace/inventory")) return json(p.inventory || {});
         if (u.includes("/api/marketplace/compendium")) return json(p.compendium || {});
         if (u.includes("/api/marketplace/jeweller")) return json(p.jeweller || {});
         if (u.includes("/api/marketplace/pets")) return json(p.pets || {});
@@ -50,11 +52,11 @@ const CRACKED = { rank: "Rich seam", rankColor: "#8fe3ff", parts: [], tier: 4,
     bonus: { kind: "gear", id: "eternal_timeless_orb", name: "Timeless Orb", icon: "GiCrystalShine",
         rarity: "eternal", stats: { armor: 354, block_chance: 0.44, vitality: 26, tenacity: 7, pierce: 7, counter: 9 } } };
 
-const TABS = ["inspect", "compendium", "jeweller", "sets", "collections", "pets", "chest", "mine"];
+const TABS = ["gear", "inspect", "compendium", "jeweller", "sets", "collections", "pets", "chest", "mine"];
 
-export default function ItemLab({ who, equipped, bag, sets, compendium, jeweller, pets }) {
-    PAYLOADS = { compendium, jeweller, pets };
-    const [tab, setTab] = useState("inspect");
+export default function ItemLab({ who, equipped, bag, sets, inventory, compendium, jeweller, pets }) {
+    PAYLOADS = { inventory, compendium, jeweller, pets };
+    const [tab, setTab] = useState("gear");
 
 
     return (
@@ -72,6 +74,7 @@ export default function ItemLab({ who, equipped, bag, sets, compendium, jeweller
                     </button>
                 ))}
             </div>
+            {tab === "gear" ? <EquipmentClient displayLabel={who} level={60} /> : null}
             {tab === "inspect" ? <InspectableGear equipped={equipped} inventory={bag} /> : null}
             {tab === "compendium" ? <CompendiumClient /> : null}
             {tab === "jeweller" ? <JewellerClient initial={jeweller} /> : null}
