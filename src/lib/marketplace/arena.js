@@ -428,6 +428,8 @@ export async function kitFor(buyerId, opts = {}) {
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
         // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
         counter: Number(stats.counter) || 0,
+        // Raw points; LIFESTEAL_PER_POINT turns them into a share of what you inflict.
+        lifesteal: (Number(stats.lifesteal) || 0) + (perks.lifestealStat || 0),
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
@@ -462,8 +464,10 @@ export async function kitFor(buyerId, opts = {}) {
         // Brutality: the class's own, plus the tree's. Reaver carries base damage the way the Warden carries
         // base Lifedrink — "hit hardest" was a tagline the numbers did not pay for.
         dmgPct: Math.max(0, (base.dmgPct || 0) + (perks.dmgPct || 0)),
-        // Gear-only, capped: a coin flip for a free swing every attack is a different game.
-        doublestrike: Math.min(0.25, Math.max(0, (Number(stats.doublestrike) || 0) / 100)),
+        // Raw points, uncapped — the engine turns them into a chance (DOUBLESTRIKE_PER_POINT). The old 25%
+        // ceiling is gone for the same reason the crit-chance one is: past 100% it just means two blows every
+        // time, with the surplus rolling for a third.
+        doublestrike: Number(stats.doublestrike) || 0,
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep

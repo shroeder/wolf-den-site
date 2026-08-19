@@ -27,6 +27,8 @@ import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marke
 export const DEFAULT_SPEED = 10;
 export const PIERCE_PER_POINT = 0.005;
 export const COUNTER_PER_POINT = 0.0025;
+export const DOUBLESTRIKE_PER_POINT = 0.005;
+export const LIFESTEAL_PER_POINT = 0.0025;
 
 export function ringStats(stats = {}) {
     return {
@@ -44,6 +46,8 @@ export function ringStats(stats = {}) {
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         pierce: Number(stats.pierce) || 0,
         counter: Number(stats.counter) || 0,
+        doublestrike: Number(stats.doublestrike) || 0,
+        lifesteal: Number(stats.lifesteal) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
         // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
         guard: Number(stats.guard) || DEFAULT_GUARD,
@@ -286,6 +290,11 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         pierce: Math.max(0, Math.min(1, (Number(f.pierce) || 0) * PIERCE_PER_POINT)),
         // 1 point = 0.25% chance to answer a blow with one of your own. Item-exclusive.
         counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT)),
+        // 1 point = 0.5% chance the swing lands twice. Uncapped, like crit chance: past 100% it is simply
+        // always two, and the surplus rolls for a third.
+        doublestrike: Math.max(0, (Number(f.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT),
+        // 1 point = 0.25% of whatever you actually inflict, healed back.
+        lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT),
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -298,18 +307,35 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     let nextB = 1 / B.speed;
     let swings = 0;
 
+    // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the
+    // whole multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
+    const blows = (ds) => {
+        if (ds <= 0) return 1;
+        const guaranteed = 1 + Math.floor(ds);
+        return guaranteed + (rng() < ds - Math.floor(ds) ? 1 : 0);
+    };
+
     const swing = (att, def, who) => {
-        const stacks = critStacks(att.critChance, rng);
-        const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
-        // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────────
-        // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour in
-        // full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter with
-        // no pierce is exactly where they were.
-        const through = raw * att.pierce;
-        const rest = raw - through;
-        const dealt = Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
+        // Each blow of a doublestrike rolls its own crit, so the stat is variance as well as volume.
+        const hits = blows(att.doublestrike);
+        let dealt = 0;
+        let anyCrit = false;
+        for (let i = 0; i < hits; i += 1) {
+            const stacks = critStacks(att.critChance, rng);
+            if (stacks > 0) anyCrit = true;
+            const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
+            // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────
+            // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour
+            // in full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter
+            // with no pierce is exactly where they were.
+            const through = raw * att.pierce;
+            const rest = raw - through;
+            dealt += Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
+        }
         def.hp -= dealt;
-        log.push({ t, who, dmg: dealt, crit: stacks > 0, stacks });
+        // Lifedrink is off what you ACTUALLY inflict, not what you swung for — armour eats the healing too.
+        if (att.lifesteal > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(dealt * att.lifesteal));
+        log.push({ t, who, dmg: dealt, crit: anyCrit, hits });
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
