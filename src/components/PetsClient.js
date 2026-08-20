@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
@@ -132,18 +131,17 @@ export default function PetsClient() {
     // it seen server-side, so a later reload returns an empty list — and the flags would vanish mid-visit.
     const [newIds, setNewIds] = useState(null);
     const newSet = useMemo(() => new Set(newIds || []), [newIds]);
-    const [celebrateQueue, setCelebrateQueue] = useState([]);
 
     async function load() {
         const r = await fetch("/api/marketplace/pets", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (!d) return;
         setState(d);
-        if (newIds === null) {
-            const fresh = (d.newPets || []).filter((id) => collectibleById(id));
-            setNewIds(fresh);
-            if (fresh.length) setCelebrateQueue(fresh.map((id) => collectibleById(id)));
-        }
+        // The FLAGS stay here — a pop-up you dismiss still leaves you looking at a hundred identical cards,
+        // which was GrayKitsune's point. The CELEBRATION does not: <PetAlerts> in the layout now shows that
+        // wherever you were standing when the pet actually arrived, so popping it again on arrival at this
+        // page would be the same moment told twice, late.
+        if (newIds === null) setNewIds((d.newPets || []).filter((id) => collectibleById(id)));
     }
     useEffect(() => { load(); }, []);
 
@@ -154,15 +152,6 @@ export default function PetsClient() {
     useEffect(() => setMounted(true), []);
     const [modalErr, setModalErr] = useState(null);
     const [sending, setSending] = useState(false);
-    const [celebrate, setCelebrate] = useState(null); // pet to show a receive/unlock celebration for
-    // One celebration at a time — earning two pets at once should be two moments, not a pile. Declared here
-    // rather than beside the queue itself because it reads `celebrate`, which is the line above.
-    useEffect(() => {
-        if (!celebrate && celebrateQueue.length) {
-            setCelebrate(celebrateQueue[0]);
-            setCelebrateQueue((q) => q.slice(1));
-        }
-    }, [celebrate, celebrateQueue]);
     const [detail, setDetail] = useState(null); // pet whose detail PAGE is open (in-flow, not a modal)
     // Give-a-copy: folded into the detail page as an expandable member-search panel (no more @handle typing).
     const [giveOpen, setGiveOpen] = useState(false);
@@ -249,7 +238,9 @@ export default function PetsClient() {
         setBusy(null);
         if (r?.ok && d?.ok) {
             if (act === "equip") { setJustEquipped(petId); setTimeout(() => setJustEquipped(null), 900); }
-            if (act === "accept") setCelebrate(collectibleById(d.petId) || null);
+            // Handed to the ONE celebration card, the same way a level-up is — so accepting a gift looks
+            // identical to a pet arriving any other way.
+            if (act === "accept" && d.petId) window.dispatchEvent(new CustomEvent("wolfden-pet-new", { detail: { petId: d.petId } }));
             await load();
             return true;
         }
@@ -691,21 +682,8 @@ export default function PetsClient() {
             {/* Pet detail — a full in-flow PAGE (breadcrumb back), not a modal, so it scrolls normally. */}
             {mounted && detail ? renderDetail() : null}
 
-            {/* Receive/unlock celebration. */}
-            {mounted && celebrate ? createPortal(
-                <div className="petx-overlay petx-celebrate" onClick={() => setCelebrate(null)}>
-                    <div className={`petx-cele rarity-${celebrate.rarity}`} onClick={(e) => e.stopPropagation()}>
-                        <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
-                        <div className="petx-hero petx-hero-big">
-                            <span className="petx-hero-glow" />
-                            <span className="petx-hero-icon" style={{ color: celebrate.color }}><PetArt id={celebrate.id} /></span>
-                        </div>
-                        <div className="petx-cele-tag">New pet!</div>
-                        <h2 className="petx-title">{celebrate.name}</h2>
-                        <p className="petx-sub">{celebrate.rarity} companion added to your collection.</p>
-                        <button type="button" className="btn-gold" onClick={() => setCelebrate(null)}>Awesome</button>
-                    </div>
-                </div>, document.body) : null}
+            {/* The receive/unlock celebration moved to <PetAlerts> in the layout, so it fires wherever the
+                member happens to be when the pet lands rather than on their next visit to this page. */}
 
         </div>
     );

@@ -3,15 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import PetArt from "@/components/PetArt";
 import { collectibleById, petActive, petActiveLevelMult, petPassive, petPassiveLevelMult, PET_STAT_META } from "@/lib/marketplace/collectibles.js";
 
-// ── GLOBAL pet level-up watcher ──────────────────────────────────────────────────────────────────────────
-// Mounted once in the marketplace layout so a pet leveling up is celebrated ANYWHERE in the app — not just on
-// the pets page. Pets gain XP from your actions (boss strikes, farm petting, treats) and a slow trickle; every
+// ── GLOBAL pet watcher: A PET ARRIVED, A PET LEVELLED ────────────────────────────────────────────────────
+// Mounted once in the marketplace layout so both moments are celebrated ANYWHERE in the app — not just on
+// the pets page. Two celebrations, one watcher, because they come off the SAME poll: a second component
+// would double every request to an endpoint that syncs pet state on each call.
+//
+// GETTING a pet used to be announced only by the pets page, on the next visit — the server flags what was
+// granted since you last opened it and PetsClient popped the card on arrival. So the moment a pet dropped
+// (a harvest, a chest, a gift) nothing happened, and the celebration turned up later, detached from the
+// thing that caused it. Luke: "id like to see it no matter where I am and when I get it." Pets gain XP from your actions (boss strikes, farm petting, treats) and a slow trickle; every
 // such action fires `wolfden-hud-refresh`, which we listen for. We compare each pet's level to what this browser
 // last saw (localStorage) and, on a gain, play a juiced Pokémon-style evolution reveal: the OLD-level sprite
 // flashes to a silhouette and transforms into the NEW-level sprite.
 const SEEN_KEY = "wd_pet_levels_seen";
+// The collection as this browser last saw it. A pet in the server's list that is NOT in here is one that
+// arrived since — which is the honest definition of "new to you", and it does not care WHERE you were when
+// it landed. Deliberately not the server's `newPets`: that clears the moment the pets page is opened, so it
+// answers "new since you last looked at the pets screen" rather than "new since you last saw it announced".
+const OWNED_KEY = "wd_pets_owned_seen";
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const rc = (r) => RARITY_COLOR[r] || "#ffd75e";
 
@@ -35,8 +47,9 @@ function chime() {
     } catch { /* audio may be blocked until a gesture — fine */ }
 }
 
-export default function PetLevelUp() {
-    const [queue, setQueue] = useState([]); // pending celebrations (one shown at a time)
+export default function PetAlerts() {
+    const [queue, setQueue] = useState([]);       // pending level-ups (one shown at a time)
+    const [arrived, setArrived] = useState([]);   // pets that have just joined the collection
     const [mounted, setMounted] = useState(false);
     const inFlight = useRef(false);
     const lastCheck = useRef(0);
@@ -75,6 +88,32 @@ export default function PetLevelUp() {
                 }
             }
             try { localStorage.setItem(SEEN_KEY, JSON.stringify(now)); } catch { /* ignore */ }
+
+            // ── AND WHETHER THE COLLECTION ITSELF GREW ───────────────────────────────────────────────────
+            // Same poll, same baseline-in-localStorage trick as the levels above. No baseline yet means a
+            // browser that has never looked: record what is owned and celebrate nothing, or signing in on a
+            // new phone would replay a hundred pets you have had for months.
+            // A response WITHOUT the list is not a member who owns nothing — it is a response that did not
+            // answer the question. Writing [] as the baseline off one of those would make every pet look new
+            // on the next poll and fire a parade of cards for animals owned for months, so an absent list is
+            // skipped entirely rather than believed.
+            if (Array.isArray(d.ownedIds)) {
+                const owned = d.ownedIds.map(String);
+                let hadOwned = null;
+                try { const raw = localStorage.getItem(OWNED_KEY); hadOwned = raw ? JSON.parse(raw) : null; } catch { hadOwned = null; }
+                if (Array.isArray(hadOwned)) {
+                    const had = new Set(hadOwned);
+                    const fresh = owned.filter((id) => !had.has(id)).map((id) => collectibleById(id)).filter(Boolean);
+                    // Two or three at once is a good day. Ten is a baseline that has drifted, and the right
+                    // answer to a desync is to resync quietly, not to hold a ceremony for each one.
+                    if (fresh.length && fresh.length <= 6) {
+                        setArrived((q) => [...q, ...fresh.filter((x) => !q.some((y) => y.id === x.id))]);
+                        chime();
+                    }
+                }
+                try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch { /* ignore */ }
+            }
+
             if (gains.length) {
                 gains.sort((a, b) => b.to - a.to);
                 setQueue((q) => [...q, ...gains]);
@@ -118,6 +157,25 @@ export default function PetLevelUp() {
         return () => window.removeEventListener("wolfden-pet-levelup", onDirect);
     }, []);
 
+    // The same hand-off for a pet ARRIVING, so a screen that grants one (accepting a gift, a harvest) gets
+    // the card instantly instead of on the next poll — and stamps the baseline, so the poll that follows does
+    // not celebrate it a second time.
+    useEffect(() => {
+        const onNew = (e) => {
+            const pet = collectibleById(e?.detail?.petId);
+            if (!pet) return;
+            setArrived((q) => (q.some((x) => x.id === pet.id) ? q : [...q, pet]));
+            try {
+                const raw = localStorage.getItem(OWNED_KEY);
+                const list = raw ? JSON.parse(raw) : [];
+                if (Array.isArray(list) && !list.includes(pet.id)) localStorage.setItem(OWNED_KEY, JSON.stringify([...list, pet.id]));
+            } catch { /* ignore */ }
+            chime();
+        };
+        window.addEventListener("wolfden-pet-new", onNew);
+        return () => window.removeEventListener("wolfden-pet-new", onNew);
+    }, []);
+
     // Check on mount (catches trickle level-ups), whenever an action awards XP (pets earn a 12% share, so this
     // is the moment a pet may tick over a level), on tab focus, and a slow safety poll.
     useEffect(() => {
@@ -139,7 +197,35 @@ export default function PetLevelUp() {
 
     const current = queue[0] || null;
     const dismiss = () => setQueue((q) => q.slice(1));
-    if (!mounted || !current) return null;
+    if (!mounted) return null;
+
+    // ── A PET ARRIVED ────────────────────────────────────────────────────────────────────────────────────
+    // Shown ahead of any level-up in the queue: you got the pet before it grew, so that is the order the two
+    // cards should arrive in. Same markup the pets page used, so there is one look for this moment and it is
+    // still the one members already know.
+    const joined = arrived[0] || null;
+    if (joined) {
+        const shed = () => setArrived((q) => q.slice(1));
+        return createPortal(
+            <div className="petx-overlay petx-celebrate" onClick={shed} role="dialog" aria-modal="true" aria-label={`New pet: ${joined.name}`}>
+                <div className={`petx-cele rarity-${joined.rarity}`} onClick={(e) => e.stopPropagation()}>
+                    <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["✨", "🎉", "⭐", "🌟"][i % 4]}</span>)}</div>
+                    <div className="petx-hero petx-hero-big">
+                        <span className="petx-hero-glow" />
+                        <span className="petx-hero-icon" style={{ color: joined.color }}><PetArt id={joined.id} /></span>
+                    </div>
+                    <div className="petx-cele-tag">New pet!</div>
+                    <h2 className="petx-title">{joined.name}</h2>
+                    <p className="petx-sub">{joined.rarity} companion added to your collection.</p>
+                    <a className="btn-gold" href={`/marketplace/pets?pet=${encodeURIComponent(joined.id)}`}>See {joined.name}</a>
+                    <button type="button" className="petx-cele-later" onClick={shed}>Later</button>
+                </div>
+            </div>,
+            document.body
+        );
+    }
+
+    if (!current) return null;
 
     const accent = rc(current.pet.rarity);
     const evolves = current.oldArt?.url && current.newArt?.url && current.oldArt.url !== current.newArt.url;

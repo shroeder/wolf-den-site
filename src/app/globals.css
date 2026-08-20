@@ -10677,6 +10677,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .petx-err { color: #ff8a8a; font-size: 0.82rem; margin: 8px 0 0; }
 .petx-actions { display: flex; gap: 10px; margin-top: 16px; }
 .petx-actions button { flex: 1; padding: 12px; }
+/* The arrival card gained a way through to the pet itself, so its primary control is now an anchor — and the
+   site-wide link colour would paint a gold button's label blue. Stated here, on the anchor. */
+.petx-celebrate a.btn-gold { display: inline-block; color: #241a05; text-decoration: none; }
+.petx-celebrate a.btn-gold:hover, .petx-celebrate a.btn-gold:focus-visible { color: #241a05; }
+.petx-cele-later { display: block; margin: 8px auto 0; padding: 6px 14px; background: none; border: 0; cursor: pointer;
+    font-size: 0.78rem; font-weight: 800; color: rgba(255,255,255,0.55); }
+.petx-cele-later:hover, .petx-cele-later:focus-visible { color: rgba(255,255,255,0.85); }
 .petx-cele-tag { display: inline-block; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #0e1015; background: var(--glow, #ffd75e); padding: 3px 12px; border-radius: 999px; margin-bottom: 4px; }
 .petx-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: 20px; }
 .petx-confetti span { position: absolute; top: -10%; left: calc((var(--i) + 1) * 6.5%); font-size: 1rem; animation: petxFall 1.6s ease-in forwards; animation-delay: calc(var(--i) * 0.06s); opacity: 0; }

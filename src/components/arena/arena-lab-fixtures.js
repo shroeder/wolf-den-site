@@ -3,7 +3,7 @@
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
 import { autoBout } from "@/lib/marketplace/arena-engine.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
-import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
+import { arenaLevelFor, arenaXpFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 
 // One source for the fixture's build, so the kit strip, the tree and the header all describe the SAME hero.
@@ -173,8 +173,10 @@ export function makeBout(over = {}) {
 
 // Recap fixtures on the VP contract. These carried posFrom/posTo/rank, which the move to Victory Points
 // removed — and because the Recap component gated on `recap.rank`, the lab could not have shown the bug.
+// `arenaXp` comes off the real function rather than a number typed in here: it is the only payout a LOSS
+// makes, so a fixture that omitted it is a fixture that could not show the defeat card's actual contents.
 const RECAP_WIN = {
-    won: true, foe: FOE, reward: { gold: 214, xp: 89, vp: 96, laurels: 121 },
+    won: true, foe: FOE, reward: { gold: 214, xp: 89, vp: 96, laurels: 121, arenaXp: arenaXpFor({ won: true, myPower: 340, theirPower: 372, kind: "member" }) },
     vpGain: 96, vpFrom: 1040, vpTo: 1136, rankTo: 9, size: 84,
     npcTier: null, npcUnlocked: false,
     feats: [
@@ -185,7 +187,7 @@ const RECAP_WIN = {
 
 const RECAP_RANKUP = {
     ...RECAP_WIN,
-    reward: { gold: 306, xp: 121, vp: 168, laurels: 256 },
+    reward: { gold: 306, xp: 121, vp: 168, laurels: 256, arenaXp: arenaXpFor({ won: true, myPower: 340, theirPower: 448, kind: "gauntlet" }) },
     vpGain: 168, vpFrom: 1040, vpTo: 1208, rankTo: 6,
     npcTier: 14, npcUnlocked: true,
     feats: [
@@ -197,7 +199,7 @@ const RECAP_RANKUP = {
 };
 
 const RECAP_LOSS = {
-    won: false, foe: FOE, reward: { gold: 0, xp: 0, vp: 0, laurels: 38 },
+    won: false, foe: FOE, reward: { gold: 0, xp: 0, vp: 0, laurels: 38, arenaXp: arenaXpFor({ won: false, myPower: 340, theirPower: 372, kind: "gauntlet" }) },
     vpGain: 0, vpFrom: 1040, vpTo: 1040, rankTo: 12, size: 84,
     npcTier: null, npcUnlocked: false, feats: [],
     streak: 0, bestStreak: 5, rounds: 7,

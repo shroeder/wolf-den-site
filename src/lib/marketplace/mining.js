@@ -1457,19 +1457,28 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     for (const [partTier, count] of Object.entries(made)) await addParts(buyerId, Number(partTier), count).catch(() => {});
 
     // Curios — the reason to care about a perfect pour beyond the part count.
+    //
+    // AWARDED IN ONE WRITE, NOT ONE PER CHEST. A pour used to cover ten batches at most; it now covers the
+    // whole pack, so anything that was "a handful of round trips" at ten is a queue of them at ninety. The
+    // chests are all the same tier by definition (the line below is a function of the ore, not the ticket),
+    // so they are one call with a count and one art lookup no matter how many turned up.
     const bonus = [];
+    // Capped at iron. A gold chest out of a furnace is exactly the "crazy good" this should not be.
+    const chestTier = t >= 3 ? "iron" : "wooden";
+    const chestCount = curios.filter((c) => c === "chest").length;
+    if (chestCount > 0) {
+        await addChests(buyerId, { [chestTier]: chestCount }, { source: "mining" }).catch(() => {});
+        // Hand back the ART with the chest, the way grantMiningConsumable does. Without it the reveal had
+        // nothing to draw and printed the words "wooden chest" next to a sprite-less gap.
+        const art = await chestArtFor(chestTier);
+        const name = `${chestTier[0].toUpperCase()}${chestTier.slice(1)} chest`;
+        for (let i = 0; i < chestCount; i += 1) bonus.push({ kind: "chest", tier: chestTier, name, art });
+    }
     for (const c of curios) {
-        if (c === "chest") {
-            // Capped at iron. A gold chest out of a furnace is exactly the "crazy good" this should not be.
-            const chestTier = t >= 3 ? "iron" : "wooden";
-            await addChests(buyerId, { [chestTier]: 1 }, { source: "mining" }).catch(() => {});
-            // Hand back the ART with the chest, the way grantMiningConsumable does. Without it the reveal had
-            // nothing to draw and printed the words "wooden chest" next to a sprite-less gap.
-            bonus.push({ kind: "chest", tier: chestTier, name: `${chestTier[0].toUpperCase()}${chestTier.slice(1)} chest`, art: await chestArtFor(chestTier) });
-        } else {
-            const got = await grantMiningConsumable(buyerId);
-            if (got) bonus.push({ kind: "consumable", ...got });
-        }
+        if (c === "chest") continue;
+        // eslint-disable-next-line no-await-in-loop
+        const got = await grantMiningConsumable(buyerId);
+        if (got) bonus.push({ kind: "consumable", ...got });
     }
 
     const totalParts = Object.values(made).reduce((a, b) => a + b, 0);

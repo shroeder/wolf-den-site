@@ -524,6 +524,13 @@ function Recap({ bout, busy, onClose }) {
         return { dealt, taken, blocked, crits, healed, best };
     })();
 
+    // The escape hatch above, held back so it cannot be the thing you tap on the way past.
+    const [hatch, setHatch] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => setHatch(true), 7000);
+        return () => clearTimeout(t);
+    }, []);
+
     const feats = Array.isArray(r?.feats) ? r.feats : [];
     // ── A RAID IS PAID BY THE RAID, AND MUST BE REPORTED BY IT TOO ───────────────────────────────────────
     // A town bout earns no VP, no laurels, no streak and no feats — its spoils are xp/coin/loot from
@@ -552,9 +559,18 @@ function Recap({ bout, busy, onClose }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 padding: 18, overflowY: "auto",
             }}
-            onClick={() => { if (!busy) onClose(); }}>
-            <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
-                aria-label={raid ? "Back to the plaza" : r?.fishing ? "Back to the water" : "Back to the ladder"}>Close</button>
+            onClick={(e) => e.stopPropagation()}>
+            {/* ── THE HATCH IS NOT A SKIP BUTTON ──────────────────────────────────────────────────────────
+                A corner "Close" sitting above the card, plus a backdrop that dismissed on any tap, meant the
+                recap could be gone before it had been read — Luke: "the button before it lets me skip the
+                modal which I dont like". The backdrop no longer dismisses at all, and the corner button is
+                held back for a few seconds so the card's own control is the way out of a normal fight.
+                It still ARRIVES, because the reason it exists has not gone away: this screen has twice been a
+                dark sheet with nothing to press, and a member stuck on one needs something more than advice. */}
+            {hatch ? (
+                <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
+                    aria-label={raid ? "Back to the plaza" : r?.fishing ? "Back to the water" : "Back to the ladder"}>Close</button>
+            ) : null}
             <div className="ar-recap-card" onClick={(e) => e.stopPropagation()}>
                 <div className="ar-rays" aria-hidden="true">
                     {Array.from({ length: won ? 24 : 12 }).map((_, i) => (
@@ -672,6 +688,12 @@ function Recap({ bout, busy, onClose }) {
                     {reward?.gold ? <span><i>Gold</i><b>+{money(reward.gold)}</b></span> : null}
                     {reward?.coin ? <span><i>Gold</i><b>+{money(reward.coin)}</b></span> : null}
                     {reward?.xp ? <span><i>XP</i><b>+{money(reward.xp)}</b></span> : null}
+                    {/* ── THE XP THAT BUYS SKILL POINTS ───────────────────────────────────────────────────
+                        Every bout pays arena XP — the currency behind your class level and every point in the
+                        tree — and this card has never once said so. It is the ONLY payout a loss makes, which
+                        is why a defeat read as having earned nothing at all: the row for it did not exist.
+                        Luke, on the defeat card: "failure modal doesnt show exp". */}
+                    {reward?.arenaXp ? <span><i>Arena XP</i><b>+{money(reward.arenaXp)}</b></span> : null}
                     {/* No streak line on a raid: the Arena's streak is not touched by a plaza fight, so printing
                         "Streak 0" under one was the screen reporting a number that does not apply as a loss. */}
                     {raid || haul ? null : (

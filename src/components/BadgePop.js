@@ -93,15 +93,23 @@ export default function BadgePop() {
                     <span><b>+{badge.gold}</b><em>gold</em></span>
                 </div>
 
-                {/* The part nobody knew: a badge is a live number in the system it came from, for good. */}
-                {badge.bonus?.length ? (
-                    <div className="bdg-bonus">
-                        {badge.bonus.map((b) => (
-                            <p key={b.where}><i>{b.where}</i>{b.what}</p>
-                        ))}
-                        <em>Permanent, and it stacks with every other badge you hold.</em>
-                    </div>
-                ) : null}
+                {/* The part nobody knew: a badge is a live number in the system it came from, for good.
+                    AND WHEN IT IS NOT — 35 of the badges carry no stat at all, and this block simply vanished
+                    for them, leaving a card that looked like it had forgotten to say something. Luke, on the
+                    Enshriner card: "this badge doesnt show what bonus it gives". Silence is the one thing a
+                    card cannot do here: it reads identically to a bug. Say which it is, either way. */}
+                <div className={`bdg-bonus${badge.bonus?.length ? "" : " is-none"}`}>
+                    {badge.bonus?.length ? (
+                        <>
+                            {badge.bonus.map((b) => (
+                                <p key={b.where}><i>{b.where}</i>{b.what}</p>
+                            ))}
+                            <em>Permanent, and it stacks with every other badge you hold.</em>
+                        </>
+                    ) : (
+                        <p className="bdg-none">No stat bonus &mdash; this one is the XP, the gold and the record of it.</p>
+                    )}
+                </div>
 
                 <div className="bdg-acts">
                     <button type="button" className="bdg-take" onClick={dismiss}>Nice</button>
@@ -156,6 +164,8 @@ export default function BadgePop() {
                 .bdg-bonus p { margin: 0 0 4px; font-size: 0.82rem; color: #e8dcc6; }
                 .bdg-bonus i { display: block; font-style: normal; font-size: 0.62rem; font-weight: 900;
                     letter-spacing: .1em; text-transform: uppercase; color: var(--c); }
+                .bdg-bonus.is-none { background: rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.1); text-align: center; }
+                .bdg-none { margin: 0 !important; font-size: 0.78rem !important; color: #9aa2ab !important; }
                 .bdg-bonus em { display: block; font-style: normal; font-size: 0.72rem; color: #9aa2ab; margin-top: 6px; }
                 .bdg-acts { display: grid; gap: 7px; margin-top: 15px; }
                 .bdg-take { padding: 13px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(255,225,140,0.6);

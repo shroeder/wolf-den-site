@@ -6,7 +6,7 @@ import GuideStrip from "@/components/GuideStrip";
 import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import PetStoneFound from "@/components/PetStoneFound";
-import PetLevelUp from "@/components/PetLevelUp";
+import PetAlerts from "@/components/PetAlerts";
 import LocationPrompt from "@/components/LocationPrompt";
 import MusterHorn from "@/components/MusterHorn";
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
@@ -36,7 +36,7 @@ export default function PublicLayout({ children }) {
             {/* Site-wide so a level-up earned while shopping still celebrates, not just on /marketplace. */}
             <LevelUpWatcher />
             {/* Site-wide pet level-up / evolution celebration — fires anywhere a pet ticks over a level. */}
-            <PetLevelUp />
+            <PetAlerts />
             {/* One global listener for a stone turning up, for the same reason the level-up has one: four
                 systems can drop them and four separate celebrations would drift apart within a month. */}
             <PetStoneFound />
