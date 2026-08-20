@@ -2167,8 +2167,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 }} />
                             <span className="ar-next-who">
                                 <b>{next.name}</b>
-                                <em>#{next.rung} · {next.archetypeName} · {next.power.toLocaleString()} power</em>
+                                <em>#{next.rung} · {next.className ? `${next.className} ` : ""}{next.archetypeName} · {next.power.toLocaleString()} power</em>
                                 <i>{next.tell}</i>
+                                {/* WHAT IT CARRIES. The shape and the mood do not say whether it drinks what
+                                    it lands or answers every blow, and a bout is over in seconds — before it
+                                    is the only place a member gets to decide anything. */}
+                                {next.tells?.length ? (
+                                    <span className="ar-next-tells">
+                                        {next.tells.map((t) => <b key={t.key}>{t.text}</b>)}
+                                    </span>
+                                ) : null}
                             </span>
                         </span>
                         <span className="ar-next-prize">{next.reward?.label}</span>

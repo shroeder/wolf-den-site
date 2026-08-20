@@ -1,4 +1,4 @@
-import { ARCHETYPES } from "@/lib/marketplace/arena-npc.js";
+import { ARCHETYPES, npcBuild } from "@/lib/marketplace/arena-npc.js";
 
 // ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────────────
 // A hundred named opponents, each beatable exactly ONCE, in whatever order you like.
@@ -187,6 +187,8 @@ export function ladderFoe(rung) {
     // The house index rides along for CHAMPIONS so they are not all the same shape. `within + 3` is constant
     // at the tenth of every house, so every champion on the road was a Wall — ten boss fights with one answer.
     const arch = ARCHETYPES[(champion ? within + 3 + Math.floor((n - 1) / 10) : within) % ARCHETYPES.length];
+    // The whole character behind this rung, so the card can name what it carries rather than only its shape.
+    const build = npcBuild(n);
     // ── A CHAMPION IS NOT A POWER SPIKE ──────────────────────────────────────────────────────────────
     // It was +35% power, and that was the single worst discontinuity on the Road: rung 90 came out at 1,019
     // against rung 89's 731, so the DOORWAY into a house was harder than the entire house behind it. Walked
@@ -221,6 +223,15 @@ export function ladderFoe(rung) {
         archetype: arch.key,
         archetypeName: arch.name,
         tell: arch.tell,
+        // ── WHO YOU ARE ACTUALLY WALKING UP TO ───────────────────────────────────────────────────────────
+        // The archetype is a shape and the tell is a mood; neither says what the fighter CARRIES. A bout
+        // resolves in seconds, so the only place a member can make a decision is before it, and a foe whose
+        // affixes you cannot see is a coin toss wearing a portrait. npcBuild is the whole character — class,
+        // tree, gear, affixes — and  is the two or three facts worth shouting across the sand.
+        className: build.className,
+        classId: build.classId,
+        points: build.points,
+        tells: build.tells,
         power,
         reward: ladderReward(n),
     };

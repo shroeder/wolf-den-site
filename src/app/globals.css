@@ -17001,3 +17001,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fish-prize-copy b { font-size: 0.95rem; line-height: 1.25; }
 .fish-prize-copy span { font-size: 0.74rem; color: #8fa2b2; }
 @keyframes fishPrizeIn { 0% { opacity: 0; transform: translateY(10px) scale(.94); } 100% { opacity: 1; transform: none; } }
+
+/* What the next rung carries — small chips under its name, so the shape (Wall, Brute) and the FACTS (drinks
+   what it lands, stuns) are legible as two different kinds of information. */
+.ar-next-tells { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ar-next-tells b { font-size: 0.66rem; font-weight: 800; letter-spacing: .01em; color: #ffd08a;
+    background: rgba(255,176,71,0.13); border: 1px solid rgba(255,176,71,0.34);
+    border-radius: 999px; padding: 1px 7px; }
