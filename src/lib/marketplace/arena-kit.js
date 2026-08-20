@@ -685,7 +685,19 @@ export const arenaWinXp = (power = 0) =>
 // bout is decided by the ratio between them. Raise it the day gear can carry more and nothing about any
 // existing matchup changes — only the size of the numbers on the card.
 export const MIGHT_MAX = 500;
-export const DAMAGE_MAX = 10000;
+// ── 10000 -> 3500: BOUTS WERE ONE AND A HALF SWINGS LONG ──────────────────────────────────────────────────────
+// Measured on the live board, an equal fight was settled in 1.5 swings at the top (Eric 1.47, JT 1.51) and
+// under 2.4 for almost everybody. Luke: "combat feels one shotty."
+//
+// The note under HEALTH_MAX had already named this exact failure — it calls 10000 damage against 5000 health
+// "Luke's first pair" and says it makes "every bout in the game one beat long" — and then proposed fixing it
+// from the HEALTH side (110000 to 10000). That was never applied, and turning it now would multiply every
+// health number on every card by twenty-two. Turning the DAMAGE ceiling instead reaches the same ratio and
+// leaves the numbers members already read alone.
+//
+// It cancels out of every matchup exactly the way MIGHT_MAX does — both fighters are divided by the same
+// ceiling — so this lengthens fights without moving who beats whom.
+export const DAMAGE_MAX = 3500;
 // ── THE WEAPON CARRIES THE BASE ──────────────────────────────────────────────────────────────────────────────
 // SWING_BASE was one global number for every fighter in the game. It is the WEAPON's now: `base_damage` on the
 // main hand is what Might multiplies, so a tier-1 blade and a primordial one are different weapons before a
