@@ -1,5 +1,5 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
-import { ITEMS, sumItemStats } from "@/lib/marketplace/items.js";
+import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
 import { CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
@@ -52,7 +52,12 @@ export const bandForTier = (tier) => {
 // These ARE the stat budget now, not an abstract "power": npcPower(t) is how many points of Might, Crit
 // Chance, Crit Power and Ferocity a tier gets to spend, in the same units a member's gear is measured in
 // (best-in-slot across nine slots totals 644). Set by scripts/check-arena.mjs against four real loadouts.
-const BASE_POWER = 34;
+// Lowered from 34 when rungs started arriving FORGED. Enhancing every piece and rerolling the affixes into a
+// few big lines is worth about four and a half rungs on its own, so the stat budget gives that back — the
+// difficulty is the same, it is just carried by gear somebody worked rather than by a bigger raw number.
+// Calibrated so a member at roughly 40% gear and 30% tree walls at rung 40, which is Luke's own read of where
+// he should be: scripts/check-road.mjs.
+const BASE_POWER = 25;
 const GROWTH = 1.07;
 
 export function npcPower(tier) {
@@ -216,15 +221,73 @@ const PROC_LEAN = {
     berserker: { doublestrike: 1.6, haste: 1.5, crit_chance: 1.1, crit_power: 1.0, pierce: 1.0, stun: 0.7, counter: 0.3, lifesteal: 0.3 },
 };
 
-/** The affixes rolled onto a rung's gear. Deterministic, and thinner the lower down you are. */
+// ── A HIGH RUNG HAS WORKED ITS GEAR ──────────────────────────────────────────────────────────────────────────
+// Luke's brief: a rung near the top should look like somebody who has actually forged what they are wearing —
+// enhanced every piece, and been SELECTIVE about rerolling, pushing the affixes they did not want into the ones
+// they did. That is what a member at that height has done, so it is what they should be facing.
+//
+// Two separate things, and the difference matters:
+//
+//   ENHANCED  every piece levelled at the forge. That is a bigger weapon and thicker plate — the rates are the
+//             forge's own (items.js FORGE), not numbers invented here, so the two can never drift.
+//   REROLLED  a member does not carry eight small affixes. They carry three or four BIG ones, because every
+//             reroll takes a line they did not want and moves its whole value onto one they did. Spreading a
+//             budget evenly is what an unplayed piece looks like; concentration is the fingerprint of somebody
+//             who has been to the bench.
+//
+// So the affix budget is poured into the few lines the archetype actually wants, and then forged up to the cap
+// the real forge would allow.
+
+// How far a rung has taken the forge. Nothing at the bottom — you do not forge a Straw Dummy's stick — and the
+// peak by the time the ladder is well past anything a member is wearing.
+const NPC_FORGE_PER_TIER = 0.32;
+export const npcForgeLevel = (tier) => Math.max(0, Math.min(FORGE.MAX_LEVEL,
+    Math.floor(Math.max(0, Math.round(tier) - 6) * NPC_FORGE_PER_TIER)));
+
+// ── HOW MUCH OF THEIR SET HAS BEEN REROLLED ──────────────────────────────────────────────────────────────────
+// Nobody rerolls a common. A rung low down wears what it found — a thin, even smear of whatever the items came
+// with — and a rung near the top has been to the bench over and over, taking the lines it did not want and
+// moving their whole value onto the ones it did. So concentration RAMPS, and it is the fingerprint that tells
+// the two apart: an unplayed set has eight small affixes, a worked one has three big ones.
+const REROLL_FULL_TIER = 55;
+const rerollFrac = (tier) => Math.max(0, Math.min(0.85, (Math.max(1, tier) - 8) / (REROLL_FULL_TIER - 8)));
+
+// How many lines they have concentrated INTO. Two low down, five at the top.
+const npcAffixLines = (tier) => Math.max(2, Math.min(5, 2 + Math.floor(Math.max(0, tier - 10) / 13)));
+
+/**
+ * The affixes actually on a rung's gear: what the items carried, then rerolled toward what the archetype wants
+ * and forged up. Deterministic — the same rung is the same fighter every time you meet it.
+ *
+ * THE BUDGET IS CONSERVED. A reroll MOVES a value, it does not create one (see crafting.js, where the whole
+ * value transfers and the per-stat cap deliberately does not apply). So the total is set by how good the gear
+ * is, and rerolling only decides how few lines it is sitting on. An earlier version capped each line instead,
+ * which pinned every rung from 15 upward to the same numbers — flat where it should have been climbing.
+ */
 function npcProcs(tier, archKey) {
     const d = procDensity(tier);
     if (d <= 0) return {};
     const lean = PROC_LEAN[archKey] || {};
+    const ranked = Object.entries(PROC_CEILING)
+        .map(([k, ceil]) => ({ k, ceil, want: (lean[k] === undefined ? 1 : lean[k]) }))
+        .sort((a, b) => (b.want - a.want) || (a.k < b.k ? -1 : 1));
+
+    // What the SET is worth in affixes at this height, before anybody touches a bench, lifted by how far the
+    // pieces have been enhanced.
+    const forge = npcForgeLevel(tier);
+    const lift = 1 + FORGE.CAP_FRAC * Math.min(1, forge / FORGE.MAX_LEVEL);
+    const budget = ranked.reduce((n, r) => n + r.ceil * d * r.want, 0) * lift;
+
+    // Then move it. Kept lines are weighted up and the rest down by the same fraction, so nothing is invented.
+    const K = rerollFrac(tier);
+    const keep = new Set(ranked.slice(0, npcAffixLines(tier)).map((r) => r.k));
+    const weights = ranked.map((r) => ({ ...r, w: r.want * (keep.has(r.k) ? 1 + K : 1 - K) }));
+    const totalW = weights.reduce((n, r) => n + r.w, 0) || 1;
+
     const out = {};
-    for (const [k, ceil] of Object.entries(PROC_CEILING)) {
-        const v = ceil * d * (lean[k] === undefined ? 1 : lean[k]);
-        if (v >= 1) out[k] = Math.round(v);
+    for (const r of weights) {
+        const v = Math.round(budget * (r.w / totalW));
+        if (v >= 1) out[r.k] = v;
     }
     return out;
 }
@@ -445,10 +508,17 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
     //   the points are the budget, spent through the archetype weights. Unchanged from what was tuned, so a
     //   Wall is the Wall the calibration measured; it simply now carries the plate it always implied.
     const gear = sumItemStats(npcLoadout(t, seed));
+    // ── AND THEY HAVE ENHANCED IT ────────────────────────────────────────────────────────────────────────
+    // A rung high on the ladder should not be carrying an unforged weapon. Every piece is levelled at the
+    // forge, which is exactly what a member at that height has done — the rates are the forge's own, so the
+    // two cannot drift. This is why a rung climbs faster than the rarity bands alone would take it.
+    const forge = npcForgeLevel(t);
+    const forged = (v, rate) => Math.round((Number(v) || 0) * (1 + rate * forge));
     return {
-        base_damage: Math.round(Number(gear.base_damage) || 0) || undefined,
+        base_damage: forged(gear.base_damage, forgeWeaponRate) || undefined,
         speed: Number(gear.speed) || undefined,
-        armor: Math.round(Number(gear.armor) || 0),
+        armor: forged(gear.armor, forgeArmourRate),
+        forgeLevel: forge,
         block_chance: Number(gear.block_chance) || 0,
         // Vitality is what buys health; the ferocity weight was authored as the health weight and the
         // archetype note still depends on it, so it is what vitality is spent on.

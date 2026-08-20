@@ -1218,3 +1218,23 @@ for (const it of ITEMS) {
         }
     }
 }
+
+// ── WHAT THE FORGE DOES TO A PIECE, IN ONE PLACE ─────────────────────────────────────────────────────────────
+// These were private to crafting.js, which is server-only — so anything else that needed to know what a forged
+// piece looks like had to write the numbers out again, and a copied balance number is a second, quietly
+// different game. arena-npc.js needs them because a rung high on the ladder should look like somebody who has
+// actually WORKED their gear: enhanced every piece, and rerolled the affixes they did not want into the ones
+// they did. That is what a real player at that height has done, so it is what they should be facing.
+export const FORGE = {
+    // An affix can be forged up by half its printed value again (a +20 Might line caps at +10 forged). An
+    // affix the piece was NOT born with caps at +3 — see crafting.js, where `base` is 0 for those.
+    CAP_FRAC: 0.5,
+    // What an enhance adds to the piece ITSELF, per level, as a share of its own base.
+    WEAPON_PER_LEVEL: [0.03, 0.05],
+    ARMOUR_PER_LEVEL: [0.05, 0.08],
+    // The peak — three prismatic stars. Mirrors MAX_FORGE_LEVEL in forge-rank.js.
+    MAX_LEVEL: 21,
+};
+// The midpoints, for anything reconstructing an average forged piece rather than rolling one.
+export const forgeWeaponRate = (FORGE.WEAPON_PER_LEVEL[0] + FORGE.WEAPON_PER_LEVEL[1]) / 2;
+export const forgeArmourRate = (FORGE.ARMOUR_PER_LEVEL[0] + FORGE.ARMOUR_PER_LEVEL[1]) / 2;

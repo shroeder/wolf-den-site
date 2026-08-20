@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix, FORGE } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -34,7 +34,8 @@ const MAX_TIER = 5;
 const COMBINE_COST = 5; // 5 of tier N → 1 of tier N+1
 // A forged stat tops out at +40% of its BASE value (min +1). Keeps a fully-forged item a MODEST upgrade — never
 // the old runaway doubling. Past the cap the item still LEVELS (prestige border) but gains no more raw stats.
-const ENHANCE_CAP_FRAC = 0.5;
+// The forge's own numbers live in items.js so arena-npc.js can build a rung that has actually been forged.
+const ENHANCE_CAP_FRAC = FORGE.CAP_FRAC;
 
 // Salvaging a piece of gear → which tier + how many parts, by rarity.
 const SALVAGE = {
@@ -626,7 +627,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         const baseKey = item.slot === "main_hand" ? "base_damage"
             : ARMOUR_SLOTS.has(item.slot) ? "armor" : null;
         if (baseKey) {
-            const [lo, hi] = baseKey === "base_damage" ? [0.03, 0.05] : [0.05, 0.08];
+            const [lo, hi] = baseKey === "base_damage" ? FORGE.WEAPON_PER_LEVEL : FORGE.ARMOUR_PER_LEVEL;
             const base = Number(item.stats?.[baseKey]) || 0;
             const step = Math.max(1, Math.round(base * (lo + Math.random() * (hi - lo))));
             nextBonus[baseKey] = (nextBonus[baseKey] || 0) + step;
