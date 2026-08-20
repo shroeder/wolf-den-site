@@ -12,6 +12,7 @@ import MiningLaunch from "@/components/MiningLaunch";
 import ArenaReopenLaunch from "@/components/ArenaReopenLaunch";
 import DungeonLaunch from "@/components/DungeonLaunch";
 import MarketLaunch from "@/components/MarketLaunch";
+import PollModal from "@/components/PollModal";
 import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import BadgePop from "@/components/BadgePop";
@@ -474,6 +475,7 @@ export default function GameNav() {
             {signedIn ? <DungeonLaunch /> : null}
             {signedIn ? <MarketLaunch /> : null}
             {signedIn ? <SurveyModal /> : null}
+            {signedIn ? <PollModal /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">
                 <div className="game-nav-scroll">
