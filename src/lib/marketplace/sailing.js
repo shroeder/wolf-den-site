@@ -2293,7 +2293,22 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                     // since it moved into this list and the three combat tracks had none, so the only way to
                     // find out what a level of Gunnery had bought you was to open a battle and squint at it.
                     effect: t.key === "guns" ? `${gunsFor(level)} guns`
-                        : t.key === "gunnery" ? `${Math.round(accuracyFor(level, boatLevel) * 100)}% to hit · ${Math.round(rakeFor(level) * 100)}% rake`
+                        : t.key === "gunnery" ? (() => {
+                            // ── SAY WHEN THE ACCURACY HALF IS FINISHED ───────────────────────────────
+                            // accuracyFor clamps at 0.96, and it climbs with BOAT LEVEL as well as with
+                            // this track — so a developed captain is over the cap by gunnery 5 or 6 and
+                            // every level after that buys no accuracy at all. Three of the Den’s four top
+                            // sailors are there now, one of them at a raw 103%. GrayKitsune, in the plaza:
+                            // "I know I’ve spent my doubloons on accuracy upgrades... causing me to still
+                            // fail the same amount as if I had no accuracy upgrades at all." He was right,
+                            // and the yard was still quoting him the same 96% before and after the purchase.
+                            //
+                            // The track is NOT dead past that point — rake keeps climbing to level 11 — so
+                            // this says which half is still paying rather than pretending both are.
+                            const raw = 0.70 + Math.max(0, level) * 0.035 + Math.max(0, boatLevel - 1) * 0.004;
+                            const acc = Math.round(accuracyFor(level, boatLevel) * 100);
+                            return `${acc}% to hit${raw >= 0.96 ? " (maxed)" : ""} · ${Math.round(rakeFor(level) * 100)}% rake`;
+                        })()
                         : `${hullHitsFor(level)} planks to shoot away`,
                 };
             }),

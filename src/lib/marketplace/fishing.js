@@ -596,7 +596,11 @@ export const FISH_TRACKS = {
     line: { max: 5, per: 1, cap: 5, kind: "count", name: "Line", art: "line", icon: "🎣", desc: "Extra casts each day." },
     lure: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Lure", art: "lure", icon: "✨", desc: "Better odds of a rarer species." },
     net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", art: "net", icon: "🪣", desc: "More casts bring up treasure instead of a fish." },
-    gaff: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Gaff", art: "gaff", icon: "🪝", desc: "A clean landing floors the size on a poor reel." },
+        // "Floors the size" reads as REDUCES it — ValkyrieSylve, in the plaza: "What does Gaff do in the rail
+    // now?" It sets a floor UNDER the size, and the reason that is worth buying is one screen away: a
+    // fish’s payout runs 45% of its species value at the small end to full value at the top, so a bigger
+    // minimum is straightforwardly more gold and XP. Say the effect, not the mechanism.
+    gaff: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Gaff", art: "gaff", icon: "🪝", desc: "Land it cleanly and the fish is never a small one — and size is what a catch pays." },
 };
 export const FISH_TRACK_COL = {
     line: "fish_line_level", lure: "fish_lure_level", net: "fish_net_level", gaff: "fish_gaff_level",
