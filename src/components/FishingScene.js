@@ -131,6 +131,143 @@ function useSfx() {
     }), [tone]);
 }
 
+// -- THE REEL, BACK FROM THE DEAD ----------------------------------------------------------------------------
+// This is the hold-to-reel minigame, restored. It was cut when fishing was rebuilt around the watchable scene
+// and replaced with a single tap that reported a FIXED quality of 0.78 -- a graded reel nobody played, so the
+// grade was a polite fiction. The scene was the right call and it stays; the tap was one beat too few.
+//
+// What it is: the FISH swims itself, up and down the water, and nothing you press moves it. YOUR BAR is the
+// only thing your thumb touches -- hold to raise it, release and it falls. Credit banks every frame the fish
+// is inside your bar, and that fraction (curved, see scoreOf) is the quality the server receives.
+//
+// KEPT FROM THE OLD ONE, deliberately:
+//   - No line tension. It was a second axis that turned holding into a guaranteed snap, so the mechanic meant
+//     to add a choice removed the only one you had. Luke played it and said so. Depth comes from the fish.
+//   - Pointer CAPTURE on the press. The rod is narrow and onPointerLeave used to release the hold, so a thumb
+//     drifting sideways silently let go mid-reel and the line sank for no visible reason.
+//   - The warm-up. The score is an average over the WHOLE run, so the moments spent finding the fish used to
+//     cap your result permanently before you had seen where it was.
+// CHANGED, because the scene exists now: it draws over the water instead of replacing it, so the boat still
+// rocks and the hero still stands on the deck while you fight the thing.
+export function ReelStruggle({ onDone, sfx, fight = "common" }) {
+    const F = FIGHT[fight] || FIGHT.common;
+    const [tick, setTick] = useState(0);          // repaint pulse
+    const holdRef = useRef(false);
+    const posRef = useRef(0.5);                   // THE FISH, 0 (bottom) .. 1 (top). Swims itself.
+    const velRef = useRef(0);
+    const bandRef = useRef(0.5);                  // YOUR BAR (centre). Hold to raise, release to fall.
+    const barVelRef = useRef(0);
+    const inRef = useRef(0);                      // frames inside the band
+    const totalRef = useRef(0);
+    const startRef = useRef(0);
+    const lastDartRef = useRef(0);
+    const doneRef = useRef(false);
+    const clickRef = useRef(0);
+
+    useEffect(() => {
+        let raf = 0;
+        let prev = 0;
+        const step = (ts) => {
+            if (!startRef.current) { startRef.current = ts; prev = ts; }
+            const dt = Math.min(0.05, (ts - prev) / 1000);
+            prev = ts;
+            const elapsed = ts - startRef.current;
+
+            // THE FISH swims on its own. It wanders, with panicked runs on top -- nothing you do moves it. Its
+            // rarity sets how hard and how often it bolts, so a mythic thrashes and a sardine mostly drifts.
+            const t = elapsed / 1000;
+            if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
+                lastDartRef.current = elapsed;
+                velRef.current += (Math.random() - 0.5) * 1.1 * F.dart;
+            }
+            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.5 * dt * F.dart;
+            velRef.current *= Math.pow(FISH_DAMPING, dt * 60);
+            posRef.current += velRef.current * dt;
+            if (posRef.current <= 0.05) { posRef.current = 0.05; velRef.current = Math.abs(velRef.current) * 0.5; }
+            if (posRef.current >= 0.95) { posRef.current = 0.95; velRef.current = -Math.abs(velRef.current) * 0.5; }
+
+            // YOUR BAR: hold to raise, release and it falls. The only thing your thumb touches.
+            barVelRef.current += (holdRef.current ? BAR_PULL : 0) * dt;
+            barVelRef.current -= BAR_GRAVITY * dt;
+            barVelRef.current *= Math.pow(BAR_DAMPING, dt * 60);
+            bandRef.current += barVelRef.current * dt;
+            const half = BAND_H / 2;
+            if (bandRef.current <= half) { bandRef.current = half; barVelRef.current = 0; }
+            if (bandRef.current >= 1 - half) { bandRef.current = 1 - half; barVelRef.current = 0; }
+
+            // Credit, banked per frame: is the FISH inside YOUR BAR right now.
+            const scoring = elapsed >= REEL_WARMUP_MS;
+            const lo = bandRef.current - half, hi = bandRef.current + half;
+            const inside = posRef.current >= lo && posRef.current <= hi;
+            if (scoring) {
+                totalRef.current += 1;
+                if (inside) inRef.current += 1;
+            }
+            // Reel clicks while you are holding and on target -- the feedback that says it is working.
+            if (inside && holdRef.current && ts - clickRef.current > 110) { clickRef.current = ts; sfx.click(); }
+
+            setTick((n) => (n + 1) % 100000);
+
+            if (elapsed >= REEL_MS) {
+                if (!doneRef.current) {
+                    doneRef.current = true;
+                    onDone(scoreOf(inRef.current, totalRef.current));
+                }
+                return;
+            }
+            raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(raf);
+    }, [onDone, sfx, F.dart]);
+
+    // Capture the pointer on press -- see the note above the component. stopPropagation because the water
+    // frame underneath carries its own pointer handler for the strike tap.
+    const down = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not supported -- up still works */ }
+        holdRef.current = true;
+    }, []);
+    const up = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* already released */ }
+        holdRef.current = false;
+    }, []);
+
+    const elapsed = startRef.current ? Math.min(REEL_MS, performance.now() - startRef.current) : 0;
+    const left = Math.max(0, 1 - elapsed / REEL_MS);
+    const pos = posRef.current, band = bandRef.current;
+    const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
+    const scoreNow = scoreOf(inRef.current, totalRef.current);
+    const warming = elapsed < REEL_WARMUP_MS;
+
+    return (
+        <div className={`fwreel${inside ? " is-on" : ""}`} data-tick={tick}>
+            {/* The rod gauge, against the right edge -- it leaves the boat, the hero and the water visible,
+                which is the whole reason the reel lives in the frame instead of over it. */}
+            <div className="fwreel-rod" onPointerDown={down} onPointerUp={up} onPointerCancel={up} role="presentation">
+                <div className="fwreel-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }} />
+                {/* THE FISH. It swims itself; your thumb drives the BAR. */}
+                <div className={`fwreel-fish${inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }} />
+            </div>
+            <div className="fwreel-side">
+                <strong className="fwreel-title">{warming ? "GET READY…" : inside ? "ON IT!" : "KEEP IT IN THE BAR"}</strong>
+                <span className="fwreel-tip">HOLD to raise · let go to drop</span>
+                {/* Live, and the same number the server receives. What is hidden is the RELATIONSHIP: a good
+                    reel floors the bad end of the size roll rather than setting the size, so this reads as
+                    "how am I handling it" and never spoils the reveal. */}
+                <div className="fwreel-meter">
+                    <div className="fwreel-meter-fill" style={{ width: `${scoreNow * 100}%` }} />
+                </div>
+                <span className="fwreel-pct">{Math.round(scoreNow * 100)}%</span>
+            </div>
+            <div className="fwreel-timer"><div className="fwreel-timer-fill" style={{ width: `${left * 100}%` }} /></div>
+        </div>
+    );
+}
+
 
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Exported so the dedicated /marketplace/fishing page renders the SAME boards. It used to be reachable only
@@ -473,22 +610,32 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
         cast(null);
     }, [baits.length, cast]);
 
-    // ── THE TAP, AND THEN YOU WATCH ──────────────────────────────────────────────────────────────────────
-    // The struggle bar is gone. Tapping the bite hooks it and the haul begins immediately — the land call goes
-    // out while the rise animation plays, so the thing clearing the water and the answer arriving are the same
-    // beat rather than a loading gap between two screens.
+    // ── THE TAP HOOKS IT. THEN YOU FIGHT IT. ─────────────────────────────────────────────────────────────
+    // WAS: the tap went straight to the haul and reported a FIXED quality of 0.78. The server has always read
+    // that number — it floors the size roll and can bump a treasure tier — so with the reel gone we were
+    // sending a grade for a performance that never happened. Every cast was landed exactly as well as every
+    // other one, which is the definition of a stat that should not exist.
     //
-    // QUALITY IS FIXED AT A CLEAN REEL. The server still reads it (it stretches the measurement and can bump a
-    // treasure tier), so it cannot simply be dropped — and grading a timing bar nobody is playing would be a
-    // lie. 0.78 is "reeled it in properly", which is what one well-timed tap deserves. Luke: "it's really easy
-    // and I don't mind it being easy at all — I don't like that it's not very immersive."
+    // Now the tap does what a tap should: it sets the hook. The reel decides how well you bring it in, and the
+    // number that reaches the server is one you earned. `fight` is already on hand from the cast, so a mythic
+    // thrashes and a sardine drifts without the client ever being told what species is down there.
     const strike = useCallback(() => {
         if (phase !== "bite") return;
         clearTimers();
-        setPhase("hauling");
-        finishReel(0.78);
+        sfx.bite();
+        setPhase("reel");
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase, clearTimers]);
+    }, [phase, clearTimers, sfx]);
+
+    // The reel ran out. Whatever you managed is the quality, and from here the haul is exactly what it was.
+    // `finishReel` is a const declared BELOW this one, so it must not appear in the dep array: the array is
+    // evaluated at render, and reading it there is a temporal-dead-zone crash. Calling it from inside the body
+    // is fine — by then it exists. This is why `strike` above carries the same disable.
+    const reelDone = useCallback((score) => {
+        setPhase("hauling");
+        finishReel(score);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const finishReel = useCallback(async (quality) => {
         setBusy(true);
@@ -652,13 +799,14 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         </div>
                         {fishing?.totalCaught ? <p className="muted fish-tally">{fishing.totalCaught} fish landed all-time</p> : null}
                     </div>
-                ) : phase === "waiting" || phase === "tell" || phase === "bite" || phase === "hauling" ? (
-                    /* ── THE WHOLE MINIGAME, REPLACED ────────────────────────────────────────────────────
+                ) : phase === "waiting" || phase === "tell" || phase === "bite" || phase === "reel" || phase === "hauling" ? (
+                    /* ── ONE SCENE, START TO FINISH ──────────────────────────────────────────────────────
                        Was: a text line saying "waiting for a bite", then a TAP button, then a hold-to-reel
-                       bar with a moving green zone. Three screens of instruction for an action Luke was
-                       happy to have be easy — and none of them showed you anything.
-                       Now it is one scene you watch: your boat, your hero on the deck, a bobber that dips,
-                       and whatever is on the end rising through the water. One tap, same as before. */
+                       bar on a black panel that replaced everything.
+                       Now the whole cast happens in one frame you watch: your boat, your hero on the deck, a
+                       bobber that dips, the reel fought against the water it is happening in, and whatever is
+                       on the end rising out of it. The reel came back INSIDE this, not on top of it — the
+                       scene is the part that works. */
                     <FishingWater
                         phase={phase}
                         sky={sky}
@@ -668,7 +816,9 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         haul={haul}
                         busy={busy}
                         onStrike={phase === "bite" ? strike : undefined}
-                    />
+                    >
+                        {phase === "reel" ? <ReelStruggle onDone={reelDone} sfx={sfx} fight={fight} /> : null}
+                    </FishingWater>
                 ) : phase === "gone" ? (
                     <div className="fish-stage">
                         {/* The miss gets the water too — an empty float back on the surface says "it got away"

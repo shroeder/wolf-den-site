@@ -35,6 +35,7 @@ export default function FishingWater({
     haul,           // { art, name, kind } once something is coming up
     onStrike,       // the one tap: hook it
     busy = false,
+    children,       // the reel overlay, drawn INSIDE the frame — see the note below
 }) {
     // A miss has to be visible for a moment or the bobber simply stops and nothing explains why.
     const [splash, setSplash] = useState(0);
@@ -44,6 +45,14 @@ export default function FishingWater({
         lastPhase.current = phase;
     }, [phase]);
 
+    // ── THE REEL IS NOT A SCREEN ────────────────────────────────────────────────────────────────────
+    // The old minigame was a card that REPLACED everything: you tapped the bite, the boat and the sea and
+    // the hero vanished, and you played a bar on a black panel. That is why bringing it back could not just
+    // be a revert — the scene is the part that works now, and cutting to a gauge throws it away at exactly
+    // the moment there is something on the line.
+    // So the reel is drawn INSIDE this frame, over the water, while the boat still rocks and the line
+    // stays taut. Luke: "I still like the new rewards and all the new visuals ... I just want a fishing
+    // mini game like the holding bar mini game added back in."
     const live = phase === "waiting" || phase === "tell" || phase === "bite";
     return (
         <div
@@ -129,6 +138,8 @@ export default function FishingWater({
                         : phase === "hauling" ? "Hauling it in…"
                             : ""}
             </p>
+            {/* The reel, when there is one. Last child so it sits above the water, the line and the hint. */}
+            {children}
         </div>
     );
 }

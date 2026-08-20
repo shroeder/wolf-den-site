@@ -3,12 +3,15 @@
 import { useState } from "react";
 
 import FishingWater from "@/components/FishingWater";
+import { ReelStruggle } from "@/components/FishingScene";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import FishingScene from "@/components/FishingScene";
 import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 
 // The fishing scene's phases, on buttons. Waiting for a real bite to look at the bite is not a workflow.
-const PHASES = ["idle", "waiting", "tell", "bite", "hauling"];
+const PHASES = ["idle", "waiting", "tell", "bite", "reel", "hauling"];
+// A no-op sfx so the lab can mount the real reel without an AudioContext behind it.
+const NO_SFX = { click: () => {}, bite: () => {}, plop: () => {}, land: () => {}, gone: () => {} };
 // Scale comes from the REAL haulScale, not a number typed here — the whole point of the lab is to look at
 // what the game will actually draw.
 const HAULS = [
@@ -65,8 +68,12 @@ export default function WaterLab() {
                 deck={boatDeck(5)}
                 hero={{ art: "/images/arena/ladder/rung-1.webp", flip: false }}
                 haul={haul}
-                onStrike={() => setPhase("hauling")}
-            />
+                onStrike={() => setPhase("reel")}
+            >
+                {/* The REAL reel, so what the lab shows is what ships. onDone loops back to waiting rather
+                    than hauling, because the lab has no land call to answer it. */}
+                {phase === "reel" ? <ReelStruggle onDone={() => setPhase("waiting")} sfx={NO_SFX} fight="mythic" /> : null}
+            </FishingWater>
         </div>
     );
 }

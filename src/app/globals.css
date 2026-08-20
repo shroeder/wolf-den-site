@@ -16942,6 +16942,69 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-sky { position: absolute; inset: 0; background-size: cover; background-position: center;
     animation: fwDrift 60s linear infinite; }
 .fw-sky.is-plain { background: linear-gradient(180deg, #16324a, #0e2233); }
+
+/* == THE REEL, INSIDE THE WATER FRAME ===============================================================
+   The old reel had its own card (.fish-reel / .fish-rod / .fish-band, still further down this file and
+   still used by nothing) which replaced the scene entirely. These rules are the new home: the gauge is
+   pinned to the right edge of .fw and everything else in the frame keeps playing behind it.
+   Nothing here paints a full-bleed background for that reason -- a scrim over the water would throw away
+   the thing the reel is meant to be happening in. */
+.fwreel { position: absolute; inset: 0; z-index: 6; display: block; pointer-events: none;
+    animation: fwreelIn 220ms ease-out both; }
+@keyframes fwreelIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* THE ROD. Tall, narrow, hard against the right edge -- and the ONLY thing here that takes a pointer,
+   because the frame underneath still owns its own tap handler. touch-action: none so a thumb dragging on
+   it never turns into a page scroll mid-fight. */
+.fwreel-rod { position: absolute; right: 12px; top: 14px; bottom: 26px; width: 46px;
+    pointer-events: auto; touch-action: none; cursor: pointer;
+    border-radius: 24px; border: 2px solid rgba(140,215,255,0.5);
+    background: linear-gradient(180deg, rgba(4,16,26,0.72), rgba(2,10,18,0.82));
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.55), 0 4px 14px rgba(0,0,0,0.4); overflow: hidden; }
+.fwreel.is-on .fwreel-rod { border-color: rgba(126,255,178,0.85);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.5), 0 0 16px rgba(126,255,178,0.35); }
+
+/* YOUR BAR. Positioned from the bottom in percent by the component. */
+.fwreel-band { position: absolute; left: 3px; right: 3px; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(126,255,178,0.34), rgba(126,255,178,0.16));
+    border: 1px solid rgba(126,255,178,0.6); transition: background 90ms linear; }
+.fwreel.is-on .fwreel-band { background: linear-gradient(180deg, rgba(126,255,178,0.55), rgba(126,255,178,0.3)); }
+
+/* THE FISH. A marker, not the species sprite -- what is on the line is not revealed until it breaks the
+   surface, and drawing the real fish here would give the whole reveal away six seconds early. */
+.fwreel-fish { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+    border-radius: 50%; background: radial-gradient(circle at 35% 32%, #fff, #8fd3ff 55%, #2b7fb8);
+    box-shadow: 0 0 10px rgba(140,215,255,0.75); }
+.fwreel-fish.is-caught { background: radial-gradient(circle at 35% 32%, #fff, #b6ffd4 55%, #3fbf7f);
+    box-shadow: 0 0 14px rgba(126,255,178,0.95); }
+
+/* THE COPY AND THE METER, bottom-left -- clear of the rod, and clear of the hero on the deck. */
+.fwreel-side { position: absolute; left: 12px; right: 74px; bottom: 26px;
+    display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.fwreel-title { font-size: 13px; letter-spacing: 0.06em; color: #eaf6ff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.85); }
+.fwreel.is-on .fwreel-title { color: #b6ffd4; }
+.fwreel-tip { font-size: 10px; letter-spacing: 0.04em; color: rgba(210,235,255,0.8);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+.fwreel-meter { width: 100%; height: 7px; border-radius: 6px; overflow: hidden;
+    background: rgba(2,12,20,0.75); border: 1px solid rgba(140,215,255,0.35); }
+.fwreel-meter-fill { height: 100%; border-radius: 6px;
+    background: linear-gradient(90deg, #4fb0e8, #7effb2); transition: width 110ms linear; }
+.fwreel-pct { font-size: 10px; color: rgba(210,235,255,0.8); font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
+
+/* HOW LONG IS LEFT, along the very bottom of the frame. */
+.fwreel-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 4px;
+    background: rgba(2,12,20,0.6); }
+.fwreel-timer-fill { height: 100%; background: linear-gradient(90deg, #ffd75e, #ff8f5e);
+    transition: width 110ms linear; }
+
+/* Narrow phones: the rod thins and the copy gets the rest, rather than the two overlapping. */
+@media (max-width: 400px) {
+    .fwreel-rod { width: 38px; right: 8px; }
+    .fwreel-side { left: 8px; right: 56px; }
+    .fwreel-title { font-size: 12px; }
+}
 @keyframes fwDrift { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 
 /* ── NOTHING IS DRAWN OVER THE WATER ──────────────────────────────────────────────────────────────────
@@ -16976,6 +17039,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @keyframes fwBob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-6px) rotate(4deg); } }
 /* Under it goes. Fast, repeating, unmistakable — this is the thing you are watching for. */
 .fw[data-phase="bite"] .fw-bobber { animation: fwDip .42s ease-in-out infinite; }
+/* THE REEL KEEPS THE WATER MOVING. The fish is on the line for the whole six seconds, so the float keeps
+   going under and the line stays taut -- a frozen bobber would say it got off. Slower than the bite: the
+   bite is a flurry, the fight is a heavier, steadier pull. */
+.fw[data-phase="reel"] .fw-bobber { animation: fwDip .62s ease-in-out infinite; }
 @keyframes fwDip { 0%, 100% { transform: translateY(2px) rotate(0deg); } 45% { transform: translateY(15px) rotate(-14deg); opacity: .55; } }
 .fw[data-phase="hauling"] .fw-bobber, .fw[data-phase="done"] .fw-bobber,
 .fw[data-phase="hauling"] .fw-line, .fw[data-phase="done"] .fw-line { opacity: 0; transition: opacity .2s; }
@@ -16985,9 +17052,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-rings { position: absolute; left: 38%; top: 66%; }
 .fw-rings span { position: absolute; left: 0; top: 0; width: 14px; height: 5px; margin: -2px 0 0 -1px;
     border: 1px solid rgba(255,255,255,0.5); border-radius: 50%; opacity: 0; }
-.fw[data-phase="bite"] .fw-rings span { animation: fwRing 1.5s ease-out infinite; }
-.fw[data-phase="bite"] .fw-rings span:nth-child(2) { animation-delay: .5s; }
-.fw[data-phase="bite"] .fw-rings span:nth-child(3) { animation-delay: 1s; }
+.fw[data-phase="bite"] .fw-rings span, .fw[data-phase="reel"] .fw-rings span { animation: fwRing 1.5s ease-out infinite; }
+.fw[data-phase="bite"] .fw-rings span:nth-child(2), .fw[data-phase="reel"] .fw-rings span:nth-child(2) { animation-delay: .5s; }
+.fw[data-phase="bite"] .fw-rings span:nth-child(3), .fw[data-phase="reel"] .fw-rings span:nth-child(3) { animation-delay: 1s; }
 @keyframes fwRing { 0% { opacity: .8; transform: scale(.4); } 100% { opacity: 0; transform: scale(3.6); } }
 
 /* ── OUT OF THE WATER ─────────────────────────────────────────────────────────────────────────────────────
@@ -17032,6 +17099,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-line { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .fw-line line { stroke: rgba(255,255,255,0.5); stroke-width: 0.35; vector-effect: non-scaling-stroke; }
 .fw[data-phase="bite"] .fw-line line { stroke: rgba(255,255,255,0.8); animation: fwTaut .28s ease-in-out infinite; }
+.fw[data-phase="reel"] .fw-line line { stroke: rgba(255,255,255,0.9); animation: fwTaut .34s ease-in-out infinite; }
 @keyframes fwTaut { 0%, 100% { stroke-width: 0.35; } 50% { stroke-width: 0.7; } }
 /* Out on open water, clear of the hull, at the end of the line. */
 .fw-bobber { left: 72.5%; top: 58%; }
