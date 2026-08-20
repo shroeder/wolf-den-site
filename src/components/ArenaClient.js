@@ -403,8 +403,16 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                     the only honest answer to "how is speed determined" lived in the source. Printing both
                     makes the comparison the mechanic actually performs visible at a glance, and puts the
                     number next to the gear decision that moves it. SoullessShiitake asked, 2026-08-16. */}
+                {/* ── TWO DECIMALS, BECAUSE THE WHOLE RANGE IS INSIDE ONE ─────────────────────────────────
+                    Speed is ATTACKS PER SECOND and the live board runs 0.87 to 2.33, so rounding put eight of
+                    the ten members on "1" — a 62% difference between the slowest and the fastest, shown as the
+                    same number. Luke: "fights show 1 speed but i suspect this isnt accurate". It was not.
+
+                    The tooltip was stale as well: it recited `10 + 0.3 per level + 0.5 per point of Ferocity`,
+                    a formula arena-kit.js retired when auto-attack made speed the clock rather than a
+                    tiebreak. It is the weapon's base attack speed plus ferocity now. */}
                 {(f?.speed || 0) > 0 ? (
-                    <i title="Initiative — the faster fighter takes the first beat (a tie goes to the challenger). 10 + 0.3 per level + 0.5 per point of Ferocity."><b>{Math.round(f.speed)}</b> speed</i>
+                    <i title="Attacks per second — how often you swing, and the faster fighter takes the first beat (a tie goes to the challenger). Your weapon's attack speed, plus 1 for every 500 Ferocity."><b>{f.speed.toFixed(2)}</b> speed</i>
                 ) : null}
             </span>
         </div>
@@ -1590,9 +1598,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 while both bars read the same number looks like a bug rather than the rule. */}
                             {bout.beat <= 1 && bout.opener ? (
                                 <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
-                                    {Math.round(bout.me?.speed || 0) === Math.round(bout.foe?.speed || 0)
-                                        ? `Speed tied ${Math.round(bout.me?.speed || 0)} — the challenger opens`
-                                        : `${bout.opener === "you" ? "You're faster" : `${bout.foe.name} is faster`} · speed ${Math.round(bout.me?.speed || 0)} v ${Math.round(bout.foe?.speed || 0)} — ${bout.opener === "you" ? "you" : "they"} open`}
+                                    {/* COMPARED AT FULL PRECISION, which is what the engine compares. Rounding
+                                        first meant 0.87 against 1.41 announced "Speed tied 1 — the challenger
+                                        opens" over a fighter swinging 62% faster: the screen inventing a rule
+                                        to explain a number it had itself rounded away. */}
+                                    {(bout.me?.speed || 0) === (bout.foe?.speed || 0)
+                                        ? `Speed tied ${(bout.me?.speed || 0).toFixed(2)} — the challenger opens`
+                                        : `${bout.opener === "you" ? "You're faster" : `${bout.foe.name} is faster`} · speed ${(bout.me?.speed || 0).toFixed(2)} v ${(bout.foe?.speed || 0).toFixed(2)} — ${bout.opener === "you" ? "you" : "they"} open`}
                                 </span>
                             ) : null}
                         </span>

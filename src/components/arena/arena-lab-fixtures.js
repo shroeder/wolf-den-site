@@ -129,7 +129,7 @@ export const FOE_ABILITIES = [
 
 export const FOE = {
     id: "foe-1", name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34,
-    element: "water", abilities: FOE_ABILITIES, might: 27, gearPower: 168, speed: 31,
+    element: "water", abilities: FOE_ABILITIES, might: 27, gearPower: 168, speed: 1.41,
 };
 
 export const ME = {
@@ -154,7 +154,7 @@ export function makeBout(over = {}) {
         cd: { "ashfall_crown:overcharge": 4, "gambler_ring:highroller": 2 },
         clash: { mult: 0.75, note: "Their Water smothers your Fire" },
         opener: "you",
-        me: { element: "fire", abilities: MY_ABILITIES, might: 24, speed: 29 },
+        me: { element: "fire", abilities: MY_ABILITIES, might: 24, speed: 1.2 },
         shield: 0, surge: 0, underdog: 1.12,
         items: { poultice: 2, draught: 1 },
         incoming: null,
@@ -345,7 +345,7 @@ export const SCENES = {
             me: { ...ME, abilities: NEW_KIND_ABILITIES },
             bout: makeBout({
                 cd: {},
-                me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, speed: 29 },
+                me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, speed: 1.2 },
             }),
         }),
     },
