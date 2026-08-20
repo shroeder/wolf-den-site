@@ -16,8 +16,8 @@
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-archetype-cal.mjs ["Name"]
 import { ARCHETYPES, statsForPower, npcAbilities } from "../src/lib/marketplace/arena-npc.js";
-import { arenaRating, ringStats } from "../src/lib/marketplace/arena-engine.js";
-import { ladderDr } from "../src/lib/marketplace/arena-ladder.js";
+import { arenaRating } from "../src/lib/marketplace/arena-engine.js";
+import { fighterFrom } from "../src/lib/marketplace/arena.js";
 import { CLASSES } from "../src/lib/marketplace/arena-classes.js";
 import { db } from "../src/lib/db.js";
 import { bout, fighter, fullTree, GEAR } from "./lib/sim-harness.mjs";
@@ -25,13 +25,17 @@ import { bout, fighter, fullTree, GEAR } from "./lib/sim-harness.mjs";
 const WHO = process.argv[2] || null;
 const RUNS = WHO ? 320 : 260;
 
+// THE SAME BUILDER THE RING USES. This called ringStats, which no longer exists — an NPC is a made-up player
+// now and goes through fighterFrom like everybody else. A calibration run against a converter the game has
+// stopped using produces corrections for a game nobody is playing, which is how the archetype spread came
+// back without anyone touching a weight: `bal` was still carrying numbers measured against the old maths.
+// `dr` is gone too — armour is the whole of mitigation.
 function foeAt(power, archKey) {
     const st = statsForPower(power, archKey, null, 50);
-    const ring = ringStats({ ...st, dr: ladderDr(50) });
+    const ring = fighterFrom(st, {}, null);
     return {
         classId: null, abilities: npcAbilities(10), ...ring, damage: ring.damage,
-        perks: {}, lifesteal: 0, bleedChance: 0, burnChance: 0, dmgPct: 0, doublestrike: 0,
-        gearPower: arenaRating(ring),
+        perks: {}, gearPower: arenaRating(ring),
     };
 }
 

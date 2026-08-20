@@ -118,7 +118,12 @@ export function npcPower(tier) {
 // Getting that backwards does not soften the error, it doubles it: it took the spread from 26 points to 92 and
 // turned a Wall into a 98% walkover. Measure, apply, then measure AGAIN — correcting the budget moves the
 // fight the next reading is taken from.
-const ARCH_BAL = { balanced: 1.00, brute: 0.94, wall: 1.10, duelist: 1.04, berserker: 0.93 };
+// Re-derived 2026-08-19 against the NEW builder. The previous numbers were measured when an NPC went through
+// ringStats — an invisible 100-base weapon — and they went stale the moment an NPC became a made-up player
+// wearing real gear. Nobody touched a weight; the correction was simply describing different maths, and the
+// ladder started lurching again: rung 41 was a 14% fight for the field and rung 42 a 49% one.
+// Re-derive with scripts/sim-archetype-cal.mjs after touching any weight, `tough`, or the engine.
+const ARCH_BAL = { balanced: 1.02, brute: 0.67, wall: 1.37, duelist: 1.26, berserker: 0.75 };
 
 export const ARCHETYPES = [
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",

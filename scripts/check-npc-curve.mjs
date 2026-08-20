@@ -56,8 +56,10 @@ for (let t = 1; t <= MAX_TIER; t += 1) {
     const each = REF.map((m) => rate(m.f, foe));
     const all = members.reduce((a, m) => a + rate(m.f, foe), 0) / members.length;
     REF.forEach((m, i) => { if (firstWall[m.who] == null && each[i] < 0.5) firstWall[m.who] = t; });
-    if (t <= 5 || t % 5 === 0) {
-        console.log(`   ${String(t).padStart(3)}  ${n.archetype.padEnd(11)} ${each.map((x) => `${(x * 100).toFixed(0)}%`.padStart(11)).join("")}   ${(all * 100).toFixed(0)}%`);
+    // Sampling every fifth tier hid the archetypes — they cycle on t % 5, so a multiple of five is ALWAYS
+    // balanced and the column read as though the game had one shape in it. Stepped so the cycle shows.
+    if (t <= 6 || t % 7 === 0 || (t >= 38 && t <= 52)) {
+        console.log(`   ${String(t).padStart(3)}  ${n.archetype.padEnd(11)} ${each.map((x) => `${(x * 100).toFixed(0)}%`.padStart(11)).join("")}   ${String((all * 100).toFixed(0)).padStart(4)}%   foe ${String(Math.round(foe.damage)).padStart(5)}dmg ${String(foe.health).padStart(6)}hp ${String(foe.armor).padStart(5)}arm`);
     }
 }
 console.log("\n  where each of them stops winning half the time:");

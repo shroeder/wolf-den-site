@@ -39,7 +39,8 @@
     "check:ceiling": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-affix-ceiling.mjs",
     "check:enhance": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-enhance-spread.mjs",
     "check:arith": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-arithmetic.mjs",
-    "check:npc": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-curve.mjs"
+    "check:npc": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-curve.mjs",
+    "check:npcband": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-growth.mjs"
   },
   "keywords": [],
   "author": "",

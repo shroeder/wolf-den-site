@@ -15,8 +15,10 @@ import {
     RIPOSTE_SHARE, SHIELD_CAP, speedOf, SUNDER_CUT, SUNDER_TURNS, WARD_SOAK,
 } from "../../src/lib/marketplace/arena-kit.js";
 import {
-    arenaRating, counterBlow, drinkFor, lightBurn, openWound, ringStats, throwBlows,
+    arenaRating, counterBlow, drinkFor, lightBurn, openWound, throwBlows,
 } from "../../src/lib/marketplace/arena-engine.js";
+// ONE builder, the same one kitFor spreads — a harness with its own is a harness for a different game.
+import { fighterFrom } from "../../src/lib/marketplace/arena.js";
 import { npcAbilities, npcFor } from "../../src/lib/marketplace/arena-npc.js";
 
 // A member's gear budget at the level being measured. The one number this file picks, because "how geared is
@@ -52,7 +54,7 @@ export function fighter(classId, gear, taken = {}) {
         crit_power: Math.round(gear * 0.12),
         ferocity: Math.round(gear * 0.16),
     };
-    const ring = ringStats({ ...stats, dr: base.dr, accuracy: base.accuracy, guard: base.guard });
+    const ring = fighterFrom({ ...stats }, perks, classId);
     return {
         classId,
         abilities: treeAbilities(classId, taken, null),
@@ -77,7 +79,7 @@ export function fighter(classId, gear, taken = {}) {
 export function npcFighter(tier) {
     const n = npcFor(tier);
     if (!n) return null;
-    const ring = ringStats(n);
+    const ring = fighterFrom(n, {}, null);
     return {
         classId: null, abilities: npcAbilities(tier), ...ring, damage: ring.damage, perks: {},
         lifesteal: 0, bleedChance: 0, burnChance: 0, dmgPct: 0, doublestrike: 0, gearPower: arenaRating(ring),
