@@ -297,9 +297,19 @@ const FISH_BONUS = {
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
-// Coin per step of that table now the treasure wedge pays doubloons instead of chest shards. A ship battle
-// pays ~12, so a common haul is a few coins and a mythic is most of a fight.
-const FISH_DOUBLOONS_PER_STEP = 3;
+// Coin per step of that table now the treasure wedge pays doubloons instead of chest shards.
+//
+// ── THE ANCHOR HAD GONE STALE ────────────────────────────────────────────────────────────────────────────
+// This was 3, chosen when "a ship battle pays ~12" so that a mythic haul was most of a fight. Measured today
+// a ship battle pays 19 doubloons for a re-fight, 44 for a first sinking and 94 for the flagship — and
+// MISSING a wooden chest while digging hands over 18 as a consolation prize. So a treasure haul, the good
+// outcome on one cast in five, paid 3: a sixth of what the game gives you for failing at something else.
+// Luke: "man these fishing rewards are stingy." He was reading a number that had been left behind.
+//
+// EIGHT re-anchors it against what the rest of the sea actually pays: a common haul is 8, a mythic is 40 —
+// just under a first sinking, which is what "most of a fight" was always supposed to mean. It stays below a
+// battle per event, which is correct, because a cast is one of twelve a day and a sortie is one of a few.
+const FISH_DOUBLOONS_PER_STEP = 8;
 // Which chest a chest-drop gives. Wooden is the floor so a common's rare chest hit isn't better than a raid's,
 // and gold (tier 3) is the CEILING — fishing shouldn't out-drop a raid or the boss, it should just pay out
 // more often than it did.

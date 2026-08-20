@@ -60,6 +60,16 @@ export default function BattleLab() {
         events: events || [], over: Boolean(over), win, sunk, reward,
     });
 
+    // What a mid-fleet first sinking hands over — one row per kind, which is what the recap has to lay out.
+    const SPOILS = [
+        { kind: "doubloons", n: 44 },
+        { kind: "gold", n: 190 },
+        { kind: "xp", n: 133 },
+        { kind: "parts", n: 4, tier: 2 },
+        { kind: "seed", id: "potato", name: "Potato", rarity: "common" },
+        { kind: "loot", name: "Tidebreaker Cutlass", rarity: "epic" },
+    ];
+
     const fight = (rank) => {
         const ship = FLEET.find((f) => f.rank === rank);
         const meP = shipProfile({ ...BUILDS[build], ammo, name: "Your ship", art: "/images/sailing/boat-tier5-galleon.png" });
@@ -90,7 +100,10 @@ export default function BattleLab() {
         if (!r.over) r.state.theirNext = foeAims(live.me, live.foe, r.state);
         setLive((l) => ({ ...l, state: r.state }));
         setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
-            r.over && r.win ? [{ kind: "doubloons", n: 14 }, { kind: "gold", n: 320 }] : []));
+            // The FULL hand a sinking actually pays, not two of it — the spoils card is a list with names,
+            // amounts and per-kind art, and a fixture of two gold-coloured chips could not show any of that
+            // going wrong. This is the shape payFleetReward returns for a mid-fleet first sinking.
+            r.over && r.win ? SPOILS : []));
     };
 
     const reckoning = () => {
@@ -99,7 +112,7 @@ export default function BattleLab() {
         if (!r.ok) return;
         setLive((l) => ({ ...l, state: r.state }));
         setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
-            r.over && r.win ? [{ kind: "doubloons", n: 14 }] : []));
+            r.over && r.win ? SPOILS : []));
     };
 
     // The yard against fixture state, so the gun deck and the ladder can be looked at without a database.

@@ -680,6 +680,30 @@ const rows = await db.query(
 return new Set((rows || []).map((r) => String(r.defender_id)));
 }
 
+// ── AND THE SAME NPC TWICE IS THE SAME COMPLAINT ─────────────────────────────────────────────────────────────
+// The member side of matchmaking has had a rematch block since the day it was written; the Gauntlet side never
+// got one, so the tier weighting — boost/(1+i) over the closest tiers — could and did hand out the same
+// fighter back to back. Luke: "why did it match me with a warlord twice".
+//
+// Blocked by BAND, not by tier. A band covers a stretch of tiers and they share one sprite, one name and one
+// numeral series, so Warlord IV followed by Warlord V is the same man in the player's eyes even though the
+// numbers differ. Blocking exact tiers would have answered the code and not the complaint.
+export async function recentNpcBands(buyerId, limit = REMATCH_BLOCK) {
+    if (!buyerId) return new Set();
+    const rows = await db.query(
+        `SELECT npc_tier FROM mkt_arena_bout
+          WHERE challenger_id = $1 AND npc_tier IS NOT NULL
+          ORDER BY created_at DESC LIMIT $2`,
+        [buyerId, Math.max(1, limit)]
+    ).catch(() => []);
+    const bands = new Set();
+    for (const r of rows || []) {
+        const n = npcFor(Number(r.npc_tier) || 0);
+        if (n?.band) bands.add(n.band);
+    }
+    return bands;
+}
+
 export async function getArenaState(buyerId, pre = {}) {
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([
@@ -1058,7 +1082,7 @@ const RESERVE_MEMBER = 2;
 // in ten reading as never across a handful of taps. A coin flip is what he is actually asking for.
 const GAUNTLET_SHARE = 0.5;
 
-function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set()) {
+function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set(), blockedBands = new Set()) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
     const members = [];
     const npcs = [];
@@ -1127,7 +1151,10 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // Dummies in front of a geared player. If nothing is close enough the Gauntlet stands down for this roll
     // rather than being forced in, and the members take it.
     const fairNpcs = npcs.filter((n) => n.d <= 0.5);
-    const npcPool = fairNpcs.length ? fairNpcs : [];
+    // A band fought in the last few bouts stands aside — the same preference-not-a-wall the member block is,
+    // so a Den where only one band is ever fair still gets a fight rather than nothing.
+    const freshNpcs = blockedBands.size ? fairNpcs.filter((n) => !blockedBands.has(npcFor(n.tier)?.band)) : fairNpcs;
+    const npcPool = freshNpcs.length ? freshNpcs : fairNpcs;
     // ── SOMEBODY HAS TO TAKE THE ROLL ────────────────────────────────────────────────────────────────────
     // The two lines below each assume the OTHER pool has somebody in it. Both can be empty at once: no tier
     // lands within half a power-step (so the Gauntlet "stands down"), and the member list is empty or has
@@ -1421,7 +1448,11 @@ export async function startBout(buyerId, targetId = null) {
 
     // In parallel: they share no inputs, and serialising them added a whole round trip to the press that was
     // timing out. ~390ms and ~a loadout assembly, previously one after the other for no reason.
-    const [board, me, blockedFoes] = await Promise.all([standings(), kitFor(buyerId), recentPvpFoes(buyerId).catch(() => new Set())]);
+    const [board, me, blockedFoes, blockedBands] = await Promise.all([
+        standings(), kitFor(buyerId),
+        recentPvpFoes(buyerId).catch(() => new Set()),
+        recentNpcBands(buyerId).catch(() => new Set()),
+    ]);
     const myPower = arenaRating(me);
 
     // ── WHO ARE WE FIGHTING ──────────────────────────────────────────────────────────────────────────────
@@ -1431,7 +1462,7 @@ export async function startBout(buyerId, targetId = null) {
     // No target (or an explicit "auto") means: find me one.
     let target = targetId;
     if (!target || target === "auto") {
-        const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0, blockedFoes);
+        const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0, blockedFoes, blockedBands);
         if (!m) return { ok: false, error: "no_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         target = m.kind === "npc" ? `npc:${m.tier}` : m.id;
     }

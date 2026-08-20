@@ -6,6 +6,7 @@ import SceneMusic from "@/components/SceneMusic";
 import { MONSTER_ZONES, limbWords } from "@/lib/marketplace/monster-parts.js";
 import { ZONES, zoneById, zoneBox, zoneRects, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { hitChance, evasionOf, ammoById, expectedDamage } from "@/lib/marketplace/ship-battle.js";
+import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 
 // Spoils get their sprite, not a word. `+340 gold` as plain text is a receipt; a coin with a number on it is a
 // reward. Only the kinds with art on disk appear here — anything else falls through to text, which is correct
@@ -24,26 +25,47 @@ const REWARD_ART = {
 };
 // A spoil that carries its OWN art uses it — a consumable is a specific object, not a category, and the card
 // should show the vial you were handed rather than a generic badge for "consumable".
-const rewardArt = (r) => r.sprite || REWARD_ART[r.kind] || null;
+// Parts are five DIFFERENT things with five painted sprites, not one category — "tier-2 parts" beside a
+// generic anvil is the screen refusing to name what it just gave you. forge-parts.js is a pure module for
+// exactly this reason; it is what the Forge and the smelter already draw from.
+const rewardArt = (r) => r.sprite || (r.kind === "parts" ? partSprite(r.tier) : null) || REWARD_ART[r.kind] || null;
 
 const TIER_WORD = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
 const cap1 = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : "");
-function rewardText(r) {
+// ── THE SPOILS, AS A LIST ────────────────────────────────────────────────────────────────────────────────────
+// Split into WHAT and HOW MANY so the card can be a column of rows with the numbers in one line down the right
+// edge. As one string per chip in a centred wrap they came out ragged — five pills of five different widths
+// reflowing into a pile, which is what Luke saw as the rewards "overflowing". A list also has room to name
+// things properly, which is how "tier-2 parts" survived on screen for as long as it did.
+function rewardName(r) {
     switch (r.kind) {
-        case "doubloons": return `+${r.n} doubloons`;
-        case "gold": return `+${r.n.toLocaleString()} gold`;
-        case "goldLost": return `−${r.n.toLocaleString()} gold`;
-        case "xp": return `+${r.n} XP`;
-        case "parts": return `+${r.n} tier-${r.tier} parts`;
+        case "doubloons": return "Doubloons";
+        case "gold": return "Gold";
+        case "goldLost": return "Gold lost";
+        case "xp": return "Experience";
+        case "parts": return partName(r.tier);
         case "chest": return `${TIER_WORD[r.tier] || cap1(r.tier)} Chest`;
-        case "loot": return `${r.name} · ${cap1(r.rarity)}`;
-        case "item": return `plundered ${r.name}`;
-        case "free": return "battle not used up!";
-        case "seed": return r.name ? `${r.name} seed` : "a seed for the farm";
-        case "consumable": return `+${r.n || 1} ${r.name || "consumable"}`;
+        case "loot": return r.name || "Plunder";
+        case "item": return r.name || "Plunder";
+        case "free": return "Battle not used up";
+        case "seed": return r.name ? `${r.name} seed` : "A seed for the farm";
+        case "consumable": return r.name || "Supply";
         // Anything unhandled says its kind, which is how "consumable" ended up on screen as a word. Kept as
         // the last resort it was meant to be, now that the kinds that actually drop are all named above.
-        default: return String(r.kind);
+        default: return cap1(String(r.kind));
+    }
+}
+function rewardAmount(r) {
+    switch (r.kind) {
+        case "doubloons": case "xp": case "parts": return `+${(r.n || 0).toLocaleString()}`;
+        case "gold": return `+${(r.n || 0).toLocaleString()}`;
+        case "goldLost": return `−${(r.n || 0).toLocaleString()}`;
+        case "consumable": return `+${r.n || 1}`;
+        case "seed": return "+1";
+        case "chest": return "×1";
+        // Plunder's "amount" is how good it is — the one number that matters about a piece of gear.
+        case "loot": case "item": return r.rarity ? cap1(r.rarity) : "";
+        default: return "";
     }
 }
 
@@ -1353,14 +1375,16 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                             <div className="sbt-rewards">
                                 {battle.reward.map((r, i) => {
                                     const art = rewardArt(r);
+                                    const amount = rewardAmount(r);
                                     return (
                                         <span key={i} className={`sbt-reward is-${r.kind}${r.rarity ? ` is-r-${r.rarity}` : ""}`}
                                             style={{ animationDelay: `${0.18 + i * 0.11}s` }}>
                                             {art ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img className="sbt-reward-art" src={art} alt="" draggable="false" />
-                                            ) : null}
-                                            {rewardText(r)}
+                                            ) : <i className="sbt-reward-art" aria-hidden="true" />}
+                                            <b className="sbt-reward-name">{rewardName(r)}</b>
+                                            {amount ? <em className="sbt-reward-n">{amount}</em> : null}
                                         </span>
                                     );
                                 })}

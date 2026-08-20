@@ -18,7 +18,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
-         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V,
+         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
          GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
          RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
@@ -2409,9 +2409,15 @@ async function payFleetReward(buyerId, reward) {
     if (reward.fragments) {
         // Was a chest shard, tiered by how hard the fight was. Pays coin now on the same curve, so sinking the
         // flagship still reads richer than sinking a fishing boat.
+        //
+        // ONE DOUBLOON ROW, NOT TWO. This is the second place a battle mints doubloons and it used to push its
+        // own chip, so the card showed "+34 doubloons" and "+10 doubloons" side by side — the same currency,
+        // twice, for reasons that are ours and not the player's. The purse is added to the row already there.
         const coin = shardCoin(reward.fragTier || "wooden", reward.fragments);
         await grantDoubloons(buyerId, coin).catch(() => {});
-        out.push({ kind: "doubloons", n: coin });
+        const purse = out.find((x) => x.kind === "doubloons");
+        if (purse) purse.n += coin;
+        else out.push({ kind: "doubloons", n: coin });
     }
     if (reward.parts) {
         try {
@@ -2773,7 +2779,7 @@ const RIVAL_WEIGHT = 1.5;   // a real ship is a better story than a designed one
 const RIVAL_COOLDOWN = 7;
 const FLEET_SHARE = 0.34;
 
-async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
+async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     // ── NOT THE SAME CAPTAIN AGAIN ───────────────────────────────────────────────────────────────────────
     // Luke: "if I fight in a ship battle I won't fight that same opponent for at least 7 turns." Drawing at
     // random from thirty rivals means the same face keeps surfacing, and a sea full of members reads like a
@@ -2826,11 +2832,24 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
     const dist = (o) => Math.abs(o - TARGET_ODDS);
     const mine = { myGuns, myHull, myAcc: myAccuracy };
     // A captain fought inside the window is dropped from the pool outright, the same filter the rivals get.
-    const fleetPool = FLEET.filter((f) => !skipNames.has(f.name));
-    const all = (fleetPool.length ? fleetPool : FLEET).map((f) => ({
+    //
+    // ── AND NOT THE SAME SHIP FOREVER EITHER ─────────────────────────────────────────────────────────────
+    // `foePlanks`, NOT `f.hp`. The catalogue's hp is a dead field — the fight counts a hull in planks — and
+    // feeding a 280-POINT ship to a model holding a 15-PLANK player told it Gull's Folly was a coin flip and
+    // the rest of the fleet was unwinnable. It then dutifully aimed at the coin flip: 152 of the Den's 268
+    // battles were rank 1, and ranks 6 through 15 had never been fought by anybody. Luke: "the fights I get
+    // in are repetitive and not challenging at all."
+    //
+    // The ladder is also WALKED rather than skipped: only ranks up to two past your depth are in the pool, so
+    // a captain who has outgrown the bottom climbs into the ships above it instead of being handed the
+    // flagship and marking every rung between as beaten.
+    const reach = Math.min(MAX_FLEET_RANK, (Number(myDepth) || 0) + 2);
+    const fleetPool = FLEET.filter((f) => f.rank <= reach && !skipNames.has(f.name));
+    const fleetFallback = FLEET.filter((f) => f.rank <= reach);
+    const all = (fleetPool.length ? fleetPool : (fleetFallback.length ? fleetFallback : FLEET)).map((f) => ({
         kind: "fleet", rank: f.rank, boost: 1, name: f.name,
         // +0.1 on their accuracy, the same lift foeProfile gives a designed ship when it actually fights.
-        d: dist(matchupOdds({ ...mine, guns: f.guns, hull: f.hp, acc: Math.min(0.96, f.accuracy + 0.1) })),
+        d: dist(matchupOdds({ ...mine, guns: f.guns, hull: foePlanks(f), acc: Math.min(0.96, f.accuracy + 0.1) })),
     }));
     for (const r of rivals) {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
@@ -2881,7 +2900,7 @@ export async function doBattle(buyerId) {
 
     const myGuns = gunsFor(row?.gun_level || 0), myHull = hullHitsFor(row?.hull_level || 0);
     const match = await matchOpponent(buyerId, myGuns, myHull,
-        accuracyFor(row?.gunnery_level || 0, myLevel));
+        accuracyFor(row?.gunnery_level || 0, myLevel), row?.fleet_depth || 0);
     return match.kind === "rival" ? doRaid(buyerId, match.id) : doFleetBattle(buyerId, match.rank);
 }
 

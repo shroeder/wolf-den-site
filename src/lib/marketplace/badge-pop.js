@@ -76,7 +76,15 @@ export const WORDS = {
 };
 const DOMAIN = { combat: "In a fight", sea: "At sea", farm: "On the farm", forge: "At the forge", depth: "In the Depths" };
 
+// A badge that is a PUNISHMENT still has to say what it does, and it is not "no stat bonus — this one is the
+// XP, the gold and the record of it". It is the only badge in the game you do not want.
+const PENALTY_BADGES = {
+    mark_of_shame: { where: "While you wear it", what: "−10% XP · −10% coin · −10% boss damage" },
+};
+
 function bonusLines(slug) {
+    const p = PENALTY_BADGES[slug];
+    if (p) return [{ ...p, penalty: true }];
     const b = BADGE_BONUSES[slug];
     if (!b) return [];
     const out = [];

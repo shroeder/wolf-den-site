@@ -16,6 +16,21 @@ export const BONUS_META = {
             might: { art: "/images/bonus/might.png", icon: "⚔️", label: "Might", suffix: "" },
             crit_chance: { art: "/images/bonus/crit_chance.png", icon: "🎯", label: "Crit Chance", suffix: "%" },
             crit_power: { art: "/images/bonus/crit_power.png", icon: "💥", label: "Crit Power", suffix: "%" },
+            // ── FIVE STATS THE PAGE COULD NOT DRAW ───────────────────────────────────────────────────────
+            // C() has paid vitality, tenacity, ferocity, fortune and pierce on every badge worth 3 or more
+            // since the hard-badge rule was written, and this map knew about three combat stats — so
+            // bonusChips silently dropped the rest and the Badges page under-reported every prestige badge
+            // it drew. Living Legend showed "+7 Might" and said nothing about the four other columns it
+            // moves. Same defect Luke reported on the Enshriner card, one screen over.
+            //
+            // ART IS BORROWED, not invented: might.png stands in the way the domain heads above already
+            // borrow a representative sprite. Five proper icons would be a small generation run — worth
+            // doing, not worth guessing at.
+            vitality: { art: "/images/bonus/might.png", icon: "❤️", label: "Vitality", suffix: "" },
+            tenacity: { art: "/images/bonus/might.png", icon: "🛡️", label: "Tenacity", suffix: "" },
+            ferocity: { art: "/images/bonus/might.png", icon: "🔥", label: "Ferocity", suffix: "" },
+            fortune: { art: "/images/bonus/might.png", icon: "🍀", label: "Fortune", suffix: "" },
+            pierce: { art: "/images/bonus/might.png", icon: "🗡️", label: "Pierce", suffix: "" },
         },
     },
     sea: {

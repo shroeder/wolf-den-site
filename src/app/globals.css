@@ -13589,6 +13589,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* THE RECAP. It was a card that simply existed: no arrival, no weight, and the same flat treatment whether you
    had just sunk the flagship or been sent to the bottom. Now the card drops in, and the verdict punches. */
 .sbt-result-card { position: relative; overflow: hidden; width: 100%; max-width: 380px; text-align: center;
+    /* The card inherits .card's padding, which left the button hard against the bottom edge with no air under
+       it. Stated here rather than leaned on. */
+    padding: 18px 18px 20px;
     animation: sbtCardIn .42s cubic-bezier(.2,1.35,.35,1) both; }
 @keyframes sbtCardIn { 0% { opacity: 0; transform: translateY(26px) scale(.92); } 100% { opacity: 1; transform: none; } }
 .sbt-result-card.is-win { border-color: rgba(140,240,180,0.5); box-shadow: 0 0 34px rgba(70,220,150,0.28); }
@@ -13606,14 +13609,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-result-line { margin: 6px 0 10px; font-size: 0.84rem; line-height: 1.45; color: #b9c6d4; }
 /* THE SPOILS. They pop in one after another rather than all appearing at once — a stack of prizes landing is
    the reward for the fight, and it costs nothing to let the player watch it arrive. */
-.sbt-rewards { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-bottom: 12px; }
-.sbt-reward { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 7px; border-radius: 999px;
+/* A COLUMN, NOT A CENTRED PILE. Five pills of five different widths reflowing in a wrap is what read as the
+   spoils "overflowing" — nothing lined up with anything, and the last row floated alone in the middle. Rows
+   put every sprite on one left edge and every number on one right edge, which is also the only arrangement
+   with room to spell out what a thing is called. */
+.sbt-rewards { display: grid; gap: 6px; margin-bottom: 14px; text-align: left; }
+.sbt-reward { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px; padding: 7px 12px; border-radius: 12px;
     font-size: 0.78rem; font-weight: 900; color: #ffd75e;
     background: linear-gradient(180deg, rgba(255,215,94,0.24), rgba(255,170,40,0.1));
     border: 1px solid rgba(255,215,94,0.55); box-shadow: 0 3px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,240,190,0.3);
     animation: sbtSpoil .5s cubic-bezier(.2,1.6,.4,1) both; }
 @keyframes sbtSpoil { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 100% { opacity: 1; transform: none; } }
 .sbt-reward-art { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 0 5px rgba(255,200,80,0.6)); }
+.sbt-reward-name { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The numbers are the column you read down, so they get the tabular figures and the weight. */
+.sbt-reward-n { font-style: normal; font-size: 0.92rem; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .sbt-reward.is-doubloons { color: #9fe6ff; background: linear-gradient(180deg, rgba(120,220,255,0.24), rgba(60,170,230,0.1)); border-color: rgba(120,220,255,0.55); }
 .sbt-reward.is-chest { color: #d6b0ff; background: linear-gradient(180deg, rgba(180,120,255,0.26), rgba(140,70,230,0.1)); border-color: rgba(180,120,255,0.6); }
 .sbt-reward.is-goldLost { color: #ff9a8a; background: linear-gradient(180deg, rgba(255,90,70,0.22), rgba(200,40,30,0.1)); border-color: rgba(255,110,90,0.55); }

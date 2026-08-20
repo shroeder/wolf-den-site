@@ -384,6 +384,16 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
 }
 
 // An enemy from the fleet catalog → the same profile shape, built from designed numbers rather than tracks.
+// ── HOW MANY PLANKS A DESIGNED SHIP ACTUALLY HAS ─────────────────────────────────────────────────────────────
+// Pulled out of foeProfile so the matchmaker can ask the same question the FIGHT asks. It could not, and read
+// the catalogue's legacy `hp` instead — see the note inside foeProfile: those numbers (78 at rank 1 up past
+// 800) are a dead field from when a hull was a damage bar. Feeding them to matchupOdds put a 15-PLANK player
+// against a 280-POINT ship in one ratio, and the model came back saying the tutorial boat was a coin flip and
+// every other ship in the fleet was hopeless. 268 battles later, 152 of them were rank 1 and ranks 6 to 15 had
+// never been fought once.
+export const foePlanks = (foe) =>
+    foe?.hits ?? (foe?.rank ? Math.max(5, Math.min(22, 5 + Number(foe.rank))) : 10);
+
 export function foeProfile(foe) {
     return {
         name: foe?.name || "Pirate ship",
@@ -397,7 +407,7 @@ export function foeProfile(foe) {
         // 600) from when a hull was a bar; a ship is counted in planks now, so the ladder is derived from its
         // RANK instead — 6 at the bottom, 20 at the top, against a player who runs 10 bare and 18 plated.
         // A rival captain arrives with `hits` already worked out from their own Hull track.
-        hp: foe?.hits ?? (foe?.rank ? Math.max(5, Math.min(22, 5 + Number(foe.rank))) : 10),
+        hp: foePlanks(foe),
         ammo: ammoById(foe?.ammo || "round"),
         dmgMult: 1,
         dmgTaken: 1,

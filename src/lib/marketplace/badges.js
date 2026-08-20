@@ -496,6 +496,66 @@ export const BADGE_BONUSES = {
     tavern_regular: C(1), dice_devil: C(0, 3), dice_king: C(0, 5),
     town_patron: C(2), town_benefactor: C(5), well_wisher: C(1), fountain_faithful: C(3),
     high_stakes: C(2), merchant_jackpot: C(0, 4), town_taskmaster: C(2),
+
+    // ── THE THIRTY-FIVE THAT PAID NOTHING ────────────────────────────────────────────────────────────────
+    // Five whole subsystems had badges with no bonus at all: every cooking badge, every delve badge, the
+    // auction ladder, three forge badges and the four enshrinement badges — 35 of 267, earning 120 XP and 120
+    // gold and then nothing, while the other 232 were live numbers. Luke, on the Enshriner card: "this badge
+    // doesnt show what bonus it gives", then "all missing badge bonuses need to be filled, depending on the
+    // badge and its difficulty."
+    //
+    // TWO RULES held the whole set together:
+    //
+    //   1. A badge pays into the VERB THAT EARNED IT, which is what every domain badge above already does. So
+    //      cooking pays farm stats (its inputs are crops and fish, its output feeds pets), delving pays Depths
+    //      affinity — the stat line that literally says "powers delving" — and the forge badges pay forge.
+    //      The auction ladder is the exception and pays combat, because that is where the trading badges
+    //      beside it already pay (first_trade, trader, deal_maker, trade_value_10k).
+    //
+    //   2. SCALED BY WHAT IT ACTUALLY TOOK, read off how many members hold one rather than off the sentence.
+    //      27 people have cooked a first dish and nobody has cooked 2,500; those two cannot pay the same.
+    //
+    // Only the five auction badges touch combat, and they add +10 Might across all five — against a full
+    // collection already worth +356. The other thirty pay in their own subsystem's currency, so the thing this
+    // does NOT do is quietly raise the arena's ceiling by a third.
+
+    // COOKING → farm. The kitchen runs on what the farm and the sea produce, and its plates feed pets.
+    cook_first: F({ petXp: 1 }), cook_chain: F({ harvestLuck: 1 }), cook_perfect: F({ harvestLuck: 2 }),
+    cook_apprentice: F({ petXp: 3 }), cook_collector: F({ harvestLuck: 3 }),
+    cook_every_tier: F({ petXp: 3, harvestLuck: 2 }), cook_legendary: F({ petXp: 4 }),
+    cook_forager: F({ harvestLuck: 4, seedLuck: 3 }), cook_prep: F({ harvestLuck: 4, fertPower: 3 }),
+    cook_chef: F({ petXp: 5, goldHarvest: 3 }), cook_grand: F({ petXp: 5, harvestLuck: 4 }),
+    cook_thousand: F({ petXp: 6, goldHarvest: 4 }),
+    cook_wolfs: F({ petXp: 6, harvestLuck: 5, goldHarvest: 4 }),
+    // Every recipe in the book, and 2,500 plates — the two nobody has. Priced beside master_gardener.
+    cook_librarian: F({ growSpeed: 6, seedLuck: 6, harvestLuck: 6, petXp: 6 }),
+    cook_master: F({ petXp: 8, goldHarvest: 6, harvestLuck: 6 }),
+
+    // THE DUNGEONS → Depths affinity, the stat family whose own blurb reads "powers delving, mining & smelting".
+    // Nerve is roof safety, which is the delving equivalent of surviving the floor you are standing on.
+    delve_first_boss: D({ nerve: 1 }), delve_floors_100: D({ nerve: 3 }), delve_no_potion: D({ nerve: 4 }),
+    delve_flawless: D({ nerve: 4, lodesense: 2 }), delve_bosses_25: D({ hew: 3, nerve: 2 }),
+    delve_floors_500: D({ nerve: 6, lodesense: 4, prospect: 3 }),
+    delve_all_four: D({ nerve: 6, hew: 5, lodesense: 4, prospect: 4 }),
+
+    // THE FORGE → forge odds, same as the eight forge badges above them.
+    forge_attuned: G({ keen_eye: 2 }), forge_enchanter: G({ masters_touch: 2 }),
+    forge_dual_affinity: G({ keen_eye: 3, masters_touch: 2 }),
+
+    // ENSHRINEMENT → pet XP, the pet system's own currency. A stone is spent forever and the ability becomes
+    // permanent, so this ladder is steep: Pantheon is ten of them and is the strongest pet badge there is.
+    pet_enshrined: F({ petXp: 4 }), pet_reliquary: F({ petXp: 6 }),
+    pet_both_stones: F({ petXp: 5, harvestLuck: 3 }),
+    pet_pantheon: F({ petXp: 10, goldHarvest: 5, growSpeed: 4 }),
+
+    // THE AUCTION HOUSE → combat, beside the trading badges. A single 5,000-gold sale is a lucky hit rather
+    // than a grind, so it pays crit the way `jackpot` and `high_roller` do.
+    auction_seller: C(1), auction_buyer: C(1), auction_windfall: C(0, 3),
+    auction_magnate: C(3), auction_tycoon: C(5, 0, 3),
+
+    // mark_of_shame is DELIBERATELY absent. It is a punishment — its own description is the penalty it
+    // carries — and a bonus table is not the place to express one. See PENALTY_BADGES in badge-pop.js for what
+    // its card says instead of the "no stat bonus" line every other bonus-less badge would have got.
 };
 
 // Sum one bonus DOMAIN across every badge a member holds. Cheap (one held-slugs read); safe on hot paths.
