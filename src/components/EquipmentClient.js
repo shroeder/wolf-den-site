@@ -583,12 +583,20 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             const slotLabel = EQUIP_SLOTS.find((x) => x.slot === slot)?.label || slot;
                             const wornId = equipped[slot];
                             const worn = wornId ? ownedById.get(wornId) || itemDef(wornId) : null;
-                            const wornScore = worn ? scoreStats(worn.stats, priorities) : 0;
+                            // ── AS YOU HAVE IT, NOT AS IT SHIPS ─────────────────────────────────────────
+                            // effStats exists in this file for exactly this, and its comment says why: the
+                            // compare panel once weighed a forged Legendary at its unforged value. This
+                            // picker was written using `i.stats` — the bare catalogue line — and so
+                            // reintroduced the same bug one panel over. Kaishiern, hours after it shipped:
+                            // "The equipment compare screen doesn’t show any of the gears enhancement levels
+                            // or boosted stats." A +7 rare could rank below an unforged epic.
+                            const wornStats = worn ? effStats(worn, ownedById) : {};
+                            const wornScore = worn ? scoreStats(wornStats, priorities) : 0;
                             // Trophies never appear in a slot picker: their bonus is already yours, so
                             // offering one here is offering to waste a slot. See isCollectionItem in items.js.
                             const candidates = (data.items || [])
                                 .filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece && i.id !== wornId)
-                                .map((i) => ({ ...i, score: scoreStats(i.stats, priorities) }))
+                                .map((i) => { const st = effStats(i, ownedById); return { ...i, eff: st, score: scoreStats(st, priorities) }; })
                                 .sort((a, b) => b.score - a.score);
                             return (
                                 <>
@@ -603,8 +611,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                             <div className="gearpick-worn-row">
                                                 <ItemGlyph id={worn.id} className="gearpick-glyph" elements={worn.elements} gem={worn.gem} socket={worn.socket} />
                                                 <div className="gearpick-worn-body">
-                                                    <b>{worn.name}</b>
-                                                    <span>{describeStats(worn.stats)}</span>
+                                                    <b>{worn.name}{worn.enhanceLevel > 0 ? <em className="gearpick-forge">+{worn.enhanceLevel}</em> : null}</b>
+                                                    <span>{describeStats(wornStats)}</span>
                                                 </div>
                                                 <button type="button" className="gearpick-off" onClick={() => { unequip(slot); setSlot(null); }} disabled={busy}>Take off</button>
                                             </div>
@@ -633,14 +641,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
 
                                     <div className="gearpick-list">
                                         {candidates.length ? candidates.map((i, n) => {
-                                            const rows = statDelta(worn?.stats || {}, i.stats || {});
+                                            const rows = statDelta(wornStats, i.eff || {});
                                             const up = i.score - wornScore;
                                             return (
                                                 <button type="button" key={i.id} className={`gearpick-row rar-${i.rarity}${n === 0 && up > 0 ? " is-best" : ""}`}
                                                     onClick={() => { equip(slot, i.id); setSlot(null); }} disabled={busy}>
                                                     <ItemGlyph id={i.id} className="gearpick-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
                                                     <div className="gearpick-row-body">
-                                                        <b>{i.name}{n === 0 && up > 0 ? <em className="gearpick-best">best pick</em> : null}</b>
+                                                        <b>{i.name}{i.enhanceLevel > 0 ? <em className="gearpick-forge">+{i.enhanceLevel}</em> : null}{n === 0 && up > 0 ? <em className="gearpick-best">best pick</em> : null}</b>
                                                         {/* WHAT CHANGES, not what it is. The stat string is on
                                                             the item everywhere else; the only thing this screen
                                                             can add is the subtraction. */}

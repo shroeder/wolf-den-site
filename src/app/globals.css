@@ -17155,3 +17155,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-size: 0.8rem; line-height: 1.45; color: #cdd5df;
     background: rgba(126,214,162,0.08); border: 1px solid rgba(126,214,162,0.28); }
 .equip-doll-cta b { color: #9ef0bf; }
+
+/* The forge level, on both sides of the comparison — a +7 rare beating an unforged epic only makes sense if
+   the screen says the piece is forged at all. */
+.gearpick-forge { margin-left: 5px; font-style: normal; font-size: 10px; font-weight: 900; color: #ffb86b;
+    background: rgba(255,150,60,0.16); border: 1px solid rgba(255,170,80,0.45); padding: 1px 5px; border-radius: 999px; }
