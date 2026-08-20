@@ -101,10 +101,14 @@ const CAST_MS = 700;
 // How the transcript is paced on screen. PLAY_SCALE turns fight-seconds into milliseconds; the clamps keep a
 // very slow or very fast pair watchable either way, and PLAY_OPEN_MS is the beat before the first blow so the
 // two fighters are on screen before anything happens to them.
-const PLAY_SCALE = 900;
-const PLAY_MIN_MS = 260;
-const PLAY_MAX_MS = 900;
-const PLAY_OPEN_MS = 620;
+// SLOWED DELIBERATELY. A fast pair traded blows at the 260ms floor — four swings a second, which is quicker
+// than the eye can attach a number to a body, and the whole exchange was over before a thumb had left the
+// glass. Luke: "attacks are too quick... translate down attack speed a bit." The floor is what actually
+// governs a fast fight, so that is what moved most.
+const PLAY_SCALE = 1000;
+const PLAY_MIN_MS = 430;
+const PLAY_MAX_MS = 1100;
+const PLAY_OPEN_MS = 700;
 
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
 // own result and their incoming telegraph from being on screen at the same time — which they were, in the same
@@ -2768,7 +2772,11 @@ function Styles() {
             /* Sized so the two of them meet near the middle without occluding each other, and so the lit sand
                still reads underneath. Wider than this and they crowd; narrower and they are back to being two
                small figures with an empty arena between them. */
-            .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
+            /* ── OFF THE VERY BOTTOM EDGE ────────────────────────────────────────────────────────────────
+               bottom:0 stood them on the frame's edge, so on a tall ring the pair sat in the last tenth of
+               the screen under a great empty arena, with the caption bar cropping their feet. Lifted clear of
+               it; the ring's own floor gradient (::before, 26%) is what they now stand on. */
+            .ar-fighter { position: absolute; bottom: 13%; width: 54%; height: 87%; }
             /* ── BLEEDING ────────────────────────────────────────────────────────────────────────────────
                A red wash under the body and drops running DOWN out of it — the opposite direction to haste's
                motes, so the two states never read as the same effect in a different colour. */
@@ -3590,7 +3598,7 @@ function Styles() {
             .ar-pop { font-size: 1.9rem; font-weight: 900; line-height: 1.05;
                 letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
                 font-variant-numeric: tabular-nums;
-                animation: arPop 2.1s cubic-bezier(.2,1,.3,1) both; }
+                animation: arPop .95s cubic-bezier(.2,1,.3,1) both; }
             .ar-pop.is-dmg { color: #ffd75e; }
             /* A miss is a real outcome and has to read as one — small, grey and unmistakably not a number,
                so a flurry that lands two of three shows two golds and a grey MISS rather than one figure
@@ -3601,7 +3609,7 @@ function Styles() {
             /* A crit is the biggest number in the game and it should look like it. */
             .ar-pop.is-crit { font-size: 2.9rem; color: #fff6cc;
                 text-shadow: 0 3px 12px #000, 0 0 26px #ffe28a, 0 0 60px rgba(255,190,60,.95);
-                animation: arPopCrit 2.4s cubic-bezier(.2,1.1,.3,1) both; }
+                animation: arPopCrit 1.15s cubic-bezier(.2,1.1,.3,1) both; }
             /* The half of the exchange your defensive choices actually bought you. Cooler and offset so it is
                never mistaken for damage you took — but no longer TINY. At 1rem next to a 1.9rem hit it read as
                a footnote, which is the wrong way round: the block is the thing you chose. */

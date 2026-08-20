@@ -405,9 +405,13 @@ export const SCENES = {
                 blockReduction: 0.5, stun: 0, haste: 0 };
             const r = autoBout(me, foe);
             return baseState({
+                // THE SCENE HAS TO ACTUALLY PLAY. This handed over `over: true` and the FINAL hit points, so a
+                // scene whose whole note is "played back blow by blow" opened on the victory card and never
+                // showed a single blow — which is exactly the thing anyone opening it came to look at. It
+                // starts where the fight starts now and the client walks the transcript.
                 bout: { ...b, me, foe: { ...b.foe, ...foe }, log: r.log, beat: r.swings,
                     maxHp: me.health, foeMaxHp: foe.health,
-                    hp: Math.max(0, r.hp), foeHp: Math.max(0, r.foeHp), over: true, won: r.won },
+                    hp: me.health, foeHp: foe.health, over: false, won: r.won },
             });
         },
     },
