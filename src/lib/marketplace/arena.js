@@ -1080,7 +1080,16 @@ const RESERVE_MEMBER = 2;
 // 0.3 -> 0.5. The mechanism is sound this time — measured against Luke's own card, 11 of 44 reachable tiers
 // clear the fairness gate and the closest sits 4% off his rating — so "I still never see npc fights" was three
 // in ten reading as never across a handful of taps. A coin flip is what he is actually asking for.
-const GAUNTLET_SHARE = 0.5;
+// ── AND THEN: THE ARENA IS FOR PEOPLE ────────────────────────────────────────────────────────────────────────
+// 0.5 -> 0. Luke: "when fighting in the arena id prefer only pvp not npcs we can leave npcs for the road."
+// The Gauntlet share was built to stop designed fighters vanishing from the hat; the Road is where they live
+// now, a hundred rungs of them with names and sprites, so the Arena does not need to carry them too.
+//
+// This is a PREFERENCE, not a removal, and the three fallbacks below still stand: a member with nobody their
+// own size on the board — the bottom of the ladder, or the top — still gets handed a designed fighter rather
+// than a tapped button that finds nothing. Luke asked for exactly that case: "in the case of Kent, it should
+// offer up a fake NPC."
+const GAUNTLET_SHARE = 0;
 
 function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set(), blockedBands = new Set()) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
@@ -1165,9 +1174,11 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     if (!npcPool.length && !members.length) return npcs.length ? pickWithin(npcs, RESERVE_NPC + 1) : null;
     if (!npcPool.length) return pickWithin(members, SHORTLIST);
     if (!members.length) return pickWithin(npcPool, RESERVE_NPC + 1);
-    return Math.random() < GAUNTLET_SHARE
-        ? pickWithin(npcPool, RESERVE_NPC + 1)
-        : pickWithin(members, SHORTLIST - RESERVE_NPC);
+    // `SHORTLIST - RESERVE_NPC` reserved seats for the Gauntlet in the member draw. With the share at zero
+    // there is nothing to reserve them for, and holding two back would narrow the pool of PEOPLE for no
+    // reason — which is the same mistake, one level down, that the reserve was invented to fix.
+    if (GAUNTLET_SHARE > 0 && Math.random() < GAUNTLET_SHARE) return pickWithin(npcPool, RESERVE_NPC + 1);
+    return pickWithin(members, GAUNTLET_SHARE > 0 ? SHORTLIST - RESERVE_NPC : SHORTLIST);
 }
 
 /**
