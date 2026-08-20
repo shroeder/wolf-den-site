@@ -1064,7 +1064,7 @@ function boardView(board) {
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
 // `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
 // function is synchronous on purpose.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = []) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = []) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1235,7 +1235,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // The bait shelf rides with the fishing view, because the picker that spends one has to list what you
         // are carrying — and each entry carries its own tilt, so the number shown is the number applied.
         fishing: fishingUnlocked(buyerId || row?.buyer_id)
-            ? { ...fishingView(row, angling, status), baits }
+            ? { ...fishingView(row, angling, status), baits, baitCookable }
             : null,
     };
 }
@@ -1685,6 +1685,12 @@ export async function getSailingState(buyerId, skyKey = null) {
     const baits = await import("@/lib/marketplace/cooking.js")
         .then((m) => m.baitStock(buyerId))
         .catch(() => []);
+    // ── AND WHAT YOU COULD MAKE WITHOUT LEAVING THE RAIL ─────────────────────────────────────────────────
+    // An empty bait box and a pantry full of what bait is made of used to mean a trip to the Kitchen and back.
+    // Same lazy import and the same reason as the shelf above it.
+    const baitCookable = await import("@/lib/marketplace/cooking.js")
+        .then((m) => m.cookableNow(buyerId, new Set(["bait"])))
+        .catch(() => []);
     // ── WHO IS STANDING ON THE BOAT ──────────────────────────────────────────────────────────────────────
     // The member's own hero sprite, at the top level, because the fishing scene draws them on the deck holding
     // the rod. It already existed inside the ship-battle payload as `me.rider` — but that is built only when a
@@ -1693,7 +1699,7 @@ export async function getSailingState(buyerId, skyKey = null) {
         `SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]
     ).catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         hero: { art: heroRow?.avatar_sprite_url || null, flip: heroRow?.avatar_sprite_flip === true },
         // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
         chestsHeld: (() => {

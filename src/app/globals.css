@@ -12793,6 +12793,19 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* ── THE BAIT STEP ── the picker that opens before a cast. Rows state the boost they buy; the ladder is
    legible at a glance so a mythic bait never looks like a dough ball. */
 .fish-bait { margin: 0 0 10px; padding: 10px; border-radius: 14px; background: rgba(6,14,20,0.72); border: 1px solid rgba(120,200,255,0.28); }
+/* Making bait at the rail. Deliberately quieter than the bait rows above it — this is the way out of an empty
+   box, not the ordinary path through the screen. */
+.fish-make { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); }
+.fish-make-head { margin: 0 0 6px; font-size: 0.72rem; font-weight: 800; color: #8fb6c8; }
+.fish-make-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; margin-bottom: 5px; border-radius: 10px; cursor: pointer; text-align: left;
+    background: rgba(110,190,220,0.09); border: 1px solid rgba(110,190,220,0.3); }
+.fish-make-row:hover:not(:disabled) { background: rgba(110,190,220,0.16); }
+.fish-make-row:disabled { opacity: .5; cursor: default; }
+.fish-make-art { width: 30px; height: 30px; object-fit: contain; font-size: 20px; text-align: center; }
+.fish-make-name b { display: block; font-size: 0.82rem; color: #dff0f7; }
+.fish-make-name em { display: block; font-style: normal; font-size: 0.66rem; color: #86a6b6; }
+.fish-make-num { font-size: 0.7rem; font-weight: 800; color: #9fd8ec; white-space: nowrap; }
 .fish-bait-head { margin: 0 0 8px; font-size: 12.5px; font-weight: 800; color: #cfe8ff; text-align: center; }
 /* minmax(0,1fr) and min-width:0 together, and both are load-bearing: a grid item's default min-width is AUTO,
    so a row sized itself to its longest word and ran off the right edge — taking the "+5.5 rarity · 1 left"

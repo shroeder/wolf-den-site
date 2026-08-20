@@ -662,6 +662,55 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
  * The tilt is read off the BAITS catalog rather than stored on the row, so the number the picker shows and the
  * number the cast applies are the same number — a bait cannot advertise a boost fishing does not pay.
  */
+// ── WHAT COULD YOU MAKE, RIGHT NOW, WITHOUT LEAVING THE SCREEN ───────────────────────────────────────────────
+// One answer, two callers. The water asks it about BAIT — you are standing at the rail with an empty bait box
+// and the ingredients for three in your pantry, and the current answer is "walk to the Kitchen". The Kitchen
+// asks it about PREPS — a dish wants Risen Dough you do not have, you have everything Risen Dough needs, and
+// the current answer is "go and cook that first, then come back".
+//
+// Both are the same question and neither is worth a trip. Luke: "if we already know the ingredients you have
+// and what bait recipes you have and which ones you can fulfill and how many of each, maybe we could just do
+// it quickly from fishing" — and the same for preps inside a cook.
+//
+// `kinds` is a Set so the two callers ask for what they need and nothing else; `max` is how many times over
+// your shelf could pay for it, which is the number that makes a "make three" button honest.
+export async function cookableNow(buyerId, kinds = new Set(["bait"])) {
+    if (!buyerId) return [];
+    const [known, pantry, sprites] = await Promise.all([
+        db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        db.query(`SELECT ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
+        cookingSprites().catch(() => ({})),
+    ]);
+    const have = new Map(pantry.map((r) => [r.ref, Number(r.qty) || 0]));
+    const knownIds = new Set(known.map((r) => r.recipe_id));
+    const out = [];
+    for (const r of RECIPES) {
+        if (!kinds.has(r.kind) || !knownIds.has(r.id)) continue;
+        const need = Object.entries(r.need || {});
+        if (!need.length) continue;
+        // How many times over the shelf covers it. Zero means the row is still worth SHOWING — "you are two
+        // Kelp short" is more use than the recipe silently not being there.
+        let max = Infinity;
+        const missing = [];
+        for (const [ref, qty] of need) {
+            const held = have.get(ref) || 0;
+            max = Math.min(max, Math.floor(held / qty));
+            if (held < qty) missing.push({ ...ingredientMeta(ref, sprites), need: qty, held });
+        }
+        const outMeta = ingredientMeta(r.out, sprites);
+        out.push({
+            id: r.id, kind: r.kind, name: r.name, tier: r.tier,
+            makes: { ref: r.out, name: outMeta.name, sprite: outMeta.sprite || outMeta.fallback || null },
+            sprite: sprites[r.id] || null,
+            max: Number.isFinite(max) ? max : 0,
+            missing,
+            need: need.map(([ref, qty]) => ({ ...ingredientMeta(ref, sprites), qty, held: have.get(ref) || 0 })),
+        });
+    }
+    // Best first: what you can actually make, then by how much of it.
+    return out.sort((a, b) => (b.max > 0) - (a.max > 0) || b.max - a.max || a.tier - b.tier);
+}
+
 export async function baitStock(buyerId) {
     if (!buyerId) return [];
     const [rows, sprites] = await Promise.all([
@@ -1026,6 +1075,32 @@ export async function getKitchenState(buyerId) {
             } : null,
             need,   // shown whether known or not — what a recipe wants is the useful half of the hint
             canCook: known && need.every((n) => n.enough),
+            // ── COULD IT COOK IF IT MADE ITS OWN PREPS FIRST? ────────────────────────────────────────
+            // Named on the recipe so the card can offer the chain without a second round trip, and so the
+            // button can say what it will actually do — "makes 2 Risen Dough first" rather than a bare
+            // "cook" that quietly spends four other things. Only counts a prep this member KNOWS and can
+            // afford; one level deep, matching cookWithPrereqs.
+            chainable: (() => {
+                if (!known || need.every((n) => n.enough)) return null;
+                const spend = new Map(have);
+                const steps = [];
+                for (const n of need) {
+                    const short = n.qty - n.held;
+                    if (short <= 0) continue;
+                    const maker = RECIPES.find((x) => x.out === n.ref && (x.kind === "prep" || x.kind === "bait"));
+                    if (!maker || !cookedMap.has(maker.id)) return null;
+                    for (let i = 0; i < short; i += 1) {
+                        const ok = Object.entries(maker.need || {}).every(([r2, q2]) => (spend.get(r2) || 0) >= q2);
+                        if (!ok) return null;
+                        for (const [r2, q2] of Object.entries(maker.need || {})) spend.set(r2, (spend.get(r2) || 0) - q2);
+                        steps.push(maker.name);
+                    }
+                }
+                if (!steps.length) return null;
+                // Counted, not listed twice — "2x Risen Dough" rather than the same name printed twice.
+                const tally = steps.reduce((m, x) => m.set(x, (m.get(x) || 0) + 1), new Map());
+                return { steps: [...tally].map(([name, n]) => ({ name, n })) };
+            })(),
         };
     }).sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
 
@@ -1117,6 +1192,61 @@ export async function getKitchenState(buyerId) {
  * can't cook twice off one set of ingredients. The daily counter is claimed the same way, before anything is
  * granted, for the same reason.
  */
+// ── COOK THE THINGS THE THING NEEDS ──────────────────────────────────────────────────────────────────────────
+// A dish that wants two Risen Dough and finds none used to be a dead end with a link on it: go to the prep,
+// cook it, come back, find your place again. Every ingredient of that dough was already on the shelf. Luke:
+// "if you have prep ingredients you need that you have the ingredients to make, maybe instead of having to go
+// make them you could just make them as all as part of one transaction."
+//
+// A LOOP OVER cookRecipe AND NOTHING ELSE. Every portion roll, every pet bonus, every power, every XP line is
+// the ordinary cook — a second implementation of "what does cooking a prep give you" would drift, and it would
+// drift on the path nobody watches. Preps are one press now (they have no ladder to roll), so each runs at
+// quality 1, exactly as pressing the button would.
+//
+// ONE LEVEL DEEP, deliberately. A prep whose own ingredients are preps you also lack is a chain nobody asked
+// for and a spend nobody can see the end of; that case still says what is missing and sends you to the recipe.
+//
+// It is NOT atomic, because nothing here can be — the driver has no transactions (see market.js). Each prep is
+// its own guarded spend, so the worst case is that the preps got made and the dish did not, which leaves you
+// holding the preps. That is the failure worth having.
+export async function cookWithPrereqs(buyerId, recipeId, { quality = null, chain = 0 } = {}) {
+    const rec = recipeById(recipeId);
+    if (!rec) return { ok: false, error: "unknown_recipe" };
+
+    const [pantry, known] = await Promise.all([
+        db.query(`SELECT ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
+        db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+    ]);
+    const have = new Map(pantry.map((r) => [r.ref, Number(r.qty) || 0]));
+    const knownIds = new Set(known.map((r) => r.recipe_id));
+
+    // What this dish is short of, and which of those shortfalls a recipe you KNOW could cover.
+    const made = [];
+    for (const [ref, qty] of Object.entries(rec.need || {})) {
+        const short = qty - (have.get(ref) || 0);
+        if (short <= 0) continue;
+        const maker = RECIPES.find((x) => x.out === ref && (x.kind === "prep" || x.kind === "bait"));
+        if (!maker || !knownIds.has(maker.id)) continue;
+        // Can the shelf pay for the maker, `short` times over? Checked against a WORKING copy of the pantry so
+        // two preps competing for the same flour cannot both be promised.
+        for (let i = 0; i < short; i += 1) {
+            const affordable = Object.entries(maker.need || {}).every(([r2, q2]) => (have.get(r2) || 0) >= q2);
+            if (!affordable) break;
+            // eslint-disable-next-line no-await-in-loop
+            const r = await cookRecipe(buyerId, maker.id, { quality: 1, chain: 0 });
+            if (!r?.ok) break;
+            for (const [r2, q2] of Object.entries(maker.need || {})) have.set(r2, (have.get(r2) || 0) - q2);
+            have.set(ref, (have.get(ref) || 0) + (r.portions || 1));
+            made.push({ id: maker.id, name: maker.name, out: ref, portions: r.portions || 1 });
+        }
+    }
+
+    const res = await cookRecipe(buyerId, recipeId, { quality, chain });
+    // The preps are reported whether or not the dish went through, because they were really cooked and the
+    // ingredients really left the shelf. A silent spend is the one outcome this must never produce.
+    return { ...res, prereqs: made };
+}
+
 export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 } = {}) {
     if (!COOK_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const rec = recipeById(recipeId);

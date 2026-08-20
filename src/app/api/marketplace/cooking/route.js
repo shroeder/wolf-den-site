@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { cookRecipe, devReset, devStock, getKitchenState, upgradeKitchen } from "@/lib/marketplace/cooking.js";
+import { cookRecipe, cookWithPrereqs, devReset, devStock, getKitchenState, upgradeKitchen } from "@/lib/marketplace/cooking.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -27,7 +27,11 @@ export async function POST(request) {
             if (!buyer?.id) return noStore({ error: "unauthorized" }, { status: 401 });
             const b = await request.json().catch(() => ({}));
             switch (String(b?.action || "")) {
-                case "cook": return noStore(await cookRecipe(buyer.id, String(b.recipe || ""), { quality: b.quality, chain: b.chain }));
+                // `withPreps` cooks any prep this dish is short of first, out of ingredients already on the
+                // shelf, and reports them back as `prereqs`. Same cook underneath either way.
+                case "cook": return noStore(b?.withPreps
+                    ? await cookWithPrereqs(buyer.id, String(b.recipe || ""), { quality: b.quality, chain: b.chain })
+                    : await cookRecipe(buyer.id, String(b.recipe || ""), { quality: b.quality, chain: b.chain }));
                 case "upgrade": return noStore(await upgradeKitchen(buyer.id, String(b.track || "")));
                 // Owner-only test tools — the gate is inside, not here.
                 case "dev_stock": return noStore(await devStock(buyer.id, String(b.what || "all")));

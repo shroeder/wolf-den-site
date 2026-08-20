@@ -185,11 +185,14 @@ export default function CookingClient({ initial }) {
     // `recipe` is passed by the instant path (prep/bait), which never opens the minigame and therefore never
     // sets `playing`. The minigame still calls it the old way and falls back to `playing`, so there is one
     // finish for both routes rather than a second copy that could drift.
-    const finishCook = async ({ quality, chain, recipe = null }) => {
+    const finishCook = async ({ quality, chain, recipe = null, withPreps = false }) => {
         const rec = recipe || playing;
         if (!rec) return;
         setPlaying(null);
-        const d = await post({ action: "cook", recipe: rec.id, quality, chain });
+        // The flag rides on the recipe when the minigame path set it, since that route hands back only the
+        // score — see the "Cook it all" button, which stashes it on `playing`.
+        const preps = withPreps || Boolean(rec.withPreps);
+        const d = await post({ action: "cook", recipe: rec.id, quality, chain, withPreps: preps });
         if (d?.ok) {
             setResult(d);
             setDailyTick((n) => n + 1);
@@ -575,10 +578,27 @@ export default function CookingClient({ initial }) {
                                                 one — you cannot fumble a button, so it should not pay like you
                                                 did. Dishes are untouched. */}
                                         {r.known ? (
+                                            <>
                                             <button type="button" className="btn ck-cook" disabled={busy || !r.canCook}
                                                 onClick={() => (INSTANT_KINDS.has(r.kind) ? finishCook({ quality: 1, chain: 0, recipe: r }) : setPlaying(r))}>
                                                 {busy ? "Working…" : r.kind === "prep" ? "Prep it" : r.kind === "bait" ? "Make the bait" : "Start cooking"}
                                             </button>
+                                            {/* ── COOK THE THINGS THE THING NEEDS ─────────────────────────────
+                                                Short of a prep but holding everything that prep is made of was
+                                                a dead end with a link on it: go there, cook it, come back,
+                                                find your place. The card offers to do it instead — and says
+                                                exactly what it will make first, because it spends ingredients
+                                                and a button that quietly does that is worse than the trip. */}
+                                            {!r.canCook && r.chainable ? (
+                                                <button type="button" className="btn ck-chain" disabled={busy}
+                                                    onClick={() => (INSTANT_KINDS.has(r.kind)
+                                                        ? finishCook({ quality: 1, chain: 0, recipe: r, withPreps: true })
+                                                        : setPlaying({ ...r, withPreps: true }))}>
+                                                    Cook it all
+                                                    <em>makes {r.chainable.steps.map((x) => `${x.n}\u00d7 ${x.name}`).join(", ")} first</em>
+                                                </button>
+                                            ) : null}
+                                            </>
                                         ) : (
                                             <p className="ck-locked-note">You haven&rsquo;t found this recipe yet — keep at it and it&rsquo;ll turn up.</p>
                                         )}
@@ -912,6 +932,14 @@ const CK_CSS = `
 .ck-need-item.is-link { cursor: pointer; text-decoration: none; color: inherit; font: inherit;
     border-color: rgba(255,180,90,0.5); background: rgba(255,180,90,0.08); }
 .ck-need-item.is-link:hover { background: rgba(255,180,90,0.16); }
+/* The chain button is quieter than the cook button above it — it is the way round a blocker, not the main
+   way in, and it carries a second line saying what it will spend. */
+.ck-chain { display: block; width: 100%; margin-top: 6px; padding: 9px 11px; border-radius: 11px; cursor: pointer;
+    font-size: 0.82rem; font-weight: 900; color: #dff3e5; line-height: 1.3;
+    background: rgba(126,214,162,0.10); border: 1px solid rgba(126,214,162,0.36); }
+.ck-chain:hover:not(:disabled) { background: rgba(126,214,162,0.18); }
+.ck-chain:disabled { opacity: .5; cursor: default; }
+.ck-chain em { display: block; margin-top: 2px; font-style: normal; font-size: 0.68rem; font-weight: 700; color: #93b7a3; }
 .ck-need-go { font-style: normal; font-size: 0.68rem; font-weight: 900; color: #ffb86b; margin-left: 2px; }
 
 /* ── THE MARKET, INSIDE THE RECIPE ── a quieter green than the kitchen's orange, because it is a different

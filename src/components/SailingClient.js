@@ -1685,6 +1685,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     onCast={fishCast}
                     onLand={fishLand}
                     onRecharge={() => act("fish_recharge")}
+                    /* Cooking a bait at the rail changes the shelf the picker is drawing, so the scene needs
+                       a way to ask for the state again. Same load the rest of the screen uses. */
+                    onRefresh={load}
                     onLoadRecords={loadFishRecords}
                     onMonster={hookMonster}
                     onClose={() => setFishOpen(false)}

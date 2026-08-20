@@ -256,7 +256,7 @@ const statLine = (stats) => describeStats(stats);
 //
 // It owns its own scroll state. Sitting in the parent, the measurement was shared between the two mount
 // points and the fade told the recap about the idle screen's list.
-function BaitPicker({ baits, busy, onCast }) {
+function BaitPicker({ baits, cookable = [], busy, onCast, onMakeBait }) {
     const listRef = useRef(null);
     const [more, setMore] = useState(false);
     const measure = useCallback(() => {
@@ -292,6 +292,27 @@ function BaitPicker({ baits, busy, onCast }) {
                     ))}
                 </div>
             </div>
+            {/* ── MAKE IT HERE ────────────────────────────────────────────────────────────────────────────
+                An empty bait box and a pantry full of what bait is made of meant a trip to the Kitchen and
+                back, and by then you have lost the thread of what you came to do. These are only the recipes
+                you KNOW and can afford right now, with the number your shelf could actually pay for — so the
+                button never promises bait it cannot make. */}
+            {cookable.some((c) => c.max > 0) ? (
+                <div className="fish-make">
+                    <p className="fish-make-head">Out of what you want? Make it here.</p>
+                    {cookable.filter((c) => c.max > 0).map((c) => (
+                        <button key={c.id} type="button" className="fish-make-row" disabled={busy}
+                            onClick={() => onMakeBait?.(c.id)}>
+                            {c.makes.sprite
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={c.makes.sprite} alt="" className="fish-make-art" draggable="false" />
+                                : <span className="fish-make-art" aria-hidden="true">🪱</span>}
+                            <span className="fish-make-name"><b>{c.makes.name}</b><em>{c.name}</em></span>
+                            <span className="fish-make-num">enough for {c.max}</span>
+                        </button>
+                    ))}
+                </div>
+            ) : null}
             <button type="button" className="fish-ghost" disabled={busy} onClick={() => onCast(null)}>
                 Skip baiting — cast the bare hook
             </button>
@@ -314,7 +335,7 @@ const TELL_MS = 1400;
 
 
 
-export default function FishingScene({ fishing, sky, boat = null, deck = 30, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null }) {
+export default function FishingScene({ fishing, sky, boat = null, deck = 30, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null, onRefresh = null }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
     const [fight, setFight] = useState("common"); // the fight profile of what is on the line (rarity only)
@@ -367,6 +388,24 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
     // one on a cast you never thought about.
     const [picking, setPicking] = useState(false);
     const baits = Array.isArray(fishing?.baits) ? fishing.baits : [];
+    // What the pantry could turn into bait right now — see cookableNow. Empty for anybody who knows no bait
+    // recipes, which removes the whole block rather than showing an empty one.
+    const baitCookable = Array.isArray(fishing?.baitCookable) ? fishing.baitCookable : [];
+    const [making, setMaking] = useState(false);
+    // Cooked through the KITCHEN's own endpoint, not a second copy of cooking here: quality 1 because a bait
+    // has no reward ladder to roll and is one press in the Kitchen too. onLoot refreshes the shelf, so the
+    // new bait appears in the list above without a reload.
+    const makeBait = useCallback(async (recipeId) => {
+        if (making) return;
+        setMaking(true);
+        try {
+            const r = await fetch("/api/marketplace/cooking", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "cook", recipe: recipeId, quality: 1, chain: 0 }),
+            }).catch(() => null);
+            if (r?.ok) { await onRefresh?.(); window.dispatchEvent(new Event("wolfden-hud-refresh")); }
+        } finally { setMaking(false); }
+    }, [making, onRefresh]);
 
     // ── THE LIST HAS TO LOOK UNFINISHED WHEN IT IS ───────────────────────────────────────────────────────
     // The box holds about five rows and there are twenty baits in the game. The cut falls neatly BETWEEN
@@ -578,7 +617,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         </p>
                         {/* ── THE BAIT STEP ── every row states what it buys, and the number comes off the
                             bait itself, so the picker cannot advertise a boost the cast does not apply. */}
-                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
+                        {picking ? <BaitPicker baits={baits} cookable={baitCookable} busy={busy} onCast={cast} onMakeBait={makeBait} /> : null}
                         {err ? <p className="fish-err">{err}</p> : null}
                         <div className="fish-actions">
                             {/* ONE button. Running out of casts doesn't hand you a dead control and hide the
@@ -694,7 +733,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                             advertising a throw. With bait in the pantry the picker opens right on the recap
                             instead, so choosing what goes on the hook and throwing it are one screen and one
                             decision, on the card you are already reading. */}
-                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
+                        {picking ? <BaitPicker baits={baits} cookable={baitCookable} busy={busy} onCast={cast} onMakeBait={makeBait} /> : null}
                         <div className="fish-actions">
                             {picking ? null : (
                             <button
@@ -807,7 +846,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                             advertising a throw. With bait in the pantry the picker opens right on the recap
                             instead, so choosing what goes on the hook and throwing it are one screen and one
                             decision, on the card you are already reading. */}
-                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
+                        {picking ? <BaitPicker baits={baits} cookable={baitCookable} busy={busy} onCast={cast} onMakeBait={makeBait} /> : null}
                         <div className="fish-actions">
                             {picking ? null : (
                             <button
