@@ -3012,8 +3012,20 @@ function Styles() {
                 filter: drop-shadow(0 10px 16px rgba(0,0,0,0.7));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
+            /* ── THE MIRROR IS A PROPERTY OF THE FIGHTER, NOT OF ONE ANIMATION ───────────────────────────
+               It used to live INSIDE the keyframes — every mirrored variant opened with scaleX(-1), and the
+               foe's rest pose was whatever arBreatheFoe happened to be holding. That works right up until an
+               animation runs that has no mirrored variant, and then the enemy turns round and fights with his
+               back to you for as long as it lasts. arStunSway is exactly that: no Foe version, no scaleX,
+               so a stunned foe faced away for the whole stun. Luke: "they are still facing the wrong way" —
+               and the sprite was fine, the ring simply stopped mirroring him.
+               scale is its own property, not part of transform, so a transform animation cannot overwrite
+               it. Every keyframe below now carries only its motion, and the flip is held here where no
+               animation can reach it. Translations still read mirrored because scale is applied before the
+               transform, exactly as it was when the two were in the same declaration. */
+            .ar-fighter.is-mirror .ar-hero { scale: -1 1; }
             .ar-fighter.is-mirror .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
-            @keyframes arBreatheFoe { from { transform: scaleX(-1) translateY(0) } to { transform: scaleX(-1) translateY(-5px) } }
+            @keyframes arBreatheFoe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
             /* ── THE TELEGRAPH ── the acting fighter draws back for exactly as long as the ring takes to close,
                so the wind-up and the countdown are the same event. There was nothing tying the circle to the
                fight before this: the ring closed on its own while both fighters stood there breathing, so the
@@ -3025,8 +3037,8 @@ function Styles() {
                     filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 20px rgba(255,215,94,0.9)); } }
             .ar-fighter.is-mirror.is-wind .ar-hero { animation: arWindFoe var(--wind, 1.4s) cubic-bezier(.35,0,.65,1) both; }
             @keyframes arWindFoe {
-                0% { transform: scaleX(-1) translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
-                100% { transform: scaleX(-1) translateX(-18px) rotate(-9deg) scale(1.06);
+                0% { transform: translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
+                100% { transform: translateX(-18px) rotate(-9deg) scale(1.06);
                     filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 20px rgba(111,208,255,0.9)); } }
             /* Whoever is being aimed at hunches — it reads as "this is coming at me" without pulling focus. */
             .ar-fighter.is-brace .ar-hero { animation: arBrace .45s ease-out both; }
@@ -3038,18 +3050,18 @@ function Styles() {
                from +1 through 0 to -1: the sprite squashed to nothing and turned itself inside out. It fired
                on is-brace, which is the beat where the enemy hunches because YOU are winding up, so it read as
                the enemy doing a 360 before every attack you made. Measured: scaleX went 1 -> .64 -> .32 -> 0. */
-            @keyframes arBraceFoe { from { transform: scaleX(-1) translateY(0) scale(1) }
-                to { transform: scaleX(-1) translateY(4px) scale(.96) } }
+            @keyframes arBraceFoe { from { transform: translateY(0) scale(1) }
+                to { transform: translateY(4px) scale(.96) } }
             /* ── CONTACT ── landing a blow drives you INTO them and back; taking one rocks you away from it.
                The old version nudged 14px and returned, which at this size was barely perceptible — the whole
                of "you hit them" was a number changing. A step-in with a scale-up sells the weight.
 
                "both" IS LOAD-BEARING ON EVERY ONE OF THESE, and it is not about the fill looking nicer.
-               The MIRROR lives inside the keyframes — a foe's rest pose is scaleX(-1), supplied by
-               arBreatheFoe. A mirrored animation with no fill mode reverts to the element's unanimated
-               transform the instant it finishes, which is scaleX(1): the enemy turned round to face away,
-               held that until the class came off, then snapped back when breathing resumed. Two flips in a
-               third of a second, and it read as the enemy spinning 360 before every blow you struck. */
+               A mirrored animation with no fill mode reverts to the element's unanimated transform the
+               instant it finishes: the enemy stepped back to centre, held it until the class came off, then
+               snapped when breathing resumed. (The MIRROR no longer rides in these keyframes — see the
+               scale rule on .ar-fighter.is-mirror .ar-hero — but the fill mode is still load-bearing for
+               the motion itself.) */
             .ar-fighter.is-lunge .ar-hero { animation: arLunge .34s cubic-bezier(.2,.9,.3,1) both; }
             @keyframes arLunge {
                 0% { transform: translateX(0) scale(1) }
@@ -3057,9 +3069,9 @@ function Styles() {
                 100% { transform: translateX(0) scale(1) } }
             .ar-fighter.is-mirror.is-lunge .ar-hero { animation: arLungeFoe .34s cubic-bezier(.2,.9,.3,1) both; }
             @keyframes arLungeFoe {
-                0% { transform: scaleX(-1) translateX(0) scale(1) }
-                28% { transform: scaleX(-1) translateX(34px) scale(1.06) }
-                100% { transform: scaleX(-1) translateX(0) scale(1) } }
+                0% { transform: translateX(0) scale(1) }
+                28% { transform: translateX(34px) scale(1.06) }
+                100% { transform: translateX(0) scale(1) } }
             /* Taking one: knocked back, tipped, and washed red. */
             .ar-fighter.is-hurt .ar-hero { animation: arRecoil .36s cubic-bezier(.2,.9,.3,1) both;
                 filter: drop-shadow(0 10px 16px rgba(0,0,0,0.7)) drop-shadow(0 0 18px #ff4d5e) brightness(1.6); }
@@ -3069,9 +3081,9 @@ function Styles() {
                 100% { transform: translateX(0) rotate(0deg) } }
             .ar-fighter.is-mirror.is-hurt .ar-hero { animation: arRecoilFoe .36s cubic-bezier(.2,.9,.3,1) both; }
             @keyframes arRecoilFoe {
-                0% { transform: scaleX(-1) translateX(0) rotate(0deg) }
-                22% { transform: scaleX(-1) translateX(-22px) rotate(-5deg) }
-                100% { transform: scaleX(-1) translateX(0) rotate(0deg) } }
+                0% { transform: translateX(0) rotate(0deg) }
+                22% { transform: translateX(-22px) rotate(-5deg) }
+                100% { transform: translateX(0) rotate(0deg) } }
             /* Shared with the ladder's 30px portraits, so it stays proportional; only the RING placeholder
                gets a fixed size. Sizing this in px broke the little rows above the fold. */
             .ar-noface { width: 60%; height: 60%; border-radius: 50%; background: rgba(255,255,255,0.12); }
@@ -3189,8 +3201,8 @@ function Styles() {
             @keyframes arDown { to { transform: translateY(16px) rotate(-16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
             .ar-fighter.is-mirror.is-down .ar-hero { animation: arDownFoe .6s cubic-bezier(.4,0,.6,1) both; }
             /* Same trap as arBraceFoe: without a from, going down flipped the loser through zero first. */
-            @keyframes arDownFoe { from { transform: scaleX(-1) translateY(0) rotate(0deg); opacity: 1; }
-                to { transform: scaleX(-1) translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
+            @keyframes arDownFoe { from { transform: translateY(0) rotate(0deg); opacity: 1; }
+                to { transform: translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
             /* The celebration behind the word. Deliberately BEHIND: the sprite going down on the sand is the
                thing to look at, and this frames it rather than covering it. */
             .ar-cele { position: absolute; inset: -30%; z-index: -1; pointer-events: none;
