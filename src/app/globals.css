@@ -11901,6 +11901,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .dig-wrap { position: relative; border-radius: 14px; overflow: hidden; padding: 12px; background-size: cover; background-position: center; box-shadow: inset 0 0 70px rgba(0,0,0,0.5); }
 .dig-hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
 .dig-frag { color: #ffe9a8; } .dig-stam { color: #bfe9ff; }
+/* Two chests buried — a lure or a charm. Gold and lit, because it is the best thing that can be true of a
+   board and it has to survive being read at a glance over a dirt background. */
+.dig-twin { color: #1a1206; background: linear-gradient(180deg, #ffd75e, #f0a92e); font-weight: 900;
+    font-size: 0.72rem; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
+    box-shadow: 0 0 12px rgba(255,215,94,0.45); }
 .dig-stambar { height: 7px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 6px 0 10px; }
 .dig-stambar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); transition: width 0.3s ease; }
 .dig-grid { display: grid; gap: 7px; }

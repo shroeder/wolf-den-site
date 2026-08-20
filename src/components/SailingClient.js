@@ -759,6 +759,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     <div className="dig-wrap" style={{ backgroundImage: `url(${state.digBg})` }}>
                         <div className="dig-hud">
                             <span className="dig-frag">🎁 {dig.found}/{dig.buried} chest</span>
+                            {/* The lure's promise, while there is still dirt to move. Told at the payout it is
+                                a pleasant surprise; told HERE it is the reason to spend the last of the
+                                stamina, which is what the item is actually for. */}
+                            {dig.twinChest ? <span className="dig-twin" title="A Lure or Charm buried a second chest — finish the dig and you take both">✨ TWO buried</span> : null}
                             {dig.tier ? <span className="dig-tier" title="Difficulty — climbs with your Excavation level">Depth {dig.tier}</span> : null}
                             <span className="dig-stam" title="Digs remaining">⛏️ {dig.stamina}/{dig.maxStamina}</span>
                         </div>
@@ -1497,7 +1501,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
                             ? (result.chest
-                                ? `You dug the whole thing out — the ${result.chest.name} is yours${result.doubloons ? `, plus ${result.doubloons} doubloons` : ""}${result.items?.length ? `, and you grabbed ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"} on the way` : ""}.`
+                                ? `You dug the whole thing out — ${(result.chest.n || 1) > 1 ? `BOTH ${result.chest.name}s are` : `the ${result.chest.name} is`} yours${result.doubloons ? `, plus ${result.doubloons} doubloons` : ""}${result.items?.length ? `, and you grabbed ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"} on the way` : ""}.`
                                 : `You exposed ${result.uncovered}/${result.total} of the chest before the light went — ${result.doubloons} doubloons for what you shifted${result.items?.length ? `, and you grabbed ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"}` : ""}.`)
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         {result.reveal ? (
@@ -1519,7 +1523,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {result.chest ? (
                                 <div className="sail-recap-row" key={result.chest.tier}>
                                     <span><FragmentIcon size={16} art={result.chest.art} /> {result.chest.name}</span>
-                                    <b className="sail-recap-pos" style={{ color: result.chest.color }}>+1</b>
+                                    {/* The lure can bury two. A hard-coded +1 would show one chest and quietly
+                                        bank the second, which is the way to make a good drop feel like a bug. */}
+                                    <b className="sail-recap-pos" style={{ color: result.chest.color }}>+{result.chest.n || 1}</b>
                                 </div>
                             ) : null}
                             {result.doubloons > 0 ? (

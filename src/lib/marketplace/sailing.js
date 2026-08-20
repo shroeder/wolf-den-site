@@ -180,6 +180,9 @@ const wavesPerDay = (luckLevel = 0) => WAVES_PER_DAY + Math.floor(Math.max(0, lu
 // being answered can be a whole night's sleep, and crediting THAT pushed the arrival past where the member had
 // already seen the boat land.
 const ENCOUNTER_PAUSE_CAP_MS = 10 * 60 * 1000;
+// How often a lure or a charm buries a SECOND chest. Not a certainty — an item that always doubled the best
+// outcome in the feature would be the only thing anyone ever spent doubloons on.
+const LURE_TWIN_CHANCE = 0.35;
 const ENCOUNTER_BASE = 0.35;          // base chance the FIRST mark of a voyage has something waiting
 const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
 const ENCOUNTER_CHANCE_CAP = 0.65;    // Fortune can raise the encounter chance up to this cap
@@ -869,6 +872,15 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // the thing you brush the dirt off is the object you are about to own — a gold chest looks like a gold
     // chest while it is still in the ground.
     const fragTiers = frag.map(() => artifactTier);
+    // ── TWO CHESTS DOWN THERE ────────────────────────────────────────────────────────────────────────────
+    // What the Lucky Lure and the Prospector's Charm buy. They used to swell the CONSOLATION — the coin a dig
+    // pays for a chest you did NOT finish — which meant a 600-gold charm was worth nothing to anybody who digs
+    // well, and paid out only when you played badly. Eric D: "is it possible for the prospector charm and
+    // lucky lure to give something even if we hit the chest? Cause I hit the chest every time."
+    //
+    // Now they bury a SECOND chest. Decided here rather than at the payout so the board can announce it while
+    // there is still dirt to move: knowing two are down there is the reason to spend the stamina.
+    const twinChest = row?.dig_lure === true && Math.random() < LURE_TWIN_CHANCE;
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
     // Beachhead: a third of sites arrive half dug, so the shallow layers over the chest are already gone.
@@ -917,7 +929,7 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const tools = unlockedTools(digUpgradeLevels(row)).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, chestTier: artifactTier, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, chestTier: artifactTier, shape, artifactTier, chestBox, twinChest, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Finding the chest NO LONGER ends the dig on its own — you keep
@@ -1041,7 +1053,9 @@ function boardView(board) {
         // WHICH CHEST IS DOWN THERE. The client slices this tier's real art across the buried cells
         // instead of one generic prop, so a gold chest looks like a gold chest while still in the dirt.
         chestTier: board.chestTier || board.artifactTier || "wooden",
-        shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null, chestDone, itemsLeft };
+        shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null, chestDone, itemsLeft,
+        // The lure's promise, on the board while it still matters.
+        twinChest: Boolean(board.twinChest) };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -3735,11 +3749,13 @@ async function finishDig(buyerId, board) {
     const fullyUnearthed = total > 0 && uncovered >= total;
     const exposure = total > 0 ? uncovered / total : 0;
     const chestWon = fullyUnearthed ? chestTier : null;
+    // The lure buried a second one of the same tier — finishing the dig takes both out of the ground.
+    const chestCount = chestWon && board.twinChest ? 2 : 1;
     if (chestWon) {
-        await addChests(buyerId, { [chestWon]: 1 }, { source: "sail_dig", meta: { tier: chestWon } }).catch(() => {});
+        await addChests(buyerId, { [chestWon]: chestCount }, { source: "sail_dig", meta: { tier: chestWon, twin: chestCount > 1 } }).catch(() => {});
         // The diggers board ranks on this. Nothing wrote it between forging being removed and here.
         await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`,
-            [buyerId, CHEST_POINT_WEIGHT(chestWon)]).catch(() => {});
+            [buyerId, CHEST_POINT_WEIGHT(chestWon) * chestCount]).catch(() => {});
     }
     // Trove (sea affinity), Lucky Lure and Maw (the Leviathan's perk) used to swell the shard count. There is
     // no shard count any more, so they swell the CONSOLATION instead — the only number a dig still pays by
@@ -3816,7 +3832,8 @@ async function finishDig(buyerId, board) {
     const chestArt = await getChestArt().catch(() => ({}));
     const ct = chestWon ? (CHEST_TIERS[chestWon] || {}) : null;
     const chest = chestWon
-        ? { tier: chestWon, name: ct.label || chestWon, emoji: ct.emoji || "🎁", color: ct.color || "#b08a52", art: chestArt[chestWon] || null }
+        // `n` so the recap can say TWO rather than showing one chest and quietly banking a second.
+        ? { tier: chestWon, name: ct.label || chestWon, emoji: ct.emoji || "🎁", color: ct.color || "#b08a52", art: chestArt[chestWon] || null, n: chestCount }
         : null;
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
