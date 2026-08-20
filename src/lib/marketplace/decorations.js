@@ -38,8 +38,12 @@ export const DECO_RARITY = {
 const prompt = (subject) => housePrompt(`A ${subject}.`);
 
 // Helper to declare a decoration compactly. buff is null for cosmetic pieces.
-function deco(id, name, emoji, rarity, source, price, buff, subject) {
-    return { id, name, emoji, rarity, source, price: price || null, buff: buff || null, prompt: prompt(subject) };
+// `level` belongs to source:"level" decorations and to nothing else. It was missing entirely, which is how
+// fifteen of these ended up advertised as level unlocks with no level to unlock at and no code granting them —
+// GrayKitsune, in the plaza: "There are some that mention unlocking under rewards, but none are listed on
+// level up rewards." See syncLevelDecorations in farm-decorations.js for the half that hands them over.
+function deco(id, name, emoji, rarity, source, price, buff, subject, level = null) {
+    return { id, name, emoji, rarity, source, price: price || null, buff: buff || null, level, prompt: prompt(subject) };
 }
 
 // source: "shop" (gold, regular store) · "special" (premium gold, special shop) · "spin" (wheel) · "level" (track)
@@ -110,11 +114,11 @@ export const DECORATIONS = [
     deco("deco_lamp_post", "Lamp Post", "🪔", "rare", "shop", 900, null, "old-fashioned iron lamp post"),
     deco("deco_swing", "Tree Swing", "🌳", "rare", "shop", 1000, null, "rope swing hanging from a branch"),
     deco("deco_owl", "Wise Owl", "🦉", "rare", "spin", null, null, "carved owl perched on a stump"),
-    deco("deco_deer", "Garden Deer", "🦌", "rare", "level", null, null, "graceful standing garden deer statue"),
-    deco("deco_fox", "Sly Fox", "🦊", "rare", "level", null, null, "small orange fox statue mid-trot"),
-    deco("deco_rabbit_topiary", "Rabbit Topiary", "🐇", "rare", "level", null, null, "rabbit-shaped hedge topiary"),
-    deco("deco_flower_tower", "Flower Tower", "🌺", "rare", "level", null, null, "tall tiered tower of cascading flowers"),
-    deco("deco_lantern_string", "String Lights", "✨", "rare", "level", null, null, "strand of warm glowing garden string lights"),
+    deco("deco_deer", "Garden Deer", "🦌", "rare", "level", null, null, "graceful standing garden deer statue", 5),
+    deco("deco_fox", "Sly Fox", "🦊", "rare", "level", null, null, "small orange fox statue mid-trot", 10),
+    deco("deco_rabbit_topiary", "Rabbit Topiary", "🐇", "rare", "level", null, null, "rabbit-shaped hedge topiary", 15),
+    deco("deco_flower_tower", "Flower Tower", "🌺", "rare", "level", null, null, "tall tiered tower of cascading flowers", 20),
+    deco("deco_lantern_string", "String Lights", "✨", "rare", "level", null, null, "strand of warm glowing garden string lights", 25),
 
     // ── EPIC · all carry a buff · special shop + level + spin (18) ─────────────────────────────────────────
     deco("deco_grand_fountain", "Grand Fountain", "⛲", "epic", "special", 3200, { stat: "growSpeed", value: 5 }, "tiered marble fountain with flowing water"),
@@ -125,11 +129,11 @@ export const DECORATIONS = [
     deco("deco_crystal_pond", "Crystal Pond", "💠", "epic", "special", 3400, { stat: "harvestLuck", value: 7 }, "pond of glowing crystal-clear water with gems"),
     deco("deco_zen_garden", "Zen Garden", "🎋", "epic", "special", 3000, { stat: "petXp", value: 8 }, "raked sand zen garden with bamboo"),
     deco("deco_pergola", "Grape Pergola", "🍇", "epic", "special", 3200, { stat: "goldHarvest", value: 7 }, "wooden pergola heavy with grape vines"),
-    deco("deco_sun_statue", "Sun Idol", "☀️", "epic", "level", null, { stat: "growSpeed", value: 6 }, "golden radiant sun-face garden idol"),
-    deco("deco_moon_statue", "Moon Idol", "🌙", "epic", "level", null, { stat: "seedLuck", value: 7 }, "silver crescent-moon garden idol"),
-    deco("deco_rune_stone", "Rune Stone", "🪨", "epic", "level", null, { stat: "harvestLuck", value: 6 }, "standing stone carved with glowing runes"),
-    deco("deco_greenhouse_lush", "Lush Conservatory", "🌴", "epic", "level", null, { stat: "growSpeed", value: 7 }, "domed conservatory bursting with tropical plants"),
-    deco("deco_fountain_koi", "Koi Fountain", "🐠", "epic", "level", null, { stat: "petXp", value: 8 }, "ornate fountain with leaping koi fish"),
+    deco("deco_sun_statue", "Sun Idol", "☀️", "epic", "level", null, { stat: "growSpeed", value: 6 }, "golden radiant sun-face garden idol", 30),
+    deco("deco_moon_statue", "Moon Idol", "🌙", "epic", "level", null, { stat: "seedLuck", value: 7 }, "silver crescent-moon garden idol", 35),
+    deco("deco_rune_stone", "Rune Stone", "🪨", "epic", "level", null, { stat: "harvestLuck", value: 6 }, "standing stone carved with glowing runes", 40),
+    deco("deco_greenhouse_lush", "Lush Conservatory", "🌴", "epic", "level", null, { stat: "growSpeed", value: 7 }, "domed conservatory bursting with tropical plants", 45),
+    deco("deco_fountain_koi", "Koi Fountain", "🐠", "epic", "level", null, { stat: "petXp", value: 8 }, "ornate fountain with leaping koi fish", 50),
     deco("deco_lucky_cat_grand", "Fortune Cat", "🐱", "epic", "spin", null, { stat: "goldHarvest", value: 8 }, "large golden waving fortune cat statue"),
     deco("deco_clover_grand", "Four-Leaf Shrine", "🍀", "epic", "spin", null, { stat: "seedLuck", value: 8 }, "shrine built around a giant glowing four-leaf clover"),
     deco("deco_gilded_arch", "Gilded Arch", "🏛️", "epic", "special", 3400, { stat: "goldHarvest", value: 7 }, "golden ornamental garden archway"),
@@ -141,16 +145,16 @@ export const DECORATIONS = [
     deco("deco_crystal_obelisk", "Crystal Obelisk", "🔷", "legendary", "special", 6500, { stat: "seedLuck", value: 10 }, "towering faceted crystal obelisk radiating light"),
     deco("deco_golden_idol", "Golden Idol", "🗿", "legendary", "special", 7000, { stat: "goldHarvest", value: 12 }, "gleaming solid-gold ancient garden idol"),
     deco("deco_rainbow_fountain", "Rainbow Fountain", "🌈", "legendary", "special", 6800, { stat: "harvestLuck", value: 10 }, "fountain spraying shimmering rainbow water"),
-    deco("deco_phoenix_perch", "Phoenix Perch", "🔥", "legendary", "level", null, { stat: "growSpeed", value: 11 }, "ornate perch with a small glowing phoenix"),
-    deco("deco_moon_pool", "Moonlit Pool", "🌕", "legendary", "level", null, { stat: "petXp", value: 12 }, "still reflecting pool glowing with moonlight"),
-    deco("deco_grand_greenhouse", "Emerald Greenhouse", "💚", "legendary", "level", null, { stat: "growSpeed", value: 12 }, "grand emerald-glass greenhouse glowing from within"),
+    deco("deco_phoenix_perch", "Phoenix Perch", "🔥", "legendary", "level", null, { stat: "growSpeed", value: 11 }, "ornate perch with a small glowing phoenix", 60),
+    deco("deco_moon_pool", "Moonlit Pool", "🌕", "legendary", "level", null, { stat: "petXp", value: 12 }, "still reflecting pool glowing with moonlight", 70),
+    deco("deco_grand_greenhouse", "Emerald Greenhouse", "💚", "legendary", "level", null, { stat: "growSpeed", value: 12 }, "grand emerald-glass greenhouse glowing from within", 80),
     deco("deco_fortune_shrine", "Fortune Shrine", "⛩️", "legendary", "spin", null, { stat: "goldHarvest", value: 12 }, "red torii shrine wreathed in golden coins"),
     deco("deco_clover_fountain", "Clover Fountain", "🍀", "legendary", "spin", null, { stat: "seedLuck", value: 12 }, "fountain shaped like a giant four-leaf clover"),
     deco("deco_star_sundial", "Astral Sundial", "⭐", "legendary", "special", 6800, { stat: "harvestLuck", value: 11 }, "celestial sundial ringed with floating stars"),
 
     // ── MYTHIC · top buffs · level track + special shop only (4) ───────────────────────────────────────────
-    deco("deco_world_tree", "The World Tree", "🌲", "mythic", "level", null, { stat: "growSpeed", value: 15 }, "colossal luminous world tree with golden glowing canopy"),
-    deco("deco_cornucopia", "Eternal Cornucopia", "🌽", "mythic", "level", null, { stat: "goldHarvest", value: 18 }, "overflowing golden cornucopia spilling endless harvest"),
+    deco("deco_world_tree", "The World Tree", "🌲", "mythic", "level", null, { stat: "growSpeed", value: 15 }, "colossal luminous world tree with golden glowing canopy", 90),
+    deco("deco_cornucopia", "Eternal Cornucopia", "🌽", "mythic", "level", null, { stat: "goldHarvest", value: 18 }, "overflowing golden cornucopia spilling endless harvest", 100),
     deco("deco_celestial_garden", "Celestial Orrery", "🪐", "mythic", "special", 12000, { stat: "harvestLuck", value: 15 }, "floating celestial orrery of orbiting planets and stars"),
     deco("deco_gaia_shrine", "Shrine of Gaia", "🌍", "mythic", "special", 12000, { stat: "seedLuck", value: 16 }, "verdant living shrine overflowing with glowing greenery and blossoms"),
 

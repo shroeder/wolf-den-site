@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { levelForXp } from "@/lib/marketplace/xp.js";
 import { DECORATIONS, PUBLIC_DECORATIONS, UNIQUE_DECOS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
 import { trophyMap } from "@/lib/marketplace/boss-trophy.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
@@ -74,6 +75,35 @@ export async function grantDecoration(buyerId, decoId, qty = 1, source = "grant"
     return { ok: true, decoId, qty };
 }
 
+// ── THE FIFTEEN THE LEVEL TRACK PROMISED AND NEVER HANDED OVER ───────────────────────────────────────────────
+// Fifteen decorations carry source:"level". Nothing granted them. grantDecoration is reached from the shop,
+// the spin wheel and the town glint and from nowhere else, and the rewards track had no decoration code at
+// all — so they sat in the catalogue, described, illustrated and unobtainable. GrayKitsune found it: "There
+// are some that mention unlocking under rewards, but none are listed on level up rewards." Three exist in the
+// whole Den and all three were granted in July, before the current paths existed.
+//
+// NO WATERMARK COLUMN, unlike syncLevelChests. A chest is a CADENCE — miss the level it was owed at and it is
+// gone — so that one has to remember how far it has counted. A decoration is a permanent unlock with no
+// quantity that matters, so "everything at or below your level that you do not already own" is the whole rule
+// and it is self-correcting: it back-fills anybody who passed these levels while nothing was listening, which
+// is currently every member in the Den.
+export async function syncLevelDecorations(buyerId, level) {
+    if (!buyerId || !Number.isFinite(Number(level))) return [];
+    const due = DECORATIONS.filter((d) => d.source === "level" && typeof d.level === "number" && d.level <= level);
+    if (!due.length) return [];
+    const owned = await db
+        .query(`SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = ANY($2::text[])`,
+            [buyerId, due.map((d) => d.id)])
+        .catch(() => []);
+    const have = new Set((owned || []).map((r) => r.deco_id));
+    const missing = due.filter((d) => !have.has(d.id));
+    for (const d of missing) {
+        // eslint-disable-next-line no-await-in-loop
+        await grantDecoration(buyerId, d.id, 1, "level").catch(() => {});
+    }
+    return missing.map((d) => ({ id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, level: d.level }));
+}
+
 // Buy a decoration from the regular ("shop") or premium ("special") shop with gold. Atomic gold guard.
 export async function buyDecoration(buyerId, decoId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
@@ -130,6 +160,11 @@ export async function getPlacements(buyerId) {
 // the aggregate buff totals, and the keep-out zone. Everything the client needs to manage decorations.
 export async function decoState(buyerId) {
     if (!buyerId) return { owned: [], placements: [], buffs: decorationBuffs([]), keepout: decoKeepout() };
+    // ── COLLECT WHAT THE LEVEL TRACK OWES YOU, BEFORE READING THE SHELF ──────────────────────────────────
+    // The same shape getChests uses: sync first, then report, so the panel can never show a member fewer
+    // decorations than their level has earned. Guarded so a failure here still renders the farm.
+    const lvlRow = await db.queryOne(`SELECT COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (lvlRow) await syncLevelDecorations(buyerId, levelForXp(lvlRow.xp).level).catch(() => {});
     const [ownedRows, placeRows, sprites, customMap] = await Promise.all([
         db.query(`SELECT deco_id, qty FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot, view, light_on, light_color, light_intensity, light_radius, brightness FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []),

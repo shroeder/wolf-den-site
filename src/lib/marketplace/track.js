@@ -7,6 +7,7 @@ import { BORDERS } from "@/lib/marketplace/borders.js";
 import { FRAMES } from "@/lib/marketplace/frames.js";
 import { AVATAR_COSMETICS } from "@/lib/marketplace/avatar-cosmetics.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { DECORATIONS } from "@/lib/marketplace/decorations.js";
 import { LEVEL_PERKS, RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
 import { xpForLevel } from "@/lib/marketplace/xp-curve.js";
 
@@ -68,6 +69,12 @@ export async function getRewardsTrack(buyerId) {
     // so including them all seeded the notableLevels set with `undefined` — which sorts to the very end and
     // produced a phantom "Level (blank)" node after 100 that dumped EVERY non-level pet into one confusing pile.
     const unlockableCollectibles = COLLECTIBLES.filter((c) => c.source === "level" && typeof c.level === "number");
+    // ── AND THE DECORATIONS, WHICH THIS TRACK HAS BEEN PROMISING SILENTLY ────────────────────────────────
+    // Fifteen carry source:"level". They were never listed here and never granted anywhere, so the farm's
+    // decoration panel described them as level unlocks while the level track said nothing about them and
+    // handed over nothing. GrayKitsune found the gap from the other end: "There are some that mention
+    // unlocking under rewards, but none are listed on level up rewards."
+    const unlockableDecorations = DECORATIONS.filter((d) => d.source === "level" && typeof d.level === "number");
     // A bonus Gold Chest lands every 10th level (see chests.js syncLevelChests) — surface it on the track.
     const CHEST_MILESTONE_LEVELS = Array.from({ length: 15 }, (_, i) => (i + 1) * 10); // 10, 20, … 150
     const notableLevels = Array.from(
@@ -79,6 +86,7 @@ export async function getRewardsTrack(buyerId) {
             ...unlockableFrames.map((f) => f.level),
             ...unlockableCosmetics.map((c) => c.level),
             ...unlockableCollectibles.map((c) => c.level),
+            ...unlockableDecorations.map((d) => d.level),
             ...LEVEL_PERKS.map((p) => p.level),
             ...CHEST_MILESTONE_LEVELS,
         ])
@@ -105,6 +113,7 @@ export async function getRewardsTrack(buyerId) {
                 ...unlockableFrames.filter((f) => f.level === L).map((f) => ({ icon: f.icon, label: `${f.label} frame`, soon: false })),
                 ...unlockableCosmetics.filter((c) => c.level === L).map((c) => ({ icon: c.icon, label: `${c.label} (avatar)`, soon: false })),
                 ...unlockableCollectibles.filter((c) => c.level === L).map((c) => ({ icon: "🎁", label: `${c.name} (collectible)`, soon: false })),
+                ...unlockableDecorations.filter((d) => d.level === L).map((d) => ({ icon: d.emoji || "🪴", label: `${d.name} (farm decoration)`, soon: false })),
                 ...LEVEL_PERKS.filter((p) => p.level === L).map((p) => ({ icon: p.icon, label: p.label, soon: p.soon })),
                 ...(L % 10 === 0 ? [{ icon: "💰", label: "Gold Chest", soon: false }] : []),
             ],
