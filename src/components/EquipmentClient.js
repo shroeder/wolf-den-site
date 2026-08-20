@@ -13,6 +13,7 @@ import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, sortStatKeys, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
+import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 // An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
@@ -45,6 +46,10 @@ const rank = (list, v) => { const i = list.indexOf(v); return i < 0 ? list.lengt
 // Power is the plain sum of a piece's stats — the same one-number reading the delve uses, so "strongest" means
 // the same thing in both places.
 const powerOf = (i) => Object.values(i?.stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+
+// What the member said they care about, and the scorer that reads it. See item-value.js for why this ranks
+// rather than judges.
+const PRIORITY_KEY = "wd-gear-priorities";
 
 const BAG_SORTS = {
     rarity: {
@@ -233,6 +238,26 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // The chosen order survives a reload, because re-picking it on every visit is the same chore as not
     // having it. Read lazily so the server render and the first client render agree.
     const [bagSort, setBagSort] = useState("rarity");
+    // ── WHAT YOU CARE ABOUT ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "maybe we could make a feature that lets you select the stats you care about and it can help you
+    // out?" Kept in localStorage rather than on the account: it is a way of LOOKING at your gear, not part of
+    // your character, and a preference that needs no migration and no round trip is one that can be changed
+    // while you are standing in the picker deciding.
+    const [priorities, setPriorities] = useState(() => new Set());
+    const [pickerOpen, setPickerOpen] = useState(false);
+    useEffect(() => {
+        try {
+            const raw = window.localStorage.getItem(PRIORITY_KEY);
+            const list = raw ? JSON.parse(raw) : null;
+            if (Array.isArray(list)) setPriorities(new Set(list.filter((k) => PRIORITY_STATS.includes(k))));
+        } catch { /* private mode */ }
+    }, []);
+    const togglePriority = (k) => setPriorities((prev) => {
+        const n = new Set(prev);
+        if (n.has(k)) n.delete(k); else n.add(k);
+        try { window.localStorage.setItem(PRIORITY_KEY, JSON.stringify([...n])); } catch { /* private mode */ }
+        return n;
+    });
     useEffect(() => {
         try { const v = window.localStorage.getItem("wd-bag-sort"); if (v && BAG_SORTS[v]) setBagSort(v); } catch { /* private mode */ }
     }, []);
@@ -417,9 +442,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // Equipped pieces float to the top whatever the order: the first thing anybody wants from a bag screen is
     // "what am I wearing", and hunting a worn piece through forty tiles was half of why this screen felt like
     // a mess. Everything below them is in the order you chose.
-    const gearItems = (data.items || []).filter((i) => !i.collectionPiece)
+    // ── THE BAG IS WHAT YOU ARE NOT WEARING ──────────────────────────────────────────────────────────────
+    // Equipped pieces used to be sorted to the FRONT of the bag, so the first thing in the list of gear you
+    // are choosing between was the gear you had already chosen — drawn twice on one screen, since the doll at
+    // the top is the same nine items. Luke: "I dont think we should show our equipped items in the area we
+    // look at our gear we are considering equipping. plus we already show it up top."
+    const gearItems = (data.items || []).filter((i) => !i.collectionPiece && !i.equipped)
         .slice()
-        .sort((a, b) => (b.equipped ? 1 : 0) - (a.equipped ? 1 : 0) || (BAG_SORTS[bagSort] || BAG_SORTS.rarity).cmp(a, b));
+        .sort((a, b) => (BAG_SORTS[bagSort] || BAG_SORTS.rarity).cmp(a, b));
     // Trophies come down as their OWN list now that they are not items — filtering the bag for them returned
     // nothing the moment they moved out of it, which is what emptied everyone's collections on screen.
     const trophyItems = data.pieces || [];
@@ -527,32 +557,104 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 );
             })()}
 
-            {/* Slot picker */}
-            {slot ? (
-                <div className="card equip-picker">
-                    <div className="equip-picker-head">
-                        <h3>{EQUIP_SLOTS.find((s) => s.slot === slot)?.label}</h3>
-                        <button type="button" className="pill" onClick={() => setSlot(null)}>Close</button>
-                    </div>
-                    <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.78rem" }}>👆 Tap an item to equip it in this slot.</p>
-                    {equipped[slot] ? <button type="button" className="pill" onClick={() => unequip(slot)} disabled={busy}>✕ Unequip {itemDef(equipped[slot])?.name}</button> : null}
-                    <div className="equip-bag-grid">
-                        {/* Trophies never appear in a slot picker: their bonus is already yours, so offering
-                            one here is offering to waste a slot. See isCollectionItem in items.js. */}
-                        {(data.items || []).filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece).map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equip(slot, i.id)} disabled={busy}>
-                                <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
-                                <span className="equip-card-name">{i.name}</span>
-                                <span className="equip-card-stats">{describeStats(i.stats)}</span>
-                                {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
-                                {i.depth ? <span className="equip-card-depth">{describeDepth(i.depth)}</span> : null}
-                                <ElBadge id={i.id} elements={i.elements} />
-                            </button>
-                        ))}
-                        {!(data.items || []).some((i) => itemFitsSlot(i, slot)) ? <p className="muted" style={{ margin: 0 }}>No gear for this slot yet.</p> : null}
+            {/* ── THE SLOT PICKER, AS A COMPARISON ────────────────────────────────────────────────────────
+                It was a list of everything that fits, in bag order, each card printing its own stats and
+                nothing else — so working out whether any of them beat the thing you had on meant reading two
+                stat strings in two places and doing the subtraction in your head. Luke: "its so hard to
+                compare items with what I have equipped."
+
+                Now: what you are wearing sits at the top as the thing to beat, the candidates are RANKED, and
+                every row states WHAT CHANGES rather than what it is. The scoring is a sort order and says so
+                — see item-value.js. */}
+            {slot && typeof document !== "undefined" ? createPortal((
+                <div className="gearpick-scrim" role="dialog" aria-modal="true" onClick={() => { setSlot(null); setPickerOpen(false); }}>
+                    <div className="gearpick" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                            const slotLabel = EQUIP_SLOTS.find((x) => x.slot === slot)?.label || slot;
+                            const wornId = equipped[slot];
+                            const worn = wornId ? ownedById.get(wornId) || itemDef(wornId) : null;
+                            const wornScore = worn ? scoreStats(worn.stats, priorities) : 0;
+                            // Trophies never appear in a slot picker: their bonus is already yours, so
+                            // offering one here is offering to waste a slot. See isCollectionItem in items.js.
+                            const candidates = (data.items || [])
+                                .filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece && i.id !== wornId)
+                                .map((i) => ({ ...i, score: scoreStats(i.stats, priorities) }))
+                                .sort((a, b) => b.score - a.score);
+                            return (
+                                <>
+                                    <div className="gearpick-head">
+                                        <b>{slotLabel}</b>
+                                        <button type="button" className="gearpick-x" onClick={() => { setSlot(null); setPickerOpen(false); }}>Close</button>
+                                    </div>
+
+                                    {worn ? (
+                                        <div className="gearpick-worn">
+                                            <span className="gearpick-worn-kick">Wearing now</span>
+                                            <div className="gearpick-worn-row">
+                                                <ItemGlyph id={worn.id} className="gearpick-glyph" elements={worn.elements} gem={worn.gem} socket={worn.socket} />
+                                                <div className="gearpick-worn-body">
+                                                    <b>{worn.name}</b>
+                                                    <span>{describeStats(worn.stats)}</span>
+                                                </div>
+                                                <button type="button" className="gearpick-off" onClick={() => { unequip(slot); setSlot(null); }} disabled={busy}>Take off</button>
+                                            </div>
+                                        </div>
+                                    ) : <p className="gearpick-empty">Nothing in this slot.</p>}
+
+                                    {/* The chooser lives HERE, beside the decision it changes, rather than in
+                                        a settings screen you would have to leave the picker to reach. */}
+                                    <div className="gearpick-prio">
+                                        <button type="button" className="gearpick-prio-head" onClick={() => setPickerOpen((v) => !v)}>
+                                            <span>What matters to you</span>
+                                            <em>{priorities.size ? [...priorities].map((k) => STAT_META[k]?.label || k).join(", ") : "everything, evenly"}</em>
+                                            <i aria-hidden="true">{pickerOpen ? "▲" : "▼"}</i>
+                                        </button>
+                                        {pickerOpen ? (
+                                            <div className="gearpick-prio-chips">
+                                                {PRIORITY_STATS.map((k) => (
+                                                    <button type="button" key={k} className={`gearpick-chip${priorities.has(k) ? " is-on" : ""}`}
+                                                        onClick={() => togglePriority(k)}>
+                                                        {STAT_META[k]?.icon || ""} {STAT_META[k]?.label || k}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="gearpick-list">
+                                        {candidates.length ? candidates.map((i, n) => {
+                                            const rows = statDelta(worn?.stats || {}, i.stats || {});
+                                            const up = i.score - wornScore;
+                                            return (
+                                                <button type="button" key={i.id} className={`gearpick-row rar-${i.rarity}${n === 0 && up > 0 ? " is-best" : ""}`}
+                                                    onClick={() => { equip(slot, i.id); setSlot(null); }} disabled={busy}>
+                                                    <ItemGlyph id={i.id} className="gearpick-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
+                                                    <div className="gearpick-row-body">
+                                                        <b>{i.name}{n === 0 && up > 0 ? <em className="gearpick-best">best pick</em> : null}</b>
+                                                        {/* WHAT CHANGES, not what it is. The stat string is on
+                                                            the item everywhere else; the only thing this screen
+                                                            can add is the subtraction. */}
+                                                        <span className="gearpick-deltas">
+                                                            {rows.length ? rows.slice(0, 5).map((d) => (
+                                                                <em key={d.stat} className={d.diff > 0 ? "is-up" : "is-down"}>
+                                                                    {d.diff > 0 ? "+" : "−"}{Math.abs(Math.round(d.diff * 10) / 10)} {STAT_META[d.stat]?.label || d.stat}
+                                                                </em>
+                                                            )) : <em className="is-same">identical stats</em>}
+                                                        </span>
+                                                    </div>
+                                                    <span className={`gearpick-score${up > 0 ? " is-up" : up < 0 ? " is-down" : ""}`} aria-hidden="true">
+                                                        {up > 0 ? "▲" : up < 0 ? "▼" : "="}
+                                                    </span>
+                                                </button>
+                                            );
+                                        }) : <p className="gearpick-empty">No other gear for this slot yet.</p>}
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
 
             {/* Charged perks */}
             {charged.length ? (

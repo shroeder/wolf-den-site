@@ -17083,3 +17083,68 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-next-tells b { font-size: 0.66rem; font-weight: 800; letter-spacing: .01em; color: #ffd08a;
     background: rgba(255,176,71,0.13); border: 1px solid rgba(255,176,71,0.34);
     border-radius: 999px; padding: 1px 7px; }
+
+/* ── THE SLOT PICKER ─────────────────────────────────────────────────────────────────────────────────────────
+   A comparison, not a catalogue. What you are wearing is pinned at the top as the thing to beat; every row
+   below states the DIFFERENCE rather than restating its own stats, which are already printed on the item
+   everywhere else in the game. The one thing this screen can add is the subtraction. */
+.gearpick-scrim { position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center; padding: 16px;
+    background: rgba(4,3,8,0.86); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+.gearpick { width: 100%; max-width: 440px; max-height: 88dvh; overflow-y: auto; padding: 16px;
+    border-radius: 18px; background: linear-gradient(180deg, #1c1626, #100c18);
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 70px rgba(0,0,0,0.8); }
+.gearpick-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.gearpick-head b { font-size: 1.1rem; color: #f0e6d2; }
+.gearpick-x { padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 800;
+    color: #cdd5df; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.16); }
+
+/* THE THING TO BEAT. Set apart from the list so it never reads as one of the options — it is the only item
+   on this screen you cannot choose. */
+.gearpick-worn { padding: 10px 11px; border-radius: 13px; margin-bottom: 12px;
+    background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.3); }
+.gearpick-worn-kick { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .14em;
+    text-transform: uppercase; color: #d8b25e; margin-bottom: 5px; }
+.gearpick-worn-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; }
+.gearpick-worn-body { min-width: 0; }
+.gearpick-worn-body b { display: block; font-size: 0.9rem; color: #f0e6d2; }
+.gearpick-worn-body span { display: block; font-size: 0.72rem; line-height: 1.4; color: #9aa2ab; }
+.gearpick-off { padding: 7px 11px; border-radius: 9px; cursor: pointer; font-size: 11px; font-weight: 800;
+    color: #ffb3a8; background: rgba(255,90,70,0.12); border: 1px solid rgba(255,110,90,0.4); }
+.gearpick-off:disabled { opacity: .5; cursor: default; }
+.gearpick-glyph { width: 36px; height: 36px; }
+
+/* WHAT MATTERS TO YOU — beside the decision, because that is when you know the answer. */
+.gearpick-prio { margin-bottom: 12px; border-radius: 12px; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
+.gearpick-prio-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 11px; cursor: pointer; text-align: left; background: none; border: 0; }
+.gearpick-prio-head > span { font-size: 11.5px; font-weight: 900; color: #cdd5df; white-space: nowrap; }
+.gearpick-prio-head em { font-style: normal; font-size: 11px; color: #8b93a0; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.gearpick-prio-head i { font-style: normal; font-size: 9px; color: #8b93a0; }
+.gearpick-prio-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 11px 11px; }
+.gearpick-chip { padding: 5px 9px; border-radius: 999px; cursor: pointer; font-size: 11px; font-weight: 800;
+    color: #9aa2ab; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.gearpick-chip.is-on { color: #0f1a13; background: #7ed6a2; border-color: #9ef0bf; }
+
+.gearpick-list { display: grid; gap: 6px; }
+.gearpick-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px;
+    width: 100%; padding: 9px 11px; border-radius: 12px; cursor: pointer; text-align: left;
+    background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.1); }
+.gearpick-row:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+.gearpick-row:disabled { opacity: .5; cursor: default; }
+/* The best candidate is marked, not auto-applied — the pick is still yours. */
+.gearpick-row.is-best { border-color: rgba(126,214,162,0.55); background: rgba(126,214,162,0.09); }
+.gearpick-row-body { min-width: 0; }
+.gearpick-row-body b { display: block; font-size: 0.88rem; color: #f0e6d2; }
+.gearpick-best { margin-left: 6px; font-style: normal; font-size: 9px; font-weight: 900; letter-spacing: .1em;
+    text-transform: uppercase; color: #0f1a13; background: #7ed6a2; padding: 2px 6px; border-radius: 999px; }
+.gearpick-deltas { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 3px; }
+.gearpick-deltas em { font-style: normal; font-size: 11px; font-weight: 800; }
+.gearpick-deltas em.is-up { color: #7ee6a0; }
+.gearpick-deltas em.is-down { color: #ff9a8a; }
+.gearpick-deltas em.is-same { color: #8b93a0; font-weight: 600; }
+.gearpick-score { font-size: 15px; font-weight: 900; color: #8b93a0; }
+.gearpick-score.is-up { color: #7ee6a0; }
+.gearpick-score.is-down { color: #ff9a8a; }
+.gearpick-empty { margin: 0 0 12px; font-size: 0.8rem; color: #8b93a0; }
