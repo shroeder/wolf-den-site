@@ -38,23 +38,32 @@ export const POLLS = [
                 id: "direction",
                 text: "The Den has been getting less hands-on. How do you feel about that?",
                 choices: [
-                    { id: "more_active", label: "I want more to DO", blurb: "Minigames with timing and skill. Playing well should beat playing often." },
+                    { id: "more_active", label: "I want more to DO", blurb: "Minigames with timing and skill, even if that means being present to get the most out of a day." },
                     { id: "passive_fine", label: "Passive suits me", blurb: "I check in around work and life. I would rather set things up than play them out." },
-                    { id: "choose", label: "Let me choose", blurb: "Offer both — play it out for a better result, or skip it and take the ordinary one." },
-                    { id: "depends", label: "Depends on the activity", blurb: "Some things should be a game, some should be a button." },
+                    { id: "choose", label: "Both, and I accept the cost", blurb: "Build every activity twice. That is half as many NEW things, because the time goes into second versions of what exists." },
+                    { id: "depends", label: "Depends on the activity", blurb: "Pick a few to make into real games and leave the rest as buttons." },
                 ],
             },
             // ── The fishing reel. SoullessShiitake: "I miss having to press and hold to keep the fish in game
             // while fishing — that was hands down my favourite minigame." ValkyrieSylve, immediately: "I can't
             // lie, same." Two people is a signal; this is how we find out whether it is more.
+            // ── REWRITTEN, BECAUSE THE FIRST VERSION WAS A FREE LUNCH ───────────────────────────────────
+            // It offered "Both — hold the line for a bigger fish, or tap to take an ordinary one", which costs
+            // nothing and pays more, so all three of the first respondents took it and the answer told us
+            // nothing. Luke: "the fishing question kind of baits people because you have one option that
+            // basically makes good fish deterministic."
+            //
+            // Every option carries its price now, including the optional one: playing the reel can go WRONG,
+            // which is what makes it a game rather than a toll booth with a prize at the end. New question id,
+            // so the three answers to the old wording stay recorded and are never mixed in with these.
             {
-                id: "fishing",
-                text: "Fishing used to be press-and-hold to keep the fish on the line. Now it is a tap.",
+                id: "fishing_v2",
+                text: "Fishing used to be press-and-hold to land the fish. Now it is a tap. What should it be?",
                 choices: [
-                    { id: "bring_back", label: "Bring the reel back", blurb: "That was the best minigame in the Den." },
-                    { id: "keep_tap", label: "Keep it a tap", blurb: "Twelve casts a day is enough to do without a fight each time." },
-                    { id: "both", label: "Both", blurb: "Hold the line for a bigger fish, or tap to take an ordinary one." },
-                    { id: "no_opinion", label: "No strong feeling", blurb: "I fish for what it pays, not how it plays." },
+                    { id: "bring_back", label: "The reel, for everyone", blurb: "Skill decides the size — and you can fumble it and land a small one." },
+                    { id: "keep_tap", label: "The tap, for everyone", blurb: "Size is luck. Fast, fair, and nothing to practise." },
+                    { id: "optional_risk", label: "Optional, with a risk", blurb: "Play the reel for a shot at a bigger fish, but a bad reel lands you less than the tap would." },
+                    { id: "optional_safe", label: "Optional, no risk", blurb: "Play it for a bigger fish, skip it for an average one. Nothing to lose either way." },
                 ],
             },
             // ── ValkyrieSylve on the arena: "No strategy behind it, took all my agency away." Brecken22 the
@@ -69,13 +78,16 @@ export const POLLS = [
                     { id: "none", label: "No", blurb: "Leave it. Gear and the tree are enough." },
                 ],
             },
+            // "An even split" was the third option and took every vote, which is what a fence always does. The
+            // question is only useful if it forces the trade it is actually asking about: when a well-geared
+            // player meets a well-built one, WHO WINS. There is no even answer to that.
             {
-                id: "decides",
-                text: "What should decide who wins a fight?",
+                id: "decides_v2",
+                text: "A player with better gear meets a player with a smarter build. Who should win?",
                 choices: [
-                    { id: "gear", label: "Mostly your gear", blurb: "The hours in loot and the Forge are the point." },
-                    { id: "choices", label: "Mostly your choices", blurb: "Class, tree and how you play should beat what you are wearing." },
-                    { id: "even", label: "An even split", blurb: "Good gear beats bad, but a smart build beats a lazy one." },
+                    { id: "gear", label: "The gear", blurb: "Loot and the Forge are the long game. Hours put in should show." },
+                    { id: "choices", label: "The build", blurb: "Anybody can grind. Reading the fight and spending points well should beat that." },
+                    { id: "close", label: "Whoever plays it better on the day", blurb: "Neither should be enough on its own — leave room for the fight itself to decide." },
                 ],
             },
             // ── ValkyrieSylve: "New stat system is too convoluted, sometimes, especially in gaming, simple is
