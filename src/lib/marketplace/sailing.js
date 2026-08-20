@@ -176,6 +176,10 @@ const wavesPerDay = (luckLevel = 0) => WAVES_PER_DAY + Math.floor(Math.max(0, lu
 // ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
 // (repurposed from "+buried fragments"). It is a FIGHT now — it pushes your phone and stops the voyage dead
 // until you answer it. See encounters.js for the table and resolveDueEncounter() for the interruption.
+// The most sailing time one encounter can give back. A fight is minutes; the gap between it being pushed and
+// being answered can be a whole night's sleep, and crediting THAT pushed the arrival past where the member had
+// already seen the boat land.
+const ENCOUNTER_PAUSE_CAP_MS = 10 * 60 * 1000;
 const ENCOUNTER_BASE = 0.35;          // base chance the FIRST mark of a voyage has something waiting
 const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
 const ENCOUNTER_CHANCE_CAP = 0.65;    // Fortune can raise the encounter chance up to this cap
@@ -1496,12 +1500,24 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
         if (pet) spoils.push({ kind: "pet", id: pet.id, name: pet.name, rarity: pet.rarity, color: pet.color });
     }
 
-    // THE CLOCK STARTS AGAIN. `returns_at` moves forward by exactly how long the boat sat still, so being
-    // interrupted never costs you sailing time — only the time you left it waiting does.
+    // ── THE CLOCK STARTS AGAIN, BUT ONLY FOR THE FIGHT ──────────────────────────────────────────────────
+    // `returns_at` moved forward by exactly how long the boat sat still, and the comment's "only the time you
+    // left it waiting does" is the bug: an encounter is PUSHED to you the moment it comes due, whether or not
+    // you are awake. So a boat that met something at 2am and was answered at 8am had its arrival shoved six
+    // hours later — and the member had already watched it land. GrayKitsune: "I wake up, it says I am ready to
+    // dig. I click on it and have a battle with a fish which I win. Now I have 2 hours until dig even though
+    // it was ready before the battle."
+    //
+    // The pause is credited up to ENCOUNTER_PAUSE_CAP_MS — long enough that a fight genuinely fought never
+    // costs sailing time, short enough that sleeping through one cannot. Anything past the cap was not the
+    // fight taking time, it was the member living their life.
     const done = encMarks(await readRow(buyerId)).map((m) => (m.enc === meta.encId && !m.done ? { ...m, done: true } : m));
     await db.query(
         `UPDATE mkt_sailing
-            SET returns_at = returns_at + (NOW() - COALESCE(encounter_paused_at, NOW())),
+            SET returns_at = returns_at + LEAST(
+                    NOW() - COALESCE(encounter_paused_at, NOW()),
+                    ($4 || ' milliseconds')::interval
+                ),
                 encounter_paused_at = NULL, encounter_active = NULL,
                 encounter_marks = $2::jsonb,
                 encounters_fought = COALESCE(encounters_fought,0) + 1,
@@ -1509,7 +1525,7 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
                 encounters_total = COALESCE(encounters_total,0) + 1,
                 updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, JSON.stringify(done), res.win ? 1 : 0]
+        [buyerId, JSON.stringify(done), res.win ? 1 : 0, String(ENCOUNTER_PAUSE_CAP_MS)]
     ).catch(() => {});
 
     // THE BESTIARY. A count cannot answer "have you beaten all twenty", so the ids are kept — which is also

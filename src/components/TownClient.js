@@ -1055,10 +1055,21 @@ export default function TownClient({ initial }) {
             const st = await fetch("/api/marketplace/arena", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
             if (st?.bout && !st.bout.over) { setFight(st); return; }
         }
-        // Somebody else got to it first, or a bout of yours is already open. Say which.
-        setRaidNote(r?.error === "bout_in_progress"
-            ? "Finish the fight you are already in first."
-            : r?.who ? `${r.who} is already on that one.` : "That one is already taken.");
+        // ── SAY WHAT ACTUALLY HAPPENED ───────────────────────────────────────────────────────────────────
+        // Every error that was not `bout_in_progress` fell through to "That one is already taken", so while
+        // the ring was shut for the combat rebuild EVERY tap on EVERY foe reported that somebody else had
+        // claimed it. Four members spent an evening believing the raid was fully taken by each other —
+        // JT: "Can't attack any of these little guys", GrayKitsune: "Everything just says already taken",
+        // Sunflower Jinxx: "every mob is taken". Nobody had taken anything; the ring was closed.
+        const RAID_ERRORS = {
+            bout_in_progress: "Finish the fight you are already in first.",
+            combat_closed: "The ring is shut while combat is rebuilt — the raid keeps until it opens.",
+            already_dead: "That one is already down.",
+            no_event: "This raid has finished.",
+            not_signed_in: "Sign in to join the raid.",
+        };
+        setRaidNote(RAID_ERRORS[r?.error]
+            || (r?.who ? `${r.who} is already on that one.` : "That one is already taken."));
         setTimeout(() => setRaidNote(null), 2600);
     }, [state?.event, duel, swing]);
 
