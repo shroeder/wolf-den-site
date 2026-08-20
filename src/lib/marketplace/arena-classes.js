@@ -44,9 +44,27 @@ export function arenaLevelFor(xp = 0) {
 // Arena XP levels the class and feeds the skill tree. A loss used to pay 35% of a win, which made a member
 // stuck at a wall able to keep levelling by feeding themselves to it — progress for failing. Nothing is paid
 // for losing any more; see the note in arena-rewards.js.
-export function arenaXpFor({ won, myPower = 1, theirPower = 1 }) {
+// ── WHAT A FIGHT IS WORTH DEPENDS ON WHAT IT COST YOU ────────────────────────────────────────────────────────
+// Every kind of bout paid the same, and they are not the same thing to obtain. A member-versus-member fight
+// needs a real opponent and spends one of the ten you get in a day; a Gauntlet tier is always standing there
+// and spends the same ten; a Road rung spends none of them at all.
+//
+// So the rate follows the scarcity. PvP is the premium — it is the one you cannot farm, the one that needs
+// somebody else to be online, and the one the daily allowance was built to ration. Measured before this
+// change, twenty points was 46,240 XP: 63 days of winning all ten fights a day, every day, against opponents
+// your own size. The best player in the Den was on track for 72.
+export const PVP_XP_MULT = 3;      // needs another member, and one of your ten
+export const NPC_XP_MULT = 1;      // always available, still costs one of the ten
+export const ROAD_XP_MULT = 0.6;   // unlimited attempts, so it cannot be the best rate as well
+
+//  is whatever boutKindOf() says: member, gauntlet, ladder or town. Named the same way there so the two
+// cannot drift into disagreeing about what a fight was.
+export const XP_MULT_BY_KIND = { member: PVP_XP_MULT, gauntlet: NPC_XP_MULT, town: NPC_XP_MULT, ladder: ROAD_XP_MULT };
+
+export function arenaXpFor({ won, myPower = 1, theirPower = 1, kind = "gauntlet" }) {
     const ratio = Math.max(0.3, Math.min(2.5, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
-    const win = Math.round(26 + 48 * ratio);
+    const mult = XP_MULT_BY_KIND[kind] === undefined ? NPC_XP_MULT : XP_MULT_BY_KIND[kind];
+    const win = Math.round((26 + 48 * ratio) * mult);
     return won ? win : 0;
 }
 

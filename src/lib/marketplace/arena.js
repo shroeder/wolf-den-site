@@ -1788,7 +1788,11 @@ async function finishBout(buyerId, row, b, won) {
     const myPower = b.myPower || 1;
     const theirPower = b.theirPower || 1;
     const baseVp = vpFor({ won, myPower, theirPower });
-    const axp = arenaXpFor({ won, myPower, theirPower });
+    // WHICH KIND OF FIGHT THIS WAS. A road rung is unlimited, a Gauntlet tier costs one of the daily ten, and
+    // a member costs one of the ten AND needs somebody else to be there — so they cannot all pay the same.
+    // boutKindOf is the existing classifier the telemetry and the bout row already use; a second one here
+    // would be a second answer to the same question, and they would disagree the first time either moved.
+    const axp = arenaXpFor({ won, myPower, theirPower, kind: boutKindOf(b) });
     const baseLaurels = boutLaurels({ won, myPower, theirPower });
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     const vp = baseVp + (won ? featVp : 0);
