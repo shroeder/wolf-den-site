@@ -476,7 +476,13 @@ async function grantHaul(buyerId, kind, tier = "common") {
         // single time and the haul paid nothing at all.
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
         const seed = await grantSeedFromBand(buyerId, "fishing").catch(() => null);
-        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seed.id) } : null;
+        // `seedId`, NOT `id`. grantSeedFromBand returns { seedId, name, emoji, rarity } and this read `seed.id`,
+        // which is undefined on every seed it has ever paid — so the sprite lookup was handed nothing and came
+        // back null. What the member then watched was the RISE's no-sprite fallback, which is a treasure chest:
+        // a chest came up out of the water and the card underneath it said "Potato", drawn as the bare emoji.
+        // Luke: "it shows a potato but I reeled up a chest?". The art was there the whole time.
+        const seedId = seed?.seedId || seed?.id || null;
+        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seedId, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seedId) } : null;
     }
     if (kind === "consumable") {
         const pool = FISH_CONSUMABLES.slice(0, (CONSUMABLE_REACH[tier] ?? 2) + 1);

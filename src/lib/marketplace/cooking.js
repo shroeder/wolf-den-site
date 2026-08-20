@@ -1029,6 +1029,40 @@ export async function getKitchenState(buyerId) {
         };
     }).sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
 
+    // ── AND WHETHER SOMEBODY IS SELLING THE ONE YOU ARE SHORT OF ─────────────────────────────────────────
+    // Standing in a recipe missing one Manta Ray, the useful answer is not "catch it out at sea" when three
+    // are sitting on the board a tap away. Luke: "if I'm missing an ingredient but it's on the market it
+    // should tell me and allow me to buy it from here."
+    //
+    // ONE query for the whole screen, not one per recipe: the refs are collected across every known recipe
+    // first. Only shortfalls on recipes you KNOW — a locked recipe's ingredient list is a hint, not a
+    // shopping list, and offering to buy for it would sell people goods for a dish they cannot cook.
+    //
+    // Imported dynamically because market.js imports THIS file for ingredientMeta and the pantry; a static
+    // import here would close that circle.
+    const shortRefs = [];
+    for (const r of recipes) {
+        if (!r.known) continue;
+        for (const n of r.need) if (!n.enough) shortRefs.push(n.ref);
+    }
+    if (shortRefs.length) {
+        const { marketStallsByRef } = await import("@/lib/marketplace/market.js");
+        const stalls = await marketStallsByRef(buyerId, shortRefs).catch(() => ({}));
+        for (const r of recipes) {
+            if (!r.known) continue;
+            for (const n of r.need) {
+                const lots = !n.enough ? stalls[n.ref] : null;
+                if (!lots || !lots.length) continue;
+                n.market = {
+                    lots,                                                   // cheapest first, already ordered
+                    units: lots.reduce((a, l) => a + l.qty, 0),             // everything on the board, by unit
+                    from: lots[0].unitGold,                                 // cheapest per-unit price showing
+                    shortBy: Math.max(0, n.qty - n.held),
+                };
+            }
+        }
+    }
+
     return {
         unlocked: true,
         art: art?.url || null,

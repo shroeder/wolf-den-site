@@ -242,6 +242,63 @@ export async function buyFromMarket(buyerId, listingId) {
     };
 }
 
+// ── WHAT IS FOR SALE, BY INGREDIENT ──────────────────────────────────────────────────────────────────────────
+// For the Kitchen. Standing in a recipe short of one Manta Ray, the answer "somebody is selling three" is
+// worth more than a link to a stall front you then have to search. Grouped by ref, cheapest lot first, with
+// the seller's own stalls left out because buyFromMarket refuses those anyway — offering one is offering a
+// button that cannot work.
+//
+// Lots are INDIVISIBLE: a stall is `qty` at `unit_gold` each, bought whole. Anything built on top of this has
+// to add up whole lots rather than pretend a quantity can be sliced off one.
+export async function marketStallsByRef(buyerId, refs = []) {
+    const want = [...new Set((refs || []).map((r) => String(r || "")).filter(Boolean))];
+    if (!MARKET_OPEN(buyerId) || !want.length) return {};
+    const rows = await db.query(
+        `SELECT l.id, l.ref, l.qty, l.unit_gold, b.display_name, b.alias
+           FROM mkt_market_listing l JOIN mkt_buyer b ON b.id = l.seller_id
+          WHERE l.sold_at IS NULL AND l.cancelled_at IS NULL
+            AND l.seller_id <> $1 AND l.ref = ANY($2::text[])
+          ORDER BY l.unit_gold ASC, l.created_at ASC`,
+        [buyerId, want]
+    ).catch(() => []);
+    const out = {};
+    for (const r of rows) {
+        (out[r.ref] ||= []).push({
+            id: Number(r.id), qty: Number(r.qty), unitGold: Number(r.unit_gold),
+            total: Number(r.qty) * Number(r.unit_gold), seller: sellerName(r),
+        });
+    }
+    return out;
+}
+
+/**
+ * Buy several lots in one go — the Kitchen's "I need three of these" button, which no single stall may cover.
+ *
+ * NOT a transaction, and it must not pretend to be one: each lot is bought by the same guarded claim a single
+ * purchase uses, in cheapest-first order, and the loop STOPS at the first failure rather than pressing on. A
+ * lot someone else took a second earlier, or a balance that runs out halfway, leaves you with what did land
+ * and an honest count of it — never a silent partial spend reported as success.
+ */
+export async function buyMarketLots(buyerId, ids = []) {
+    if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };
+    const list = (Array.isArray(ids) ? ids : []).map((n) => Number(n) || 0).filter(Boolean).slice(0, 12);
+    if (!list.length) return { ok: false, error: "bad_listing" };
+    let spent = 0, lots = 0, units = 0, name = null, sprite = null, error = null;
+    for (const id of list) {
+        // eslint-disable-next-line no-await-in-loop
+        const r = await buyFromMarket(buyerId, id);
+        if (!r?.ok) { error = r?.error || "gone"; break; }
+        spent += Number(r.bought?.cost) || 0;
+        units += Number(r.bought?.qty) || 0;
+        lots += 1;
+        name = r.bought?.name || name;
+        sprite = r.bought?.sprite || sprite;
+    }
+    // Anything at all landing is an `ok` with a count; nothing landing is the error that stopped the first one.
+    if (!lots) return { ok: false, error: error || "gone" };
+    return { ok: true, bought: { name, sprite, lots, units, cost: spent }, partial: lots < list.length, error };
+}
+
 /** Pull a listing off the board. The goods return only once the row is provably yours to cancel. */
 export async function cancelListing(buyerId, listingId) {
     if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };

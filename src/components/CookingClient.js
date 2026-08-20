@@ -125,6 +125,60 @@ export default function CookingClient({ initial }) {
 
     const say = (msg) => { setFlash(msg); setTimeout(() => setFlash(null), 2300); };
 
+    // ── BUYING THE MISSING INGREDIENT WITHOUT LEAVING THE RECIPE ─────────────────────────────────────────
+    // `buying` is the ref of the need row whose stall panel is open, and `wantQty` how many UNITS of it the
+    // member has dialled up. Lots are indivisible — a stall is a whole stack at a price — so a quantity is
+    // satisfied by taking whole lots cheapest-first until it is covered, which is what `plan` works out and
+    // what the panel states before anything is spent.
+    const [buying, setBuying] = useState(null);
+    const [wantQty, setWantQty] = useState(1);
+    const [buyErr, setBuyErr] = useState(null);
+    const MARKET_ERRORS = {
+        gone: "Somebody bought that stall first.",
+        not_enough_gold: "Not enough gold.",
+        your_own: "That is your own stall.",
+        not_open: "The Market is closed.",
+    };
+    const openBuy = (n) => {
+        setBuyErr(null);
+        setBuying(n.ref);
+        // Default to what the recipe is actually short of — the number they came here with.
+        setWantQty(Math.max(1, Math.min(n.market.units, n.market.shortBy || 1)));
+    };
+    // Whole lots, cheapest first, until the wanted units are covered. Returns what it would cost and what it
+    // would actually deliver, which is usually MORE than asked for — a 3-lot covering a shortfall of 1 hands
+    // you three. Saying so up front is the difference between a purchase and a surprise.
+    const lotPlan = (market, units) => {
+        const take = [];
+        let got = 0, cost = 0;
+        for (const l of market.lots) {
+            if (got >= units) break;
+            take.push(l); got += l.qty; cost += l.total;
+        }
+        return { ids: take.map((l) => l.id), lots: take.length, units: got, cost };
+    };
+    const buyLots = async (n) => {
+        const plan = lotPlan(n.market, wantQty);
+        if (!plan.ids.length) return;
+        setBuyErr(null);
+        setBusy(true);
+        try {
+            const r = await fetch("/api/marketplace/market", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "buyLots", ids: plan.ids }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!d?.ok) { setBuyErr(MARKET_ERRORS[d?.error] || "That did not go through."); return; }
+            setBuying(null);
+            say(`Bought ${d.bought.units} ${d.bought.name} for ${d.bought.cost.toLocaleString()} gold.`);
+            // The pantry and the recipe's shortfall both changed, and so did the board — reload the screen
+            // from the server rather than patching a copy of it here.
+            const fresh = await fetch("/api/marketplace/cooking", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+            if (fresh?.unlocked) setState(fresh);
+            window.dispatchEvent(new Event("wolfden-hud-refresh"));
+        } finally { setBusy(false); }
+    };
+
     const finishCook = async ({ quality, chain }) => {
         const rec = playing;
         setPlaying(null);
@@ -414,6 +468,46 @@ export default function CookingClient({ initial }) {
                                                 return <span key={n.ref} className={`ck-need-item${short ? " is-short" : ""}`}>{body}</span>;
                                             })}
                                         </div>
+
+                                        {/* ── SOMEBODY IS SELLING WHAT YOU ARE SHORT OF ───────────────────
+                                            The gather link above says where a thing COMES from; this says
+                                            where one is, right now, for gold. Only on recipes you know and
+                                            only for ingredients actually on the board — no row appears to
+                                            tell you the Market has nothing. */}
+                                        {(r.need || []).filter((n) => n.market).map((n) => {
+                                            const openPanel = buying === n.ref;
+                                            const plan = openPanel ? lotPlan(n.market, wantQty) : null;
+                                            const afford = plan ? (state.gold || 0) >= plan.cost : true;
+                                            return (
+                                                <div key={`mk-${n.ref}`} className={`ck-mk${openPanel ? " is-open" : ""}`}>
+                                                    <button type="button" className="ck-mk-head" onClick={() => (openPanel ? setBuying(null) : openBuy(n))}>
+                                                        <Art sprite={n.sprite} fallback={n.fallback} size={20} alt={n.name} />
+                                                        <span><b>{n.name}</b> is on the Market</span>
+                                                        <em>{n.market.units} for sale · from {n.market.from.toLocaleString()}g each</em>
+                                                    </button>
+                                                    {openPanel ? (
+                                                        <div className="ck-mk-buy">
+                                                            <div className="ck-mk-qty">
+                                                                <button type="button" onClick={() => setWantQty((q) => Math.max(1, q - 1))} disabled={wantQty <= 1} aria-label="One fewer">−</button>
+                                                                <b>{wantQty}</b>
+                                                                <button type="button" onClick={() => setWantQty((q) => Math.min(n.market.units, q + 1))} disabled={wantQty >= n.market.units} aria-label="One more">+</button>
+                                                                <span className="ck-mk-unit">{wantQty === 1 ? "unit" : "units"}</span>
+                                                            </div>
+                                                            {/* A stall is a whole stack. Asking for one out of a stack of three buys
+                                                                three — said BEFORE the button, not discovered after it. */}
+                                                            <p className="ck-mk-plan">
+                                                                {plan.lots === 1 ? "1 stall" : `${plan.lots} stalls`} · you get <b>{plan.units}</b>
+                                                                {plan.units > wantQty ? " (a stall is a whole stack)" : ""} · <b>{plan.cost.toLocaleString()}g</b>
+                                                            </p>
+                                                            {buyErr ? <p className="ck-mk-err">{buyErr}</p> : null}
+                                                            <button type="button" className="ck-mk-go" disabled={busy || !afford} onClick={() => buyLots(n)}>
+                                                                {afford ? `Buy for ${plan.cost.toLocaleString()}g` : `Need ${(plan.cost - (state.gold || 0)).toLocaleString()}g more`}
+                                                            </button>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            );
+                                        })}
 
                                         <div className="ck-block-label">Makes</div>
                                         {r.makes ? (
@@ -798,6 +892,28 @@ const CK_CSS = `
     border-color: rgba(255,180,90,0.5); background: rgba(255,180,90,0.08); }
 .ck-need-item.is-link:hover { background: rgba(255,180,90,0.16); }
 .ck-need-go { font-style: normal; font-size: 0.68rem; font-weight: 900; color: #ffb86b; margin-left: 2px; }
+
+/* ── THE MARKET, INSIDE THE RECIPE ── a quieter green than the kitchen's orange, because it is a different
+   economy: this is another member's stall, not something the land gave you. */
+.ck-mk { margin-top: 8px; border-radius: 12px; background: rgba(126,214,162,0.07); border: 1px solid rgba(126,214,162,0.28); overflow: hidden; }
+.ck-mk.is-open { background: rgba(126,214,162,0.11); border-color: rgba(126,214,162,0.5); }
+.ck-mk-head { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 11px; cursor: pointer;
+    background: none; border: 0; text-align: left; color: #dff3e5; font-size: 0.8rem; }
+.ck-mk-head b { color: #b6f0cb; }
+.ck-mk-head em { margin-left: auto; font-style: normal; font-size: 0.68rem; font-weight: 800; color: #8fd8ab; white-space: nowrap; }
+.ck-mk-buy { padding: 0 11px 11px; display: grid; gap: 8px; }
+.ck-mk-qty { display: flex; align-items: center; gap: 8px; }
+.ck-mk-qty button { width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 1.1rem; font-weight: 900;
+    color: #0f1a13; background: #7ed6a2; border: 0; }
+.ck-mk-qty button:disabled { opacity: .35; cursor: default; }
+.ck-mk-qty b { min-width: 2.2ch; text-align: center; font-size: 1.15rem; color: #fff; font-variant-numeric: tabular-nums; }
+.ck-mk-unit { font-size: 0.74rem; color: #9fb5a8; }
+.ck-mk-plan { margin: 0; font-size: 0.76rem; line-height: 1.45; color: #a9c4b5; }
+.ck-mk-plan b { color: #dff3e5; }
+.ck-mk-err { margin: 0; font-size: 0.76rem; font-weight: 800; color: #ff9f9f; }
+.ck-mk-go { padding: 11px; border-radius: 12px; cursor: pointer; font-size: 0.86rem; font-weight: 900;
+    color: #0f1a13; background: linear-gradient(180deg, #9ef0bf, #62c68d); border: 1px solid rgba(190,255,215,0.5); }
+.ck-mk-go:disabled { opacity: .45; cursor: default; }
 .ck-crumb { display: inline-flex; align-items: center; margin: 0 0 8px; padding: 5px 11px; border-radius: 9px;
     font-size: 0.76rem; font-weight: 800; cursor: pointer; color: #8fb8ff;
     background: rgba(143,184,255,0.1); border: 1px solid rgba(143,184,255,0.3); }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { buyFromMarket, cancelListing, getMarketState, listOnMarket } from "@/lib/marketplace/market.js";
+import { buyFromMarket, buyMarketLots, cancelListing, getMarketState, listOnMarket } from "@/lib/marketplace/market.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,6 +31,9 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "list": return noStore(await listOnMarket(buyer.id, { ref: b.ref, qty: b.qty, unitGold: b.unitGold }));
                 case "buy": return noStore(await buyFromMarket(buyer.id, b.id));
+                // Several lots at once — the Kitchen buying enough of one ingredient to finish a recipe when
+                // no single stall covers it. Same guarded claim per lot; see buyMarketLots.
+                case "buyLots": return noStore(await buyMarketLots(buyer.id, b.ids));
                 case "cancel": return noStore(await cancelListing(buyer.id, b.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }

@@ -2423,7 +2423,13 @@ async function payFleetReward(buyerId, reward) {
     if (reward.chest) { await addChests(buyerId, { [reward.chest]: 1 }, { source: "ship_battle" }).catch(() => {}); out.push({ kind: "chest", tier: reward.chest }); }
     // The battle's own reward table said seed; this picks which. "ship_battle" was never a declared source,
     // so every won battle that promised a seed handed over nothing.
-    if (reward.seed) { const sid = await grantSeedFromBand(buyerId, "ship_battle").catch(() => null); if (sid) out.push({ kind: "seed", id: sid }); }
+    // `sid` is the seed OBJECT, not an id — it was pushed whole under `id`, so the row carried no `name` and
+    // ShipBattleScene fell through to "a seed for the farm" on every win that paid a named one. Same family of
+    // slip as the fishing haul: this function returns { seedId, name, emoji, rarity }.
+    if (reward.seed) {
+        const sd = await grantSeedFromBand(buyerId, "ship_battle").catch(() => null);
+        if (sd) out.push({ kind: "seed", id: sd.seedId || null, name: sd.name || null, emoji: sd.emoji || null, rarity: sd.rarity || null });
+    }
     // PLUNDER — something off their deck. Uncommon by design and weighted hard toward common: the fleet is not
     // meant to out-supply the Forge or the chests, it is meant to occasionally hand you a story. The rank sets
     // both the odds and the ceiling, so a fishing cutter can only ever cough up something ordinary.
