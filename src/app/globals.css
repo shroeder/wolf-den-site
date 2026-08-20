@@ -17148,3 +17148,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .gearpick-score.is-up { color: #7ee6a0; }
 .gearpick-score.is-down { color: #ff9a8a; }
 .gearpick-empty { margin: 0 0 12px; font-size: 0.8rem; color: #8b93a0; }
+
+/* The doll's instruction. Sits directly under it, tinted like the picker it opens, and given a little more
+   presence than a muted caption — it is the primary action of the whole screen and it had no words at all. */
+.equip-doll-cta { max-width: 460px; margin: 8px auto 0; padding: 9px 12px; border-radius: 11px; text-align: center;
+    font-size: 0.8rem; line-height: 1.45; color: #cdd5df;
+    background: rgba(126,214,162,0.08); border: 1px solid rgba(126,214,162,0.28); }
+.equip-doll-cta b { color: #9ef0bf; }

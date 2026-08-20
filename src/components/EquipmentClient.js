@@ -498,6 +498,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 </div>
             </div>
 
+            {/* ── SAY WHAT THE DOLL IS FOR ────────────────────────────────────────────────────────────────
+                Nine slots that look like a display of what you own, and the one thing they actually DO —
+                open a ranked comparison against everything else that fits — was discoverable only by
+                tapping one on the off chance. Luke: "make the equipment screen cta for clicking your gear
+                more apparent." A line under the doll costs nothing and answers it before the guess. */}
+            <p className="equip-doll-cta">
+                <b>Tap any slot</b>{" "}
+                to compare it against everything else you own &mdash; ranked, with what each swap changes.
+            </p>
+
             {/* Live stat total */}
             <div className="equip-stats card">
                 <h3>⚔️ Combat stats</h3>
