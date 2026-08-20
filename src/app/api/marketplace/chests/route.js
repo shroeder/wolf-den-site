@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 
-import { getChests, openChest } from "@/lib/marketplace/chests.js";
+import { getChests, openChest, openChests } from "@/lib/marketplace/chests.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
@@ -30,16 +30,25 @@ export async function GET(request) {
     });
 }
 
-// POST — open one chest. Body: { tier }. Returns the reveal (item or gold) + updated chest list.
+// POST — open a chest. Body: { tier } opens ONE and returns its reveal, which is what the celebration
+// animates. { all: true } opens a pile — a whole tier with `tier`, or everything you hold without one — and
+// returns every reveal in `opens` for the summary instead. Both go through openChest, so a chest opened in
+// bulk rolls exactly what a chest opened alone rolls.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/chests", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = await openChest(buyer.id, String(body?.tier || ""));
+            const bulk = Boolean(body?.all);
+            const res = bulk
+                ? await openChests(buyer.id, { tier: body?.tier ? String(body.tier) : null, max: body?.max })
+                : await openChest(buyer.id, String(body?.tier || ""));
             if (!res.ok) return noStore({ error: res.error }, { status: 400 });
-            after(() => bumpQuestProgress(buyer.id, "chest_open", 1));
+            // BY THE CHEST, not by the tap — ten opened in one press is ten chests of quest progress, which is
+            // the same rule the smelter's batch follows.
+            const progressed = bulk ? res.opened : 1;
+            after(() => bumpQuestProgress(buyer.id, "chest_open", progressed));
             // Chests DO NOT drop badges. A badge is meant to say you did a thing; a 4% roll on a chest said
             // only that you opened a chest, and it handed out achievement badges — "Forged a single item to
             // +10", "Jackpot" — to members who had never done either. It also had the Mark of Shame in its

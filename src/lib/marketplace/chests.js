@@ -222,6 +222,59 @@ export async function getChests(buyerId) {
     return CHEST_ORDER.filter((t) => counts[t]).map((t) => ({ tier: t, count: counts[t], ...CHEST_TIERS[t], image: art[t] || null }));
 }
 
+// ── OPENING A PILE OF THEM ───────────────────────────────────────────────────────────────────────────────────
+// Twenty-eight chests is twenty-eight taps, twenty-eight one-and-a-half-second shakes and twenty-eight
+// full-screen celebrations to dismiss. The celebration is right for ONE chest and it is the reason nobody
+// opens a backlog.
+//
+// This is a loop over openChest and NOTHING ELSE — every roll, every power, every promotion and every atomic
+// decrement is the single-open path, unchanged. A second implementation of what a chest contains is exactly
+// the kind of thing that drifts and starts paying different odds through a different button.
+//
+// CAPPED PER CALL, and the cap is a real one: a single open costs the better part of a dozen queries once the
+// recipe, seed, pet, gem, scroll and consumable rolls have each had their turn, so an uncapped "open 200"
+// would be a request that runs until the platform kills it halfway through — chests debited, loot half
+// granted. `more` is what is left, so the screen can go round again and show progress instead.
+export const BULK_OPEN_CAP = 10;
+
+/**
+ * Open up to `max` chests, either of one tier or across every tier you hold (richest first — a pile opened
+ * top-down ends on your best chest rather than your worst).
+ */
+export async function openChests(buyerId, { tier = null, max = BULK_OPEN_CAP } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    if (tier && !CHEST_TIERS[tier]) return { ok: false, error: "unknown_tier" };
+    const limit = Math.max(1, Math.min(BULK_OPEN_CAP, Number(max) || BULK_OPEN_CAP));
+
+    // Richest first. CHEST_ORDER runs wooden→primordial, so this walks it backwards.
+    const order = tier ? [tier] : [...CHEST_ORDER].reverse();
+    const opens = [];
+    for (const t of order) {
+        while (opens.length < limit) {
+            // eslint-disable-next-line no-await-in-loop
+            const one = await openChest(buyerId, t);
+            // `no_chest` is the ordinary end of a tier, not a failure — the guarded decrement inside openChest
+            // is what tells us the stack is empty, which is also what makes this safe against a second tab.
+            if (!one?.ok) break;
+            opens.push({ ...one, tier: t });
+        }
+        if (opens.length >= limit) break;
+    }
+    if (!opens.length) return { ok: false, error: "no_chest", chests: await getChests(buyerId) };
+
+    const chests = await getChests(buyerId);
+    return {
+        ok: true,
+        bulk: true,
+        opened: opens.length,
+        opens,
+        chests,
+        // What is still sitting there. Zero means the pile is gone; anything else is the screen's cue to
+        // offer another round rather than leaving somebody wondering why 28 became 18.
+        more: chests.reduce((n, c) => n + (tier ? (c.tier === tier ? c.count : 0) : c.count), 0),
+    };
+}
+
 // Open one chest of a tier: roll a rarity, grant a random un-owned item of it (or gold dust if you own
 // them all). Returns the reveal for the animation.
 export async function openChest(buyerId, tier) {

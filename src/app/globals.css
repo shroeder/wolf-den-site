@@ -10717,15 +10717,66 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* ============ Loot chests + reveal ============ */
 .chest-card { border-color: rgba(255, 215, 94, 0.35); }
 .chest-total { float: right; background: #e0443a; color: #fff; font-size: 0.8rem; font-weight: 800; border-radius: 999px; padding: 1px 9px; }
-.chest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+/* `align-items: stretch` is the grid default, but the TILE has to pass it on: a stack tile carries a second
+   button and a single chest does not, so without the chest art growing to fill the difference the row came out
+   ragged — the Gold Chest sitting a button shorter than the two beside it. */
+.chest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; align-items: stretch; }
+/* ── THE TILE IS A CONTAINER NOW, NOT A BUTTON ───────────────────────────────────────────────────────────────
+   It carries two controls — open one, open the stack — so the frame moved off the button and onto a wrapper,
+   and the rules that only ever applied to a button (`:disabled`, the whole-tile `:hover` lift) moved with
+   them onto the inner control. Left where they were, `.chest-tile:disabled` would simply never match again
+   and a disabled stack would have gone on looking tappable. */
 .chest-tile {
-    display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; font: inherit; color: #e7dcc4;
+    display: flex; flex-direction: column; align-items: stretch; gap: 6px;
     padding: 12px 6px; border-radius: 14px; background: rgba(0, 0, 0, 0.3);
     border: 1.5px solid var(--chest, #b08a52); box-shadow: 0 0 14px -6px var(--chest);
     transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.chest-tile:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 0 20px -4px var(--chest); }
-.chest-tile:disabled { opacity: 0.6; cursor: default; }
+.chest-tile:has(.chest-tile-one:hover) { transform: translateY(-3px) scale(1.03); box-shadow: 0 0 20px -4px var(--chest); }
+.chest-tile-one {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer;
+    font: inherit; color: #e7dcc4; background: none; border: 0; padding: 0; width: 100%; flex: 1;
+}
+.chest-tile-one:disabled { opacity: 0.6; cursor: default; }
+/* The stack button is deliberately quieter than the chest above it: opening one is the ordinary gesture and
+   this is the shortcut, not the headline. */
+.chest-tile-all {
+    padding: 5px 8px; border-radius: 9px; cursor: pointer; font-size: 11px; font-weight: 900; letter-spacing: .01em;
+    color: var(--chest, #e7dcc4); background: color-mix(in srgb, var(--chest) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--chest) 45%, transparent);
+}
+.chest-tile-all:hover:not(:disabled) { background: color-mix(in srgb, var(--chest) 26%, transparent); }
+.chest-tile-all:disabled { opacity: 0.5; cursor: default; }
+.chest-openall {
+    display: block; width: 100%; margin-top: 10px; padding: 12px; border-radius: 13px; cursor: pointer;
+    font-size: 0.9rem; font-weight: 900; color: #2a1a00;
+    background: linear-gradient(180deg, #ffe08a, #f0b73c); border: 1px solid rgba(255,240,190,0.5);
+}
+.chest-openall:disabled { opacity: 0.5; cursor: default; }
+
+/* ── THE SUMMARY, FOR A PILE ─────────────────────────────────────────────────────────────────────────────────
+   Rows, best first, each tinted by its own rarity — the same reading the single-chest celebration gives you,
+   compressed to one line so twenty-eight of them fit on one card. */
+/* `.chest-reveal` carries no surface of its own — the single-chest celebration is a full-screen burst with no
+   card behind it, which is right for one dramatic object and wrong for a list. The summary needs a real card
+   or the page reads straight through the gaps between its rows. */
+.chest-bulk { max-width: 420px; width: 100%; padding: 18px 16px 16px; border-radius: 20px;
+    background: linear-gradient(180deg, #221a2c, #120d18);
+    border: 1px solid color-mix(in srgb, var(--r, #ffd75e) 40%, rgba(255,255,255,0.12));
+    box-shadow: 0 26px 70px rgba(0,0,0,0.8), 0 0 50px -18px var(--r, #ffd75e); }
+.chest-bulk-head { text-align: center; padding-bottom: 10px; }
+.chest-bulk-head b { display: block; font-size: 1.35rem; color: var(--r, #ffd75e); }
+.chest-bulk-head em { font-style: normal; font-size: 0.78rem; color: #9aa2ab; }
+.chest-bulk-list { display: grid; gap: 5px; max-height: 52dvh; overflow-y: auto; }
+.chest-bulk-row {
+    display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 8px;
+    padding: 8px 11px; border-radius: 10px; text-align: left;
+    background: color-mix(in srgb, var(--r) 10%, rgba(255,255,255,0.04));
+    border: 1px solid color-mix(in srgb, var(--r) 34%, transparent);
+}
+.chest-bulk-row b { font-size: 0.86rem; font-weight: 800; color: var(--r, #e7dcc4); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chest-bulk-row span { font-size: 0.7rem; color: #96a0ac; }
+.chest-bulk-row em { font-style: normal; font-size: 0.86rem; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
 .chest-emoji { font-size: 2rem; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 .chest-img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 10px color-mix(in srgb, var(--chest, #ffd75e) 45%, transparent)); }
 .chest-name { font-size: 0.72rem; font-weight: 700; }

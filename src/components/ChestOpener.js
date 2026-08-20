@@ -21,6 +21,10 @@ const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", lege
 const PARTICLE_COUNT = { common: 16, rare: 22, epic: 28, legendary: 36, mythic: 46, ascendant: 58, eternal: 72 };
 const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "eternal"]);
 
+// Where a rarity sits on the ladder, for "which of these is the best one" questions. RARITY_COLOR is already
+// declared in ladder order, so the ladder is read off it rather than typed out a second time.
+const RARITY_RANK = (r) => Math.max(0, Object.keys(RARITY_COLOR).indexOf(r));
+
 function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     if (reveal?.pet) return reveal.pet.rarity || "rare";
@@ -63,9 +67,42 @@ export default function ChestOpener({ onLoot }) {
         return () => { document.body.style.overflow = prev; };
     }, [modalTier]);
 
+    // ── OPENING A PILE ───────────────────────────────────────────────────────────────────────────────────
+    // The one-chest path is a shake, a beat and a full-screen celebration, which is exactly right for one
+    // chest and exactly wrong for twenty-eight. A pile gets a rattle and a SUMMARY: everything that came out,
+    // best first, in one card you dismiss once.
+    //
+    // The server caps how many it will open in a request, so `more` is what is left and the card offers
+    // another round rather than silently stopping — see BULK_OPEN_CAP.
+    const [bulk, setBulk] = useState(null);   // { opens, opened, more, tier }
+    async function openAll(tier = null) {
+        if (busy) return;
+        setBusy(true); setModalTier(tier || "__all"); setPhase("shaking"); setReveal(null); setBulk(null);
+        unlock();
+        Sfx.chestRattle(1.4);
+        Haptic.chestShake();
+        const pending = fetch("/api/marketplace/chests", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ all: true, ...(tier ? { tier } : {}) }),
+        }).then((r) => r.json().catch(() => ({ error: "failed" })));
+        setTimeout(async () => {
+            const d = await pending;
+            if (d?.error) { setModalTier(null); setBusy(false); return; }
+            setBulk({ ...d, tier });
+            setChests(d.chests || []);
+            setPhase("revealed");
+            setBusy(false);
+            // The pile celebrates at its BEST chest, the same rule a handful of seeds already follows.
+            const best = (d.opens || []).reduce((b, o) => (RARITY_RANK(rarityOf(o)) > RARITY_RANK(b) ? rarityOf(o) : b), "common");
+            Sfx.chestOpen(best);
+            Haptic.chestOpen(best);
+            onLoot?.();
+        }, 1500);
+    }
+
     function open(tier) {
         if (busy) return;
-        setBusy(true); setModalTier(tier); setPhase("shaking"); setReveal(null);
+        setBusy(true); setModalTier(tier); setPhase("shaking"); setReveal(null); setBulk(null);
         // ── THE SOUND OF IT ── this was silent from end to end: a second and a half of a chest visibly shaking
         // with nothing coming out of the speaker, then a full-screen LEGENDARY with no payoff at all. Opening a
         // chest is the most celebratory thing in the game and it was the quietest.
@@ -92,11 +129,14 @@ export default function ChestOpener({ onLoot }) {
         }, 1500);
     }
 
-    function closeModal() { if (busy) return; setModalTier(null); setReveal(null); setPhase("idle"); }
+    function closeModal() { if (busy) return; setModalTier(null); setReveal(null); setBulk(null); setPhase("idle"); }
 
     if (!chests) return null;
     const total = chests.reduce((s, c) => s + c.count, 0);
-    const activeChest = chests.find((c) => c.tier === modalTier) || null;
+    // "__all" is not a tier, so the shake falls back to the richest chest actually held — the pile should
+    // rattle as the best thing in it, not as an empty box.
+    const activeChest = chests.find((c) => c.tier === modalTier)
+        || (modalTier === "__all" ? [...chests].sort((a, z) => RARITY_RANK(z.tier) - RARITY_RANK(a.tier))[0] || chests[0] || null : null);
     const remaining = activeChest?.count || 0;
 
     const modal = modalTier ? (
@@ -114,6 +154,9 @@ export default function ChestOpener({ onLoot }) {
                     </div>
                     <p className="chest-opening">Opening…</p>
                 </div>
+            ) : bulk ? (
+                <BulkReveal bulk={bulk} onClose={closeModal}
+                    onAgain={bulk.more > 0 ? () => openAll(bulk.tier) : null} />
             ) : (
                 <RewardReveal reveal={reveal} onClose={closeModal} onAgain={remaining > 0 ? () => open(modalTier) : null} />
             )}
@@ -132,18 +175,37 @@ export default function ChestOpener({ onLoot }) {
                     <p className="muted" style={{ marginTop: 0 }}>A Gold Chest every 10th level — plus whatever the boss, the delves, the sea and your dailies turn up. Tap to open.</p>
                     <div className="chest-grid">
                         {chests.map((c) => (
-                            <button type="button" key={c.tier} className="chest-tile" style={{ "--chest": c.color }} onClick={() => open(c.tier)} disabled={busy}>
-                                {c.image ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="chest-img" src={c.image} alt="" />
-                                ) : (
-                                    <ChestIcon className="chest-img" tier={c.tier} />
-                                )}
-                                <span className="chest-name">{c.label}</span>
-                                <span className="chest-count">×{c.count}</span>
-                            </button>
+                            /* A tile used to BE the button. It carries two now — open one, or open the stack —
+                               so it is a container with buttons inside it rather than a button with a button
+                               inside it, which is invalid markup and would have swallowed one of the taps. */
+                            <div key={c.tier} className="chest-tile" style={{ "--chest": c.color }}>
+                                <button type="button" className="chest-tile-one" onClick={() => open(c.tier)} disabled={busy}>
+                                    {c.image ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img className="chest-img" src={c.image} alt="" />
+                                    ) : (
+                                        <ChestIcon className="chest-img" tier={c.tier} />
+                                    )}
+                                    <span className="chest-name">{c.label}</span>
+                                    <span className="chest-count">×{c.count}</span>
+                                </button>
+                                {/* Only worth offering when there is a stack. On a single chest "open all"
+                                    and "open" are the same tap with two names. */}
+                                {c.count > 1 ? (
+                                    <button type="button" className="chest-tile-all" onClick={() => openAll(c.tier)} disabled={busy}>
+                                        Open all {c.count}
+                                    </button>
+                                ) : null}
+                            </div>
                         ))}
                     </div>
+                    {/* The whole pile, richest first. Only when there is more than one tier to sweep — with a
+                        single tier on the shelf its own "open all" already is this button. */}
+                    {chests.length > 1 ? (
+                        <button type="button" className="chest-openall" onClick={() => openAll(null)} disabled={busy}>
+                            Open all {total} chests
+                        </button>
+                    ) : null}
                 </>
             ) : <p className="muted" style={{ margin: 0 }}>No chests right now — level up to earn one.</p>}
 
@@ -161,6 +223,70 @@ function GemReveal({ gem }) {
 }
 
 // The full-screen celebration: flash → light rays + particle burst → the reward slams in.
+// ── WHAT CAME OUT OF THE PILE ────────────────────────────────────────────────────────────────────────────────
+// One card for the whole sweep. Every reveal the server sent, described in one line each and ordered BEST
+// FIRST, because a list of twenty-eight in the order they happened buries the mythic under nine bundles of
+// wheat. Identical lines fold together with a count for the same reason.
+//
+// It deliberately does NOT reuse RewardReveal's full-screen treatment per row: that treatment is a
+// celebration of one thing, and twenty-eight celebrations is the problem this exists to solve.
+function bulkLine(o) {
+    if (o.item) return { name: o.item.name, sub: o.item.slot || "gear", rarity: o.item.rarity || "common" };
+    if (o.pet) return { name: o.pet.name, sub: "companion", rarity: o.pet.rarity || "rare" };
+    if (o.gem) return { name: o.gem.name, sub: "gem", rarity: rarityOf(o) };
+    if (o.recipe) return { name: o.recipe.name, sub: "recipe", rarity: "epic" };
+    if (o.consumable) return { name: o.consumable.name, sub: o.consumable.kind || "supply", rarity: rarityOf(o) };
+    if (Array.isArray(o.seeds) && o.seeds.length) {
+        return { name: o.seeds.length === 1 ? `${o.seeds[0].name} seed` : `${o.seeds.length} seeds`, sub: "for the farm", rarity: rarityOf(o) };
+    }
+    if (o.piece) return { name: "A set piece", sub: "gear", rarity: rarityOf(o) };
+    if (o.gold) return { name: `+${Number(o.gold).toLocaleString()} gold`, sub: "already owned the gear", rarity: "common" };
+    return { name: "Something", sub: "", rarity: rarityOf(o) };
+}
+
+function BulkReveal({ bulk, onClose, onAgain }) {
+    const rows = [];
+    const put = (line) => {
+        const key = `${line.name}|${line.sub}|${line.rarity}`;
+        const found = rows.find((r) => r.key === key);
+        if (found) found.n += 1;
+        else rows.push({ ...line, key, n: 1 });
+    };
+    for (const o of bulk.opens || []) {
+        put(bulkLine(o));
+        // A chest can hand over TWO pieces — Twin Hinges is a once-a-day double and openChest returns the
+        // extra as `second`. Named on its own row: dropping it would be the summary quietly under-reporting
+        // the best thing that can happen to a chest.
+        if (o.second) put({ name: o.second.name, sub: "gear · doubled", rarity: o.second.rarity || "common" });
+    }
+    rows.sort((a, z) => RARITY_RANK(z.rarity) - RARITY_RANK(a.rarity) || z.n - a.n || a.name.localeCompare(z.name));
+    const best = rows[0]?.rarity || "common";
+    return (
+        /* The best rarity tints the CARD, so --r is set on the root rather than the header — the border and the
+           glow read it too, which is how a pile that turned up a legendary looks different from one that did
+           not before a word is read. */
+        <div className="chest-reveal chest-bulk" style={{ "--r": RARITY_COLOR[best] || RARITY_COLOR.common }} onClick={(e) => e.stopPropagation()}>
+            <div className="chest-bulk-head">
+                <b>{bulk.opened} chest{bulk.opened === 1 ? "" : "s"} opened</b>
+                {bulk.more > 0 ? <em>{bulk.more} still on the shelf</em> : null}
+            </div>
+            <div className="chest-bulk-list">
+                {rows.map((r) => (
+                    <div key={r.key} className="chest-bulk-row" style={{ "--r": RARITY_COLOR[r.rarity] || RARITY_COLOR.common }}>
+                        <b>{r.name}</b>
+                        <span>{r.sub}</span>
+                        {r.n > 1 ? <em>×{r.n}</em> : null}
+                    </div>
+                ))}
+            </div>
+            <div className="chest-modal-actions">
+                {onAgain ? <button type="button" className="button gold" onClick={onAgain}>Open {Math.min(bulk.more, 10)} more</button> : null}
+                <button type="button" className="button" onClick={onClose}>Done</button>
+            </div>
+        </div>
+    );
+}
+
 function RewardReveal({ reveal, onClose, onAgain }) {
     const rarity = rarityOf(reveal);
     const color = RARITY_COLOR[rarity] || RARITY_COLOR.common;
