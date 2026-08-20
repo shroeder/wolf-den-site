@@ -566,7 +566,22 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // The Master's Mark: one enhance in three advances TWO levels instead of one.
     const doubleLevel = enhancePowers.has("master_s_mark") && oneIn(3);
 
-    const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
+    // ── THE PIECE'S OWN NUMBERS ARE NOT AFFIXES, AND `apply` CANNOT TELL ─────────────────────────────────
+    // `apply` adds ONE WHOLE POINT to whatever it is handed, and capOf floors every stat at +3. That is the
+    // right arithmetic for Might or Pierce, which are counted in points. It is catastrophic for the stats
+    // counted in something else:
+    //
+    //   speed          runs 0.87 to 2.33 across the entire Den. +3 took a Heavy Cleaver from 0.93/s to
+    //                  3.93/s — four times the attack rate, so four times the damage, off one enhance.
+    //   block_chance   is stored 0..1. +2 made a shield 220% to block.
+    //
+    // base_damage and armor were double-dipping too: a point from here AND the proportional lift below,
+    // which is the one that is actually meant to raise them.
+    //
+    // So the affix pool is affixes only. isIntrinsicStat is the same predicate the reforge list and the
+    // reforge server both refuse on — one answer to "is this the item or a bonus on it".
+    const existing = Object.keys(item.stats || {})
+        .filter((k) => STAT_META[k] && k !== "extra_strike" && !isIntrinsicStat(k));
     // ── WHAT A FORGE MAY ADD, BY SLOT ────────────────────────────────────────────────────────────────────
     // This was five stats for every item, which predates Vitality/Tenacity/Precision/Pierce — so the forge
     // could not roll any of the new gear stats at all, and every item's addable pool was identical.
