@@ -455,9 +455,32 @@ export async function openChest(buyerId, tier) {
             return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null }, sorted: true };
         }
     }
+    // ── A CHEST MUST NEVER BE WORTH NOTHING ──────────────────────────────────────────────────────────────
+    // Widening goes DOWNWARD only, deliberately (see the note above — upward widening was the biggest hole in
+    // the economy). But downward has a floor, and a completionist hits it: Kaishiern owns every common in the
+    // pool, 36 of 36, and every rare, 35 of 35. His wooden and iron chests can therefore never pay an item
+    // again — a common roll finds nothing, walks down to nothing, and hands over 25 gold. He opened three in a
+    // row and said so in the plaza.
+    //
+    // Gold is the wrong consolation because it is the one currency that says "there was nothing here for
+    // you". FORGE PARTS are the right one: they have no ownership ceiling, so they cannot run out the way the
+    // gear pool does, and they feed the Forge, which is where the gear he already owns gets better. Paid ON
+    // TOP of the dust rather than instead of it, scaled by the CHEST's tier rather than by the rolled rarity,
+    // because the chest is the thing that was earned.
     let gold = DUST[rarity] || 25;
     if (twinHinges) gold *= 2;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
-    return { ok: true, remaining: dec.count, gold, rarity, doubled: twinHinges };
+    // Tier of part follows the chest, capped at the top of the ladder; the count follows it too, so a
+    // primordial chest that finds nothing is still a primordial chest.
+    const partTier = Math.max(1, Math.min(5, CHEST_ORDER.indexOf(tier) + 1));
+    const partQty = Math.max(2, (CHEST_ORDER.indexOf(tier) + 1) * 2) * (twinHinges ? 2 : 1);
+    let parts = null;
+    try {
+        const { addParts } = await import("@/lib/marketplace/crafting.js");
+        await addParts(buyerId, partTier, partQty);
+        const { partName, partSprite } = await import("@/lib/marketplace/forge-parts.js");
+        parts = { tier: partTier, n: partQty, name: partName(partTier), sprite: partSprite(partTier) };
+    } catch { /* the Forge is optional — a chest never fails for it */ }
+    return { ok: true, remaining: dec.count, gold, rarity, parts, doubled: twinHinges };
 }

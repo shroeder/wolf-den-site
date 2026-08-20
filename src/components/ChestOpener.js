@@ -240,6 +240,7 @@ function bulkLine(o) {
         return { name: o.seeds.length === 1 ? `${o.seeds[0].name} seed` : `${o.seeds.length} seeds`, sub: "for the farm", rarity: rarityOf(o) };
     }
     if (o.piece) return { name: "A set piece", sub: "gear", rarity: rarityOf(o) };
+    if (o.parts) return { name: `${o.parts.n} ${o.parts.name}`, sub: "you own every piece it could have given", rarity: "common" };
     if (o.gold) return { name: `+${Number(o.gold).toLocaleString()} gold`, sub: "already owned the gear", rarity: "common" };
     return { name: "Something", sub: "", rarity: rarityOf(o) };
 }
@@ -394,9 +395,21 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         </>
                     ) : (
                         <>
-                            <span className="chest-reward-glyph">💰</span>
-                            <div className="chest-reward-name">+{reveal?.gold} gold</div>
-                            <div className="chest-reward-sub muted">You already own that gear — take the dust!</div>
+                            {/* Parts ride ON the dust now — see the note in chests.js. A member who owns every
+                                item at the rolled rarity is the one member for whom this chest could never
+                                have paid gear, so the card leads with the thing that IS new. */}
+                            {reveal?.parts?.sprite ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="chest-reward-glyph" src={reveal.parts.sprite} alt="" draggable="false" />
+                            ) : <span className="chest-reward-glyph">💰</span>}
+                            <div className="chest-reward-name">
+                                {reveal?.parts ? `+${reveal.parts.n} ${reveal.parts.name}` : `+${reveal?.gold} gold`}
+                            </div>
+                            <div className="chest-reward-sub muted">
+                                {reveal?.parts
+                                    ? `You own every piece it could have given you — so it paid the forge instead. +${reveal?.gold} gold as well.`
+                                    : "You already own that gear — take the dust!"}
+                            </div>
                         </>
                     )}
                 </div>
