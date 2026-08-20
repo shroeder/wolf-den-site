@@ -999,7 +999,23 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <button key={o.id} className="sail-embark-opt" disabled={busy} onClick={() => act("start", { duration: o.id })}>
                                     <span className="sail-embark-opt-name">{o.label}</span>
                                     <span className="sail-embark-opt-time">🧭 {fmtLeft(o.ms)}</span>
-                                    <span className="sail-embark-opt-loot">up to <FragmentIcon size={15} art={state?.chestArtMap?.[o.topTier] || `/images/sailing/fragment-${o.topTier}.png`} /></span>
+                                    {/* "up to" is a promise about the ceiling and says nothing about the floor.
+                                        The standard run can now only bury one thing, so "up to iron" undersells
+                                        it as badly as it used to oversell the long trip — floorTier equal to
+                                        topTier means guaranteed, and the word changes to say so. */}
+                                    <span className="sail-embark-opt-loot">
+                                        {o.floorTier === o.topTier ? (
+                                            <>always <FragmentIcon size={15} art={state?.chestArtMap?.[o.topTier] || `/images/sailing/fragment-${o.topTier}.png`} /></>
+                                        ) : o.floorTier === "wooden" ? (
+                                            <>up to <FragmentIcon size={15} art={state?.chestArtMap?.[o.topTier] || `/images/sailing/fragment-${o.topTier}.png`} /></>
+                                        ) : (
+                                            <>
+                                                <FragmentIcon size={15} art={state?.chestArtMap?.[o.floorTier] || `/images/sailing/fragment-${o.floorTier}.png`} />
+                                                {" or "}
+                                                <FragmentIcon size={15} art={state?.chestArtMap?.[o.topTier] || `/images/sailing/fragment-${o.topTier}.png`} />
+                                            </>
+                                        )}
+                                    </span>
                                 </button>
                             ))}
                         </div>

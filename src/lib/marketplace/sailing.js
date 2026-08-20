@@ -71,10 +71,19 @@ const fragmentArt = (tier) => `/images/sailing/fragment-${tier}.png`;
 
 // Three embark durations: trip time = your (Speed-shortened) base voyage × mult; longer trips roll better
 // shards. `frag` = tier weights (each option's own ceiling). Plain consts (no env) so they're easy to tune.
+// ── THE LONGER TRIP IS A BETTER CHEST, NOT A BETTER LOTTERY TICKET ───────────────────────────────────────────
+// These were weights on the same wide table: every option could still bury a WOODEN chest, so a twelve-hour
+// run came back with the same thing a four-hour one did seven times in ten, and the twenty-four-hour one
+// better than half the time. What a member was actually buying with the extra twenty hours was a slightly
+// kinder roll, which is not a choice — it is the same choice at a worse rate.
+//
+// Luke's call: the second option is ALWAYS iron, and the third is gold or mythic. The short haul keeps its
+// spread, because something has to be the cheap one. The gold-to-mythic ratio is the 15:3 the old table
+// already used, so mythic stays the thing you hope for rather than the thing you expect.
 export const VOYAGE_OPTIONS = [
-    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 88, iron: 12 } },                 // ~4h
-    { id: "standard", label: "Standard run", mult: 3, frag: { wooden: 70, iron: 24, gold: 6 } },   // ~12h
-    { id: "long", label: "Long expedition", mult: 6, frag: { wooden: 54, iron: 28, gold: 15, mythic: 3 } }, // ~24h
+    { id: "short", label: "Short haul", mult: 1, frag: { wooden: 88, iron: 12 } },        // ~4h
+    { id: "standard", label: "Standard run", mult: 3, frag: { iron: 100 } },              // ~12h — always iron
+    { id: "long", label: "Long expedition", mult: 6, frag: { gold: 83, mythic: 17 } },    // ~24h — gold or mythic
 ];
 
 // SAILING — dispatch your boat on a ONE-WAY voyage to a mysterious island; when it lands you play an
@@ -1083,6 +1092,9 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             id: o.id, label: o.label,
             ms: Math.round(voyageDurationMs(speedLevel, level) * o.mult),
             topTier: Object.keys(o.frag)[Object.keys(o.frag).length - 1],
+            // The WORST it can be, so the picker can say "always iron" rather than "up to iron" for an
+            // option that can no longer bury anything else. Sent alongside topTier; equal means guaranteed.
+            floorTier: Object.keys(o.frag)[0],
         })),
         digRefill: { amount: DIG_REFILL, cost: digRefillCost(row?.dig_state?.refills || 0) },
         // The boat's FOUR travel/loot levers — all boat-exclusive. Each carries its per-level effect + current/next value.
