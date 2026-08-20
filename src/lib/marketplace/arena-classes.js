@@ -61,11 +61,24 @@ export const ROAD_XP_MULT = 0.6;   // unlimited attempts, so it cannot be the be
 // cannot drift into disagreeing about what a fight was.
 export const XP_MULT_BY_KIND = { member: PVP_XP_MULT, gauntlet: NPC_XP_MULT, town: NPC_XP_MULT, ladder: ROAD_XP_MULT };
 
+// ── AND A LOSS PAYS, WHERE THE ATTEMPTS ARE RATIONED ─────────────────────────────────────────────────────────
+// A loss used to pay 35% and it was taken away for a good reason: Sunflower Jinxx, walled on the Road, said
+// "I am just taking loss after loss to try and get laurels for recipes" — the game was paying her to keep
+// doing the thing that was making her want to stop. But that was the ROAD, where attempts are unlimited, and
+// unlimited is what made it farmable.
+//
+// A member fight and a Gauntlet tier each spend one of the ten you get in a day. Ten is the ration, so paying
+// for a loss there cannot become an income — it can only stop a bad evening being a wasted one. On the Road it
+// still pays nothing, because nothing there stops you doing it a hundred times.
+export const LOSS_SHARE = 0.35;
+const LOSS_PAYS = new Set(["member", "gauntlet"]);
+
 export function arenaXpFor({ won, myPower = 1, theirPower = 1, kind = "gauntlet" }) {
     const ratio = Math.max(0.3, Math.min(2.5, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
     const mult = XP_MULT_BY_KIND[kind] === undefined ? NPC_XP_MULT : XP_MULT_BY_KIND[kind];
     const win = Math.round((26 + 48 * ratio) * mult);
-    return won ? win : 0;
+    if (won) return win;
+    return LOSS_PAYS.has(kind) ? Math.round(win * LOSS_SHARE) : 0;
 }
 
 // ── RESPEC ───────────────────────────────────────────────────────────────────────────────────────────────────
