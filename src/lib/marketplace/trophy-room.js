@@ -229,7 +229,6 @@ const WALLS = [
             rec("Current streak", "streak"),
             rec("Laurels earned", "laurels_earned", { rank: true }),
             rec("Ladder rungs beaten", "ladder_beaten", { rank: true }),
-            rec("Best ladder rung", "best_rung", { rank: true }),
             rec("Toughest NPC felled", "npc_best", { rank: true }),
             rec("Arena XP", "arena_xp", { rank: true }),
         ],
@@ -413,6 +412,12 @@ function derive(row, key) {
     if (key === "fleetRate") return n("fleet_wins") + n("fleet_losses") ? n("fleet_wins") / (n("fleet_wins") + n("fleet_losses")) : null;
     if (key === "fleetFights") return n("fleet_wins") + n("fleet_losses");
     if (key === "delveRate") return n("runs_started") ? n("runs_cleared") / n("runs_started") : null;
+    // `ladder_beaten` is the SET of rungs taken, not a count — Number([1,2,3]) is NaN, which readCol turned into
+    // a 0 and hung on the wall of every member who had walked the Road. Its length is the number of rungs. The
+    // `best_rung` column that used to sit beside it is gone: nothing has ever written it, so it ranked a field
+    // of zeroes, and the highest rung is this array's max anyway — which on a Road you climb in order is its
+    // length. One honest record beats two, one of them dead.
+    if (key === "ladder_beaten") return Array.isArray(row?.ladder_beaten) ? row.ladder_beaten.length : 0;
     return null;
 }
 
