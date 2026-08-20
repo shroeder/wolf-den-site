@@ -55,11 +55,25 @@ export function arenaLevelFor(xp = 0) {
 // your own size. The best player in the Den was on track for 72.
 export const PVP_XP_MULT = 3;      // needs another member, and one of your ten
 export const NPC_XP_MULT = 1;      // always available, still costs one of the ten
-export const ROAD_XP_MULT = 0.6;   // unlimited attempts, so it cannot be the best rate as well
+// ── THE ROAD PAYS BY HOW HIGH THE RUNG IS ────────────────────────────────────────────────────────────────────
+// The Road is not a farm and never was: a rung can be beaten ONCE. So the thing that stopped it being the best
+// rate is not a multiplier, it is that the whole ladder is a fixed pool — a hundred rewards, in order, and no
+// way to take any of them twice.
+//
+// Which means the payout should follow the RUNG, not the power ratio. Walking in order, every rung sits a few
+// percent above the last and a few percent above you, so the ratio never moves and the difficulty scaling it
+// was supposed to express never expressed anything. Rung 40 should pay more than rung 10 because it IS rung 40.
+//
+// Compounding, so the climb is worth more the higher it goes — 30 at the first rung, 135 at the thirtieth,
+// 420 at the fiftieth. Walking as far as anybody currently can (about rung 46) is worth roughly an eighth of
+// a twenty-point journey, spread over forty-six one-time fights.
+export const ROAD_XP_BASE = 30;
+export const ROAD_XP_GROWTH = 1.055;
+export const roadArenaXp = (rung) => Math.round(ROAD_XP_BASE * Math.pow(ROAD_XP_GROWTH, Math.max(1, Math.round(rung)) - 1));
 
 //  is whatever boutKindOf() says: member, gauntlet, ladder or town. Named the same way there so the two
 // cannot drift into disagreeing about what a fight was.
-export const XP_MULT_BY_KIND = { member: PVP_XP_MULT, gauntlet: NPC_XP_MULT, town: NPC_XP_MULT, ladder: ROAD_XP_MULT };
+export const XP_MULT_BY_KIND = { member: PVP_XP_MULT, gauntlet: NPC_XP_MULT, town: NPC_XP_MULT };
 
 // ── AND A LOSS PAYS, WHERE THE ATTEMPTS ARE RATIONED ─────────────────────────────────────────────────────────
 // A loss used to pay 35% and it was taken away for a good reason: Sunflower Jinxx, walled on the Road, said
@@ -73,7 +87,9 @@ export const XP_MULT_BY_KIND = { member: PVP_XP_MULT, gauntlet: NPC_XP_MULT, tow
 export const LOSS_SHARE = 0.35;
 const LOSS_PAYS = new Set(["member", "gauntlet"]);
 
-export function arenaXpFor({ won, myPower = 1, theirPower = 1, kind = "gauntlet" }) {
+export function arenaXpFor({ won, myPower = 1, theirPower = 1, kind = "gauntlet", rung = 0 }) {
+    // A rung is priced by its height, once, and a loss on the Road still pays nothing — see LOSS_PAYS.
+    if (kind === "ladder") return won ? roadArenaXp(rung) : 0;
     const ratio = Math.max(0.3, Math.min(2.5, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
     const mult = XP_MULT_BY_KIND[kind] === undefined ? NPC_XP_MULT : XP_MULT_BY_KIND[kind];
     const win = Math.round((26 + 48 * ratio) * mult);

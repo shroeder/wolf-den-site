@@ -1792,7 +1792,7 @@ async function finishBout(buyerId, row, b, won) {
     // a member costs one of the ten AND needs somebody else to be there — so they cannot all pay the same.
     // boutKindOf is the existing classifier the telemetry and the bout row already use; a second one here
     // would be a second answer to the same question, and they would disagree the first time either moved.
-    const axp = arenaXpFor({ won, myPower, theirPower, kind: boutKindOf(b) });
+    const axp = arenaXpFor({ won, myPower, theirPower, kind: boutKindOf(b), rung: boutRungOf(b) });
     const baseLaurels = boutLaurels({ won, myPower, theirPower });
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     const vp = baseVp + (won ? featVp : 0);
