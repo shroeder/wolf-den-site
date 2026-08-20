@@ -37,6 +37,16 @@ const ICONS = {
     might: "two crossed broadswords with bright polished STEEL blades, silver-grey metal, and leather-wrapped grips",
     crit_chance: "a round archery target with a single arrow buried dead centre",
     crit_power: "a jagged orange starburst impact flash, like a shell going off",
+    // The five C() has always paid and this family never drew — they were borrowing might.png on the Badges
+    // page. Each is deliberately a DIFFERENT object from the three above and from ironclad's shield, because
+    // at 28px the silhouette is the whole of the reading.
+    vitality: "a deep crimson heart bound with a riveted iron band across its middle",
+    tenacity: "a heavy riveted iron shoulder pauldron, layered plates, dented and battle-worn",
+    ferocity: "a snarling grey wolf's head in profile, jaws open, teeth bared",
+    fortune: "a pair of ivory dice tumbling, both showing six pips",
+    // A long thin spear was the first draw and it VANISHED at 28px — a one-pixel-wide shaft is not a
+    // silhouette. Broad head, punched plate: two big shapes, which is the whole rule this family runs on.
+    pierce: "a broad triangular steel arrowhead punched clean through a torn iron plate, the plate curling back around the hole",
     // ── Sailing
     broadside: "a stubby iron cannon firing, a puff of smoke at the muzzle",
     ironclad: "a riveted iron-plated shield with a reinforced band across it",

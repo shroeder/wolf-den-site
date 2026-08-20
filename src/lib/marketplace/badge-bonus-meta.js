@@ -23,14 +23,16 @@ export const BONUS_META = {
             // it drew. Living Legend showed "+7 Might" and said nothing about the four other columns it
             // moves. Same defect Luke reported on the Enshriner card, one screen over.
             //
-            // ART IS BORROWED, not invented: might.png stands in the way the domain heads above already
-            // borrow a representative sprite. Five proper icons would be a small generation run — worth
-            // doing, not worth guessing at.
-            vitality: { art: "/images/bonus/might.png", icon: "❤️", label: "Vitality", suffix: "" },
-            tenacity: { art: "/images/bonus/might.png", icon: "🛡️", label: "Tenacity", suffix: "" },
-            ferocity: { art: "/images/bonus/might.png", icon: "🔥", label: "Ferocity", suffix: "" },
-            fortune: { art: "/images/bonus/might.png", icon: "🍀", label: "Fortune", suffix: "" },
-            pierce: { art: "/images/bonus/might.png", icon: "🗡️", label: "Pierce", suffix: "" },
+            // Drawn into the same family as the other thirty (scripts/gen-bonus-icons.mjs) rather than
+            // borrowing might.png: a heart in an iron band, a pauldron, a wolf's head, a pair of sixes, and
+            // an arrowhead through a punched plate. Each is a DIFFERENT object from its neighbours, because
+            // at 28px the silhouette is the whole of the reading — the first pierce draw was a thin spear
+            // and disappeared entirely.
+            vitality: { art: "/images/bonus/vitality.png", icon: "❤️", label: "Vitality", suffix: "" },
+            tenacity: { art: "/images/bonus/tenacity.png", icon: "🛡️", label: "Tenacity", suffix: "" },
+            ferocity: { art: "/images/bonus/ferocity.png", icon: "🔥", label: "Ferocity", suffix: "" },
+            fortune: { art: "/images/bonus/fortune.png", icon: "🍀", label: "Fortune", suffix: "" },
+            pierce: { art: "/images/bonus/pierce.png", icon: "🗡️", label: "Pierce", suffix: "" },
         },
     },
     sea: {
