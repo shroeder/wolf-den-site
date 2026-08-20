@@ -622,8 +622,19 @@ export default function BlacksmithClient({ initial }) {
                 sounds like a choice of destination. This is the step that tells you it is random, and the one
                 place to say the thing people actually want to know: the VALUE comes with it. */}
             {swapConfirm ? (
-                <div className="forge-modal" role="dialog" aria-modal="true" onClick={() => setSwapConfirm(null)}>
-                    <div className="forge-founder" onClick={(e) => e.stopPropagation()}>
+                /* ── THIS CARD WAS INVISIBLE ─────────────────────────────────────────────────────────────
+                   Two mistakes stacked. `forge-modal` has NO CSS rule anywhere in the codebase, so the
+                   overlay was a plain in-flow div with no position, no z-index and no backdrop — it laid
+                   itself out at the bottom of the page, behind the fixed scrim already covering the screen.
+                   And the card inside it reused `forge-founder`, which is the 46px ROUND MEDALLION in the
+                   corner of the forge (the aannw tribute) — `width: 46px; height: 46px; overflow: hidden` —
+                   so even had it been on top, the confirm was a clipped circle the size of a coin.
+
+                   Tapping a stat therefore did nothing you could see. The only visible button left on screen
+                   was Enhance, and that is the one people pressed. Luke: "where do I click to change the
+                   stat". Nowhere — the thing you were meant to click could not be seen. */
+                <div className="forge-swapscrim" role="dialog" aria-modal="true" onClick={() => setSwapConfirm(null)}>
+                    <div className="forge-founder-card" onClick={(e) => e.stopPropagation()}>
                         <p className="forge-founder-kicker">Swap a line</p>
                         <div className="forge-swapask">
                             <span className="forge-swapask-old">+{swapConfirm.f.n} {swapConfirm.f.label}</span>
@@ -631,7 +642,10 @@ export default function BlacksmithClient({ initial }) {
                             <span className="forge-swapask-new">+{swapConfirm.f.n} <b>?</b></span>
                         </div>
                         <p className="forge-founder-blurb">
-                            The forge picks the new stat <b>at random</b> from anything this piece
+                            {/* JSX drops the whitespace between a tag and text that starts the next line, so
+                                this rendered as "at randomfrom anything". */}
+                            The forge picks the new stat <b>at random</b>{" "}
+                            from anything this piece
                             doesn&rsquo;t already carry &mdash; you can&rsquo;t choose what it lands on.
                             {" "}<b>The +{swapConfirm.f.n} comes with it in full</b>, so whatever it turns into,
                             it turns into +{swapConfirm.f.n} of it.
@@ -1261,6 +1275,10 @@ export const FORGE_CSS = `
 .forge-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 .forge-founder span { font-size: 22px; }
 .forge-founder:hover, .forge-founder:focus-visible { transform: scale(1.12) rotate(-3deg); border-color: rgba(255,190,90,0.7); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 16px rgba(255,170,70,0.5); outline: none; }
+/* ABOVE the reforge card that opened it (z-index 200) — a confirm that asks about something on the card
+   beneath it has to sit on top of that card. */
+.forge-swapscrim { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 20px;
+    background: rgba(8,4,2,0.8); backdrop-filter: blur(4px); animation: forgeFounderFade .2s ease both; }
 .forge-founder-scrim { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(8,4,2,0.72); backdrop-filter: blur(3px); animation: forgeFounderFade .2s ease both; }
 .forge-founder-card { position: relative; max-width: 340px; width: 100%; text-align: center; padding: 22px 22px 18px; border-radius: 18px;
     background: linear-gradient(180deg, #2a180c, #160c06); border: 1px solid rgba(255,150,60,0.4); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(255,140,40,0.28);
@@ -1351,7 +1369,13 @@ export const FORGE_CSS = `
 .forge-swap em { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
     font-style: normal; font-size: 10.5px; font-weight: 700; color: #a4917a; }
 .forge-swap em.is-short { color: #ff9f9f; }
-.forge-swap-go { font-style: normal; font-size: 11px; font-weight: 900; color: #ff9f4a; white-space: nowrap; }
+/* A SOLID PILL, because "where do I click to change the stat" was the next question after the row stopped
+   looking like a price list. The whole row is still the button — this is the part that says so. Bare orange
+   text beside two other pieces of text reads as a third label, not as a control. */
+.forge-swap-go { font-style: normal; font-size: 11px; font-weight: 900; white-space: nowrap;
+    color: #2a1400; background: linear-gradient(180deg, #ffb257, #ff8a2a);
+    padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(255,210,150,0.5); }
+.forge-swap:hover:not(:disabled) .forge-swap-go { filter: brightness(1.08); }
 .forge-swap:hover:not(:disabled) { background: rgba(255,175,75,0.14); border-color: rgba(255,200,110,0.6); }
 .forge-swap:disabled { opacity: 0.5; cursor: default; }
 /* The two operations are separated rather than stacked, so the second one cannot read as the conclusion of
