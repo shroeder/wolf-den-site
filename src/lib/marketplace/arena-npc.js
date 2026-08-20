@@ -1,5 +1,6 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
 import { ITEMS, sumItemStats } from "@/lib/marketplace/items.js";
+import { CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -144,6 +145,138 @@ export const archetypeForTier = (t) => {
     const n = Math.max(1, Math.round(t));
     return n <= 3 ? ARCHETYPES[0] : ARCHETYPES[n % ARCHETYPES.length];
 };
+
+// ── AN NPC IS A CHARACTER, NOT A STAT BLOCK ──────────────────────────────────────────────────────────────────
+// Luke's brief, and it is the same rule the gear rework followed: whatever a member is made of, an opponent is
+// made of the same things. A rung is therefore a whole CHARACTER —
+//
+//   a CLASS, with the passives that class actually has
+//   POINTS SPENT in that class's tree, more of them the further up you are
+//   GEAR at a rarity band, with real affixes rolled onto it
+//   PROCS — crit, riposte, double strike, stun, haste — which are gear affixes, so they are RARE low down and
+//           common high up, exactly as a member's wardrobe fills out
+//   and an IDENTITY: the fight says what it is carrying before you commit to it
+//
+// The last one is not decoration. A bout resolves in seconds, so the only place a member can make a decision is
+// BEFORE it — and a foe whose shape you cannot see is a coin toss wearing a portrait.
+
+// Which class a rung fights as. Cycled rather than rolled so a rung is the same character every time, and
+// offset from the archetype cycle (3 against 5) so the pairing does not repeat until rung fifteen.
+const NPC_CLASSES = ["reaver", "warden", "runecaller"];
+export const npcClassFor = (tier) => NPC_CLASSES[Math.max(1, Math.round(tier)) % NPC_CLASSES.length];
+
+// How many tree points a rung has spent. A member has ten to twelve; a rung climbs past that because the
+// ladder is endless and the tree is one of the few things about a character that can keep growing.
+const NPC_POINTS_PER_TIER = 0.42;
+export const npcPointsFor = (tier) => Math.max(0, Math.min(60, Math.round(Math.max(0, tier - 3) * NPC_POINTS_PER_TIER)));
+
+// Spend them the way a member must: one at a time, respecting each node's rank cap and its gate. Deterministic
+// per (tier, class), so the same rung is the same build every time you meet it.
+function npcTree(classId, points, tier) {
+    const tree = treeFor(classId);
+    if (!tree.length || points <= 0) return {};
+    const taken = {};
+    const total = () => Object.values(taken).reduce((a, n) => a + n, 0);
+    const order = [...tree].sort((a, b) => (a.tier - b.tier) || (a.id < b.id ? -1 : 1));
+    let guard = 0;
+    while (total() < points && guard < 500) {
+        guard += 1;
+        let placed = false;
+        for (let i = 0; i < order.length; i += 1) {
+            const n = order[(i + tier) % order.length];
+            if (total() >= points) break;
+            if ((taken[n.id] || 0) >= n.ranks) continue;
+            if (total() < (n.needs || 0)) continue;
+            taken[n.id] = (taken[n.id] || 0) + 1;
+            placed = true;
+        }
+        if (!placed) break;
+    }
+    return taken;
+}
+
+// ── HOW MUCH OF THEIR GEAR IS ENCHANTED ──────────────────────────────────────────────────────────────────────
+// Procs are gear affixes, so their density is a statement about how good the wardrobe is: nothing at the bottom
+// of the ladder, because a Straw Dummy has not rolled a Riposte, and everything by the top. Ramped rather than
+// stepped so no single rung is where the game suddenly starts critting you.
+const PROC_FULL_TIER = 60;
+const procDensity = (tier) => Math.max(0, Math.min(1, (Math.max(1, tier) - 4) / (PROC_FULL_TIER - 4)));
+
+// What a fully-kitted rung carries, in gear points — the same units a member's affixes are counted in. A member
+// with a good wardrobe runs 40-60 crit chance and single digits of the rare ones.
+const PROC_CEILING = { crit_chance: 60, crit_power: 60, pierce: 14, lifesteal: 10, counter: 12, doublestrike: 12, stun: 10, haste: 10 };
+
+// The archetype decides WHICH affixes it favours, so a Duelist really is the crit one and a Wall really does
+// answer every blow — identity you can read off the card rather than a uniform sprinkle over everybody.
+const PROC_LEAN = {
+    balanced: {},
+    brute: { crit_power: 1.4, pierce: 1.3, doublestrike: 1.2, stun: 1.2, crit_chance: 0.6, counter: 0.4, haste: 0.6, lifesteal: 0.5 },
+    wall: { counter: 1.6, lifesteal: 1.4, stun: 1.1, crit_chance: 0.4, crit_power: 0.5, pierce: 0.5, doublestrike: 0.4, haste: 0.4 },
+    duelist: { crit_chance: 1.8, crit_power: 1.6, pierce: 0.8, doublestrike: 1.1, haste: 0.8, counter: 0.6, stun: 0.5, lifesteal: 0.4 },
+    berserker: { doublestrike: 1.6, haste: 1.5, crit_chance: 1.1, crit_power: 1.0, pierce: 1.0, stun: 0.7, counter: 0.3, lifesteal: 0.3 },
+};
+
+/** The affixes rolled onto a rung's gear. Deterministic, and thinner the lower down you are. */
+function npcProcs(tier, archKey) {
+    const d = procDensity(tier);
+    if (d <= 0) return {};
+    const lean = PROC_LEAN[archKey] || {};
+    const out = {};
+    for (const [k, ceil] of Object.entries(PROC_CEILING)) {
+        const v = ceil * d * (lean[k] === undefined ? 1 : lean[k]);
+        if (v >= 1) out[k] = Math.round(v);
+    }
+    return out;
+}
+
+// ── WHAT TO WARN THEM ABOUT ──────────────────────────────────────────────────────────────────────────────────
+// Only the things that change how the fight GOES, in the member's own words, biggest first. A list of every
+// stat would be a stat block again; this is the two or three facts you would want shouted across the sand
+// before the bell.
+const TELL_RULES = [
+    { key: "lifesteal", from: (s, p) => (s.lifesteal || 0) * 0.0025 + (p.lifestealBonus || 0), text: "drinks what it lands" },
+    { key: "counter", from: (s, p) => (s.counter || 0) * 0.0025 + (p.counterBonus || 0), text: "strikes back when you hit it" },
+    { key: "doublestrike", from: (s, p) => (s.doublestrike || 0) * 0.005 + (p.doublestrikeBonus || 0), text: "swings twice" },
+    { key: "stun", from: (s, p) => (s.stun || 0) * 0.005 + (p.stunBonus || 0), text: "stuns" },
+    { key: "haste", from: (s, p) => (s.haste || 0) * 0.005 + (p.hasteBonus || 0), text: "hastes itself" },
+    { key: "pierce", from: (s) => (s.pierce || 0) * 0.005, text: "goes through armour" },
+    { key: "bleed", from: (s, p) => p.bleedChance || 0, text: "makes you bleed" },
+    { key: "burn", from: (s, p) => p.burnChance || 0, text: "sets you alight" },
+    { key: "ward", from: (s, p) => p.ward || 0, text: "fights behind a shield" },
+    { key: "guard", from: (s, p) => p.guardChance || 0, text: "raises a guard" },
+    { key: "thorns", from: (s, p) => (p.thorns || 0) + (p.iceThorns || 0), text: "returns damage" },
+    { key: "freeze", from: (s, p) => p.freeze || 0, text: "freezes" },
+];
+export function npcTells(stats = {}, perks = {}) {
+    const hits = TELL_RULES
+        .map((r) => ({ key: r.key, text: r.text, v: r.from(stats, perks) || 0 }))
+        .filter((r) => r.v >= 0.03)
+        .sort((a, b) => b.v - a.v)
+        .slice(0, 3);
+    const crit = (Number(stats.crit_chance) || 0) / 1000;
+    if (crit >= 0.25 && hits.length < 3) hits.push({ key: "crit", text: "crits often", v: crit });
+    return hits.map((h) => ({ key: h.key, text: h.text, pct: Math.round(Math.min(1, h.v) * 100) }));
+}
+
+/**
+ * Everything a rung IS: class, tree, gear, affixes — and the plain-language tells that go on its card.
+ * One place, so the fight, the card and any simulation are all looking at the same character.
+ */
+export function npcBuild(tier, seed = 0) {
+    const t = Math.max(1, Math.round(tier));
+    const arch = archetypeForTier(t);
+    const classId = npcClassFor(t);
+    const points = npcPointsFor(t);
+    const taken = npcTree(classId, points, t);
+    const stats = { ...npcStats(npcPower(t), arch.key, seed, t), ...npcProcs(t, arch.key) };
+    const perks = treeEffects(classId, taken);
+    const cls = CLASSES.find((c) => c.id === classId) || {};
+    return {
+        classId, className: cls.name || classId, points, taken, stats, perks,
+        archetype: arch.key, archetypeName: arch.name, tell: arch.tell,
+        tells: npcTells(stats, perks),
+    };
+}
 
 // The budget a tier gets to spend across the four stats. Kept as npcPower so the existing tier curve, the
 // matchmaker and every saved `npc_best` still mean what they meant.
