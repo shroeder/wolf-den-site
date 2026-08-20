@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -1642,6 +1642,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 onClick={() => setLogOpen((v) => !v)}>
                                 <GiScrollUnfurled aria-hidden="true" />
                             </button>
+                            {/* ── STRAIGHT TO THE VERDICT ─────────────────────────────────────────────────
+                                A bout is resolved on the server the moment it starts; what plays out here is
+                                a RECORDING of a fight already decided. Watching it is the good part the first
+                                few times and a toll every time after — and with bouts now running to a couple
+                                of minutes, ten fights a day is an hour of watching with no way out but
+                                leaving. This jumps to the last blow. It cannot change an outcome, because
+                                the outcome was never in this component. */}
+                            {shown < logAll.length ? (
+                                <button type="button" className="ar-mute ar-skip" aria-label="Skip to the result"
+                                    onClick={() => { Sfx.ui(); setShown(logAll.length); }}>
+                                    <GiFastForwardButton aria-hidden="true" />
+                                </button>
+                            ) : null}
                             {/* ── GIVE UP, FROM INSIDE THE FIGHT ──────────────────────────────────────────
                                 The forfeit already existed and lived on the Arena landing screen, under the
                                 Resume button. From IN a bout there was no route to it at all: you had to know
@@ -2543,6 +2556,9 @@ function Styles() {
             /* ── the buttons ── */
             /* Their own, not .dlv-btn: that class lives inside DelveClient's scoped <style jsx>, so borrowing
                it here produced a bare browser-default button in the middle of the screen. */
+            /* The skip sits with the other in-fight controls and is deliberately quiet — it is an exit from
+               the spectacle, not a feature of it. */
+            .ar-skip { color: #cdd5df; }
             .ar-btn { padding: 12px 22px; border-radius: 12px; border: none; cursor: pointer;
                 font-size: 0.95rem; font-weight: 900; color: #2a0d10;
                 background: linear-gradient(180deg, #ffc4ca, #ff6f7d);

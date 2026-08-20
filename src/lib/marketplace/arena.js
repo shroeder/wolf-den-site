@@ -80,7 +80,10 @@ const roadOpenFor = (buyerId) => ROAD_OPEN || isOwner(buyerId);
 //     have turned up a monster turns up a fish instead rather than dangling a fight nobody can take)
 //
 // The owner is exempt so the rebuild can be walked through end to end on the live site.
-export const COMBAT_OPEN = false;
+// OPEN AGAIN 2026-08-20 — the ring, the plaza and the water. The LONG ROAD stays shut on its own gate
+// below: a rung must never be easier than the one under it, and at the new fight length that is not yet true
+// at every rung. One door at a time.
+export const COMBAT_OPEN = true;
 export const combatOpenFor = (buyerId) => COMBAT_OPEN || isOwner(buyerId);
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
