@@ -16970,6 +16970,45 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid rgba(126,255,178,0.6); transition: background 90ms linear; }
 .fwreel.is-on .fwreel-band { background: linear-gradient(180deg, rgba(126,255,178,0.55), rgba(126,255,178,0.3)); }
 
+/* THE PERFECT CORE. A child of the bar, so it tracks it for free and grows with Gaff along with everything
+   else. Sitting here banks nearly double -- and it is drawn as a brighter seam rather than a separate shape,
+   because it is not a second target, it is the middle of the one you already have. */
+.fwreel-core { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    border-radius: 14px; background: linear-gradient(180deg, rgba(255,236,150,0.42), rgba(255,215,94,0.24));
+    border-top: 1px solid rgba(255,236,150,0.7); border-bottom: 1px solid rgba(255,236,150,0.7); }
+.fwreel.is-core .fwreel-core { background: linear-gradient(180deg, rgba(255,240,175,0.75), rgba(255,215,94,0.5));
+    box-shadow: 0 0 14px rgba(255,215,94,0.6); }
+.fwreel.is-core .fwreel-rod { border-color: rgba(255,215,94,0.95);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.5), 0 0 20px rgba(255,215,94,0.45); }
+.fwreel-fish.is-core { background: radial-gradient(circle at 35% 32%, #fff, #ffeaa0 55%, #ffb63f);
+    box-shadow: 0 0 18px rgba(255,215,94,1); }
+.fwreel.is-core .fwreel-title { color: #ffe27a; }
+.fwreel.is-core .fwreel-meter-fill { background: linear-gradient(90deg, #7effb2, #ffd75e); }
+
+/* == IT RUNS =========================================================================================
+   A bolt has to be legible in the corner of your eye -- you are watching the fish, not the copy. So the
+   whole rod goes hot and shakes, which is visible without being read. The breather afterwards goes calm
+   and blue-green: that is the tell that it is time to get back in the core. */
+.fwreel[data-mood="run"] .fwreel-rod { border-color: rgba(255,138,110,0.95);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.5), 0 0 22px rgba(255,110,80,0.55);
+    animation: fwreelShake 140ms linear infinite; }
+.fwreel[data-mood="run"] .fwreel-title { color: #ff9e7a; }
+.fwreel[data-mood="tired"] .fwreel-rod { border-color: rgba(150,235,255,0.9);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.5), 0 0 18px rgba(120,220,255,0.4); }
+.fwreel[data-mood="tired"] .fwreel-title { color: #a9e8ff; }
+@keyframes fwreelShake {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(-1.5px); }
+    75%  { transform: translateX(1.5px); }
+    100% { transform: translateX(0); }
+}
+/* The shake is the one motion here that is pure decoration on top of a state the colour already carries,
+   so it is the one that goes when the reader has asked for less. Everything else stays: the reel is the
+   feature, not an embellishment on it. */
+@media (prefers-reduced-motion: reduce) {
+    .fwreel[data-mood="run"] .fwreel-rod { animation: none; }
+}
+
 /* THE FISH. A marker, not the species sprite -- what is on the line is not revealed until it breaks the
    surface, and drawing the real fish here would give the whole reveal away six seconds early. */
 .fwreel-fish { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
@@ -16986,7 +17025,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fwreel.is-on .fwreel-title { color: #b6ffd4; }
 .fwreel-tip { font-size: 10px; letter-spacing: 0.04em; color: rgba(210,235,255,0.8);
     text-shadow: 0 1px 4px rgba(0,0,0,0.9); }
-.fwreel-meter { width: 100%; height: 7px; border-radius: 6px; overflow: hidden;
+.fwreel-meter { width: 100%; max-width: 220px; height: 7px; border-radius: 6px; overflow: hidden;
     background: rgba(2,12,20,0.75); border: 1px solid rgba(140,215,255,0.35); }
 .fwreel-meter-fill { height: 100%; border-radius: 6px;
     background: linear-gradient(90deg, #4fb0e8, #7effb2); transition: width 110ms linear; }

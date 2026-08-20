@@ -28,9 +28,59 @@ import { createPortal } from "react-dom";
 // reports one number — quality, 0..1 — exactly like the forge's enhance minigame and the merchant's coin game.
 
 const REEL_MS = 6500;            // how long the struggle lasts
-const BAND_H = 0.26;             // height of your bar, as a fraction of the tank
+const BAND_H = 0.26;             // height of your bar, as a fraction of the tank — the FLOOR; see bandFor
 const REEL_WARMUP_MS = 700;      // grace before scoring starts — see the note at the scoring site
 const DART_EVERY_MS = 900;       // the fish makes a run for it this often
+
+// ── YOUR TACKLE, IN YOUR HANDS ───────────────────────────────────────────────────────────────────────────────
+// The Rail sells four upgrade tracks and not one of them could be felt. Line buys casts, Lure and Net move
+// odds you never see rolled, and Gaff sets a floor under the size — all of them numbers on an upgrade card
+// that change a result somewhere off screen. You could max the lot and the fight in your hands was identical
+// to a brand-new angler's.
+//
+// Gaff is the one that belongs in the fight: it is the hook you land it with, and its existing job is already
+// "land it cleanly and the fish is never a small one". So it widens YOUR BAR. A new angler works a 26% band;
+// a maxed Gaff works 40%. Same fish, same darting, but you are better equipped to hold it — and the upgrade
+// is felt on the very next cast instead of being taken on trust.
+const BAND_PER_GAFF = 0.56;      // gaff's value runs 0..0.25, so this adds up to +0.14 on top of BAND_H
+const bandFor = (gaff = 0) => BAND_H + Math.max(0, Math.min(0.25, Number(gaff) || 0)) * BAND_PER_GAFF;
+
+// ── THE PERFECT CORE ─────────────────────────────────────────────────────────────────────────────────────────
+// Sitting anywhere in the bar used to bank full credit, which meant the score topped out the moment you were
+// competent and there was nothing left to get better at. The middle of the bar is now worth close to double
+// what its edges are, so a good reel and a GREAT one are different things.
+//
+// This does lower the ceiling on ordinary play — holding the fish loosely inside the band now banks 0.55 a
+// frame rather than 1.0 — and that is the point: 100% has to be hard to be worth printing. The two other
+// changes push the other way (Gaff widens the whole bar, better bait calms the fish), so an invested angler
+// playing well lands in much the same place they always did.
+const CORE_SHARE = 0.42;         // the core is this fraction of the bar's height, centred
+const BAND_CREDIT = 0.55;        // banked per frame inside the bar but outside the core
+const CORE_CREDIT = 1.0;         // and inside the core
+
+// ── IT RUNS ──────────────────────────────────────────────────────────────────────────────────────────────────
+// Six seconds of the same steady darting is one texture held for the whole fight, and every fish felt like
+// every other fish with the dial turned up. Now it bolts: a hard sustained surge for one end of the water,
+// then it tires and gives you a moment of easy line. Rarity sets how many runs you have to survive, so a
+// sardine is a drift with one lunge in it and a mythic is three, back to back to back.
+const RUN_MS = 900;              // how long a bolt lasts
+const TIRE_MS = 700;             // and the breather immediately after it
+const RUN_PUSH = 2.4;            // sustained acceleration toward the end it is making for
+const RUN_DART = 1.8;            // and how much harder it thrashes while running
+const TIRE_DAMPING = 0.70;       // it settles fast when it is blown — this is your window
+const RUNS = { common: 1, rare: 1, epic: 2, legendary: 2, mythic: 3 };
+
+// ── WHAT IS ON THE HOOK CHANGES THE FIGHT ────────────────────────────────────────────────────────────────────
+// Bait moved odds and nothing else: you picked it in a menu, a rarer fish became likelier somewhere in the
+// server's roll, and the pick had no consequence you could feel. It does now — and it pulls AGAINST the thing
+// it buys. Crude bait gets worried at, so the fish is frantic on the end of it; proper bait is taken properly,
+// the hook sets deep, and the thing fights hard but honestly.
+//
+// So a mythic bait attracts something far rarer (a harder fight) and then partly pays for the trouble it
+// caused (a calmer one). Net: good bait buys you access to fish you could not otherwise hold, rather than
+// simply handing you a harder fight and calling it a reward.
+const BAIT_HOLD = { common: 1.0, rare: 0.94, epic: 0.88, legendary: 0.82, mythic: 0.76 };
+const holdFor = (rarity) => BAIT_HOLD[rarity] || 1.0;
 
 // ── YOUR BAR ─────────────────────────────────────────────────────────────────────────────────────────────────
 // These were inherited from the old marker physics and were catastrophically wrong once the bar became the
@@ -149,20 +199,36 @@ function useSfx() {
 //     cap your result permanently before you had seen where it was.
 // CHANGED, because the scene exists now: it draws over the water instead of replacing it, so the boat still
 // rocks and the hero still stands on the deck while you fight the thing.
-export function ReelStruggle({ onDone, sfx, fight = "common" }) {
+export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRarity = null }) {
     const F = FIGHT[fight] || FIGHT.common;
+    // Your tackle and your bait, resolved once — both are fixed for the length of the fight.
+    const BAND = bandFor(gaff);
+    const HOLD = holdFor(baitRarity);
+    const runCount = RUNS[fight] || 1;
     const [tick, setTick] = useState(0);          // repaint pulse
     const holdRef = useRef(false);
     const posRef = useRef(0.5);                   // THE FISH, 0 (bottom) .. 1 (top). Swims itself.
     const velRef = useRef(0);
     const bandRef = useRef(0.5);                  // YOUR BAR (centre). Hold to raise, release to fall.
     const barVelRef = useRef(0);
-    const inRef = useRef(0);                      // frames inside the band
-    const totalRef = useRef(0);
+    const bankRef = useRef(0);                    // credit banked (core is worth more than the band)
+    const totalRef = useRef(0);                   // and the most that could have been banked
     const startRef = useRef(0);
     const lastDartRef = useRef(0);
     const doneRef = useRef(false);
     const clickRef = useRef(0);
+    const runDirRef = useRef(1);                  // which way it bolted, held for the length of the run
+    const runSeenRef = useRef(-1);                // so a run only announces itself once
+    const [mood, setMood] = useState("hold");     // hold | run | tired — drives the copy and the glow
+
+    // WHEN IT RUNS. Spread evenly across the scoring part of the fight, so the last one never lands so late
+    // that it cannot be recovered from. Recomputed only when the fish's rarity changes.
+    const runs = useMemo(() => {
+        const first = REEL_WARMUP_MS + 500;
+        const last = REEL_MS - (RUN_MS + TIRE_MS) - 250;
+        const span = Math.max(0, last - first);
+        return Array.from({ length: runCount }, (_, k) => first + (runCount === 1 ? span / 2 : (span / (runCount - 1)) * k));
+    }, [runCount]);
 
     useEffect(() => {
         let raf = 0;
@@ -173,15 +239,35 @@ export function ReelStruggle({ onDone, sfx, fight = "common" }) {
             prev = ts;
             const elapsed = ts - startRef.current;
 
-            // THE FISH swims on its own. It wanders, with panicked runs on top -- nothing you do moves it. Its
-            // rarity sets how hard and how often it bolts, so a mythic thrashes and a sardine mostly drifts.
-            const t = elapsed / 1000;
-            if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
-                lastDartRef.current = elapsed;
-                velRef.current += (Math.random() - 0.5) * 1.1 * F.dart;
+            // ── WHAT THE FISH IS DOING RIGHT NOW ──────────────────────────────────────────────────────
+            // Three states. Between runs it drifts and darts as it always did; during a run it surges for
+            // one end and thrashes; straight after, it is blown and settles — which is the moment to get it
+            // back in the core.
+            let phase = "hold";
+            let runIdx = -1;
+            for (let k = 0; k < runs.length; k += 1) {
+                const t0 = runs[k];
+                if (elapsed >= t0 && elapsed < t0 + RUN_MS) { phase = "run"; runIdx = k; break; }
+                if (elapsed >= t0 + RUN_MS && elapsed < t0 + RUN_MS + TIRE_MS) { phase = "tired"; runIdx = k; break; }
             }
-            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.5 * dt * F.dart;
-            velRef.current *= Math.pow(FISH_DAMPING, dt * 60);
+            // A fresh run picks its direction once, and announces itself once.
+            if (phase === "run" && runSeenRef.current !== runIdx) {
+                runSeenRef.current = runIdx;
+                // It bolts AWAY from where your bar is — a run you could ignore is not a run.
+                runDirRef.current = bandRef.current > 0.5 ? -1 : 1;
+                sfx.bite();
+                try { navigator.vibrate?.(35); } catch { /* no haptics here */ }
+            }
+
+            const t = elapsed / 1000;
+            const frenzy = (phase === "run" ? RUN_DART : 1) * HOLD;
+            if (phase !== "tired" && elapsed - lastDartRef.current > DART_EVERY_MS / (F.dart * (phase === "run" ? 1.6 : 1))) {
+                lastDartRef.current = elapsed;
+                velRef.current += (Math.random() - 0.5) * 1.1 * F.dart * frenzy;
+            }
+            if (phase === "run") velRef.current += runDirRef.current * RUN_PUSH * dt * F.dart * HOLD;
+            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.5 * dt * F.dart * HOLD;
+            velRef.current *= Math.pow(phase === "tired" ? TIRE_DAMPING : FISH_DAMPING, dt * 60);
             posRef.current += velRef.current * dt;
             if (posRef.current <= 0.05) { posRef.current = 0.05; velRef.current = Math.abs(velRef.current) * 0.5; }
             if (posRef.current >= 0.95) { posRef.current = 0.95; velRef.current = -Math.abs(velRef.current) * 0.5; }
@@ -191,27 +277,33 @@ export function ReelStruggle({ onDone, sfx, fight = "common" }) {
             barVelRef.current -= BAR_GRAVITY * dt;
             barVelRef.current *= Math.pow(BAR_DAMPING, dt * 60);
             bandRef.current += barVelRef.current * dt;
-            const half = BAND_H / 2;
+            const half = BAND / 2;
             if (bandRef.current <= half) { bandRef.current = half; barVelRef.current = 0; }
             if (bandRef.current >= 1 - half) { bandRef.current = 1 - half; barVelRef.current = 0; }
 
-            // Credit, banked per frame: is the FISH inside YOUR BAR right now.
+            // ── CREDIT, BANKED PER FRAME ──────────────────────────────────────────────────────────────
+            // Inside the bar pays; inside the CORE pays nearly double. The warm-up still applies: the score
+            // averages the whole run, so the moments spent finding the fish used to cap the result before
+            // you had seen where it was.
             const scoring = elapsed >= REEL_WARMUP_MS;
-            const lo = bandRef.current - half, hi = bandRef.current + half;
-            const inside = posRef.current >= lo && posRef.current <= hi;
+            const inside = Math.abs(posRef.current - bandRef.current) <= half;
+            const inCore = Math.abs(posRef.current - bandRef.current) <= (BAND * CORE_SHARE) / 2;
             if (scoring) {
-                totalRef.current += 1;
-                if (inside) inRef.current += 1;
+                totalRef.current += CORE_CREDIT;
+                if (inCore) bankRef.current += CORE_CREDIT;
+                else if (inside) bankRef.current += BAND_CREDIT;
             }
-            // Reel clicks while you are holding and on target -- the feedback that says it is working.
-            if (inside && holdRef.current && ts - clickRef.current > 110) { clickRef.current = ts; sfx.click(); }
+            // Reel clicks while you are holding and on target — the feedback that says it is working. Tighter
+            // and brighter in the core, so the best place to be is audible without having to look at it.
+            if (inside && holdRef.current && ts - clickRef.current > (inCore ? 80 : 130)) { clickRef.current = ts; sfx.click(); }
 
+            setMood(phase);
             setTick((n) => (n + 1) % 100000);
 
             if (elapsed >= REEL_MS) {
                 if (!doneRef.current) {
                     doneRef.current = true;
-                    onDone(scoreOf(inRef.current, totalRef.current));
+                    onDone(scoreOf(bankRef.current, totalRef.current));
                 }
                 return;
             }
@@ -219,14 +311,14 @@ export function ReelStruggle({ onDone, sfx, fight = "common" }) {
         };
         raf = requestAnimationFrame(step);
         return () => cancelAnimationFrame(raf);
-    }, [onDone, sfx, F.dart]);
+    }, [onDone, sfx, F.dart, BAND, HOLD, runs]);
 
-    // Capture the pointer on press -- see the note above the component. stopPropagation because the water
+    // Capture the pointer on press — see the note above the component. stopPropagation because the water
     // frame underneath carries its own pointer handler for the strike tap.
     const down = useCallback((e) => {
         e.preventDefault();
         e.stopPropagation();
-        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not supported -- up still works */ }
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not supported — up still works */ }
         holdRef.current = true;
     }, []);
     const up = useCallback((e) => {
@@ -239,21 +331,30 @@ export function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const elapsed = startRef.current ? Math.min(REEL_MS, performance.now() - startRef.current) : 0;
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
-    const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
-    const scoreNow = scoreOf(inRef.current, totalRef.current);
+    const half = BAND / 2;
+    const inside = Math.abs(pos - band) <= half;
+    const inCore = Math.abs(pos - band) <= (BAND * CORE_SHARE) / 2;
+    const scoreNow = scoreOf(bankRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
+    const title = warming ? "GET READY…"
+        : mood === "run" ? "IT'S RUNNING!"
+        : mood === "tired" ? "IT'S TIRING — NOW!"
+        : inCore ? "PERFECT" : inside ? "ON IT" : "KEEP IT IN THE BAR";
 
     return (
-        <div className={`fwreel${inside ? " is-on" : ""}`} data-tick={tick}>
-            {/* The rod gauge, against the right edge -- it leaves the boat, the hero and the water visible,
+        <div className={`fwreel${inside ? " is-on" : ""}${inCore ? " is-core" : ""}`} data-mood={mood} data-tick={tick}>
+            {/* The rod gauge, against the right edge — it leaves the boat, the hero and the water visible,
                 which is the whole reason the reel lives in the frame instead of over it. */}
             <div className="fwreel-rod" onPointerDown={down} onPointerUp={up} onPointerCancel={up} role="presentation">
-                <div className="fwreel-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }} />
+                <div className="fwreel-band" style={{ bottom: `${(band - half) * 100}%`, height: `${BAND * 100}%` }}>
+                    {/* THE CORE. Drawn as a child of the bar so it tracks it for free and scales with Gaff. */}
+                    <div className="fwreel-core" style={{ height: `${CORE_SHARE * 100}%` }} />
+                </div>
                 {/* THE FISH. It swims itself; your thumb drives the BAR. */}
-                <div className={`fwreel-fish${inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }} />
+                <div className={`fwreel-fish${inCore ? " is-core" : inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }} />
             </div>
             <div className="fwreel-side">
-                <strong className="fwreel-title">{warming ? "GET READY…" : inside ? "ON IT!" : "KEEP IT IN THE BAR"}</strong>
+                <strong className="fwreel-title">{title}</strong>
                 <span className="fwreel-tip">HOLD to raise · let go to drop</span>
                 {/* Live, and the same number the server receives. What is hidden is the RELATIONSHIP: a good
                     reel floors the bad end of the size roll rather than setting the size, so this reads as
@@ -476,6 +577,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
     const [fight, setFight] = useState("common"); // the fight profile of what is on the line (rarity only)
+    const [baitRarity, setBaitRarity] = useState(null); // and what is holding it there
     const [result, setResult] = useState(null);
     // What is currently breaking the surface, for FishingWater to draw. Set the moment the land call answers,
     // so the rise animation is already showing the real thing rather than a silhouette.
@@ -525,6 +627,10 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
     // one on a cast you never thought about.
     const [picking, setPicking] = useState(false);
     const baits = Array.isArray(fishing?.baits) ? fishing.baits : [];
+    // GAFF, which now widens your bar in the fight. `valueNow` is the resolved fraction (0..0.25), so the
+    // cap is honoured for free and the component never has to know the track's levelling maths.
+    const gaffValue = (Array.isArray(fishing?.tracks) ? fishing.tracks : [])
+        .find((t) => t.id === "gaff")?.valueNow || 0;
     // What the pantry could turn into bait right now — see cookableNow. Empty for anybody who knows no bait
     // recipes, which removes the whole block rather than showing an empty one.
     const baitCookable = Array.isArray(fishing?.baitCookable) ? fishing.baitCookable : [];
@@ -577,6 +683,9 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
         castRef.current = Number(res.cast?.biteAt) || 0;
         // How hard this one fights. Rarity only — never the species, which stays hidden until it surfaces.
         setFight(res.cast?.fight || "common");
+        // WHAT WENT ON THE HOOK. startCast reports the bait it actually spent, and its rarity decides how
+        // cleanly the fish is held — see BAIT_HOLD. A bare hook is `null`, which reads as crude.
+        setBaitRarity(res.bait?.rarity || null);
         setPhase("waiting");
         sfx.plop();
         const wait = Math.max(200, Number(res.cast?.biteAt || 0) - Date.now());
@@ -817,7 +926,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         busy={busy}
                         onStrike={phase === "bite" ? strike : undefined}
                     >
-                        {phase === "reel" ? <ReelStruggle onDone={reelDone} sfx={sfx} fight={fight} /> : null}
+                        {phase === "reel" ? <ReelStruggle onDone={reelDone} sfx={sfx} fight={fight} gaff={gaffValue} baitRarity={baitRarity} /> : null}
                     </FishingWater>
                 ) : phase === "gone" ? (
                     <div className="fish-stage">

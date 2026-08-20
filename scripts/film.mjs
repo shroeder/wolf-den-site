@@ -46,6 +46,14 @@ const SETTLE = Number(arg("--settle", 4200));
 // beat as one frame — the tool would have answered the timing question by destroying it. JPEG at 1x is ~60ms.
 const DPR = Number(arg("--dpr", 1));
 const DELAY = Number(arg("--delay", 0));
+// -- SOME THINGS CANNOT BE FILMED BY TAPPING THEM -------------------------------------------------------------
+// A minigame needs a thumb held down for six seconds, not a click. This rig could fire exactly one click and
+// then watch, which films every interactive feature as the thing sitting still doing nothing -- and that reads
+// as a broken animation rather than as a rig that cannot play the game. --eval runs arbitrary JS in the page
+// after the click and before the first frame, so a scripted "player" can be installed and filmed at work:
+//   node scripts/film.mjs "<lab url>" out/reel --click ".pill" --eval "window.__bot(130)" --frames 16
+// (shot.mjs learned the same lesson and grew SHOT_EVAL.)
+const EVAL = arg("--eval", null);
 
 if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
 if (!existsSync(dirname(outBase)) && dirname(outBase) !== ".") mkdirSync(dirname(outBase), { recursive: true });
@@ -113,6 +121,13 @@ if (CLICK) {
         if (!fired) await sleep(250);
     }
     if (!fired) { chrome.kill(); throw new Error(`nothing clickable matched ${CLICK} — nothing was filmed`); }
+}
+
+// The scripted player, if there is one. Its return value is printed: a bot that failed to find what it drives
+// must say so here rather than producing a film of a page sitting still.
+if (EVAL) {
+    const out = await evaluate(EVAL);
+    console.log(`--eval returned: ${JSON.stringify(out)}`);
 }
 
 // WAIT FOR THE MOMENT, rather than guessing at it with a sleep. Polled in the page so the condition is the

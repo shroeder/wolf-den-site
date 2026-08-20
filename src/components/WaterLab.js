@@ -35,6 +35,12 @@ const IDLE_FISHING = {
 export default function WaterLab() {
     const [phase, setPhase] = useState("waiting");
     const [haul, setHaul] = useState(null);
+    // The three things that change the fight, on dials -- a maxed Gaff and a mythic bait cannot be waited for.
+    const [rf, setRf] = useState("mythic");   // what is on the line
+    const [rg, setRg] = useState(0);          // gaff's resolved value, 0 .. 0.25
+    const [rb, setRb] = useState(null);       // the bait's rarity, null = a bare hook
+    const [reelKey, setReelKey] = useState(0);
+    const [lastScore, setLastScore] = useState(null);
     const full = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("full") === "1";
     if (full) {
         return (
@@ -53,10 +59,32 @@ export default function WaterLab() {
     }
     return (
         <div style={{ padding: 12, maxWidth: 720, margin: "0 auto" }}>
+            {/* The last reel's score, verbatim, for the measuring harness to read. */}
+            <div className="lab-score" data-score={lastScore === null ? "" : lastScore}
+                style={{ fontSize: 12, marginBottom: 6 }}>
+                last reel: {lastScore === null ? "—" : `${Math.round(lastScore * 100)}%`}
+            </div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                 {PHASES.map((p) => (
                     <button key={p} type="button" className="pill" onClick={() => { setPhase(p); if (p !== "hauling") setHaul(null); }}>{p}</button>
                 ))}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+                <b style={{ fontSize: 12 }}>reel:</b>
+                {["common", "rare", "epic", "legendary", "mythic"].map((r) => (
+                    <button key={r} type="button" className="pill" onClick={() => { setRf(r); setReelKey((n) => n + 1); setPhase("reel"); }}
+                        style={rf === r ? { outline: "2px solid #7effb2" } : undefined}>fish: {r}</button>
+                ))}
+                {[0, 0.10, 0.25].map((g) => (
+                    <button key={g} type="button" className="pill" onClick={() => { setRg(g); setReelKey((n) => n + 1); setPhase("reel"); }}
+                        style={rg === g ? { outline: "2px solid #ffd75e" } : undefined}>gaff: {g}</button>
+                ))}
+                {[null, "common", "mythic"].map((b) => (
+                    <button key={String(b)} type="button" className="pill" onClick={() => { setRb(b); setReelKey((n) => n + 1); setPhase("reel"); }}
+                        style={rb === b ? { outline: "2px solid #8fd3ff" } : undefined}>bait: {b || "bare"}</button>
+                ))}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                 {HAULS.map((h) => (
                     <button key={h.name} type="button" className="pill" onClick={() => { setHaul(h); setPhase("hauling"); }}>haul: {h.name}</button>
                 ))}
@@ -72,7 +100,8 @@ export default function WaterLab() {
             >
                 {/* The REAL reel, so what the lab shows is what ships. onDone loops back to waiting rather
                     than hauling, because the lab has no land call to answer it. */}
-                {phase === "reel" ? <ReelStruggle onDone={() => setPhase("waiting")} sfx={NO_SFX} fight="mythic" /> : null}
+                {phase === "reel" ? <ReelStruggle key={reelKey} onDone={(q) => { setLastScore(q); setPhase("waiting"); }} sfx={NO_SFX}
+                    fight={rf} gaff={rg} baitRarity={rb} /> : null}
             </FishingWater>
         </div>
     );
