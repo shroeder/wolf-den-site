@@ -129,7 +129,23 @@ export function npcPower(tier) {
 // wearing real gear. Nobody touched a weight; the correction was simply describing different maths, and the
 // ladder started lurching again: rung 41 was a 14% fight for the field and rung 42 a 49% one.
 // Re-derive with scripts/sim-archetype-cal.mjs after touching any weight, `tough`, or the engine.
-const ARCH_BAL = { balanced: 1.02, brute: 0.67, wall: 1.37, duelist: 1.26, berserker: 0.75 };
+// ── RE-DERIVED 2026-08-20, AND THE WALL WAS INVERTED ─────────────────────────────────────────────────────────
+// These normalise what an archetype’s point of power is WORTH, so one stated power means one difficulty.
+// They were solved under the old damage ceiling and the old armour rule, and both have since moved — so the
+// wall, which is the archetype armour helps most, was being handed 37% MORE budget when the calibrator now
+// says it should get 32% LESS. That is the whole reason rungs 37 and 42 were unwinnable while 38 and 41 were
+// free: the ladder was not lurching, the wall was being paid twice.
+//
+// Re-solved with scripts/sim-archetype-cal.mjs against a real loadout — binary-searching the budget that
+// makes an even fight, per archetype, across all three classes. RE-RUN IT whenever DAMAGE_MAX,
+// ARMOUR_MAX_SHARE or HEALTH_MAX moves; these numbers are downstream of all three.
+//
+// COMPOSE ITS ANSWER, DO NOT PASTE IT. statsForPower applies these multipliers before the probe fights, so
+// the calibrator measures the world WITH them already in effect and its “suggested mult” is a CORRECTION to
+// multiply through — new = old x suggested. Pasting the suggestions straight in inverts the ladder: it made
+// the wall easy and turned the brute into the new wall, and the count of rungs that get easier as you climb
+// went UP, from 15 to 20.
+const ARCH_BAL = { balanced: 0.969, brute: 0.811, wall: 0.932, duelist: 1.184, berserker: 0.907 };
 
 export const ARCHETYPES = [
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",

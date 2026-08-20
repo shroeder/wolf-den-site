@@ -890,6 +890,16 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 //
 // A bare-handed fighter (every NPC) swings at BARE_ATTACK_SPEED.
 // What a successful block takes off the blow. The Warden's own is higher — see arena-classes.js.
+// ── THE MOST OF A BLOW ARMOUR MAY EAT ────────────────────────────────────────────────────────────────────────
+// Armour is flat subtraction, which reads well and is the stat everybody understands. Its failure mode is at
+// the bottom: when armour approaches the raw blow every swing clamps to the 1-damage floor, the fight turns
+// into an attrition race decided by regen, and the result stops being a probability — the same pairing wins
+// every seed or loses every seed. On the Long Road that made the WALL archetype unwinnable while the rungs on
+// either side of it were free, which is a ladder that gets easier as you climb.
+//
+// A ceiling on the SHARE fixes it without changing what armour is. At 0.75 the most armoured fighter in the
+// game still takes four times as long to kill; nobody is ever immune.
+export const ARMOUR_MAX_SHARE = 0.75;
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
 export const GUARD_BASE_SHARE = 0.10;

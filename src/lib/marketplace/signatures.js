@@ -151,9 +151,14 @@ export const ITEM_SIGNATURES = {
     gs2_plate_of_kings: { label: "King's Plate", onslaught: true }, // legendary — declone from King's Plate pack dupe: an opener
 
     // ===== Belts — the STRIKE slot (kept) + a couple of giants =====
-    giants_belt: { label: "Titan's Might", extraStrikes: 2 }, // legendary
-    colossus_belt: { label: "Colossal Might", extraStrikes: 2 }, // mythic
-    cosmic_sash: { label: "Cosmic Girdle", extraStrikes: 2 }, // mythic
+    // ── 2 -> 1 ───────────────────────────────────────────────────────────────────────────────────────────
+    // The base allowance is ONE strike a day, so a belt granting two was not a bonus, it was tripling the
+    // feature off a single slot. Ten pieces grant strikes between them and the Den averaged 2.1 a day
+    // against a base of 1, with the top member on 5. Every grant is worth one now: the slot still matters,
+    // it just is not worth more than everything else put together.
+    giants_belt: { label: "Titan's Might", extraStrikes: 1 }, // legendary
+    colossus_belt: { label: "Colossal Might", extraStrikes: 1 }, // mythic
+    cosmic_sash: { label: "Cosmic Girdle", extraStrikes: 1 }, // mythic
     world_girdle: { label: "Atlas", giantSlayer: true }, // mythic
     bear_girdle: { label: "Bear's Endurance", extraStrikes: 1 }, // legendary
     kings_sash: { label: "Royal Girdle", extraStrikes: 1 }, // legendary

@@ -240,6 +240,12 @@ export const PROC_CAP = {
     execute: 1.2,
     onslaught: 1.2,
     first_blood: 1.2,
+    // ── THE ONE THAT WAS NEVER CAPPED ────────────────────────────────────────────────────────────────────
+    // first_hit is a MULTIPLIER rather than a chance or a percentage, so it was written as
+    // `1 + (v - 1) * aMult` and — alone among the six — never passed through cap(). Pet level scales aMult
+    // freely, and the strongest pet in the Den had reached x4.60 on the day’s opening strike. Every other
+    // proc has had a ceiling since the day it was written; this is that ceiling.
+    first_hit: 2.5,      // the multiplier itself, not an increment
 };
 
 export function petPerkValue(rarity, key) {
@@ -514,7 +520,7 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         const aMult = petActiveLevelMult(Math.max(1, Number(level) || 1)) * boost;
         const cap = (x, hi) => Math.min(hi, x);
         const best = (k, x) => { proc[k] = Math.max(proc[k] || 0, x); };
-        if (def.key === "first_hit") best("firstHitMult", 1 + (v - 1) * aMult);
+        if (def.key === "first_hit") best("firstHitMult", cap(1 + (v - 1) * aMult, PROC_CAP.first_hit));
         else if (def.key === "erupt") { best("eruptChance", cap(v.chance * aMult, PROC_CAP.erupt)); proc.eruptMult = Math.max(proc.eruptMult || 0, v.mult); }
         else if (def.key === "chain_strike") best("chainChance", cap(v * aMult, PROC_CAP.chain_strike));
         else if (def.key === "execute") best("executePct", cap(v * aMult, PROC_CAP.execute));

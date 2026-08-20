@@ -9,6 +9,7 @@ import { FaDharmachakra } from "react-icons/fa6";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
+import ArenaReopenLaunch from "@/components/ArenaReopenLaunch";
 import DungeonLaunch from "@/components/DungeonLaunch";
 import MarketLaunch from "@/components/MarketLaunch";
 import SurveyModal from "@/components/SurveyModal";
@@ -469,6 +470,7 @@ export default function GameNav() {
                 card is: it lands while you are busy doing something else entirely. */}
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
+            {signedIn ? <ArenaReopenLaunch /> : null}
             {signedIn ? <DungeonLaunch /> : null}
             {signedIn ? <MarketLaunch /> : null}
             {signedIn ? <SurveyModal /> : null}

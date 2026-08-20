@@ -37,6 +37,9 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
 // where every member's avatar chips away 24/7 (a background tick applies it and records it over time).
 export const DAILY_ATTACKS = 1;
+// The most the six damage systems may multiply to between them. See the note at the damage line: each system
+// has always had its own ceiling and the product had none.
+export const BOSS_MULT_CAP = 20;
 
 // Fortune → boss-raffle tickets. Instead of a flat one-time bonus, each point of fortune banks
 // TICKETS_PER_FORTUNE_PER_DAY (from pet-perks.js) lottery tickets PER DAY the boss is alive — so holding
@@ -1330,7 +1333,17 @@ export async function attackBoss(buyerId) {
     });
     // The Stockade's -10% damage penalty used to be applied here. Removed — the pillory is a joke, not a
     // sentence, and taking a bite out of someone's boss damage for a day made it a punishment instead.
-    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult * wMult * setHit.mult + (onHit.bonusDamage || 0));
+    // ── AND A CEILING ON THE PRODUCT, NOT JUST ON EACH PART ──────────────────────────────────────────────
+    // Six independent systems multiply here, and every one of them caps ITSELF: signatures at x15
+    // (SIG_MULT_CAP x BURST_CAP), pet procs at their own PROC_CAP, sets and elements by what they can roll.
+    // Nothing capped the PRODUCT — so six individually reasonable bonuses reached x60 before might and crit
+    // were applied at all, and the biggest strike in the Den was 3,404,998 against an average hit of 3,440.
+    //
+    // A single ceiling on the stack. It bites only where several systems are already at their own limits,
+    // which is exactly the case that was running away; a member with one good signature and no pet never
+    // reaches it and never notices it.
+    const stack = Math.min(BOSS_MULT_CAP, buffMult * sig.mult * petMult * wMult * setHit.mult);
+    const damage = Math.round(swing.damage * stack + (onHit.bonusDamage || 0));
     const crit = swing.crit;
     const ability = pickAbility(crit);
 

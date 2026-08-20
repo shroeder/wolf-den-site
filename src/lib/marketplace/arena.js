@@ -57,7 +57,15 @@ import { arenaRating, autoBout } from "@/lib/marketplace/arena-engine.js";
 //
 // It stays shut until the curve is re-solved against the threshold members actually stop at, not the one the
 // simulator assumed.
-const ROAD_OPEN = false;
+// OPEN AGAIN 2026-08-20. It shut because the ladder got EASIER as you climbed — the wall archetype was
+// unwinnable while the rungs either side of it were free. Two causes, both fixed: armour could eat a whole
+// blow (see ARMOUR_MAX_SHARE), which turned those fights into 1-damage attrition with a binary outcome; and
+// ARCH_BAL was still calibrated against the old damage ceiling, so the wall was being handed 37% MORE budget
+// than its neighbours on top of already being the archetype armour helps most.
+//
+// Measured across six real loadouts afterwards: below every member’s wall the ladder is strictly monotonic,
+// and the walls now spread from rung 37 to rung 46 instead of everyone stopping at the same one.
+const ROAD_OPEN = true;
 // ── SHUT TO THE DEN, OPEN TO THE OWNER ───────────────────────────────────────────────────────────────────────
 // The Road was closed because the new gear stats made it clearable overnight, and a rung once beaten cannot be
 // un-beaten without taking progress off people. That reasoning is about the ninety-odd members walking it, not

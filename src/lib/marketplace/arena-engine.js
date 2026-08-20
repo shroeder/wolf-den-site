@@ -19,7 +19,7 @@ import {
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
-import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -400,7 +400,23 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             // Pierce did literally zero for the entire game and the audit is the only thing that saw it.
             //
             // It reduces the armour instead. 50% pierce means half their armour is not there.
-            let blow = Math.max(1, Math.round(raw - def.armor * (1 - att.pierce)));
+            //
+            // ── AND ARMOUR CAN NEVER EAT THE WHOLE BLOW ──────────────────────────────────────────────
+            // Flat subtraction with a floor of 1 is fine while blows are large. It stops being fine the
+            // moment they are not: once armour approaches the raw blow, every swing clamps to 1 damage,
+            // the fight becomes an attrition race decided by regen and lifedrink, and the OUTCOME GOES
+            // BINARY — the same pairing wins every seed or loses every seed.
+            //
+            // That is what broke the Long Road. The ladder cycles five archetypes, one of which is the
+            // WALL, and measured across six real builds the wall rungs were 0% while the rungs either side
+            // were 100%: rung 37 unwinnable, 38 free, 40 unwinnable, 41 free. A ladder that gets EASIER as
+            // you climb is the one rule Luke set as absolute, and it was armour doing it, not the rungs.
+            //
+            // So armour is still flat — it is subtraction, it is the stat people understand — but it can
+            // never remove more than ARMOUR_MAX_SHARE of the blow that hits it. A wall is still four times
+            // the fight anybody else is; it is no longer an unmovable object.
+            const softened = Math.min(def.armor * (1 - att.pierce), raw * ARMOUR_MAX_SHARE);
+            let blow = Math.max(1, Math.round(raw - softened));
             // ── THE SHIELD ───────────────────────────────────────────────────────────────────────────
             // Rolled per blow, so a doublestrike gets two chances to be blocked rather than one verdict on
             // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
