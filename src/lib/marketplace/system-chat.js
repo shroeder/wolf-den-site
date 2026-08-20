@@ -19,13 +19,17 @@ import { db } from "@/lib/db";
 // Looked up by ALIAS rather than a pasted uuid — the id is stable today and an id in source is the kind of
 // thing that rots silently. Returns false if the Arbiter is missing, so a failure is a missing announcement
 // rather than an exception in the middle of paying somebody out.
-export async function postSystemChat(body) {
+// `kind` marks an AUTOMATED post so it can be muted without muting the Arbiter, who also writes the
+// hand-authored triage posts members ask for. NULL — the default, and every message written before this — is
+// "a human typed this". See migration 388 and NOTIFY_KINDS "milestone".
+export async function postSystemChat(body, kind = null) {
     const text = String(body || "").trim();
     if (!text) return false;
     const arbiter = await db.queryOne(`SELECT id FROM mkt_buyer WHERE alias = 'arbiter' LIMIT 1`).catch(() => null);
     if (!arbiter?.id) return false;
     const r = await db.queryOne(
-        `INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2) RETURNING id`, [arbiter.id, text]
+        `INSERT INTO mkt_town_chat (buyer_id, body, kind) VALUES ($1, $2, $3) RETURNING id`,
+        [arbiter.id, text, kind || null]
     ).catch(() => null);
     return Boolean(r);
 }

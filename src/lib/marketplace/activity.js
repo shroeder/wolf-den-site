@@ -127,7 +127,8 @@ async function chronicle(buyerId, event) {
     // Posting it as the member wrapped a third-person sentence about them in their own avatar and bubble, which
     // reads as them announcing themselves.
     const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
-    await postSystemChat(`${me.name} is the first in the Den to ${what}. Written into the chronicle.`).catch(() => {});
+    // Same kind as the Long Road firsts — an automated milestone, muted by the same switch.
+    await postSystemChat(`${me.name} is the first in the Den to ${what}. Written into the chronicle.`, "milestone").catch(() => {});
 }
 
 const CHRONICLE_LABEL = {

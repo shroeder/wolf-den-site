@@ -706,7 +706,7 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
     // So the join runs once for the whole plaza instead of once per viewer per poll. This was the last live
     // piece of the Town poll still doing per-viewer database work for a shared answer.
     const rows = await shared(`town:chat:${n}`, TTL.LIVE, () => db.query(
-        `SELECT c.id, c.body, c.created_at, c.buyer_id,
+        `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind,
                 b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
            FROM mkt_town_chat c
            JOIN mkt_buyer b ON b.id = c.buyer_id
@@ -714,7 +714,17 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
           LIMIT $1`,
         [n]
     ).catch(() => []));
-    return rows.slice().reverse().map((r) => ({
+    // ── MUTED MILESTONES ARE FILTERED PER VIEWER, NOT PER QUERY ──────────────────────────────────────────
+    // The query above is deliberately shared across the whole plaza — one join per poll for everybody — so
+    // this cannot become a WHERE clause without giving every viewer their own database round trip. One extra
+    // row read for the viewer's prefs is the cheaper half of that trade by a wide margin.
+    let hideMilestones = false;
+    if (buyerId) {
+        const { getNotifyPrefs, allowsNotify } = await import("@/lib/marketplace/notify-prefs.js");
+        const prefs = await getNotifyPrefs(buyerId).catch(() => ({}));
+        hideMilestones = !allowsNotify(prefs, "chat", "milestone");
+    }
+    return rows.slice().reverse().filter((r) => !(hideMilestones && r.kind === "milestone")).map((r) => ({
         id: String(r.id),
         body: r.body,
         at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),

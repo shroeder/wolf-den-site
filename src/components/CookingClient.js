@@ -37,6 +37,9 @@ const FOUNDER = {
 // consumable from its tier and lists the whole pool it can roll from, so there is nothing to guess about what
 // pressing the button gets you.
 
+// The recipe kinds that have no ladder to roll and therefore no minigame — see the button below.
+const INSTANT_KINDS = new Set(["prep", "bait"]);
+
 const TIER_RING = { 1: "#cfd8e3", 2: "#7ec8ff", 3: "#c9a2ff", 4: "#ffd75e", 5: "#ff9ec4" };
 const pctText = (v) => `${Math.round((Number(v) || 0) * 100)}%`;
 // How an upgrade track states its effect. A "chance" track reads as a bare percentage; Big Pot is a size
@@ -179,8 +182,12 @@ export default function CookingClient({ initial }) {
         } finally { setBusy(false); }
     };
 
-    const finishCook = async ({ quality, chain }) => {
-        const rec = playing;
+    // `recipe` is passed by the instant path (prep/bait), which never opens the minigame and therefore never
+    // sets `playing`. The minigame still calls it the old way and falls back to `playing`, so there is one
+    // finish for both routes rather than a second copy that could drift.
+    const finishCook = async ({ quality, chain, recipe = null }) => {
+        const rec = recipe || playing;
+        if (!rec) return;
         setPlaying(null);
         const d = await post({ action: "cook", recipe: rec.id, quality, chain });
         if (d?.ok) {
@@ -554,9 +561,23 @@ export default function CookingClient({ initial }) {
                                             </div>
                                         )}
 
+                                            {/* ── A SKILL GAME NEEDS SOMETHING TO BE SKILFUL ABOUT ────────────
+                                                A DISH rolls a reward ladder and the timing run decides which
+                                                rung — that is a game. A PREP or a BAIT hands back one fixed
+                                                ingredient whatever you do; the run only ever moved its XP a
+                                                little. So the five-step minigame was a toll on the grindiest
+                                                half of the Kitchen and nothing else. Kaishiern: "Make making
+                                                Bait in the kitchen be a single button press instead of the
+                                                timing game? Since there's no reward table to roll on it kinda
+                                                feels like a waste of time to play the skill based mini[game]."
+
+                                                One press, and it counts as a CLEAN run rather than a middling
+                                                one — you cannot fumble a button, so it should not pay like you
+                                                did. Dishes are untouched. */}
                                         {r.known ? (
-                                            <button type="button" className="btn ck-cook" disabled={busy || !r.canCook} onClick={() => setPlaying(r)}>
-                                                {busy ? "Working…" : r.kind === "prep" ? "Start prepping" : "Start cooking"}
+                                            <button type="button" className="btn ck-cook" disabled={busy || !r.canCook}
+                                                onClick={() => (INSTANT_KINDS.has(r.kind) ? finishCook({ quality: 1, chain: 0, recipe: r }) : setPlaying(r))}>
+                                                {busy ? "Working…" : r.kind === "prep" ? "Prep it" : r.kind === "bait" ? "Make the bait" : "Start cooking"}
                                             </button>
                                         ) : (
                                             <p className="ck-locked-note">You haven&rsquo;t found this recipe yet — keep at it and it&rsquo;ll turn up.</p>

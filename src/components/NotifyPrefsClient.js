@@ -13,6 +13,9 @@ import { useCallback, useEffect, useState } from "react";
 const CHANNEL_META = {
     push: { icon: "🔔", label: "Push" },
     email: { icon: "✉️", label: "Email" },
+    // Not every notification arrives on your phone. A milestone post is delivered by appearing in the plaza,
+    // so "shown in chat" is a channel like any other and gets a switch like any other.
+    chat: { icon: "💬", label: "In chat" },
 };
 
 function Switch({ on, busy, onToggle, ariaLabel }) {

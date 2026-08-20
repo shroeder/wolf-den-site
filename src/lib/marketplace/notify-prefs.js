@@ -41,6 +41,13 @@ export const NOTIFY_KINDS = [
     { key: "bossevent", group: "events", label: "Weekly boss", desc: "The boss appears, or the pack brings it down", channels: ["push", "email"] },
     { key: "bounty", group: "events", label: "Bounties", desc: "A member posts a new bounty", channels: ["push"] },
     { key: "announce", group: "events", label: "Big announcements", desc: "New features and Den news", channels: ["push", "email"] },
+    // ── DELIVERED IN CHAT, NOT BY PUSH ───────────────────────────────────────────────────────────────────
+    // The Arbiter is one voice doing two jobs: hand-written triage posts, which people ask for, and automated
+    // milestones — a line in the plaza every time somebody takes a rung nobody has taken. Sunflower Jinxx:
+    // "Are we able to turn off the auto messages for the road rungs?" The announcements stay; this is the
+    // switch. It mutes ONLY the automated ones (mkt_town_chat.kind = 'milestone', migration 388), so muting
+    // it never costs you a post a person wrote.
+    { key: "milestone", group: "events", label: "Milestone posts in chat", desc: "The Arbiter announcing a first-in-the-Den — a new Long Road rung, a chronicle entry", channels: ["chat"] },
 
     // Push only: the Looking-For *email* goes to standalone card-alert subscribers (their own confirmed list
     // with its own unsubscribe link), not to member records, so a member-level email switch wouldn't bite.

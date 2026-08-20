@@ -1747,7 +1747,8 @@ async function announceRoadFirst(buyerId, rung, foeName) {
         ? `${me.name} is the first in the Den to break into ${house.name} — rung ${rung} of the Long Road, and ${foeName || "its keeper"} is down. ${house.blurb}`
         : `${me.name} is the first in the Den to take rung ${rung} of the Long Road${foeName ? `, past ${foeName}` : ""}. Nobody has stood further.`;
     const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
-    await postSystemChat(body).catch(() => {});
+    // "milestone" — an automated post. Members who mute these keep the Arbiter's written posts.
+    await postSystemChat(body, "milestone").catch(() => {});
     // ── A PUSH, BUT ONLY WHEN A HOUSE OPENS ──────────────────────────────────────────────────────────────
     // A hundred rungs means a hundred notifications if every first is pushed, which is the mistake this game
     // already made once by ringing the owner's phone for every raid. A HOUSE opening is one of ten events in
