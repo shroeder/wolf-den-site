@@ -131,6 +131,22 @@ await send("Page.navigate", { url });
 // the picture was wrong and looked deliberate. Cheap insurance on a tool whose whole job is being trustworthy.
 await sleep(4200);
 
+// ── SOME STATES HAVE NO BUTTON AT ALL ────────────────────────────────────────────────────────────────────────
+// A modal that only appears when the app dispatches an event — the pet level-up celebration, an XP toast — has
+// nothing on the page to click, so CLICK cannot reach it and it would go to members unlooked-at. SHOT_EVAL runs
+// one expression in the page after load, which is enough to fire the event that opens it.
+//
+//   SHOT_EVAL='window.dispatchEvent(new CustomEvent("wolfden-pet-levelup", { detail: { petId: "kitten", level: 6 } }))'
+if (process.env.SHOT_EVAL) {
+    await send("Runtime.enable");
+    const r = await send("Runtime.evaluate", { expression: process.env.SHOT_EVAL, returnByValue: true, awaitPromise: true });
+    if (r?.exceptionDetails) {
+        console.error(`shot.mjs: SHOT_EVAL threw — ${r.exceptionDetails.exception?.description || r.exceptionDetails.text}`);
+        sock.close(); chrome.kill(); process.exit(1);
+    }
+    await sleep(1400);   // let whatever it opened mount and finish its entrance
+}
+
 // Open whatever state is being judged.
 //
 // THE CLICK MUST BE RETRIED, AND ITS RESULT MUST BE CHECKED. The element exists in the server-rendered HTML

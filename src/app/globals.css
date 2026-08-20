@@ -16076,6 +16076,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    size rather than described — the sprites are the argument, and they cost nothing to show. */
 .pens { margin: 14px 0 4px; padding: 12px; border-radius: 14px;
     background: linear-gradient(180deg, rgba(255,224,138,0.07), rgba(176,97,255,0.07)); border: 1px solid rgba(255,255,255,0.14); }
+/* Landed here from the level-six celebration — one pulse so the eye finds the panel it was sent to. */
+.pens-called { animation: pensCalled 2.2s ease-out 1; }
+@keyframes pensCalled {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,224,138,0); border-color: rgba(255,255,255,0.14); }
+    18% { box-shadow: 0 0 0 4px rgba(255,224,138,0.34); border-color: rgba(255,224,138,0.75); }
+    52% { box-shadow: 0 0 0 2px rgba(255,224,138,0.12); border-color: rgba(255,224,138,0.5); }
+}
 .pens-kick { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #cfc3ff; }
 .pens-h { display: block; font-size: 1.05rem; color: #fff; margin: 2px 0 4px; }
 .pens-p { margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: rgba(255,255,255,0.78); }

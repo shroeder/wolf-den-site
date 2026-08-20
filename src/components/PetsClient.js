@@ -199,6 +199,34 @@ export default function PetsClient() {
         return () => window.removeEventListener("popstate", fromUrl);
     }, []);
 
+    // ── ARRIVING TO ENSHRINE ─────────────────────────────────────────────────────────────────────────────
+    // The level-six celebration links in here with `?pet=<id>&enshrine=1`, and the stone panel sits well below
+    // the fold of a long sheet — landing at the top of it is landing in the wrong place. Scroll to the panel
+    // and flash it once, then drop the flag from the URL so a back-navigation or a refresh does not repeat a
+    // movement the member did not ask for the second time.
+    useEffect(() => {
+        if (!detail || typeof window === "undefined") return undefined;
+        if (new URLSearchParams(window.location.search).get("enshrine") !== "1") return undefined;
+        // The panel renders with the sheet, but only once the pet's levels have come back from the server —
+        // which on a cold load is a good deal later than this effect first runs. So watch for it for a few
+        // seconds rather than looking once, and give up quietly if it never appears (an unowned pet, or one
+        // that has already been enshrined and shows its done-panel instead — that one is a `.pens` too, and
+        // scrolling to it is still the right answer).
+        let el = null;
+        let tries = 0;
+        const timer = setInterval(() => {
+            el = document.querySelector(".pens");
+            if (!el) { if (tries++ > 50) clearInterval(timer); return; }
+            clearInterval(timer);
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("pens-called");
+            const url = new URL(window.location.href);
+            url.searchParams.delete("enshrine");
+            window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+        }, 120);
+        return () => { clearInterval(timer); el?.classList.remove("pens-called"); };
+    }, [detail]);
+
     const ERRORS = {
         not_enough_gold: "Not enough gold.",
         no_power: "You need to be wearing the piece that grants the Breeder's Eye.",

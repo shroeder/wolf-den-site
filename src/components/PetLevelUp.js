@@ -171,6 +171,8 @@ export default function PetLevelUp() {
     // And at five it should say the opposite — loudly, because this is the only moment we have somebody's
     // attention on the subject.
     const atFive = current.to === 5;
+    // The pets page opens a sheet from `?pet=`; `enshrine=1` tells it to scroll to the stone panel once there.
+    const enshrineHref = `/marketplace/pets?pet=${encodeURIComponent(current.pet.id)}&enshrine=1`;
 
     return createPortal(
         <div className="plu-scrim" onClick={dismiss} role="dialog" aria-modal="true" aria-label={`${current.pet.name} leveled up`}>
@@ -216,12 +218,18 @@ export default function PetLevelUp() {
                     <p className="plu-sixth">
                         One more to go. At <b>Lv 6</b> you can ENSHRINE {current.pet.name} — its ability becomes
                         permanent, working whether it is equipped or not.
+                        {" "}<a className="plu-go is-quiet" href={enshrineHref}>See what a stone would do →</a>
                     </p>
                 ) : null}
+                {/* ── A DOOR, NOT JUST AN ANNOUNCEMENT ── this card told you the pet could be enshrined and then
+                    left you to go find where that happens: back out, open Pets, find this pet, scroll its
+                    sheet. The one moment the member is looking straight at the thing is the moment to hand
+                    them the way in. `?enshrine=1` scrolls the panel into view on arrival. */}
                 {maxed ? (
                     <p className="plu-sixth">
                         The top. {current.pet.name} can be <b>enshrined</b> now — spend a stone and its ability
                         is yours whether it is out or not.
+                        <a className="plu-go" href={enshrineHref}>Enshrine {current.pet.name} →</a>
                     </p>
                 ) : null}
                 {/* BEFORE → AFTER, for both stats. The whole point of a level is the number moving. */}
@@ -258,6 +266,16 @@ const PLU_CSS = `
 .plu-sixth { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; font-size: .78rem; line-height: 1.45;
     color: #ffe9c2; background: rgba(255,224,138,.10); border: 1px solid rgba(255,224,138,.34); }
 .plu-sixth b { color: #ffe08a; }
+/* Colour is stated on the anchor itself: the global link rule wins over an inherited one and would paint this
+   button's label the site link blue on a gold ground. */
+.plu-go { display: block; margin: 9px auto 1px; width: fit-content; padding: 9px 16px; border-radius: 999px;
+    font-size: .8rem; font-weight: 900; letter-spacing: .01em; text-decoration: none;
+    color: #2a1a00; background: linear-gradient(180deg, #ffe08a, #f0b73c);
+    border: 1px solid rgba(255,240,190,.5); box-shadow: 0 6px 18px rgba(240,183,60,.28); }
+.plu-go:hover, .plu-go:focus-visible { color: #2a1a00; filter: brightness(1.07); }
+.plu-go.is-quiet { display: inline; margin: 0; padding: 0; background: none; border: 0; box-shadow: none;
+    font-size: inherit; font-weight: 800; color: #ffe08a; text-decoration: underline; text-underline-offset: 2px; }
+.plu-go.is-quiet:hover, .plu-go.is-quiet:focus-visible { color: #fff3cf; }
 
 /* WHAT THE LEVEL BOUGHT — one row per stat, before › after. */
 .plu-gains { margin-top: 14px; display: grid; gap: 7px; text-align: left; }
