@@ -233,3 +233,9 @@ export function encounterArt(dungeonId, event) {
     if (event.kind === "fight" || event.kind === "boss") return null;
     return `/images/delves/ev-${dungeonId}-${event.kind}.webp`;
 }
+
+// ── WHAT A CHEST SHARD IS WORTH ──────────────────────────────────────────────────────────────────────────────
+// Shards stopped fusing into chests when chests became something you dig up, so a delve pays coin for them.
+// It lives HERE because both delves.js (the log line as you find them) and delve-floors.js (the payout and the
+// wrap card) need it, and a rate that is written down twice is two rates the moment one of them is tuned.
+export const DELVE_SHARD_DOUBLOONS = 3;

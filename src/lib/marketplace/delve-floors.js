@@ -10,7 +10,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
-import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
+import { DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
@@ -35,7 +35,6 @@ import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 // half; the weighted tables sit on `run.rolls`). Rolling on the server at resolve time is also what makes the
 // reload button worthless.
 // What a banked chest shard is worth now that chests are dug up whole rather than forged.
-const DELVE_SHARD_DOUBLOONS = 3;
 
 export async function offerChoice(ctx, run, d, floor, action, choice) {
     const { buyerId, saveRun, hurt, bank, finishRun, settle, state } = ctx;

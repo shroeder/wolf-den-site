@@ -9974,6 +9974,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* The piece's own damage/armour/speed, marked apart from the bonuses stacked on top of it. */
 .equip-stat.is-own { color: #f0e2c2; }
 .equip-stat.is-own strong { color: #ffb347; }
+/* Damage per second — the line that answers "is this weapon better", set apart from the stat grid because it
+   is DERIVED from two rows above it rather than being a stat of its own. */
+.equip-dps { margin: 10px 0 0; padding-top: 9px; border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.92rem; color: #cdbfa6; }
+.equip-dps strong { color: #ffb347; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.equip-dps em { font-style: normal; opacity: 0.65; font-size: 0.82rem; }
 
 /* Bag + picker cards */
 .equip-picker-head { display: flex; align-items: center; justify-content: space-between; }

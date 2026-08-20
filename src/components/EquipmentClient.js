@@ -405,6 +405,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const equipped = data.equipped || {};
     const stats = data.stats || {};
     const statEntries = sortStatKeys(Object.keys(stats)).map((k) => [k, stats[k]]).filter(([, v]) => v);
+    // Damage per second, from the two numbers already on the panel. Only shown when both exist — bare-handed
+    // or shield-only there is nothing to multiply and a "0 damage a second" line would be noise.
+    const dps = Number(stats.base_damage) > 0 && Number(stats.speed) > 0
+        ? { damage: Math.round(Number(stats.base_damage)), speed: Number(stats.speed).toFixed(2),
+            perSecond: Math.round(Number(stats.base_damage) * Number(stats.speed) * 10) / 10 }
+        : null;
     const charged = (data.items || []).filter((i) => i.charge);
     // Trophies are not gear. They live in their own section below the bag: you cannot wear, sell, salvage or
     // trade one, so listing them among the things you can is the screen telling you something untrue.
@@ -474,7 +480,20 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             <span key={k} className="equip-stat" title={STAT_META[k]?.desc || ""}>{STAT_META[k]?.icon || ""} <strong>{describeStat(k, v).replace(` ${STAT_META[k]?.label || k}`, "")}</strong> {STAT_META[k]?.label || k}</span>
                         ))}
                     </div>
-                ) : <p className="muted" style={{ margin: 0 }}>Equip gear to boost your boss fight — Might, crit, ferocity and more.</p>}
+                ) : null}
+                {/* ── THE ONE NUMBER THAT COMPARES TWO WEAPONS ────────────────────────────────────────────
+                    Damage and attack speed are both on the card and neither answers "is this sword better".
+                    GrayKitsune: "I'm trying to figure out.. is 0.8 attack speed or 1.2 attack speed better
+                    lol / Is that 0.8 seconds to make an attack, or 0.8 attacks per second" — and then he
+                    asked for exactly this: "I feel like it would be better to have some metric listed that
+                    does attack x attack speed to give a basic dps idea to determine which weapon is better."
+                    It also settles the units by showing its working: 24 x 0.74/s reads only one way. */}
+                {dps ? (
+                    <p className="equip-dps" title="Your damage multiplied by how many times a second you swing. The higher number is the better weapon, all else equal.">
+                        ⚔️ <strong>{dps.perSecond}</strong> damage a second <em>— {dps.damage} per swing × {dps.speed}/s</em>
+                    </p>
+                ) : null}
+                {statEntries.length ? null : <p className="muted" style={{ margin: 0 }}>Equip gear to boost your boss fight — Might, crit, ferocity and more.</p>}
             </div>
 
             {/* Plain-English guide — so a player actually knows what each stat does for them. */}

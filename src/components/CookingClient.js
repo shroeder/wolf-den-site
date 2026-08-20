@@ -543,7 +543,13 @@ export default function CookingClient({ initial }) {
                         ) : null}
                         <div className="ck-reveal-tier">{result.made.tierName} · {result.grade}</div>
                         <div className="ck-reveal-art"><Art sprite={result.made.sprite} fallback="/images/cooking/dish.png" size={110} alt={result.made.name} /></div>
-                        <div className="ck-reveal-name">{result.made.name}{result.portions > 1 ? ` ×${result.portions}` : ""}</div>
+                        {/* NO ×N ON THE DISH. The dish is granted exactly once — `portions` is the Seasoning
+                            track doubling the reward RUNG (gold, parts, seeds), not the plate. Stamping it on
+                            the dish's own name promised a second dish that never arrived.
+                            SoullessShiitake: "food paying out twice doesnt actually mean you get 2 in your
+                            inventory. Is there a chance that could actually happen? Or change the verbiage so
+                            its less misleading?" — the verbiage. */}
+                        <div className="ck-reveal-name">{result.made.name}</div>
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
                                 {result.made.reward.rungs ? (
@@ -584,7 +590,7 @@ export default function CookingClient({ initial }) {
                         ) : null}
                         <div className="ck-reveal-tags">
                             {result.bumped ? <span className="ck-tag heat">The heat caught it — a tier better</span> : null}
-                            {result.portions > 1 ? <span className="ck-tag season">Second helping — ×{result.portions}</span> : null}
+                            {result.portions > 1 ? <span className="ck-tag season">Second helping — the spoils paid ×{result.portions}</span> : null}
                             {result.freeCook ? <span className="ck-tag larder">The larder covered it — no ingredients used</span> : null}
                             <span className="ck-tag run">Timing {pctText(result.quality)} · best chain ×{result.chain} · +{result.xp} XP</span>
                         </div>

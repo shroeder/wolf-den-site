@@ -11,6 +11,7 @@ import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
     delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
     potionCount, potionHealFrac, wardCut,
+    DELVE_SHARD_DOUBLOONS,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
@@ -364,7 +365,14 @@ async function rollFightLoot(buyerId, run, d, { mult = 1, boss = false } = {}) {
 function lootLine(got, partName) {
     const bits = [];
     if (got.parts) bits.push(`${got.parts.n}x ${partName(got.parts.tier)}`);
-    if (got.frags) bits.push(`${got.frags} fragments`);
+    // ── SAY WHAT LANDS, NOT WHAT IT USED TO BE ───────────────────────────────────────────────────────────
+    // Chest shards stopped fusing into chests when chests became something you dig up; a delve pays coin for
+    // them now (DELVE_SHARD_DOUBLOONS, and the wrap card has always shown the coin). The line-by-line log kept
+    // announcing "3 fragments" — so the run narrated a currency that no longer exists and the card at the end
+    // showed a different one. Kaishiern: "I still find chest fragments in the dungeons even though we don't
+    // build chests anymore." GrayKitsune worked out where they went: "The fragments in dungeons turn into
+    // doubloons." Neither of them should have had to.
+    if (got.frags) bits.push(`${got.frags * DELVE_SHARD_DOUBLOONS} doubloons`);
     if (got.potion) bits.push("a potion");
     if (got.chest) bits.push(`a ${got.chest} chest`);
     if (got.gear) bits.push(got.gear.name);
