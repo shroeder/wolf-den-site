@@ -718,12 +718,18 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     <div className="equip-bag-grid">
                         {gearItems.map((i) => (
                             <div key={i.id} className="equip-cardwrap">
-                            <button type="button" className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
+                            <button type="button" className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(effStats(i, ownedById))}`} style={{ position: "relative" }}>
                                 {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
                                 <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")}</span>
-                                <span className="equip-card-stats">{describeStats(i.stats)}</span>
+                                {/* ── THE STATS THE PIECE ACTUALLY HAS ────────────────────────────────────
+                                    This card draws a ForgeRank badge in its corner and then printed the
+                                    CATALOGUE line beside it — so a piece forged to +7 showed the numbers it
+                                    had at +0, with the badge right there contradicting them. GrayKitsune:
+                                    "I also feel like forge upgrades arent showing in stats." He was reading
+                                    these cards. Same effStats the compare panel and the salvage sheet use. */}
+                                <span className="equip-card-stats">{describeStats(effStats(i, ownedById))}</span>
                                 {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
