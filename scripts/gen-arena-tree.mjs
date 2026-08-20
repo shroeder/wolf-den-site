@@ -27,6 +27,8 @@ const NODE = (s) => `A single fantasy SKILL-TREE NODE ICON — an abstract emble
 const EMBLEM = (s) => `A fantasy GLADIATOR CLASS EMBLEM — a bold heraldic crest, centered and filling the frame, readable at small size. ${s} ${STYLE} ${CUT}`;
 
 // Node id → what the icon shows. Kept beside the tree's own descriptions so the art matches the mechanic.
+const QUALITY = (process.argv.includes("--quality") ? process.argv[process.argv.indexOf("--quality") + 1] : "medium");
+
 const ART = {
     // Reaver — damage, criticals, volume
     "node/rv_might": NODE("a clenched armoured gauntlet crushing a stone, shards flying, deep red accents."),
@@ -72,6 +74,47 @@ const ART = {
     "node/rc_overcharge": NODE("a jagged blue-white ice crystal shattering outward into frozen shards, pale cold light in the cracks."),
     "node/rc_spread": NODE("a bursting star of fire scattering smaller flames outward."),
     "node/rc_fortune": NODE("a rune-carved coin spinning inside a ring of luck-sparks."),
+    // ── THE REWRITTEN TREES ──────────────────────────────────────────────────────────────────────────────
+    // Twelve nodes per class, three classes, all new ids. The entries above are the OLD tree and are kept only
+    // because eleven of the new nodes still point at one of those files; everything below had no art at all,
+    // which is why the tree rendered broken-image squares from Deep Cuts downward.
+    //
+    // Each icon is drawn from what the node actually DOES, because a skill tree is read at a glance and an
+    // icon that means nothing is worse than no icon — it teaches the wrong thing confidently.
+
+    // Reaver — bleed, speed, criticals, and answering a blow with one of your own.
+    "node/rv_rend": NODE("a deep triple claw-gash torn through a steel plate, blood welling from the cuts."),
+    "node/rv_drain": NODE("a curved blade with a ribbon of blood spiralling up it into a crimson glow."),
+    "node/rv_counter": NODE("an incoming blade knocked aside while a second blade strikes back along it, crimson counter-arc."),
+    "node/rv_stun": NODE("a helmet struck from the side, a burst of impact stars ringing off the temple, red shock lines."),
+    "node/rv_haste": NODE("a snarling wolf muzzle scenting the air, three red speed-streaks trailing behind it."),
+    "node/rv_leech": NODE("a blood droplet drawn upward into a crimson heart, thin red threads feeding it."),
+    "node/rv_wild": NODE("three crimson blades fanned like a dealt hand, one of them lit and sparking."),
+
+    // Warden — plate, guards, and punishing whoever swung.
+    "node/wd_health": NODE("a broad iron breastplate with a steady blue heart-glow at its centre, heavy riveted bands."),
+    "node/wd_deflect": NODE("a round shield turning a blade wide, a bright cyan spark at the glancing point."),
+    "node/wd_counter": NODE("a tower shield slamming forward as a blade rebounds off it, cyan impact ring."),
+    "node/wd_guard": NODE("a curved barrier of blue light raised in front of a planted shield, layered like glass."),
+    "node/wd_grudge": NODE("a cracked shield whose fractures glow molten orange, the stored heat about to be returned."),
+    "node/wd_stun": NODE("a mace head connecting with a helm, blue-white impact stars bursting outward."),
+    "node/wd_aegis": NODE("a single vast dome of blue energy over a small planted shield, the dome many times its size."),
+
+    // Runecaller — burn, freeze, wards and raw arcane overflow.
+    "node/rc_ember": NODE("a burning heart of coals inside a rune-etched cage, orange light pulsing out of the seams."),
+    "node/rc_leech": NODE("a chalice catching falling embers, orange firelight curling up out of it."),
+    "node/rc_freeze": NODE("a blade caught mid-swing inside a block of jagged blue ice, frost spikes radiating."),
+    "node/rc_chill": NODE("an hourglass rimed with frost, the falling sand freezing into a slow crystal column."),
+    "node/rc_thorns": NODE("a ring of pale blue ice spikes bristling outward from a frozen round guard."),
+    "node/rc_ward": NODE("a hexagonal shell of translucent violet aether panels, light in every seam."),
+    // Rerolled: the pouring stream ran off the top of the frame, so the sprite was cropped at the border.
+    // The subject has to sit WHOLLY inside the square — an icon that touches the edge reads as broken art.
+    "node/rc_reservoir": NODE("a squat rune-carved stone basin brimming with violet light, small and complete, well inside the frame with clear empty space on every side."),
+    "node/rc_surge": NODE("five rune tiles in a row, the fifth erupting in a column of violet light far brighter than the rest."),
+    "node/rc_might": NODE("a clenched gauntlet wrapped in glowing violet runes, arcane force bleeding off the knuckles."),
+    "node/rc_soulfire": NODE("a pale violet flame passing straight THROUGH a steel plate, the plate untouched and the flame unbroken."),
+    "node/rc_cata": NODE("fire and ice colliding in one sphere, half roaring orange flame and half jagged blue frost, shattering at the seam."),
+
     // Training tracks — bought with gold, so they get the same treatment as the Kitchen's tracks: sprites,
     // never emoji.
     "track/conditioning": NODE("a muscular armoured torso wrapped in training bindings, a steady red heart-glow at its centre."),
@@ -93,7 +136,10 @@ async function generate(prompt) {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
                 body: JSON.stringify({
-                    model: "gpt-image-1", prompt, size: "1024x1024", quality: "low", n: 1,
+                    // MEDIUM by default — the house rule for anything a member looks at. `--quality low`
+                    // drops it deliberately (25 icons: ~$1.05 medium against ~$0.27 low), which is worth
+                    // having as a choice rather than a constant nobody remembers is set to the cheap one.
+                    model: "gpt-image-1", prompt, size: "1024x1024", quality: QUALITY, n: 1,
                     background: "transparent",
                 }),
             });
