@@ -541,7 +541,15 @@ export default function BlacksmithClient({ initial }) {
                             {(rerolling.forged || []).map((f) => (
                                 <button key={f.stat} type="button" className="forge-swap" disabled={Boolean(busy)}
                                     onClick={() => { ac(); setSwapConfirm({ item: rerolling, f }); }}>
-                                    <span>Swap <b>+{f.n} {f.label}</b></span>
+                                    {/* ── THE STAT IS THE CHOICE; THE PRICE IS NOT ────────────────────────
+                                        The cost sat on the right in full-size bold gold, so the loudest thing
+                                        on a row you pick a STAT from was "167/28 Iron Filings" — and the rows
+                                        read as a priced list rather than as the five buttons they are. With
+                                        the only gold button in the modal saying "Enhance", the obvious thing
+                                        to press after choosing a stat was the operation that ignores it.
+                                        Luke: "im trying to reforge a stat, I select it, and click enhance,
+                                        but all it does is enhance the gear piece." */}
+                                    <span className="forge-swap-stat">+{f.n} {f.label}</span>
                                     {/* Priced in the same parts the piece eats to enhance, and SHOWN the same
                                         way the enhance card shows it: the part's own sprite, then have/need
                                         so the answer to "can I afford this" is on the row rather than found
@@ -558,14 +566,17 @@ export default function BlacksmithClient({ initial }) {
                                             </em>
                                         );
                                     })()}
+                                    <i className="forge-swap-go" aria-hidden="true">Reforge →</i>
                                 </button>
                             ))}
                         </div>
-                        {/* The hammer still lives on the piece, so opening a card has not cost anyone the
-                            action they open it for most. */}
-                        {/* THE primary action. Enhancing is what people open a piece to do; swapping a line is
-                            the considered thing you do occasionally, so it sits above as a list rather than
-                            competing with this. */}
+                        {/* ── THE OTHER OPERATION, AND IT LOOKS LIKE IT ───────────────────────────────
+                            Enhancing used to be the one gold button on a card titled REFORGE, which made it
+                            the thing you press after choosing a stat — and it does not touch the stat. It is
+                            still here, because the hammer is what most people open a piece for and taking it
+                            away would cost them a step. It is just no longer dressed as the answer to the
+                            question this card asks. */}
+                        <div className="forge-orline"><span>or</span></div>
                         {!rerolling.maxed ? (() => {
                             // ── THE SAME GATE THE CARD APPLIES ───────────────────────────────────────────
                             // This button opened the hammer unconditionally, so a piece you could not afford
@@ -581,9 +592,13 @@ export default function BlacksmithClient({ initial }) {
                             const ok = Boolean(rerolling.affordable) || scroll;
                             return (
                                 <>
-                                    <button type="button" className="forge-founder-close" disabled={!ok || Boolean(busy)}
+                                    <button type="button" className="forge-secondary" disabled={!ok || Boolean(busy)}
                                         onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: scroll }); }}>
-                                        {rerolling.affordable ? "Enhance" : scroll ? <>Enhance &mdash; spend a 📜 Power Scroll</> : <>Need {need} {part?.name || "parts"}</>}
+                                        {/* Says what it DOES, not just its name — the whole confusion was two
+                                            operations on one card and only one of them explaining itself. */}
+                                        {rerolling.affordable ? <>Enhance the piece &mdash; raise it to <b>+{(rerolling.level || 0) + 1}</b></>
+                                            : scroll ? <>Enhance the piece &mdash; spend a 📜 Power Scroll</>
+                                                : <>Need {need} {part?.name || "parts"} to enhance</>}
                                     </button>
                                     <span className={`forge-card-cost forge-enhance-cost${ok ? "" : " is-short"}`}>
                                         {part?.sprite
@@ -1323,15 +1338,33 @@ export const FORGE_CSS = `
 .forge-founder-keep { display: block; width: 100%; margin-top: 8px; padding: 8px; background: none; border: 0;
     color: #b9a892; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .forge-swaplist { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
-.forge-swap { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
-    padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
+/* ── A ROW IS A BUTTON, AND THE STAT IS THE HEADLINE ─────────────────────────────────────────────────────────
+   Three columns: the stat you are choosing, its price, and an affordance that says pressing this does the
+   thing. The price used to be the biggest, brightest text on the row — so five rows of "167/28 Iron Filings"
+   read as a price list and the only thing that looked pressable in the whole card was the Enhance button
+   underneath, which does something else entirely. */
+.forge-swap { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; width: 100%;
+    padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
     color: #e6d9c2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.3); }
+.forge-swap-stat { font-size: 14px; font-weight: 900; color: #ffd08a; }
 .forge-swap b { color: #ffd08a; }
-.forge-swap em { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.forge-swap em { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+    font-style: normal; font-size: 10.5px; font-weight: 700; color: #a4917a; }
 .forge-swap em.is-short { color: #ff9f9f; }
-.forge-swap em { font-style: normal; font-weight: 800; color: #ffcf7a; }
+.forge-swap-go { font-style: normal; font-size: 11px; font-weight: 900; color: #ff9f4a; white-space: nowrap; }
 .forge-swap:hover:not(:disabled) { background: rgba(255,175,75,0.14); border-color: rgba(255,200,110,0.6); }
 .forge-swap:disabled { opacity: 0.5; cursor: default; }
+/* The two operations are separated rather than stacked, so the second one cannot read as the conclusion of
+   the first. */
+.forge-orline { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: #8a7a66; font-size: 10.5px;
+    font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.forge-orline::before, .forge-orline::after { content: ""; flex: 1; height: 1px; background: rgba(255,175,75,0.22); }
+.forge-secondary { display: block; width: 100%; padding: 11px; border-radius: 11px; cursor: pointer;
+    font-size: 12.5px; font-weight: 800; color: #e6d9c2;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.34); }
+.forge-secondary b { color: #ffd08a; }
+.forge-secondary:hover:not(:disabled) { background: rgba(255,175,75,0.12); }
+.forge-secondary:disabled { opacity: 0.5; cursor: default; }
 .forge-cardwrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .forge-cardwrap > .forge-card { flex: 1 1 auto; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 9px 11px; border-radius: 14px; cursor: pointer; text-align: center;
