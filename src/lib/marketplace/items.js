@@ -944,6 +944,16 @@ export function sumItemStats(itemIds = []) {
 const INTRINSIC = new Set(["base_damage", "armor", "speed"]);
 const FRACTION = new Set(["block_chance"]);
 
+// ── WHAT THE PIECE IS, AND SO WHAT IT CANNOT STOP BEING ──────────────────────────────────────────────────────
+// The same three above plus block chance, which FRACTION describes as a FORMAT and this describes as a KIND:
+// a shield's block is as intrinsic to it as a sword's damage is, they are simply printed differently.
+//
+// Exported because the Forge needs it. A reforge picks a forged line and rolls it into something else, and
+// enhancing raises these lines too — so the swap list happily offered to turn a sword's own Damage into
+// Fortune, or a breastplate's Armour into Chance to Stun, leaving a piece of armour that is not armour.
+// Luke: "you cant reroll armor on armor, weapon damage on weapons, and block chance on shields."
+export const isIntrinsicStat = (k) => INTRINSIC.has(String(k)) || FRACTION.has(String(k));
+
 // ── SHORT LABELS, FROM ONE PLACE ─────────────────────────────────────────────────────────────────────────────
 // Five components each kept their own hand-written {might, crit_chance, crit_power, ferocity, fortune} map, so
 // every stat added since — vitality, tenacity, pierce, lifedrink, riposte, double strike, stun, haste, armour,

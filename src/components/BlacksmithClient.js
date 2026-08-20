@@ -662,7 +662,7 @@ export default function BlacksmithClient({ initial }) {
                                             setSwapConfirm(null); setRerolling(null);
                                             const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
                                             if (d?.ok) setSwapFx({ from: `+${f.n} ${f.label}`, to: `+${d.points ?? f.n} ${d.toLabel || d.to}`, item: it.name });
-                                            else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${part?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
+                                            else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${part?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : d?.error === "intrinsic_stat" ? "That is the piece itself — a sword’s damage, a shield’s block, armour’s armour. It cannot be rolled away." : "That swap didn't go through." });
                                         }}>
                                         {ok ? <>Roll a new stat &mdash; {swapConfirm.f.cost.qty} {part?.name || "parts"}</>
                                             : <>Need {swapConfirm.f.cost.qty} {part?.name || "parts"}</>}

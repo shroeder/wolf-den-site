@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix, FORGE } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -446,6 +446,10 @@ export async function rerollStat(buyerId, itemId, stat) {
     const key = String(stat || "");
     const points = Number(before[key]) || 0;
     if (points <= 0) return { ok: false, error: "no_such_stat" };
+    // THE GATE IS HERE AS WELL AS ON THE SCREEN. A rule enforced only in the UI is not enforced — see the
+    // ownerOnly landmine — and this one is destructive: a swapped-away Armour line cannot be swapped back,
+    // because the pool a roll lands in has never contained it.
+    if (isIntrinsicStat(key)) return { ok: false, error: "intrinsic_stat" };
 
     // Guarded spend first — no transactions on this driver, so a swap that rolled before it charged would be
     // free every time the charge failed.
@@ -726,8 +730,11 @@ export async function getForgeState(buyerId) {
             // prints one price and a server that takes another is the oldest bug in this codebase.
             // The forged lines themselves, so the modal can offer them one at a time rather than only
             // all-or-nothing. Each carries its own price from the same function that charges for it.
+            // A piece's OWN stat is never offered: rolling a sword's Damage into Fortune leaves a sword that
+            // does not cut. isIntrinsicStat is the same predicate the server refuses on, so the list can
+            // never offer a swap the server would reject.
             forged: enh?.bonus
-                ? Object.entries(enh.bonus).filter(([, v]) => (Number(v) || 0) > 0)
+                ? Object.entries(enh.bonus).filter(([k, v]) => (Number(v) || 0) > 0 && !isIntrinsicStat(k))
                     .map(([k, v]) => ({ stat: k, label: STAT_META[k]?.label || k, n: Number(v), cost: rerollStatCost(it, enh?.level || 0) }))
                 : [],
             rerollPoints: enh?.bonus ? Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0) : 0,
