@@ -46,6 +46,14 @@ function statsOf(s) {
     if (s.grudge > 0) out.push(["Grudge", p(s.grudge)]);
     if (s.executeAt > 0) out.push(["Execute", `<${p(s.executeAt)}`]);
     if (s.thorns > 0) out.push(["Thorns", p(s.thorns)]);
+    // The over-time numbers matter MORE than the ones above once a branch is invested in — Hemorrhage's whole
+    // payoff is here, and leaving them off meant the strip said "Power 1.60x" for a build whose damage does not
+    // come from the blow at all.
+    if (s.bleedDamage > 0) out.push(["Wound tick", `+${p(s.bleedDamage)}`]);
+    if (s.bleedLeech > 0) out.push(["Wound leech", p(s.bleedLeech)]);
+    if (s.burnDamage > 0) out.push(["Burn tick", `+${p(s.burnDamage)}`]);
+    if (s.burnLeech > 0) out.push(["Burn leech", p(s.burnLeech)]);
+    if (s.keepGrudge > 0) out.push(["Ledger kept", p(s.keepGrudge)]);
     if (s.cleanse) out.push(["Cleanse", "wound, burn"]);
     if (s.haste > 0) out.push(["Haste", "5 swings"]);
     if (s.free) out.push(["Costs", "no beat"]);
@@ -103,29 +111,59 @@ function Detail({ s, busy, points, onTake, onNode, onClose }) {
             ) : (
                 <>
                     <div className="skp-nodes-lab">
-                        <span>Its five nodes</span>
-                        <em>{NODE_COST} point each &middot; any order</em>
+                        <span>Two branches</span>
+                        <em>{NODE_COST} point a rung &middot; top down</em>
                     </div>
-                    <ul className="skp-nodes">
-                        {s.nodes.map((n) => (
-                            <li key={n.id} className={`skp-node${n.held ? " is-held" : ""}`}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={n.sprite} alt="" draggable="false" />
-                                <div className="skp-node-body">
-                                    <b>{n.name}</b>
-                                    <span>{n.desc}</span>
+                    {/* ── TWO LADDERS, SIDE BY SIDE ────────────────────────────────────────────────────────
+                        Drawn as columns rather than one list, because the shape IS the decision: a member has
+                        to see that the points they spend on the left are points that never reach the capstone
+                        on the right. A flat list of six hides exactly that, which is what the first build of
+                        this screen did. */}
+                    <div className="skp-branches">
+                        {s.branches.map((b) => (
+                            <div key={b.id} className={`skp-branch${b.depth >= b.nodes.length ? " is-full" : ""}`}>
+                                <div className="skp-branch-head">
+                                    <b>{b.name}</b>
+                                    <span>{b.tag}</span>
+                                    <i aria-hidden="true">{b.depth}/{b.nodes.length}</i>
                                 </div>
-                                {n.held
-                                    ? <i className="skp-held">Taken</i>
-                                    : (
-                                        <button type="button" className="skp-node-buy" disabled={busy || !n.canTake}
-                                            onClick={() => onNode(s.id, n.id)}>
-                                            {n.canTake ? "Take" : `${NODE_COST} pt`}
-                                        </button>
-                                    )}
-                            </li>
+                                <ol className="skp-rungs">
+                                    {b.nodes.map((n, i) => (
+                                        <li key={n.id}
+                                            className={`skp-rung${n.held ? " is-held" : ""}${n.open ? "" : " is-shut"}${i === b.nodes.length - 1 ? " is-cap" : ""}`}>
+                                            <div className="skp-rung-top">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={n.sprite} alt="" draggable="false" />
+                                                <div className="skp-rung-id">
+                                                    <b>{n.name}</b>
+                                                    {i === b.nodes.length - 1 ? <i className="skp-cap-tag">Capstone</i> : null}
+                                                </div>
+                                            </div>
+                                            <span className="skp-rung-desc">{n.desc}</span>
+                                            {/* ── THE STATE GETS ITS OWN LINE ──────────────────────────────
+                                                It sat beside the name, which works right up until the column
+                                                is 165px wide — on a phone the name wrapped straight underneath
+                                                the button and the two printed on top of each other
+                                                ("DeeperTAKEN"). There is no breakpoint that fixes it either:
+                                                three classes across a desktop gives columns barely wider than
+                                                the phone does. So it is always its own row. */}
+                                            <div className="skp-rung-state">
+                                                {n.held
+                                                    ? <i className="skp-held">Taken</i>
+                                                    : (
+                                                        <button type="button" className="skp-node-buy"
+                                                            disabled={busy || !n.canTake}
+                                                            onClick={() => onNode(s.id, n.id)}>
+                                                            {n.canTake ? "Take" : n.open ? `${NODE_COST} pt` : "Locked"}
+                                                        </button>
+                                                    )}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ol>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 </>
             )}
             <p className="skp-foot">
@@ -262,17 +300,44 @@ export default function SkillPanel({ classId, taken = {}, points = 0, treeSpent 
                     text-transform: uppercase; color: #9aa2ab; }
                 .skp-nodes-lab em { font-style: normal; font-size: 9.5px; color: #7d858f; }
 
-                .skp-nodes { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
-                .skp-node { display: grid; grid-template-columns: 34px 1fr auto; gap: 9px; align-items: center;
-                    padding: 8px; border-radius: 12px; background: rgba(255,255,255,.04);
-                    border: 1px solid rgba(255,255,255,.07); }
-                .skp-node.is-held { border-color: color-mix(in srgb, var(--c) 48%, transparent);
+                /* Two columns even on a phone: seeing both ladders at once is the entire point of the
+                   screen, and stacking them turns the fork back into the flat list it replaced. */
+                .skp-branches { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+                .skp-branch { display: grid; gap: 5px; padding: 8px 7px 9px; border-radius: 13px;
+                    background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.07); align-content: start; }
+                .skp-branch.is-full { border-color: color-mix(in srgb, var(--c) 55%, transparent);
+                    box-shadow: inset 0 0 22px -10px var(--c); }
+                .skp-branch-head { display: grid; gap: 1px; padding: 0 2px 3px; position: relative; }
+                .skp-branch-head b { font-size: 11.5px; font-weight: 900; letter-spacing: .04em;
+                    color: color-mix(in srgb, var(--c) 66%, white); padding-right: 26px; }
+                .skp-branch-head span { font-size: 9.5px; line-height: 1.35; color: #838b96; }
+                .skp-branch-head i { position: absolute; top: 0; right: 2px; font-style: normal;
+                    font-size: 9px; font-weight: 900; color: #6f7883; font-variant-numeric: tabular-nums; }
+
+                /* The spine. A ladder has to LOOK like one, or the ordering rule stays invisible until a
+                   member taps a locked rung and wonders why nothing happened. */
+                .skp-rungs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+                .skp-rung { position: relative; padding: 7px 6px; border-radius: 10px;
+                    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
+                .skp-rung + .skp-rung { margin-top: 11px; }
+                .skp-rung + .skp-rung::before { content: ""; position: absolute; left: 21px; top: -12px;
+                    width: 2px; height: 12px; background: rgba(255,255,255,.14); }
+                .skp-rung.is-held + .skp-rung::before { background: var(--c); }
+                .skp-rung.is-held { border-color: color-mix(in srgb, var(--c) 48%, transparent);
                     background: color-mix(in srgb, var(--c) 12%, transparent); }
-                .skp-node img { width: 34px; height: 34px; object-fit: contain; }
-                .skp-node:not(.is-held) img { filter: grayscale(1) brightness(.75); }
-                .skp-node-body { min-width: 0; }
-                .skp-node-body b { display: block; font-size: 12px; font-weight: 900; color: #dfe4ea; }
-                .skp-node-body span { display: block; margin-top: 2px; font-size: 11px; line-height: 1.4; color: #98a0aa; }
+                .skp-rung.is-shut { opacity: .45; }
+                .skp-rung.is-cap { border-style: dashed; }
+                .skp-rung.is-cap.is-held { border-style: solid; }
+                .skp-rung-top { display: grid; grid-template-columns: 30px 1fr; gap: 7px; align-items: center; }
+                .skp-rung-state { display: flex; justify-content: flex-end; margin-top: 6px; }
+                .skp-rung-top img { width: 30px; height: 30px; object-fit: contain; }
+                .skp-rung:not(.is-held) img { filter: grayscale(1) brightness(.72); }
+                .skp-rung-id { min-width: 0; }
+                .skp-rung-id b { display: block; font-size: 11px; font-weight: 900; color: #dfe4ea; line-height: 1.2;
+                    overflow-wrap: anywhere; }
+                .skp-cap-tag { display: block; margin-top: 1px; font-style: normal; font-size: 8px;
+                    font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--c); }
+                .skp-rung-desc { display: block; margin-top: 5px; font-size: 10px; line-height: 1.4; color: #98a0aa; }
                 .skp-node-buy { flex: 0 0 auto; padding: 6px 10px; border-radius: 9px; cursor: pointer;
                     font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
                     background: color-mix(in srgb, var(--c) 24%, transparent);
