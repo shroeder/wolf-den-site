@@ -2,6 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
@@ -160,12 +162,19 @@ export async function spinSlot(buyerId, { bet } = {}) {
         ).catch(() => null);
         if (back) {
             gold = back.gold;
-            await logCoin(buyerId, won, "casino_slot_win", { balanceAfter: gold, meta: { bet: stake, reels, mult } });
+            // The machine stamps its OWN jackpot. Anything downstream that wants to count them — the badges
+            // do — then counts a fact the slot asserted, instead of re-deriving "three wolves" from a
+            // multiplier it would have to keep in step with the paytable forever.
+            await logCoin(buyerId, won, "casino_slot_win", {
+                balanceAfter: gold,
+                meta: { bet: stake, reels, mult, jackpot: reels.every((r) => r === SLOT_SYMBOLS[0].id) },
+            });
         }
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
     const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf"), perks });
     // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
+    await tickCasinoQuests(buyerId, "slot", won);
     const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
 }
@@ -207,10 +216,13 @@ const withPerk = (pet) => {
 export async function casinoPerks(buyerId) {
     const out = { freePlay: 0, prizeChance: 0, prizeTierUp: false, wheelRefund: 0, pets: [] };
     if (!buyerId) return out;
+    // OWNERSHIP LIVES IN mkt_cosmetic_unlock. This read mkt_item_collected, which is the COMPENDIUM — every
+    // piece of gear you have ever seen — so it matched nothing a pet drop ever writes and every perk on this
+    // floor was permanently off. The pets would have dropped, shown their banner, and done nothing forever.
     const rows = await db.query(
-        `SELECT item_id FROM mkt_item_collected WHERE buyer_id = $1`, [buyerId],
+        `SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId],
     ).catch(() => []);
-    const owned = new Set(rows.map((r) => r.item_id));
+    const owned = new Set(rows.map((r) => r.ref));
     for (const pet of CASINO_PETS) {
         if (!owned.has(pet.id)) continue;
         out.pets.push({ id: pet.id, name: pet.name, perk: perkPhrase(pet.casinoPerk) });
@@ -225,6 +237,17 @@ export async function casinoPerks(buyerId) {
 
 /** The stake back, before anything else happens. Returns true when the house is paying for this one. */
 const onTheHouse = (perks) => (perks?.freePlay || 0) > 0 && Math.random() < perks.freePlay;
+
+
+// ── WHAT THE BOUNTIES COUNT ──────────────────────────────────────────────────────────────────────────────────
+// One function for all three machines, so the fourth one somebody adds cannot quietly fail to tick a card.
+// The per-game metric is what lets a bounty ask for the WHEEL specifically rather than for "gamble more",
+// which is the difference between a bounty and a nag.
+async function tickCasinoQuests(buyerId, game, won) {
+    await bumpQuestProgress(buyerId, "casino_play", 1).catch(() => {});
+    await bumpQuestProgress(buyerId, `casino_${game}`, 1).catch(() => {});
+    if (won > 0) await bumpQuestProgress(buyerId, "casino_win", 1).catch(() => {});
+}
 
 // ── THE PRIZE ON TOP ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke's brief again: "it's a gold sink with a chance to win like chests, laurels, doubloons, pet stones,
@@ -282,7 +305,10 @@ export async function rollCasinoPrize(buyerId, { jackpot = false, perks = null }
     const kind = jackpot && Math.random() < 0.5 ? "chest" : pickPrize();
     const prize = await grantHaul(buyerId, kind, tier).catch(() => null);
     if (prize) {
-        await logCoin(buyerId, 0, "casino_prize", { meta: { kind: prize.kind, tier, jackpot } }).catch(() => {});
+        // NOT logCoin: it drops any event with a zero delta ("no-op rows add noise"), and a prize moves no
+        // gold, so every prize this floor has ever handed out was silently unrecorded. The activity log is
+        // where non-gold events belong anyway, and it is what the casino badges count.
+        await trackActivity(buyerId, "casino_prize", { kind: prize.kind, tier, jackpot }).catch(() => {});
     }
     return prize ? { ...prize, tier, jackpot } : null;
 }
@@ -411,6 +437,7 @@ export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}
         }
     }
     const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf", perks });
+    await tickCasinoQuests(buyerId, "wheel", won);
     const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, seg, choice, hit, bet: stake, won, gold, prize, pet, onHouse, refund };
 }
@@ -496,6 +523,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     }
     // Five of five is 1 in 2,611 — the rarest thing on the floor, and the only one that is worth a certainty.
     const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
+    await tickCasinoQuests(buyerId, "keno", won);
     const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize, pet, onHouse };
 }

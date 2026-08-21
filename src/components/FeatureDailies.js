@@ -13,6 +13,10 @@ const THEME = {
     farm: { accent: "#7ed57e", soft: "rgba(126,213,126,0.13)", border: "rgba(126,213,126,0.4)", title: "Today's farm bounties", icon: "/images/nav/farm.png" },
     sailing: { accent: "#6fd0ff", soft: "rgba(111,208,255,0.13)", border: "rgba(111,208,255,0.4)", title: "Today's voyage bounties", icon: "/images/nav/sailing.png" },
     cooking: { accent: "#ffb86b", soft: "rgba(255,184,107,0.13)", border: "rgba(255,184,107,0.4)", title: "Today's kitchen orders", icon: "/images/cooking/bounties.png" },
+    // The Casino has no icon of its own yet — the floor's whole art budget is still CSS. `icon: null` is
+    // handled below rather than borrowed from another feature, because the fallback that USED to happen here
+    // is exactly the bug in the note above: the Kitchen wore the farm's wheat for weeks.
+    casino: { accent: "#ffd75e", soft: "rgba(255,215,94,0.13)", border: "rgba(255,215,94,0.4)", title: "Today's floor bounties", icon: null },
 };
 
 export default function FeatureDailies({ feature, refreshKey = 0 }) {
@@ -47,7 +51,7 @@ export default function FeatureDailies({ feature, refreshKey = 0 }) {
     return (
         <section className="fd-card" style={{ "--fd-accent": t.accent, "--fd-soft": t.soft, "--fd-border": t.border }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <div className="fd-head"><span className="fd-ico"><img src={t.icon} alt="" draggable="false" /></span><b>{t.title}</b>{allDone ? <span className="fd-alldone">all done ✓</span> : null}</div>
+            <div className="fd-head">{t.icon ? <span className="fd-ico"><img src={t.icon} alt="" draggable="false" /></span> : null}<b>{t.title}</b>{allDone ? <span className="fd-alldone">all done ✓</span> : null}</div>
             {dailies.map((q) => (
                 <div key={q.key} className={`fd-row${q.claimed ? " is-claimed" : ""}`}>
                     <div className="fd-body">

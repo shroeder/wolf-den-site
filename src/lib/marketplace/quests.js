@@ -84,6 +84,19 @@ export const QUEST_TEMPLATES = [
     { key: "delve_floors", label: "Clear 5 dungeon floors", metric: "delve_floor", target: 5, gold: 150, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
     { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
     { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
+
+    // ── The Casino. ownerOnly while the floor is gated, because eligibleTemplates is the ONLY thing that
+    // keeps a bounty off a member who cannot open the page it points at — and one of those is worse than one
+    // fewer bounty. When the casino opens, this flag comes off IN THE SAME CHANGE. The Kitchen's four sat
+    // gated for nine days after it opened because nobody came back for them; that is the mistake to not
+    // repeat, and it is written here rather than in a note somewhere because this is where it gets fixed.
+    //
+    // Paid low on purpose: the floor is a gold sink, and a bounty that pays more than the house keeps turns
+    // the machines into a way of farming the bounty.
+    { key: "casino_sit", label: "Play a machine in the Casino", metric: "casino_play", target: 1, gold: 110, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
+    { key: "casino_ten", label: "Play 10 times in the Casino", metric: "casino_play", target: 10, gold: 250, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
+    { key: "casino_win", label: "Win on any Casino machine", metric: "casino_win", target: 1, gold: 160, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
+    { key: "casino_ticket", label: "Play a Keno ticket", metric: "casino_keno", target: 1, gold: 120, area: "/marketplace/casino", cta: "Buy a ticket", ownerOnly: true },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

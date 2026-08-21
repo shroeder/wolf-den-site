@@ -62,6 +62,19 @@ export const FEATURE_DAILIES = {
         { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
         { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { gold: 200 }, rewardLabel: "+200 gold" },
     ],
+    // THE CASINO'S THREE. The floor is a gold SINK, which makes its bounties a different problem from every
+    // other card here: paying people to gamble is paying them to lose, and a card that hands back more than
+    // the house takes turns the machines into a way of farming the card.
+    //
+    // So the three are deliberately cheap — 380 gold for a day of it, against a floor that keeps 10% of
+    // every stake — and two of the three ask you to SIT DOWN rather than to win. The one that pays for a win
+    // pays the least per unit of luck involved, because rewarding luck is how a bounty stops meaning
+    // anything: you either got it or you did not, and nothing you chose changed it.
+    casino: [
+        { key: "cas_play5", label: "Play 5 times on the floor", metric: "casino_play", need: 5, reward: { gold: 150 }, rewardLabel: "+150 gold" },
+        { key: "cas_wheel1", label: "Take a spin on the wheel", metric: "casino_wheel", need: 1, reward: { gold: 110 }, rewardLabel: "+110 gold" },
+        { key: "cas_win1", label: "Win on any machine", metric: "casino_win", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
+    ],
 };
 
 // metric → feature, so the central quest pump can also feed these dailies with a single hook.

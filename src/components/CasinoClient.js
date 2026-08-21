@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import FeatureDailies from "@/components/FeatureDailies";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -308,6 +309,12 @@ export default function CasinoClient({ initial }) {
                 </div>
               </div>
             </div>
+
+            {/* THE DAY'S THREE, under the room rather than over it. The floor is the screen; a bounty card
+                above the machines would be a to-do list you have to walk past to reach the thing you came
+                for. Deliberately cheap bounties — see FEATURE_DAILIES.casino for why a gold sink cannot
+                afford generous ones. */}
+            <FeatureDailies feature="casino" />
 
             <div className="cas-walk">
                 <button type="button" onClick={() => walk(-1)} aria-label="Walk left">◀</button>

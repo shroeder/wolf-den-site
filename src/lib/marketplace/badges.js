@@ -209,6 +209,31 @@ export async function getMemberMetrics(buyerId) {
         if (d.rarity === "eternal") eternalItems++;
     }
 
+    // ── THE CASINO ───────────────────────────────────────────────────────────────────────────────────
+    // Every one of these comes out of the coin ledger the floor already writes, so the casino needed no
+    // counters of its own and no table to drift out of step with the money. One query, because the three
+    // machines all log the same shapes: a bet row per play and a win row carrying what it was.
+    //
+    // The three rare ones are read off the win rows' meta rather than tracked separately: the slot stamps
+    // its own jackpot, `choice` names the wheel bet, and keno stamps how many of the five came up. Note the
+    // absence of an import from casino.js — fishing.js already imports THIS file, so reaching the other way
+    // would close a cycle. Counting facts the floor wrote down avoids needing to.
+    const casinoRow = await db.queryOne(
+        `SELECT COUNT(*) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet'))::int AS plays,
+                COALESCE(-SUM(delta) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet')), 0)::bigint AS wagered,
+                COUNT(*) FILTER (WHERE reason = 'casino_slot_win' AND meta->>'jackpot' = 'true')::int AS jackpots,
+                COUNT(*) FILTER (WHERE reason = 'casino_wheel_win' AND meta->>'choice' = 'single')::int AS pockets,
+                COUNT(*) FILTER (WHERE reason = 'casino_keno_win' AND (meta->>'hits')::int = 5)::int AS perfect
+           FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'`,
+        [buyerId],
+    ).catch(() => null);
+    // Owning all five is its own badge, and it is the hardest thing on the floor by a distance: the rarest
+    // of the five is one drop in 5,556 plays.
+    const casinoPetRow = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = ANY($2)`,
+        [buyerId, COLLECTIBLES.filter((p) => p.casinoExclusive).map((p) => p.id)],
+    ).catch(() => null);
+
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
     const allMilestones = ["spend", "first_purchase", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
     // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
@@ -299,6 +324,12 @@ export async function getMemberMetrics(buyerId) {
         auctionSales: auctionRow?.sales || 0,
         auctionBuys: auctionRow?.buys || 0,
         auctionTopSale: auctionRow?.top_sale || 0,
+        casinoPlays: casinoRow?.plays || 0,
+        casinoWagered: Number(casinoRow?.wagered || 0),
+        casinoJackpots: casinoRow?.jackpots || 0,
+        casinoPockets: casinoRow?.pockets || 0,
+        casinoPerfect: casinoRow?.perfect || 0,
+        casinoPets: casinoPetRow?.n || 0,
     };
 }
 
@@ -773,6 +804,12 @@ export function progressForRule(rule, threshold, m) {
         case "auction_sales": return { current: m.auctionSales, target: t }; // items SOLD on the Auction House
         case "auction_buys": return { current: m.auctionBuys, target: t }; // items BOUGHT on the Auction House
         case "auction_top_sale": return { current: m.auctionTopSale, target: t }; // biggest single sale (gold)
+        case "casino_plays": return { current: m.casinoPlays, target: t };       // pulls, spins and tickets
+        case "casino_wagered": return { current: m.casinoWagered, target: t };   // lifetime gold across the floor
+        case "casino_jackpot": return { current: m.casinoJackpots, target: t };  // three wolves on the slot
+        case "casino_pocket": return { current: m.casinoPockets, target: t };    // called a single pocket on the wheel
+        case "casino_perfect": return { current: m.casinoPerfect, target: t };   // five of five on a keno ticket
+        case "casino_pets": return { current: m.casinoPets, target: t };         // how many of the five you hold
         default: return { current: 0, target: t || 1 };
     }
 }
