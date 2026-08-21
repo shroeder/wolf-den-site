@@ -899,6 +899,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // in front of it — see the playback effect. Only for the two that throw something; a dismiss or a
         // seen has no blow to show.
         if (action === "act" || action === "forfeit") instant.current = true;
+        // A fight YOU start plays from the opening blow. Anything else — a refresh, a return to the tab —
+        // opens where the fight actually is.
+        if (action === "start") startedHere.current = true;
         setBusy(true); setErr(null);
         try {
             const r = await fetch("/api/marketplace/arena", {
@@ -1050,7 +1053,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const instant = useRef(false);
     const boutKey = String(raw?.foe?.id || "");
     const lastKey = useRef(null);
-    const mounted = useRef(false);
+    // True only between pressing Challenge and the bout it produces arriving — see the effect below.
+    const startedHere = useRef(false);
     useEffect(() => {
         if (lastKey.current === boutKey) return;
         lastKey.current = boutKey;
@@ -1067,10 +1071,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // ── A FIGHT ALREADY IN PROGRESS OPENS WHERE IT IS ────────────────────────────────────────────────
         // Only a bout that STARTS while you are watching plays from the first blow. Walk back into a bout
         // you left — a refresh, a return from another screen — and the cursor belongs at the end of what has
-        // already happened, not at the beginning of it. Luke's rung-31 bout is 65 rounds long; opening it
-        // replayed all 65 before the screen would take a tap.
-        const openAtEnd = !mounted.current && logAll.length > 0;
-        mounted.current = true;
+        // already happened, not at the beginning of it.
+        //
+        // KEYED ON WHO STARTED IT, not on whether the component has mounted before, and that distinction is
+        // the whole bug. `mounted` was spent on the FIRST run of this effect — which happens on the initial
+        // render, before the bout has arrived, when boutKey is "" and the log is empty. By the time the real
+        // bout landed the flag was already used, so every refresh was treated as "a fight that started while
+        // you were watching" and replayed the lot. Luke: "I'm just refreshing the screen... why does it even
+        // show me all the stuff that happened? Why can't it just show me where the battle is at."
+        //
+        // `startedHere` is set when THIS client presses Challenge and spent on the bout that follows, so the
+        // answer no longer depends on render order.
+        const openAtEnd = !startedHere.current && logAll.length > 0;
+        startedHere.current = false;
         setShown(openAtEnd ? logAll.length : 0);
     }, [boutKey, logAll.length, clearRing]);
     // A shorter transcript than the cursor is standing on cannot be the same fight — rematch, forfeit, or a
@@ -1526,7 +1539,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const pops = [];
         fresh.forEach((l, li) => {
             const sub = [];
-            const target = l.who === "you" ? "right" : "left";
+            // ── WHERE THE NUMBER LANDS ───────────────────────────────────────────────────────────────────────
+            // You are on the LEFT, so a blow you throw floats over the opponent on the right. That is right
+            // for a swing and WRONG for a tick, which is the one line in the log that does not cross the ring:
+            // "You burn — 93" is you paying, so the 93 belongs over YOU.
+            //
+            // This is the third place that sentence has had to be written this week — the health bars needed
+            // it, the effect layer needed it, and this is the floating number, which is a SECOND `target`
+            // shadowing the one above in the same function. Fixing the other two did nothing for what Luke
+            // was actually looking at: "it says I burn for 93 but it's burning them on screen."
+            const onMe = l.burnTick || l.bleedTick ? l.who === "you" : l.who !== "you";
+            const target = onMe ? "left" : "right";
             // ── ONE NUMBER PER BLOW ──────────────────────────────────────────────────────────────────────────
             // A three-hit flurry used to arrive as a single accumulated number, so the one thing that makes it a
             // flurry — that it is THREE — was invisible, and Rampage looked exactly like a big swing with a
