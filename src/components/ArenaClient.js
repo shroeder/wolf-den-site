@@ -1614,21 +1614,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {bout.underdog > 1 ? (
                                 <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
                             ) : null}
-                            {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here.
-                                It now shows the two numbers it compared: "you're faster" is an assertion, and
-                                18 vs 15 is the reason — and on a TIE it says so outright, because "you open"
-                                while both bars read the same number looks like a bug rather than the rule. */}
-                            {bout.beat <= 1 && bout.opener ? (
-                                <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
-                                    {/* COMPARED AT FULL PRECISION, which is what the engine compares. Rounding
-                                        first meant 0.87 against 1.41 announced "Speed tied 1 — the challenger
-                                        opens" over a fighter swinging 62% faster: the screen inventing a rule
-                                        to explain a number it had itself rounded away. */}
-                                    {(bout.me?.speed || 0) === (bout.foe?.speed || 0)
-                                        ? `Speed tied ${(bout.me?.speed || 0).toFixed(2)} — the challenger opens`
-                                        : `${bout.opener === "you" ? "You're faster" : `${bout.foe.name} is faster`} · speed ${(bout.me?.speed || 0).toFixed(2)} v ${(bout.foe?.speed || 0).toFixed(2)} — ${bout.opener === "you" ? "you" : "they"} open`}
-                                </span>
-                            ) : null}
+                            {/* (Who opened, and the two speeds it compared, used to be a third pill here.
+                                Luke, on a screenshot of round 1: "remove the red pill and text in the top
+                                left." It was four lines of prose in the corner of a fight — and both numbers
+                                it quoted are already printed under the health bars, six lines below it, next
+                                to the fighters they belong to. `opener` went with it: nothing else on either
+                                side of the wire ever read it.) */}
                         </span>
 
                         {/* ── THE TOOLS ── mute, leave and the log. A ROW, because .ar-mute was once absolutely
@@ -2786,8 +2777,11 @@ function Styles() {
                page copy rather than fight state. Same words, on the field, where they apply. */
             .ar-tag { font-size: 9.5px; font-weight: 900; padding: 2px 8px; border-radius: 999px;
                 background: rgba(8,6,10,0.66); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(2px); }
-            .ar-tag.is-good { color: #8bf0b4; border-color: rgba(139,240,180,.45); }
-            .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
+            /* (.is-good / .is-bad were the opener pill's two colours and went with it. A rule whose only
+               caller is deleted is the stale-CSS landmine pointing the other way — it sits there looking
+               like a class somebody can reach for, and the next ar-tag is-bad gets a red pill nobody
+               designed. And no backticks in here: one ends the template literal the whole stylesheet
+               lives in, which is the trap this file has now sprung three times.) */
             .ar-tag.is-fever { color: #ff8a4c; border-color: rgba(255,138,76,.6);
                 animation: arFever 1.1s ease-in-out infinite; }
             @keyframes arFever { 0%, 100% { opacity: .82; } 50% { opacity: 1; } }

@@ -154,7 +154,6 @@ export function makeBout(over = {}) {
         hp: 148, maxHp: 206, foeHp: 122, foeMaxHp: 241,
         cd: { "ashfall_crown:overcharge": 4, "gambler_ring:highroller": 2 },
         clash: { mult: 0.75, note: "Their Water smothers your Fire" },
-        opener: "you",
         me: { element: "fire", abilities: MY_ABILITIES, might: 24, speed: 1.2 },
         shield: 0, surge: 0, underdog: 1.12,
         items: { poultice: 2, draught: 1 },

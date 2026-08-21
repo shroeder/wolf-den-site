@@ -1052,7 +1052,7 @@ const staleBout = (b) => Boolean(b) && !b.over && (b.me?.damage == null || b.foe
 function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
-        cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
+        cd: b.cd || {}, clash: b.clash, fever: pitFever(b.beat || 1),
         me: b.me, underdog: b.underdog || 1,
         // ── WHAT THE SCREEN HAS TO ASK FOR ───────────────────────────────────────────────────────────────
         // `awaiting` is the whole state machine as far as the client is concerned: "act" wants a command,
@@ -1402,7 +1402,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
         // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
         turn: me.speed >= foeKit.speed ? "you" : "them",
-        opener: me.speed >= foeKit.speed ? "you" : "them",
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
         bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back
