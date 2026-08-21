@@ -1745,12 +1745,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {/* THE PIT CLOSES. An escalation nobody is told about is the hidden roll all over
                                 again, so it says so the round it starts and keeps saying how much. */}
                             {bout.fever > 1 ? (
-                                <span className="ar-tag is-fever">
-                                    The pit closes · +{Math.round((bout.fever - 1) * 100)}% both ways
+                                <span className="ar-tag is-fever"
+                                    title={`The pit is closing: both fighters take +${Math.round((bout.fever - 1) * 100)}% damage, rising every round until somebody goes down.`}>
+                                    Pit +{Math.round((bout.fever - 1) * 100)}%
                                 </span>
                             ) : null}
                             {bout.underdog > 1 ? (
-                                <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
+                                <span className="ar-tag is-under"
+                                    title={`You are the underdog on gear, so every blow you throw is worth +${Math.round((bout.underdog - 1) * 100)}%.`}>
+                                    Outgunned +{Math.round((bout.underdog - 1) * 100)}%
+                                </span>
                             ) : null}
                             {/* (Who opened, and the two speeds it compared, used to be a third pill here.
                                 Luke, on a screenshot of round 1: "remove the red pill and text in the top
@@ -2918,13 +2922,23 @@ function Styles() {
             .ar-hud { position: relative; z-index: 5; flex: 0 0 auto; padding: 8px 8px 0; display: grid;
                 grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 6px;
                 pointer-events: none; }
+            /* ── A CHIP IS ONE LINE ──────────────────────────────────────────────────────────────────
+               This wrapped, and a wrapped chip is a two-line blob leaning on the round number. Luke, on a
+               screenshot of "The pit closes · +5% both ways" folded in half: "I don't like that pill in the
+               top left and how its text wraps, it's so ghetto."
+               Two fixes and they work together: the copy is short enough to fit — "both ways" and "swing"
+               moved to a title, which is where the sentence belongs when the chip is a number — and the row
+               can no longer wrap under any circumstance. It scrolls sideways instead, which is a thing a
+               chip row is allowed to do and a two-line pill is not. */
             .ar-hud-tags { display: flex; align-items: center; justify-content: center; gap: 6px;
-                flex-wrap: wrap; min-width: 0; }
+                flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+            .ar-hud-tags::-webkit-scrollbar { display: none; }
             .ar-round { font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
                 color: #ffe0b0; text-shadow: 0 2px 8px #000; }
             /* The affinity read and the underdog bonus used to be paragraphs UNDER the panel, where they were
                page copy rather than fight state. Same words, on the field, where they apply. */
             .ar-tag { font-size: 9.5px; font-weight: 900; padding: 2px 8px; border-radius: 999px;
+                white-space: nowrap; flex: 0 0 auto;
                 background: rgba(8,6,10,0.66); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(2px); }
             /* (.is-good / .is-bad were the opener pill's two colours and went with it. A rule whose only
                caller is deleted is the stale-CSS landmine pointing the other way — it sits there looking
