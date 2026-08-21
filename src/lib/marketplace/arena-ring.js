@@ -75,6 +75,7 @@ export const FEVER_PER_BEAT = 0.012;
 function fever(ring) {
     if (ring.beat < FEVER_AT) return;
     const share = FEVER_PER_BEAT * (ring.beat - FEVER_AT + 1);
+    const bites = [];
     for (const f of [ring.A, ring.B]) {
         // Through the shield first — a shield you refresh every beat is precisely what the fever is here to
         // outlast, so letting it hide behind one would leave the stall exactly where it was.
@@ -82,8 +83,13 @@ function fever(ring) {
         const eaten = Math.min(f.shield, bite);
         f.shield -= eaten;
         f.hp -= bite - eaten;
+        bites.push(bite);
     }
-    ring.log.push({ t: ring.t, who: "me", fever: true, share });
+    // NO `dmg` ON THIS LINE, deliberately. The fight screen reconstructs both health bars by subtracting each
+    // line's `dmg` from ONE side, and the pit bites both — a single number here would come off whichever bar
+    // `who` named and be wrong twice. The two bites ride as their own fields so the sentence can name them.
+    ring.log.push({ t: ring.t, who: "me", fever: true, share, meBite: bites[0], foeBite: bites[1],
+        meShield: ring.A.shield, foeShield: ring.B.shield });
 }
 
 // The clock only turns once the whole turn is DONE — after the swing, and after the haste decrement that the
@@ -109,18 +115,25 @@ function closeTurn(ring) {
  */
 function advance(ring, rng) {
     while (!settle(ring)) {
+        // The fever line is inside the narrated range, which it was not: `from` used to be captured after
+        // this, so the pit closing arrived with no text and no beat and the fight screen printed it as "You
+        // strike — 0". The one line in the transcript that explains why both bars are falling on their own
+        // read as a swing that did nothing.
+        const from = ring.log.length;
         fever(ring);
-        if (settle(ring)) return ring;
+        // Including when the pit is what ends it — narrate before the return, or the last line of the fight
+        // is the unnarrated one.
+        if (settle(ring)) { narrate(ring, from, { name: ring.foeName }); return ring; }
         const mine = ring.nextA <= ring.nextB;
         ring.acting = mine ? "me" : "foe";
         ring.t = mine ? ring.nextA : ring.nextB;
         ring.beat += 1;
         const att = mine ? ring.A : ring.B;
         const def = mine ? ring.B : ring.A;
-        // Captured BEFORE openTurn, because openTurn is what pushes the bleed and burn ticks and the stun
-        // skip — and those were the lines still coming out blank. A wound eating a third of somebody's health
-        // between two swings is not a footnote; it is frequently the reason the fight went the way it did.
-        const from = ring.log.length;
+        // `from` is above the fever call on purpose, so this narration also covers the bleed and burn ticks
+        // and the stun skip that openTurn pushes — those were the lines still coming out blank. A wound
+        // eating a third of somebody's health between two swings is not a footnote; it is frequently the
+        // reason the fight went the way it did.
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });
@@ -147,7 +160,7 @@ function advance(ring, rng) {
                     mult: (foeSkill?.power ?? 1) * (cast?.mult || 1),
                     hitsOverride: foeSkill?.hits || 0,
                 });
-            } else ring.log.push({ t: ring.t, who: "foe", cast: true });   // see the same push in act()
+            } else ring.log.push({ t: ring.t, who: "foe", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
             narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe" });
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
@@ -318,7 +331,8 @@ function narrate(ring, from, { name, skill = null, by = "me" }) {
         // strikes — 0", eight lines running, while the fight is in fact going well for you. Naming the guard
         // says the same number and says who is winning the exchange.
         const took = l.damage > 0 ? `${l.damage}.` : "the guard holds.";
-        if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
+        if (l.fever) l.text = `The pit closes — ${l.meBite} off you, ${l.foeBite} off ${name}.`;
+        else if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.burnTick) l.text = `${actor} burn${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.stunnedSkip) l.text = `${actor} cannot act.`;
         else if (l.guard) l.text = `${actor} raise${verb} a guard.`;
@@ -368,7 +382,7 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
         // member who spent their beat on Bastion got a transcript that said nothing at all. The beat was
         // gone, the cooldown was running, and the only evidence either had happened was a greyed-out button.
         // A move you cannot see in the log is a move you cannot learn to use.
-        ring.log.push({ t: ring.t, who: "me", cast: true });
+        ring.log.push({ t: ring.t, who: "me", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield });
     }
     if (cast) uncast(skill, ring.A, cast);
     narrate(ring, from, { name: ring.foeName, skill, by: "me" });
@@ -396,5 +410,12 @@ export function ringResult(ring) {
         log: ring.log,
         hp: Math.max(0, ring.A.hp), foeHp: Math.max(0, ring.B.hp),
         maxHp: ring.A.maxHp, foeMaxHp: ring.B.maxHp,
+        // ── AND THE GUARDS ───────────────────────────────────────────────────────────────────────────────
+        // Left out of here for the ring's whole life, so syncRing had nothing to copy and `bout.shield` sat
+        // at the zero buildBout gave it. FighterBar draws the blue slab off that field, so NO shield has
+        // ever been visible in an interactive bout: not Bastion, not Rally, not the ward every Warden opens
+        // with. Luke, having cast one: "when I Rally I don't see any of my blue shielded health in my health
+        // bar." It was not the skill — it was that this object stopped at health.
+        shield: Math.max(0, ring.A.shield), foeShield: Math.max(0, ring.B.shield),
     };
 }

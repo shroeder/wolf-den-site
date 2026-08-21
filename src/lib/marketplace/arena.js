@@ -1453,6 +1453,10 @@ function syncRing(b) {
     b.foeHp = r.foeHp;
     b.maxHp = r.maxHp;
     b.foeMaxHp = r.foeMaxHp;
+    // The blue slab on both bars. publicBout has published `shield` and `foeShield` all along and this is
+    // what was never filling them in — see ringResult.
+    b.shield = r.shield;
+    b.foeShield = r.foeShield;
     b.over = r.over;
     b.won = r.won;
     b.unresolved = r.unresolved;

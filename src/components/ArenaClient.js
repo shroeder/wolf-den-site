@@ -1006,6 +1006,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // is read rather than reconstructed. The WORD fires only on the blow that opened the wound.
             bleeding: (cur?.meBleed || 0) > 0,
             foeBleeding: (cur?.foeBleed || 0) > 0,
+            // ── THE BLUE SLAB, AS OF THE BLOW BEING PLAYED ───────────────────────────────────────────────
+            // Same argument as the ticks above, and it matters more here: a whole exchange arrives in one
+            // response, so `raw.shield` is the guard AFTER their swing has already eaten it. Read straight
+            // it would put a shield up and take it away again before the animation of your own cast had
+            // finished — the bar contradicting the sentence under it. Stamped per line, it moves when the
+            // blow that moved it plays. Falls back to the current value for a transcript with no stamp.
+            shield: cur?.meShield ?? raw.shield,
+            foeShield: cur?.foeShield ?? raw.foeShield,
             bled: Boolean(cur?.who === "foe" && cur?.bled),
             foeBled: Boolean(cur?.who === "me" && cur?.bled),
         };
