@@ -566,7 +566,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         }
         log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
             burned, frozen, surge: surging, soul,
-            meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meBurn: A.burnLeft, foeBurn: B.burnLeft });
+            meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance, meBurn: A.burnLeft, foeBurn: B.burnLeft });
         // RIMEGUARD answers EVERY blow rather than only a blocked one — that is the difference between the
         // Runecaller's thorns and the Warden's.
         if (def.iceThorns > 0 && dealt > 0 && att.hp > 0) thornsBack += Math.round(dealt * def.iceThorns);
@@ -575,7 +575,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         if (thornsBack > 0 && att.hp > 0) {
             att.hp -= thornsBack;
             log.push({ t, who: who === "me" ? "foe" : "me", dmg: thornsBack, thorns: true,
-                meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield });
+                meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
@@ -586,7 +586,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             const craw = att.damage * (cs > 0 ? att.critMult * cs : 1);
             const extra = Math.max(1, Math.round(craw - def.armor * (1 - att.pierce)));
             def.hp -= extra;
-            log.push({ t, who, dmg: extra, crit: cs > 0, wild, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield });
+            log.push({ t, who, dmg: extra, crit: cs > 0, wild, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
         if (def.hp > 0 && def.counter > 0 && rng() < def.counter) {
             const cs = critStacks(def.critChance, rng);
@@ -594,7 +594,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             const cdealt = Math.max(1, Math.round(craw - att.armor * (1 - def.pierce)));
             att.hp -= cdealt;
             log.push({ t, who: who === "me" ? "foe" : "me", dmg: cdealt, crit: cs > 0, stacks: cs, counter: true,
-                meShield: A.shield, foeShield: B.shield });
+                meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
 }
 
@@ -620,7 +620,7 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
                 cutter.hp = Math.min(cutter.maxHp, cutter.hp + Math.round(tick * cutter.bleedLeech));
             }
             log.push({ t, who, bleedTick: true, dmg: tick,
-                meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield });
+                meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             if (att.hp <= 0) return false;
         }
         if (att.burnLeft > 0) {
@@ -631,12 +631,12 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
             if (lighter.burnLeech > 0 && lighter.hp > 0) {
                 lighter.hp = Math.min(lighter.maxHp, lighter.hp + Math.round(tick * lighter.burnLeech));
             }
-            log.push({ t, who, burnTick: true, dmg: tick, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield });
+            log.push({ t, who, burnTick: true, dmg: tick, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             if (att.hp <= 0) return false;
         }
         if (att.stunned > 0) {
             att.stunned -= 1;
-            log.push({ t, who, stunnedSkip: true, meShield: A.shield, foeShield: B.shield });
+            log.push({ t, who, stunnedSkip: true, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             return false;
         }
         // ── CHILLED: THE TURN THAT DOES NOT HAPPEN ───────────────────────────────────────────────────
@@ -645,7 +645,7 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         // work and says so out loud. Rolled AFTER the stun check so the two never both fire on one turn
         // and print two reasons for one lost beat.
         if (att.skipChance > 0 && rng() < att.skipChance) {
-            log.push({ t, who, chilledSkip: true, meShield: A.shield, foeShield: B.shield });
+            log.push({ t, who, chilledSkip: true, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             return false;
         }
         // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
@@ -655,7 +655,7 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         }
         if (att.guardChance > 0 && rng() < att.guardChance) {
             att.shield += Math.round(att.maxHp * att.guardSize);
-            log.push({ t, who, guard: true, shield: att.shield, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield });
+            log.push({ t, who, guard: true, shield: att.shield, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
     return true;
 }

@@ -330,6 +330,12 @@ export const SCENES = {
                 // On YOU: their burn, so both sides of the readout can be seen at once.
                 foeBleed: { turns: 2, stacks: 1, dmg: 41 },
                 hp: 402, foeHp: 318,
+                // ── AND THE STATE DRAWN ON THE BODIES ────────────────────────────────────────────────
+                // The chips above are the readout; these are the fighters themselves. Both are set here
+                // so one scene shows every state at once: you in the ice with a burn on you, them
+                // burning. Without this the only way to look at a freeze was to be frozen in a real bout.
+                frozen: true, frozenLeft: 2, burning: true, burnLeft: 3, chilled: 0.1,
+                foeBurning: true, foeBurnLeft: 2, foeFrozen: false, foeChilled: 0,
             }),
         }),
     },

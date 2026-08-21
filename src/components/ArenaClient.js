@@ -423,11 +423,12 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 // the flip to the Final Fantasy arrangement (party right, enemy left) it meant `is-foe` marked YOU, so the
 // cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
 function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false,
-    stunned = false, hasted = false, bleeding = false, bled = false }) {
+    stunned = false, hasted = false, bleeding = false, bled = false,
+    burning = false, burnLeft = 0, frozen = false, frozenLeft = 0, chilled = 0 }) {
     const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
         + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
         + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`
-        + `${stunned ? " is-stunned" : ""}${hasted ? " is-hasted" : ""}${bleeding ? " is-bleeding" : ""}`;
+        + `${stunned ? " is-stunned" : ""}${hasted ? " is-hasted" : ""}${bleeding ? " is-bleeding" : ""}${burning ? " is-burning" : ""}${frozen ? " is-frozen" : ""}`;
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
@@ -469,6 +470,54 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
                 </span>
             ) : null}
             {bled ? <b className="ar-bleed-word" aria-hidden="true">BLEED!</b> : null}
+
+            {/* ── ON FIRE ─────────────────────────────────────────────────────────────────────────────────
+                Flames climb the body for as long as the burn has ticks left, and the count is on the label,
+                because "how much longer" is the question a burn actually raises. A burn was previously
+                invisible in every way: no glow, no word, and a tick that read "You burn — 75" for a quarter
+                of a second before the next line replaced it. */}
+            {burning ? (
+                <span className="ar-burn" aria-hidden="true">
+                    {Array.from({ length: 7 }).map((_, i) => (
+                        <span key={i} className="ar-burn-flame" style={{ "--i": i }} />
+                    ))}
+                </span>
+            ) : null}
+            {burning ? (
+                <b className="ar-state-word is-burn" aria-hidden="true">
+                    BURNING{burnLeft > 1 ? <i>{burnLeft}</i> : null}
+                </b>
+            ) : null}
+
+            {/* ── IN THE ICE ──────────────────────────────────────────────────────────────────────────────
+                Luke's own example, and the reason this whole pass exists: "if I'm frozen I should be covered
+                in ice, with a clear status that says frozen in light blue." So the sprite is inside a block
+                — a frosted pane over it, shards at the edges, and the body goes cold and still — and it
+                STAYS until the ice does. The turns left are on the word, because that is the answer to the
+                only question being frozen asks. */}
+            {frozen ? (
+                <span className="ar-ice" aria-hidden="true">
+                    <span className="ar-ice-block" />
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <span key={i} className="ar-ice-shard" style={{ "--i": i }} />
+                    ))}
+                </span>
+            ) : null}
+            {frozen ? (
+                <b className="ar-state-word is-ice" aria-hidden="true">
+                    FROZEN{frozenLeft > 1 ? <i>{frozenLeft}</i> : null}
+                </b>
+            ) : null}
+
+            {/* ── CHILLED ── not an event, a condition: a share of your turns will not happen, for the whole
+                bout. It never reached the screen at all, so a member losing one turn in ten had no way to
+                learn that was a rule rather than a glitch. Quiet on purpose — it is permanent, and a
+                permanent thing that shouts becomes noise by the third beat. */}
+            {chilled > 0 && !frozen ? (
+                <b className="ar-state-word is-chill" aria-hidden="true">
+                    CHILLED<i>{Math.round(chilled * 100)}%</i>
+                </b>
+            ) : null}
         </div>
     );
 }
@@ -1025,6 +1074,29 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // is read rather than reconstructed. The WORD fires only on the blow that opened the wound.
             bleeding: (cur?.meBleed || 0) > 0,
             foeBleeding: (cur?.foeBleed || 0) > 0,
+            // ── THE THREE STATES THE SCREEN COULD NOT SEE ────────────────────────────────────────────────
+            // Luke: "every burn feels like you have no idea what happened, and every freeze and skipped turn
+            // has no info." He is right, and the reason is that only stun, haste and bleed were ever drawn
+            // on a fighter — the three a Runecaller actually uses were nowhere.
+            //
+            // Read as COUNTS, not as events. `stunned` above fires on the frame the stun lands and is gone
+            // 400ms later; ice you are still inside has to be visible for as long as you are inside it, or
+            // "why did I not get a turn" has no answer on screen at the moment you are asking it.
+            //
+            // FALLING BACK TO `raw` WHEN A LINE CARRIES NO STAMP, which is not a nicety: every transcript
+            // written before these stamps existed has none of them, and reading a missing field as "zero
+            // turns of ice" would erase a state that is genuinely on. It is also what lets the lab set
+            // these directly on a fixture, so a freeze can be looked at without being frozen in a real one.
+            burning: cur?.meBurn != null ? cur.meBurn > 0 : Boolean(raw.burning),
+            foeBurning: cur?.foeBurn != null ? cur.foeBurn > 0 : Boolean(raw.foeBurning),
+            frozen: cur?.meStun != null ? cur.meStun > 0 : Boolean(raw.frozen),
+            foeFrozen: cur?.foeStun != null ? cur.foeStun > 0 : Boolean(raw.foeFrozen),
+            burnLeft: cur?.meBurn ?? raw.burnLeft ?? 0,
+            foeBurnLeft: cur?.foeBurn ?? raw.foeBurnLeft ?? 0,
+            frozenLeft: cur?.meStun ?? raw.frozenLeft ?? 0,
+            foeFrozenLeft: cur?.foeStun ?? raw.foeFrozenLeft ?? 0,
+            chilled: cur?.meChill ?? raw.chilled ?? 0,
+            foeChilled: cur?.foeChill ?? raw.foeChilled ?? 0,
             // ── THE BLUE SLAB, AS OF THE BLOW BEING PLAYED ───────────────────────────────────────────────
             // Same argument as the ticks above, and it matters more here: a whole exchange arrives in one
             // response, so `raw.shield` is the guard AFTER their swing has already eaten it. Read straight
@@ -1817,13 +1889,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             wind={counterWind === "left" ? COUNTER_WIND_MS : 0}
                             brace={false}
                             stunned={Boolean(bout.stunned)} hasted={Boolean(bout.hasted)}
-                            bleeding={Boolean(bout.bleeding)} bled={Boolean(bout.bled)} />
+                            bleeding={Boolean(bout.bleeding)} bled={Boolean(bout.bled)}
+                            burning={Boolean(bout.burning)} burnLeft={bout.burnLeft || 0}
+                            frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
+                            chilled={bout.chilled || 0} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
                             brace={false}
                             stunned={Boolean(bout.foeStunned)} hasted={Boolean(bout.foeHasted)}
-                            bleeding={Boolean(bout.foeBleeding)} bled={Boolean(bout.foeBled)} />
+                            bleeding={Boolean(bout.foeBleeding)} bled={Boolean(bout.foeBled)}
+                            burning={Boolean(bout.foeBurning)} burnLeft={bout.foeBurnLeft || 0}
+                            frozen={Boolean(bout.foeFrozen)} frozenLeft={bout.foeFrozenLeft || 0}
+                            chilled={bout.foeChilled || 0} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -2959,6 +3037,69 @@ function Styles() {
                 60% { opacity: 1; transform: translateX(-50%) scale(1.12) } 100% { opacity: 1; transform: translateX(-50%) scale(1) } }
             /* The body itself runs red while the wound is open. */
             .ar-fighter.is-bleeding .ar-hero { filter: drop-shadow(0 0 9px rgba(224,60,60,.7)) saturate(1.1); }
+
+            /* ── STATE, WRITTEN ON THE FIGHTER ───────────────────────────────────────────────────────────
+               One shape for all three, so a member learns to read the position once. It sits UNDER the body
+               rather than over the head, where the stun swirl and the bleed word already live, and it stays
+               for as long as the state does -- these are conditions, not events. The count rides in an <i>
+               because "two more turns of this" is the question every one of them raises. */
+            /* ON the fighter, not under it: hung below the sprite these fell off the bottom of the frame
+               and the one that matters most -- FROZEN -- was the one you could not see. Burning sits at the
+               feet, ice a row above it, because a fighter can be both at once. */
+            .ar-state-word { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%);
+                z-index: 9; display: inline-flex; align-items: center; gap: 5px;
+                padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+                font-size: 9.5px; font-weight: 900; letter-spacing: .14em; font-style: normal;
+                background: rgba(6,10,16,.72); backdrop-filter: blur(2px);
+                animation: arStateIn .3s cubic-bezier(.2,1.4,.3,1) both; }
+            .ar-state-word i { font-style: normal; font-size: 9px; opacity: .85;
+                padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.16); }
+            @keyframes arStateIn { from { opacity: 0; transform: translateX(-50%) translateY(-4px) }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) } }
+            .ar-state-word.is-burn { color: #ffb35c; border: 1px solid rgba(255,140,60,.55);
+                text-shadow: 0 0 10px rgba(255,140,60,.8); }
+            .ar-state-word.is-ice { color: #bfe9ff; border: 1px solid rgba(150,220,255,.7);
+                text-shadow: 0 0 10px rgba(150,220,255,.9); bottom: 15%; }
+            .ar-state-word.is-chill { color: #9fc6dd; border: 1px solid rgba(140,190,220,.35); opacity: .78; }
+
+            /* ── ON FIRE ── flames climb the body, behind it, so the sprite stays readable through them. */
+            .ar-burn { position: absolute; left: 8%; right: 8%; bottom: 2%; height: 82%; z-index: 2;
+                pointer-events: none; }
+            .ar-burn-flame { position: absolute; bottom: 0; left: calc(6% + var(--i) * 13%);
+                width: 16%; height: 34%; border-radius: 50% 50% 44% 44%;
+                background: linear-gradient(to top, rgba(255,196,80,.95), rgba(255,90,30,.55) 55%, rgba(255,60,20,0));
+                filter: blur(1px);
+                animation: arBurnLick 780ms ease-in-out infinite both;
+                animation-delay: calc(var(--i) * -130ms); }
+            @keyframes arBurnLick {
+                0%, 100% { transform: translateY(0) scaleY(.82) scaleX(1); opacity: .55; }
+                45% { transform: translateY(-26%) scaleY(1.25) scaleX(.86); opacity: .95; } }
+            .ar-fighter.is-burning .ar-hero { filter: drop-shadow(0 0 10px rgba(255,140,60,.75)) saturate(1.15); }
+
+            /* ── IN THE ICE ── a frosted pane over the whole body, shards around it, and the sprite goes
+               cold and still: no drop-shadow warmth, a blue cast, and the breathing animation reads through
+               a block that does not move. This is the one Luke asked for by name. */
+            .ar-ice { position: absolute; inset: -4% -6% -2%; z-index: 7; pointer-events: none;
+                animation: arIceIn .26s ease-out both; }
+            @keyframes arIceIn { from { opacity: 0; transform: scale(1.12) } to { opacity: 1; transform: none } }
+            .ar-ice-block { position: absolute; inset: 0; border-radius: 18% 18% 12% 12%;
+                background: linear-gradient(160deg, rgba(190,240,255,.26), rgba(110,190,235,.17) 45%, rgba(70,150,210,.24));
+                border: 2px solid rgba(205,245,255,.7);
+                box-shadow: inset 0 0 26px rgba(255,255,255,.3), 0 0 22px rgba(140,215,255,.5);
+                backdrop-filter: blur(1px) saturate(.75); }
+            .ar-ice-shard { position: absolute; width: 0; height: 0;
+                border-left: 7px solid transparent; border-right: 7px solid transparent;
+                border-bottom: 18px solid rgba(215,248,255,.85);
+                filter: drop-shadow(0 0 6px rgba(140,215,255,.9));
+                transform: rotate(calc(var(--i) * 61deg)); }
+            .ar-ice-shard:nth-child(2) { left: 2%; top: 14%; }
+            .ar-ice-shard:nth-child(3) { right: 4%; top: 26%; }
+            .ar-ice-shard:nth-child(4) { left: 10%; bottom: 8%; }
+            .ar-ice-shard:nth-child(5) { right: 8%; bottom: 14%; }
+            .ar-ice-shard:nth-child(6) { left: 44%; top: -4%; }
+            .ar-ice-shard:nth-child(7) { right: 34%; bottom: -2%; }
+            .ar-fighter.is-frozen .ar-hero { filter: saturate(.45) brightness(.9)
+                drop-shadow(0 0 10px rgba(150,220,255,.7)); animation-play-state: paused; }
 
             /* ── STUNNED ─────────────────────────────────────────────────────────────────────────────────
                Three stars on a ring above the head, the ring turning, each star bobbing on its own offset so
