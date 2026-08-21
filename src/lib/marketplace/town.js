@@ -116,6 +116,9 @@ export const GATED_BUILDINGS = [
     { id: "arena", emoji: "⚔️", label: "The Arena", href: "/marketplace/arena", x: 34, gate: "owner" },
     // No `gate` — the Market is public. (An entry WITHOUT it is shown to everybody, per the note above.)
     { id: "market", emoji: "🏪", label: "The Market", href: "/marketplace/market", x: 40 },
+    // The casino is being built. `gate: "owner"` is what keeps it off everybody else's street — see the note
+    // above: an entry WITHOUT it is shown to the whole Den.
+    { id: "casino", emoji: "🎰", label: "The Casino", href: "/marketplace/casino", x: 46, gate: "owner" },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.
