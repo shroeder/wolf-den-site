@@ -162,6 +162,9 @@ const BEAT_BUDGET_MS = 1200;
 const COUNTER_WIND_MS = 150;
 // Which events make somebody flinch — the ones that move a health bar.
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
+// The two that are damage over time. They still float a number and still colour it; what they do NOT do is
+// shake the stage, stop the frame or recoil a fighter — see the branch that reads this.
+const DOT_KINDS = new Set(["bleed", "burn"]);
 // The engine's vocabulary against the pop stylesheet's.
 const POP_KIND = { hit: "dmg", crit: "crit", counter: "counter", riposte: "thorn", thorn: "thorn", bleed: "bleed", burn: "burn", drink: "heal", block: "block", ward: "ward", miss: "miss" };
 
@@ -1461,11 +1464,18 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // guard. The self-actions are exactly the ones where the actor IS the target, which is the one case
         // the old expression got backwards.
         //
-        // The burn clause was wrong the same way. A burn logs `who` as the fighter who APPLIED it, so
-        // `|| l.grade === "burn"` forced every tick onto the foe — including the burn ticking on YOU, whose
-        // flames played over the enemy who lit them. With `who` meaning the actor in both cases, burns need
-        // no special case at all: they land on the other one, like any other blow.
-        const target = onSelf ? (mineNow ? "you" : "them") : (mineNow ? "them" : "you");
+        // ── AND A TICK HAPPENS TO WHOEVER IS STAMPED ON IT ───────────────────────────────────────────────
+        // This comment used to say a burn logs `who` as the fighter who APPLIED it, and reasoned from there
+        // that a burn needs no special case. That was true of the old auto-resolver and it stopped being
+        // true when the ring took over: openTurn stamps a tick with the fighter whose turn it is — the one
+        // PAYING it. So "You burn — 93" carried who="me", fell through to the not-on-self branch, and put
+        // your flames over the opponent. Luke: "it says I burn for 93 but it's burning them on screen."
+        //
+        // A tick is the one line in the log that never crosses the ring, which is the same sentence the
+        // health-bar reconstruction needed teaching yesterday. Both now say it in code rather than in a
+        // comment that can quietly go out of date.
+        const tick = Boolean(l.burnTick || l.bleedTick);
+        const target = onSelf || tick ? (mineNow ? "you" : "them") : (mineNow ? "them" : "you");
         // Scale the spectacle by how much of the target's bar it actually took, so a graze and a
         // fight-ender are not the same picture.
         const pool = target === "you" ? bout.maxHp : bout.foeMaxHp;
@@ -1656,7 +1666,18 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // The ring itself answers, every time — this is the half that was only ever played once per
                 // beat, which is why ten numbers flew while the fighters stood still.
                 const hurtSide = e.side === "left" ? "you" : "them";
-                if (DAMAGE_KINDS.has(e.kind)) {
+                // ── A TICK IS NOT A BLOW ─────────────────────────────────────────────────────────
+                // Luke: "burning feels too much like an attack." It was shaking the stage, freezing the
+                // frame and throwing the fighter into a recoil — the full vocabulary of somebody being
+                // hit — for damage nobody swung for. A wound opening on its own turn is a consequence,
+                // not an impact: it gets its number and its colour and leaves the ring alone.
+                if (DOT_KINDS.has(e.kind)) {
+                    // Still heard and still felt a little — it is damage, and silence would be its own kind
+                    // of lie. What it does not get is the recoil, the shake and the hit-stop.
+                    setHitSide(null);
+                    Sfx.burn();
+                    Haptic.hit(0.25);
+                } else if (DAMAGE_KINDS.has(e.kind)) {
                     setHitSide(hurtSide);
                     setShake(e.crit || e.kind === "counter" ? 2 : 1);
                     setStop(true);
@@ -1675,7 +1696,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     }
                     else if (e.crit) { Sfx.crit(0.8); Haptic.crit(); duck(0.5, 0.3); }
                     else if (e.kind === "thorn" || e.kind === "riposte") { Sfx.impact(0.45); Haptic.hit(0.5); }
-                    else if (e.kind === "bleed" || e.kind === "burn") { Sfx.burn(); }
                     else { Sfx.impact(0.5); Haptic.hit(0.6); }
                 } else if (e.kind === "drink") { Sfx.heal?.(); Haptic.cast(); }
                 else if (e.kind === "block" || e.kind === "ward") { Sfx.block(0.4); }
