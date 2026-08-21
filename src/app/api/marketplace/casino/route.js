@@ -7,6 +7,7 @@ import { getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
 import { blackjackState, dealBlackjack, doubleBlackjack, hitBlackjack, standBlackjack } from "@/lib/marketplace/blackjack.js";
+import { bingoState, buyBingoCard } from "@/lib/marketplace/bingo.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,8 +32,10 @@ export async function GET(request) {
         try {
             const buyer = await gate();
             if (!buyer) return noStore({ open: false });
-            const [floor, table] = await Promise.all([getCasinoState(buyer.id), blackjackState(buyer.id)]);
-            return noStore({ open: true, ...floor, blackjack: table });
+            const [floor, table, hall] = await Promise.all([
+                getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(buyer.id),
+            ]);
+            return noStore({ open: true, ...floor, blackjack: table, bingo: hall });
         } catch (error) {
             return internalError(error, { event: "marketplace.casino.state.failure" });
         }
@@ -65,6 +68,11 @@ export async function POST(request) {
                 case "bj_hit": return noStore(await hitBlackjack(buyer.id));
                 case "bj_stand": return noStore(await standBlackjack(buyer.id));
                 case "bj_double": return noStore(await doubleBlackjack(buyer.id));
+                // ── THE HALL ── one verb. A card is bought, dealt and scored in a single answer, and the
+                // balls that follow on screen are a ceremony over a result already banked. What the ROUND
+                // shares is the forty numbers, not the moment of watching them: buy at any point in the
+                // three minutes and you are playing the same draw as everybody else who did.
+                case "bingo": return noStore(await buyBingoCard(buyer.id, { bet: b?.bet }));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

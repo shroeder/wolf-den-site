@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import CasinoClient from "@/components/CasinoClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { bingoState } from "@/lib/marketplace/bingo.js";
 import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -24,6 +25,8 @@ export default async function CasinoPage() {
 
     // A hand left open survives a refresh, which is the whole reason the table lives in a row: closing the
     // tab mid-hand must not be a way to lose a stake, and it must not be a way to escape one either.
-    const [floor, table] = await Promise.all([getCasinoState(buyer.id), blackjackState(buyer.id)]);
-    return <CasinoClient initial={{ ...floor, blackjack: table }} />;
+    const [floor, table, hall] = await Promise.all([
+        getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(buyer.id),
+    ]);
+    return <CasinoClient initial={{ ...floor, blackjack: table, bingo: hall }} />;
 }

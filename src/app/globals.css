@@ -17593,3 +17593,43 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-vol { margin: 0 0 10px; text-align: center; }
 .cas-vol span { display: block; font-size: 12px; font-weight: 700; color: #e7edf4; }
 .cas-vol i { display: block; font-style: normal; font-size: 9.5px; letter-spacing: 0.04em; color: #98a0aa; margin-top: 3px; }
+
+/* ── THE BINGO HALL ──────────────────────────────────────────────────────────────────────────────────
+   The one game on this floor with other people in it: everybody who buys a card inside the same three
+   minutes is playing the same forty numbers. The line at the top says so, because a shared draw that
+   nobody is told about is just a draw. */
+.cas-hall { margin: 0 0 10px; }
+.cas-hall-top { text-align: center; font-size: 10px; color: #9fc6dd; margin-bottom: 8px; }
+
+.cas-bhead, .cas-bcard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: #ffd75e; }
+.cas-bcard { margin-top: 5px; }
+.cas-bcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; font-size: 13px; font-weight: 800; color: #cbd3dc;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+    transition: background .18s ease, color .18s ease, transform .18s ease; }
+/* A daub. It lands with a little pop, because the whole appeal of bingo is watching your own card fill in
+   — a grid that arrives already completed is a receipt. */
+.cas-bcell.is-hit { color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e);
+    border-color: rgba(255,215,94,0.6); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
+/* The free square is ALWAYS marked — that is what free means — so it must not be styled as though it is
+   waiting for a ball. This rule sat AFTER .is-hit and overrode its background, so the one cell on the card
+   that is marked before the game starts was the one cell that looked empty. Set the whole daubed look here
+   rather than only the colour; a rule that wins on one property and loses on another is worse than either. */
+.cas-bcell.is-free, .cas-bcell.is-free.is-hit { color: #0e1116;
+    background: linear-gradient(180deg, #ffe9b8, #ffd75e); border-color: rgba(255,215,94,0.6); animation: none; }
+/* The line that paid, marked once the balls have stopped. */
+.cas-bcell.is-line { box-shadow: 0 0 0 2px rgba(126,255,178,0.75), 0 0 16px rgba(126,255,178,0.4); }
+@keyframes casDaub { from { transform: scale(1.35); } to { transform: none; } }
+
+/* The balls, in the order they came out. They wrap and keep going — forty of them is a lot, and the point
+   is the accumulating pile, not any one of them. */
+.cas-balls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; min-height: 26px; align-items: center; }
+.cas-ball { min-width: 22px; padding: 2px 5px; border-radius: 999px; text-align: center;
+    font-size: 10px; font-weight: 800; color: #98a0aa;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
+/* The one that just came out. It is bigger and gold for exactly one ball's worth of time. */
+.cas-ball.is-new { color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e);
+    border-color: rgba(255,215,94,0.7); animation: casBall .2s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes casBall { from { transform: scale(1.5); } to { transform: none; } }
+.cas-balls-idle { font-size: 11px; color: #98a0aa; }

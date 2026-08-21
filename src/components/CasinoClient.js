@@ -18,12 +18,13 @@ import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 // generate and this is a layout to be argued with first. When the floor plan is right, the cabinets get
 // painted.
 const MACHINES = [
-    { id: "slot", x: 12, label: "Wolf's Luck", kind: "Slots", live: true },
-    { id: "slot2", x: 28, label: "Den Fortune", kind: "Slots", live: true },
-    { id: "slot3", x: 44, label: "Moonrise", kind: "Slots", live: true },
-    { id: "roulette", x: 60, label: "The Wheel", kind: "Roulette", live: true },
-    { id: "keno", x: 75, label: "Keno", kind: "Keno", live: true },
-    { id: "blackjack", x: 90, label: "The Table", kind: "Blackjack", live: true },
+    { id: "slot", x: 10, label: "Wolf's Luck", kind: "Slots", live: true },
+    { id: "slot2", x: 24, label: "Den Fortune", kind: "Slots", live: true },
+    { id: "slot3", x: 38, label: "Moonrise", kind: "Slots", live: true },
+    { id: "roulette", x: 52, label: "The Wheel", kind: "Roulette", live: true },
+    { id: "keno", x: 66, label: "Keno", kind: "Keno", live: true },
+    { id: "bingo", x: 80, label: "The Hall", kind: "Bingo", live: true },
+    { id: "blackjack", x: 94, label: "The Table", kind: "Blackjack", live: true },
 ];
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
@@ -118,6 +119,10 @@ export default function CasinoClient({ initial }) {
     // The one machine with a hand in progress. It comes down from the server on load, so closing the tab
     // mid-hand is not a way to lose a stake — nor a way to walk out of one.
     const [hand, setHand] = useState(initial?.blackjack?.hand || null);
+    // The hall. `card` is the whole answer the moment it arrives; `called` is how far the ceremony has got
+    // through the forty balls, which is the only thing the animation actually advances.
+    const [card, setCard] = useState(null);
+    const [called, setCalled] = useState(0);
     const rakeRate = initial?.blackjack?.rakeRate ?? 0.2;
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -332,6 +337,55 @@ export default function CasinoClient({ initial }) {
         }
     }, [busy, absorb]);
 
+    // ── THE HALL ────────────────────────────────────────────────────────────────────────────────────────
+    // One request buys the card, deals it and scores it. What happens next on screen is a ceremony over a
+    // result already banked — the balls come out one at a time and the card daubs itself as they land,
+    // because the whole appeal of bingo is watching your own card fill in, and a grid that arrives already
+    // completed is a receipt.
+    //
+    // Nothing here can change the outcome, which is why the reveal is allowed to be pure presentation.
+    const BALL_MS = 85;
+    const buyCard = useCallback(async () => {
+        if (busy) return;
+        unlock();
+        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
+        setCard(null); setCalled(0);
+        Sfx.whoosh();
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "bingo", bet }),
+        }).then((x2) => x2.json()).catch(() => null);
+        if (!r?.ok) {
+            setBusy(false);
+            setErr(r?.error === "no_gold" ? "Not enough gold for that card." : "That didn't go through.");
+            return;
+        }
+        setCard(r);
+        setSt((p) => ({ ...p, gold: r.gold }));
+
+        // Ball by ball. The last five are slowed down: by then you can see what you need, and the pause is
+        // where the game actually lives.
+        (r.drawn || []).forEach((_, i) => {
+            const late = i >= (r.drawn.length - 5);
+            const at = i * BALL_MS + (late ? (i - (r.drawn.length - 5)) * 220 : 0);
+            timers.current.push(setTimeout(() => {
+                setCalled(i + 1);
+                Sfx.ui?.();
+            }, at));
+        });
+        const total = (r.drawn?.length || 0) * BALL_MS + 5 * 220 + 260;
+        timers.current.push(setTimeout(() => {
+            setBusy(false);
+            absorb(r);
+            if (r.won > 0) {
+                const big = r.mult >= 8;
+                setFlash(big ? "big" : "win");
+                if (big) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+                timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
+            } else Sfx.block(0.3);
+        }, total));
+    }, [bet, busy, absorb]);
+
     // Three of whatever this cabinet actually rolls, taken from the middle of its own symbol list so the
     // idle machine is neither promising a jackpot nor showing three blanks.
     const idleReels = useMemo(() => {
@@ -523,6 +577,63 @@ export default function CasinoClient({ initial }) {
                         </>
                     ) : null}
 
+                    {/* ── THE CARD ───────────────────────────────────────────────────────────────────
+                        Five columns under B-I-N-G-O, daubed as the balls land. The winning lines are sent
+                        down with the result rather than worked out here — the server already knows which
+                        ones paid, and a screen that recomputes them is a second implementation of the rules
+                        that can disagree with the one that paid the money. */}
+                    {at.live && at.id === "bingo" ? (
+                        <div className="cas-hall">
+                            <div className="cas-hall-top">
+                                <span>{st?.bingo?.players?.length
+                                    ? `${st.bingo.players.length} in this round — same forty numbers`
+                                    : "Everyone who buys in this round plays the same forty numbers"}</span>
+                            </div>
+
+                            <div className="cas-bhead" aria-hidden="true">
+                                {["B", "I", "N", "G", "O"].map((L) => <b key={L}>{L}</b>)}
+                            </div>
+                            <div className="cas-bcard">
+                                {[0, 1, 2, 3, 4].map((row) => (
+                                    [0, 1, 2, 3, 4].map((col) => {
+                                        const n = card?.card?.[col]?.[row];
+                                        const hit = n === 0 || (card && card.drawn.slice(0, called).includes(n));
+                                        const won = Boolean(card && !busy && (
+                                            card.lines?.some((l) => (l.kind === "row" && l.i === row)
+                                                || (l.kind === "col" && l.i === col)
+                                                || (l.kind === "diag" && l.i === 0 && row === col)
+                                                || (l.kind === "diag" && l.i === 1 && row + col === 4))
+                                            || (card.corners && card.lines?.length === 0
+                                                && (row === 0 || row === 4) && (col === 0 || col === 4))
+                                        ));
+                                        return (
+                                            <span key={`${row}-${col}`}
+                                                className={`cas-bcell${hit ? " is-hit" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}`}>
+                                                {card ? (n === 0 ? "★" : n) : ""}
+                                            </span>
+                                        );
+                                    })
+                                ))}
+                            </div>
+
+                            {/* The balls, in the order they came out. The newest one is the loud one. */}
+                            <div className="cas-balls">
+                                {(card?.drawn || []).slice(0, called).map((n, i) => (
+                                    <span key={`${n}-${i}`} className={`cas-ball${i === called - 1 ? " is-new" : ""}`}>{n}</span>
+                                ))}
+                                {!card ? <span className="cas-balls-idle">Forty balls. A line gets your card back.</span> : null}
+                            </div>
+
+                            <p className={`cas-result${card && !busy && card.won > 0 ? " is-win" : ""}`}>
+                                {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 2.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 300)}x`
+                                    : busy ? `${called} of ${card.drawn.length} called…`
+                                        : card.label
+                                            ? `${card.label} — ${card.won > 0 ? `${money(card.won)} gold` : "no pay"}`
+                                            : "Not this time."}
+                            </p>
+                        </div>
+                    ) : null}
+
                     {/* ── THE FELT ────────────────────────────────────────────────────────────────────
                         Dealer on top, you below, the way a table is laid out — and the face-down card is
                         drawn face-down rather than left out, because the shape of the hand is the whole
@@ -621,13 +732,14 @@ export default function CasinoClient({ initial }) {
                                 onClick={() => {
                                     if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
+                                    if (at.id === "bingo") return buyCard();
                                     if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
                                 {busy ? "…"
                                     : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
-                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
+                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
                             {err ? <p className="cas-err">{err}</p> : null}
                         </>
