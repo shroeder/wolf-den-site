@@ -110,6 +110,11 @@ const CAST_MS = 700;
 // governs a fast fight, so that is what moved most.
 const PLAY_SCALE = 1000;
 const PLAY_MIN_MS = 430;
+// What a line that is not a blow is worth. Long enough to read four words, short enough that eight of them
+// in a row is not a loading screen. See beatMs.
+const PLAY_CHORE_MS = 170;
+// And what a deep queue multiplies all of it by.
+const PLAY_RUSH = 0.6;
 const PLAY_MAX_MS = 1100;
 const PLAY_OPEN_MS = 700;
 
@@ -1025,15 +1030,38 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         if (logAll.length < shown) setShown(0);
     }, [logAll.length, shown]);
 
+    // ── NOT EVERY LINE DESERVES THE SAME HALF SECOND ─────────────────────────────────────────────────────────
+    // Luke: "every user interaction results in slow feedback, nothing feels good, it all feels laggy."
+    //
+    // The server answers an act in 20-50ms. The lag is entirely here: PLAY_MIN_MS is 430 and it was applied
+    // to EVERY line. That was fine when an exchange was two lines. It is not fine now — making the transcript
+    // honest (burn ticks, freezes, casts, counters, extra turns all narrate) took a typical exchange to nine
+    // lines, and nine times 430ms is 3.9 seconds of animation between you and the next thing you get to do.
+    // The fix is not to hide the lines. It is that a burn ticking for 65 is not the same event as a
+    // critical, and pretending they are is what makes the whole screen feel like treacle.
+    //
+    // A BLOW keeps its moment. Everything that is bookkeeping — a tick, a lost turn, a cast with no swing —
+    // gets a beat you can read and no more. And when the queue is deep the whole run compresses, because the
+    // eighth line of a nine-line exchange is not being savoured by anybody.
+    const beatMs = useCallback((line, queued) => {
+        const prevT = shown > 0 ? logAll[shown - 1].t : 0;
+        const gap = Math.max(0, (Number(line.t) || 0) - prevT);
+        const chore = line.bleedTick || line.burnTick || line.stunnedSkip || line.chilledSkip
+            || line.cast || line.guard || line.fever;
+        const base = chore
+            ? PLAY_CHORE_MS
+            : Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, gap * PLAY_SCALE));
+        // Four or more still to come and the exchange is a run, not a beat: play it like one.
+        return queued > 3 ? Math.round(base * PLAY_RUSH) : base;
+    }, [logAll, shown]);
+
     useEffect(() => {
         if (!logAll.length || shown >= logAll.length) return undefined;
-        const here = logAll[shown];
-        const prevT = shown > 0 ? logAll[shown - 1].t : 0;
-        const gap = Math.max(0, (Number(here.t) || 0) - prevT);
-        const ms = Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, gap * PLAY_SCALE));
-        const id = setTimeout(() => setShown((n) => n + 1), shown === 0 ? PLAY_OPEN_MS : ms);
+        const queued = logAll.length - shown;
+        const ms = shown === 0 ? PLAY_OPEN_MS : beatMs(logAll[shown], queued);
+        const id = setTimeout(() => setShown((n) => n + 1), ms);
         return () => clearTimeout(id);
-    }, [logAll, shown]);
+    }, [logAll, shown, beatMs]);
 
     // The position after the blows played so far. Recomputed rather than accumulated, so a scrub or a replay
     // can land anywhere without the health bars drifting out of step with the transcript.

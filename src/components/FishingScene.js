@@ -364,12 +364,17 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
                     <img src="/images/fish/fish_mackerel.png" alt="" draggable="false" aria-hidden="true" />
                 </div>
             </div>
+            {/* ── THE HOLD, ACROSS THE WATER ──────────────────────────────────────────────────────────────
+                Luke: "the button to reel should be over the bottom area where the ripple effects are, nice
+                and big." Which is right for two reasons past the size of it: that strip is the only part of
+                the frame with nothing to watch in it, and a control down there is under your thumb already
+                rather than somewhere you have to reach for while a fish is running. */}
+            <button type="button" className="fwreel-hold"
+                onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
+                HOLD TO REEL
+            </button>
             <div className="fwreel-side">
                 <strong className="fwreel-title">{title}</strong>
-                <button type="button" className="fwreel-hold"
-                    onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
-                    HOLD TO REEL
-                </button>
                 {/* Live, and the same number the server receives. What is hidden is the RELATIONSHIP: a good
                     reel floors the bad end of the size roll rather than setting the size, so this reads as
                     "how am I handling it" and never spoils the reveal. */}
