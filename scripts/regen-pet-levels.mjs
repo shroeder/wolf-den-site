@@ -12,17 +12,36 @@ import path from "node:path";
 import "./lib/ai-trace.mjs";
 import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
+import { priceRun, quality, requirePreview } from "./lib/gen-guard.mjs";
 
 const APPLY = process.argv.includes("--apply");
+
+// ── THE QUALITY IS NOW A CHOICE ──────────────────────────────────────────────────────────────────────────────
+// This script hard-coded `quality: "high"` in two places, and gen-guard.mjs names it by name: "It was copied
+// from regen-pet-levels.mjs ... `high` is 4x medium and it was never a decision, it was an inherited default."
+// The guard was written after that cost $65 and then this script — the source of the default — was never
+// changed, so every run since has quietly been the expensive one.
+//
+// Medium unless --high is passed. Five pets is $1.10 at medium and $4.28 at high; the difference dies in the
+// 512px downscale two lines below.
+const Q = quality();
 const ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 if (!ids.length) { console.error("Name at least one pet id."); process.exit(1); }
+
+// Five images per pet: Lv1 from text, then Lv2-5 as EDITS of it — an edit is billed the image plus the
+// reference it was handed, which is why they are priced separately.
+const total = priceRun({ count: ids.length, quality: Q })
+    + priceRun({ count: ids.length * 4, quality: Q, edit: true });
+console.log(`${ids.length} pet(s) x (Lv1 + 4 edits) = ${ids.length * 5} images, $${total.toFixed(2)} total${APPLY ? "" : " — PREVIEW ONLY, nothing will be uploaded"}`);
+if (APPLY) requirePreview({ count: ids.length * 5, total });
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 const env = fs.readFileSync("../accounting_app/.env", "utf8");
 const sql = neon(env.match(/^DATABASE_URL=(.*)$/m)[1].trim());
 const blobToken = env.match(/^BLOB_READ_WRITE_TOKEN=(.*)$/m)?.[1]?.trim();
-const OUT = "C:/Users/Luke/AppData/Local/Temp/claude/C--Users-Luke-Projects/a74e73a5-2c7a-498f-9a71-6af0a5746735/scratchpad/pets";
+// The preview drop. Points at whatever scratchpad the session has rather than a dead path from an old one.
+const OUT = process.env.PET_OUT || "C:/Users/Luke/AppData/Local/Temp/claude/C--Users-Luke-Projects/a74e73a5-2c7a-498f-9a71-6af0a5746735/scratchpad/pets";
 fs.mkdirSync(OUT, { recursive: true });
 
 // Mirrors src/lib/marketplace/pet-sprite.js — kept in step by hand because this script runs outside Next and
@@ -47,7 +66,7 @@ async function genBase(pet) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         // HIGH, always. Pets are the thing members look at most and the cost control was showing.
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", output_format: "png", quality: "high", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", output_format: "png", quality: Q, n: 1 }),
     });
     if (!r.ok) throw new Error(`Lv1 ${r.status}: ${(await r.text()).slice(0, 200)}`);
     return Buffer.from((await r.json()).data[0].b64_json, "base64");
@@ -61,7 +80,7 @@ async function genLevel(baseBuf, level) {
     form.append("image", new Blob([baseBuf], { type: "image/png" }), "base.png");
     form.append("prompt", prompt);
     form.append("size", "1024x1024");
-    form.append("quality", "high");
+    form.append("quality", Q);
     // The edits endpoint does NOT inherit the source image's alpha — omit this and every evolved level comes
     // back on an opaque plate, which is exactly what happened on the first run.
     form.append("background", "transparent");
@@ -81,7 +100,18 @@ for (const id of ids) {
     // The pet's own description lives in collectibles.js; read it straight out of the source rather than
     // duplicating 98 prompts into this script.
     const src = fs.readFileSync("src/lib/marketplace/collectibles.js", "utf8");
-    const m = src.match(new RegExp(`\\{ id: "${id}",[^}]*?spritePrompt: "([^"]+)"`));
+    // ── SCRAPING THE PROMPT OUT OF collectibles.js ──────────────────────────────────────────────────────
+    // This used a regex that ran from the entry's `id` to `spritePrompt` through `[^}]*?` — which stops dead
+    // at the FIRST closing brace, so any pet whose entry contains a nested object loses its prompt and is
+    // silently skipped. The five casino pets all carry a `casinoPerk: { ... }`, and all five reported
+    // "no spritePrompt found" while having one on the very next line.
+    //
+    // Read from the entry's start to the start of the NEXT entry instead, and find the prompt inside that
+    // window. Nested braces are then just characters, which is what they always were.
+    const at = src.indexOf(`{ id: "${id}",`);
+    const next = at === -1 ? -1 : src.indexOf('\n    { id: "', at + 1);
+    const entry = at === -1 ? "" : src.slice(at, next === -1 ? src.length : next);
+    const m = entry.match(/spritePrompt: "([^"]+)"/);
     if (!m) { console.log(`SKIP ${id} — no spritePrompt found`); continue; }
     const pet = { id, spritePrompt: m[1] };
     console.log(`\n${id}: ${pet.spritePrompt.slice(0, 70)}…`);
@@ -109,8 +139,19 @@ for (const id of ids) {
             await sql`INSERT INTO mkt_pet_sprite (pet_id, url, flip, updated_at) VALUES (${id}, ${up.url}, FALSE, NOW())
                       ON CONFLICT (pet_id) DO UPDATE SET url = ${up.url}, flip = FALSE, facing_checked_at = NULL, updated_at = NOW()`;
         } else {
-            await sql`INSERT INTO mkt_pet_sprite_level (pet_id, level, url, updated_at) VALUES (${id}, ${Number(lv)}, ${up.url}, NOW())
-                      ON CONFLICT (pet_id, level) DO UPDATE SET url = ${up.url}, flip = FALSE, facing_checked_at = NULL, updated_at = NOW()`;
+            // ── ON CONFLICT MUST NAME THE WHOLE KEY ─────────────────────────────────────────────────────
+            // The key on this table is (pet_id, level, VARIANT) — `variant` was added for the level-6
+            // light/dark forms, and this line was never updated. `ON CONFLICT (pet_id, level)` matches no
+            // constraint, so Postgres throws 42P10 and the whole run dies after publishing Lv1: every
+            // --apply of this script has been broken since the column existed, and the failure looks like a
+            // crash rather than like a missing sprite.
+            //
+            // '' is the base variant, which is what gen-pet-level6.mjs reads when it looks for a pet's
+            // ordinary ladder. Third time this codebase has paid for an ON CONFLICT that did not match its
+            // index; the first cost two weeks of silently lost writes.
+            await sql`INSERT INTO mkt_pet_sprite_level (pet_id, level, variant, url, updated_at)
+                      VALUES (${id}, ${Number(lv)}, '', ${up.url}, NOW())
+                      ON CONFLICT (pet_id, level, variant) DO UPDATE SET url = ${up.url}, flip = FALSE, facing_checked_at = NULL, updated_at = NOW()`;
         }
         console.log(`  published Lv${lv}`);
     }

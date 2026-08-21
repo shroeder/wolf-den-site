@@ -17338,38 +17338,51 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    room is what gives way. */
 .cas-room { position: relative; height: clamp(150px, 30vh, 300px); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
-    background: radial-gradient(120% 80% at 50% 0%, #2a1636 0%, #140d1c 55%, #0a0710 100%);
+    /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
+       point precisely so it can do this — a perspective backdrop is only correct from one camera position,
+       and this camera pans. The gradient stays underneath as the colour the room is when the image has not
+       arrived yet, so a slow connection gets a dark violet hall rather than a white one. */
+    background: url("/images/casino/room.webp") repeat-x center / auto 100%,
+        radial-gradient(120% 80% at 50% 0%, #2a1636 0%, #140d1c 55%, #0a0710 100%);
     /* The window. It scrolls, but never by dragging — the camera follows the walk buttons, so a stray
        swipe cannot leave you looking at a wall you are not standing near. */
     overflow-x: hidden; scrollbar-width: none; }
 .cas-room::-webkit-scrollbar { display: none; }
 /* The floor itself, wider than the window. Everything inside is positioned as a % of THIS. */
 .cas-world { position: relative; width: 240%; height: 100%; }
-.cas-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 38%;
-    background: linear-gradient(180deg, rgba(255,190,90,0.10), rgba(255,140,60,0.03) 60%, transparent);
-    border-top: 1px solid rgba(255,190,90,0.14); }
+/* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
+   the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
+   that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of
+   lamplight at the very bottom — light on the ground the machines stand on, not a horizon line. */
+.cas-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 16%;
+    background: linear-gradient(180deg, transparent, rgba(255,190,90,0.10)); }
 
 /* A cabinet. Gradient and border on purpose — see the note in the component. */
 /* Narrow, because six cabinets in a fixed-width room collide on a phone — at 74px wide and 14% apart the
    labels ran into each other and the last one hung off the edge. This is the stopgap: the real answer when
    there are more machines is a camera that scrolls the room with you rather than fitting the whole floor on
    one screen. */
-.cas-mach { position: absolute; bottom: 30%; transform: translateX(-50%); text-align: center;
-    width: 54px; transition: transform 140ms ease; }
-.cas-mach-body { display: block; height: 62px; border-radius: 9px;
-    border: 1px solid rgba(255,255,255,0.12);
-    background: linear-gradient(180deg, #2c2038, #191122);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.5); position: relative; }
-.cas-mach-screen { position: absolute; left: 12%; right: 12%; top: 16%; height: 38%;
-    border-radius: 4px; background: rgba(120,90,160,0.35); }
-.cas-mach.is-live .cas-mach-screen { background: linear-gradient(180deg, #ffd75e, #ff9f43);
-    box-shadow: 0 0 16px rgba(255,190,90,0.55); }
-.cas-mach b { display: block; margin-top: 5px; font-size: 8.5px; font-weight: 900; line-height: 1.1; }
+/* THE MACHINES STAND ON THE CARPET. At `bottom: 30%` they floated in the middle of the wall's arches like
+   pictures hung on it — which was invisible while the room was a gradient with no floor in it, and obvious
+   the moment the room became a room. They sit just above the carpet strip now, with the player in front. */
+.cas-mach { position: absolute; bottom: 13%; transform: translateX(-50%); text-align: center;
+    width: 66px; transition: transform 140ms ease; }
+/* The cabinet is a SPRITE now, so the box that used to draw it is only a place to stand and a ground
+   shadow. Every rule that painted the old gradient is deleted rather than left underneath — a background
+   and a border still winning behind a transparent PNG is how a swapped-in sprite ends up in a box. */
+.cas-mach-body { display: block; height: 84px; position: relative; }
+.cas-mach-body img { display: block; width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); }
+/* The machine you are standing at lights up. On a sprite this has to be a GLOW rather than a border —
+   a border would draw a rectangle around a die-cut object and give away that it is a picture. */
+.cas-mach.is-near .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6))
+    drop-shadow(0 0 10px rgba(255,215,94,0.75)); }
+/* A machine that is not live is dimmed rather than differently drawn, so the row reads as one room. */
+.cas-mach:not(.is-live) .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)) grayscale(0.7) brightness(0.55); }
+.cas-mach b { display: block; margin-top: 3px; font-size: 8.5px; font-weight: 900; line-height: 1.1; }
 .cas-mach em { display: block; font-style: normal; font-size: 7.5px; color: #98a0aa;
     letter-spacing: .12em; text-transform: uppercase; }
 .cas-mach.is-near { transform: translateX(-50%) translateY(-4px); }
-.cas-mach.is-near .cas-mach-body { border-color: rgba(255,215,94,0.7);
-    box-shadow: 0 8px 22px rgba(0,0,0,0.55), 0 0 22px rgba(255,215,94,0.3); }
 
 /* People. Yours is the solid one; everybody else is dimmer and behind. */
 .cas-other, .cas-you { position: absolute; bottom: 8%; transform: translateX(-50%); text-align: center; }

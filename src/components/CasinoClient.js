@@ -431,8 +431,12 @@ export default function CasinoClient({ initial }) {
                 {MACHINES.map((m) => (
                     <div key={m.id} className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
                         style={{ left: `${m.x}%` }}>
+                        {/* The cabinet, drawn rather than approximated. It was a gradient and a border for
+                            as long as the floor plan was still being argued about, which was the right order
+                            to do it in — art costs money to get wrong, and the plan changed three times. */}
                         <span className="cas-mach-body">
-                            <i className="cas-mach-screen" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`/images/casino/${m.id}.webp`} alt="" draggable="false" />
                         </span>
                         <b>{m.label}</b>
                         <em>{m.live ? m.kind : "soon"}</em>
