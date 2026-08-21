@@ -14,8 +14,13 @@
 //   node scripts/gen-skill-art.mjs --only rupture  one skill and its nine nodes
 //   node scripts/gen-skill-art.mjs --quality medium
 //
-// Quality defaults to LOW, which is the house default (see art-style.js) — image output is ~91% of the OpenAI
-// bill and low is ~15x cheaper than high. At the size these are drawn, 30-52px, the tier is invisible.
+// MEDIUM, and that is a correction. art-style.js records low as the house default from 2026-07-31; the memory
+// written after the $65 day on 2026-08-11 supersedes it with medium, and Luke has now said it directly for
+// game art. Low came back visibly off-house-style — thinner ink, weaker silhouette, a washed palette — which
+// is exactly what SMALL_ICON_EXTRA exists to protect, and these are icons a member reads while deciding how
+// to spend a point.
+//
+// 90 pieces at medium is about $3.80. Priced here rather than discovered on the bill.
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
@@ -30,7 +35,7 @@ if (!KEY) throw new Error("no OPENAI_API_KEY in accounting_app/local.properties"
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > -1 ? process.argv[i + 1] : d; };
 const FORCE = process.argv.includes("--force");
 const ONLY = arg("--only", null);
-const QUALITY = arg("--quality", "low");
+const QUALITY = arg("--quality", "medium");
 
 const OUT = "public/images/arena/skill";
 fs.mkdirSync(`${OUT}/node`, { recursive: true });
@@ -51,7 +56,20 @@ const nodeOf = (s, b, n) => housePrompt(
     + `What it does: ${String(n.desc).replace(/^CAPSTONE\.\s*/, "")} `
     + `It belongs to the "${b.name}" branch — ${b.tag}. `
     + "A small abstract emblem, no character, no scenery, no text. Centered and filling the frame, "
-    + `readable at 32 pixels. ${n.tier === 2 ? "This is a CAPSTONE: make it noticeably grander and brighter than an ordinary node." : ""}`,
+    // ── AND NOT THE RECYCLE ARROW ────────────────────────────────────────────────────────────────────────
+    // The three "comes back a beat sooner" nodes all summoned it — a curved arrow chasing its own tail is
+    // what the model reaches for when a description says "again". It is a banned glyph here (see the memory:
+    // "never use those blue and with arrow icons ever again"); on a fantasy skill panel it also reads as a
+    // browser refresh button somebody pasted into the game.
+    + "NEVER draw a circular or curved arrow, a refresh/recycle/undo symbol, or any arrow chasing its own "
+    + "tail — draw the THING, not a UI glyph for it. "
+    // Forbidding it was not enough on its own: told only what NOT to draw, the model drew the arrow smaller.
+    // A ban needs somewhere for the idea to GO, so a cooldown node is handed a subject — Quickened came back
+    // as an hourglass on the first try once it had one.
+    + (Number(n.mod?.cooldown) < 0
+        ? "Draw a TIMEKEEPING object — an hourglass, a sandglass, a war-drum, a struck bell — as the subject. "
+        : "")
+    + `Readable at 32 pixels. ${n.tier === 2 ? "This is a CAPSTONE: make it noticeably grander and brighter than an ordinary node." : ""}`,
     { extra: SMALL_ICON_EXTRA },
 );
 
@@ -77,7 +95,14 @@ for (const j of todo) {
         const r = await fetch("https://api.openai.com/v1/images/generations", {
             method: "POST",
             headers: { "content-type": "application/json", authorization: `Bearer ${KEY}` },
-            body: JSON.stringify({ model: "gpt-image-1", prompt: j.prompt, size: "1024x1024", quality: QUALITY, n: 1 }),
+            // ── background: "transparent" IS NOT OPTIONAL ────────────────────────────────────────────────
+            // Every other generator in this folder passes it and this one did not, and the prompt asking for
+            // a transparent background is not a substitute: gpt-image-1 honoured it about 94% of the time and
+            // drew a dark panel behind the other 6% — ba_ready, ra_const, ra_bristle, re_pierce and im_sear
+            // all came back as an emblem sitting on a black tile. On the panel that reads as a card behind
+            // one icon in a row of nine, which looks like a rendering bug rather than art.
+            body: JSON.stringify({ model: "gpt-image-1", prompt: j.prompt, size: "1024x1024",
+                background: "transparent", output_format: "png", quality: QUALITY, n: 1 }),
         });
         const body = await r.json();
         const b64 = body?.data?.[0]?.b64_json;

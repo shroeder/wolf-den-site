@@ -423,14 +423,14 @@ export const SCENES = {
         note: "The command deck. Attack / Skill / Guard / Item.",
         state: () => baseState({ bout: makeBout() }),
     },
-    // ── THE TWO HALVES OF AN INTERACTIVE BEAT ────────────────────────────────────────────────────────────
-    // Both are behind a live bout that is waiting on YOUR input, which on a real account means being mid-fight
-    // — you cannot hold a fight still to look at the deck, and the sweep is 1400ms of animation nobody can
-    // pause. The deck is built from the real catalog rather than invented, so a skill that gets renamed or
-    // recosted shows up here rather than drifting into a fixture nobody re-reads.
+    // ── THE INTERACTIVE BEAT ─────────────────────────────────────────────────────────────────────────────
+    // Behind a live bout that is waiting on YOUR input, which on a real account means being mid-fight — you
+    // cannot hold a fight still to look at the deck. The deck is built from the real catalog rather than
+    // invented, so a skill that gets renamed or recosted shows up here rather than drifting into a fixture
+    // nobody re-reads. (There were two of these scenes; the brace went with the timing game.)
     act: {
         label: "Your beat — the deck",
-        note: "Pick a command, then time the tap. Cooldowns count down on the buttons.",
+        note: "Pick a command. Cooldowns count down on the buttons.",
         state: () => baseState({
             bout: makeBout({
                 awaiting: "act",
@@ -441,13 +441,6 @@ export const SCENES = {
                         power: r.power, hits: r.hits, cooldown: r.cooldown, free: Boolean(r.free) };
                 }),
             }),
-        }),
-    },
-    brace: {
-        label: "Their beat — the brace",
-        note: "Their swing is coming; the sweep is already running. Missing it costs nothing.",
-        state: () => baseState({
-            bout: makeBout({ awaiting: "brace", turn: "them" }),
         }),
     },
     telegraph: {

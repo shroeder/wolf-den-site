@@ -15,12 +15,12 @@
 //   npm run sim:skills 400        with a bigger sample per pairing
 import { db } from "../src/lib/db.js";
 import { kitFor } from "../src/lib/marketplace/arena.js";
-import { act, brace, openRing, ringResult } from "../src/lib/marketplace/arena-ring.js";
+import { act, openRing, ringResult } from "../src/lib/marketplace/arena-ring.js";
 import { SKILLS, housePick } from "../src/lib/marketplace/arena-skills.js";
 import { CLASSES } from "../src/lib/marketplace/arena-classes.js";
 
 const N = Number(process.argv[2]) || 160;
-const HAND = 0.7;                 // a competent thumb on both sides, so timing is not the variable here
+
 
 const mulberry = (a) => () => {
     a |= 0; a = (a + 0x6D2B79F5) | 0;
@@ -44,9 +44,8 @@ function play(me, foe, myBag, foeBag, seed) {
             shield: r.A.shield, banked: r.A.banked, maxHp: r.A.maxHp,
             bleeding: r.A.bleedLeft > 0 || r.A.burnLeft > 0,
         };
-        r = r.awaiting === "brace"
-            ? brace(r, { closeness: HAND, rng })
-            : act(r, { closeness: HAND, skill: housePick(myBag, r.cd, ctx), rng });
+        // Their beat resolves inside advance() now, so the loop only ever answers "act".
+        r = act(r, { skill: housePick(myBag, r.cd, ctx), rng });
     }
     return { ...ringResult(r), ran: guard < 5000 };
 }
@@ -73,7 +72,7 @@ for (const r of rows) {
     fighters.push({ name: r.name || "(unnamed)", classId: r.arena_class, kit });
 }
 
-console.log(`${fighters.length} real loadouts, ${N} bouts a pairing, competent hand on both sides\n`);
+console.log(`${fighters.length} real loadouts, ${N} bouts a pairing\n`);
 console.log("loadout                 class        gear   dmg    hp    armour");
 for (const f of fighters) {
     console.log(

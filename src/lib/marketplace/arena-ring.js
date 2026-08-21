@@ -18,17 +18,17 @@
 // CHOOSE your action, not that the turns alternate.
 //
 // ── THE SHAPE OF A BEAT ──────────────────────────────────────────────────────────────────────────────────────
-// A turn is two halves and the ring stops between them, because they ask the member two different questions:
+// The ring stops on exactly ONE question: what are you throwing. Everything else — the bleed ticks, the stun
+// skips, the regen, and the whole of the opponent's turn — resolves on its own and arrives as transcript.
 //
-//   openTurn   bleed, burn, the stun skip, regen, ward — everything that happens TO whoever is up. Nobody
-//              chooses any of it, so the ring resolves it without asking.
-//   the swing  yours (`awaiting: "act"` — pick a command, and time the tap) or theirs (`awaiting: "brace"` —
-//              time the tap to take a share off it).
+// It used to stop twice. The second stop was a timing window on their swing, and it is gone with the rest of
+// the timing game (see the tombstone in arena-kit.js): a fight is a place to spend a decision, and there is no
+// decision in bracing — you were going to tap it every time. Asking anyway turned every exchange into two
+// interactions where one of them had nothing in it.
 //
-// Stopping between them is not tidiness. If a stun ate their turn there is no blow coming, and asking someone
-// to time a brace against a swing that never happens is a fight screen telling a lie about its own state.
+// Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
+// every exchange was a brace nobody was choosing.
 import { HASTE_ATTACKS, gapOf, openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
-import { HAND_FLOOR, betterHand, gradeTiming, houseHand } from "@/lib/marketplace/arena-kit.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
@@ -117,12 +117,47 @@ function advance(ring, rng) {
         ring.beat += 1;
         const att = mine ? ring.A : ring.B;
         const def = mine ? ring.B : ring.A;
+        // Captured BEFORE openTurn, because openTurn is what pushes the bleed and burn ticks and the stun
+        // skip — and those were the lines still coming out blank. A wound eating a third of somebody's health
+        // between two swings is not a footnote; it is frequently the reason the fight went the way it did.
+        const from = ring.log.length;
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });
+        narrate(ring, from, { name: ring.foeName });
         if (!acts) { closeTurn(ring); continue; }   // stunned, or dead on their own wound
-        ring.awaiting = mine ? "act" : "brace";
-        ring.turn = mine ? "you" : "them";
+
+        // ── THEIR BEAT NEEDS NOBODY ──────────────────────────────────────────────────────────────────────
+        // Resolved here and the loop carries on, so a member is only ever stopped for a decision that is
+        // actually theirs. Their skill choice happens the same way it always did — housePick, off their own
+        // build — it simply no longer waits for a tap that was never a choice.
+        if (!mine) {
+            const foeSkill = housePick(ring.foeSkills, ring.foeCd, {
+                selfFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
+                foeFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
+                shield: ring.B.shield, banked: ring.B.banked, maxHp: ring.B.maxHp,
+                bleeding: ring.B.bleedLeft > 0 || ring.B.burnLeft > 0,
+            });
+            const swungFrom = ring.log.length;
+            const cast = foeSkill ? castSkill(ring, foeSkill, ring.B, ring.A) : null;
+            if (!foeSkill || foeSkill.power > 0) {
+                resolveSwing({
+                    A: ring.A, B: ring.B, att: ring.B, def: ring.A, who: "foe",
+                    log: ring.log, t: ring.t, rng,
+                    mult: (foeSkill?.power ?? 1) * (cast?.mult || 1),
+                    hitsOverride: foeSkill?.hits || 0,
+                });
+            }
+            if (cast) uncast(foeSkill, ring.B, cast);
+            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill });
+            if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
+            for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
+            closeTurn(ring);
+            continue;
+        }
+
+        ring.awaiting = "act";
+        ring.turn = "you";
         return ring;
     }
     return ring;
@@ -135,7 +170,7 @@ function advance(ring, rng) {
  * chill that slows the other fighter's clock once, for the whole bout. Duplicated deliberately rather than
  * shared: it is six lines, and the alternative is a fourth function whose only job is to be called twice.
  */
-export function openRing(me, foe, { rng = Math.random, foeSkills = {} } = {}) {
+export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName = null } = {}) {
     const A = sideOf(me);
     const B = sideOf(foe);
     A.shield += Math.round(A.maxHp * A.ward);
@@ -158,9 +193,10 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {} } = {}) {
         cd: {},                       // skillId -> beats of YOURS before it comes back
         foeCd: {},                    // and theirs, kept apart so one deck cannot cool the other
         foeSkills,                    // the build the defence actually paid for — see housePick
+        foeName: foeName || "Your opponent",   // so the transcript can say who did it
         log: [],
         acting: null,                 // whose turn is open, mid-beat
-        awaiting: null,               // "act" | "brace" | null when the fight is over
+        awaiting: null,               // "act" when it is your beat, null when the fight is over
         turn: null, incoming: null,
         over: false, won: false, unresolved: false,
     };
@@ -246,27 +282,58 @@ function uncast(skill, att, state) {
     A.banked = kept;
 }
 
+
+// ── SAYING WHAT JUST HAPPENED ────────────────────────────────────────────────────────────────────────────────
+// resolveSwing logs the ARITHMETIC — who, how much, did it crit — because that is all the auto-resolver ever
+// needed. The fight screen narrates from `text`, `beat`, `damage` and `ability`, none of which it emits, so an
+// interactive bout printed a blank line for every exchange.
+//
+// Which is most of what Luke was reporting from a Road rung: "he takes like eight attacks and doesn't go water
+// splash or icicle blast or something." Half of that was the empty NPC deck (see npcSkills) and half was this
+// — even once they had skills, nothing on screen said so. A move nobody can see the name of is a move that did
+// not happen as far as the player is concerned.
+//
+// Decorates the lines resolveSwing just pushed rather than adding new ones, so the transcript stays one line
+// per blow and the playback timing does not change.
+function narrate(ring, from, { name, skill = null }) {
+    for (let i = from; i < ring.log.length; i += 1) {
+        const l = ring.log[i];
+        if (l.beat != null) continue;                 // already narrated (a thorn, a counter)
+        l.beat = ring.beat;
+        l.damage = l.dmg || 0;
+        if (skill) l.ability = skill.name;
+        const mine = l.who === "me";
+        const actor = mine ? "You" : name;
+        const verb = mine ? "" : "s";
+        if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
+        else if (l.burnTick) l.text = `${actor} burn${mine ? "" : "s"} — ${l.damage}.`;
+        else if (l.stunnedSkip) l.text = `${actor} cannot act.`;
+        else if (l.guard) l.text = `${actor} raise${verb} a guard.`;
+        else if (l.thorns) l.text = `Thorns bite back — ${l.damage}.`;
+        else if (l.counter) l.text = `${actor} answer${verb} — ${l.damage}.`;
+        else if (skill) l.text = `${actor} cast${verb} ${skill.name} — ${l.damage}.`;
+        else l.text = `${actor} strike${verb} — ${l.damage}.`;
+        if (l.crit) l.text = l.text.replace(" — ", " — CRIT ");
+        if (l.frozen) l.text += " Frozen solid.";
+        else if (l.burned) l.text += " It catches fire.";
+        else if (l.bled) l.text += " The wound opens.";
+    }
+}
+
 /**
- * THE MEMBER'S SWING.
+ * THE MEMBER'S BEAT — the only thing the ring ever stops to ask.
  *
- * `closeness` is how near the centre of the window their tap landed, 0..1, straight off the client — and it is
- * graded HERE rather than trusted. A grade is worth up to 30% more damage, so a number that arrives in a POST
- * body is a number somebody can type; gradeTiming clamps before it grades, and this is the only door it comes
- * through.
+ * One command, and the beat resolves: yours, then theirs, then back here. There is nothing else to send and
+ * nothing else to grade — the tap that used to ride in beside the skill went with the timing game (see the
+ * tombstone in arena-kit.js).
  *
  * `skill` is the resolved skill definition or null for a plain attack. Its power and its hit count ride in as
  * the same two parameters a crit or a surge uses, so a skill is a swing with different numbers rather than a
  * second code path that has to remember armour exists.
  */
-export function act(ring, { closeness = 0, skill = null, rng = Math.random } = {}) {
+export function act(ring, { skill = null, rng = Math.random } = {}) {
     if (ring.over || ring.awaiting !== "act") return ring;
-    // Floored at the house hand — see betterHand. A member who never taps fights the same competent fight
-    // their opponent's loadout is fighting, so the window is upside and only upside.
-    const timing = betterHand(gradeTiming(closeness), gradeTiming(HAND_FLOOR.at));
-    // THEY BRACE TOO. There is nobody on the other end of a defence, so the house plays their hand — see
-    // houseHand. Without this the whole ladder is decided by who happened to press Challenge: the attacker
-    // collects a bonus on every swing and the defender eats every one of them at full weight.
-    const theirs = houseHand(rng);
+    const from = ring.log.length;
     const cast = skill ? castSkill(ring, skill, ring.A, ring.B) : null;
     // A skill with power 0 throws NO BLOW — Bastion and Rally spend the beat on being harder to kill, which is
     // the Warden's whole identity. Skipping the swing entirely rather than swinging for nothing matters: a
@@ -275,17 +342,12 @@ export function act(ring, { closeness = 0, skill = null, rng = Math.random } = {
         resolveSwing({
             A: ring.A, B: ring.B, att: ring.A, def: ring.B, who: "me",
             log: ring.log, t: ring.t, rng,
-            mult: timing.strike * (skill?.power ?? 1) * (cast?.mult || 1),
-            brace: theirs.brace,
+            mult: (skill?.power ?? 1) * (cast?.mult || 1),
             hitsOverride: skill?.hits || 0,
         });
     }
     if (cast) uncast(skill, ring.A, cast);
-    // The tap is logged on its own line rather than folded into the blow, because the screen has to be able to
-    // say "Perfect" next to the swing it graded — a multiplier buried in a damage number teaches nobody
-    // anything about when to tap.
-    ring.log.push({ t: ring.t, who: "me", timing: timing.id, timingLabel: timing.label,
-        foeBrace: theirs.id, skill: skill?.id || null });
+    narrate(ring, from, { name: ring.foeName, skill });
     if (skill?.id) ring.cd[skill.id] = (skill.cooldown || 0) + 1;
     // ── A FREE SKILL DOES NOT COST YOU THE BEAT ──────────────────────────────────────────────────────────────
     // Cast it and you are still up: same beat, same clock, and now pick what you actually swing.
@@ -296,48 +358,6 @@ export function act(ring, { closeness = 0, skill = null, rng = Math.random } = {
     if (skill?.free) return ring;
     closeTurn(ring);
     for (const k of Object.keys(ring.cd)) ring.cd[k] = Math.max(0, ring.cd[k] - 1);
-    return advance(ring, rng);
-}
-
-/**
- * THEIR SWING, AND WHAT THE MEMBER'S TAP TOOK OFF IT.
- *
- * The mirror of act(): same clamp, same grading, and the same floor of nothing-taken-away. A member who does
- * not tap at all catches the blow at full weight — which is the fight the auto-resolver would have given them,
- * and is the reason a missed window is never a punishment.
- */
-export function brace(ring, { closeness = 0, rng = Math.random } = {}) {
-    if (ring.over || ring.awaiting !== "brace") return ring;
-    const timing = betterHand(gradeTiming(closeness), gradeTiming(HAND_FLOOR.at));
-    // And they time their own swing, for the same reason. A defence that always threw at bare power would be
-    // a defence anybody could stand in front of.
-    const theirs = houseHand(rng);
-    // ── AND THEY REACH FOR SOMETHING ─────────────────────────────────────────────────────────────────────────
-    // Their own build, chosen on their own read of the fight. A defence that taps well and then throws nothing
-    // but plain attacks is the lopsidedness houseHand fixed, wearing a different hat: measured before this,
-    // one point in any skill beat a skill-less mirror 88-100% of the time.
-    const foeSkill = housePick(ring.foeSkills, ring.foeCd, {
-        selfFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
-        foeFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
-        shield: ring.B.shield, banked: ring.B.banked, maxHp: ring.B.maxHp,
-        bleeding: ring.B.bleedLeft > 0 || ring.B.burnLeft > 0,
-    });
-    const cast = foeSkill ? castSkill(ring, foeSkill, ring.B, ring.A) : null;
-    if (!foeSkill || foeSkill.power > 0) {
-        resolveSwing({
-            A: ring.A, B: ring.B, att: ring.B, def: ring.A, who: "foe",
-            log: ring.log, t: ring.t, rng,
-            mult: theirs.strike * (foeSkill?.power ?? 1) * (cast?.mult || 1),
-            brace: timing.brace,
-            hitsOverride: foeSkill?.hits || 0,
-        });
-    }
-    if (cast) uncast(foeSkill, ring.B, cast);
-    if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
-    for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
-    ring.log.push({ t: ring.t, who: "me", brace: timing.id, timingLabel: timing.label,
-        foeTiming: theirs.id, foeSkill: foeSkill?.id || null });
-    closeTurn(ring);
     return advance(ring, rng);
 }
 

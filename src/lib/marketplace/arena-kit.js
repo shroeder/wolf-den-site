@@ -754,121 +754,24 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
     return 1 + Math.min(UNDERDOG_MAX, gap * 0.75);
 }
 
-// ── TIMING, AND WHY THIS ONE IS DIFFERENT ────────────────────────────────────────────────────────────────────
-// Timing has been in this game twice and taken out twice. Both removals were right, and both were for the same
-// reason, written down two comments below this one: timing GATED things. It filled a Focus pool you had to
-// have in order to use your own skills, so a bad run of taps locked a member out of the gear they had paid
-// for — and a mechanic that can take your build away is not a skill test, it is a tax on having hands.
+// ── NO TIMING. THIRD TIME. ───────────────────────────────────────────────────────────────────────────────────
+// A closing ring, then a Focus pool, then a sweeping bar — three separate attempts to make combat a test of
+// rhythm, and three removals. Luke on the last one, having played it: "just remove the timing mini game
+// entirely i hate it during combat."
 //
-// Luke's rule, and the whole design: TIMING MULTIPLIES, IT NEVER GATES.
+// The first two came out because they GATED things and this one deliberately did not: it multiplied, it never
+// punished, and a missed window fought the fight a competent hand would have. That fixed the objection the
+// first two earned and it did not fix the actual problem, which is simpler and was never about fairness — a
+// fight is a place to spend a decision, and a rhythm test interrupts the decision to ask for a reflex. Every
+// beat became a small chore between you and the thing you came to do.
 //
-//   offence   a well-timed tap adds to the blow, up to STRIKE_MAX
-//   defence   a well-timed tap takes a share off the blow coming back, up to BRACE_MAX
+// So a beat is the COMMAND and nothing else: what you throw, against what they are holding, with what is off
+// cooldown. That is the whole game now, on both sides of the ring, and it is the one this codebase kept
+// arriving back at.
 //
-// The floor on both sides is ZERO BONUS, never a penalty. Miss every window in the bout and you fight exactly
-// the fight the auto-resolver would have fought for you — no whiffs, no stunlock, nothing taken away from
-// someone on bad wifi or holding a phone in one hand. Everything timing does is upside.
-//
-// ── THE BAND IS THE DIAL FOR "GEAR DECIDES EVERYTHING" ───────────────────────────────────────────────────────
-// This number, and not a stat migration, is the answer to the oldest argument about the Arena. Narrow it and
-// gear decides every bout, which is what the heavily-invested members want. Widen it and a sharp player in
-// worse gear can take the fight, which is what everybody else wants. It is ONE constant, tunable off
-// arena-report telemetry, and it moves that balance without touching a single item, badge or pet.
-//
-// Starting at 30% by Luke's call. Do not move it off a hunch — run scripts/arena-report.mjs, look at the upset
-// rate, then move it.
-export const STRIKE_MAX = 0.30;     // most a perfect tap can add to a blow you throw
-export const BRACE_MAX = 0.30;      // most a perfect tap can take off a blow you catch
-
-// The bands a tap falls into, best first. `at` is the minimum closeness-to-centre that reaches this band, so
-// a tap is graded by the first band it clears. Named rather than continuous because the fight screen has to
-// SAY which one you got — "Perfect" is feedback, "1.27x" is a spreadsheet.
-export const TIMING_BANDS = [
-    { id: "perfect", label: "Perfect", at: 0.88, share: 1 },
-    { id: "good", label: "Good", at: 0.55, share: 0.55 },
-    { id: "early", label: "Clipped", at: 0.22, share: 0.2 },
-    { id: "miss", label: "Missed", at: 0, share: 0 },
-];
-
-/**
- * Grade a tap. `closeness` is 0..1, where 1 is dead centre of the window.
- *
- * SERVER-AUTHORITATIVE ON PURPOSE. A grade is worth damage, so it can never be believed as it arrives from a
- * POST body: this clamps first and grades second, and every caller passes the raw client number straight in
- * rather than pre-processing it somewhere the clamp does not run.
- */
-export function gradeTiming(closeness) {
-    const c = Math.max(0, Math.min(1, Number(closeness) || 0));
-    const band = TIMING_BANDS.find((b) => c >= b.at) || TIMING_BANDS[TIMING_BANDS.length - 1];
-    return gradeOf(band);
-}
-
-const gradeOf = (band) => ({
-    id: band.id,
-    label: band.label,
-    // What a swing thrown on this tap is multiplied by, and what a blow caught on it is reduced by.
-    strike: 1 + STRIKE_MAX * band.share,
-    brace: BRACE_MAX * band.share,
-});
-
-// ── AND THE OTHER SIDE OF THE RING HAS HANDS TOO ─────────────────────────────────────────────────────────────
-// You fight a LOADOUT, not a person — nobody is sitting on the other end of a defence to tap anything. The
-// first build of this gave the timing bonus only to whoever pressed Challenge, and Luke stopped it on sight:
-// "it can't be super lopsided playing async against someone who has no ability to tap."
-//
-// He is right, and it is the same bug the underdog clause already has a comment about further up this file —
-// a rule only one side of the ring can ever collect. An absent defender who eats every blow at full weight and
-// throws every swing at bare power is not a fighter, it is a practice dummy wearing somebody's gear, and a
-// ladder sorted by that is sorted by who happened to attack.
-//
-// So the house plays their hand. THE DISTRIBUTION IS THE DESIGN: not a constant, because a fighter who lands
-// exactly the same grade on every beat has no texture and can be solved once; and not a perfect hand, because
-// then nobody could ever out-play a defence. This is a competent attentive human — mostly Good, a quarter
-// Perfect, occasionally clipped, and now and then they simply miss one.
-//
-// It averages to a 0.565 share, which is the "decent" hand in the sweep: worth about 17% gear. So beating a
-// defence still means out-timing it, and the margin a great hand has over a competent one is real but earned.
-export const HOUSE_HAND = [
-    { id: "perfect", p: 0.25 },
-    { id: "good", p: 0.50 },
-    { id: "early", p: 0.20 },
-    { id: "miss", p: 0.05 },
-];
-
-// ── AND THE HOUSE PLAYS FOR YOU WHEN YOU DO NOT PLAY FOR YOURSELF ────────────────────────────────────────────
-// Giving the absent defender a competent hand fixed one lopsidedness and immediately created the mirror of it.
-// Measured: against an equal-geared defence that taps, a member who taps NOTHING wins 4% of bouts. "Timing is
-// upside only" stopped being true the moment the other side of the ring got hands — not tapping went from
-// costing you a bonus to costing you the fight.
-//
-// So a member's tap does not replace nothing, it replaces THE HOUSE HAND. Whichever is better is the one that
-// counts. Look away, lose the window, hold the phone in one hand while you ring somebody up at the counter —
-// you fight the same competent fight your opponent's loadout is fighting, every time. Play well and you beat
-// it. There is no way to be worse off for having tried.
-//
-// It is also the honest sentence to put on the screen: the house plays your hand when you do not.
-export const betterHand = (a, b) => (a.strike >= b.strike ? a : b);
-
-// ── AND THE FLOOR IS A FIXED BAND, NOT A FRESH ROLL ──────────────────────────────────────────────────────────
-// The first build floored a member's tap against a live houseHand draw, which quietly handed them the best of
-// two hands on every single beat while the defence played one. Measured in a true mirror — same stats, same
-// build, both tapping Good — the attacker won 69%. The floor meant to stop one lopsidedness had built another.
-//
-// So the floor is the GOOD band, flat. A member who taps Good gets exactly what a competent hand is worth;
-// the house averages a shade above it, because a quarter of its draws are Perfect. Near parity, with the edge
-// going to whoever actually plays well — which is the whole point of having a window at all.
-export const HAND_FLOOR = TIMING_BANDS.find((b) => b.id === "good");
-
-/** The grade the absent fighter's hand lands this beat. Same shape gradeTiming returns, so nothing downstream
- *  can tell — or needs to tell — which side of the ring had a person behind it. */
-export function houseHand(rng = Math.random) {
-    let roll = rng();
-    for (const h of HOUSE_HAND) {
-        roll -= h.p;
-        if (roll <= 0) return gradeOf(TIMING_BANDS.find((b) => b.id === h.id));
-    }
-    return gradeOf(TIMING_BANDS.find((b) => b.id === "good"));
-}
+// Anything reaching for STRIKE_MAX, BRACE_MAX, TIMING_BANDS, gradeTiming, houseHand or betterHand is reaching
+// for something removed on 2026-08-21. Do not reintroduce it without a fourth reason that is different from
+// the first three.
 
 // ── COOLDOWNS, NOT FOCUS ─────────────────────────────────────────────────────────────────────────────────────
 // Focus was a pool you filled by timing well and spent on skills. It made every skill interchangeable — a

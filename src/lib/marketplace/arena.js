@@ -33,9 +33,9 @@ import {
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 import {
-    resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
+    npcSkills, resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
 } from "@/lib/marketplace/arena-skills.js";
-import { act, brace, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
+import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
 import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
@@ -1055,9 +1055,10 @@ function publicBout(b) {
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
         me: b.me, underdog: b.underdog || 1,
         // ── WHAT THE SCREEN HAS TO ASK FOR ───────────────────────────────────────────────────────────────
-        // `awaiting` is the whole state machine as far as the client is concerned: "act" wants a command and
-        // an offensive tap, "brace" wants a defensive one, null means the fight is over and it is playing a
-        // transcript back. A bout with no ring has no `awaiting` and reads as null, which is exactly right —
+        // `awaiting` is the whole state machine as far as the client is concerned: "act" wants a command,
+        // null means the fight is over and it is playing a transcript back. It used to have a second value —
+        // "brace" — and that went with the timing game, see the tombstone in arena-kit.js. A bout with no ring
+        // has no `awaiting` and reads as null, which is exactly right —
         // that is a finished fight from before this shipped.
         awaiting: b.ring?.awaiting || null,
         // The deck, so the buttons exist. Only YOUR side: `b.foe.skills` stays server-side with their
@@ -1431,11 +1432,12 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
 // it rides INSIDE bout_json rather than in a column of its own, so every path that already loads, saves,
 // clears or expires a bout carries it without needing to know it exists.
 //
-// The foe's skills come along so the defence fights its own build. Nobody is on the other end of a defence,
-// so without this it would tap competently and then throw nothing but plain attacks — the same lopsidedness
-// the house hand exists to stop, one level up and worse, because a skill is a bigger lever than a tap.
+// The foe's skills come along so the defence fights its own build, and its NAME comes with them so the
+// transcript can say who did what. Nobody is on the other end of a defence, so without the skills it would
+// throw nothing but plain attacks for the length of the bout — which is exactly what Luke hit on a Road rung,
+// and see npcSkills for the half of it that was NPCs having no deck at all.
 function openBoutRing(b) {
-    b.ring = openRing(b.me, b.foe, { foeSkills: b.foe?.skills || {} });
+    b.ring = openRing(b.me, b.foe, { foeSkills: b.foe?.skills || {}, foeName: b.foe?.name || null });
     syncRing(b);
     return b;
 }
@@ -1519,7 +1521,8 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         blurb: prof.blurb, color: prof.tint, archetype: prof.archetype, archetypeName: prof.archetypeName,
         tell: prof.tell, level: null,
     };
-    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(prof.kitTier) };
+    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(prof.kitTier),
+        skills: npcSkills(prof.kitTier, prof.archetype) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
@@ -1570,7 +1573,8 @@ export async function startFishingBout(buyerId, monsterId) {
         id: `fish:${m.id}`, name: m.name, sprite: m.art, npc: true, fishing: true,
         blurb: m.blurb, color: null, archetype: m.archetype, level: null,
     };
-    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(Math.max(1, m.tier * 3)) };
+    const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(Math.max(1, m.tier * 3)),
+        skills: npcSkills(Math.max(1, m.tier * 3), m.archetype) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
@@ -1676,7 +1680,10 @@ export async function startBout(buyerId, targetId = null) {
         // An NPC's kit is drawn from the same archetype catalog members use, so it fights with real named
         // moves rather than a bare swing — scaled by tier, and seeded off the tier so a given tier always
         // brings the same two moves and can be planned against.
-        foeKit = { ...n, ...fighterFrom(n, {}, null), abilities: npcAbilities(npcTier) };
+        // `skills` is what the RING reads; `abilities` is the old gear-signature list it does not. Without the
+        // first of these an NPC throws a bare swing every beat of every fight — see npcSkills.
+        foeKit = { ...n, ...fighterFrom(n, {}, null), abilities: npcAbilities(npcTier),
+            skills: npcSkills(rung > 0 ? rung : npcTier, n.archetype) };
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
@@ -2217,17 +2224,13 @@ async function settle(buyerId, b, row = null) {
 const playable = (b) => Boolean(b && !b.over && b.ring);
 
 /**
- * YOUR SWING.
- *
- * `closeness` is how near the centre of the window the tap landed, 0..1, straight off the client. It is graded
- * inside the ring rather than trusted here — a grade is worth up to 30% more damage, so a number arriving in a
- * POST body is a number somebody can type, and gradeTiming clamps before it grades.
+ * YOUR BEAT. The only thing a member is ever asked for — see the timing tombstone in arena-kit.js.
  *
  * `skillId` names a skill off the member's own deck. Re-resolved from the SAVED bout rather than from the
  * request: the deck was written into bout_json when the fight opened, so a member cannot buy a capstone
  * mid-bout and swing with it, and cannot name a skill they have never owned.
  */
-export async function actBout(buyerId, { skillId = null, closeness = 0 } = {}) {
+export async function actBout(buyerId, { skillId = null } = {}) {
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
     if (!playable(b)) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
@@ -2242,25 +2245,7 @@ export async function actBout(buyerId, { skillId = null, closeness = 0 } = {}) {
         if ((b.ring.cd?.[skill.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
     }
 
-    act(b.ring, { closeness: Number(closeness) || 0, skill });
-    syncRing(b);
-    return settle(buyerId, b, row);
-}
-
-/**
- * THEIR SWING, AND WHAT YOUR TAP TOOK OFF IT.
- *
- * The mirror of actBout, and the floor is the same: a member who does not tap at all catches the blow at what
- * a competent hand would have caught it at. Missing the window is never a punishment — it is the fight the
- * auto-resolver would have given them.
- */
-export async function braceBout(buyerId, { closeness = 0 } = {}) {
-    const row = await arenaRow(buyerId);
-    const b = row?.bout_json;
-    if (!playable(b)) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
-    if (b.ring.awaiting !== "brace") return { ok: false, error: "not_their_beat", ...(await getArenaState(buyerId)) };
-
-    brace(b.ring, { closeness: Number(closeness) || 0 });
+    act(b.ring, { skill });
     syncRing(b);
     return settle(buyerId, b, row);
 }

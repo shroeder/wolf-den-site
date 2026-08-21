@@ -663,11 +663,70 @@ export function skillPointsSpent(taken = {}) {
     return n;
 }
 
+// ── AND SO DOES SOMETHING THAT WAS NEVER A PERSON ────────────────────────────────────────────────────────────
+// Road rungs, Gauntlet tiers, plaza raiders and hooked monsters have no arena row, so they have no skills bag,
+// so housePick found nothing and every one of them threw a bare swing for the whole fight. Luke, playing a
+// rung: "he takes like eight attacks and doesn't go water splash or icicle blast or something."
+//
+// He is describing a foe that CANNOT. NPCs carry `abilities` — the old gear-signature list — and the ring does
+// not read it; that list belonged to an engine that was deleted. So they had a deck the fight could not see.
+//
+// This gives them a real one, off the catalog members use, so an NPC is a made-up player in this too — the
+// same rule arena-npc.js already follows for stats ("an NPC is a made-up player now, not a parallel stat
+// system"). Two systems inventing opponents is how they end up disagreeing about what a fight is.
+//
+// THE ARCHETYPE PICKS THE CLASS and the rung picks the depth, so a rung-8 brute swings Onslaught at base and a
+// rung-60 one arrives with a capstone. Deterministic off the rung: the same rung always brings the same build,
+// which is what lets somebody walk away and plan against it rather than reroll until it is easy.
+const NPC_CLASS = {
+    wall: "warden", brute: "reaver", berserker: "reaver",
+    duelist: "reaver", balanced: "runecaller", caster: "runecaller",
+};
+
+// Which branch each archetype commits to — the one that reads like the thing it is supposed to BE.
+const NPC_BRANCH = {
+    wall: ["fortress", "medic", "ledger"],
+    brute: ["weight", "guillotine", "butcher"],
+    berserker: ["storm", "butcher", "frenzy"],
+    duelist: ["predator", "hemorrhage", "punish"],
+    balanced: ["lance", "winter", "cataclysm"],
+    caster: ["pyre", "shatter", "wellspring"],
+};
+
+/**
+ * The deck a designed opponent brings, given its archetype and how far up it stands.
+ *
+ * Depth is the whole difficulty curve here: one skill at base low down, a second by the middle, a capstone at
+ * the top. It is deliberately NOT random — a rung you cannot plan against is a rung you can only grind.
+ */
+export function npcSkills(rung = 1, archetype = "balanced") {
+    const classId = NPC_CLASS[archetype] || "runecaller";
+    const want = NPC_BRANCH[archetype] || NPC_BRANCH.balanced;
+    const mine = skillsForClass(classId);
+    // How many rungs deep, and how many skills wide. A rung-1 foe has one skill at base; by rung 40 it has
+    // two skills with a capstone on the first.
+    const depth = Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, rung) / 18)));
+    const width = Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, rung) / 12)));
+    const bag = {};
+    for (let i = 0; i < width; i += 1) {
+        const branchId = want[i];
+        const skill = mine.find((sk) => sk.branches.some((b) => b.id === branchId));
+        if (!skill) continue;
+        // The first skill runs deepest; the ones after it are shallower, so a foe reads as one plan with
+        // support rather than three half-finished ideas.
+        const d = Math.max(1, depth - i);
+        bag[skill.id] = skill.nodes
+            .filter((n) => n.branch === branchId && n.tier < d)
+            .map((n) => n.id);
+    }
+    return bag;
+}
+
 // ── THE HOUSE PLAYS ITS SKILLS TOO ───────────────────────────────────────────────────────────────────────────
-// The mirror of houseHand, and it exists for the mirror of that reason. Luke, on the timing: "it can't be super
-// lopsided playing async against someone who has no ability to tap." A defence that taps competently and then
-// throws nothing but plain attacks is the same lopsidedness one level up, and it is worse, because a skill is
-// a bigger lever than a tap.
+// You fight a LOADOUT, not a person — nobody is sitting on the other end of a defence to pick anything. Luke,
+// back when the lopsidedness was about timing: "it can't be super lopsided playing async against someone who
+// has no ability to tap." The timing is gone and that sentence outlived it, because it was never really about
+// taps: a defence that throws nothing but plain attacks is a practice dummy wearing somebody's gear.
 //
 // Measured before this existed: a member with ONE point in any of the nine beat a skill-less mirror of
 // themselves 88-100% of the time. That is not a balance result, it is a punching bag.

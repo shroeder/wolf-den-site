@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-    actBout, braceBout, clearBout, forfeitBout, getArenaState, seenArena, startBout,
+    actBout, clearBout, forfeitBout, getArenaState, seenArena, startBout,
 } from "@/lib/marketplace/arena.js";
 import {
     buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, refundSkill,
@@ -38,13 +38,10 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
                 case "seen": return noStore(await seenArena(buyer.id));
-                // ── THE TWO HALVES OF A BEAT ── your swing, and their swing with your brace on it. `closeness`
-                // is the raw tap position and is graded server-side; a grade is worth damage, so it is never
-                // believed as it arrives.
+                // ── A BEAT ── what you throw, and nothing else. The brace action went with the timing game;
+                // their swing resolves inside advance() and arrives as transcript.
                 case "act":
-                    return noStore(await actBout(buyer.id, { skillId: b?.skillId || null, closeness: b?.closeness }));
-                case "brace":
-                    return noStore(await braceBout(buyer.id, { closeness: b?.closeness }));
+                    return noStore(await actBout(buyer.id, { skillId: b?.skillId || null }));
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 // Leaving a fight that is still running. It resolves as a loss — see forfeitBout.
                 case "forfeit": return noStore(await forfeitBout(buyer.id));

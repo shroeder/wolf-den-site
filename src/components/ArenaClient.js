@@ -1911,12 +1911,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 
                     Above the log and below the field on purpose: it is the only thing on this screen anybody
                     is going to touch under time pressure, and it should not be something you scroll to. */}
-                <FightInput
-                    bout={bout}
-                    busy={busy}
-                    onAct={(skillId, closeness) => act("act", { skillId, closeness })}
-                    onBrace={(closeness) => act("brace", { closeness })}
-                />
+                <FightInput bout={bout} busy={busy} onAct={(skillId) => act("act", { skillId })} />
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px

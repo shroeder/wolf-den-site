@@ -19,7 +19,7 @@ import {
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
-import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, houseHand, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -403,9 +403,8 @@ export const blowCount = (ds, rng = Math.random) => {
 // and one you chose:
 //
 //   mult          everything specific to what was thrown — a skill's power, and the timing grade on it
-//   brace         the defender's timing, as a share of the blow that never lands. 0 is the auto-resolver.
 //   hitsOverride  a skill that strikes a fixed number of times, instead of rolling doublestrike for it
-export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, brace = 0, hitsOverride = 0 }) {
+export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, hitsOverride = 0 }) {
         // Each blow of a doublestrike rolls its own crit, so the stat is variance as well as volume.
         const hits = hitsOverride || blowCount(att.doublestrike, rng);
         let dealt = 0;
@@ -462,7 +461,6 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             } else if (def.blockStackMax > 0) {
                 def.stacks = Math.min(def.blockStackMax, def.stacks + 1);
             }
-            if (brace > 0) blow = Math.max(1, Math.round(blow * (1 - brace)));
             dealt += blow;
         }
         // A GUARD EATS IT FIRST. Whatever the shield can absorb never reaches health, and what is left of
@@ -612,9 +610,9 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
 // has to stop BETWEEN those two halves — the pre-swing decides whether there is even a blow to brace against,
 // and asking a member to time a tap against a swing that a stun already cancelled is how a fight screen starts
 // lying about what is happening.
-export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, brace = 0, hitsOverride = 0 }) {
+export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, hitsOverride = 0 }) {
     if (!openTurn({ A, B, att, def, who, log, t, rng })) return false;
-    resolveSwing({ A, B, att, def, who, log, t, rng, mult, brace, hitsOverride });
+    resolveSwing({ A, B, att, def, who, log, t, rng, mult, hitsOverride });
     if (att.hasteLeft > 0) att.hasteLeft -= 1;
     return true;
 }
@@ -629,25 +627,7 @@ export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult 
 // the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
 // ring calls, so an auto-resolved bout and a played one cannot disagree about what a swing is.
 //
-// ── BOTH FIGHTERS CAN BE DEALT A HAND, AND IN PRODUCTION THEY ARE NOT ────────────────────────────────────────
-// Nobody is present in an auto-resolved bout by definition, so once the interactive ring exists the honest
-// thing is to give BOTH sides a competent hand: otherwise an auto-resolved fight is systematically different
-// from a played one and the simulator is measuring a game nobody plays.
-//
-// It defaults OFF, and that is a correction rather than a design choice. It shipped defaulting ON, which meant
-// resolveAuto — every arena challenge, Gauntlet tier, Road rung, plaza raid and hooked monster — quietly
-// changed under members who were told nothing. Measured: fights 3-8% shorter, a mirror down from 57% to 51%,
-// and a glass cannon against a tank down from 53% to 43%. Small, real, and nobody asked for it.
-//
-// It was written to make the SIMULATOR honest about a fight that does not exist yet. There is no consistency
-// to preserve between auto and played bouts while nothing is played, so there is no reason for it to be live
-// ahead of the ring.
-//
-// FLIP THIS TO TRUE the day the interactive ring is wired to a route, and not before — at that point an
-// auto-resolved defence and a played challenge have to be the same fight, and this is what makes them one.
-// The sims pass `hands: true` explicitly when they want to measure that future.
-export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000, hands = false } = {}) {
-    const hand = () => (hands ? houseHand(rng) : { strike: 1, brace: 0 });
+export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
     const A = sideOf(me);
     const B = sideOf(foe);
     // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
@@ -664,18 +644,8 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000, hands 
     let swings = 0;
 
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        // Two draws, not one: the swing is timed by whoever throws it and the brace by whoever catches it.
-        // Sharing a single draw would tie the two hands together, so a fighter who timed their swing well
-        // would also, always, have braced well — which is one hand, not two.
-        if (nextA <= nextB) {
-            t = nextA;
-            takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng, mult: hand().strike, brace: hand().brace });
-            nextA = t + gapOf(A);
-        } else {
-            t = nextB;
-            takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng, mult: hand().strike, brace: hand().brace });
-            nextB = t + gapOf(B);
-        }
+        if (nextA <= nextB) { t = nextA; takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng }); nextA = t + gapOf(A); }
+        else { t = nextB; takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng }); nextB = t + gapOf(B); }
         swings += 1;
     }
     return {

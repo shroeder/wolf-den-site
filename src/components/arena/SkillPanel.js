@@ -417,6 +417,13 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                 .skp-cap-tag { display: block; margin-top: 2px; font-style: normal; font-size: 8px;
                     font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
                 .skp-rung-desc { display: block; margin-top: 6px; font-size: 11px; line-height: 1.45; color: #98a0aa; }
+                /* ── THE ACTION ROW ──────────────────────────────────────────────────────────────────────
+                   This rule was collateral: rewriting the block above deleted it while the JSX kept using
+                   the class, so every Take and Give back button fell back to default flow — flush left and
+                   jammed against the delta row with no gap. A class the markup still names and the
+                   stylesheet no longer defines is the same landmine as a stale rule, just pointing the
+                   other way, and nothing in the build can see it. */
+                .skp-rung-state { display: flex; justify-content: flex-end; margin-top: 9px; }
 
                 /* ── WHAT IT MOVES ───────────────────────────────────────────────────────────────────────
                    The reason the rung got the full width back. Every row is a real before-and-after off the
