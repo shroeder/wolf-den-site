@@ -32,6 +32,7 @@ import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js
 import {
     resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
 } from "@/lib/marketplace/arena-skills.js";
+import { act, brace, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
 import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
@@ -95,6 +96,18 @@ const roadOpenFor = (buyerId) => ROAD_OPEN || isOwner(buyerId);
 // below: a rung must never be easier than the one under it, and at the new fight length that is not yet true
 // at every rung. One door at a time.
 export const COMBAT_OPEN = true;
+
+// ── IS THE FIGHT PLAYED, OR WATCHED? ─────────────────────────────────────────────────────────────────────────
+// The server can run a bout one beat at a time (see arena-ring.js) and the fight screen cannot yet drive it.
+// Those two have to ship together or every fight in the game hangs on a beat nobody can take, so this is the
+// switch that holds them apart until they are both ready.
+//
+// It is the same shape as COMBAT_OPEN above and for the same reason: one flag, checked in one place
+// (buildBout), covering all four doors into the ring — a challenge, the Gauntlet, the Long Road, a plaza raid
+// and a hooked monster. The owner is exempt so the whole thing can be walked end to end on the live site
+// before anybody else sees it.
+export const INTERACTIVE = false;
+export const interactiveFor = (buyerId) => INTERACTIVE || isOwner(buyerId);
 export const combatOpenFor = (buyerId) => COMBAT_OPEN || isOwner(buyerId);
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1031,6 +1044,18 @@ function publicBout(b) {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
         me: b.me, underdog: b.underdog || 1,
+        // ── WHAT THE SCREEN HAS TO ASK FOR ───────────────────────────────────────────────────────────────
+        // `awaiting` is the whole state machine as far as the client is concerned: "act" wants a command and
+        // an offensive tap, "brace" wants a defensive one, null means the fight is over and it is playing a
+        // transcript back. A bout with no ring has no `awaiting` and reads as null, which is exactly right —
+        // that is a finished fight from before this shipped.
+        awaiting: b.ring?.awaiting || null,
+        // The deck, so the buttons exist. Only YOUR side: `b.foe.skills` stays server-side with their
+        // cooldowns, because what the other fighter is holding is not the player's information.
+        deck: (b.me?.deck || []).map((k) => ({
+            id: k.id, name: k.name, sprite: k.sprite, blurb: k.blurb,
+            power: k.power, hits: k.hits, cooldown: k.cooldown, free: Boolean(k.free),
+        })),
         // THEIR WARD, ON THEIR BAR. `shield` was published and `foeShield` was not, so the blue slab that sits
         // on your health bar when you brace had no counterpart when THEY braced — the enemy guarded, the next
         // swing did far less than the numbers said it should, and nothing on screen accounted for it.
@@ -1259,7 +1284,7 @@ const TOWN_EDGE = 2;
 // A member id, as opposed to `ladder:12` or `town:<enemy>`. Used where a value is about to meet a uuid column.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {} } = {}) {
+function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {}, interactive = false } = {}) {
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
         myPower, theirPower, npcTier, size,
@@ -1290,6 +1315,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // the rest — were computed for this fighter and then dropped on the way into bout_json. See
             // COMBAT_FIELDS in arena-engine.js for what that cost and why the list lives there now.
             ...fighterFields(foeKit),
+            // Their build, so the defence fights it. Withheld from publicBout below — what they are holding
+            // is their business, the same way their cooldowns were.
+            skills: foeKit.skills || {},
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed,
             // WHICH DISCIPLINE THEY FIGHT AS. The bout knew everyone's class and published nobody's, so the
@@ -1331,6 +1359,11 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         // shape of the "why do I do so little damage" complaint further down this file — the fix for that was
         // to stop hiding terms, and a town buff nobody can see would be a new one.
         me: { ...fighterFields(me),
+            // ── WHAT THEY CAN PRESS, FROZEN AT THE BELL ──────────────────────────────────────────────────
+            // The bag and the resolved deck both ride on the bout rather than being looked up per beat. That
+            // is what stops a member unlocking a capstone mid-fight and swinging with it, and it is what
+            // actBout re-resolves against — never the skill id in the request body.
+            skills: me.skills || {}, deck: me.deck || [],
             element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
@@ -1372,13 +1405,52 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         foeBleed: null, foeSunder: 0, foeRiposte: 0,
     };
     Object.assign(bout, extra);
-    // ── AND IT IS ALREADY OVER ───────────────────────────────────────────────────────────────────────────
-    // Combat is passive. There is nothing to decide once the two fighters are built, so the whole bout is
-    // resolved HERE, in one pass, and what the client receives is a finished fight to play back rather than
-    // a turn to take. Everything that used to sit between those two facts — the command deck, the telegraph,
-    // the brace, the items, the abilities and the AI that chose between them — is gone.
-    resolveAuto(bout);
+    // ── PLAYED, OR RESOLVED WHERE IT STANDS ──────────────────────────────────────────────────────────────
+    // Interactive: a ring is opened and the bout stops on the first thing the member has to answer. Passive:
+    // the whole fight runs here in one pass and what the client receives is a finished transcript to play
+    // back. Both go through the same three functions in arena-engine, so the two cannot disagree about what
+    // a swing is — that is the whole reason the ring was built on top of the auto-resolver rather than beside
+    // it.
+    if (interactive) openBoutRing(bout);
+    else resolveAuto(bout);
     return bout;
+}
+
+// ── OPENING A FIGHT SOMEBODY IS GOING TO PLAY ────────────────────────────────────────────────────────────────
+// The ring is the live fighter state — both sides' hp, shields, wounds, burns, the clock, the cooldowns — and
+// it rides INSIDE bout_json rather than in a column of its own, so every path that already loads, saves,
+// clears or expires a bout carries it without needing to know it exists.
+//
+// The foe's skills come along so the defence fights its own build. Nobody is on the other end of a defence,
+// so without this it would tap competently and then throw nothing but plain attacks — the same lopsidedness
+// the house hand exists to stop, one level up and worse, because a skill is a bigger lever than a tap.
+function openBoutRing(b) {
+    b.ring = openRing(b.me, b.foe, { foeSkills: b.foe?.skills || {} });
+    syncRing(b);
+    return b;
+}
+
+// Mirror the ring onto the fields the rest of the game already reads. finishBout, the telemetry, the payouts,
+// publicBout and the fight screen were all written against `hp` / `foeHp` / `log` / `over` / `won`, and none of
+// them should have to learn that a ring exists — so the ring stays the source of truth and this copies out of
+// it after every beat.
+function syncRing(b) {
+    const r = ringResult(b.ring);
+    b.log = r.log;
+    b.beat = r.beat;
+    b.hp = r.hp;
+    b.foeHp = r.foeHp;
+    b.maxHp = r.maxHp;
+    b.foeMaxHp = r.foeMaxHp;
+    b.over = r.over;
+    b.won = r.won;
+    b.unresolved = r.unresolved;
+    b.duration = r.time;
+    // What the screen has to ask for next, and what is off cooldown when it does.
+    b.awaiting = b.ring.awaiting;
+    b.turn = b.ring.turn;
+    b.cd = b.ring.cd;
+    return b;
 }
 
 // Run the fight and write the result onto the bout. `log` is the play-by-play the screen animates.
@@ -1441,12 +1513,13 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
+        interactive: interactiveFor(buyerId),
         // `townEdge` is stamped alongside the rider so a bout can say whether it has already been scaled —
         // see the repair in resolveBeat, which is what rescues the fights that were open when this shipped.
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
-    return finishBout(buyerId, row, b, b.won);
+    return settle(buyerId, b, row);
     // Hands back the board and kit it already built rather than making getArenaState rebuild both — see the
     // note on its `pre` parameter. This is the press that was timing out.
     // THE WHOLE STATE, not just the bout — which is what every other action in this file returns, and what the
@@ -1491,9 +1564,10 @@ export async function startFishingBout(buyerId, monsterId) {
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
+        interactive: interactiveFor(buyerId),
     });
     await saveBout(buyerId, b);
-    return finishBout(buyerId, row, b, b.won);
+    return settle(buyerId, b, row);
 }
 
 export async function startBout(buyerId, targetId = null) {
@@ -1613,6 +1687,7 @@ export async function startBout(buyerId, targetId = null) {
     const bout = buildBout(me, foe, foeKit, {
         npcTier, size: board.length, myPower,
         extra: rung > 0 ? { ladder: { rung } } : {},
+        interactive: interactiveFor(buyerId),
     });
     // The counter moves for an arena fight and stands still for a rung — the other half of the rule above.
     // Both columns are left completely alone on a Road bout: bumping `fights_day` while holding the count
@@ -1627,9 +1702,9 @@ export async function startBout(buyerId, targetId = null) {
         [buyerId, JSON.stringify(bout), rung > 0]
     ).catch(() => {});
     await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower: bout.theirPower }).catch(() => {});
-    // The fight is already decided (see resolveAuto), so it is paid out here rather than on a beat that will
-    // never be taken. finishBout owns every economy this can touch and returns the whole arena state.
-    return finishBout(buyerId, await arenaRow(buyerId), bout, bout.won);
+    // A passive bout is already decided and pays out here. An interactive one has barely begun — it pays when
+    // the ring says it is over, on whichever beat that turns out to be. See settle().
+    return settle(buyerId, bout);
 }
 
 /** One exchange. Your stance against theirs, resolved on the server so the pick can't be read or replayed. */
@@ -2102,6 +2177,76 @@ async function finishBout(buyerId, row, b, won) {
  * the shared roster the same way it does when you are killed, because duelRaidEnemy is what books that and it
  * is booked from finishBout.
  */
+// ── PAY IT, OR PUT IT DOWN AND WAIT ──────────────────────────────────────────────────────────────────────────
+// Every door into the ring ends here. A passive bout arrives already decided and is paid immediately, which is
+// exactly what the three start paths used to do inline. An interactive one arrives with a member owing it a
+// tap, so it is saved and the state handed back for them to answer.
+//
+// One function rather than the same `if` written three times, because the three doors have already diverged
+// once — the Road stopped bumping the daily counter and the town grew an edge multiplier — and the payout is
+// the half that must never diverge.
+async function settle(buyerId, b, row = null) {
+    if (!b.over) {
+        await saveBout(buyerId, b);
+        return { ok: true, ...(await getArenaState(buyerId)) };
+    }
+    return finishBout(buyerId, row || await arenaRow(buyerId), b, b.won);
+}
+
+// A bout that has a ring is one somebody is playing. Anything older — a transcript from before this shipped,
+// or a bout built while the flag was off — has no ring and cannot take a beat; it is already finished and the
+// screen is only playing it back.
+const playable = (b) => Boolean(b && !b.over && b.ring);
+
+/**
+ * YOUR SWING.
+ *
+ * `closeness` is how near the centre of the window the tap landed, 0..1, straight off the client. It is graded
+ * inside the ring rather than trusted here — a grade is worth up to 30% more damage, so a number arriving in a
+ * POST body is a number somebody can type, and gradeTiming clamps before it grades.
+ *
+ * `skillId` names a skill off the member's own deck. Re-resolved from the SAVED bout rather than from the
+ * request: the deck was written into bout_json when the fight opened, so a member cannot buy a capstone
+ * mid-bout and swing with it, and cannot name a skill they have never owned.
+ */
+export async function actBout(buyerId, { skillId = null, closeness = 0 } = {}) {
+    const row = await arenaRow(buyerId);
+    const b = row?.bout_json;
+    if (!playable(b)) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
+    if (b.ring.awaiting !== "act") return { ok: false, error: "not_your_beat", ...(await getArenaState(buyerId)) };
+
+    let skill = null;
+    if (skillId) {
+        // From the bout's own frozen bag, and only if it is actually off cooldown. Both checks are the same
+        // shape as the tree's: the screen decides what to offer, the server decides what is legal.
+        skill = resolveSkill(String(skillId), b.me?.skills || {});
+        if (!skill) return { ok: false, error: "no_skill", ...(await getArenaState(buyerId)) };
+        if ((b.ring.cd?.[skill.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
+    }
+
+    act(b.ring, { closeness: Number(closeness) || 0, skill });
+    syncRing(b);
+    return settle(buyerId, b, row);
+}
+
+/**
+ * THEIR SWING, AND WHAT YOUR TAP TOOK OFF IT.
+ *
+ * The mirror of actBout, and the floor is the same: a member who does not tap at all catches the blow at what
+ * a competent hand would have caught it at. Missing the window is never a punishment — it is the fight the
+ * auto-resolver would have given them.
+ */
+export async function braceBout(buyerId, { closeness = 0 } = {}) {
+    const row = await arenaRow(buyerId);
+    const b = row?.bout_json;
+    if (!playable(b)) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
+    if (b.ring.awaiting !== "brace") return { ok: false, error: "not_their_beat", ...(await getArenaState(buyerId)) };
+
+    brace(b.ring, { closeness: Number(closeness) || 0 });
+    syncRing(b);
+    return settle(buyerId, b, row);
+}
+
 export async function forfeitBout(buyerId) {
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;

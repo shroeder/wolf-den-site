@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { clearBout, forfeitBout, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
+import {
+    actBout, braceBout, clearBout, forfeitBout, getArenaState, seenArena, startBout,
+} from "@/lib/marketplace/arena.js";
 import {
     buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, refundSkill,
     respecClass, respecTree, takeNode, takeSkill, takeSkillNode,
@@ -36,7 +38,13 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
                 case "seen": return noStore(await seenArena(buyer.id));
-                // "beat" is gone with fightRound — combat is passive and a bout is resolved when it starts.
+                // ── THE TWO HALVES OF A BEAT ── your swing, and their swing with your brace on it. `closeness`
+                // is the raw tap position and is graded server-side; a grade is worth damage, so it is never
+                // believed as it arrives.
+                case "act":
+                    return noStore(await actBout(buyer.id, { skillId: b?.skillId || null, closeness: b?.closeness }));
+                case "brace":
+                    return noStore(await braceBout(buyer.id, { closeness: b?.closeness }));
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 // Leaving a fight that is still running. It resolves as a loss — see forfeitBout.
                 case "forfeit": return noStore(await forfeitBout(buyer.id));
