@@ -941,14 +941,40 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 text: `${head} — ${n.toLocaleString()}${tail}` };
         });
     }, [raw?.log, raw?.foe?.name]);
+    // ── WHAT COUNTS AS "A NEW FIGHT" ─────────────────────────────────────────────────────────────────────────
+    // The log's LENGTH was in this key, and the log grows every time you take a turn — so every turn looked
+    // like a brand new bout, the cursor reset to zero, and the entire fight replayed from the opening blow.
+    // Filmed on Luke's own rung-31 bout: one tap on Attack, and at 4.3s of an 5.7s film the screen went from
+    // Round 15 back to ROUND 0 with both fighters at full health, then played the first Overflow again.
+    //
+    // Every complaint about that fight was this one bug wearing different hats — "fifteen turns of one burn
+    // damage", "three attacks back and forth with no input", "the shield goes away and comes back". None of
+    // it was happening. It was history, re-run, a little longer each tap.
+    //
+    // The identity of a bout is WHO IS IN IT. A log that got shorter is the only other thing that can mean a
+    // different fight (a fresh bout against the same opponent), and it is checked rather than inferred.
     const [shown, setShown] = useState(0);
-    const boutKey = `${raw?.foe?.id || ""}:${logAll.length}`;
+    const boutKey = String(raw?.foe?.id || "");
     const lastKey = useRef(null);
+    const mounted = useRef(false);
     useEffect(() => {
         if (lastKey.current === boutKey) return;
         lastKey.current = boutKey;
-        setShown(0);   // a new fight always plays from the first blow
-    }, [boutKey]);
+        // ── A FIGHT ALREADY IN PROGRESS OPENS WHERE IT IS ────────────────────────────────────────────────
+        // Only a bout that STARTS while you are watching plays from the first blow. Walk back into a bout
+        // you left — a refresh, a return from another screen — and the cursor belongs at the end of what has
+        // already happened, not at the beginning of it. Luke's rung-31 bout is 65 rounds long; opening it
+        // replayed all 65 before the screen would take a tap.
+        const openAtEnd = !mounted.current && logAll.length > 0;
+        mounted.current = true;
+        setShown(openAtEnd ? logAll.length : 0);
+    }, [boutKey, logAll.length]);
+    // A shorter transcript than the cursor is standing on cannot be the same fight — rematch, forfeit, or a
+    // bout cleared out from under the screen. Anything else only ever GROWS, and growth is the normal case:
+    // the cursor stays where it is and the new lines animate from there.
+    useEffect(() => {
+        if (logAll.length < shown) setShown(0);
+    }, [logAll.length, shown]);
 
     useEffect(() => {
         if (!logAll.length || shown >= logAll.length) return undefined;
@@ -1166,7 +1192,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         if (isNew) {
             setClash({
                 grade: crit ? "crit" : last.grade,
-                move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
+                // ── NOT EVERY LINE IS A SWING ────────────────────────────────────────────────────────
+                // This fell through to "Strike" for anything with no ability on it, so the big centred
+                // callout announced STRIKE over a burn tick and over "You cannot act." — filmed, four
+                // frames running, on a turn nobody swung. A line that is not a blow says what it is.
+                move: last.burnTick ? "Burning"
+                    : last.bleedTick ? "Bleeding"
+                        : last.stunnedSkip ? "Stunned"
+                            : last.chilledSkip ? "Frozen stiff"
+                                : last.fever ? "The pit closes"
+                                    : last.guard ? "Guard up"
+                                        : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
                 crit,
                 again: Boolean(last.again),

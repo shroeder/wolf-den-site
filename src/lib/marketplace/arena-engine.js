@@ -548,13 +548,18 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         const cata = att.cataclysm > 0 && def.hp > 0 && rng() < att.cataclysm;
         let burned = false;
         let frozen = false;
-        if (def.hp > 0 && (cata || (att.burnChance > 0 && rng() < att.burnChance))) {
+        // ── A BLOW THE GUARD ATE STARTS NO FIRE ──────────────────────────────────────────────────────
+        // `dealt` is what reached HEALTH, and a tick is a share of it — so a blow a shield absorbed
+        // entirely lit a fire worth `0 * share`, which the max(1, ...) floor turned into three ticks of
+        // ONE DAMAGE. Filmed on a real bout it is most of the transcript: "You burn — 1", over and over,
+        // from blows that did nothing. A wound needs a wound.
+        if (dealt > 0 && def.hp > 0 && (cata || (att.burnChance > 0 && rng() < att.burnChance))) {
             def.burnLeft = BURN_TICKS;
             def.burnPer = dealt * (BURN_SHARE + att.burnDamage);
             burned = true;
         }
         if (def.hp > 0 && (cata || (att.freeze > 0 && rng() < att.freeze))) { def.stunned += 1; frozen = true; }
-        if (att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
+        if (dealt > 0 && att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
             def.bleedLeft = BLEED_TICKS;
             def.bleedPer = dealt * (BLEED_SHARE + att.bleedDamage);
             bled = true;

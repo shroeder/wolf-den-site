@@ -101,6 +101,41 @@ const send = (method, params = {}) => new Promise((res) => { const i = ++id; pen
 await send("Page.enable");
 await send("Runtime.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: DPR, mobile: true });
+// ── SIGNED IN, AND WITH THE LAUNCH MODALS ALREADY SEEN ───────────────────────────────────────────────────────
+// Same two env vars shot.mjs takes, and for the same reason — without them this films the login redirect, or
+// a modal sitting on top of the thing being filmed, and reports success either way. Most of the game is
+// behind a session, so a film rig that cannot hold one can only film the fixtures.
+if (process.env.SHOT_COOKIE) {
+    await send("Network.enable");
+    await send("Network.setCookie", {
+        name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
+        domain: new URL(url).hostname, path: "/",
+    });
+}
+if (process.env.SHOT_SEEN) {
+    const keys = process.env.SHOT_SEEN.split(";").map((x) => x.trim()).filter(Boolean);
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `(() => { for (const k of ${JSON.stringify(keys)}) { try { localStorage.setItem(k, "1"); } catch {} } })();`,
+    });
+}
+// And the ones a localStorage marker cannot pre-empt, because the server decides they are due. The poll took
+// the whole screen one frame after the click on 2026-08-21 and the rig filmed twenty frames of it while
+// reporting success — the click landed on the modal, not the button underneath it.
+if (process.env.SHOT_HIDE) {
+    const sel = process.env.SHOT_HIDE.split(",").map((x) => x.trim()).filter(Boolean).join(", ");
+    const css = `${sel} { display: none !important; }`;
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `(() => {
+            const put = () => { const s = document.createElement("style");
+                s.textContent = ${JSON.stringify(css)};
+                (document.head || document.documentElement).appendChild(s); };
+            put(); document.addEventListener("DOMContentLoaded", put);
+            // A modal that mounts after hydration outlives a style added at document-start if the app
+            // replaces the head, so re-apply on an interval for the first few seconds too.
+            let n = 0; const iv = setInterval(() => { put(); if (++n > 20) clearInterval(iv); }, 200);
+        })();`,
+    });
+}
 await send("Page.navigate", { url });
 await sleep(SETTLE);
 
