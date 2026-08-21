@@ -2014,17 +2014,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             </div>
 
             {tab === "tree" ? (
-                <>
-                    {/* ── THE PANEL SITS ABOVE THE TREE ───────────────────────────────────────────────────
-                        Same tab, deliberately. They are one decision seen twice — every point spent below
-                        earns a point to spend up here — and putting them on separate tabs would hide that
-                        relationship behind a tap. The panel goes FIRST because it is the half you press in a
-                        fight; the tree is the half you read once and forget. */}
+                // ── THE PANEL SITS ABOVE THE TREE ───────────────────────────────────────────────────────
+                // Same tab, deliberately. They are one decision seen twice — every point spent below earns a
+                // point to spend up here — and putting them on separate tabs would hide that relationship
+                // behind a tap. The panel goes FIRST because it is the half you press in a fight; the tree is
+                // the half you read once and forget.
+                //
+                // The gap is on a WRAPPER rather than a margin on either child. Both of them are self-contained
+                // cards with their own internal spacing, and hanging a margin off one of them would follow it
+                // into the lab and anywhere else it gets mounted — a spacing rule that belongs to this layout
+                // living inside a component that does not know about this layout.
+                <div style={{ display: "grid", gap: 18 }}>
                     <SkillPanel progress={st.progress} busy={busy}
                         onAct={(action, extra) => act(action, extra)} />
                     <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
                         onAct={(action, extra) => act(action, extra)} />
-                </>
+                </div>
             ) : null}
 
             {tab === "train" ? (
