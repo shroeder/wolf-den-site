@@ -86,11 +86,33 @@ function Skill({ s, selected, onPick, busy }) {
 // ── THE DETAIL ───────────────────────────────────────────────────────────────────────────────────────────────
 // Docked under the row rather than in a modal, for the reason the tree's is: the answer belongs next to the
 // question, and a sheet that covers the row scrolls the thing you were comparing off the screen.
-function Detail({ s, busy, points, onTake, onNode, onClose }) {
+// ── THE DETAIL ───────────────────────────────────────────────────────────────────────────────────────────────
+// Docked under the row rather than in a modal: the answer belongs next to the question, and a sheet that
+// covers the row scrolls the thing you were comparing off the screen.
+//
+// ── BRANCHES ARE TABS NOW, NOT COLUMNS ───────────────────────────────────────────────────────────────────────
+// Three columns side by side was the honest way to show a three-way choice and it did not survive a phone.
+// At 390px each column was 134px, the third sat mostly off-screen behind a scroll nobody discovers, and Luke
+// looking at his own build said the plainest possible thing: "not clear this has a 3rd branch."
+//
+// A tab strip states the count in the one place a member cannot miss — three tabs, all visible, each carrying
+// its own depth. And it buys back the width: a rung is now the full card instead of a 134px sliver, which is
+// what makes room for the numbers below.
+//
+// ── AND THE NUMBERS ARE THE POINT ────────────────────────────────────────────────────────────────────────────
+// "A markedly bigger shield" invites exactly one question. Every rung prints what it moves and by how much,
+// diffed off the resolved skill (see skillDelta) rather than off its raw `mod`, so a capstone that pushes one
+// number up while pulling another down shows BOTH — which is the trade the branch is asking you to make.
+function Detail({ s, busy, points, onTake, onNode, onRefund, onClose }) {
+    const [branch, setBranch] = useState(s.branches[0]?.id || null);
+    const b = s.branches.find((x) => x.id === branch) || s.branches[0];
     const stats = statsOf(s.now);
+
     return (
         <div className="skp-detail">
             <div className="skp-detail-head">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="skp-detail-art" src={s.sprite} alt="" draggable="false" />
                 <div>
                     <b>{s.name}</b>
                     <p>{s.blurb}</p>
@@ -110,72 +132,89 @@ function Detail({ s, busy, points, onTake, onNode, onClose }) {
                 </button>
             ) : (
                 <>
-                    <div className="skp-nodes-lab">
-                        <span>Three branches</span>
-                        <em>{NODE_COST} point a rung &middot; top down</em>
-                    </div>
-                    {/* ── TWO LADDERS, SIDE BY SIDE ────────────────────────────────────────────────────────
-                        Drawn as columns rather than one list, because the shape IS the decision: a member has
-                        to see that the points they spend on the left are points that never reach the capstone
-                        on the right. A flat list of six hides exactly that, which is what the first build of
-                        this screen did. */}
-                    <div className="skp-branches">
-                        {s.branches.map((b) => (
-                            <div key={b.id} className={`skp-branch${b.depth >= b.nodes.length ? " is-full" : ""}`}>
-                                <div className="skp-branch-head">
-                                    <b>{b.name}</b>
-                                    <span>{b.tag}</span>
-                                    <i aria-hidden="true">{b.depth}/{b.nodes.length}</i>
-                                </div>
-                                <ol className="skp-rungs">
-                                    {b.nodes.map((n, i) => (
-                                        <li key={n.id}
-                                            className={`skp-rung${n.held ? " is-held" : ""}${n.open ? "" : " is-shut"}${i === b.nodes.length - 1 ? " is-cap" : ""}`}>
-                                            <div className="skp-rung-top">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img src={n.sprite} alt="" draggable="false" />
-                                                <div className="skp-rung-id">
-                                                    <b>{n.name}</b>
-                                                    {i === b.nodes.length - 1 ? <i className="skp-cap-tag">Capstone</i> : null}
-                                                </div>
-                                            </div>
-                                            <span className="skp-rung-desc">{n.desc}</span>
-                                            {/* ── THE STATE GETS ITS OWN LINE ──────────────────────────────
-                                                It sat beside the name, which works right up until the column
-                                                is 165px wide — on a phone the name wrapped straight underneath
-                                                the button and the two printed on top of each other
-                                                ("DeeperTAKEN"). There is no breakpoint that fixes it either:
-                                                three classes across a desktop gives columns barely wider than
-                                                the phone does. So it is always its own row. */}
-                                            <div className="skp-rung-state">
-                                                {n.held
-                                                    ? <i className="skp-held">Taken</i>
-                                                    : (
-                                                        <button type="button" className="skp-node-buy"
-                                                            disabled={busy || !n.canTake}
-                                                            onClick={() => onNode(s.id, n.id)}>
-                                                            {n.canTake ? "Take" : n.open ? `${NODE_COST} pt` : "Locked"}
-                                                        </button>
-                                                    )}
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ol>
-                            </div>
+                    <div className="skp-brs" role="tablist" aria-label="Branches">
+                        {s.branches.map((x) => (
+                            <button key={x.id} type="button" role="tab" aria-selected={x.id === b.id}
+                                className={`skp-br${x.id === b.id ? " is-on" : ""}${x.depth >= x.nodes.length ? " is-full" : ""}`}
+                                onClick={() => setBranch(x.id)}>
+                                <b>{x.name}</b>
+                                <span className="skp-pips" aria-hidden="true">
+                                    {x.nodes.map((n) => <i key={n.id} className={n.held ? "is-on" : ""} />)}
+                                </span>
+                            </button>
                         ))}
                     </div>
+
+                    <p className="skp-br-tag">{b.tag}</p>
+
+                    <ol className="skp-rungs">
+                        {b.nodes.map((n, i) => {
+                            const cap = i === b.nodes.length - 1;
+                            return (
+                                <li key={n.id}
+                                    className={`skp-rung${n.held ? " is-held" : ""}${n.open ? "" : " is-shut"}${cap ? " is-cap" : ""}`}>
+                                    <div className="skp-rung-top">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={n.sprite} alt="" draggable="false" />
+                                        <div className="skp-rung-id">
+                                            <b>{n.name}</b>
+                                            {cap ? <i className="skp-cap-tag">Capstone</i> : null}
+                                        </div>
+                                        {n.held ? <i className="skp-held">Taken</i> : null}
+                                    </div>
+                                    <span className="skp-rung-desc">{String(n.desc).replace(/^CAPSTONE\.\s*/, "")}</span>
+
+                                    {/* What it moves, in the units the stat strip above uses. A held rung
+                                        prints what it is DOING; an unheld one prints what it would do. */}
+                                    {n.delta?.length ? (
+                                        <ul className="skp-delta">
+                                            {n.delta.map((d) => (
+                                                <li key={d.key} className={d.better ? "is-up" : "is-down"}>
+                                                    <span>{d.label}</span>
+                                                    <em>{d.from}</em>
+                                                    <i aria-hidden="true">&rarr;</i>
+                                                    <b>{d.to}</b>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : null}
+
+                                    <div className="skp-rung-state">
+                                        {n.held ? (
+                                            <button type="button" className="skp-undo" disabled={busy}
+                                                onClick={() => onRefund(s.id, n.id)}>
+                                                {n.refunds > 1 ? `Give back · ${n.refunds} pts` : "Give back"}
+                                            </button>
+                                        ) : (
+                                            <button type="button" className="skp-node-buy"
+                                                disabled={busy || !n.canTake}
+                                                onClick={() => onNode(s.id, n.id)}>
+                                                {n.canTake ? `Take · ${NODE_COST} pt` : n.open ? `${NODE_COST} pt` : "Locked"}
+                                            </button>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ol>
+
+                    {/* ── GIVING THE WHOLE THING BACK ──────────────────────────────────────────────────────
+                        Its own control, away from the rungs, because it is a different size of decision —
+                        and because a member who wants OUT of a skill should not have to give back three
+                        rungs one at a time to get there. */}
+                    <button type="button" className="skp-drop" disabled={busy} onClick={() => onRefund(s.id, null)}>
+                        Give back {s.name} entirely &middot; {s.spent} pt{s.spent === 1 ? "" : "s"}
+                    </button>
                 </>
             )}
             <p className="skp-foot">
                 {points > 0 ? `${num(points)} point${points === 1 ? "" : "s"} to spend` : "No points to spend"}
+                {" · "}three free changes a day
             </p>
         </div>
     );
 }
 
-// Takes the SERVER'S view model rather than building its own — `progress.skills` is skillState() run on the
-// server, against the same bag it will validate a spend against. SkillTree takes `progress` for exactly this
-// reason: a screen that recomputes what it is allowed to offer is a screen that can drift from the answer.
 export default function SkillPanel({ progress, busy = false, onAct = () => {} }) {
     const [sel, setSel] = useState(null);
     const p = progress || {};
@@ -188,6 +227,7 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
     const toNext = TREE_POINTS_PER_SKILL_POINT - (treeSpent % TREE_POINTS_PER_SKILL_POINT);
     const onTake = (id) => onAct("take_skill", { skillId: id });
     const onNode = (skillId, nodeId) => onAct("take_skill_node", { skillId, nodeId });
+    const onRefund = (skillId, nodeId) => onAct("refund_skill", { skillId, nodeId });
 
     // A member who has not picked a class has no panel to show — the tree tab asks them to choose first, and
     // two screens asking the same question is one too many.
@@ -227,7 +267,7 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
 
             {chosen ? (
                 <Detail s={chosen} busy={busy} points={points}
-                    onTake={onTake} onNode={onNode} onClose={() => setSel(null)} />
+                    onTake={onTake} onNode={onNode} onRefund={onRefund} onClose={() => setSel(null)} />
             ) : (
                 <p className="skp-hint">
                     <GiSwapBag aria-hidden="true" /> Tap a skill to read what it does and what its nodes change.
@@ -290,8 +330,8 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                 .skp-detail { display: grid; gap: 11px; padding: 13px; border-radius: 17px;
                     background: radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--c) 12%, transparent), transparent 62%), rgba(0,0,0,.34);
                     border: 1px solid color-mix(in srgb, var(--c) 34%, transparent); }
-                .skp-detail-head { display: flex; align-items: flex-start; gap: 10px; }
-                .skp-detail-head > div { flex: 1; min-width: 0; }
+                .skp-detail-head { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px; align-items: start; }
+                .skp-detail-head > div { min-width: 0; }
                 .skp-detail-head b { font-size: 1.05rem; font-weight: 900;
                     color: color-mix(in srgb, var(--c) 72%, white); }
                 .skp-detail-head p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.5; color: #9aa2ab; }
@@ -327,62 +367,88 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                    panel padding are out, and a node card cannot be read at 100px. So the row SCROLLS rather
                    than squeezing — a fixed floor per column, two and a bit visible, swipe for the third. The
                    headers stay legible, which is what makes the third one findable rather than hidden. */
-                /* ── AND THE THIRD ONE HAS TO ANNOUNCE ITSELF ─────────────────────────────────────
-                   At 146px a column, two filled the phone exactly and the third sat flush against the edge
-                   with no sliver showing — a branch that exists, costs points, and that nobody would ever
-                   know to swipe for. 134px leaves about fifty pixels of the third column visible, which is
-                   the whole affordance: a cut-off card reads as "there is more" in a way that a clean edge
-                   never does. The fade is the belt to that brace. */
-                .skp-branches { display: grid; gap: 7px; grid-auto-flow: column;
-                    grid-auto-columns: minmax(134px, 1fr); overflow-x: auto; padding-bottom: 4px;
-                    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
-                    -webkit-mask-image: linear-gradient(to right, #000 88%, rgba(0,0,0,.25));
-                    mask-image: linear-gradient(to right, #000 88%, rgba(0,0,0,.25)); }
-                .skp-branches > * { scroll-snap-align: start; }
-                /* Once all three genuinely fit, stop scrolling, drop the fade, and share the width evenly. */
-                @media (min-width: 560px) {
-                    .skp-branches { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr);
-                        overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
-                }
-                .skp-branch { display: grid; gap: 5px; padding: 8px 7px 9px; border-radius: 13px;
-                    background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.07); align-content: start; }
-                .skp-branch.is-full { border-color: color-mix(in srgb, var(--c) 55%, transparent);
-                    box-shadow: inset 0 0 22px -10px var(--c); }
-                .skp-branch-head { display: grid; gap: 1px; padding: 0 2px 3px; position: relative; }
-                .skp-branch-head b { font-size: 11.5px; font-weight: 900; letter-spacing: .04em;
-                    color: color-mix(in srgb, var(--c) 66%, white); padding-right: 26px; }
-                .skp-branch-head span { font-size: 9.5px; line-height: 1.35; color: #838b96; }
-                .skp-branch-head i { position: absolute; top: 0; right: 2px; font-style: normal;
-                    font-size: 9px; font-weight: 900; color: #6f7883; font-variant-numeric: tabular-nums; }
+                /* ── BRANCH TABS ─────────────────────────────────────────────────────────────────────────
+                   Three, always all three on screen, always the same width. The count of branches is the
+                   thing this has to communicate before anything else — the previous build put the third one
+                   behind a horizontal scroll and the answer to "how many branches are there" became "two,
+                   apparently". */
+                .skp-brs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+                .skp-br { display: grid; justify-items: center; gap: 5px; padding: 9px 4px 8px; cursor: pointer;
+                    border-radius: 12px; background: rgba(0,0,0,.32);
+                    border: 1px solid rgba(255,255,255,.09);
+                    transition: border-color .16s ease, background .16s ease, transform .12s ease; }
+                .skp-br b { font-size: 10.5px; font-weight: 900; line-height: 1.15; text-align: center;
+                    color: #9aa2ab; letter-spacing: -.01em; }
+                .skp-br.is-on { background: color-mix(in srgb, var(--c) 17%, transparent);
+                    border-color: color-mix(in srgb, var(--c) 62%, transparent); }
+                .skp-br.is-on b { color: color-mix(in srgb, var(--c) 68%, white); }
+                /* A branch you have run to its capstone should read as DONE from the tab, not only from
+                   inside it — that is the one state worth being smug about. */
+                .skp-br.is-full { border-color: color-mix(in srgb, var(--c) 75%, transparent);
+                    box-shadow: 0 0 16px -6px var(--c); }
+                @media (hover: hover) { .skp-br:hover { transform: translateY(-1px); } }
+                .skp-br-tag { margin: 0; text-align: center; font-size: 10.5px; color: #8b93a0; }
 
-                /* The spine. A ladder has to LOOK like one, or the ordering rule stays invisible until a
-                   member taps a locked rung and wonders why nothing happened. */
+                /* ── THE RUNGS ── full width now that they are not fighting two siblings for it. */
                 .skp-rungs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-                .skp-rung { position: relative; padding: 7px 6px; border-radius: 10px;
-                    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
-                .skp-rung + .skp-rung { margin-top: 11px; }
-                .skp-rung + .skp-rung::before { content: ""; position: absolute; left: 21px; top: -12px;
-                    width: 2px; height: 12px; background: rgba(255,255,255,.14); }
-                .skp-rung.is-held + .skp-rung::before { background: var(--c); }
-                .skp-rung.is-held { border-color: color-mix(in srgb, var(--c) 48%, transparent);
-                    background: color-mix(in srgb, var(--c) 12%, transparent); }
-                .skp-rung.is-shut { opacity: .45; }
-                .skp-rung.is-cap { border-style: dashed; }
-                .skp-rung.is-cap.is-held { border-style: solid; }
-                .skp-rung-top { display: grid; grid-template-columns: 30px 1fr; gap: 7px; align-items: center; }
-                .skp-rung-state { display: flex; justify-content: flex-end; margin-top: 6px; }
-                .skp-rung-top img { width: 30px; height: 30px; object-fit: contain; }
-                .skp-rung:not(.is-held) img { filter: grayscale(1) brightness(.72); }
+                .skp-rung { position: relative; padding: 10px; border-radius: 13px;
+                    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+                .skp-rung + .skp-rung { margin-top: 13px; }
+                /* The spine, lit through what you own. A ladder has to LOOK like one or the ordering rule
+                   stays invisible until somebody taps a locked rung and wonders why nothing happened. */
+                .skp-rung + .skp-rung::before { content: ""; position: absolute; left: 27px; top: -14px;
+                    width: 2px; height: 14px; background: rgba(255,255,255,.14); }
+                .skp-rung.is-held + .skp-rung::before { background: var(--c); box-shadow: 0 0 8px var(--c); }
+                .skp-rung.is-held { border-color: color-mix(in srgb, var(--c) 50%, transparent);
+                    background: linear-gradient(150deg, color-mix(in srgb, var(--c) 15%, transparent), rgba(255,255,255,.03) 70%); }
+                .skp-rung.is-shut { opacity: .5; }
+                /* A capstone is the thing the branch is FOR, so it gets a frame of its own — dashed while it
+                   is still out of reach, solid and lit the moment it is yours. */
+                .skp-rung.is-cap { border-style: dashed; border-color: rgba(255,255,255,.2); }
+                .skp-rung.is-cap.is-held { border-style: solid;
+                    border-color: color-mix(in srgb, var(--c) 85%, transparent);
+                    box-shadow: 0 0 26px -8px var(--c), inset 0 0 30px -18px var(--c); }
+                .skp-rung-top { display: grid; grid-template-columns: 38px 1fr auto; gap: 9px; align-items: center; }
+                .skp-rung-top img { width: 38px; height: 38px; object-fit: contain; }
+                .skp-rung:not(.is-held) img { filter: grayscale(.85) brightness(.72); }
+                .skp-rung.is-held img { filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--c) 55%, transparent)); }
                 .skp-rung-id { min-width: 0; }
-                .skp-rung-id b { display: block; font-size: 11px; font-weight: 900; color: #dfe4ea; line-height: 1.2;
-                    /* break-word, not anywhere. "anywhere" lets the browser split a word to minimise the
-                       column even when the word would have fitted, which printed Exsanguinat/e on a phone.
-                       This only breaks a word that genuinely cannot fit.
-                       (And no backticks in here: the whole block is a template literal, so one ends it.) */
-                    overflow-wrap: break-word; }
-                .skp-cap-tag { display: block; margin-top: 1px; font-style: normal; font-size: 8px;
-                    font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--c); }
-                .skp-rung-desc { display: block; margin-top: 5px; font-size: 10px; line-height: 1.4; color: #98a0aa; }
+                .skp-rung-id b { display: block; font-size: 12.5px; font-weight: 900; color: #e8ecf1; line-height: 1.2; }
+                .skp-cap-tag { display: block; margin-top: 2px; font-style: normal; font-size: 8px;
+                    font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+                .skp-rung-desc { display: block; margin-top: 6px; font-size: 11px; line-height: 1.45; color: #98a0aa; }
+
+                /* ── WHAT IT MOVES ───────────────────────────────────────────────────────────────────────
+                   The reason the rung got the full width back. Every row is a real before-and-after off the
+                   resolved skill, so a capstone that trades one number for another shows the trade rather
+                   than the half of it that sounds good. */
+                .skp-delta { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
+                .skp-delta li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px;
+                    align-items: baseline; padding: 4px 7px; border-radius: 8px;
+                    background: rgba(0,0,0,.3); font-variant-numeric: tabular-nums; }
+                .skp-delta span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: #8b93a0; }
+                .skp-delta em { font-style: normal; font-size: 10.5px; color: #7d858f; }
+                .skp-delta i { font-style: normal; font-size: 9px; color: #6f7883; }
+                .skp-delta b { font-size: 11px; font-weight: 900; }
+                .skp-delta li.is-up b { color: #7ee2a8; }
+                .skp-delta li.is-down b { color: #ff9f8a; }
+
+                /* ── GIVING IT BACK ──────────────────────────────────────────────────────────────────────
+                   Present on every taken rung rather than hidden behind a mode. A tree you cannot walk back
+                   out of is a tree nobody experiments with, which is the whole argument the passive tree's
+                   own respec pricing already makes. */
+                .skp-undo { padding: 6px 11px; border-radius: 9px; cursor: pointer;
+                    font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+                    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); color: #a7aeb8; }
+                .skp-undo:hover:not(:disabled) { color: #ff9f8a; border-color: rgba(255,159,138,.5); }
+                .skp-drop { padding: 9px; border-radius: 11px; cursor: pointer; font-size: 10.5px;
+                    font-weight: 900; letter-spacing: .04em;
+                    background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.16); color: #8b93a0; }
+                .skp-drop:hover:not(:disabled) { color: #ff9f8a; border-color: rgba(255,159,138,.45); }
+                .skp-drop:disabled, .skp-undo:disabled { opacity: .45; cursor: default; }
+
+                .skp-detail-art { width: 46px; height: 46px; object-fit: contain; flex: 0 0 auto;
+                    filter: drop-shadow(0 3px 12px color-mix(in srgb, var(--c) 55%, transparent)); }
                 .skp-node-buy { flex: 0 0 auto; padding: 6px 10px; border-radius: 9px; cursor: pointer;
                     font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
                     background: color-mix(in srgb, var(--c) 24%, transparent);

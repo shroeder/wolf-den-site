@@ -3468,12 +3468,17 @@ function Styles() {
             .ar-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 0 0 16px; }
             .ar-tab { position: relative; padding: 9px 2px; border-radius: 11px; cursor: pointer;
                 font-size: 10.5px; font-weight: 900; letter-spacing: -.01em; color: #9aa2ab;
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap;
                 background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12); }
             /* The count rides on the corner rather than inside the label, so a two-digit number and a
                three-digit one produce the same row. Absolutely positioned for the same reason: it must not be
                able to push the word it belongs to. */
-            .ar-tab-n { position: absolute; top: -5px; right: -3px; min-width: 16px; padding: 1px 4px;
+            /* The tab CANNOT clip. overflow:hidden was on the button for label ellipsis and it took the
+               corner off this badge, so 30 rendered as a sliced 3. The labels are single short words now and
+               never need truncating, so the clip went rather than the badge moving inside — a count tucked
+               within the padding would be back to letting the number decide the layout.
+               (No backticks in here: the whole block is a template literal, so one would end it.) */
+            .ar-tab-n { position: absolute; top: -6px; right: -2px; min-width: 16px; padding: 1px 4px;
                 border-radius: 999px; font-style: normal; font-size: 9px; font-weight: 900; line-height: 1.4;
                 color: #12101a; background: #ffd75e; box-shadow: 0 0 0 2px rgba(18,16,26,.85);
                 font-variant-numeric: tabular-nums; }
