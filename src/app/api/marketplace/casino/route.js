@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib/marketplace/casino.js";
+// Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
+// blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
+// between the two would be a runtime landmine in a serverless bundle rather than a compile error.
+import { blackjackState, dealBlackjack, doubleBlackjack, hitBlackjack, standBlackjack } from "@/lib/marketplace/blackjack.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -27,7 +31,8 @@ export async function GET(request) {
         try {
             const buyer = await gate();
             if (!buyer) return noStore({ open: false });
-            return noStore({ open: true, ...(await getCasinoState(buyer.id)) });
+            const [floor, table] = await Promise.all([getCasinoState(buyer.id), blackjackState(buyer.id)]);
+            return noStore({ open: true, ...floor, blackjack: table });
         } catch (error) {
             return internalError(error, { event: "marketplace.casino.state.failure" });
         }
@@ -52,6 +57,14 @@ export async function POST(request) {
                 // would break the odds these games were priced on.
                 case "wheel": return noStore(await spinWheel(buyer.id, { bet: b?.bet, choice: b?.choice, pick: b?.pick }));
                 case "keno": return noStore(await playKeno(buyer.id, { bet: b?.bet, picks: b?.picks }));
+                // ── THE TABLE ── four verbs instead of one, because a hand of blackjack is a conversation.
+                // None of them carries state from the client: which hand is in play, what is left in the
+                // shoe and whose turn it is are all read from the row, so the only thing a POST body can
+                // decide here is the size of the opening bet.
+                case "bj_deal": return noStore(await dealBlackjack(buyer.id, { bet: b?.bet }));
+                case "bj_hit": return noStore(await hitBlackjack(buyer.id));
+                case "bj_stand": return noStore(await standBlackjack(buyer.id));
+                case "bj_double": return noStore(await doubleBlackjack(buyer.id));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

@@ -175,7 +175,7 @@ export async function spinSlot(buyerId, { bet } = {}) {
     const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf"), perks });
     // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
     await tickCasinoQuests(buyerId, "slot", won);
-    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
 }
 
@@ -205,7 +205,7 @@ export function perkPhrase(k = {}) {
 
 /** A dropped pet, told what it does. maybeGrantCasinoPet is shared with every other pet source, so the
  *  casino-specific half is added here rather than bent into the generic granter. */
-const withPerk = (pet) => {
+export const withCasinoPerk = (pet) => {
     if (!pet) return null;
     const def = CASINO_PETS.find((p) => p.id === pet.id);
     return { ...pet, perk: perkPhrase(def?.casinoPerk) };
@@ -243,7 +243,7 @@ const onTheHouse = (perks) => (perks?.freePlay || 0) > 0 && Math.random() < perk
 // One function for all three machines, so the fourth one somebody adds cannot quietly fail to tick a card.
 // The per-game metric is what lets a bounty ask for the WHEEL specifically rather than for "gamble more",
 // which is the difference between a bounty and a nag.
-async function tickCasinoQuests(buyerId, game, won) {
+export async function tickCasinoQuests(buyerId, game, won) {
     await bumpQuestProgress(buyerId, "casino_play", 1).catch(() => {});
     await bumpQuestProgress(buyerId, `casino_${game}`, 1).catch(() => {});
     if (won > 0) await bumpQuestProgress(buyerId, "casino_win", 1).catch(() => {});
@@ -438,7 +438,7 @@ export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}
     }
     const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf", perks });
     await tickCasinoQuests(buyerId, "wheel", won);
-    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, seg, choice, hit, bet: stake, won, gold, prize, pet, onHouse, refund };
 }
 
@@ -524,7 +524,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // Five of five is 1 in 2,611 — the rarest thing on the floor, and the only one that is worth a certainty.
     const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
     await tickCasinoQuests(buyerId, "keno", won);
-    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize, pet, onHouse };
 }
 

@@ -23,7 +23,7 @@ const MACHINES = [
     { id: "slot3", x: 44, label: "Moonrise", kind: "Slots", live: false },
     { id: "roulette", x: 60, label: "The Wheel", kind: "Roulette", live: true },
     { id: "keno", x: 75, label: "Keno", kind: "Keno", live: true },
-    { id: "blackjack", x: 90, label: "The Table", kind: "Blackjack", live: false },
+    { id: "blackjack", x: 90, label: "The Table", kind: "Blackjack", live: true },
 ];
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
@@ -41,9 +41,43 @@ const SYMBOL_ART = {
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
+// Every way a hand can end, said the way somebody would say it out loud. "dealer_bust" is a state name, not
+// a sentence, and a table that reports state names is a table that reads like a debug log.
+const OUTCOME = {
+    blackjack: "Blackjack.",
+    win: "You take it.",
+    dealer_bust: "Dealer busts.",
+    push: "Push — your stake comes back.",
+    lose: "The house takes it.",
+    bust: "Bust.",
+    dealer_blackjack: "Dealer had blackjack.",
+};
+
+// A card, drawn in CSS like every other thing on this floor. Red suits red, black suits pale — the one piece
+// of card design that is not decoration, because it is how you read a hand at a glance.
+const SUIT_ART = { s: { glyph: "♠", red: false }, h: { glyph: "♥", red: true }, d: { glyph: "♦", red: true }, c: { glyph: "♣", red: false } };
+function Card({ card }) {
+    const rank = String(card).slice(0, -1);
+    const suit = SUIT_ART[String(card).slice(-1)] || SUIT_ART.s;
+    return (
+        <span className={`cas-card${suit.red ? " is-red" : ""}`}>
+            <b>{rank}</b><i>{suit.glyph}</i>
+        </span>
+    );
+}
+
 export default function CasinoClient({ initial }) {
     const [st, setSt] = useState(initial);
-    const [x, setX] = useState(14);
+    // ── WALKING IN FACING SOMETHING ──────────────────────────────────────────────────────────────────────
+    // `?at=blackjack` starts you at that cabinet instead of at the door. The floor is six machines wide and
+    // getting to the far end is thirteen taps, which is fine when you are wandering and tedious when you came
+    // back for one thing. It also makes a machine linkable — from a bounty card, a badge, a message.
+    // Unknown or missing name just starts you at the door, so a bad link is a walk rather than an error.
+    const [x, setX] = useState(() => {
+        if (typeof window === "undefined") return 14;
+        const want = new URLSearchParams(window.location.search).get("at");
+        return MACHINES.find((m) => m.id === want)?.x ?? 14;
+    });
     const [facing, setFacing] = useState(1);
     const [at, setAt] = useState(null);          // the machine you are standing at
     const [bet, setBet] = useState(100);
@@ -75,6 +109,10 @@ export default function CasinoClient({ initial }) {
     // pet arriving is a different size of moment than a chest and must not quietly replace one.
     const [note, setNote] = useState(null);
     const [wonPet, setWonPet] = useState(null);
+    // The one machine with a hand in progress. It comes down from the server on load, so closing the tab
+    // mid-hand is not a way to lose a stake — nor a way to walk out of one.
+    const [hand, setHand] = useState(initial?.blackjack?.hand || null);
+    const rakeRate = initial?.blackjack?.rakeRate ?? 0.2;
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -249,6 +287,44 @@ export default function CasinoClient({ initial }) {
         }
     }, [busy, absorb]);
 
+    // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────
+    // Four verbs against one endpoint. The client sends no state at all — not which hand, not what is in it —
+    // because everything about a hand of blackjack that could be worth lying about lives in a row on the
+    // server. All this function decides is which word to send.
+    const table = useCallback(async (action, body = {}) => {
+        if (busy) return;
+        unlock();
+        setBusy(true); setErr(null); setFlash(null);
+        if (action === "bj_deal") { setPrize(null); setNote(null); setWonPet(null); }
+        Sfx.whoosh();
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action, ...body }),
+        }).then((x2) => x2.json()).catch(() => null);
+        setBusy(false);
+        if (!r?.ok) {
+            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+                : r?.error === "cannot_double" ? "You can only double on your first two cards."
+                    : r?.error === "no_hand" ? "That hand is already finished."
+                        : "That didn't go through.");
+            return;
+        }
+        setHand(r.hand || null);
+        if (r.gold != null) setSt((p) => ({ ...p, gold: r.gold }));
+        // A card landing is a small sound; the hand ENDING is the moment. Splitting them is what keeps a hit
+        // from feeling like a result.
+        if (r.hand && r.hand.open) { Sfx.impact(0.4); Haptic.hit(0.35); return; }
+        absorb(r);
+        const beat = r.hand?.outcome;
+        if (beat === "blackjack") { setFlash("big"); Sfx.crit(0.9); Haptic.crit(); }
+        else if (r.won > 0) { setFlash("win"); Sfx.gemSet?.(); Haptic.hit(0.6); }
+        else if (beat === "push") { Sfx.block(0.2); }
+        else { Sfx.block(0.3); Haptic.hit(0.25); }
+        if (r.won > 0 || beat === "blackjack") {
+            timers.current.push(setTimeout(() => setFlash(null), beat === "blackjack" ? 2200 : 1200));
+        }
+    }, [busy, absorb]);
+
     const toggleNumber = useCallback((n) => {
         setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
     }, []);
@@ -309,12 +385,6 @@ export default function CasinoClient({ initial }) {
                 </div>
               </div>
             </div>
-
-            {/* THE DAY'S THREE, under the room rather than over it. The floor is the screen; a bounty card
-                above the machines would be a to-do list you have to walk past to reach the thing you came
-                for. Deliberately cheap bounties — see FEATURE_DAILIES.casino for why a gold sink cannot
-                afford generous ones. */}
-            <FeatureDailies feature="casino" />
 
             <div className="cas-walk">
                 <button type="button" onClick={() => walk(-1)} aria-label="Walk left">◀</button>
@@ -414,6 +484,40 @@ export default function CasinoClient({ initial }) {
                         </>
                     ) : null}
 
+                    {/* ── THE FELT ────────────────────────────────────────────────────────────────────
+                        Dealer on top, you below, the way a table is laid out — and the face-down card is
+                        drawn face-down rather than left out, because the shape of the hand is the whole
+                        thing you are reading. It is genuinely not in the payload while the hand is open. */}
+                    {at.live && at.id === "blackjack" ? (
+                        <div className="cas-felt">
+                            <div className="cas-seat">
+                                <span className="cas-seat-who">Dealer{hand && !hand.dealerHidden ? ` · ${hand.dealerValue.total}` : ""}</span>
+                                <div className="cas-cards">
+                                    {(hand?.dealer || []).map((c, i) => <Card key={`d${i}${c}`} card={c} />)}
+                                    {hand?.dealerHidden ? <span className="cas-card is-down" aria-label="face down" /> : null}
+                                    {!hand ? <span className="cas-card is-empty" /> : null}
+                                </div>
+                            </div>
+                            <div className="cas-seat is-you">
+                                <span className="cas-seat-who">
+                                    You{hand ? ` · ${hand.playerValue.total}${hand.playerValue.soft && hand.playerValue.total <= 21 ? " soft" : ""}` : ""}
+                                    {hand?.doubled ? " · doubled" : ""}
+                                </span>
+                                <div className="cas-cards">
+                                    {(hand?.player || []).map((c, i) => <Card key={`p${i}${c}`} card={c} />)}
+                                    {!hand ? <span className="cas-card is-empty" /> : null}
+                                </div>
+                            </div>
+                            <p className={`cas-result${hand && !hand.open && hand.won > 0 ? " is-win" : ""}`}>
+                                {!hand ? `Blackjack pays 3:2. The house rakes ${Math.round(rakeRate * 100)}% of what you win — never your stake.`
+                                    : hand.open ? "Hit, stand, or double."
+                                        : OUTCOME[hand.outcome] || "Hand over."}
+                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} gold` : ""}
+                                {hand && !hand.open && hand.rake > 0 ? ` (rake ${money(hand.rake)})` : ""}
+                            </p>
+                        </div>
+                    ) : null}
+
                     {/* ── WHAT YOU WON THAT WAS NOT GOLD ──────────────────────────────────────────────
                         Shared by every machine, because a prize is a prize wherever it came from — and it
                         sits ABOVE the stake row so it is the last thing you read before deciding to go
@@ -451,24 +555,40 @@ export default function CasinoClient({ initial }) {
                         floor you have to learn three times. */}
                     {at.live ? (
                         <>
-                            <div className="cas-bets">
+                            {/* The stake row goes away mid-hand. The bet is already placed and the chips are
+                                already gone — leaving four stake buttons live under a hand in progress asks
+                                a question that has no answer until the hand is over. */}
+                            <div className="cas-bets" hidden={at.id === "blackjack" && Boolean(hand?.open)}>
                                 {[25, 100, 500, 2500].map((v) => (
                                     <button key={v} type="button"
                                         className={`cas-bet${bet === v ? " is-on" : ""}`}
                                         onClick={() => setBet(v)}>{money(v)}</button>
                                 ))}
                             </div>
+                            {at.id === "blackjack" && hand?.open ? (
+                                // MID-HAND the stake is already placed, so the stake row above is dead and
+                                // these three are the only decision on the screen.
+                                <div className="cas-acts">
+                                    <button type="button" className="cas-act" disabled={busy} onClick={() => table("bj_hit")}>Hit</button>
+                                    <button type="button" className="cas-act is-stand" disabled={busy} onClick={() => table("bj_stand")}>Stand</button>
+                                    <button type="button" className="cas-act is-double"
+                                        disabled={busy || !hand.canDouble || (st?.gold || 0) < hand.stake}
+                                        onClick={() => table("bj_double")}>Double</button>
+                                </div>
+                            ) : null}
                             <button type="button" className="cas-pull"
+                                hidden={at.id === "blackjack" && Boolean(hand?.open)}
                                 disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
                                 onClick={() => {
                                     if (at.id === "slot") return pull();
+                                    if (at.id === "blackjack") return table("bj_deal", { bet });
                                     if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
                                 {busy ? "…"
                                     : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
-                                            : `${at.id === "slot" ? "Pull" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
+                                            : `${at.id === "slot" ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
                             </button>
                             {err ? <p className="cas-err">{err}</p> : null}
                         </>
@@ -477,6 +597,12 @@ export default function CasinoClient({ initial }) {
                     )}
                 </div>
             ) : null}
+
+            {/* THE DAY'S THREE, at the very bottom. This sat between the room and the walk controls for
+                exactly one screenshot: it is tall enough on a phone that it pushed the ◀ ▶ buttons off the
+                bottom of the screen, so the floor became a room you could not walk around. Anything that
+                is not the room or the machine goes below both. */}
+            <FeatureDailies feature="casino" />
 
         </section>
     );

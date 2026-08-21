@@ -17330,7 +17330,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-purse i { font-style: normal; font-size: 10px; color: #98a0aa; margin-left: 4px; }
 
 /* The room. Deep and warm, with the floor catching the light from the cabinets. */
-.cas-room { position: relative; height: 300px; margin: 10px 0; border-radius: 16px;
+/* ── HOW TALL THE ROOM IS ALLOWED TO BE ──────────────────────────────────────────────────────────────
+   300px flat, and on a real phone that put every machine's controls below the fold: site chrome and the
+   HUD take ~150px, the room took 300, the walk row 56, and the panel started at 500 on a screen with
+   441 usable. You walked into a casino you could not reach the buttons in.
+   The room is the ATMOSPHERE; the machine is the game. When there is not enough screen for both, the
+   room is what gives way. */
+.cas-room { position: relative; height: clamp(150px, 30vh, 300px); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     background: radial-gradient(120% 80% at 50% 0%, #2a1636 0%, #140d1c 55%, #0a0710 100%);
     /* The window. It scrolls, but never by dragging — the camera follows the walk buttons, so a stray
@@ -17374,7 +17380,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-other b { display: block; font-size: 9px; color: #98a0aa; }
 
 .cas-walk { display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; gap: 8px; }
-.cas-walk button { padding: 14px 0; border-radius: 12px; font-size: 16px; cursor: pointer;
+.cas-walk button { padding: 11px 0; border-radius: 12px; font-size: 16px; cursor: pointer;
     color: #eaf1f8; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
 .cas-walk span { text-align: center; font-size: 11px; color: #98a0aa; letter-spacing: .1em;
     text-transform: uppercase; }
@@ -17537,3 +17543,45 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     transform: translateX(-120%); animation: casSweep 1.5s ease .25s both; }
 @keyframes casNewPet { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes casSweep { to { transform: translateX(120%); } }
+
+/* ── THE FELT ────────────────────────────────────────────────────────────────────────────────────────
+   Dealer on top, you below, the way a table is laid out. Green, because this is the one game on the
+   floor everybody arrives already knowing what it should look like, and fighting that is a fight with
+   nothing on the other side of it. */
+.cas-felt { margin: 0 0 10px; padding: 12px; border-radius: 14px;
+    border: 1px solid rgba(126,213,126,0.24);
+    background: radial-gradient(120% 90% at 50% 0%, rgba(40,110,66,0.34), rgba(14,26,18,0.5)); }
+.cas-seat + .cas-seat { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.09); }
+.cas-seat-who { display: block; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #9db6a4; margin-bottom: 6px; }
+.cas-seat.is-you .cas-seat-who { color: #ffe9b8; }
+.cas-cards { display: flex; flex-wrap: wrap; gap: 6px; min-height: 62px; }
+
+/* Each card deals itself in — a hand that appears fully formed reads as a number, and a hand that lands
+   card by card reads as a hand. One animation, no stagger: the server already decided, and pretending a
+   later card is still undecided would be theatre with nothing behind it. */
+.cas-card { position: relative; width: 42px; height: 60px; flex: none; border-radius: 6px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    background: linear-gradient(180deg, #f6f3ea, #ddd6c6); border: 1px solid rgba(0,0,0,0.35);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    animation: casDeal .28s cubic-bezier(.2,1.3,.35,1) both; }
+.cas-card b { font-size: 0.95rem; font-weight: 900; color: #1a1d22; line-height: 1; }
+.cas-card i { font-style: normal; font-size: 0.8rem; color: #1a1d22; line-height: 1; }
+.cas-card.is-red b, .cas-card.is-red i { color: #c0392b; }
+/* The hole card. Drawn face-down rather than omitted, because the SHAPE of the hand is what you read. */
+.cas-card.is-down { background: repeating-linear-gradient(45deg, #4a2f6b, #4a2f6b 4px, #3b2456 4px, #3b2456 8px);
+    border-color: rgba(255,255,255,0.2); }
+.cas-card.is-empty { background: rgba(255,255,255,0.04); border-style: dashed; border-color: rgba(255,255,255,0.12);
+    box-shadow: none; animation: none; }
+@keyframes casDeal { from { opacity: 0; transform: translateY(-14px) rotate(-6deg); } to { opacity: 1; transform: none; } }
+
+/* Hit / Stand / Double. Three equal buttons because they are three equal decisions — sizing one of them
+   bigger would be the table telling you what to do. */
+.cas-acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.cas-act { padding: 13px 6px; border-radius: 12px; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.02em;
+    color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e); border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35); cursor: pointer; }
+.cas-act:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.35); }
+.cas-act:disabled { opacity: 0.4; cursor: default; }
+.cas-act.is-stand { background: linear-gradient(180deg, #cbd3dc, #9aa6b3); }
+.cas-act.is-double { background: linear-gradient(180deg, #d9c2ff, #a982ff); }

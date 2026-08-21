@@ -118,10 +118,25 @@ if (process.env.SHOT_HIDE) {
 //
 // So the markers are seeded BEFORE any page script runs. Semicolon-separated keys, each set to "1":
 //   SHOT_SEEN="wolfden-dungeons-announce-v1;wolfden-howto-market" node scripts/shot.mjs …
+//
+// SOME MARKERS ARE NOT FLAGS, THEY ARE TIMESTAMPS. The web-push prompt snoozes for a week by storing
+// Date.now() and comparing against it — so seeding its key with "1" reads as "dismissed in 1970", which is
+// well outside the snooze window, and the banner shows anyway. It then sits over the bottom of every
+// screenshot of every page, which is how it covered the casino's buttons in four shots running.
+//
+// So an entry may carry its own value, and the word `now` means the current timestamp:
+//   SHOT_SEEN="wolfden-webpush-dismissed=now;wolfden-market-announce-v1" node scripts/shot.mjs …
 if (process.env.SHOT_SEEN) {
     const keys = process.env.SHOT_SEEN.split(";").map((k) => k.trim()).filter(Boolean);
+    const setters = keys.map((entry) => {
+        const eq = entry.indexOf("=");
+        const key = eq === -1 ? entry : entry.slice(0, eq);
+        const raw = eq === -1 ? "1" : entry.slice(eq + 1);
+        const value = raw === "now" ? "String(Date.now())" : JSON.stringify(raw);
+        return `localStorage.setItem(${JSON.stringify(key)}, ${value});`;
+    });
     await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `try { ${keys.map((k) => `localStorage.setItem(${JSON.stringify(k)}, "1");`).join(" ")} } catch (e) {}`,
+        source: `try { ${setters.join(" ")} } catch (e) {}`,
     });
 }
 
