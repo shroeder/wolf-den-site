@@ -161,34 +161,26 @@ const BEAT_BUDGET_MS = 1200;
 // command you press has a wind-up. Short: this is a punish, not a cast.
 const COUNTER_WIND_MS = 150;
 // Which events make somebody flinch — the ones that move a health bar.
-// ── THE FIGHTS ON OFFER ──────────────────────────────────────────────────────────────────────────────────────
-// Members and Gauntlet tiers in one list, hardest first. Both already arrive from the server carrying their
-// own `reward`, so nothing here computes a payout — a screen that worked out its own number would be a second
-// copy of the rule, and the copies drift. Capped at six: a wall of opponents is not a choice, it is a list.
+// ── THE FIGHTS ON OFFER: PEOPLE, HARDEST FIRST ───────────────────────────────────────────────────────────────
+// Luke: "can we remove all NPC battles from PvP fights and picking please, just sort by hardest to weakest
+// fights from real players to pick from."
+//
+// So this is members only. Gauntlet tiers still EXIST — the server still builds them, still rates them and
+// still accepts `npc:<tier>` as a target — they are simply no longer mixed into the list of people you
+// choose between. A ladder of players and a ladder of manufactured opponents are two different things, and
+// sorting them into one column asked members to compare them as if they were not.
+//
+// No reward is computed here. Every option arrives from the server carrying its own `reward`, because a
+// screen that worked out its own payout would be a second copy of the rule and the copies drift.
 const BAND_WORD = { brutal: "brutal", hard: "harder", even: "even", easy: "easier" };
 
 function FIGHT_OPTIONS(st) {
-    const out = [];
-    for (const t of st?.targets || []) {
-        out.push({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
-            damage: t.damage, health: t.health, reward: t.reward });
-    }
-    for (const n of st?.gauntlet || []) {
-        out.push({ key: `n:${n.tier}`, target: `npc:${n.tier}`, name: n.name || `Tier ${n.tier}`, sprite: n.sprite,
-            // `power` (an arenaRating) and NOT `gearPower` (a gear score in the hundreds). Mixing the two
-            // sorted every tier below every member and made them all read EASIER — see the note in arena.js.
-            power: n.power, damage: n.damage, health: n.health, beaten: n.beaten, reward: n.reward });
-    }
-    // ── HARDEST FIRST ────────────────────────────────────────────────────────────────────────────────────
-    // Two wrong versions before this one, both caused by the units. Sorting by power gave six members and no
-    // tiers, because a tier's `gearPower` is in the hundreds and a member's rating is in the tens of
-    // thousands. Spreading evenly across the whole list then filled the menu with trivial opponents — the
-    // board has ninety-two members on it and most of them are far below the top.
-    //
-    // With both sides rated the same way, hardest-first is simply correct: it puts the fights worth having
-    // at the top, mixes members and Gauntlet tiers by how hard they actually are, and leaves "Surprise me"
-    // as the row for anybody who does not want to choose.
-    return out.sort((x, y) => (y.power || 0) - (x.power || 0)).slice(0, 6);
+    return (st?.targets || [])
+        .map((t) => ({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
+            damage: t.damage, health: t.health, reward: t.reward }))
+        // Hardest first — the fight worth having should be the one under your thumb, not the safest one.
+        .sort((x, y) => (y.power || 0) - (x.power || 0))
+        .slice(0, 8);
 }
 
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
@@ -2742,7 +2734,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 afterwards. Luke: "I want to be able to select a fight — laurels, gold, exp related to the
                 fight difficulty I pick." The scaling was already there and always had been (laurels and VP
                 both multiply by their power over yours, 0.3x to 2.5x), and so was the data: `targets` and
-                `gauntlet` have shipped with a per-opponent `reward` for months. Nothing rendered them.
+                `gauntlet` had shipped with a per-opponent `reward` for months with nothing rendering them.
                 There is even a comment in arena.js noting that nothing draws this list any more — "a flag
                 nobody draws is the Den's favourite bug."
                 So this is not a new economy. It is the existing one, made into a choice you can see. */}
