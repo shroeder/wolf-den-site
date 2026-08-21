@@ -1132,6 +1132,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         return () => clearTimeout(id);
     }, [logAll, shown, beatMs]);
 
+    // Is the ring still working through what it was handed? True from the moment a response arrives until
+    // its last line has played. The deck reads this; see FightInput below.
+    const playing = shown < logAll.length;
+
     // The position after the blows played so far. Recomputed rather than accumulated, so a scrub or a replay
     // can land anywhere without the health bars drifting out of step with the transcript.
     const played = useMemo(() => {
@@ -2195,7 +2199,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 
                     Above the log and below the field on purpose: it is the only thing on this screen anybody
                     is going to touch under time pressure, and it should not be something you scroll to. */}
-                <FightInput bout={bout} busy={busy} onAct={(skillId) => act("act", { skillId })} />
+                {/* ── THE DECK IS SHUT WHILE THE RING IS STILL TALKING ────────────────────────────────────
+                    Luke: "I shouldn't be able to tap attack or abilities until all the animations are done."
+                    `busy` is only the network flight, which is now 130ms — so the buttons came back alive
+                    while the exchange they belong to was still playing out, and a second tap landed on a
+                    screen that had not finished telling you what the first one did. `playing` is the
+                    playback cursor still catching up to the transcript; between them they cover the whole
+                    time a beat is in the air. */}
+                <FightInput bout={bout} busy={busy || playing} onAct={(skillId) => act("act", { skillId })} />
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px
