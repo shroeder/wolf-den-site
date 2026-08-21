@@ -908,6 +908,25 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const mine = e.who === "me";
             const who = mine ? "you" : "them";
             const n = Number(e.dmg) || 0;
+            // ── A FIGHT SOMEBODY PLAYED ARRIVES ALREADY WORDED ───────────────────────────────────────────
+            // narrate() in arena-ring.js writes the sentence for an interactive bout, and it knows two
+            // things this translation cannot: which SKILL was thrown, and the half-dozen line kinds that
+            // only exist in the ring (a burn tick, a raised guard, thorns, a counter). Re-wording it here
+            // threw all of that away and printed "You strike — 12" over the top of "You cast Rupture — 12".
+            //
+            // So the server's prose wins where there is any, and everything below stays exactly as it was
+            // for the transcripts that have none: autoBout's away fights, and every bout written before
+            // interactive combat shipped.
+            if (e.text) {
+                // The grade is not decoration — it picks the sound, the haptic and the shake. `cast` and
+                // `guard` are the two lines that throw no blow, and left as an ordinary hit they fell to the
+                // damage === 0 branch and played a BLOCK: raising a shield sounded like being hit by
+                // something that did nothing.
+                const grade = e.cast || e.guard ? "guard"
+                    : e.crit ? "crit" : e.blocked ? "block"
+                        : e.burnTick ? "burn" : e.bleedTick ? "bleed" : e.stunnedSkip ? "stun" : "hit";
+                return { ...e, who, damage: n, grade };
+            }
             if (e.bleedTick) {
                 return { ...e, who, damage: n, grade: "bleed",
                     text: mine ? `You bleed — ${n.toLocaleString()}.` : `${foeName} bleeds — ${n.toLocaleString()}.` };

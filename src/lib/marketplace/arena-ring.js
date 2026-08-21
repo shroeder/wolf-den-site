@@ -147,9 +147,9 @@ function advance(ring, rng) {
                     mult: (foeSkill?.power ?? 1) * (cast?.mult || 1),
                     hitsOverride: foeSkill?.hits || 0,
                 });
-            }
+            } else ring.log.push({ t: ring.t, who: "foe", cast: true });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
-            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill });
+            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe" });
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
             for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
             closeTurn(ring);
@@ -295,25 +295,42 @@ function uncast(skill, att, state) {
 //
 // Decorates the lines resolveSwing just pushed rather than adding new ones, so the transcript stays one line
 // per blow and the playback timing does not change.
-function narrate(ring, from, { name, skill = null }) {
+//
+// `by` is which side threw this beat, and it is the difference between naming a move and mislabelling one. A
+// swing can push FOUR lines — the blow, a thorn, a counter, a wild extra — and two of them belong to the other
+// fighter. Tagging the whole range with the caster's skill put their name on your reply: a counter of yours
+// came back as "Rupture", and the on-field callout reads `ability`, so the screen announced their move over
+// your answer to it.
+function narrate(ring, from, { name, skill = null, by = "me" }) {
     for (let i = from; i < ring.log.length; i += 1) {
         const l = ring.log[i];
         if (l.beat != null) continue;                 // already narrated (a thorn, a counter)
         l.beat = ring.beat;
         l.damage = l.dmg || 0;
-        if (skill) l.ability = skill.name;
+        const answer = Boolean(l.thorns || l.counter);
+        if (skill && l.who === by && !answer) l.ability = skill.name;
         const mine = l.who === "me";
         const actor = mine ? "You" : name;
         const verb = mine ? "" : "s";
+        // ── A BLOW THE GUARD ATE IS NOT A BLOW THAT MISSED ───────────────────────────────────────────────
+        // `dmg` is what reached HEALTH — the shield is subtracted before it is logged — so a swing entirely
+        // absorbed by a ward logs a truthful zero. Printed raw it reads as a broken fight: "Roan Vasquez
+        // strikes — 0", eight lines running, while the fight is in fact going well for you. Naming the guard
+        // says the same number and says who is winning the exchange.
+        const took = l.damage > 0 ? `${l.damage}.` : "the guard holds.";
         if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.burnTick) l.text = `${actor} burn${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.stunnedSkip) l.text = `${actor} cannot act.`;
         else if (l.guard) l.text = `${actor} raise${verb} a guard.`;
-        else if (l.thorns) l.text = `Thorns bite back — ${l.damage}.`;
-        else if (l.counter) l.text = `${actor} answer${verb} — ${l.damage}.`;
-        else if (skill) l.text = `${actor} cast${verb} ${skill.name} — ${l.damage}.`;
-        else l.text = `${actor} strike${verb} — ${l.damage}.`;
-        if (l.crit) l.text = l.text.replace(" — ", " — CRIT ");
+        // The beat somebody spent on being harder to kill. It throws no blow, so resolveSwing never ran and
+        // there was no line here at all — a member cast Bastion, the transcript said nothing, and the only
+        // evidence the beat happened was a cooldown starting. See the push in act().
+        else if (l.cast) l.text = `${actor} cast${verb} ${skill?.name || "a skill"}.`;
+        else if (l.thorns) l.text = `Thorns bite back — ${took}`;
+        else if (l.counter) l.text = `${actor} answer${verb} — ${took}`;
+        else if (l.ability) l.text = `${actor} cast${verb} ${l.ability} — ${took}`;
+        else l.text = `${actor} strike${verb} — ${took}`;
+        if (l.crit && l.damage > 0) l.text = l.text.replace(" — ", " — CRIT ");
         if (l.frozen) l.text += " Frozen solid.";
         else if (l.burned) l.text += " It catches fire.";
         else if (l.bled) l.text += " The wound opens.";
@@ -345,9 +362,16 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
             mult: (skill?.power ?? 1) * (cast?.mult || 1),
             hitsOverride: skill?.hits || 0,
         });
+    } else {
+        // ── AND THE BEAT STILL HAPPENED ──────────────────────────────────────────────────────────────────
+        // No swing means no line from resolveSwing, and narrate() only decorates lines that exist — so a
+        // member who spent their beat on Bastion got a transcript that said nothing at all. The beat was
+        // gone, the cooldown was running, and the only evidence either had happened was a greyed-out button.
+        // A move you cannot see in the log is a move you cannot learn to use.
+        ring.log.push({ t: ring.t, who: "me", cast: true });
     }
     if (cast) uncast(skill, ring.A, cast);
-    narrate(ring, from, { name: ring.foeName, skill });
+    narrate(ring, from, { name: ring.foeName, skill, by: "me" });
     if (skill?.id) ring.cd[skill.id] = (skill.cooldown || 0) + 1;
     // ── A FREE SKILL DOES NOT COST YOU THE BEAT ──────────────────────────────────────────────────────────────
     // Cast it and you are still up: same beat, same clock, and now pick what you actually swing.
