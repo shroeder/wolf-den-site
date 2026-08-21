@@ -2003,13 +2003,28 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 once again done nothing. Bring the message to whoever pressed the button. */}
             {err ? <p className="ar-err" ref={errRef}>{err}</p> : null}
 
+            {/* ── FIVE TABS, ONE ROW ──────────────────────────────────────────────────────────────────────
+                Five items in a four-column grid, so the fifth wrapped onto a line of its own and "Armoury"
+                sat alone under the others looking like a different kind of thing. The counts were the other
+                half of it: "The Road · 30/100" is three times the width of "Fight", which forced the whole
+                row wider than a phone before the wrap even mattered.
+
+                So the label is a WORD and the count is a badge on the corner of it. A count that has to fit
+                inside the label is a count that decides the layout; a badge floats and the words stay even. */}
             <div className="ar-tabs" role="tablist">
-                {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", (st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)
-                        ? `Skills · ${(st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)}`
-                        : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
+                {[
+                    ["fight", "Fight", null],
+                    ["road", "Road", st.ladder ? `${st.ladder.beaten}` : null],
+                    ["tree", "Skills", (st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0) || null],
+                    ["train", "Training", null],
+                    ["armoury", "Armoury", null],
+                ].map(([k, label, badge]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}
-                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && ((st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)) ? " has-dot" : ""}`}
-                        onClick={() => { Sfx.ui(); setTab(k); }}>{label}</button>
+                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && badge ? " has-dot" : ""}`}
+                        onClick={() => { Sfx.ui(); setTab(k); }}>
+                        {label}
+                        {badge ? <i className="ar-tab-n">{badge}</i> : null}
+                    </button>
                 ))}
             </div>
 
@@ -3450,10 +3465,19 @@ function Styles() {
             /* ── TABS ── */
             /* FOUR now that the Armoury is a tab. The count was hardcoded at three, so the fourth wrapped onto
                a line of its own and the strip stopped reading as one control. */
-            .ar-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0 0 16px; }
-            .ar-tab { position: relative; padding: 10px 4px; border-radius: 12px; cursor: pointer;
-                font-size: 11.5px; font-weight: 900; letter-spacing: .01em; color: #9aa2ab;
+            .ar-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 0 0 16px; }
+            .ar-tab { position: relative; padding: 9px 2px; border-radius: 11px; cursor: pointer;
+                font-size: 10.5px; font-weight: 900; letter-spacing: -.01em; color: #9aa2ab;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12); }
+            /* The count rides on the corner rather than inside the label, so a two-digit number and a
+               three-digit one produce the same row. Absolutely positioned for the same reason: it must not be
+               able to push the word it belongs to. */
+            .ar-tab-n { position: absolute; top: -5px; right: -3px; min-width: 16px; padding: 1px 4px;
+                border-radius: 999px; font-style: normal; font-size: 9px; font-weight: 900; line-height: 1.4;
+                color: #12101a; background: #ffd75e; box-shadow: 0 0 0 2px rgba(18,16,26,.85);
+                font-variant-numeric: tabular-nums; }
+            .ar-tab.is-on .ar-tab-n { color: #ffd75e; background: #12101a; box-shadow: 0 0 0 2px rgba(255,223,134,.6); }
             .ar-tab.is-on { color: #12101a; background: linear-gradient(180deg,#ffdf86,#e8ab24);
                 border-color: rgba(255,240,200,.5); }
             /* An unspent point should be visible from the tab, not only once you are inside. */

@@ -18,7 +18,10 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
-import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
+import {
+    boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
+    lossLaurels, vpFor, vpPreview,
+} from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
@@ -814,7 +817,14 @@ export async function getArenaState(buyerId, pre = {}) {
     // matchArenaOpponent skips them, and startBout refuses them.
     const targets = board
         .filter((o) => o.id !== buyerId)
-        .map((o) => ({ ...o, reward: { vp: vpPreview(myPower, o.power), laurels: boutLaurels({ won: true, myPower, theirPower: o.power }) } }))
+        .map((o) => ({ ...o, reward: {
+            vp: vpPreview(myPower, o.power),
+            // A member, so the PvP premium applies — the card must promise what finishBout will pay.
+            laurels: boutLaurels({ won: true, myPower, theirPower: o.power, kind: "member" }),
+            // What a defeat is worth at best and at worst, so "challenge upward" is a visible offer rather
+            // than something a member only discovers by losing.
+            lossLaurels: Math.round(lossLaurels({ myPower, theirPower: o.power, kind: "member" }) * LOSS_EFFORT_CEIL),
+        } }))
         // Hardest first: the interesting fight should be the one you see, not the safest one.
         .sort((x, y) => y.power - x.power);
 
@@ -1971,8 +1981,16 @@ async function finishBout(buyerId, row, b, won) {
     // a member costs one of the ten AND needs somebody else to be there — so they cannot all pay the same.
     // boutKindOf is the existing classifier the telemetry and the bout row already use; a second one here
     // would be a second answer to the same question, and they would disagree the first time either moved.
-    const axp = arenaXpFor({ won, myPower, theirPower, kind: boutKindOf(b), rung: boutRungOf(b) });
-    const baseLaurels = boutLaurels({ won, myPower, theirPower });
+    const kind = boutKindOf(b);
+    const axp = arenaXpFor({ won, myPower, theirPower, kind, rung: boutRungOf(b) });
+    // ── AND A DEFEAT IN A MEMBER FIGHT PAYS FOR HOW IT WENT ──────────────────────────────────────────────
+    // `kind` is threaded in for both halves now. It buys two things laurels never had: the PvP premium a
+    // member bout has always been worth (XP has paid it for months), and a losing payout scaled by the share
+    // of their health you actually took off. See the long note in arena-rewards.js for why paying a loss is
+    // safe HERE and would not be on the Road — twelve fights a day is the ration that stops it being a farm.
+    const baseLaurels = won
+        ? boutLaurels({ won, myPower, theirPower, kind })
+        : Math.round(lossLaurels({ myPower, theirPower, kind }) * lossEffort(b));
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     const vp = baseVp + (won ? featVp : 0);
     // RENOWN. The track says "every bout pays more laurels" and nothing read it — fifteen levels of a gold

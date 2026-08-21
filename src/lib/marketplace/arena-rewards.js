@@ -66,10 +66,74 @@ export function defenceLaurels({ myPower = 1, theirPower = 1 }) {
     return Math.max(4, Math.round(boutLaurels({ won: true, myPower, theirPower }) * DEFENCE_SHARE));
 }
 
-export function boutLaurels({ won, myPower = 1, theirPower = 1 }) {
+// ── A MEMBER FIGHT IS WORTH MORE THAN A DUMMY ────────────────────────────────────────────────────────────────
+// Arena XP has paid a PvP premium since the scarcity pass — a member bout needs another person to exist, and
+// it spends one of the twelve you get in a day, while a Gauntlet tier is always standing there. Laurels never
+// learned that, so the two currencies disagreed about what a fight was worth.
+//
+// Same shape as XP_MULT_BY_KIND in arena-classes.js, deliberately smaller: XP pays 3x for PvP because levels
+// are slow, and laurels are money that buys crates. 1.6x is a real reason to challenge a person without making
+// the Gauntlet pointless for somebody with nobody online.
+export const PVP_LAUREL_MULT = 1.6;
+export const LAUREL_MULT_BY_KIND = { member: PVP_LAUREL_MULT, gauntlet: 1, ladder: 1, town: 1 };
+
+export function boutLaurels({ won, myPower = 1, theirPower = 1, kind = "gauntlet" }) {
     const ratio = Math.max(VP_FLOOR, Math.min(VP_CEIL, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
-    const win = Math.round(18 + 34 * ratio);
-    return won ? win : 0;
+    const mult = LAUREL_MULT_BY_KIND[kind] === undefined ? 1 : LAUREL_MULT_BY_KIND[kind];
+    const win = Math.round((18 + 34 * ratio) * mult);
+    return won ? win : lossLaurels({ myPower, theirPower, kind });
+}
+
+// ── AND LOSING A PERSON'S FIGHT PAYS FOR HOW YOU FOUGHT ──────────────────────────────────────────────────────
+// Luke: "when you lose a pvp fight you should still be awarded laurels for how you fought."
+//
+// The note at the top of this file says nothing is paid for losing, and gives the reason: Sunflower Jinxx,
+// walled at rung 21, "just taking loss after loss to try and get laurels for recipes." That reason was real
+// and it still is — but it was about THE ROAD, where attempts are unlimited. On the Road a paid loss is an
+// income, because you can throw yourself at rung 21 a hundred times in an evening.
+//
+// A member fight is not that. It costs one of the twelve you get in a day, and it needs somebody else to
+// exist. Twelve is the ration, so paying for a loss there cannot become a farm — it can only stop a bad
+// evening being a wasted one. This is exactly the split arena XP already makes (LOSS_PAYS in
+// arena-classes.js covers member and gauntlet, never ladder), and the two systems agreeing is the point.
+//
+// ONLY MEMBER FIGHTS. Not the Gauntlet, even though XP pays there: a Gauntlet tier is always standing and a
+// member with twelve fights and no opponents online could otherwise spend all twelve losing on purpose to a
+// tier far above them, which is the farm again wearing a different hat.
+export const LOSS_LAUREL_SHARE = 0.3;
+const LOSS_PAYS_LAURELS = new Set(["member"]);
+
+/**
+ * What a defeat was worth, before performance is counted.
+ *
+ * Scaled by the same difficulty ratio a win uses, so losing narrowly to somebody far above you pays more than
+ * losing to somebody your own size — which is the "challenge upward" incentive the VP note describes, applied
+ * to the half of it that does not currently exist.
+ */
+export function lossLaurels({ myPower = 1, theirPower = 1, kind = "gauntlet" }) {
+    if (!LOSS_PAYS_LAURELS.has(kind)) return 0;
+    const ratio = Math.max(VP_FLOOR, Math.min(VP_CEIL, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
+    return Math.round((18 + 34 * ratio) * PVP_LAUREL_MULT * LOSS_LAUREL_SHARE);
+}
+
+/**
+ * HOW YOU FOUGHT, as a multiplier on that.
+ *
+ * The share of their health you took off, which is the one measure of a defeat that cannot be farmed: you
+ * cannot lose "well" by giving up, and taking a member to their last few points is genuinely harder than
+ * being flattened. A wipeout pays the floor; a fight they nearly lost pays close to double.
+ *
+ * Deliberately NOT beats survived. Surviving is something a tank build does by existing, and it would have
+ * paid a Warden for standing still — the same shape of mistake as paying for attempts.
+ */
+export const LOSS_EFFORT_FLOOR = 0.5;
+export const LOSS_EFFORT_CEIL = 2;
+
+export function lossEffort(b = {}) {
+    const max = Math.max(1, Number(b.foeMaxHp) || 0);
+    const took = Math.max(0, max - Math.max(0, Number(b.foeHp) || 0));
+    const share = Math.min(1, took / max);
+    return LOSS_EFFORT_FLOOR + (LOSS_EFFORT_CEIL - LOSS_EFFORT_FLOOR) * share;
 }
 
 // ── FEATS ────────────────────────────────────────────────────────────────────────────────────────────────────
