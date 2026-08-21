@@ -8,7 +8,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
-    BLOCK_REDUCTION, GUARD_BASE_SHARE, guardSoakFrom, speedOf,
+    BLOCK_REDUCTION, GUARD_BASE_SHARE, extraTurnFrom, guardSoakFrom,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
@@ -341,9 +341,15 @@ export async function arenaPower(buyerId) {
 export function fighterFrom(stats = {}, perks = {}, classId = null) {
     const base = classBase(classId);
     return {
-        // `speed` rides in on the equipped weapon (items.js) the way base_damage does — only one main hand is
-        // worn, so the summed value IS that weapon's rate. Attacks per second, not a tiebreak.
-        speed: speedOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.speed || 0),
+        // ── THE EXTRA TURN, WHICH IS WHAT SPEED BECAME ───────────────────────────────────────────────────
+        // `speed` still rides in on the equipped weapon (items.js) the way base_damage does — only one main
+        // hand is worn, so the summed value IS that weapon's rate. It is no longer a rate anything is paced
+        // off: it converts, with Ferocity, into the chance to take another turn on the spot. See
+        // extraTurnFrom, and the tombstone in arena-engine.js for why there is no clock to be a rate for.
+        //
+        // Quickblade lands in `perks.extra` and is added flat on top, which is the same arithmetic it did
+        // when it was adding to a clock.
+        extra: extraTurnFrom(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.extra || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
@@ -1099,8 +1105,10 @@ function publicBout(b) {
         // ── STUN AND HASTE, ON BOTH BODIES ───────────────────────────────────────────────────────────────
         // Published for each fighter separately because the screen draws them on the fighter they belong to:
         // a swirl over the one who cannot act, a green glow on the one who is about to act twice as often.
-        stunned: (b.stunned || 0) > 0, hasted: (b.hasteLeft || 0) > 0,
-        foeStunned: (b.foeStunned || 0) > 0, foeHasted: (b.foeHasteLeft || 0) > 0,
+        // `hasted` is now "a haste just procced and they are owed a turn", not "they are swinging at double
+        // rate for the next five" -- the glow marks the same moment either way.
+        stunned: (b.stunned || 0) > 0, hasted: (b.bonusTurns || 0) > 0,
+        foeStunned: (b.foeStunned || 0) > 0, foeHasted: (b.foeBonusTurns || 0) > 0,
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
         // ── AND THE ONES ON YOU ──────────────────────────────────────────────────────────────────────
         // These were deliberately held back as "the opponent's business". They are not: a burn eating your
@@ -1330,7 +1338,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // is their business, the same way their cooldowns were.
             skills: foeKit.skills || {},
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            speed: foeKit.speed,
+            extra: foeKit.extra,
             // WHICH DISCIPLINE THEY FIGHT AS. The bout knew everyone's class and published nobody's, so the
             // card could tell you their element and their crit but not whether you were swinging at a Warden.
             // Named here or the allowlist above drops it, which is how The Long Road lost its rung.
@@ -1375,7 +1383,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // is what stops a member unlocking a capstone mid-fight and swinging with it, and it is what
             // actBout re-resolves against — never the skill id in the request body.
             skills: me.skills || {}, deck: me.deck || [],
-            element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
+            element: me.element, abilities: me.abilities, might: me.might, extra: me.extra,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
             dr: me.dr ?? DEFAULT_DR,
@@ -1401,7 +1409,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         // next beat (the picker falls back to a fresh set if this is missing) rather than fighting empty.
         // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
         // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
-        turn: me.speed >= foeKit.speed ? "you" : "them",
+        // A coin flip at the bell — openRing asks it, and this is only the pre-ring default for a bout that
+        // never opens one. Speed used to decide it; there is no speed.
+        turn: "you",
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
         bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back

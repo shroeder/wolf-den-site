@@ -40,14 +40,14 @@
 //   heal        share of your maximum health restored
 //   drain       share of what this blow lands, healed back — on top of any Lifedrink you carry
 //   cleanse     clears the bleed and the burn on YOU
-//   haste       1 hastes you: five swings at double rate
+//   haste       1 grants you another turn, on the spot
 //   grudge      share of the damage banked since your last swing, added to this blow
 //   executeAt   their health fraction below which this starts scaling up
 //   executeMax  the extra multiplier at zero health, scaling in linearly from executeAt
 //   desperateAt the fraction of YOUR OWN health below which the blow starts scaling up
 //   desperateMax  and what it is worth at your last hit point — the comeback term
 //   pierce      extra share of their armour this blow ignores
-//   chill       share taken off their clock for the rest of the bout
+//   chill       share of THEIR turns that simply do not happen, for the rest of the bout
 //   soulfire    share of what landed, dealt again past armour and shields both
 //   free        true means it does NOT cost your beat — you cast it and still swing
 export const SKILL_UNLOCK_COST = 1;
@@ -196,7 +196,7 @@ export const SKILLS = [
                 { id: "on_relent", name: "Relentless", sprite: "/images/arena/skill/node/on_relent.webp",
                     desc: "Comes back two beats sooner.", mod: { cooldown: -2 } },
                 { id: "on_wind", name: "Second Wind", sprite: "/images/arena/skill/node/on_wind.webp",
-                    desc: "Finishing the flurry hastes you: five swings at double rate.", mod: { haste: 1 } },
+                    desc: "Finishing the flurry buys you another turn, straight away.", mod: { haste: 1 } },
                 { id: "on_cadence", name: "Cadence", sprite: "/images/arena/skill/node/on_cadence.webp",
                     desc: "CAPSTONE. Ready every other beat. Lighter blows, thrown twice as often as anybody else can answer.",
                     mod: { cooldown: -2, power: -0.18 } },
@@ -351,7 +351,7 @@ export const SKILLS = [
                 { id: "ra_clear", name: "Clear Head", sprite: "/images/arena/skill/node/ra_clear.webp",
                     desc: "Rally shakes off a freeze as well as the wounds.", mod: { unfreeze: 1 } },
                 { id: "ra_roar", name: "Roar", sprite: "/images/arena/skill/node/ra_roar.webp",
-                    desc: "Standing up hastes you: five swings at double rate.", mod: { haste: 1 } },
+                    desc: "You come up swinging — another turn, straight away.", mod: { haste: 1 } },
                 { id: "ra_fury", name: "Battle Fury", sprite: "/images/arena/skill/node/ra_fury.webp",
                     desc: "CAPSTONE. Standing up costs you no beat at all — a lighter heal, but you never stop swinging.",
                     mod: { free: true, heal: -0.07 } },
@@ -424,9 +424,9 @@ export const SKILLS = [
                 { id: "ri_hold", name: "Hold Fast", sprite: "/images/arena/skill/node/ri_hold.webp",
                     desc: "They lose a second beat.", mod: { freeze: 1 } },
                 { id: "ri_cold", name: "Killing Cold", sprite: "/images/arena/skill/node/ri_cold.webp",
-                    desc: "And their clock runs slower for the rest of the bout.", mod: { chill: 0.12 } },
+                    desc: "And the cold stays on them: a share of their turns never happen.", mod: { chill: 0.12 } },
                 { id: "ri_zero", name: "Absolute Zero", sprite: "/images/arena/skill/node/ri_zero.webp",
-                    desc: "CAPSTONE. Deeper cold, back a beat sooner. They fight the whole bout on your clock.",
+                    desc: "CAPSTONE. Deeper cold, back a beat sooner. They spend the whole bout losing turns.",
                     mod: { chill: 0.15, cooldown: -1, power: -0.2 } },
             ]),
             ...br("shatter", [

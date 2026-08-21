@@ -7,15 +7,16 @@
 // three functions to resolve a swing, which is the entire point — the last time this repo had two things doing
 // one job, five constants drifted and six mechanics quietly stopped existing.
 //
-// ── WHY THE CLOCK SURVIVES INTO TURN-BASED ───────────────────────────────────────────────────────────────────
-// The obvious build is strict alternation: you, them, you, them. It is also how the LAST turn-based engine
-// made SPEED worthless — `08d68220` records it plainly, "invisible under turn-based, where speed only broke
-// the tie for who opened". Quickblade, every speed affix and the speed on every weapon in the game would go
-// back to buying nothing.
+// ── THE CLOCK IS GONE. YOU, THEM, YOU, THEM. ─────────────────────────────────────────────────────────────────
+// This file argued the other way for its whole life: keep the clock, because strict alternation is what made
+// the LAST turn-based engine's speed stat worthless (`08d68220`: "invisible under turn-based, where speed only
+// broke the tie for who opened"). The argument was sound and it was answering the wrong question. A clock is
+// not unfair — it is UNREADABLE, and the proof is that its own author reported it as a bug: the beats in a
+// 1.06 v 1.31 fight are correct, and from the seat they read as the game skipping your turns.
 //
-// So the clock stays exactly as it is. A fighter's beat comes round every 1/speed, whoever is due next acts,
-// and a fast fighter simply gets more beats than a slow one — sometimes two in a row. Turn-based means you
-// CHOOSE your action, not that the turns alternate.
+// Turn order is now the shortest rule in the game: the other fighter, unless somebody earned another turn or
+// lost one. Everything that made a fighter fast feeds `extra` instead — see EXTRA_TURN_MAX in arena-engine.js
+// — so a stat that used to be dealt out silently is an event with a sentence attached.
 //
 // ── THE SHAPE OF A BEAT ──────────────────────────────────────────────────────────────────────────────────────
 // The ring stops on exactly ONE question: what are you throwing. Everything else — the bleed ticks, the stun
@@ -28,7 +29,7 @@
 //
 // Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
 // every exchange was a brace nobody was choosing.
-import { HASTE_ATTACKS, gapOf, openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
+import { goesAgain, openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
@@ -92,15 +93,21 @@ function fever(ring) {
         meShield: ring.A.shield, foeShield: ring.B.shield });
 }
 
-// The clock only turns once the whole turn is DONE — after the swing, and after the haste decrement that the
-// gap itself reads. Advancing it any earlier is how a hasted fighter would get their gap measured at the old
-// rate, and it is exactly the ordering the auto-resolver uses (`take(...)` then `nextA = t + gap(A)`).
-function closeTurn(ring) {
-    const mine = ring.acting === "me";
-    const f = mine ? ring.A : ring.B;
-    if (f.hasteLeft > 0) f.hasteLeft -= 1;
-    if (mine) ring.nextA = ring.t + gapOf(ring.A);
-    else ring.nextB = ring.t + gapOf(ring.B);
+/**
+ * Hand the turn on — to the same fighter if they earned another, otherwise to the other one.
+ *
+ * This is the whole of turn order now. There is no clock to advance, no gap to measure and nothing to
+ * decrement: the question "who is up" has exactly one answer that is not simply "the other one", and
+ * `goesAgain` in arena-engine.js is where that answer lives so the auto-resolver cannot disagree with it.
+ */
+function closeTurn(ring, rng = Math.random) {
+    const f = ring.acting === "me" ? ring.A : ring.B;
+    const again = ring.over ? null : goesAgain(f, rng, ring.wasExtra);
+    ring.wasExtra = Boolean(again);
+    if (!again) ring.up = ring.acting === "me" ? "foe" : "me";
+    // The screen has to be able to SAY it, and it has to know which of the two it was: a Haste proc you can
+    // see coming is a different feeling from a lucky roll off your weapon.
+    ring.wentAgain = again;
     ring.acting = null;
     ring.awaiting = null;
     ring.incoming = null;
@@ -124,9 +131,11 @@ function advance(ring, rng) {
         // Including when the pit is what ends it — narrate before the return, or the last line of the fight
         // is the unnarrated one.
         if (settle(ring)) { narrate(ring, from, { name: ring.foeName }); return ring; }
-        const mine = ring.nextA <= ring.nextB;
-        ring.acting = mine ? "me" : "foe";
-        ring.t = mine ? ring.nextA : ring.nextB;
+        const mine = ring.up === "me";
+        ring.acting = ring.up;
+        // A turn counter, not a clock. The fight screen paces playback off the gaps between `t` values, so it
+        // still has to rise — it just counts the only thing left to count.
+        ring.t += 1;
         ring.beat += 1;
         const att = mine ? ring.A : ring.B;
         const def = mine ? ring.B : ring.A;
@@ -134,37 +143,22 @@ function advance(ring, rng) {
         // and the stun skip that openTurn pushes — those were the lines still coming out blank. A wound
         // eating a third of somebody's health between two swings is not a footnote; it is frequently the
         // reason the fight went the way it did.
-        // ── COUNTED ON THE CLOCK, NOT ON YOUR TAPS ───────────────────────────────────────────────────────
-        // Reset the moment YOUR beat comes round, whether or not you get to use it. Counting from your last
-        // ACTION instead would have blamed the speed gap for a beat a freeze ate: Rimebind takes your turn,
-        // the ring rolls straight on to their next one, and the marker would have called that "faster" when
-        // the honest line — "You cannot act." — is already on screen one row above it.
-        if (mine) ring.foeRun = 0;
-        else ring.foeRun = (ring.foeRun || 0) + 1;
+        // ── IS THIS TURN AN EXTRA ONE ────────────────────────────────────────────────────────────────────
+        // Set by closeTurn when the last turn ended, so it is already true by the time the fighter who
+        // earned it steps up. This is the only reason a fight is ever anything other than you-them-you-them,
+        // and every one of them gets a sentence — which is the entire point of replacing the clock.
+        const isExtra = ring.wasExtra;
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });
-        narrate(ring, from, { name: ring.foeName });
-        if (!acts) { closeTurn(ring); continue; }   // stunned, or dead on their own wound
+        narrate(ring, from, { name: ring.foeName, by: ring.acting, again: isExtra });
+        if (!acts) { closeTurn(ring, rng); continue; }   // stunned, chilled, or dead on their own wound
 
         // ── THEIR BEAT NEEDS NOBODY ──────────────────────────────────────────────────────────────────────
         // Resolved here and the loop carries on, so a member is only ever stopped for a decision that is
         // actually theirs. Their skill choice happens the same way it always did — housePick, off their own
         // build — it simply no longer waits for a tap that was never a choice.
         if (!mine) {
-            // ── AND SAY SO WHEN THE CLOCK GIVES THEM TWO ─────────────────────────────────────────────────
-            // Luke: "something is up with attack speed. the enemy hit me twice then my turn, then they hit
-            // me twice again then I attack once." Nothing was up with it — measured against rung 31, the
-            // beats run 1:1 with a double every fourth exchange, which is exactly the 1.06 v 1.31 speed
-            // gap. The rule was working and it was invisible.
-            //
-            // It is invisible because of how a beat is PACKAGED: one tap comes back as your swing plus
-            // every foe beat the clock owes before your next one, so a double always lands in the two
-            // sentences immediately before "your turn" comes back. From the seat, that reads as them
-            // going twice and you going once — a bug, not a fighter who is faster than you.
-            //
-            // So the second one names itself. `foeRun` is counted at the top of this loop, off the clock
-            // rather than off your taps; anything past the first is a blow the clock gave them.
             const foeSkill = housePick(ring.foeSkills, ring.foeCd, {
                 selfFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
                 foeFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
@@ -182,11 +176,10 @@ function advance(ring, rng) {
                 });
             } else ring.log.push({ t: ring.t, who: "foe", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
-            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe",
-                again: ring.foeRun > 1 });
+            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe", again: isExtra });
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
             for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
-            closeTurn(ring);
+            closeTurn(ring, rng);
             continue;
         }
 
@@ -209,21 +202,20 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName =
     const B = sideOf(foe);
     A.shield += Math.round(A.maxHp * A.ward);
     B.shield += Math.round(B.maxHp * B.ward);
-    if (A.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - A.chill));
-    if (B.chill > 0) A.speed = Math.max(0.0001, A.speed * (1 - B.chill));
-    // ── WHO OPENS, WHEN NOTHING SEPARATES THEM ───────────────────────────────────────────────────────────────
-    // `advance` gives a tie to A, and with two equal clocks that is not one tie, it is EVERY tie for the whole
-    // bout — A opens, A swings first every exchange, and A lands the killing blow first. Measured in a true
-    // mirror: 65% to whoever happened to be A. Fifteen points of win rate handed to whoever pressed Challenge,
-    // in a ladder that is supposed to be sorting people by their loadout.
-    //
-    // One coin flip at the bell settles it, permanently — the two clocks can never meet again once they are
-    // apart by an epsilon, so this is the only place the question is ever asked.
-    const flip = rng() < 0.5 ? 1 : -1;
+    if (A.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + A.chill);
+    if (B.chill > 0) A.skipChance = Math.min(0.6, A.skipChance + B.chill);
+    // ── WHO OPENS ────────────────────────────────────────────────────────────────────────────────────────────
+    // A coin flip, and it matters MORE now than it did under the clock. Two equal clocks used to hand every
+    // tie to A, which measured 65% to whoever happened to be the challenger; strict alternation is that same
+    // problem in its purest form, because the opener swings first in every single exchange for the whole
+    // bout. One flip at the bell is the whole of the answer, and it is asked exactly once.
+    const flip = rng() < 0.5;
     const ring = {
         A, B,
         t: 0, beat: 0,
-        nextA: gapOf(A) + flip * 1e-9, nextB: gapOf(B) - flip * 1e-9,
+        up: flip ? "me" : "foe",      // whose turn it is; the only thing turn order consists of now
+        wasExtra: false,              // was the turn about to be taken an extra one — see closeTurn
+        wentAgain: null,              // and how it was earned, for the screen: "granted" | "extra" | null
         cd: {},                       // skillId -> beats of YOURS before it comes back
         foeCd: {},                    // and theirs, kept apart so one deck cannot cool the other
         foeSkills,                    // the build the defence actually paid for — see housePick
@@ -257,14 +249,14 @@ function castSkill(ring, skill, att, def) {
     if (skill.heal > 0) A.hp = Math.min(A.maxHp, A.hp + Math.round(A.maxHp * skill.heal));
     if (skill.cleanse) { A.bleedLeft = 0; A.burnLeft = 0; }
     if (skill.unfreeze > 0) A.stunned = Math.max(0, A.stunned - skill.unfreeze);
-    if (skill.haste > 0) A.hasteLeft = HASTE_ATTACKS;
+    if (skill.haste > 0) A.bonusTurns += 1;
     // ── A FREEZE CANNOT BE STACKED ON A FROZEN FIGHTER ───────────────────────────────────────────────────────
     // Rimebind mirrored won 100% of bouts for whoever opened: freeze them, they lose the beat, freeze them
     // again before they ever act. A lock that renews itself is not a control effect, it is the end of the
     // fight. So a freeze only lands on somebody who is currently able to act — the beat they spend frozen is
     // also the beat they are immune.
     if (skill.freeze > 0 && B.stunned <= 0) B.stunned += Math.round(skill.freeze);
-    if (skill.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - skill.chill));
+    if (skill.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + skill.chill);
     // SET, never stacked. A skill you can cast eight times in a bout must not be able to multiply a permanent
     // stat eight times — that is a number growing without a ceiling, which is how a fight stops ending.
     if (skill.thorns > 0) A.thorns = Math.max(A.thorns, skill.thorns);
@@ -359,6 +351,10 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         else if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.burnTick) l.text = `${actor} burn${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.stunnedSkip) l.text = `${actor} cannot act.`;
+        // Named, rather than folded in with the stun. They are the same outcome and completely different
+        // information: one is a thing that was done to them this turn, the other is the cold they have been
+        // under since somebody cast it.
+        else if (l.chilledSkip) l.text = `${actor} ${mine ? "are" : "is"} too cold to move.`;
         else if (l.guard) l.text = `${actor} raise${verb} a guard.`;
         // The beat somebody spent on being harder to kill. It throws no blow, so resolveSwing never ran and
         // there was no line here at all — a member cast Bastion, the transcript said nothing, and the only
@@ -371,7 +367,10 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         // Said in the sentence as well as on the field, because the log is a drawer and the drawer is shut.
         // Inserted before the dash rather than rebuilt, so it keeps whatever the line already said — the
         // skill's name included — and the CRIT insertion below still finds the first dash after it.
-        if (l.again) l.text = l.text.replace(" — ", " again — ");
+        // An extra turn is the ONLY reason a fight is ever not you-them-you-them, so it never happens
+        // silently. A skip line has no dash to insert before, and does not need one — "cannot act" on a turn
+        // they were handed is already the whole story.
+        if (l.again) l.text = l.text.includes(" — ") ? l.text.replace(" — ", " again — ") : `${l.text} (again)`;
         if (l.crit && l.damage > 0) l.text = l.text.replace(" — ", " — CRIT ");
         if (l.frozen) l.text += " Frozen solid.";
         else if (l.burned) l.text += " It catches fire.";
@@ -422,7 +421,7 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
     // in the deck twice on any beat a free skill was cast — the free skill paying for itself out of everything
     // else's rhythm, which is not free, it is a discount on the whole deck.
     if (skill?.free) return ring;
-    closeTurn(ring);
+    closeTurn(ring, rng);
     for (const k of Object.keys(ring.cd)) ring.cd[k] = Math.max(0, ring.cd[k] - 1);
     return advance(ring, rng);
 }

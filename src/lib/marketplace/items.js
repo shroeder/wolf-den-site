@@ -79,14 +79,14 @@ export const STAT_META = {
     // armour rating are what the thing IS before a single stat is rolled on it, and they were missing from
     // this table entirely, which meant nothing anywhere in the game printed them.
     base_damage: { label: "Damage", icon: "⚔️", desc: "The weapon's own damage. Might multiplies it — this is the number every swing starts from.", suffix: "" },
-    speed: { label: "Attack Speed", icon: "⏱️", desc: "How many times a second this weapon swings. Ferocity adds to it.", suffix: "/s" },
+    speed: { label: "Attack Speed", icon: "⏱️", desc: "Above bare-handed, this is your chance to take another turn immediately. Ferocity adds to it.", suffix: "/s" },
     armor: { label: "Armour", icon: "🛡️", desc: "Comes off every blow, flat, before anything else. Tenacity multiplies it.", suffix: "" },
     block_chance: { label: "Block Chance", icon: "🛡️", desc: "How often this shield blocks — a block takes 35% off the blow.", suffix: "%" },
 
     // ── THE FOUR YOU BUILD ───────────────────────────────────────────────────────────────────────────────
     might: { label: "Might", icon: "⚔️", desc: "Multiplies your weapon's damage. The whole of what you hit for.", suffix: "" },
     vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Your health in the Arena.", suffix: "" },
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "Adds to your attack speed — how often you swing.", suffix: "" },
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "Chance to take another turn immediately. 1% for every 5 points.", suffix: "" },
     tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing. 500 tenacity doubles it.", suffix: "" },
 
     // ── THE CRITS ────────────────────────────────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export const STAT_META = {
     counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands. Each point is 0.25%.", suffix: "" },
     doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your swing lands twice — a whole extra hit, with its own crit roll. Each point is 0.5%.", suffix: "" },
     stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stuns — they lose the swing that was due. Each point is 0.5%.", suffix: "" },
-    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing hastes you: five swings at double speed. Each point is 0.5%.", suffix: "" },
+    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing grants you another turn on the spot. Each point is 0.5%.", suffix: "" },
 
     // ── OUTSIDE THE RING ─────────────────────────────────────────────────────────────────────────────────
     fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize. Does nothing in a fight.", suffix: "" },

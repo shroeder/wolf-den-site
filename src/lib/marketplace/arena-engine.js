@@ -19,7 +19,7 @@ import {
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
-import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { ARMOUR_MAX_SHARE, EXTRA_TURN_MAX, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -42,8 +42,31 @@ export const DOUBLESTRIKE_PER_POINT = 0.005;
 export const LIFESTEAL_PER_POINT = 0.0025;
 export const STUN_PER_POINT = 0.005;
 export const HASTE_PER_POINT = 0.005;
-export const HASTE_ATTACKS = 5;      // how many of your own swings a haste lasts
-export const HASTE_RATE = 2;         // and how much faster they come
+// ── THERE IS NO CLOCK. THE TURNS ALTERNATE. ──────────────────────────────────────────────────────────────────
+// Luke, 2026-08-21: "let's just remove the idea of speed from the arena, everyone gets a turn and then it's
+// the other person's turn unless they get stunned or something."
+//
+// Speed had been the pacing of every fight since the auto-resolver: a fighter's beat came round every
+// 1/speed, so a faster one simply got more of them. It reads fine in a transcript and it does not survive
+// being PLAYED. One tap returns your swing plus every beat the clock owes them before your next, so a faster
+// opponent's extra blow always lands in the last sentence before your turn comes back — which reads as the
+// game taking turns away from you. It got reported as a bug twice in one day, and the second time it was not
+// a bug at all: the beats were exactly the 1.06 v 1.31 speed gap, correctly applied, and unreadable.
+//
+// So: you, them, you, them. A turn is lost only to something with a NAME — a stun, a freeze, a chill — which
+// is a sentence the screen can print instead of an arithmetic nobody can see.
+//
+// ── AND SPEED BECAME THE EXTRA TURN ──────────────────────────────────────────────────────────────────────────
+// Ferocity, a weapon's attack speed, Quickblade and Haste all fed the clock, so removing it would have made
+// four kinds of content worth nothing. They feed ONE number now — `extra`, the chance to immediately take
+// another turn — which is the same arithmetic wearing a shape a player can see: a fighter who took p extra
+// turns per turn under the clock takes p extra turns per turn now, and the screen says GOES AGAIN when it
+// happens instead of quietly dealing them a beat.
+//
+// ONE PER EXCHANGE. An extra turn does not roll for another, or a lucky streak is an unanswerable combo.
+// A queued haste is the exception and is deliberately a separate field: it is GRANTED, not rolled.
+//
+// EXTRA_TURN_MAX and extraTurnFrom live in arena-kit.js with the other balance constants.
 // ── BLEED ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Three ticks at a fifth of the blow that opened it, and armour never sees a drop of it. It ticks on the
 // BLEEDING fighter's own swings, which is what "three turns" means when there are no turns: three more times
@@ -280,7 +303,9 @@ export function counterBlow(b, mine) {
 // which reads what sideOf actually touches rather than trusting either list.
 export const COMBAT_FIELDS = [
     // the four numbers a card shows
-    "damage", "health", "critChance", "critMult", "speed", "dmgPct",
+    "damage", "health", "critChance", "critMult", "dmgPct",
+    // turn order: the chance to take another one, and the chance one of theirs never happens
+    "extra", "skipChance",
     // mitigation and getting through it
     "armor", "pierce", "blockChance", "blockReduction", "blockStack", "blockStackMax",
     // the procs that come off affix points
@@ -370,21 +395,34 @@ export const sideOf = (f) => ({
         // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
         // from an affix.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
-        stunned: 0,      // swings this fighter must skip
-        hasteLeft: 0,    // swings left at double rate
+        stunned: 0,      // turns this fighter must skip
+        bonusTurns: 0,   // turns GRANTED (a haste proc), taken whether or not the roll comes up
         bleedLeft: 0,    // ticks of bleed still owed
         bleedPer: 0,     // and what each one costs them
-        speed: Math.max(0.0001, Number(f.speed) || 1),
+        // The chance to take another turn straight away — see EXTRA_TURN_MAX. This is where a weapon's
+        // attack speed, Ferocity and Quickblade all land now that nothing is paced off a clock.
+        extra: Math.max(0, Math.min(EXTRA_TURN_MAX, Number(f.extra) || 0)),
+        // And the chance one of THEIR turns simply does not happen — Chill, which used to slow their clock.
+        skipChance: Math.max(0, Math.min(0.6, Number(f.skipChance) || 0)),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
 });
 
-// A hasted fighter's swings come HASTE_RATE times as fast, for HASTE_ATTACKS of their own swings. The gap is
-// what makes SPEED mean something under turns as well as under a clock: a faster fighter's beat comes round
-// sooner, so they simply get more of them. That is deliberate — the alternative (strict you-me-you-me) would
-// have made Quickblade, every speed affix and the weapon speed on every sword worth exactly nothing, which is
-// how the last turn-based engine ended up with a stat nobody could spend on.
-export const gapOf = (f) => (1 / f.speed) / (f.hasteLeft > 0 ? HASTE_RATE : 1);
+/**
+ * Does this fighter go again?
+ *
+ * `wasExtra` is the one-per-exchange rule: the turn you were handed does not roll for another. A GRANTED turn
+ * (Haste) is checked first and consumed, because it was promised rather than rolled — and it is allowed to
+ * follow an extra turn, which is what makes proccing Haste on a lucky beat feel like the event it is.
+ *
+ * Both loops call this, which is the whole point of it living here: an auto-resolved bout and a played one
+ * cannot disagree about how many turns somebody got.
+ */
+export function goesAgain(f, rng = Math.random, wasExtra = false) {
+    if (f.bonusTurns > 0) { f.bonusTurns -= 1; return "granted"; }
+    if (wasExtra || f.extra <= 0) return null;
+    return rng() < f.extra ? "extra" : null;
+}
 
 // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the whole
 // multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
@@ -485,7 +523,9 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         let bled = false;
         let wild = null;
         if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned += 1; stunned = true; }
-        if (att.haste > 0 && rng() < att.haste) { att.hasteLeft = HASTE_ATTACKS; hasted = true; }
+        // HASTE IS ONE TURN, GRANTED. It used to be five swings at double rate, which needed a clock to be
+        // five swings faster THAN. A turn you are handed on the spot is the same idea a player can watch.
+        if (att.haste > 0 && rng() < att.haste) { att.bonusTurns += 1; hasted = true; }
         // ── THE WILD PROC ────────────────────────────────────────────────────────────────────────────
         // One roll, and only then does it decide which of the three it is. Rolled after the blow so the
         // extra swing it can grant lands on the NEXT one rather than compounding inside this one.
@@ -494,7 +534,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             if (pick === 0) wild = "doublestrike";
             else if (pick === 1) wild = "counter";
             else wild = "haste";
-            if (wild === "haste") att.hasteLeft = HASTE_ATTACKS;
+            if (wild === "haste") att.bonusTurns += 1;
         }
         // A fresh wound REFRESHES rather than stacks — stacking is a Reaver tree node, not the base rule.
         // SOULFIRE — a share of what landed, dealt again as magic that armour and shields both ignore. It
@@ -594,6 +634,15 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
             log.push({ t, who, stunnedSkip: true, meShield: A.shield, foeShield: B.shield });
             return false;
         }
+        // ── CHILLED: THE TURN THAT DOES NOT HAPPEN ───────────────────────────────────────────────────
+        // Chill used to multiply the other fighter's clock, which was the most invisible effect in the
+        // game — a permanent 12% that never once produced a sentence. Rolled per turn it does the same
+        // work and says so out loud. Rolled AFTER the stun check so the two never both fire on one turn
+        // and print two reasons for one lost beat.
+        if (att.skipChance > 0 && rng() < att.skipChance) {
+            log.push({ t, who, chilledSkip: true, meShield: A.shield, foeShield: B.shield });
+            return false;
+        }
         // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
         if (att.regen > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(att.maxHp * att.regen));
         if (att.wardRefill > 0) {
@@ -614,15 +663,15 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
 export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, hitsOverride = 0 }) {
     if (!openTurn({ A, B, att, def, who, log, t, rng })) return false;
     resolveSwing({ A, B, att, def, who, log, t, rng, mult, hitsOverride });
-    if (att.hasteLeft > 0) att.hasteLeft -= 1;
     return true;
 }
 
 // ── AUTO-ATTACK COMBAT ───────────────────────────────────────────────────────────────────────────────────────
-// No turns, no commands, no skills. Two fighters swing on their own clocks and the fight resolves itself.
+// No commands, no skills. Two fighters take turns and the fight resolves itself.
 //
-// SPEED IS WHEN YOU ATTACK. A fighter's `speed` is their rate, so the interval between their swings is 1/speed
-// and a fighter with twice the speed swings twice as often.
+// STRICTLY ALTERNATING, same as the ring — see the note on EXTRA_TURN_MAX. The challenger opens, because
+// somebody has to and bringing the fight is the fairest reason. A fighter goes again only when `goesAgain`
+// says so, which is the one place that answer is written.
 //
 // Still here, and still used, for every fight nobody is present to play: a defence somebody else brought, and
 // the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
@@ -635,19 +684,27 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     // between it and the Warden's Bastion.
     A.shield += Math.round(A.maxHp * A.ward);
     B.shield += Math.round(B.maxHp * B.ward);
-    // CHILL slows the OTHER fighter's clock. Applied once, to the speed the whole fight is paced off.
-    if (A.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - A.chill));
-    if (B.chill > 0) A.speed = Math.max(0.0001, A.speed * (1 - B.chill));
+    // CHILL is a share of the OTHER fighter's turns that simply do not happen. Applied once, at the bell,
+    // because it lasts the bout — it is a condition they are under, not a status they can shake.
+    if (A.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + A.chill);
+    if (B.chill > 0) A.skipChance = Math.min(0.6, A.skipChance + B.chill);
     const log = [];
     let t = 0;
-    let nextA = gapOf(A);
-    let nextB = gapOf(B);
     let swings = 0;
+    let mine = true;                 // the challenger opens
+    let wasExtra = false;
 
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        if (nextA <= nextB) { t = nextA; takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng }); nextA = t + gapOf(A); }
-        else { t = nextB; takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng }); nextB = t + gapOf(B); }
+        const att = mine ? A : B;
+        const def = mine ? B : A;
+        takeTurn({ A, B, att, def, who: mine ? "me" : "foe", log, t, rng });
         swings += 1;
+        // `t` is a turn counter now rather than a clock. It is still what the fight screen paces playback
+        // off, and it still has to rise, so it counts the one thing left that it can honestly count.
+        t += 1;
+        const again = A.hp > 0 && B.hp > 0 ? goesAgain(att, rng, wasExtra) : null;
+        wasExtra = Boolean(again);
+        if (!again) mine = !mine;
     }
     return {
         won: B.hp <= 0 && A.hp > 0,

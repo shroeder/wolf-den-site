@@ -130,7 +130,7 @@ export const FOE_ABILITIES = [
 
 export const FOE = {
     id: "foe-1", name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34,
-    element: "water", abilities: FOE_ABILITIES, might: 27, gearPower: 168, speed: 1.41,
+    element: "water", abilities: FOE_ABILITIES, might: 27, gearPower: 168, extra: 0.41,
 };
 
 export const ME = {
@@ -154,7 +154,7 @@ export function makeBout(over = {}) {
         hp: 148, maxHp: 206, foeHp: 122, foeMaxHp: 241,
         cd: { "ashfall_crown:overcharge": 4, "gambler_ring:highroller": 2 },
         clash: { mult: 0.75, note: "Their Water smothers your Fire" },
-        me: { element: "fire", abilities: MY_ABILITIES, might: 24, speed: 1.2 },
+        me: { element: "fire", abilities: MY_ABILITIES, might: 24, extra: 0.2 },
         shield: 0, surge: 0, underdog: 1.12,
         items: { poultice: 2, draught: 1 },
         incoming: null,
@@ -345,7 +345,7 @@ export const SCENES = {
             me: { ...ME, abilities: NEW_KIND_ABILITIES },
             bout: makeBout({
                 cd: {},
-                me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, speed: 1.2 },
+                me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, extra: 0.2 },
             }),
         }),
     },
@@ -399,10 +399,10 @@ export const SCENES = {
         note: "A whole fight, resolved by the engine and played back blow by blow. This is what a bout looks like now.",
         state: () => {
             const b = makeBout();
-            const me = { ...b.me, damage: 210, health: 1600, critChance: 0.35, critMult: 2.4, speed: 1.3,
+            const me = { ...b.me, damage: 210, health: 1600, critChance: 0.35, critMult: 2.4, extra: 0.3,
                 armor: 60, pierce: 20, counter: 40, doublestrike: 30, lifesteal: 20, blockChance: 0.15,
                 blockReduction: 0.35, stun: 30, haste: 30, bleedChance: 0.55 };
-            const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, speed: 1.0,
+            const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, extra: 0,
                 armor: 40, pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.25,
                 blockReduction: 0.5, stun: 0, haste: 0 };
             const r = autoBout(me, foe);

@@ -401,21 +401,14 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 {(f?.accuracy ?? 1) < 1 ? (
                     <i title="Chance a plain swing connects"><b>{Math.round((f.accuracy ?? 1) * 100)}%</b> acc</i>
                 ) : null}
-                {/* SPEED, ON BOTH SIDES. It decides exactly one thing — who takes the first beat — and the
-                    bout said "you open" for a single beat without ever showing the number that caused it, so
-                    the only honest answer to "how is speed determined" lived in the source. Printing both
-                    makes the comparison the mechanic actually performs visible at a glance, and puts the
-                    number next to the gear decision that moves it. SoullessShiitake asked, 2026-08-16. */}
-                {/* ── TWO DECIMALS, BECAUSE THE WHOLE RANGE IS INSIDE ONE ─────────────────────────────────
-                    Speed is ATTACKS PER SECOND and the live board runs 0.87 to 2.33, so rounding put eight of
-                    the ten members on "1" — a 62% difference between the slowest and the fastest, shown as the
-                    same number. Luke: "fights show 1 speed but i suspect this isnt accurate". It was not.
-
-                    The tooltip was stale as well: it recited `10 + 0.3 per level + 0.5 per point of Ferocity`,
-                    a formula arena-kit.js retired when auto-attack made speed the clock rather than a
-                    tiebreak. It is the weapon's base attack speed plus ferocity now. */}
-                {(f?.speed || 0) > 0 ? (
-                    <i title="Attacks per second — how often you swing, and the faster fighter takes the first beat (a tie goes to the challenger). Your weapon's attack speed, plus 1 for every 500 Ferocity."><b>{f.speed.toFixed(2)}</b> speed</i>
+                {/* ── WHERE "SPEED" WENT ──────────────────────────────────────────────────────────────────
+                    This printed attacks per second, on both sides, because speed decided who took each beat
+                    and members could not see the number doing it (SoullessShiitake asked, 2026-08-16). There
+                    is no clock now — turns alternate — and the same weapon and Ferocity buy the chance to
+                    take another turn on the spot instead. Same number, same gear decision, and this time it
+                    is a thing you can watch happen rather than a rate you have to infer from the log. */}
+                {(f?.extra || 0) > 0 ? (
+                    <i title="Chance to take another turn immediately. Your weapon's attack speed above bare-handed, plus 1% for every 5 points of Ferocity, plus Quickblade."><b>{Math.round(f.extra * 100)}%</b> again</i>
                 ) : null}
             </span>
         </div>
@@ -1888,12 +1881,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             aria-hidden="true">
                             {clash.crit ? <b className="ar-critword">Critical</b> : null}
                             <em className="ar-move">{clash.move}</em>
-                            {/* WHY THEY JUST WENT TWICE. The clock can owe a faster fighter a second beat
-                                before yours comes round, and because one tap returns your swing plus every
-                                beat they are owed, that second blow always lands in the moment right before
-                                "your turn" comes back — which reads as broken attack speed rather than as
-                                somebody faster than you. Named here, on the blow itself. */}
-                            {clash.again ? <i className="ar-faster">faster · second blow</i> : null}
+                            {/* WHY SOMEBODY JUST WENT TWICE. Turns alternate, so this is the only thing that
+                                can break the rhythm and it is never allowed to happen quietly — that is the
+                                whole reason the clock came out. It says it on the blow itself, on both sides
+                                of the ring: yours is a reward, theirs is the explanation you are owed. */}
+                            {clash.again ? <i className="ar-faster">goes again</i> : null}
                         </div>
                     ) : null}
 

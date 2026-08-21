@@ -920,3 +920,23 @@ export const BARE_ATTACK_SPEED = 1;
 export const FEROCITY_PER_SPEED = 500;
 export const speedOf = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
     (Number(baseAttackSpeed) || BARE_ATTACK_SPEED) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_SPEED;
+
+// ── AND WHAT THAT NUMBER BUYS, NOW THAT THERE IS NO CLOCK ────────────────────────────────────────────────────
+// The chance to take another turn on the spot. See the tombstone in arena-engine.js for why the clock went;
+// this is the conversion, and it is deliberately the arithmetic that was already happening.
+//
+// THE CAP LIVES HERE, with the rest of the balance constants — arena-engine.js imports this file and not the
+// other way round, and a constant copied into the second of two files is the bug this subsystem already has
+// a comment about.
+export const EXTRA_TURN_MAX = 0.5;
+//
+// Under a clock, a fighter at speed s took s turns for every 1 the baseline took. As a chance, p = s - 1 gives
+// exactly the same 1 + p turns per turn — so a 1.31 weapon is a 31% chance to go again, which is the same
+// number of swings it was already getting, in a shape somebody can watch land. Nothing rebalances; the same
+// gear is worth the same amount, and the same fights come out the same way.
+//
+// A weapon slower than bare hands buys nothing rather than costing you turns. That IS a small buff to the
+// slow end, and it is the honest reading of "speed is not a thing any more" — the alternative is a hidden
+// penalty on a stat the game has stopped talking about.
+export const extraTurnFrom = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
+    Math.max(0, Math.min(EXTRA_TURN_MAX, speedOf(baseAttackSpeed, ferocity) - BARE_ATTACK_SPEED));

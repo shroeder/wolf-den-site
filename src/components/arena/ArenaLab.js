@@ -191,7 +191,7 @@ function makeServer(initial) {
                 foe = {
                     ...base, id: n.id, name: n.name, sprite: n.sprite, level: null, npc: true, tier,
                     element: n.element, abilities: npcAbilities(tier), might: n.might, gearPower: n.gearPower,
-                    speed: n.speed, fortune: n.fortune, health: n.health,
+                    extra: n.extra, fortune: n.fortune, health: n.health,
                 };
                 theirPower = n.gearPower;
             } else {

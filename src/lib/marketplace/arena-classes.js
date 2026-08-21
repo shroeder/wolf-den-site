@@ -253,8 +253,8 @@ export const TREES = {
         N({ id: "rv_rend", tier: 0, name: "Rend", ranks: 5, stat: "bleedChance", per: 0.06,
             desc: "+6% chance a blow opens a bleed. A wound ticks three times for a fifth of the blow and armour never sees it.",
             sprite: "/images/arena/node/rv_might.webp" }),
-        N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "speed", per: 0.06,
-            desc: "+0.06 attacks per second. Speed is the clock — every swing you gain is another roll at everything else.",
+        N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "extra", per: 0.06,
+            desc: "+6% chance to take another turn immediately. Every turn you steal is another roll at everything else.",
             sprite: "/images/arena/node/rv_strike.webp" }),
         N({ id: "rv_edge", tier: 0, name: "Killing Edge", ranks: 5, stat: "crit", per: 0.03,
             desc: "+3% critical chance.", sprite: "/images/arena/node/rv_crit.webp" }),
@@ -281,7 +281,7 @@ export const TREES = {
 
         // TIER 4 — capstones.
         N({ id: "rv_scent", tier: 3, name: "Bloodscent", ranks: 5, stat: "hasteBonus", per: 0.02, needs: 12,
-            desc: "+2% chance a swing hastes you: five swings at double speed.",
+            desc: "+2% chance a swing grants you another turn on the spot.",
             sprite: "/images/arena/node/rv_haste.webp" }),
         N({ id: "rv_exsang", tier: 3, name: "Exsanguinate", ranks: 5, stat: "bleedLeech", per: 0.03, needs: 12,
             desc: "+3% of all bleed damage healed back to you. Rend starts it, Deep Cuts deepens it, this drinks it.",
@@ -352,7 +352,7 @@ export const TREES = {
             desc: "+2% chance a blow freezes — they lose the swing that was due.",
             sprite: "/images/arena/node/rc_freeze.webp" }),
         N({ id: "rc_chill", tier: 1, name: "Chill", ranks: 5, stat: "chill", per: 0.02, needs: 3,
-            desc: "-2% to the enemy's attack speed. It slows their clock rather than stopping it.",
+            desc: "+2% chance the enemy is too cold to take their turn at all. It lasts the whole bout.",
             sprite: "/images/arena/node/rc_chill.webp" }),
         N({ id: "rc_rime", tier: 1, name: "Rimeguard", ranks: 5, stat: "iceThorns", per: 0.03, needs: 3,
             desc: "+3% of the damage done to you is sent back. Every blow, not only the ones you block.",
