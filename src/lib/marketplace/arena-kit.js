@@ -800,13 +800,74 @@ export const TIMING_BANDS = [
 export function gradeTiming(closeness) {
     const c = Math.max(0, Math.min(1, Number(closeness) || 0));
     const band = TIMING_BANDS.find((b) => c >= b.at) || TIMING_BANDS[TIMING_BANDS.length - 1];
-    return {
-        id: band.id,
-        label: band.label,
-        // What a swing thrown on this tap is multiplied by, and what a blow caught on it is reduced by.
-        strike: 1 + STRIKE_MAX * band.share,
-        brace: BRACE_MAX * band.share,
-    };
+    return gradeOf(band);
+}
+
+const gradeOf = (band) => ({
+    id: band.id,
+    label: band.label,
+    // What a swing thrown on this tap is multiplied by, and what a blow caught on it is reduced by.
+    strike: 1 + STRIKE_MAX * band.share,
+    brace: BRACE_MAX * band.share,
+});
+
+// ── AND THE OTHER SIDE OF THE RING HAS HANDS TOO ─────────────────────────────────────────────────────────────
+// You fight a LOADOUT, not a person — nobody is sitting on the other end of a defence to tap anything. The
+// first build of this gave the timing bonus only to whoever pressed Challenge, and Luke stopped it on sight:
+// "it can't be super lopsided playing async against someone who has no ability to tap."
+//
+// He is right, and it is the same bug the underdog clause already has a comment about further up this file —
+// a rule only one side of the ring can ever collect. An absent defender who eats every blow at full weight and
+// throws every swing at bare power is not a fighter, it is a practice dummy wearing somebody's gear, and a
+// ladder sorted by that is sorted by who happened to attack.
+//
+// So the house plays their hand. THE DISTRIBUTION IS THE DESIGN: not a constant, because a fighter who lands
+// exactly the same grade on every beat has no texture and can be solved once; and not a perfect hand, because
+// then nobody could ever out-play a defence. This is a competent attentive human — mostly Good, a quarter
+// Perfect, occasionally clipped, and now and then they simply miss one.
+//
+// It averages to a 0.565 share, which is the "decent" hand in the sweep: worth about 17% gear. So beating a
+// defence still means out-timing it, and the margin a great hand has over a competent one is real but earned.
+export const HOUSE_HAND = [
+    { id: "perfect", p: 0.25 },
+    { id: "good", p: 0.50 },
+    { id: "early", p: 0.20 },
+    { id: "miss", p: 0.05 },
+];
+
+// ── AND THE HOUSE PLAYS FOR YOU WHEN YOU DO NOT PLAY FOR YOURSELF ────────────────────────────────────────────
+// Giving the absent defender a competent hand fixed one lopsidedness and immediately created the mirror of it.
+// Measured: against an equal-geared defence that taps, a member who taps NOTHING wins 4% of bouts. "Timing is
+// upside only" stopped being true the moment the other side of the ring got hands — not tapping went from
+// costing you a bonus to costing you the fight.
+//
+// So a member's tap does not replace nothing, it replaces THE HOUSE HAND. Whichever is better is the one that
+// counts. Look away, lose the window, hold the phone in one hand while you ring somebody up at the counter —
+// you fight the same competent fight your opponent's loadout is fighting, every time. Play well and you beat
+// it. There is no way to be worse off for having tried.
+//
+// It is also the honest sentence to put on the screen: the house plays your hand when you do not.
+export const betterHand = (a, b) => (a.strike >= b.strike ? a : b);
+
+// ── AND THE FLOOR IS A FIXED BAND, NOT A FRESH ROLL ──────────────────────────────────────────────────────────
+// The first build floored a member's tap against a live houseHand draw, which quietly handed them the best of
+// two hands on every single beat while the defence played one. Measured in a true mirror — same stats, same
+// build, both tapping Good — the attacker won 69%. The floor meant to stop one lopsidedness had built another.
+//
+// So the floor is the GOOD band, flat. A member who taps Good gets exactly what a competent hand is worth;
+// the house averages a shade above it, because a quarter of its draws are Perfect. Near parity, with the edge
+// going to whoever actually plays well — which is the whole point of having a window at all.
+export const HAND_FLOOR = TIMING_BANDS.find((b) => b.id === "good");
+
+/** The grade the absent fighter's hand lands this beat. Same shape gradeTiming returns, so nothing downstream
+ *  can tell — or needs to tell — which side of the ring had a person behind it. */
+export function houseHand(rng = Math.random) {
+    let roll = rng();
+    for (const h of HOUSE_HAND) {
+        roll -= h.p;
+        if (roll <= 0) return gradeOf(TIMING_BANDS.find((b) => b.id === h.id));
+    }
+    return gradeOf(TIMING_BANDS.find((b) => b.id === "good"));
 }
 
 // ── COOLDOWNS, NOT FOCUS ─────────────────────────────────────────────────────────────────────────────────────

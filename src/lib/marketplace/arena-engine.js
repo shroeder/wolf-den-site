@@ -19,7 +19,7 @@ import {
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
-import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { ARMOUR_MAX_SHARE, critChanceFrom, critMultFrom, healthFrom, houseHand, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -587,7 +587,17 @@ export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult 
 // Still here, and still used, for every fight nobody is present to play: a defence somebody else brought, and
 // the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
 // ring calls, so an auto-resolved bout and a played one cannot disagree about what a swing is.
-export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
+//
+// ── BOTH FIGHTERS GET A HAND ─────────────────────────────────────────────────────────────────────────────────
+// Nobody is present here BY DEFINITION, so the alternative to giving both sides a competent hand is giving
+// neither one — and that makes an auto-resolved bout a systematically different fight from a played one, at
+// which point the simulator is measuring a game nobody plays. Both sides draw from houseHand, so the balance
+// numbers this produces are the balance of the game as it is actually fought.
+//
+// `hands: false` turns it off, and exists for one purpose: proving this loop is still the same loop. The
+// equivalence test that guards the refactor runs with it off.
+export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000, hands = true } = {}) {
+    const hand = () => (hands ? houseHand(rng) : { strike: 1, brace: 0 });
     const A = sideOf(me);
     const B = sideOf(foe);
     // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
@@ -604,8 +614,18 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     let swings = 0;
 
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        if (nextA <= nextB) { t = nextA; takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng }); nextA = t + gapOf(A); }
-        else { t = nextB; takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng }); nextB = t + gapOf(B); }
+        // Two draws, not one: the swing is timed by whoever throws it and the brace by whoever catches it.
+        // Sharing a single draw would tie the two hands together, so a fighter who timed their swing well
+        // would also, always, have braced well — which is one hand, not two.
+        if (nextA <= nextB) {
+            t = nextA;
+            takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng, mult: hand().strike, brace: hand().brace });
+            nextA = t + gapOf(A);
+        } else {
+            t = nextB;
+            takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng, mult: hand().strike, brace: hand().brace });
+            nextB = t + gapOf(B);
+        }
         swings += 1;
     }
     return {
