@@ -186,11 +186,17 @@ export default function SkillPanel({ classId, taken = {}, points = 0, treeSpent 
                 <div className="skp-head-body">
                     <span className="skp-kick">Skills</span>
                     <b className="skp-title">What you can press in a fight</b>
+                    {/* At a rate of one the countdown sentence is nonsense — "1 more tree point for the next"
+                        is true on every single beat of the game and tells nobody anything. The rate decides
+                        which sentence gets written, rather than the sentence being written for a rate that has
+                        since changed underneath it. */}
                     <p className="skp-sub">
-                        Every {TREE_POINTS_PER_SKILL_POINT} points in the tree earns 1 here.
-                        {" "}{toNext === TREE_POINTS_PER_SKILL_POINT
-                            ? "The next tree point starts the next one."
-                            : `${toNext} more tree point${toNext === 1 ? "" : "s"} for the next.`}
+                        {TREE_POINTS_PER_SKILL_POINT === 1
+                            ? "Every point the tree earns, you earn one here too."
+                            : `Every ${TREE_POINTS_PER_SKILL_POINT} points in the tree earns 1 here. ${
+                                toNext === TREE_POINTS_PER_SKILL_POINT
+                                    ? "The next tree point starts the next one."
+                                    : `${toNext} more tree point${toNext === 1 ? "" : "s"} for the next.`}`}
                     </p>
                 </div>
                 <div className={`skp-points${points > 0 ? " is-live" : ""}`}>

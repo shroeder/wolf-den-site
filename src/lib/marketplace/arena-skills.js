@@ -54,11 +54,29 @@ export const SKILL_UNLOCK_COST = 1;
 export const NODE_COST = 1;
 
 // ── THE EXCHANGE RATE ────────────────────────────────────────────────────────────────────────────────────────
-// Three points in the passive tree buys one skill point. Luke's number, and it lands the economy in a good
-// place: the passive tree caps at 60 points, so a fully-invested member ends with 20 skill points against the
-// 18 it costs to own all three skills at full depth. Completionism is reachable at the very end of a very long
-// road, and everybody short of that — which is everybody — is making a real choice about depth against breadth.
-export const TREE_POINTS_PER_SKILL_POINT = 3;
+// ONE FOR ONE. Every point the passive tree pays out earns one here too — they are not in competition, and a
+// level gives you one of each.
+//
+// It was 3:1, on the reasoning that a skill point should cost something. That reasoning was arithmetic done
+// against a curve nobody checked, and the curve is exponential. Measured, in days of winning ALL TEN daily
+// Gauntlet fights — the ceiling, so a real member is two or three times slower:
+//
+//                                     3:1        2:1        1:1
+//   first capstone (4 points)         11d         4d         1d
+//   one skill complete (10)         never        81d         7d
+//   all three complete (30)         never      never       953d
+//
+// At 3:1 one finished skill sat 953 days away and two-thirds of the eighty-one nodes were decoration — content
+// authored for nobody, which is the same trap as gear that cannot be obtained. The claim in this comment's
+// previous version, that a maxed tree pays out 20 skill points, was fiction: level 61 costs 1.16 BILLION arena
+// XP. Nobody has ever been within three orders of magnitude of it.
+//
+// Luke's call is 1:1, and the trade he is accepting is real. A capstone arrives fast — inside the first week
+// for an ordinary member — so the branch commitment is not permanent the way it would be at 2:1, and a
+// dedicated player owns every node of one skill in a month. What that buys is that members PLAY the system
+// instead of reading about the parts of it they will never reach, and the respec that already exists (three
+// free refunds a day) means trying a branch was never meant to be a life sentence anyway.
+export const TREE_POINTS_PER_SKILL_POINT = 1;
 
 /** How many skill points a member has earned, ever. Derived from what is in the passive tree rather than
  *  stored, so it can never drift out of step with a respec. */
@@ -94,9 +112,9 @@ export const skillPointsFrom = (treePointsSpent = 0) =>
 // makes depth cost something structural rather than just costing points: three capstones exist and you can
 // never hold more than one of them cheaply.
 //
-// The economy: 1 to unlock, 3 more to run a branch to its capstone, 10 to own all nine nodes. Three skills
-// fully owned is 30 points against the 20 a maxed passive tree ever pays out — so nobody holds all of it, and
-// most members are choosing ONE capstone on ONE skill and living with it.
+// The economy: 1 to unlock, 3 more to run a branch to its capstone, 10 to own all nine nodes, 30 for all three
+// skills. At the 1:1 exchange rate that is roughly a week to a first capstone, a month to a finished skill,
+// and years to everything — so the ceiling still exists, it is just no longer somewhere nobody can see.
 const S = (o) => ({ power: 1, hits: 0, cooldown: 3, ...o });
 
 // `br` stamps the branch and the depth onto each node, so the flat list stays the thing resolveSkill merges
