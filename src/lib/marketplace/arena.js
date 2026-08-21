@@ -109,7 +109,21 @@ export const COMBAT_OPEN = true;
 // (buildBout), covering all four doors into the ring — a challenge, the Gauntlet, the Long Road, a plaza raid
 // and a hooked monster. The owner is exempt so the whole thing can be walked end to end on the live site
 // before anybody else sees it.
-export const INTERACTIVE = false;
+//
+// OPEN 2026-08-21. Everything it was holding back is built and has been played on the live site: the timing
+// game removed, turn order alternating, the states drawn on the fighters, the transcript narrated, the beat
+// down from 4.4 seconds to about a fifth of one. Luke, on being told this was still owner-only: "can u
+// ungate plz."
+//
+// Checked before flipping, because this is the whole Den rather than one account: sim:skills over the 8 real
+// loadouts, 27 capstone branches, spread 44-65% and EVERY BOUT ENDED. Nothing sits more than 15 points off an
+// even fight, which is this project's own tolerance. Bastion/Reprisal at 65% is the one to watch — a Warden
+// shield build is the strongest thing in the game right now, and the audit of a live rung-31 bout says the
+// same: a shield that refreshes faster than a comparable opponent can spend it.
+//
+// A bout opened BEFORE this flip has no ring and is not playable. It still works — `playable()` refuses it
+// and the screen plays it back as the transcript it always was.
+export const INTERACTIVE = true;
 export const interactiveFor = (buyerId) => INTERACTIVE || isOwner(buyerId);
 export const combatOpenFor = (buyerId) => COMBAT_OPEN || isOwner(buyerId);
 
