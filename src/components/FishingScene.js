@@ -230,6 +230,28 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         return Array.from({ length: runCount }, (_, k) => first + (runCount === 1 ? span / 2 : (span / (runCount - 1)) * k));
     }, [runCount]);
 
+    // ── BRING THE WATER DOWN TO THE THUMB ────────────────────────────────────────────────────────────────
+    // The control belongs on the frame; what was wrong was the frame's position on the page, not the
+    // button's position in the frame. So when a fish takes the line, the bottom of the water is scrolled to
+    // the bottom of the screen — which puts the HOLD button in the thumb arc AND keeps it over the ripples
+    // where it reads as part of the picture.
+    //
+    // `block: "end"` rather than "center": it is the bottom strip of the frame that has to be reachable,
+    // and centring a tall frame on a short phone leaves the button below the fold again.
+    const rootRef = useRef(null);
+    useEffect(() => {
+        const frame = rootRef.current?.closest(".fw") || rootRef.current;
+        if (!frame) return;
+        // NOT scrollIntoView({block:"end"}) — that aligns the frame's bottom flush with the viewport's, so
+        // the button ends up hard against the screen edge and under whatever toast or home indicator is
+        // there. Positioned by hand with a margin instead: the bottom of the water sits REST_GAP above the
+        // bottom of the screen, which puts the control in the thumb arc with room to breathe.
+        const REST_GAP = 34;
+        const r = frame.getBoundingClientRect();
+        const delta = r.bottom - (window.innerHeight - REST_GAP);
+        if (Math.abs(delta) > 8) window.scrollBy({ top: delta, behavior: "smooth" });
+    }, []);
+
     useEffect(() => {
         let raf = 0;
         let prev = 0;
@@ -342,7 +364,7 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         : inCore ? "PERFECT" : inside ? "ON IT" : "KEEP IT IN THE BAR";
 
     return (
-        <div className={`fwreel${inside ? " is-on" : ""}${inCore ? " is-core" : ""}`} data-mood={mood} data-tick={tick}>
+        <div ref={rootRef} className={`fwreel${inside ? " is-on" : ""}${inCore ? " is-core" : ""}`} data-mood={mood} data-tick={tick}>
             {/* The rod gauge, against the right edge — it leaves the boat, the hero and the water visible,
                 which is the whole reason the reel lives in the frame instead of over it. */}
             {/* ── THE ROD IS A GAUGE, NOT A BUTTON ────────────────────────────────────────────────────────
