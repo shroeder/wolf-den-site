@@ -261,24 +261,12 @@ export function counterBlow(b, mine) {
 
     return { dmg, crit, drank, burned, bled, doubled: roll.doubled, missed: false };
 }
-
-// ── AUTO-ATTACK COMBAT ───────────────────────────────────────────────────────────────────────────────────────
-// No turns, no commands, no skills. Two fighters swing on their own clocks and the fight resolves itself.
-//
-// SPEED IS WHEN YOU ATTACK. A fighter's `speed` is their rate, so the interval between their swings is 1/speed
-// and a fighter with twice the speed swings twice as often. Nothing else about speed matters — it is not a
-// tiebreak for who opens any more, it is the whole schedule.
-//
-// The clock is arbitrary units. Only the RATIO between the two intervals decides anything, so whether speed 30
-// means thirty swings a second or thirty a minute is a presentation question, not a mechanical one.
-//
-// Each swing is the ordinary one: accuracy, then crit through critStacks (so a fighter past 100% crit chance
-// gets their multiples here too), then the defender's damage reduction. Skills, guards, items and abilities
-// are deliberately not here.
-export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
-    // Armour is the whole of mitigation now: a flat number subtracted from every blow. Damage reduction is
-    // gone (it was a percentage doing the same job worse) and so is accuracy — every swing lands.
-    const side = (f) => ({
+// ── A FIGHTER, IN THE SHAPE THE RING USES ────────────────────────────────────────────────────────────────────
+// Every affix, node and class trait converted to the units a swing is resolved in, once. This was `side`,
+// declared inside autoBout — fine while a bout was one function call, wrong the moment a fight has to be put
+// down between beats and picked back up. A turn-based ring saves this object to `bout_json` and resumes off
+// it, so it has to be a value anybody can build rather than a closure only the auto-resolver could reach.
+export const sideOf = (f) => ({
         // dmgPct was on the kit, on the card, and read by NOTHING — Runic Might and every point spent in it
         // did precisely zero. Folded into the damage the engine actually swings with.
         damage: (Number(f.damage) || 0) * (1 + Math.max(0, Number(f.dmgPct) || 0)),
@@ -348,35 +336,37 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
-    });
-    const A = side(me);
-    const B = side(foe);
-    // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
-    // between it and the Warden's Bastion.
-    A.shield += Math.round(A.maxHp * A.ward);
-    B.shield += Math.round(B.maxHp * B.ward);
-    // CHILL slows the OTHER fighter's clock. Applied once, to the speed the whole fight is paced off.
-    if (A.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - A.chill));
-    if (B.chill > 0) A.speed = Math.max(0.0001, A.speed * (1 - B.chill));
-    const log = [];
-    let t = 0;
-    // A hasted fighter's swings come HASTE_RATE times as fast, for HASTE_ATTACKS of their own swings.
-    const gap = (f) => (1 / f.speed) / (f.hasteLeft > 0 ? HASTE_RATE : 1);
-    let nextA = gap(A);
-    let nextB = gap(B);
-    let swings = 0;
+});
 
-    // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the
-    // whole multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
-    const blows = (ds) => {
-        if (ds <= 0) return 1;
-        const guaranteed = 1 + Math.floor(ds);
-        return guaranteed + (rng() < ds - Math.floor(ds) ? 1 : 0);
-    };
+// A hasted fighter's swings come HASTE_RATE times as fast, for HASTE_ATTACKS of their own swings. The gap is
+// what makes SPEED mean something under turns as well as under a clock: a faster fighter's beat comes round
+// sooner, so they simply get more of them. That is deliberate — the alternative (strict you-me-you-me) would
+// have made Quickblade, every speed affix and the weapon speed on every sword worth exactly nothing, which is
+// how the last turn-based engine ended up with a stat nobody could spend on.
+export const gapOf = (f) => (1 / f.speed) / (f.hasteLeft > 0 ? HASTE_RATE : 1);
 
-    const swing = (att, def, who) => {
+// How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the whole
+// multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
+export const blowCount = (ds, rng = Math.random) => {
+    if (ds <= 0) return 1;
+    const guaranteed = 1 + Math.floor(ds);
+    return guaranteed + (rng() < ds - Math.floor(ds) ? 1 : 0);
+};
+
+// ── ONE SWING, WHOEVER THREW IT AND HOWEVER IT WAS CHOSEN ────────────────────────────────────────────────────
+// Lifted whole out of autoBout. An auto-resolved bout and a turn you took by hand must be the same arithmetic
+// or the game has two combat models, and the file's own opening comment is about what happened the last time
+// this repo had two of something.
+//
+// The three parameters that did not exist before are the entire difference between a swing that happens TO you
+// and one you chose:
+//
+//   mult          everything specific to what was thrown — a skill's power, and the timing grade on it
+//   brace         the defender's timing, as a share of the blow that never lands. 0 is the auto-resolver.
+//   hitsOverride  a skill that strikes a fixed number of times, instead of rolling doublestrike for it
+export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, brace = 0, hitsOverride = 0 }) {
         // Each blow of a doublestrike rolls its own crit, so the stat is variance as well as volume.
-        const hits = blows(att.doublestrike);
+        const hits = hitsOverride || blowCount(att.doublestrike, rng);
         let dealt = 0;
         let anyCrit = false;
         let blocked = 0;
@@ -392,7 +382,7 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
             const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1)
-                * (surging ? 1 + att.surge : 1);
+                * (surging ? 1 + att.surge : 1) * mult;
             // ── PIERCE THINS THE ARMOUR ──────────────────────────────────────────────────────────────
             // It used to route a share of the blow AROUND the armour and send the rest through it in full,
             // which is algebraically nothing: `raw*p + (raw - raw*p - armour)` collapses to `raw - armour`
@@ -431,6 +421,7 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             } else if (def.blockStackMax > 0) {
                 def.stacks = Math.min(def.blockStackMax, def.stacks + 1);
             }
+            if (brace > 0) blow = Math.max(1, Math.round(blow * (1 - brace)));
             dealt += blow;
         }
         // A GUARD EATS IT FIRST. Whatever the shield can absorb never reaches health, and what is left of
@@ -520,10 +511,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             att.hp -= cdealt;
             log.push({ t, who: who === "me" ? "foe" : "me", dmg: cdealt, crit: cs > 0, stacks: cs, counter: true });
         }
-    };
+}
 
-    // A stunned fighter loses the swing that was due: the clock still turns, they just do not act.
-    const take = (att, def, who) => {
+// ── THE HALF OF A TURN THAT HAPPENS TO YOU ───────────────────────────────────────────────────────────────────
+// Bleed, burn, the stun skip, regen, ward refill and the Bastion roll — everything a fighter's turn does BEFORE
+// they choose anything. A stunned fighter loses the swing that was due: the clock still turns, they just do not
+// act.
+//
+// Returns false if the fighter never got to act — stunned, or dead on their own bleed before they could swing.
+// Both loops need that answer: the auto-resolver to skip the swing, and the interactive ring to know there is
+// no incoming blow to ask anybody to brace against.
+export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
         // not stop you bleeding — and it can kill, which is the whole point of a wound.
         if (att.bleedLeft > 0) {
@@ -538,7 +536,7 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             }
             log.push({ t, who, bleedTick: true, dmg: tick,
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
-            if (att.hp <= 0) return;
+            if (att.hp <= 0) return false;
         }
         if (att.burnLeft > 0) {
             const tick = Math.max(1, Math.round(att.burnPer));
@@ -549,12 +547,12 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
                 lighter.hp = Math.min(lighter.maxHp, lighter.hp + Math.round(tick * lighter.burnLeech));
             }
             log.push({ t, who, burnTick: true, dmg: tick, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
-            if (att.hp <= 0) return;
+            if (att.hp <= 0) return false;
         }
         if (att.stunned > 0) {
             att.stunned -= 1;
             log.push({ t, who, stunnedSkip: true });
-            return;
+            return false;
         }
         // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
         if (att.regen > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(att.maxHp * att.regen));
@@ -565,13 +563,49 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             att.shield += Math.round(att.maxHp * att.guardSize);
             log.push({ t, who, guard: true, shield: att.shield, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
         }
-        swing(att, def, who);
-        if (att.hasteLeft > 0) att.hasteLeft -= 1;
-    };
+    return true;
+}
+
+// ── THE WHOLE TURN, FOR ANYBODY NOT PRESENT TO PLAY IT ───────────────────────────────────────────────────────
+// openTurn then the swing, which is what a turn IS. It exists as its own function because the interactive ring
+// has to stop BETWEEN those two halves — the pre-swing decides whether there is even a blow to brace against,
+// and asking a member to time a tap against a swing that a stun already cancelled is how a fight screen starts
+// lying about what is happening.
+export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, brace = 0, hitsOverride = 0 }) {
+    if (!openTurn({ A, B, att, def, who, log, t, rng })) return false;
+    resolveSwing({ A, B, att, def, who, log, t, rng, mult, brace, hitsOverride });
+    if (att.hasteLeft > 0) att.hasteLeft -= 1;
+    return true;
+}
+
+// ── AUTO-ATTACK COMBAT ───────────────────────────────────────────────────────────────────────────────────────
+// No turns, no commands, no skills. Two fighters swing on their own clocks and the fight resolves itself.
+//
+// SPEED IS WHEN YOU ATTACK. A fighter's `speed` is their rate, so the interval between their swings is 1/speed
+// and a fighter with twice the speed swings twice as often.
+//
+// Still here, and still used, for every fight nobody is present to play: a defence somebody else brought, and
+// the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
+// ring calls, so an auto-resolved bout and a played one cannot disagree about what a swing is.
+export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
+    const A = sideOf(me);
+    const B = sideOf(foe);
+    // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
+    // between it and the Warden's Bastion.
+    A.shield += Math.round(A.maxHp * A.ward);
+    B.shield += Math.round(B.maxHp * B.ward);
+    // CHILL slows the OTHER fighter's clock. Applied once, to the speed the whole fight is paced off.
+    if (A.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - A.chill));
+    if (B.chill > 0) A.speed = Math.max(0.0001, A.speed * (1 - B.chill));
+    const log = [];
+    let t = 0;
+    let nextA = gapOf(A);
+    let nextB = gapOf(B);
+    let swings = 0;
 
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        if (nextA <= nextB) { t = nextA; take(A, B, "me"); nextA = t + gap(A); }
-        else { t = nextB; take(B, A, "foe"); nextB = t + gap(B); }
+        if (nextA <= nextB) { t = nextA; takeTurn({ A, B, att: A, def: B, who: "me", log, t, rng }); nextA = t + gapOf(A); }
+        else { t = nextB; takeTurn({ A, B, att: B, def: A, who: "foe", log, t, rng }); nextB = t + gapOf(B); }
         swings += 1;
     }
     return {

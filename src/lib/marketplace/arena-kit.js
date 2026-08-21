@@ -754,11 +754,60 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
     return 1 + Math.min(UNDERDOG_MAX, gap * 0.75);
 }
 
-// ── NO TIMING ────────────────────────────────────────────────────────────────────────────────────────────────
-// The closing ring, its per-gear speed and the five timing GRADES all lived here. They are gone: a beat is
-// decided by the command you choose and the gear behind it, so there is nothing left to grade. arena.js
-// carries the two flat constants that replaced the grade multipliers, set to what an average hand was
-// actually landing, which is why removing the ring moved no balance.
+// ── TIMING, AND WHY THIS ONE IS DIFFERENT ────────────────────────────────────────────────────────────────────
+// Timing has been in this game twice and taken out twice. Both removals were right, and both were for the same
+// reason, written down two comments below this one: timing GATED things. It filled a Focus pool you had to
+// have in order to use your own skills, so a bad run of taps locked a member out of the gear they had paid
+// for — and a mechanic that can take your build away is not a skill test, it is a tax on having hands.
+//
+// Luke's rule, and the whole design: TIMING MULTIPLIES, IT NEVER GATES.
+//
+//   offence   a well-timed tap adds to the blow, up to STRIKE_MAX
+//   defence   a well-timed tap takes a share off the blow coming back, up to BRACE_MAX
+//
+// The floor on both sides is ZERO BONUS, never a penalty. Miss every window in the bout and you fight exactly
+// the fight the auto-resolver would have fought for you — no whiffs, no stunlock, nothing taken away from
+// someone on bad wifi or holding a phone in one hand. Everything timing does is upside.
+//
+// ── THE BAND IS THE DIAL FOR "GEAR DECIDES EVERYTHING" ───────────────────────────────────────────────────────
+// This number, and not a stat migration, is the answer to the oldest argument about the Arena. Narrow it and
+// gear decides every bout, which is what the heavily-invested members want. Widen it and a sharp player in
+// worse gear can take the fight, which is what everybody else wants. It is ONE constant, tunable off
+// arena-report telemetry, and it moves that balance without touching a single item, badge or pet.
+//
+// Starting at 30% by Luke's call. Do not move it off a hunch — run scripts/arena-report.mjs, look at the upset
+// rate, then move it.
+export const STRIKE_MAX = 0.30;     // most a perfect tap can add to a blow you throw
+export const BRACE_MAX = 0.30;      // most a perfect tap can take off a blow you catch
+
+// The bands a tap falls into, best first. `at` is the minimum closeness-to-centre that reaches this band, so
+// a tap is graded by the first band it clears. Named rather than continuous because the fight screen has to
+// SAY which one you got — "Perfect" is feedback, "1.27x" is a spreadsheet.
+export const TIMING_BANDS = [
+    { id: "perfect", label: "Perfect", at: 0.88, share: 1 },
+    { id: "good", label: "Good", at: 0.55, share: 0.55 },
+    { id: "early", label: "Clipped", at: 0.22, share: 0.2 },
+    { id: "miss", label: "Missed", at: 0, share: 0 },
+];
+
+/**
+ * Grade a tap. `closeness` is 0..1, where 1 is dead centre of the window.
+ *
+ * SERVER-AUTHORITATIVE ON PURPOSE. A grade is worth damage, so it can never be believed as it arrives from a
+ * POST body: this clamps first and grades second, and every caller passes the raw client number straight in
+ * rather than pre-processing it somewhere the clamp does not run.
+ */
+export function gradeTiming(closeness) {
+    const c = Math.max(0, Math.min(1, Number(closeness) || 0));
+    const band = TIMING_BANDS.find((b) => c >= b.at) || TIMING_BANDS[TIMING_BANDS.length - 1];
+    return {
+        id: band.id,
+        label: band.label,
+        // What a swing thrown on this tap is multiplied by, and what a blow caught on it is reduced by.
+        strike: 1 + STRIKE_MAX * band.share,
+        brace: BRACE_MAX * band.share,
+    };
+}
 
 // ── COOLDOWNS, NOT FOCUS ─────────────────────────────────────────────────────────────────────────────────────
 // Focus was a pool you filled by timing well and spent on skills. It made every skill interchangeable — a
