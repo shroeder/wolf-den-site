@@ -8,6 +8,9 @@ import {
     TIER_GATE, treeFor,
 } from "@/lib/marketplace/arena-classes.js";
 import { ARENA_UPGRADES, upgradeCost } from "@/lib/marketplace/arena-upgrades.js";
+import {
+    NODE_COST, SKILL_UNLOCK_COST, skillById, skillPointsFrom, skillPointsSpent, skillsForClass,
+} from "@/lib/marketplace/arena-skills.js";
 import { crateById, rollCrate } from "@/lib/marketplace/armoury.js";
 import { GEM_KINDS, gemId } from "@/lib/marketplace/gems.js";
 
@@ -20,7 +23,7 @@ import { GEM_KINDS, gemId } from "@/lib/marketplace/gems.js";
 // without anything having to reset it at midnight — the same trick the daily raid counter uses.
 const row = (buyerId) =>
     db.queryOne(
-        `SELECT arena_xp, arena_class, skill_tree, upgrades, respecs, class_respecs,
+        `SELECT arena_xp, arena_class, skill_tree, skills, upgrades, respecs, class_respecs,
                 CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
                      THEN COALESCE(free_respecs, 0) ELSE 0 END AS free_used
            FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
@@ -37,6 +40,37 @@ export function pointsFor(r) {
     const { level } = arenaLevelFor(Number(r?.arena_xp) || 0);
     const spent = pointsSpent(r?.skill_tree || {});
     return { level, spent, available: Math.max(0, level - spent) };
+}
+
+// ── THE SKILL PURSE ──────────────────────────────────────────────────────────────────────────────────────────
+// Earned off what is INVESTED in the passive tree rather than off the level, which is the shape Luke asked
+// for: "every three points you invest in the passive tree, you get one point to invest in a skill." The rate
+// is 1:1 now (see TREE_POINTS_PER_SKILL_POINT) but the derivation is the same either way — spend in the tree,
+// earn here.
+//
+// Nothing is stored. Both halves are computed from the two JSON bags every time, so a respec cannot leave a
+// stored counter describing a tree that no longer exists.
+export function skillPointsFor(r) {
+    const earned = skillPointsFrom(pointsSpent(r?.skill_tree || {}));
+    const spent = skillPointsSpent(r?.skills || {});
+    return { earned, spent, available: Math.max(0, earned - spent) };
+}
+
+/**
+ * Would pulling `back` points out of the passive tree leave the skill panel over-spent?
+ *
+ * It can, and that is the one place these two screens are genuinely coupled: skill points are bought with tree
+ * points, so refunding a tree node can un-buy a skill point that has already been spent on a capstone.
+ *
+ * The alternatives were both bad. Silently deleting a skill node to pay for it destroys something the member
+ * chose, with no warning, from a button on a different screen. Letting the panel go negative means every read
+ * afterwards has to decide what a negative purse means. So the refund is REFUSED and says why — take a point
+ * out of the skill panel first, where the member can see which one they are giving up.
+ */
+export function refundWouldOrphanSkills(r, back = 1) {
+    const { earned, spent } = skillPointsFor(r);
+    const after = skillPointsFrom(Math.max(0, pointsSpent(r?.skill_tree || {}) - back));
+    return spent > after ? { blocked: true, spent, earned, after } : { blocked: false };
 }
 
 async function spendGold(buyerId, amount, reason, meta) {
@@ -99,6 +133,10 @@ export async function refundNode(buyerId, nodeId) {
     if (!r?.arena_class) return { ok: false, error: "no_class" };
     const taken = { ...(r.skill_tree || {}) };
     if (!(Number(taken[nodeId]) > 0)) return { ok: false, error: "not_taken" };
+    // A tree point is what BUYS a skill point, so pulling one back can un-buy something already spent on a
+    // capstone. Refused rather than resolved silently — see refundWouldOrphanSkills.
+    const orphan = refundWouldOrphanSkills(r, 1);
+    if (orphan.blocked) return { ok: false, error: "skills_first", ...orphan };
 
     // THE FIRST THREE OF THE DAY ARE FREE. Charged only once the allowance is gone, and the counter moves in
     // the same statement that spends it — two taps at once must not both read "one left".
@@ -158,6 +196,9 @@ export async function respecTree(buyerId) {
     if (!r?.arena_class) return { ok: false, error: "no_class" };
     const spent = pointsSpent(r.skill_tree || {});
     if (spent <= 0) return { ok: false, error: "nothing_spent" };
+    // Emptying the tree un-buys EVERY skill point. Same refusal as a single refund, for the same reason.
+    const orphan = refundWouldOrphanSkills(r, spent);
+    if (orphan.blocked) return { ok: false, error: "skills_first", ...orphan };
     const cost = RESPEC_TREE(spent);
     const paid = await spendGold(buyerId, cost, "arena_respec_tree", { spent });
     if (!paid.ok) return { ...paid, cost };
@@ -367,4 +408,127 @@ export async function buyArmouryRecipe(buyerId) {
     await trackActivity(buyerId, "buy_recipe", { currency: "laurels", cost: RECIPE_PRICE_LAURELS, recipe: got.id }).catch(() => {});
     // No reveal payload on purpose — the site-wide watcher shows the same card a found recipe gets.
     return { ok: true, bought: got.name, laurels: Number(paid.laurels) || 0 };
+}
+
+
+// ── UNLOCKING A SKILL ────────────────────────────────────────────────────────────────────────────────────────
+// One point, no prerequisite, no tier gate. Every check the panel makes is made again here from the same pure
+// functions the panel renders from, because a skill point is worth gold and a route that can be posted into
+// is a route that will be.
+export async function takeSkill(buyerId, skillId) {
+    const r = await row(buyerId);
+    if (!r?.arena_class) return { ok: false, error: "no_class" };
+    const def = skillById(skillId);
+    // The class check is the one a crafted POST would go for: nine skills exist and only three are yours.
+    if (!def || def.classId !== r.arena_class) return { ok: false, error: "bad_skill" };
+    const bag = { ...(r.skills || {}) };
+    if (Array.isArray(bag[skillId])) return { ok: false, error: "already_owned" };
+    if (skillPointsFor(r).available < SKILL_UNLOCK_COST) return { ok: false, error: "no_points" };
+
+    bag[skillId] = [];
+    await db.query(`UPDATE mkt_arena SET skills = $2::jsonb WHERE buyer_id = $1`,
+        [buyerId, JSON.stringify(bag)]).catch(() => {});
+    await trackActivity(buyerId, "arena_skill", { skillId }).catch(() => {});
+    return { ok: true };
+}
+
+// ── BUYING A RUNG ────────────────────────────────────────────────────────────────────────────────────────────
+// The branch ladder is enforced HERE, not only in the UI. It is the only prerequisite in the system and it is
+// the whole reason a capstone means anything — without this check a POST buys Exsanguinate with the first
+// point of the game and the three-way argument the panel is built around never happens.
+export async function takeSkillNode(buyerId, skillId, nodeId) {
+    const r = await row(buyerId);
+    if (!r?.arena_class) return { ok: false, error: "no_class" };
+    const def = skillById(skillId);
+    if (!def || def.classId !== r.arena_class) return { ok: false, error: "bad_skill" };
+    const bag = { ...(r.skills || {}) };
+    const held = bag[skillId];
+    if (!Array.isArray(held)) return { ok: false, error: "not_owned" };
+    const node = def.nodes.find((n) => n.id === nodeId);
+    if (!node) return { ok: false, error: "bad_node" };
+    if (held.includes(nodeId)) return { ok: false, error: "already_taken" };
+    if (skillPointsFor(r).available < NODE_COST) return { ok: false, error: "no_points" };
+
+    // Every rung above this one in the SAME branch has to be held. Checked by tier rather than by counting, so
+    // a bag that somehow holds a capstone without its middle rung cannot buy its way further.
+    const above = def.nodes.filter((n) => n.branch === node.branch && n.tier < node.tier);
+    if (above.some((n) => !held.includes(n.id))) return { ok: false, error: "locked" };
+
+    bag[skillId] = [...held, nodeId];
+    await db.query(`UPDATE mkt_arena SET skills = $2::jsonb WHERE buyer_id = $1`,
+        [buyerId, JSON.stringify(bag)]).catch(() => {});
+    await trackActivity(buyerId, "arena_skill_node", { skillId, nodeId }).catch(() => {});
+    return { ok: true };
+}
+
+// ── GIVING IT BACK ───────────────────────────────────────────────────────────────────────────────────────────
+// Priced and rationed exactly like a tree refund — the same three free a day out of the same counter, so a
+// member has one allowance across both screens rather than two that have to be explained separately.
+//
+// PRUNED, not refused. Refunding the middle of a branch orphans everything under it, and unlike the tree
+// coupling above there is no other screen to send somebody to: the points come straight back and the reply
+// says how many, so the panel can tell them what it cost.
+export async function refundSkill(buyerId, skillId, nodeId = null) {
+    const r = await row(buyerId);
+    if (!r?.arena_class) return { ok: false, error: "no_class" };
+    const def = skillById(skillId);
+    if (!def || def.classId !== r.arena_class) return { ok: false, error: "bad_skill" };
+    const bag = { ...(r.skills || {}) };
+    const held = bag[skillId];
+    if (!Array.isArray(held)) return { ok: false, error: "not_owned" };
+
+    let next;
+    if (nodeId) {
+        const node = def.nodes.find((n) => n.id === nodeId);
+        if (!node || !held.includes(nodeId)) return { ok: false, error: "not_taken" };
+        // Everything BELOW it in the same branch goes with it — it could not have been bought without this.
+        const doomed = new Set([nodeId, ...def.nodes
+            .filter((n) => n.branch === node.branch && n.tier > node.tier).map((n) => n.id)]);
+        next = { ...bag, [skillId]: held.filter((id) => !doomed.has(id)) };
+    } else {
+        next = { ...bag };
+        delete next[skillId];            // the whole skill, and every rung in it
+    }
+    const back = skillPointsSpent(bag) - skillPointsSpent(next);
+    if (back <= 0) return { ok: false, error: "not_taken" };
+
+    const free = freeRefundsLeft(r) > 0;
+    const cost = free ? 0 : RESPEC_ONE(skillPointsSpent(bag));
+    if (free) {
+        const took = await db.queryOne(
+            `UPDATE mkt_arena
+                SET free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                    free_respecs = CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                                        THEN COALESCE(free_respecs, 0) + 1 ELSE 1 END
+              WHERE buyer_id = $1
+                AND CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                         THEN COALESCE(free_respecs, 0) ELSE 0 END < $2
+              RETURNING free_respecs`,
+            [buyerId, FREE_REFUNDS_PER_DAY]
+        ).catch(() => null);
+        // Lost the race for the last free one — charge rather than refuse, the same as the tree does.
+        if (!took) {
+            const paidNow = await spendGold(buyerId, RESPEC_ONE(skillPointsSpent(bag)), "arena_respec_skill", { skillId, nodeId });
+            if (!paidNow.ok) return { ...paidNow, cost: RESPEC_ONE(skillPointsSpent(bag)) };
+        }
+    } else {
+        const paid = await spendGold(buyerId, cost, "arena_respec_skill", { skillId, nodeId });
+        if (!paid.ok) return { ...paid, cost };
+    }
+
+    await db.query(`UPDATE mkt_arena SET skills = $2::jsonb, respecs = respecs + 1 WHERE buyer_id = $1`,
+        [buyerId, JSON.stringify(next)]).catch(() => {});
+    return { ok: true, cost, free, refunded: back };
+}
+
+/** Everything a member has bought in the panel, for the screen and for the ring. Never trusts the class to
+ *  still match — a class respec leaves a bag full of skills that are no longer yours, and this is where that
+ *  is noticed rather than in the middle of a bout. */
+export function skillsOf(r) {
+    const mine = new Set(skillsForClass(r?.arena_class || "").map((s) => s.id));
+    const out = {};
+    for (const [id, nodes] of Object.entries(r?.skills || {})) {
+        if (mine.has(id) && Array.isArray(nodes)) out[id] = nodes;
+    }
+    return out;
 }

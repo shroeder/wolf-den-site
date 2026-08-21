@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { clearBout, forfeitBout, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
-    buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
+    buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, refundSkill,
+    respecClass, respecTree, takeNode, takeSkill, takeSkillNode,
 } from "@/lib/marketplace/arena-progress.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -47,6 +48,17 @@ export async function POST(request) {
                     return noStore({ ...(await takeNode(buyer.id, String(b?.nodeId || ""))), ...(await getArenaState(buyer.id)) });
                 case "refund_node":
                     return noStore({ ...(await refundNode(buyer.id, String(b?.nodeId || ""))), ...(await getArenaState(buyer.id)) });
+                // ── THE SKILL PANEL ── same shape as the tree's three above: every one re-validates
+                // server-side against the same pure catalog the screen renders from, because a skill point is
+                // worth gold and a route that can be posted into is a route that will be.
+                case "take_skill":
+                    return noStore({ ...(await takeSkill(buyer.id, String(b?.skillId || ""))), ...(await getArenaState(buyer.id)) });
+                case "take_skill_node":
+                    return noStore({ ...(await takeSkillNode(buyer.id, String(b?.skillId || ""), String(b?.nodeId || ""))), ...(await getArenaState(buyer.id)) });
+                // `nodeId` absent gives the whole skill back; present gives back that rung and everything
+                // under it in its branch, which could not have been bought without it.
+                case "refund_skill":
+                    return noStore({ ...(await refundSkill(buyer.id, String(b?.skillId || ""), b?.nodeId ? String(b.nodeId) : null)), ...(await getArenaState(buyer.id)) });
                 case "respec_tree":
                     return noStore({ ...(await respecTree(buyer.id)), ...(await getArenaState(buyer.id)) });
                 case "respec_class":

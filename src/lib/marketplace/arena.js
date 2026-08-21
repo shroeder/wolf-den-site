@@ -29,6 +29,9 @@ import {
     FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
+import {
+    resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
+} from "@/lib/marketplace/arena-skills.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
 import { arenaRating, autoBout } from "@/lib/marketplace/arena-engine.js";
@@ -493,7 +496,7 @@ export async function kitFor(buyerId, opts = {}) {
 
     // ── THE TREE ─────────────────────────────────────────────────────────────────────────────────────────
     const prog = await db.queryOne(
-        `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
+        `SELECT arena_xp, arena_class, skill_tree, skills, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
     ).catch(() => null);
     // `opts.classId` lets a tool build this member's kit under another class's tree — used by
     // scripts/check-passives.mjs to prove all thirty-six nodes reach the character.
@@ -544,9 +547,28 @@ export async function kitFor(buyerId, opts = {}) {
     // stopped being what the fight uses when the tree took over: every ability in the bout went without its
     // art, and the loop dutifully decorated a list nobody read.
     for (const a of abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
+    // ── WHAT THEY CAN PRESS ──────────────────────────────────────────────────────────────────────────────
+    // Filtered against the class rather than trusted, because a class respec leaves a bag full of skills that
+    // are no longer yours and the middle of a bout is the worst possible place to notice. Resolved here too:
+    // the ring gets finished skills with every node already merged in, so nothing downstream has to know that
+    // nodes exist.
+    const mineIds = new Set(skillsForClass(classId || "").map((x) => x.id));
+    const rawSkills = opts.skills || prog?.skills || {};
+    const skills = {};
+    const deck = [];
+    for (const [id, nodes] of Object.entries(rawSkills)) {
+        if (!mineIds.has(id) || !Array.isArray(nodes)) continue;
+        skills[id] = nodes;
+        const resolved = resolveSkill(id, skills);
+        if (resolved) deck.push(resolved);
+    }
+
     return {
         level, gearPower,
         classId, taken,
+        // `skills` is the raw bag — what the panel renders and what the defence's AI picks out of.
+        // `deck` is the same thing already resolved, which is what the fight screen draws.
+        skills, deck,
         // ── GEAR JOINS THE PERK BAG ──────────────────────────────────────────────────────────────────────
         // The engine reads pierce off `P.pierce`, where P is this fighter's perks — a bag the skill tree used
         // to fill alone. Folding the wardrobe's contribution in HERE means it lands on both sides of the ring
@@ -802,6 +824,18 @@ export async function getArenaState(buyerId, pre = {}) {
     const taken = row?.skill_tree || {};
     const spentPts = pointsSpent(taken);
     const availPts = Math.max(0, lvl.level - spentPts);
+    // The panel's purse, computed off the two bags rather than stored. `mySkills` is filtered against the
+    // class first: a class respec leaves behind skills that are no longer yours, and a screen that renders
+    // them is a screen offering to spend points on something the server will refuse.
+    const mineIds = new Set(skillsForClass(classId || "").map((x) => x.id));
+    const mySkills = {};
+    for (const [id, nodes] of Object.entries(row?.skills || {})) {
+        if (mineIds.has(id) && Array.isArray(nodes)) mySkills[id] = nodes;
+    }
+    const skillEarned = skillPointsFrom(spentPts);
+    const skillSpent = skillPointsSpent(mySkills);
+    const skillAvail = Math.max(0, skillEarned - skillSpent);
+
     const progress = {
         xp: lvl.xp, level: lvl.level, into: lvl.into, span: lvl.span,
         classId,
@@ -812,6 +846,15 @@ export async function getArenaState(buyerId, pre = {}) {
         // A class is chosen the first time you have a point to spend.
         needsClass: !classId && lvl.level >= 1,
         tree: classId ? treeState(classId, taken, availPts) : [],
+        // ── AND THE PANEL ────────────────────────────────────────────────────────────────────────────────
+        // The same shape as `tree` above and for the same reason: the screen renders from a pure function the
+        // server validates against, so it can never offer a rung the server would refuse.
+        //
+        // The purse is DERIVED, both halves, every read. Skill points are bought with tree points, so storing
+        // a balance would mean a respec could leave a counter describing a tree that no longer exists — the
+        // exact failure the tree's own `points` block avoids by computing spent from the bag.
+        skills: classId ? skillState(classId, mySkills, skillAvail) : [],
+        skillPoints: { total: skillEarned, spent: skillSpent, available: skillAvail },
         respec: {
             one: RESPEC_ONE(spentPts),
             tree: RESPEC_TREE(spentPts),
