@@ -246,7 +246,10 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         // the button ends up hard against the screen edge and under whatever toast or home indicator is
         // there. Positioned by hand with a margin instead: the bottom of the water sits REST_GAP above the
         // bottom of the screen, which puts the control in the thumb arc with room to breathe.
-        const REST_GAP = 34;
+        // Enough to clear what lives along the bottom of every page — the XP toast, the chat bubble, the
+        // home indicator. At 14 the button was in the thumb arc and underneath all three of them, which is
+        // the same mistake as being unreachable, just wearing the opposite hat.
+        const REST_GAP = 76;
         const r = frame.getBoundingClientRect();
         const delta = r.bottom - (window.innerHeight - REST_GAP);
         if (Math.abs(delta) > 8) window.scrollBy({ top: delta, behavior: "smooth" });

@@ -16932,6 +16932,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw { position: relative; width: 100%; height: 236px; border-radius: 14px; overflow: hidden;
     background: #071019; border: 1px solid rgba(120,200,255,0.22); user-select: none; touch-action: manipulation; }
 .fw[data-phase="waiting"], .fw[data-phase="bite"] { cursor: pointer; }
+/* ── THE FRAME GROWS FOR THE FIGHT ───────────────────────────────────────────────────────────────────
+   236px is the right size for watching a bobber and much too short to hold a gauge you are meant to
+   read under pressure — the rod had 196px of usable height and the fish crossed it in a blink. Only
+   the reel gets the extra; every other phase is unchanged. */
+.fw[data-phase="reel"] { height: 348px; }
 /* ── ONE PAINTED SEASCAPE, EDGE TO EDGE ───────────────────────────────────────────────────────────────
    The sky sprites are full scenes — they already contain the water, painted, with waves and a horizon. The
    first cut cropped them to the top 60% and drew a flat CSS gradient underneath for the sea, so the frame had
@@ -16955,7 +16960,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE ROD. Tall, narrow, hard against the right edge, and INERT -- it used to take the press itself,
    which parked a thumb over the one thing you are meant to be watching. The hold moved to .fwreel-hold. */
-.fwreel-rod { position: absolute; right: 12px; top: 14px; bottom: 26px; width: 46px;
+/* Taller and wider, and it stops well clear of the button so the two never share a thumb. Luke: "I'd
+   like the fishing bar to be taller and a bit wider." */
+.fwreel-rod { position: absolute; right: 14px; top: 12px; bottom: 82px; width: 62px;
     pointer-events: none;
     border-radius: 24px; border: 2px solid rgba(140,215,255,0.5);
     background: linear-gradient(180deg, rgba(4,16,26,0.72), rgba(2,10,18,0.82));
@@ -17019,21 +17026,20 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE HOLD. Its own control, under the copy, clear of the rod -- big enough for a thumb and nowhere near
    the gauge it drives. touch-action: none so a drag on it never becomes a page scroll mid-fight. */
-/* ── ACROSS THE WATER, AND LOW ON THE SCREEN ─────────────────────────────────────────────────────────
-   Two tries to get here. It started at the bottom of the water FRAME, which is not the bottom of anything
-   a hand is near -- the frame sits mid-page, so the control landed around 60% down a phone and you had to
-   reach up for it. Then I made it position:fixed to the viewport, which put it in the thumb arc and tore
-   it off the minigame: it floated over whatever content happened to be at that height, with the water
-   frame somewhere else entirely. Luke, on the screenshot: "your picture looks off doesn't it."
+/* ── ACROSS THE WATER, ALONG THE BOTTOM ──────────────────────────────────────────────────────────────
+   Luke: "I'd like the reel button near the bottom of the screen, overlaying the bottom area."
 
-   It did. A control for a thing has to be ON the thing. So it is back inside the frame, across the
-   ripples, and the FRAME is what moves -- see the scrollIntoView in ReelStruggle, which brings the bottom
-   of the water down to the bottom of the screen when a fish takes the line. */
-.fwreel-hold { position: absolute; left: 12px; right: 74px; bottom: 12px;
+   Three attempts to place this. It started at the bottom of the water FRAME while the frame sat mid-page,
+   so it landed around 60% down a phone. Then position:fixed put it in the thumb arc and tore it off the
+   minigame — it floated over unrelated content with the water somewhere else. Now the frame itself is
+   scrolled down (see ReelStruggle) and the button spans the FULL width of it, along the bottom, over the
+   strip of ripples that is the only part of the picture with nothing to watch in it.
+   Full width because the rod no longer reaches down here: it stops 82px up, so nothing is behind this. */
+.fwreel-hold { position: absolute; left: 10px; right: 10px; bottom: 10px;
     pointer-events: auto; touch-action: none; cursor: pointer;
-    padding: 16px 20px; border-radius: 16px; font-size: 15px; font-weight: 900; letter-spacing: 0.16em;
+    padding: 19px 20px; border-radius: 15px; font-size: 16px; font-weight: 900; letter-spacing: 0.18em;
     color: #04121c; border: none; background: linear-gradient(180deg, #b6ffd4, #7effb2);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.2);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.55), inset 0 -3px 0 rgba(0,0,0,0.2);
     -webkit-user-select: none; user-select: none; }
 /* Pressed reads instantly and without waiting on anything -- the whole point of a hold control is that the
    moment your thumb lands it is already doing something. */
@@ -17042,7 +17048,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background: linear-gradient(180deg, #7effb2, #4fe39a); }
 
 /* THE COPY AND THE METER, bottom-left -- clear of the rod, and clear of the hero on the deck. */
-.fwreel-side { position: absolute; left: 12px; right: 74px; bottom: 72px;
+.fwreel-side { position: absolute; left: 12px; right: 86px; bottom: 90px;
     display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .fwreel-title { font-size: 13px; letter-spacing: 0.06em; color: #eaf6ff;
     text-shadow: 0 2px 6px rgba(0,0,0,0.85); }
@@ -17064,8 +17070,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* Narrow phones: the rod thins and the copy gets the rest, rather than the two overlapping. */
 @media (max-width: 400px) {
-    .fwreel-rod { width: 38px; right: 8px; }
-    .fwreel-side { left: 8px; right: 56px; }
+    .fwreel-rod { width: 52px; right: 8px; }
+    .fwreel-side { left: 8px; right: 68px; }
     .fwreel-title { font-size: 12px; }
 }
 @keyframes fwDrift { from { background-position-x: 0%; } to { background-position-x: 100%; } }
