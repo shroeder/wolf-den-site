@@ -67,6 +67,9 @@ export default function CasinoClient({ initial }) {
     // The ticket: five numbers of forty, and the last draw.
     const [ticket, setTicket] = useState([]);
     const [keno, setKeno] = useState(null);
+    // The last thing that was not gold. Cleared at the start of every play so it can never look like the
+    // machine just paid out twice.
+    const [prize, setPrize] = useState(null);
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -128,7 +131,7 @@ export default function CasinoClient({ initial }) {
     const pull = useCallback(async () => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setLanded(0);
+        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null);
         Sfx.whoosh();
 
         // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
@@ -186,7 +189,7 @@ export default function CasinoClient({ initial }) {
     const play = useCallback(async (body, onResult) => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null);
+        setBusy(true); setErr(null); setFlash(null); setPrize(null);
         Sfx.whoosh();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -201,6 +204,7 @@ export default function CasinoClient({ initial }) {
         }
         onResult(r);
         setSt((p) => ({ ...p, gold: r.gold }));
+        if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
         if (r.won > 0) {
             // A payout worth more than ten times the stake is the moment worth shaking the room for.
             const big = r.won >= r.bet * 10;
@@ -358,6 +362,23 @@ export default function CasinoClient({ initial }) {
                             ) : <p className="cas-result">Pick a stake and pull.</p>}
 
                         </>
+                    ) : null}
+
+                    {/* ── WHAT YOU WON THAT WAS NOT GOLD ──────────────────────────────────────────────
+                        Shared by every machine, because a prize is a prize wherever it came from — and it
+                        sits ABOVE the stake row so it is the last thing you read before deciding to go
+                        again. That placement is the whole reason it is worth showing. */}
+                    {prize ? (
+                        <div className={`cas-prize${prize.jackpot ? " is-jackpot" : ""}`}>
+                            {prize.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={prize.spriteUrl} alt="" draggable="false" />
+                            ) : null}
+                            <span>
+                                <b>{prize.label || prize.kind}</b>
+                                <em>{prize.where || "Added to your things"}</em>
+                            </span>
+                        </div>
                     ) : null}
 
                     {/* ONE STAKE ROW AND ONE BUTTON for every machine, because the stake is the same decision

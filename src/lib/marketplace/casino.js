@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { grantHaul } from "@/lib/marketplace/fishing.js";
 
 // ── THE CASINO ───────────────────────────────────────────────────────────────────────────────────────────────
 // A room off the town, owner-gated, laid out like the tavern: you walk left and right, other members walking
@@ -144,7 +145,64 @@ export async function spinSlot(buyerId, { bet } = {}) {
             await logCoin(buyerId, won, "casino_slot_win", { balanceAfter: gold, meta: { bet: stake, reels, mult } });
         }
     }
-    return { ok: true, reels, mult, bet: stake, won, gold };
+    // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
+    const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf") });
+    return { ok: true, reels, mult, bet: stake, won, gold, prize };
+}
+
+// ── THE PRIZE ON TOP ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke's brief again: "it's a gold sink with a chance to win like chests, laurels, doubloons, pet stones,
+// consumables, recipes." Gold alone makes the floor a shredder with a slightly slower blade — what makes a
+// machine worth sitting at is the possibility of something you cannot buy with the gold it just took.
+//
+// TWO WAYS TO GET ONE, and the split is the whole design:
+//
+//   the rare roll   a flat chance on ANY play, win or lose. It is small, it is not tied to the gold outcome,
+//                   and it means a losing session can still turn up something — which is what stops a bad
+//                   run being purely a bad run.
+//   the jackpot     three wolves, five of five, or the wolf pocket. Guaranteed, and from a better shelf.
+//
+// PRIZES ARE ON TOP OF THE RETURN, deliberately, and the check script says so out loud rather than folding
+// them into the RTP. The gold maths is exact and provable; a chest is worth whatever a chest is worth to the
+// person who opened it, and pretending otherwise would be a number that looks rigorous and is invented.
+// The rate is kept low enough that it cannot become the reason to play.
+export const PRIZE_CHANCE = 0.015;    // any play, win or lose
+
+// What the shelves hold. Weighted, and the tiers move up with the occasion rather than the table changing.
+export const PRIZE_SHELF = [
+    { kind: "doubloons", weight: 34 },
+    { kind: "consumable", weight: 26 },
+    { kind: "chest", weight: 20 },
+    { kind: "recipe", weight: 10 },
+    { kind: "seed", weight: 6 },
+    { kind: "gear", weight: 4 },
+];
+
+const pickPrize = () => {
+    const total = PRIZE_SHELF.reduce((n, p) => n + p.weight, 0);
+    let r = Math.random() * total;
+    for (const p of PRIZE_SHELF) { r -= p.weight; if (r <= 0) return p.kind; }
+    return "doubloons";
+};
+
+/**
+ * Roll for something that is not gold.
+ *
+ * `jackpot` means the machine did its rarest thing, so a prize is certain and comes from a better tier. Every
+ * other play takes the flat chance. Granting goes through the SAME function a fishing haul uses, so a chest
+ * from a slot machine and a chest from the sea are the same chest and land in the same place.
+ */
+export async function rollCasinoPrize(buyerId, { jackpot = false } = {}) {
+    if (!jackpot && Math.random() >= PRIZE_CHANCE) return null;
+    const tier = jackpot
+        ? (Math.random() < 0.35 ? "legendary" : "epic")
+        : (Math.random() < 0.2 ? "rare" : "common");
+    const kind = jackpot && Math.random() < 0.5 ? "chest" : pickPrize();
+    const prize = await grantHaul(buyerId, kind, tier).catch(() => null);
+    if (prize) {
+        await logCoin(buyerId, 0, "casino_prize", { meta: { kind: prize.kind, tier, jackpot } }).catch(() => {});
+    }
+    return prize ? { ...prize, tier, jackpot } : null;
 }
 
 // ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -206,7 +264,9 @@ export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}
             await logCoin(buyerId, won, "casino_wheel_win", { balanceAfter: gold, meta: { bet: stake, choice, seg: seg.i } });
         }
     }
-    return { ok: true, seg, choice, hit, bet: stake, won, gold };
+    // Landing a wolf pocket ON a wolf bet — 2 in 20, and only if you called it.
+    const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf" });
+    return { ok: true, seg, choice, hit, bet: stake, won, gold, prize };
 }
 
 // ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -272,7 +332,9 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
             await logCoin(buyerId, won, "casino_keno_win", { balanceAfter: gold, meta: { bet: stake, hits: hits.length } });
         }
     }
-    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold };
+    // Five of five is 1 in 2,611 — the rarest thing on the floor, and the only one that is worth a certainty.
+    const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS });
+    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize };
 }
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────

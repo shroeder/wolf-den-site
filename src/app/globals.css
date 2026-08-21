@@ -17485,3 +17485,19 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background: linear-gradient(180deg, #ffd75e, #e0a91e);
     box-shadow: 0 0 14px rgba(255,215,94,.7); animation: casHit .34s cubic-bezier(.2,1.5,.3,1) both; }
 @keyframes casHit { from { transform: scale(.6); } to { transform: none; } }
+
+/* ── WHAT YOU WON THAT WAS NOT GOLD ──────────────────────────────────────────────────────────────────
+   Above the stake row on purpose: it is the last thing read before deciding to go again, which is the
+   only placement that makes showing it worth anything. A jackpot prize keeps a glow so the two kinds
+   of win are never confused for each other. */
+.cas-prize { display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+    padding: 10px 12px; border-radius: 12px;
+    border: 1px solid rgba(126,255,178,0.4); background: rgba(126,255,178,0.08);
+    animation: casPrize .45s cubic-bezier(.2,1.4,.3,1) both; }
+@keyframes casPrize { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+.cas-prize img { width: 38px; height: 38px; object-fit: contain; flex: none; }
+.cas-prize b { display: block; font-size: 0.95rem; font-weight: 900; color: #b6ffd4; }
+.cas-prize em { display: block; font-style: normal; font-size: 10px; color: #98a0aa; margin-top: 1px; }
+.cas-prize.is-jackpot { border-color: rgba(255,215,94,0.7); background: rgba(255,215,94,0.1);
+    box-shadow: 0 0 26px rgba(255,215,94,0.28); }
+.cas-prize.is-jackpot b { color: #ffe9b8; }

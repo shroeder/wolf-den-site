@@ -14,6 +14,7 @@
 import {
     SLOT_SYMBOLS, SLOT_PAYS, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
     WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
+    PRIZE_CHANCE, PRIZE_SHELF,
 } from "../src/lib/marketplace/casino.js";
 
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
@@ -105,6 +106,21 @@ const kr = kenoRtp();
 console.log(`  return       ${pct(kr)}`);
 if (Math.abs(kenoTotal - 1) > 1e-6) problems.push(`keno's outcome probabilities sum to ${kenoTotal.toFixed(6)}, not 1 — the maths is wrong`);
 if (kr > RTP_CEILING) problems.push(`keno returns ${pct(kr)}, above the ${pct(RTP_CEILING)} ceiling`);
+
+// ── PRIZES, WHICH ARE NOT IN THE RETURN ──────────────────────────────────────────────────────────────────────
+// Said out loud rather than folded into the RTP. The gold maths above is exact and provable; a chest is worth
+// whatever a chest is worth to whoever opened it, and rolling that into a percentage would produce a number
+// that looks rigorous and is invented.
+//
+// What IS checked is that the rate stays small enough to be a surprise rather than a strategy — a floor where
+// the prizes are the reason to play is a floor whose gold economy no longer matters.
+console.log("\nPRIZES (on top of the return, not counted in it)");
+console.log(`  any play      ${pct(PRIZE_CHANCE)}  — roughly 1 in ${Math.round(1 / PRIZE_CHANCE)}`);
+console.log(`  a jackpot     certain, from a better shelf`);
+console.log(`  the shelf     ${PRIZE_SHELF.map((p) => p.kind).join(", ")}`);
+if (PRIZE_CHANCE > 0.05) {
+    problems.push(`prizes land on ${pct(PRIZE_CHANCE)} of plays — that is often enough to be the reason to play, which makes the gold economy decorative`);
+}
 
 // ── THE VERDICT ──────────────────────────────────────────────────────────────────────────────────────────────
 if (problems.length) {

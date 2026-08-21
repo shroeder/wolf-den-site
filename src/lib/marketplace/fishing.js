@@ -450,7 +450,11 @@ async function haulSprite(kind, id = null, chestTier = null) {
     return null;
 }
 
-async function grantHaul(buyerId, kind, tier = "common") {
+// EXPORTED for the casino, which pays the same kinds of prize a haul does — chests, doubloons, consumables,
+// recipes, gear, pets. A second granting function would be a second place for "give this member a thing" to
+// drift, and this one already knows every awkward case: a recipe they own falls back to doubloons, gear that
+// cannot be granted becomes a fragment, a seed comes from the band table.
+export async function grantHaul(buyerId, kind, tier = "common") {
     if (!kind || kind === "nothing") return null;
     // ── A SEALED BOTTLE IS A CATCH, NOT A COINCIDENCE ────────────────────────────────────────────────────
     // This used to be a separate 0.6% roll fired a few lines above the haul, so the line landed a fish AND,
