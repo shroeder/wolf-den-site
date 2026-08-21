@@ -318,6 +318,43 @@ export function resolveSkill(skillId, taken = {}) {
     return out;
 }
 
+/**
+ * THE PANEL'S VIEW OF A CLASS, the same way treeState is the tree's.
+ *
+ * The screen renders from this and nothing else, so it can never offer a node the server would refuse — that
+ * rule is why the passive tree could be trusted and it is worth keeping. `now` and `next` are what the skill
+ * IS and what it BECOMES with the node in hand, both built by resolveSkill, so a card cannot print a promise
+ * the ring will not honour.
+ */
+export function skillState(classId, taken = {}, pointsAvailable = 0) {
+    return skillsForClass(classId).map((def) => {
+        const mine = Array.isArray(taken[def.id]) ? taken[def.id] : null;
+        const unlocked = Boolean(mine);
+        const resolved = unlocked ? resolveSkill(def.id, taken) : resolveSkill(def.id, { [def.id]: [] });
+        return {
+            id: def.id,
+            name: def.name,
+            blurb: def.blurb,
+            sprite: def.sprite,
+            classId: def.classId,
+            unlocked,
+            canUnlock: !unlocked && pointsAvailable >= SKILL_UNLOCK_COST,
+            spent: unlocked ? SKILL_UNLOCK_COST + mine.length * NODE_COST : 0,
+            now: resolved,
+            nodes: def.nodes.map((n) => {
+                const held = unlocked && mine.includes(n.id);
+                return {
+                    ...n,
+                    held,
+                    // A node cannot be bought before the skill it lives in — that is the ONLY ordering rule.
+                    canTake: unlocked && !held && pointsAvailable >= NODE_COST,
+                    next: held ? null : resolveSkill(def.id, { [def.id]: [...(mine || []), n.id] }),
+                };
+            }),
+        };
+    });
+}
+
 /** What a member has spent on skills, for the panel and for the respec price. */
 export function skillPointsSpent(taken = {}) {
     let n = 0;
