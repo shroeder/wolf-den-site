@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FeatureDailies from "@/components/FeatureDailies";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
@@ -19,8 +19,8 @@ import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 // painted.
 const MACHINES = [
     { id: "slot", x: 12, label: "Wolf's Luck", kind: "Slots", live: true },
-    { id: "slot2", x: 28, label: "Den Fortune", kind: "Slots", live: false },
-    { id: "slot3", x: 44, label: "Moonrise", kind: "Slots", live: false },
+    { id: "slot2", x: 28, label: "Den Fortune", kind: "Slots", live: true },
+    { id: "slot3", x: 44, label: "Moonrise", kind: "Slots", live: true },
     { id: "roulette", x: 60, label: "The Wheel", kind: "Roulette", live: true },
     { id: "keno", x: 75, label: "Keno", kind: "Keno", live: true },
     { id: "blackjack", x: 90, label: "The Table", kind: "Blackjack", live: true },
@@ -30,6 +30,11 @@ const MACHINES = [
 // arriving rather than threading a needle.
 const REACH = 9;
 
+// Which cabinets are slot machines. Three of them now, and they are not one machine in three paint jobs —
+// see SLOT_MACHINES in casino.js. The client does not decide anything about them: it sends which cabinet
+// you are standing at and draws whatever came back.
+const SLOTS = new Set(["slot", "slot2", "slot3"]);
+
 const SYMBOL_ART = {
     wolf: { glyph: "▲", tone: "#ffd75e" },
     chest: { glyph: "■", tone: "#ff9f43" },
@@ -37,6 +42,7 @@ const SYMBOL_ART = {
     doubloon: { glyph: "●", tone: "#ffe9b8" },
     bone: { glyph: "▬", tone: "#cbd3dc" },
     moon: { glyph: "◗", tone: "#9fc6dd" },
+    star: { glyph: "✦", tone: "#d9c2ff" },
 };
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
@@ -205,15 +211,16 @@ export default function CasinoClient({ initial }) {
         Sfx.whoosh();
 
         // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
-        // rather than freezing on the old result.
-        const ids = Object.keys(SYMBOL_ART);
+        // rather than freezing on the old result — and it cycles THIS cabinet's symbols, because a machine
+        // teasing you with a star it does not have is a machine lying about its own paytable.
+        const ids = (st?.slots?.[at.id]?.symbols || []).map((x) => x.id);
         const spinner = setInterval(() => {
             setRolling([0, 1, 2].map(() => ids[Math.floor(Math.random() * ids.length)]));
         }, 70);
 
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "spin", bet }),
+            body: JSON.stringify({ action: "spin", bet, machine: at.id }),
         }).then((x2) => x2.json()).catch(() => null);
 
         if (!r?.ok) {
@@ -251,7 +258,7 @@ export default function CasinoClient({ initial }) {
                 }
             }, 780));
         }, MIN_SPIN));
-    }, [bet, busy, absorb]);
+    }, [bet, busy, absorb, at, st]);
 
     // ── THE WHEEL AND THE TICKET ─────────────────────────────────────────────────────────────────────────
     // Both are ONE ROLL, so they share a shape: take the bet, show the result, celebrate if it paid. The slot
@@ -324,6 +331,15 @@ export default function CasinoClient({ initial }) {
             timers.current.push(setTimeout(() => setFlash(null), beat === "blackjack" ? 2200 : 1200));
         }
     }, [busy, absorb]);
+
+    // Three of whatever this cabinet actually rolls, taken from the middle of its own symbol list so the
+    // idle machine is neither promising a jackpot nor showing three blanks.
+    const idleReels = useMemo(() => {
+        const syms = (st?.slots?.[at?.id]?.symbols || []).map((x) => x.id);
+        if (syms.length < 3) return ["moon", "bone", "doubloon"];
+        const mid = Math.floor(syms.length / 2);
+        return [syms[mid], syms[syms.length - 1], syms[Math.max(0, mid - 1)]];
+    }, [st, at]);
 
     const toggleNumber = useCallback((n) => {
         setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
@@ -398,9 +414,27 @@ export default function CasinoClient({ initial }) {
             {at ? (
                 <div className={`cas-panel${at.live ? "" : " is-dark"}`}>
                     <div className="cas-panel-head">
-                        <b>{at.label}</b>
+                        <b>{st?.slots?.[at.id]?.label || at.label}</b>
                         <em>{at.live ? at.kind : "not built yet"}</em>
                     </div>
+
+                    {/* ── WHICH MACHINE IS THIS ───────────────────────────────────────────────────────
+                        Three slot cabinets are only worth the floor space if the difference between them
+                        is legible BEFORE you spend anything. The two numbers that describe a slot machine
+                        are how often it pays and how much it pays at the top — so both are printed, and
+                        the return is printed beside them because a floor that hides its own odds is a
+                        floor that has something to hide. All three return within a point of each other,
+                        which is exactly the thing worth being able to check. */}
+                    {SLOTS.has(at.id) && st?.slots?.[at.id] ? (
+                        <p className="cas-vol">
+                            <span>{st.slots[at.id].blurb}</span>
+                            <i>
+                                pays on {Math.round(st.slots[at.id].hitRate * 100)}% of pulls
+                                {" · "}top {money(Math.max(...Object.values(st.slots[at.id].pays.three)))}x
+                                {" · "}returns {(st.slots[at.id].rtp * 100).toFixed(1)}%
+                            </i>
+                        </p>
+                    ) : null}
 
                     {/* Each machine draws its own game. The slot's ceremony is three landings; the wheel and
                         the ticket resolve in one, so they get a result and a celebration and no theatre. */}
@@ -450,10 +484,15 @@ export default function CasinoClient({ initial }) {
                         </>
                     ) : null}
 
-                    {at.live && at.id === "slot" ? (
+                    {at.live && SLOTS.has(at.id) ? (
                         <>
                             <div className={`cas-reels${flash ? ` is-${flash}` : ""}`}>
-                                {(rolling || spin?.reels || ["moon", "bone", "doubloon"]).map((sym, i) => {
+                                {/* IDLE, the reels show three of THIS cabinet's own symbols. They were
+                                    hard-coded to moon/bone/doubloon, which is fine on the machine that has
+                                    those and a lie on the two that do not — Moonrise sat there displaying a
+                                    doubloon it cannot roll. A machine teasing a symbol that is not on its
+                                    reels is the one thing a paytable must never do. */}
+                                {(rolling || spin?.reels || idleReels).map((sym, i) => {
                                     // A reel is SPINNING until its own stop lands. Each one is independent,
                                     // which is what lets the third hang while the first two already match.
                                     const stopped = !rolling && landed > i;
@@ -580,7 +619,7 @@ export default function CasinoClient({ initial }) {
                                 hidden={at.id === "blackjack" && Boolean(hand?.open)}
                                 disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
                                 onClick={() => {
-                                    if (at.id === "slot") return pull();
+                                    if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
                                     if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
@@ -588,7 +627,7 @@ export default function CasinoClient({ initial }) {
                                 {busy ? "…"
                                     : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
-                                            : `${at.id === "slot" ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
+                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
                             </button>
                             {err ? <p className="cas-err">{err}</p> : null}
                         </>

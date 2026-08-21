@@ -53,62 +53,178 @@ export const MAX_BET = 5000;
 //
 // The symbols are the Den's own currency of meaning: the wolf is the house, and the things below it are the
 // things a member already wants.
-export const SLOT_SYMBOLS = [
-    { id: "wolf", label: "Wolf", weight: 1 },
-    { id: "chest", label: "Chest", weight: 3 },
-    { id: "laurel", label: "Laurel", weight: 5 },
-    { id: "doubloon", label: "Doubloon", weight: 8 },
-    { id: "bone", label: "Bone", weight: 12 },
-    { id: "moon", label: "Moon", weight: 16 },
-];
+// ── THREE MACHINES, AND WHY THEY ARE NOT ONE MACHINE PAINTED THREE WAYS ──────────────────────────────────────
+// A row of cabinets that differ only in their artwork is a row of one cabinet. What actually makes somebody
+// choose a machine is VOLATILITY — how often it pays against how much it pays when it does — and that is a
+// real choice with no right answer, which is the only kind worth putting on a floor.
+//
+//   Wolf's Luck   the all-rounder. Pays something on 3 pulls in 5, tops out at 700x.
+//   Den Fortune   the grinder. Pays more often than it doesn't, and almost never pays big.
+//   Moonrise      the chase. Only three-of-a-kind pays real money, and it pays 4,000x — kept watchable by a
+//                 SCATTER: loose stars pay a little wherever they land, so the screen is not dead for
+//                 twenty pulls at a time.
+//
+// All three return roughly the same amount over a lifetime. None of them is the smart pick; they are three
+// different shapes of the same 11-12% edge, and check:casino enumerates every one of them exactly.
+export const SLOT_MACHINES = {
+    slot: {
+        id: "slot",
+        label: "Wolf's Luck",
+        blurb: "Pays often. Tops out at 700x.",
+        symbols: [
+            { id: "wolf", label: "Wolf", weight: 1 },
+            { id: "chest", label: "Chest", weight: 3 },
+            { id: "laurel", label: "Laurel", weight: 5 },
+            { id: "doubloon", label: "Doubloon", weight: 8 },
+            { id: "bone", label: "Bone", weight: 12 },
+            { id: "moon", label: "Moon", weight: 16 },
+        ],
+        // What a line pays, as a MULTIPLE OF THE BET.
+        //
+        // THE FIRST TABLE FAILED ITS OWN CHECK, which is the argument for having one: it returned 48% and
+        // paid something on one pull in twelve. Correct in the sense that the house could never lose, and it
+        // would have read as a broken machine — you would have sat there watching nothing happen.
+        //
+        // Two changes. Every symbol pays on a PAIR now, not just the top two, which is what a real machine
+        // does and what puts something on the screen often enough to be worth watching. And the low pairs
+        // pay LESS THAN THE BET on purpose — a moon pair returns 0.4x, so it is a win that is really a
+        // smaller loss. That is exactly what slot machines do, and it is honest here because the number on
+        // screen is the number you actually got.
+        pays: {
+            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 20, bone: 8, moon: 4 },
+            two: { wolf: 8, chest: 3, laurel: 1.5, doubloon: 1, bone: 0.5, moon: 0.4 },
+        },
+    },
 
-// What a line pays, as a MULTIPLE OF THE BET.
-//
-// THE FIRST TABLE FAILED ITS OWN CHECK, which is the argument for having one: it returned 48% and paid
-// something on one pull in twelve. Correct in the sense that the house could never lose, and it would have
-// read as a broken machine — you would have sat there watching nothing happen.
-//
-// Two changes. Every symbol pays on a PAIR now, not just the top two, which is what a real machine does and
-// what puts something on the screen often enough to be worth watching. And the low pairs pay LESS THAN THE
-// BET on purpose — a moon pair returns 0.4x, so it is a win that is really a smaller loss. That is exactly
-// what slot machines do, and it is honest here because the number on screen is the number you actually got.
-export const SLOT_PAYS = {
-    three: { wolf: 700, chest: 100, laurel: 35, doubloon: 20, bone: 8, moon: 4 },
-    two: { wolf: 8, chest: 3, laurel: 1.5, doubloon: 1, bone: 0.5, moon: 0.4 },
+    slot2: {
+        id: "slot2",
+        label: "Den Fortune",
+        blurb: "Pays more often than not. Rarely pays big.",
+        // FOUR symbols, where Wolf's Luck has six — and that, not the weights, is what makes this the
+        // grinder. How often three reels show a repeat is driven almost entirely by how FEW distinct
+        // symbols there are: six symbols cannot be made to pay "more often than not" at any payout, and the
+        // first attempt at this machine tried and came out at 53% of pulls and a 78% return. Four symbols
+        // pays on 74% of pulls before a single number is chosen.
+        //
+        // The cost is the top prize — 80x against Wolf's Luck's 700 and Moonrise's 4,000 — and the cost is
+        // the point. This machine is for sitting at, not for chasing.
+        symbols: [
+            { id: "wolf", label: "Wolf", weight: 3 },
+            { id: "chest", label: "Chest", weight: 8 },
+            { id: "laurel", label: "Laurel", weight: 14 },
+            { id: "moon", label: "Moon", weight: 20 },
+        ],
+        // The frequent payouts are moon and laurel pairs, and they are paid REAL money — 0.5x and 0.9x —
+        // rather than the 0.15x a machine like this could get away with. A grinder whose constant small
+        // wins are all a fifth of the stake is not a grinder, it is a slower shredder telling you it is
+        // paying you.
+        pays: {
+            three: { wolf: 80, chest: 12, laurel: 3, moon: 1.2 },
+            two: { wolf: 7, chest: 2, laurel: 0.9, moon: 0.5 },
+        },
+    },
+
+    slot3: {
+        id: "slot3",
+        label: "Moonrise",
+        blurb: "Only triples pay. One of them pays 4,000x.",
+        symbols: [
+            { id: "wolf", label: "Wolf", weight: 1 },
+            { id: "moon", label: "Moon", weight: 2 },
+            { id: "chest", label: "Chest", weight: 4 },
+            { id: "laurel", label: "Laurel", weight: 7 },
+            { id: "star", label: "Star", weight: 10 },
+            { id: "bone", label: "Bone", weight: 21 },
+        ],
+        // No pair table at all. The whole return sits on triples and on the scatter below, which is what
+        // makes this the volatile one: most pulls are nothing, and the ones that are not are enormous.
+        //
+        // THE FIRST VERSION OF THIS TABLE RETURNED 173% and check:casino caught it before a single pull.
+        // The leak was not the 4,000x jackpot — that is worth 4.4% of the return, because it lands once in
+        // ninety thousand pulls. It was BONE, the common symbol, whose triple lands on one pull in ten: at
+        // 4x that one line alone paid 40% of the bet back forever. On a machine like this the common
+        // symbol's triple has to be worth almost nothing, and here it is worth 1.2x — a hand back, plus a
+        // little, which is the right size for the thing that happens all the time.
+        pays: {
+            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 15, bone: 1.2 },
+            two: {},
+        },
+        // ── THE SCATTER ── stars pay wherever they land, not only in a line, and it takes TWO of them. It
+        // exists for one reason: a machine that pays on 8% of pulls reads as broken however good its
+        // average is, and twenty dead pulls in a row is how somebody decides the floor is rigged.
+        //
+        // Two, not one. A single star pays on 40% of pulls, which would have made the chase machine the
+        // most frequent payer on the floor and quietly deleted the reason it exists.
+        scatter: { id: "star", pays: { 2: 1.33 } },
+    },
 };
 
-/** Exact return-to-player for the slot, enumerated over every combination rather than sampled.
+/** The machine somebody is actually standing at, defaulting to the one this floor opened with. */
+export const slotMachine = (id) => SLOT_MACHINES[id] || SLOT_MACHINES.slot;
+
+// Wolf's Luck by name, kept because the room and the check script both grew up with it. Not a copy — the
+// same objects.
+export const SLOT_SYMBOLS = SLOT_MACHINES.slot.symbols;
+export const SLOT_PAYS = SLOT_MACHINES.slot.pays;
+
+/** What one spin pays, as a multiple of the bet. The single source of truth for a result — the screen shows
+ *  what this returned rather than working it out again. */
+export function slotPayout(reels, machineId = "slot") {
+    const m = slotMachine(machineId);
+    const [a, b, c] = reels;
+    if (a === b && b === c) return m.pays.three[a] || 0;
+    // A genuine pair, and only reached when it is NOT three of a kind — that case is handled above and would
+    // otherwise be counted twice.
+    const pair = a === b ? a : b === c ? b : a === c ? a : null;
+    const line = pair ? (m.pays.two[pair] || 0) : 0;
+    if (!m.scatter) return line;
+    // Scatter pays INSTEAD of a line, not on top of it — Moonrise has no pair table, so the two can never
+    // both be non-zero anyway, but stacking them would be a way to quietly add return nobody priced.
+    const stars = reels.filter((r) => r === m.scatter.id).length;
+    return Math.max(line, m.scatter.pays[stars] || 0);
+}
+
+/** Exact return-to-player, enumerated over every combination rather than sampled.
  *  Exported so the check script and the game read the SAME number from the SAME table. */
-export function slotRtp() {
-    const total = SLOT_SYMBOLS.reduce((n, s) => n + s.weight, 0);
+export function slotRtp(machineId = "slot") {
+    const m = slotMachine(machineId);
+    const total = m.symbols.reduce((n, s) => n + s.weight, 0);
     let paid = 0;
-    for (const a of SLOT_SYMBOLS) {
-        for (const b of SLOT_SYMBOLS) {
-            for (const c of SLOT_SYMBOLS) {
+    for (const a of m.symbols) {
+        for (const b of m.symbols) {
+            for (const c of m.symbols) {
                 const p = (a.weight / total) * (b.weight / total) * (c.weight / total);
-                paid += p * slotPayout([a.id, b.id, c.id]);
+                paid += p * slotPayout([a.id, b.id, c.id], machineId);
             }
         }
     }
     return paid;
 }
 
-/** What one spin pays, as a multiple of the bet. The single source of truth for a result — the screen shows
- *  what this returned rather than working it out again. */
-export function slotPayout(reels) {
-    const [a, b, c] = reels;
-    if (a === b && b === c) return SLOT_PAYS.three[a] || 0;
-    // A genuine pair, and only reached when it is NOT three of a kind — that case is handled above and would
-    // otherwise be counted twice. Every symbol has a pair value now; see the note on SLOT_PAYS.
-    const pair = a === b ? a : b === c ? b : a === c ? a : null;
-    return pair ? (SLOT_PAYS.two[pair] || 0) : 0;
+/** How often a machine pays ANYTHING. A number worth having next to the return: they are the two halves of
+ *  what a machine feels like, and either one alone describes it wrong. */
+export function slotHitRate(machineId = "slot") {
+    const m = slotMachine(machineId);
+    const total = m.symbols.reduce((n, s) => n + s.weight, 0);
+    let hits = 0;
+    for (const a of m.symbols) {
+        for (const b of m.symbols) {
+            for (const c of m.symbols) {
+                if (slotPayout([a.id, b.id, c.id], machineId) > 0) {
+                    hits += (a.weight / total) * (b.weight / total) * (c.weight / total);
+                }
+            }
+        }
+    }
+    return hits;
 }
 
-const pickSymbol = () => {
-    const total = SLOT_SYMBOLS.reduce((n, s) => n + s.weight, 0);
+const pickSymbol = (machineId = "slot") => {
+    const syms = slotMachine(machineId).symbols;
+    const total = syms.reduce((n, s) => n + s.weight, 0);
     let r = Math.random() * total;
-    for (const s of SLOT_SYMBOLS) { r -= s.weight; if (r <= 0) return s.id; }
-    return SLOT_SYMBOLS[SLOT_SYMBOLS.length - 1].id;
+    for (const s of syms) { r -= s.weight; if (r <= 0) return s.id; }
+    return syms[syms.length - 1].id;
 };
 
 const clampBet = (v) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(v) || 0)));
@@ -123,8 +239,11 @@ const clampBet = (v) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(v)
  * The payout is computed from the same table the RTP is computed from, so what the machine pays and what the
  * check script proves it pays cannot come apart.
  */
-export async function spinSlot(buyerId, { bet } = {}) {
+export async function spinSlot(buyerId, { bet, machine } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // An unknown cabinet name falls back to Wolf's Luck rather than erroring: `machine` arrives in a POST
+    // body, and the worst a lie about it can do is pay you from a table that was itself checked.
+    const m = slotMachine(machine);
     const stake = clampBet(bet);
 
     const perks = await casinoPerks(buyerId);
@@ -138,7 +257,7 @@ export async function spinSlot(buyerId, { bet } = {}) {
         [buyerId, stake],
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake } });
+    await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
 
     if (onTheHouse(perks)) {
         const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
@@ -150,8 +269,8 @@ export async function spinSlot(buyerId, { bet } = {}) {
         }
     }
 
-    const reels = [pickSymbol(), pickSymbol(), pickSymbol()];
-    const mult = slotPayout(reels);
+    const reels = [pickSymbol(m.id), pickSymbol(m.id), pickSymbol(m.id)];
+    const mult = slotPayout(reels, m.id);
     const won = Math.round(stake * mult);
 
     let gold = paid.gold;
@@ -167,16 +286,19 @@ export async function spinSlot(buyerId, { bet } = {}) {
             // multiplier it would have to keep in step with the paytable forever.
             await logCoin(buyerId, won, "casino_slot_win", {
                 balanceAfter: gold,
-                meta: { bet: stake, reels, mult, jackpot: reels.every((r) => r === SLOT_SYMBOLS[0].id) },
+                // Each machine stamps its OWN jackpot, and each one's jackpot is its own top symbol — so
+                // the badge that counts them keeps working across three cabinets without knowing there are
+                // three. See badges.js: it counts the fact, never re-derives it.
+                meta: { bet: stake, reels, mult, machine: m.id, jackpot: reels.every((r) => r === m.symbols[0].id) },
             });
         }
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
-    const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf"), perks });
+    const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === m.symbols[0].id), perks });
     // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
     await tickCasinoQuests(buyerId, "slot", won);
     const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
-    return { ok: true, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
+    return { ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
 }
 
 // ── WHAT THE CASINO PETS ARE WORTH ───────────────────────────────────────────────────────────────────────────
@@ -579,6 +701,12 @@ export async function getCasinoState(buyerId) {
     return {
         gold: Number(me?.gold) || 0,
         others,
+        // Every cabinet's table, so a machine can show what it pays without another round trip. Functions
+        // are deliberately absent — the client renders the numbers, the server decides the outcome.
+        slots: Object.fromEntries(Object.values(SLOT_MACHINES).map((m) => [m.id, {
+            id: m.id, label: m.label, blurb: m.blurb, symbols: m.symbols, pays: m.pays,
+            scatter: m.scatter || null, rtp: slotRtp(m.id), hitRate: slotHitRate(m.id),
+        }])),
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
         wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },

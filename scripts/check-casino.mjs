@@ -12,7 +12,7 @@
 //
 // Run:  node scripts/check-casino.mjs   (or npm run check:casino)
 import {
-    SLOT_SYMBOLS, SLOT_PAYS, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
+    SLOT_MACHINES, slotHitRate, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
     WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
     PRIZE_CHANCE, PRIZE_SHELF, CASINO_PETS, MAX_PERKS, perkedRtp, REFUND_CHANCE,
 } from "../src/lib/marketplace/casino.js";
@@ -20,57 +20,84 @@ import {
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
 const problems = [];
 
-// ── THE SLOT ─────────────────────────────────────────────────────────────────────────────────────────────────
-const total = SLOT_SYMBOLS.reduce((n, s) => n + s.weight, 0);
-const rtp = slotRtp();
+// ── THE SLOTS ───────────────────────────────────────────────────────────────────────────────────────────────
+// Three cabinets, each enumerated over all 216 combinations. They are meant to differ in VOLATILITY and not
+// in value: a floor where one machine is simply better is a floor with two traps on it, and nobody would
+// ever find out which was which by playing.
+const slotRtps = {};
+for (const m of Object.values(SLOT_MACHINES)) {
+    const syms = m.symbols;
+    const total = syms.reduce((n, x) => n + x.weight, 0);
+    const rtp = slotRtp(m.id);
+    const hitRate = slotHitRate(m.id);
+    slotRtps[m.id] = rtp;
 
-console.log("THE SLOT");
-console.log(`  symbols      ${SLOT_SYMBOLS.length}, ${total} weight across the reel`);
-console.log(`  combinations ${SLOT_SYMBOLS.length ** 3} (enumerated exactly, not sampled)`);
-console.log(`  return       ${pct(rtp)}   target ${pct(RTP_TARGET)}   ceiling ${pct(RTP_CEILING)}`);
-console.log(`  house edge   ${pct(1 - rtp)}`);
+    console.log(`\n${m.label.toUpperCase()}  —  ${m.blurb}`);
+    console.log(`  symbols      ${syms.length}, ${total} weight across the reel`);
+    console.log(`  combinations ${syms.length ** 3} (enumerated exactly, not sampled)`);
+    console.log(`  return       ${pct(rtp)}   target ${pct(RTP_TARGET)}   ceiling ${pct(RTP_CEILING)}`);
+    console.log(`  house edge   ${pct(1 - rtp)}`);
+    console.log(`  hit rate     ${pct(hitRate)} of pulls pay something`);
 
-if (rtp > RTP_CEILING) {
-    problems.push(`the slot returns ${pct(rtp)}, above the ${pct(RTP_CEILING)} ceiling — it is a money printer`);
-}
-if (rtp >= 1) {
-    problems.push(`the slot returns ${pct(rtp)} — every pull is free money and the Den's economy is over`);
-}
+    if (rtp > RTP_CEILING) {
+        problems.push(`${m.label} returns ${pct(rtp)}, above the ${pct(RTP_CEILING)} ceiling — it is a money printer`);
+    }
+    if (rtp >= 1) {
+        problems.push(`${m.label} returns ${pct(rtp)} — every pull is free money and the Den's economy is over`);
+    }
 
-// ── WHERE THE MONEY GOES ─────────────────────────────────────────────────────────────────────────────────────
-// Which lines carry the return, so a table can be re-tuned with the consequence visible. A machine whose whole
-// return sits on one jackpot FEELS like a coin shredder however good the average is — the number below the
-// jackpot line is the one that decides whether a session has anything in it.
-const contrib = [];
-for (const a of SLOT_SYMBOLS) {
-    for (const b of SLOT_SYMBOLS) {
-        for (const c of SLOT_SYMBOLS) {
-            const p = (a.weight / total) * (b.weight / total) * (c.weight / total);
-            const pay = slotPayout([a.id, b.id, c.id]);
-            if (pay > 0) contrib.push({ line: `${a.id}/${b.id}/${c.id}`, p, ret: p * pay, pay });
-        }
+    // ── WHERE THE MONEY GOES ─────────────────────────────────────────────────────────────────────────────
+    // Which lines carry the return, so a table can be re-tuned with the consequence visible. A machine whose
+    // whole return sits on one jackpot FEELS like a coin shredder however good the average is.
+    const contrib = [];
+    for (const a of syms) for (const b of syms) for (const c of syms) {
+        const prob = (a.weight / total) * (b.weight / total) * (c.weight / total);
+        const pay = slotPayout([a.id, b.id, c.id], m.id);
+        if (pay > 0) contrib.push({ line: [a.id, b.id, c.id], p: prob, ret: prob * pay });
+    }
+    const byKind = {};
+    for (const c of contrib) {
+        const trip = c.line.every((x) => x === c.line[0]);
+        const kind = trip ? `three ${c.line[0]}` : m.scatter && c.line.includes(m.scatter.id) ? "scattered stars" : "a pair";
+        byKind[kind] = (byKind[kind] || 0) + c.ret;
+    }
+    console.log("  what carries the return");
+    for (const [kind, ret] of Object.entries(byKind).sort((x, y) => y[1] - x[1])) {
+        console.log(`    ${kind.padEnd(16)} ${pct(ret).padStart(8)}  (${pct(ret / rtp)} of everything paid)`);
+    }
+
+    // A machine that pays one pull in twenty is technically generous and reads as broken. The VOLATILE one
+    // is allowed a thinner floor than the others — that is what it is for — but not a dead screen.
+    const floor = m.scatter ? 0.2 : 0.35;
+    if (hitRate < floor) {
+        problems.push(`${m.label} pays on only ${pct(hitRate)} of pulls (floor ${pct(floor)}) — that reads as a broken machine`);
+    }
+
+    // The jackpot may carry a volatile machine, which is the whole idea of one — but on a machine WITHOUT a
+    // scatter to keep the screen alive, a return that lives on the top prize is a shredder with a rumour
+    // attached.
+    const jackpot = byKind[`three ${syms[0].id}`] || 0;
+    if (!m.scatter && jackpot / rtp > 0.5) {
+        problems.push(`${pct(jackpot / rtp)} of ${m.label}'s return sits on the jackpot alone — a session will feel like nothing but losses`);
     }
 }
-const byKind = {};
-for (const c of contrib) {
-    const kind = c.line.split("/").every((x, _, arr) => x === arr[0]) ? `three ${c.line.split("/")[0]}` : "a pair";
-    byKind[kind] = (byKind[kind] || 0) + c.ret;
+
+// ── AND ARE THEY ACTUALLY DIFFERENT? ─────────────────────────────────────────────────────────────────────────
+// The reason for three cabinets is three SHAPES, not three paint jobs. If their returns and hit rates all
+// converge, the extra two are decoration and should be deleted rather than shipped.
+const spreadRtp = Math.max(...Object.values(slotRtps)) - Math.min(...Object.values(slotRtps));
+const hits = Object.values(SLOT_MACHINES).map((m) => slotHitRate(m.id));
+console.log(`\nTHE THREE TOGETHER`);
+console.log(`  return spread    ${pct(spreadRtp)}  (they should be close — none of them is the smart pick)`);
+console.log(`  hit-rate spread  ${pct(Math.max(...hits) - Math.min(...hits))}  (they should be far apart — that IS the choice)`);
+if (spreadRtp > 0.05) {
+    problems.push(`the slots return between ${pct(Math.min(...Object.values(slotRtps)))} and ${pct(Math.max(...Object.values(slotRtps)))} — one cabinet is strictly better, which makes the others traps`);
 }
-console.log("\n  what carries the return");
-for (const [kind, ret] of Object.entries(byKind).sort((x, y) => y[1] - x[1])) {
-    console.log(`    ${kind.padEnd(16)} ${pct(ret).padStart(8)}  (${pct(ret / rtp)} of everything paid)`);
+if (Math.max(...hits) - Math.min(...hits) < 0.15) {
+    problems.push(`all three slots pay on about the same share of pulls — they are one machine in three paint jobs, so two of them are not worth the floor space`);
 }
 
-const jackpot = byKind[`three ${SLOT_SYMBOLS[0].id}`] || 0;
-if (jackpot / rtp > 0.5) {
-    problems.push(`${pct(jackpot / rtp)} of the return sits on the jackpot alone — a session will feel like nothing but losses`);
-}
-
-// How often a pull pays ANYTHING. A machine that pays one pull in twenty is technically generous and reads as
-// broken; real slots land somewhere near one in three.
-const hitRate = contrib.reduce((n, c) => n + c.p, 0);
-console.log(`\n  hit rate     ${pct(hitRate)} of pulls pay something`);
-if (hitRate < 0.15) problems.push(`only ${pct(hitRate)} of pulls pay anything — that reads as a broken machine`);
+const rtp = slotRtps.slot;   // the floor's headline number, for the closing line and the perk maths below
 
 // ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
 // Every bet enumerated over all twenty pockets. They are meant to return the SAME amount as each other — a
@@ -142,7 +169,7 @@ for (const pet of CASINO_PETS) {
 console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.wheelRefund)} wheel refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
 
 const perked = [
-    { name: "the slot", r: perkedRtp(rtp) },
+    ...Object.values(SLOT_MACHINES).map((m) => ({ name: m.label, r: perkedRtp(slotRtps[m.id]) })),
     { name: "keno", r: perkedRtp(kr) },
     ...Object.entries(WHEEL_BETS).map(([id, bet]) => {
         // Worst bet FIRST: the refund only pays on a loss, so the long shots carry the most of it.

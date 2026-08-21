@@ -17585,3 +17585,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-act:disabled { opacity: 0.4; cursor: default; }
 .cas-act.is-stand { background: linear-gradient(180deg, #cbd3dc, #9aa6b3); }
 .cas-act.is-double { background: linear-gradient(180deg, #d9c2ff, #a982ff); }
+
+/* ── WHICH MACHINE IS THIS ───────────────────────────────────────────────────────────────────────────
+   Three slot cabinets are only worth the floor space if the difference is legible before you spend
+   anything, so each one states its shape and its odds. The numbers are deliberately small and quiet —
+   this is a label on a machine, not a pitch. */
+.cas-vol { margin: 0 0 10px; text-align: center; }
+.cas-vol span { display: block; font-size: 12px; font-weight: 700; color: #e7edf4; }
+.cas-vol i { display: block; font-style: normal; font-size: 9.5px; letter-spacing: 0.04em; color: #98a0aa; margin-top: 3px; }
