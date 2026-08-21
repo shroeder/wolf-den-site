@@ -108,14 +108,21 @@ const CAST_MS = 700;
 // than the eye can attach a number to a body, and the whole exchange was over before a thumb had left the
 // glass. Luke: "attacks are too quick... translate down attack speed a bit." The floor is what actually
 // governs a fast fight, so that is what moved most.
-const PLAY_SCALE = 1000;
+// ── PLAY_SCALE IS DEAD, AND IT TOOK THE FEEL OF THE GAME WITH IT FOR A DAY ───────────────────────────────────
+// It turned FIGHT-SECONDS into milliseconds, which was right while `t` was a clock and gaps were fractional
+// (0.19, 0.47) -- those landed on the 430ms floor. Removing the clock made `t` a turn counter that goes up by
+// exactly 1, so every gap became 1.0, every blow became 1000ms, and the whole screen doubled in weight
+// overnight. Luke: "I click attack and have to wait like 1.5 seconds to see anything happen."
+//
+// A turn counter carries no duration and cannot be asked for one. The pacing is fixed values now, per KIND of
+// line, which is what it should always have been in a game with no clock in it.
+const PLAY_BLOW_MS = 380;
 const PLAY_MIN_MS = 430;
 // What a line that is not a blow is worth. Long enough to read four words, short enough that eight of them
 // in a row is not a loading screen. See beatMs.
 const PLAY_CHORE_MS = 170;
 // And what a deep queue multiplies all of it by.
 const PLAY_RUSH = 0.6;
-const PLAY_MAX_MS = 1100;
 const PLAY_OPEN_MS = 700;
 
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
@@ -885,6 +892,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // banked server-side, so there is no version of this where the player should wait — or, as happened,
         // sit on a dark overlay with nothing to press.
         if (action === "dismiss") setSt((p) => (p ? { ...p, bout: null } : p));
+        // A command you SENT gets its answer on screen the instant it arrives, with no beat of anticipation
+        // in front of it — see the playback effect. Only for the two that throw something; a dismiss or a
+        // seen has no blow to show.
+        if (action === "act" || action === "forfeit") instant.current = true;
         setBusy(true); setErr(null);
         try {
             const r = await fetch("/api/marketplace/arena", {
@@ -1008,6 +1019,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // The identity of a bout is WHO IS IN IT. A log that got shorter is the only other thing that can mean a
     // different fight (a fresh bout against the same opponent), and it is checked rather than inferred.
     const [shown, setShown] = useState(0);
+    // Set the moment a command is sent, spent on the first line that comes back — see the effect below.
+    const instant = useRef(false);
     const boutKey = String(raw?.foe?.id || "");
     const lastKey = useRef(null);
     const mounted = useRef(false);
@@ -1044,20 +1057,26 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // gets a beat you can read and no more. And when the queue is deep the whole run compresses, because the
     // eighth line of a nine-line exchange is not being savoured by anybody.
     const beatMs = useCallback((line, queued) => {
-        const prevT = shown > 0 ? logAll[shown - 1].t : 0;
-        const gap = Math.max(0, (Number(line.t) || 0) - prevT);
         const chore = line.bleedTick || line.burnTick || line.stunnedSkip || line.chilledSkip
             || line.cast || line.guard || line.fever;
-        const base = chore
-            ? PLAY_CHORE_MS
-            : Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, gap * PLAY_SCALE));
+        const base = chore ? PLAY_CHORE_MS : PLAY_BLOW_MS;
         // Four or more still to come and the exchange is a run, not a beat: play it like one.
         return queued > 3 ? Math.round(base * PLAY_RUSH) : base;
-    }, [logAll, shown]);
+    }, []);
 
     useEffect(() => {
         if (!logAll.length || shown >= logAll.length) return undefined;
         const queued = logAll.length - shown;
+        // ── THE BLOW YOU ASKED FOR LANDS AT ONCE ─────────────────────────────────────────────────────────
+        // Every other line is something happening TO you and is worth a beat of anticipation. The first one
+        // after your own tap is not: you pressed the button, you know what you threw, and a timer between
+        // the press and the swing is the entire feeling of lag with none of the drama. The flag is set in
+        // act() and spent here.
+        if (instant.current) {
+            instant.current = false;
+            setShown((n) => n + 1);
+            return undefined;
+        }
         const ms = shown === 0 ? PLAY_OPEN_MS : beatMs(logAll[shown], queued);
         const id = setTimeout(() => setShown((n) => n + 1), ms);
         return () => clearTimeout(id);
