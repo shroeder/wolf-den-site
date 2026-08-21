@@ -28,7 +28,11 @@ import { createPortal } from "react-dom";
 // reports one number — quality, 0..1 — exactly like the forge's enhance minigame and the merchant's coin game.
 
 const REEL_MS = 6500;            // how long the struggle lasts
-const BAND_H = 0.26;             // height of your bar, as a fraction of the tank — the FLOOR; see bandFor
+// Luke, looking at it: "can you make the target area a bit bigger, it looks small." It reads smaller than
+// it did because the rod grew — the band is a FRACTION of the tank, so a taller tank kept the same share and
+// the same share looked thinner. 0.26 to 0.36 puts it back to roughly the old physical size and then some:
+// a new angler now works about 91px of a 254px rod, where before it was 66px of 196.
+const BAND_H = 0.36;             // height of your bar, as a fraction of the tank — the FLOOR; see bandFor
 const REEL_WARMUP_MS = 700;      // grace before scoring starts — see the note at the scoring site
 const DART_EVERY_MS = 900;       // the fish makes a run for it this often
 
@@ -42,7 +46,9 @@ const DART_EVERY_MS = 900;       // the fish makes a run for it this often
 // "land it cleanly and the fish is never a small one". So it widens YOUR BAR. A new angler works a 26% band;
 // a maxed Gaff works 40%. Same fish, same darting, but you are better equipped to hold it — and the upgrade
 // is felt on the very next cast instead of being taken on trust.
-const BAND_PER_GAFF = 0.56;      // gaff's value runs 0..0.25, so this adds up to +0.14 on top of BAND_H
+// Gaff's value runs 0..0.25. Trimmed from 0.56 so a maxed Gaff lands at 0.48 of the tank rather than half
+// of it — the upgrade should widen the bar, not remove the game.
+const BAND_PER_GAFF = 0.48;
 const bandFor = (gaff = 0) => BAND_H + Math.max(0, Math.min(0.25, Number(gaff) || 0)) * BAND_PER_GAFF;
 
 // ── THE PERFECT CORE ─────────────────────────────────────────────────────────────────────────────────────────
