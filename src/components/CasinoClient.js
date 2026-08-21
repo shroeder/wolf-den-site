@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
+
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
 // A room laid out like the tavern: you walk left and right along it, the other people in it are really there,
 // and the things you walk up to are MACHINES rather than people. Luke's brief, and the reason it is a room at
@@ -48,6 +50,17 @@ export default function CasinoClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState(null);
     const xRef = useRef(x);
+    // ── THE CAMERA ───────────────────────────────────────────────────────────────────────────────────────
+    // The floor is WIDER than the screen and scrolls with you. Six cabinets already crowd a phone; fitting
+    // the whole room into one viewport stops working the moment there are more, and a casino you can see all
+    // of at once is a menu with a carpet. The room is the window, `.cas-world` is the floor, and the window
+    // follows you.
+    const roomRef = useRef(null);
+    // Reels mid-spin: the symbols cycling before they land. Null when the machine is at rest.
+    const [rolling, setRolling] = useState(null);
+    const [landed, setLanded] = useState(0);     // how many reels have stopped, 0..3
+    const [flash, setFlash] = useState(null);    // "win" | "big" — the celebration, cleared on a timer
+    const timers = useRef([]);
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -73,9 +86,20 @@ export default function CasinoClient({ initial }) {
         return () => clearInterval(id);
     }, []);
 
+    // Keep the window centred on you. Written imperatively rather than as a transform because scrollLeft
+    // needs no arithmetic about percentages of percentages, and the browser smooths it for free.
+    useEffect(() => {
+        const el = roomRef.current;
+        if (!el) return;
+        const world = el.scrollWidth;
+        el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "smooth" });
+    }, [x]);
+
     const walk = useCallback((dir) => {
+        unlock();
+        Sfx.ui();
         setFacing(dir);
-        setX((p) => Math.max(6, Math.min(94, p + dir * 6)));
+        setX((p) => Math.max(4, Math.min(96, p + dir * 6)));
         setErr(null);
     }, []);
 
@@ -86,21 +110,72 @@ export default function CasinoClient({ initial }) {
         setAt(near || null);
     }, [x]);
 
+    // ── ONE PULL, AS AN EVENT ────────────────────────────────────────────────────────────────────────────
+    // The server answers in a few milliseconds and that is exactly the problem: an instant result is a number
+    // appearing, not a spin. The reels cycle while the request is in flight and then land LEFT TO RIGHT with
+    // a thunk each, which is the whole drama of a slot machine — the third reel is where the tension lives,
+    // and it cannot exist if all three resolve on the same frame.
+    //
+    // The outcome is never in doubt by then: the server decided it before the first reel stopped. The
+    // ceremony is presentation over a result already banked, which is the honest version of this — nothing
+    // here can change what was rolled.
     const pull = useCallback(async () => {
         if (busy) return;
-        setBusy(true); setErr(null);
+        unlock();
+        setBusy(true); setErr(null); setFlash(null); setLanded(0);
+        Sfx.whoosh();
+
+        // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
+        // rather than freezing on the old result.
+        const ids = Object.keys(SYMBOL_ART);
+        const spinner = setInterval(() => {
+            setRolling([0, 1, 2].map(() => ids[Math.floor(Math.random() * ids.length)]));
+        }, 70);
+
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action: "spin", bet }),
         }).then((x2) => x2.json()).catch(() => null);
-        setBusy(false);
+
         if (!r?.ok) {
+            clearInterval(spinner);
+            setRolling(null); setBusy(false);
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
-        setSpin(r);
-        setSt((p) => ({ ...p, gold: r.gold }));
+
+        // A minimum spin, so a fast answer still feels like a machine rather than a calculator.
+        const MIN_SPIN = 520;
+        timers.current.push(setTimeout(() => {
+            clearInterval(spinner);
+            setRolling(null);
+            setSpin(r);
+            setSt((p) => ({ ...p, gold: r.gold }));
+
+            // Reels stop one at a time. The gap widens for the last one — that pause IS the near-miss.
+            [0, 1, 2].forEach((i) => {
+                timers.current.push(setTimeout(() => {
+                    setLanded(i + 1);
+                    Sfx.impact(0.3 + i * 0.12);
+                    Haptic.hit(0.35);
+                }, i === 2 ? 620 : i * 230));
+            });
+
+            timers.current.push(setTimeout(() => {
+                setBusy(false);
+                const three = r.reels[0] === r.reels[1] && r.reels[1] === r.reels[2];
+                if (r.won > 0) {
+                    setFlash(three ? "big" : "win");
+                    if (three) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+                    timers.current.push(setTimeout(() => setFlash(null), three ? 2200 : 1200));
+                }
+            }, 780));
+        }, MIN_SPIN));
     }, [bet, busy]);
+
+    // Every timer this component starts is cleared on unmount — walking out mid-spin must not leave a
+    // callback firing into a component that is gone.
+    useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
 
     const canPlay = at?.live && !busy && (st?.gold || 0) >= bet;
 
@@ -115,7 +190,8 @@ export default function CasinoClient({ initial }) {
             {/* ── THE ROOM ────────────────────────────────────────────────────────────────────────────────
                 Positioned in percentages so the floor is the same room on any screen: a machine at 50 is in
                 the middle of a phone and the middle of a desktop, rather than drifting with the viewport. */}
-            <div className="cas-room">
+            <div className="cas-room" ref={roomRef}>
+              <div className="cas-world">
                 <div className="cas-floor" aria-hidden="true" />
                 {MACHINES.map((m) => (
                     <div key={m.id} className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
@@ -142,6 +218,7 @@ export default function CasinoClient({ initial }) {
                 <div className="cas-you" style={{ left: `${x}%` }}>
                     <span className="cas-blank is-you" style={{ transform: `scaleX(${facing})` }} />
                 </div>
+              </div>
             </div>
 
             <div className="cas-walk">
@@ -162,13 +239,26 @@ export default function CasinoClient({ initial }) {
 
                     {at.live ? (
                         <>
-                            <div className="cas-reels">
-                                {(spin?.reels || ["moon", "bone", "doubloon"]).map((s, i) => (
-                                    <span key={i} className={`cas-reel${spin ? " is-rolled" : ""}`}
-                                        style={{ "--tone": SYMBOL_ART[s]?.tone || "#cbd3dc", "--i": i }}>
-                                        {SYMBOL_ART[s]?.glyph || "?"}
+                            <div className={`cas-reels${flash ? ` is-${flash}` : ""}`}>
+                                {(rolling || spin?.reels || ["moon", "bone", "doubloon"]).map((sym, i) => {
+                                    // A reel is SPINNING until its own stop lands. Each one is independent,
+                                    // which is what lets the third hang while the first two already match.
+                                    const stopped = !rolling && landed > i;
+                                    return (
+                                        <span key={i}
+                                            className={`cas-reel${rolling ? " is-spin" : ""}${stopped ? " is-stop" : ""}`}
+                                            style={{ "--tone": SYMBOL_ART[sym]?.tone || "#cbd3dc", "--i": i }}>
+                                            {SYMBOL_ART[sym]?.glyph || "?"}
+                                        </span>
+                                    );
+                                })}
+                                {/* The celebration sits OVER the reels rather than beside them, so the win
+                                    happens where you were already looking. */}
+                                {flash ? (
+                                    <span className={`cas-pop is-${flash}`} aria-hidden="true">
+                                        {flash === "big" ? "JACKPOT" : "WIN"}
                                     </span>
-                                ))}
+                                ) : null}
                             </div>
                             {spin ? (
                                 <p className={`cas-result${spin.won > 0 ? " is-win" : ""}`}>
