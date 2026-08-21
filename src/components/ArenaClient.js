@@ -1027,6 +1027,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     //
     // The identity of a bout is WHO IS IN IT. A log that got shorter is the only other thing that can mean a
     // different fight (a fresh bout against the same opponent), and it is checked rather than inferred.
+    // Everything on screen that belongs to ONE fight and must not survive into the next: the health the next
+    // render diffs against, the floating number, the queue of beat events still sitting on timers, the
+    // callout and the shake. Called from both places a fight can change identity — a different opponent, and
+    // a transcript that got shorter, which is what a rematch against the SAME opponent looks like.
+    const clearRing = useCallback(() => {
+        prev.current = { hp: null, foeHp: null, round: null };
+        setPop(null);
+        setBeatQueue(null);
+        setClash(null);
+        setHitSide(null);
+        setShake(0);
+        setStop(false);
+        setCounterWind(null);
+    }, []);
+
     const [shown, setShown] = useState(0);
     // Set the moment a command is sent, spent on the first line that comes back — see the effect below.
     const instant = useRef(false);
@@ -1036,6 +1051,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     useEffect(() => {
         if (lastKey.current === boutKey) return;
         lastKey.current = boutKey;
+        // ── A NEW FIGHT INHERITS NOTHING ─────────────────────────────────────────────────────────────────
+        // Luke: "when I enter fresh into a fight a bunch of damage numbers from the previous one are popping
+        // up." They were. `prev` holds the LAST bout's health so the next render can diff against it, and it
+        // was only ever cleared when the bout went to null — walk straight from one fight into another and
+        // the first frame of the new one diffs full health against the corpse of the old one. Finish a foe
+        // at 1843 and open on a foe with 1500 max, and the screen dutifully reports that you just dealt 343.
+        //
+        // Everything transient goes with it: the floater, the queue of beat events still on timers, the
+        // callout, and the shake. None of it belongs to this fight.
+        clearRing();
         // ── A FIGHT ALREADY IN PROGRESS OPENS WHERE IT IS ────────────────────────────────────────────────
         // Only a bout that STARTS while you are watching plays from the first blow. Walk back into a bout
         // you left — a refresh, a return from another screen — and the cursor belongs at the end of what has
@@ -1044,13 +1069,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const openAtEnd = !mounted.current && logAll.length > 0;
         mounted.current = true;
         setShown(openAtEnd ? logAll.length : 0);
-    }, [boutKey, logAll.length]);
+    }, [boutKey, logAll.length, clearRing]);
     // A shorter transcript than the cursor is standing on cannot be the same fight — rematch, forfeit, or a
     // bout cleared out from under the screen. Anything else only ever GROWS, and growth is the normal case:
     // the cursor stays where it is and the new lines animate from there.
     useEffect(() => {
-        if (logAll.length < shown) setShown(0);
-    }, [logAll.length, shown]);
+        if (logAll.length < shown) { setShown(0); clearRing(); }
+    }, [logAll.length, shown, clearRing]);
 
     // ── NOT EVERY LINE DESERVES THE SAME HALF SECOND ─────────────────────────────────────────────────────────
     // Luke: "every user interaction results in slow feedback, nothing feels good, it all feels laggy."
