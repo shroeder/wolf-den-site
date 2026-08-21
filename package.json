@@ -34,6 +34,7 @@
     "sim:road:progress": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-progress.mjs",
     "check:stats": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-labels.mjs",
     "sim:pvp": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs",
+    "sim:skills": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-skills.mjs",
     "check:armour": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-armour-wall.mjs",
     "check:damage": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-damage-sources.mjs",
     "check:statvalue": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-value.mjs",
