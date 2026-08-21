@@ -16953,11 +16953,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     animation: fwreelIn 220ms ease-out both; }
 @keyframes fwreelIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* THE ROD. Tall, narrow, hard against the right edge -- and the ONLY thing here that takes a pointer,
-   because the frame underneath still owns its own tap handler. touch-action: none so a thumb dragging on
-   it never turns into a page scroll mid-fight. */
+/* THE ROD. Tall, narrow, hard against the right edge, and INERT -- it used to take the press itself,
+   which parked a thumb over the one thing you are meant to be watching. The hold moved to .fwreel-hold. */
 .fwreel-rod { position: absolute; right: 12px; top: 14px; bottom: 26px; width: 46px;
-    pointer-events: auto; touch-action: none; cursor: pointer;
+    pointer-events: none;
     border-radius: 24px; border: 2px solid rgba(140,215,255,0.5);
     background: linear-gradient(180deg, rgba(4,16,26,0.72), rgba(2,10,18,0.82));
     box-shadow: inset 0 0 18px rgba(0,0,0,0.55), 0 4px 14px rgba(0,0,0,0.4); overflow: hidden; }
@@ -16980,8 +16979,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     box-shadow: 0 0 14px rgba(255,215,94,0.6); }
 .fwreel.is-core .fwreel-rod { border-color: rgba(255,215,94,0.95);
     box-shadow: inset 0 0 18px rgba(0,0,0,0.5), 0 0 20px rgba(255,215,94,0.45); }
-.fwreel-fish.is-core { background: radial-gradient(circle at 35% 32%, #fff, #ffeaa0 55%, #ffb63f);
-    box-shadow: 0 0 18px rgba(255,215,94,1); }
 .fwreel.is-core .fwreel-title { color: #ffe27a; }
 .fwreel.is-core .fwreel-meter-fill { background: linear-gradient(90deg, #7effb2, #ffd75e); }
 
@@ -17011,11 +17008,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE FISH. A marker, not the species sprite -- what is on the line is not revealed until it breaks the
    surface, and drawing the real fish here would give the whole reveal away six seconds early. */
-.fwreel-fish { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
-    border-radius: 50%; background: radial-gradient(circle at 35% 32%, #fff, #8fd3ff 55%, #2b7fb8);
-    box-shadow: 0 0 10px rgba(140,215,255,0.75); }
-.fwreel-fish.is-caught { background: radial-gradient(circle at 35% 32%, #fff, #b6ffd4 55%, #3fbf7f);
-    box-shadow: 0 0 14px rgba(126,255,178,0.95); }
+/* THE FISH ON THE LINE. A sprite, not a ball -- the glow is a halo BEHIND it now rather than the thing
+   itself, so it still reads as a position at a glance and looks like a fish when you look at it. */
+.fwreel-fish { position: absolute; left: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+    display: grid; place-items: center;
+    filter: drop-shadow(0 0 8px rgba(140,215,255,0.75)); transition: filter 90ms linear; }
+.fwreel-fish img { width: 100%; height: 100%; object-fit: contain; }
+.fwreel-fish.is-caught { filter: drop-shadow(0 0 12px rgba(126,255,178,0.95)); }
+.fwreel-fish.is-core { filter: drop-shadow(0 0 14px rgba(255,215,94,0.95)); }
+
+/* THE HOLD. Its own control, under the copy, clear of the rod -- big enough for a thumb and nowhere near
+   the gauge it drives. touch-action: none so a drag on it never becomes a page scroll mid-fight. */
+.fwreel-hold { pointer-events: auto; touch-action: none; cursor: pointer; margin: 2px 0 4px;
+    padding: 11px 20px; border-radius: 999px; font-size: 12px; font-weight: 900; letter-spacing: 0.12em;
+    color: #04121c; border: none; background: linear-gradient(180deg, #b6ffd4, #7effb2);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45), inset 0 -2px 0 rgba(0,0,0,0.18);
+    -webkit-user-select: none; user-select: none; }
+.fwreel-hold:active { transform: translateY(1px) scale(0.98);
+    background: linear-gradient(180deg, #7effb2, #4fe39a); }
 
 /* THE COPY AND THE METER, bottom-left -- clear of the rod, and clear of the hero on the deck. */
 .fwreel-side { position: absolute; left: 12px; right: 74px; bottom: 26px;

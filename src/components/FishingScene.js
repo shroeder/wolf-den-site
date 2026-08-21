@@ -345,17 +345,31 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         <div className={`fwreel${inside ? " is-on" : ""}${inCore ? " is-core" : ""}`} data-mood={mood} data-tick={tick}>
             {/* The rod gauge, against the right edge — it leaves the boat, the hero and the water visible,
                 which is the whole reason the reel lives in the frame instead of over it. */}
-            <div className="fwreel-rod" onPointerDown={down} onPointerUp={up} onPointerCancel={up} role="presentation">
+            {/* ── THE ROD IS A GAUGE, NOT A BUTTON ────────────────────────────────────────────────────────
+                It took the press itself, which put a thumb over the one thing the mechanic asks you to
+                watch. Luke: "you need to be able to fight the fish by clicking the button, and the button
+                can't be the reel, otherwise you can't see what you're doing." So the rod is inert now and
+                the hold lives on its own control, bottom-left, where a hand rests anyway. */}
+            <div className="fwreel-rod" role="presentation">
                 <div className="fwreel-band" style={{ bottom: `${(band - half) * 100}%`, height: `${BAND * 100}%` }}>
                     {/* THE CORE. Drawn as a child of the bar so it tracks it for free and scales with Gaff. */}
                     <div className="fwreel-core" style={{ height: `${CORE_SHARE * 100}%` }} />
                 </div>
-                {/* THE FISH. It swims itself; your thumb drives the BAR. */}
-                <div className={`fwreel-fish${inCore ? " is-core" : inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }} />
+                {/* THE FISH. It swims itself; your thumb drives the BAR. It was a glowing ball, which is
+                    what you draw when you are drawing a position rather than a fish — this is the sprite
+                    the old reel had. One species for every fight, deliberately: what is on the line is not
+                    revealed until the haul, and a sprite that changed with the tier would give it away. */}
+                <div className={`fwreel-fish${inCore ? " is-core" : inside ? " is-caught" : ""}`} style={{ bottom: `${pos * 100}%` }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/fish/fish_mackerel.png" alt="" draggable="false" aria-hidden="true" />
+                </div>
             </div>
             <div className="fwreel-side">
                 <strong className="fwreel-title">{title}</strong>
-                <span className="fwreel-tip">HOLD to raise · let go to drop</span>
+                <button type="button" className="fwreel-hold"
+                    onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
+                    HOLD TO REEL
+                </button>
                 {/* Live, and the same number the server receives. What is hidden is the RELATIONSHIP: a good
                     reel floors the bad end of the size roll rather than setting the size, so this reads as
                     "how am I handling it" and never spoils the reveal. */}
