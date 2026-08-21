@@ -3,6 +3,8 @@
 import PetStoneShelf from "@/components/PetStoneShelf";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import FightInput from "@/components/arena/FightInput";
 import { createPortal } from "react-dom";
 import {
     GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
@@ -1900,6 +1902,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     fight that IS a raid, which survives a reload, a re-entry and a link with no `?from` on
                     it. A hard nav, because the town page loads its own state and must not inherit this one's. */}
                 {bout.over && recapReady ? <Recap bout={bout} busy={busy} onClose={leaveBout} /> : null}
+
+                {/* ── WHAT THE FIGHT IS ASKING YOU FOR ────────────────────────────────────────────────────
+                    Mounted off `bout.awaiting` and nothing else. A finished bout, or a transcript from before
+                    interactive combat shipped, publishes null and this renders nothing at all — so the passive
+                    fight screen is exactly what it was, and the two modes cannot collide.
+
+                    Above the log and below the field on purpose: it is the only thing on this screen anybody
+                    is going to touch under time pressure, and it should not be something you scroll to. */}
+                <FightInput
+                    bout={bout}
+                    busy={busy}
+                    onAct={(skillId, closeness) => act("act", { skillId, closeness })}
+                    onBrace={(closeness) => act("brace", { closeness })}
+                />
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px

@@ -1,5 +1,6 @@
 "use client";
 
+import { resolveSkill, skillsForClass } from "@/lib/marketplace/arena-skills.js";
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
 import { autoBout } from "@/lib/marketplace/arena-engine.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
@@ -421,6 +422,33 @@ export const SCENES = {
         label: "Your turn",
         note: "The command deck. Attack / Skill / Guard / Item.",
         state: () => baseState({ bout: makeBout() }),
+    },
+    // ── THE TWO HALVES OF AN INTERACTIVE BEAT ────────────────────────────────────────────────────────────
+    // Both are behind a live bout that is waiting on YOUR input, which on a real account means being mid-fight
+    // — you cannot hold a fight still to look at the deck, and the sweep is 1400ms of animation nobody can
+    // pause. The deck is built from the real catalog rather than invented, so a skill that gets renamed or
+    // recosted shows up here rather than drifting into a fixture nobody re-reads.
+    act: {
+        label: "Your beat — the deck",
+        note: "Pick a command, then time the tap. Cooldowns count down on the buttons.",
+        state: () => baseState({
+            bout: makeBout({
+                awaiting: "act",
+                cd: { onslaught: 2 },
+                deck: skillsForClass("reaver").map((k) => {
+                    const r = resolveSkill(k.id, { [k.id]: [] });
+                    return { id: r.id, name: r.name, sprite: r.sprite, blurb: r.blurb,
+                        power: r.power, hits: r.hits, cooldown: r.cooldown, free: Boolean(r.free) };
+                }),
+            }),
+        }),
+    },
+    brace: {
+        label: "Their beat — the brace",
+        note: "Their swing is coming; the sweep is already running. Missing it costs nothing.",
+        state: () => baseState({
+            bout: makeBout({ awaiting: "brace", turn: "them" }),
+        }),
     },
     telegraph: {
         label: "Their turn — telegraph",
