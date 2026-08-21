@@ -90,7 +90,7 @@ function fever(ring) {
     // line's `dmg` from ONE side, and the pit bites both — a single number here would come off whichever bar
     // `who` named and be wrong twice. The two bites ride as their own fields so the sentence can name them.
     ring.log.push({ t: ring.t, who: "me", fever: true, share, meBite: bites[0], foeBite: bites[1],
-        meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });
+        meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });
 }
 
 /**
@@ -174,7 +174,7 @@ function advance(ring, rng) {
                     mult: (foeSkill?.power ?? 1) * (cast?.mult || 1),
                     hitsOverride: foeSkill?.hits || 0,
                 });
-            } else ring.log.push({ t: ring.t, who: "foe", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });   // see the same push in act()
+            } else ring.log.push({ t: ring.t, who: "foe", cast: true, meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
             narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe", again: isExtra });
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
@@ -409,7 +409,7 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
         // member who spent their beat on Bastion got a transcript that said nothing at all. The beat was
         // gone, the cooldown was running, and the only evidence either had happened was a greyed-out button.
         // A move you cannot see in the log is a move you cannot learn to use.
-        ring.log.push({ t: ring.t, who: "me", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });
+        ring.log.push({ t: ring.t, who: "me", cast: true, meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });
     }
     if (cast) uncast(skill, ring.A, cast);
     narrate(ring, from, { name: ring.foeName, skill, by: "me" });

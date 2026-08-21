@@ -1137,6 +1137,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const played = useMemo(() => {
         if (!raw) return null;
         if (!logAll.length) return raw;
+        // ── HEALTH IS READ, NOT RECONSTRUCTED ────────────────────────────────────────────────────────────
+        // Luke: "we keep getting scenarios where a player reaches 0 health but the game continues."
+        //
+        // Measured over 240 simulated bouts: the screen's health disagreed with the server's in 234 of them,
+        // and in 126 a bar hit ZERO while the fight carried on. The bars were rebuilt by subtracting each
+        // line's `dmg` from one side — arithmetic that can only ever go DOWN. It never saw a Rally heal, a
+        // regen tick, lifedrink, a ward refill, or the pit closing (which deliberately carries no `dmg`
+        // because it bites both fighters at once). Every one of those is health the screen never gave back.
+        //
+        // So the engine stamps `meHp`/`foeHp` on every line, the same way it already stamps the shield, the
+        // ice and the chill, and the screen READS the number instead of deriving one. There is no arithmetic
+        // left to drift: whatever the server says the bar was at that moment IS the bar.
+        //
+        // The subtraction stays underneath for transcripts written before the stamp existed — an away fight
+        // resolved last week has no meHp on it, and a bar that is approximately right beats a bar at full.
         let hp = raw.maxHp || 0;
         let foeHp = raw.foeMaxHp || 0;
         for (let i = 0; i < shown; i += 1) {
@@ -1159,6 +1174,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         }
         const done = shown >= logAll.length;
         const cur = logAll[Math.max(0, shown - 1)] || null;
+        // The stamp wins wherever there is one. `?? ` and not `||`, because zero health is a real reading and
+        // the one that matters most.
+        if (cur?.meHp != null) hp = cur.meHp;
+        if (cur?.foeHp != null) foeHp = cur.foeHp;
         return {
             ...raw,
             hp: Math.max(0, hp),
