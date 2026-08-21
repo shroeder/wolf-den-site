@@ -903,7 +903,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 body: JSON.stringify({ action, ...extra }),
             }).then((x) => x.json()).catch(() => null);
 
-            if (r?.unlocked && action !== "dismiss") setSt(r);
+            // A PARTIAL IS A MERGE, NOT A REPLACEMENT. A beat mid-bout sends back only what a beat can
+            // change — the bout — because rebuilding the whole screen for it cost 4.4 seconds and 123
+            // queries a tap. Everything else on this screen is still true, so it is kept.
+            //
+            // A refusal is `partial` too ("that skill is still cooling") and deliberately does NOT take this
+            // branch: nothing changed server-side, so there is nothing to merge, and it belongs in the
+            // branch that says why.
+            if (r?.partial && r?.ok !== false && action !== "dismiss") {
+                setSt((prev) => (prev ? { ...prev, bout: r.bout } : prev));
+            } else if (r?.unlocked && !r?.partial && action !== "dismiss") setSt(r);
             else if (action === "dismiss") {
                 // LAST RESORT, and the important one. The bout is finished either way — the win is already
                 // banked server-side — so if the request fails there is no reason to hold somebody hostage on
@@ -1096,9 +1105,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // ever matched and every blow in the fight, both sides, came off the player's bar. The verdict
             // then announced a victory over a fighter at full health while your own bar read zero.
             //
-            // And a BLEED TICK damages the fighter it is named for, not their opponent: it is their own wound
-            // opening on their own swing, which is the one entry in the log that does not cross the ring.
-            if (e.bleedTick) { if (e.who === "you") hp -= e.dmg; else foeHp -= e.dmg; continue; }
+            // And a TICK damages the fighter it is named for, not their opponent: it is their own wound
+            // opening, or their own fire burning, on their own turn — the entries in the log that do not
+            // cross the ring.
+            //
+            // BURN WAS MISSING FROM THIS TEST and the bleed was not, so "You burn — 91" took the damage off
+            // THEIR bar and lit THEM up. Luke: "it says I burn but shows the opponent taking damage and
+            // burning?" Exactly that, and it is the same one-word omission the comment above this is about
+            // — a list of special cases that somebody has to remember to add to is a list that gets missed.
+            if (e.bleedTick || e.burnTick) { if (e.who === "you") hp -= e.dmg; else foeHp -= e.dmg; continue; }
             if (e.who === "you") foeHp -= e.dmg; else hp -= e.dmg;
         }
         const done = shown >= logAll.length;

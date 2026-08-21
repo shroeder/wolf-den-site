@@ -2231,10 +2231,25 @@ async function finishBout(buyerId, row, b, won) {
 // One function rather than the same `if` written three times, because the three doors have already diverged
 // once — the Road stopped bumping the daily counter and the town grew an edge multiplier — and the payout is
 // the half that must never diverge.
+// ── A BEAT COSTS ONE WRITE, NOT THE WHOLE SCREEN ─────────────────────────────────────────────────────────────
+// Luke: "it isn't the speed of animations, it feels like it's waiting for an api call." It was. MEASURED: a
+// single tap of Attack took 4.4 SECONDS and ran 123 database queries.
+//
+// This line did it — `getArenaState` after every beat. That function builds the entire Arena screen: the
+// challenge board, and for EVERY opponent on it their equipment, badges, enhancements and sockets; the
+// ladder; the purser; the armoury. Neon's HTTP driver makes every one of those a separate round trip at
+// ~35ms, so a tap paid for a full screen rebuild before it was allowed to animate.
+//
+// A BEAT CHANGES THE BOUT AND NOTHING ELSE. Your gear cannot change mid-fight, the board cannot reorder
+// under you, and the Road is not walking anywhere. So a beat returns the bout, and the client merges it
+// into the state it already has rather than replacing it — see `partial` in ArenaClient.
+//
+// The last beat is different and still pays full price: finishBout has to settle rewards, the ladder, the
+// streak and the standings, and the screen behind the recap has genuinely changed.
 async function settle(buyerId, b, row = null) {
     if (!b.over) {
         await saveBout(buyerId, b);
-        return { ok: true, ...(await getArenaState(buyerId)) };
+        return { ok: true, unlocked: true, partial: true, bout: publicBout(b) };
     }
     return finishBout(buyerId, row || await arenaRow(buyerId), b, b.won);
 }
@@ -2255,15 +2270,19 @@ export async function actBout(buyerId, { skillId = null } = {}) {
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
     if (!playable(b)) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
-    if (b.ring.awaiting !== "act") return { ok: false, error: "not_your_beat", ...(await getArenaState(buyerId)) };
+    // ── A REFUSAL MID-FIGHT IS ALSO JUST THE BOUT ────────────────────────────────────────────────────────
+    // These three can only happen while a bout is running, and none of them changes anything behind it —
+    // so they take the same light path a beat does. Rebuilding the whole Arena to say "that skill is still
+    // cooling" cost 4.2 seconds and 120 queries, same as a beat did.
+    if (b.ring.awaiting !== "act") return { ok: false, error: "not_your_beat", partial: true, bout: publicBout(b) };
 
     let skill = null;
     if (skillId) {
         // From the bout's own frozen bag, and only if it is actually off cooldown. Both checks are the same
         // shape as the tree's: the screen decides what to offer, the server decides what is legal.
         skill = resolveSkill(String(skillId), b.me?.skills || {});
-        if (!skill) return { ok: false, error: "no_skill", ...(await getArenaState(buyerId)) };
-        if ((b.ring.cd?.[skill.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
+        if (!skill) return { ok: false, error: "no_skill", partial: true, bout: publicBout(b) };
+        if ((b.ring.cd?.[skill.id] || 0) > 0) return { ok: false, error: "cooling", partial: true, bout: publicBout(b) };
     }
 
     act(b.ring, { skill });
