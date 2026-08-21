@@ -8,7 +8,7 @@ import FightInput from "@/components/arena/FightInput";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiLaurelCrown, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -170,11 +170,11 @@ const BAND_WORD = { brutal: "brutal", hard: "harder", even: "even", easy: "easie
 function FIGHT_OPTIONS(st) {
     const out = [];
     for (const t of st?.targets || []) {
-        out.push({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power,
+        out.push({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
             damage: t.damage, health: t.health, reward: t.reward });
     }
     for (const n of st?.gauntlet || []) {
-        out.push({ key: `n:${n.tier}`, target: `npc:${n.tier}`, name: n.name || `Tier ${n.tier}`,
+        out.push({ key: `n:${n.tier}`, target: `npc:${n.tier}`, name: n.name || `Tier ${n.tier}`, sprite: n.sprite,
             // `power` (an arenaRating) and NOT `gearPower` (a gear score in the hundreds). Mixing the two
             // sorted every tier below every member and made them all read EASIER — see the note in arena.js.
             power: n.power, damage: n.damage, health: n.health, beaten: n.beaten, reward: n.reward });
@@ -2759,39 +2759,60 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 {/* Hardest first, because the interesting fight should be the one you see. Members and
                     Gauntlet tiers in ONE list: they resolve to the same thing server-side, and splitting
                     them on screen would be asking somebody to compare two ladders to answer one question. */}
-                {FIGHT_OPTIONS(st).map((o) => {
-                    const ratio = o.power / Math.max(1, st.me?.power || 1);
-                    const band = ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy";
-                    return (
-                        <button key={o.key} type="button" className={`ar-pick-row is-${band}`}
-                            disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
-                            onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: o.target }); }}>
-                            <span className="ar-pick-who">
-                                <b>{o.name}</b>
-                                <em>{Math.round(o.damage || 0)} dmg · {Math.round(o.health || 0)} hp{o.beaten ? " · beaten" : ""}</em>
-                            </span>
-                            <span className="ar-pick-band">{BAND_WORD[band]}</span>
-                            <span className="ar-pick-pay">
-                                <b>{money(o.reward?.laurels || 0)}</b>
-                                <em>laurels{o.reward?.vp ? ` · +${o.reward.vp} vp` : ""}</em>
-                                {/* A defeat is a real outcome and the offer should say so up front, rather
-                                    than being something you only discover by losing. Members only — the
-                                    Gauntlet pays nothing for a loss on purpose. */}
-                                {o.reward?.lossLaurels ? <i>{money(o.reward.lossLaurels)} if you lose</i> : null}
-                            </span>
-                        </button>
-                    );
-                })}
+                {(() => {
+                    const opts = FIGHT_OPTIONS(st);
+                    // The biggest purse on the board, so one row can be flagged as the one worth taking.
+                    // Computed over what is SHOWN, not over the whole roster — a badge pointing at a fight
+                    // that is not on screen is a badge that lies.
+                    const best = Math.max(0, ...opts.map((o) => o.reward?.laurels || 0));
+                    return opts.map((o, i) => {
+                        const ratio = o.power / Math.max(1, st.me?.power || 1);
+                        const band = ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy";
+                        const top = (o.reward?.laurels || 0) === best && best > 0;
+                        return (
+                            <button key={o.key} type="button" className={`ar-pick-row is-${band}${top ? " is-top" : ""}`}
+                                /* The stagger is the whole difference between a list appearing and a list
+                                   DEALING itself out. Six rows at 45ms apart reads as cards being turned
+                                   over, which is the feeling a menu of fights should have. */
+                                style={{ "--i": i }}
+                                disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
+                                onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: o.target }); }}>
+                                {/* THE FACE. Both a member and a Gauntlet tier carry a sprite, and a name with
+                                    a face beside it is a person you are choosing to fight rather than a row in
+                                    a table. Tinted by the band, so difficulty is read before anything else. */}
+                                <span className="ar-pick-face">
+                                    {o.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={o.sprite} alt="" draggable="false" />
+                                    ) : <i className="ar-pick-noface" aria-hidden="true" />}
+                                </span>
+                                <span className="ar-pick-who">
+                                    <b>{o.name}</b>
+                                    <em>{Math.round(o.damage || 0)} dmg · {Math.round(o.health || 0)} hp</em>
+                                    <span className={`ar-pick-band is-${band}`}>{BAND_WORD[band]}</span>
+                                </span>
+                                <span className="ar-pick-pay">
+                                    {top ? <s className="ar-pick-best">Best purse</s> : null}
+                                    <b><GiLaurelCrown aria-hidden="true" />{money(o.reward?.laurels || 0)}</b>
+                                    <em>{o.reward?.vp ? `+${o.reward.vp} vp` : "laurels"}</em>
+                                    {o.reward?.lossLaurels ? <i>{money(o.reward.lossLaurels)} even if you lose</i> : null}
+                                </span>
+                            </button>
+                        );
+                    });
+                })()}
                 {/* The old behaviour, kept as one row rather than as the only option: somebody who does not
                     want to choose should not have to. */}
-                <button type="button" className="ar-pick-row is-auto"
+                <button type="button" className="ar-pick-row is-auto" style={{ "--i": 6 }}
                     disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
                     onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
+                    {/* Same two-part shape as every other row — the band pill lives inside the name block, or
+                        it lands in a grid column this row does not have. */}
                     <span className="ar-pick-who">
                         <b>{busy ? "Looking for an opponent…" : "Surprise me"}</b>
-                        <em>someone your own size</em>
+                        <em>someone your own size, chosen for you</em>
+                        <span className="ar-pick-band is-even">even</span>
                     </span>
-                    <span className="ar-pick-band">even</span>
                     <span className="ar-pick-pay"><em>matched</em></span>
                 </button>
             </div>
@@ -4429,38 +4450,84 @@ function Styles() {
             .ar-find em { display: block; font-style: normal; font-size: 0.78rem; opacity: .82; margin-top: 2px; }
 
             /* ── THE FIGHT PICKER ────────────────────────────────────────────────────────────────────────
-               Rows, not cards: the whole point is comparing what each one PAYS against what each one is, and
+               Rows, not cards: the whole point is comparing what each one PAYS against what each one IS, and
                a grid of tiles makes you read two axes to answer one question. Hardest first, so the
                interesting fight is the one under your thumb. */
-            .ar-pick { margin: 14px 0 4px; display: grid; gap: 6px; }
+            .ar-pick { margin: 14px 0 4px; display: grid; gap: 7px; }
             .ar-pick-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
                 padding: 0 2px 2px; }
             .ar-pick-head b { font-family: var(--font-display); font-size: 1.02rem; color: #ffe9b8; }
             .ar-pick-head em { font-style: normal; font-size: 11px; color: #98a0aa; }
             .ar-pick-note { margin: 0 0 2px; font-size: 11px; color: #ffb35c; }
-            .ar-pick-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center;
-                gap: 10px; width: 100%; padding: 11px 13px; border-radius: 13px; cursor: pointer;
-                text-align: left; color: #eaf1f8; border: 1px solid rgba(255,255,255,0.1);
-                background: linear-gradient(180deg, rgba(26,22,34,0.92), rgba(16,13,22,0.94)); }
-            .ar-pick-row:active:not(:disabled) { transform: scale(.995); }
+
+            /* Dealt out rather than simply present — six rows 45ms apart reads as cards being turned over. */
+            .ar-pick-row { position: relative; display: grid;
+                grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 11px;
+                width: 100%; padding: 10px 13px 10px 10px; border-radius: 14px; cursor: pointer;
+                text-align: left; color: #eaf1f8; overflow: hidden;
+                border: 1px solid rgba(255,255,255,0.09);
+                background: linear-gradient(180deg, rgba(28,24,38,0.95), rgba(15,12,21,0.96));
+                animation: arPickIn .34s cubic-bezier(.2,1.25,.35,1) both;
+                animation-delay: calc(var(--i) * 45ms);
+                transition: transform 90ms ease, border-color 140ms ease, box-shadow 140ms ease; }
+            @keyframes arPickIn { from { opacity: 0; transform: translateY(10px) scale(.985); }
+                to { opacity: 1; transform: none; } }
+            /* The band paints a bar down the leading edge, so difficulty is legible before a word is read. */
+            .ar-pick-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+                background: var(--band); }
+            .ar-pick-row.is-easy { --band: #4b8f6b; }
+            .ar-pick-row.is-even { --band: #cbd3dc; }
+            .ar-pick-row.is-hard { --band: #ffd75e; }
+            .ar-pick-row.is-brutal { --band: #ff8f9a; border-color: rgba(255,143,154,0.3); }
+            .ar-pick-row:active:not(:disabled) { transform: scale(.985); }
+            .ar-pick-row:not(:disabled):hover { border-color: rgba(255,215,94,0.4);
+                box-shadow: 0 6px 22px rgba(0,0,0,0.45), inset 0 0 30px rgba(255,215,94,0.05); }
             .ar-pick-row:disabled { cursor: default; opacity: .45; }
-            .ar-pick-who b { display: block; font-weight: 900; font-size: 0.96rem; }
-            .ar-pick-who em { display: block; font-style: normal; font-size: 10.5px; color: #98a0aa; margin-top: 2px; }
-            /* The band is the whole reason this screen exists: it is the word that tells you what you are
-               choosing, before the number that tells you what it pays. */
-            .ar-pick-band { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
-                padding: 3px 8px; border-radius: 999px; border: 1px solid currentColor; opacity: .9; }
-            .ar-pick-row.is-easy .ar-pick-band { color: #8bf0b4; }
-            .ar-pick-row.is-even .ar-pick-band { color: #cbd3dc; }
-            .ar-pick-row.is-hard .ar-pick-band { color: #ffd75e; }
-            .ar-pick-row.is-brutal .ar-pick-band { color: #ff8f9a; }
-            .ar-pick-row.is-brutal { border-color: rgba(255,143,154,0.35); }
-            .ar-pick-pay { text-align: right; }
-            .ar-pick-pay b { display: block; font-family: var(--font-display); font-weight: 900;
-                font-size: 1.02rem; color: #ffd75e; }
-            .ar-pick-pay em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; }
-            .ar-pick-pay i { display: block; font-style: normal; font-size: 9.5px; color: #7d858f; margin-top: 1px; }
-            .ar-pick-row.is-auto { background: rgba(255,255,255,0.045); border-style: dashed; }
+
+            /* THE FACE. A name with a face beside it is somebody you are choosing to fight. */
+            .ar-pick-face { width: 46px; height: 46px; border-radius: 11px; overflow: hidden;
+                display: grid; place-items: center; flex: none;
+                background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.09), rgba(0,0,0,.35));
+                border: 1px solid color-mix(in srgb, var(--band) 45%, transparent);
+                box-shadow: inset 0 0 16px rgba(0,0,0,.55); }
+            .ar-pick-face img { width: 132%; height: 132%; object-fit: contain; object-position: 50% 22%; }
+            .ar-pick-noface { width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,.14); }
+
+            .ar-pick-who { min-width: 0; }
+            .ar-pick-who b { display: block; font-weight: 900; font-size: 0.98rem; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; }
+            .ar-pick-who em { display: block; font-style: normal; font-size: 10.5px; color: #98a0aa;
+                margin-top: 1px; }
+            .ar-pick-band { display: inline-block; margin-top: 4px; font-size: 8.5px; font-weight: 900;
+                letter-spacing: .16em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+                color: var(--band); border: 1px solid color-mix(in srgb, var(--band) 55%, transparent);
+                background: color-mix(in srgb, var(--band) 10%, transparent); }
+
+            /* THE PURSE. The number is the reward, so it is the biggest thing in the row and it glows. */
+            .ar-pick-pay { text-align: right; flex: none; }
+            .ar-pick-pay b { display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+                font-family: var(--font-display); font-weight: 900; font-size: 1.22rem; color: #ffd75e;
+                text-shadow: 0 0 16px rgba(255,215,94,.45); line-height: 1.05; }
+            .ar-pick-pay b svg { width: 15px; height: 15px; opacity: .9; }
+            .ar-pick-pay em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; margin-top: 1px; }
+            .ar-pick-pay i { display: block; font-style: normal; font-size: 9px; color: #7d858f; margin-top: 2px; }
+            /* The one worth taking, said out loud. A sheen crosses it every few seconds — the only animated
+               thing in the list, so it is the only thing that pulls the eye. */
+            .ar-pick-best { display: block; text-decoration: none; font-size: 8px; font-weight: 900;
+                letter-spacing: .18em; text-transform: uppercase; color: #7effb2; margin-bottom: 1px; }
+            .ar-pick-row.is-top { border-color: rgba(126,255,178,0.38); }
+            .ar-pick-row.is-top::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.09) 50%, transparent 58%);
+                transform: translateX(-120%); animation: arPickSheen 3.6s ease-in-out infinite;
+                animation-delay: 1.1s; }
+            @keyframes arPickSheen { 0% { transform: translateX(-120%); } 32%, 100% { transform: translateX(120%); } }
+
+            .ar-pick-row.is-auto { --band: #98a0aa; background: rgba(255,255,255,0.04); border-style: dashed;
+                grid-template-columns: minmax(0,1fr) auto; }
+            /* The pill carries its own colour when it is not inheriting the row's band. */
+            .ar-pick-band.is-even { --band: #cbd3dc; }
+            .ar-pick-row.is-auto::before { display: none; }
+
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             /* The drawer: it takes its space from the ring rather than from the page, and never more than a
