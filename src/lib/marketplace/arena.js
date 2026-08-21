@@ -837,11 +837,44 @@ export async function getArenaState(buyerId, pre = {}) {
     // THE GAUNTLET — endless NPC challengers, so there is always something to fight even when the Den is
     // asleep and always something harder to aspire to.
     const npcBest = Number(row?.npc_best) || 0;
-    const gauntlet = npcOffer(npcBest).map((n) => ({
-        ...n,
-        beaten: n.tier <= npcBest,
-        reward: { vp: vpPreview(myPower, n.gearPower), laurels: boutLaurels({ won: true, myPower, theirPower: n.gearPower }) },
-    }));
+    // ── OFFERED FROM WHERE YOU ACTUALLY STAND ────────────────────────────────────────────────────────────
+    // This used to offer from `npc_best` alone, which is 0 until you win a Gauntlet fight — so the strongest
+    // member in the Den was shown tiers 1 to 5 and every one of them read EASIER. The matchmaker has never
+    // agreed with that: it already reaches from `max(best, tierForRating(myPower)) + NPC_REACH` (see
+    // matchArenaOpponent), and the server stopped enforcing a reach at all when points became accrued.
+    //
+    // So this is the offer catching up to the rule that was already being applied, not a new one. Same
+    // expression, so the list you are shown and the pool you are matched from cannot drift apart.
+    const gauntlet = npcOffer(Math.max(npcBest, tierForRating(myPower))).map((n) => {
+        // ── RATED THE WAY A MEMBER IS RATED ──────────────────────────────────────────────────────────────
+        // `npcFor` returns `gearPower` — a gear score in the HUNDREDS — and no rating at all. Members are
+        // measured in `arenaRating` (damage x crit x health / 10), which runs in the TENS OF THOUSANDS. The
+        // reward preview compared one against the other, so the ratio was ~0 for every tier, the clamp
+        // pinned it at VP_FLOOR, and EVERY Gauntlet fight in the game paid the 0.3x floor: 28 laurels
+        // whether you fought tier 5 or tier 45.
+        //
+        // Found by building the fight picker, which put members and tiers in one list for the first time —
+        // six Warlord tiers all paying 28 next to members paying 71.
+        //
+        // Rated through fighterFrom + arenaRating: the same two functions the bout itself uses to build and
+        // score that opponent, so the number on the card and the number in the fight cannot disagree.
+        // Built once and read three ways: the rating that sorts it, and the damage/health the card prints.
+        // `npcFor` returns a STAT LINE, not a fighter — the card was showing "0 dmg · 0 hp" for every tier
+        // because it was reading fields that only exist after this conversion.
+        const f = fighterFrom(n, {}, null);
+        const power = arenaRating(f);
+        return {
+            ...n,
+            power,
+            damage: f.damage,
+            health: f.health,
+            beaten: n.tier <= npcBest,
+            // `won: true` — this is a PREVIEW of what winning pays, and boutLaurels has no default for it:
+            // without the flag it answers the loss question instead, and a Gauntlet loss pays nothing by
+            // design, so the card promised zero.
+            reward: { vp: vpPreview(myPower, power), laurels: boutLaurels({ won: true, myPower, theirPower: power }) },
+        };
+    });
 
     const myVp = Number(row?.vp) || 0;
 

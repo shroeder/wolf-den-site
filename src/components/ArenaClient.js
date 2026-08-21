@@ -161,6 +161,36 @@ const BEAT_BUDGET_MS = 1200;
 // command you press has a wind-up. Short: this is a punish, not a cast.
 const COUNTER_WIND_MS = 150;
 // Which events make somebody flinch — the ones that move a health bar.
+// ── THE FIGHTS ON OFFER ──────────────────────────────────────────────────────────────────────────────────────
+// Members and Gauntlet tiers in one list, hardest first. Both already arrive from the server carrying their
+// own `reward`, so nothing here computes a payout — a screen that worked out its own number would be a second
+// copy of the rule, and the copies drift. Capped at six: a wall of opponents is not a choice, it is a list.
+const BAND_WORD = { brutal: "brutal", hard: "harder", even: "even", easy: "easier" };
+
+function FIGHT_OPTIONS(st) {
+    const out = [];
+    for (const t of st?.targets || []) {
+        out.push({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power,
+            damage: t.damage, health: t.health, reward: t.reward });
+    }
+    for (const n of st?.gauntlet || []) {
+        out.push({ key: `n:${n.tier}`, target: `npc:${n.tier}`, name: n.name || `Tier ${n.tier}`,
+            // `power` (an arenaRating) and NOT `gearPower` (a gear score in the hundreds). Mixing the two
+            // sorted every tier below every member and made them all read EASIER — see the note in arena.js.
+            power: n.power, damage: n.damage, health: n.health, beaten: n.beaten, reward: n.reward });
+    }
+    // ── HARDEST FIRST ────────────────────────────────────────────────────────────────────────────────────
+    // Two wrong versions before this one, both caused by the units. Sorting by power gave six members and no
+    // tiers, because a tier's `gearPower` is in the hundreds and a member's rating is in the tens of
+    // thousands. Spreading evenly across the whole list then filled the menu with trivial opponents — the
+    // board has ninety-two members on it and most of them are far below the top.
+    //
+    // With both sides rated the same way, hardest-first is simply correct: it puts the fights worth having
+    // at the top, mixes members and Gauntlet tiers by how hard they actually are, and leaves "Surprise me"
+    // as the row for anybody who does not want to choose.
+    return out.sort((x, y) => (y.power || 0) - (x.power || 0)).slice(0, 6);
+}
+
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
 // The two that are damage over time. They still float a number and still colour it; what they do NOT do is
 // shake the stage, stop the frame or recoil a fighter — see the branch that reads this.
@@ -2707,32 +2737,64 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 bout is where an opponent actually becomes a name you remember. */}
             {/* An open bout is refused by the server every single time (`bout_in_progress`), so offering the
                 press is offering a round trip that cannot succeed. The way back in is the button above. */}
-            <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
-                onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
-                {/* A PAINTED SPRITE, not a glyph. Line art on a solid gold plate is the one combination that
-                    reads as a placeholder — the sea's equivalent button has had painted art since it shipped.
-                    This is the Reaver tree's own Cleave sprite: steel and flame, already drawn in the house
-                    style, already in the arena's art folder. No new art needed for a button. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="ar-find-ico" src="/images/arena/node/rv_strike.webp" alt="" draggable="false" />
-                <span>
-                    {/* THE COUNT GOES ON THE BUTTON. It was already on Your card, at the top of the screen —
-                        which is above the fold on a phone by the time you have scrolled to the thing you press,
-                        so the one place the allowance matters was the one place it was not written. Luke, who
-                        wrote it: "where do I see my use count and remaining for find a fight?" */}
-                    {/* A PRESS HAS TO SHOW. The button looked identical mid-flight, so a slow round trip was
-                        indistinguishable from a tap that never registered — and the honest answer to "did it
-                        take my tap" is to say so on the button itself. */}
-                    <b>{busy ? "Looking for an opponent…"
-                        : bout && !bout.over ? "Finish the fight you are in"
-                            : st.fightsLeft > 0 ? `Find a fight · ${st.fightsLeft} of ${st.fightsPerDay} left` : "No fights left today"}</b>
-                    <em>{busy ? "Matching you against someone your own size"
-                        : bout && !bout.over ? `${bout.foe?.name || "Your opponent"} is still standing — one fight at a time`
-                            : st.fightsLeft > 0
-                                ? "Someone your own size — a member of the Den, or the Gauntlet"
-                                : "They come back at 5am — the Road does not use them"}</em>
-                </span>
-            </button>
+            {/* ── PICK YOUR FIGHT ─────────────────────────────────────────────────────────────────────────
+                This was one button that matched you against "someone your own size" and told you who
+                afterwards. Luke: "I want to be able to select a fight — laurels, gold, exp related to the
+                fight difficulty I pick." The scaling was already there and always had been (laurels and VP
+                both multiply by their power over yours, 0.3x to 2.5x), and so was the data: `targets` and
+                `gauntlet` have shipped with a per-opponent `reward` for months. Nothing rendered them.
+                There is even a comment in arena.js noting that nothing draws this list any more — "a flag
+                nobody draws is the Den's favourite bug."
+                So this is not a new economy. It is the existing one, made into a choice you can see. */}
+            <div className="ar-pick">
+                <div className="ar-pick-head">
+                    <b>Pick your fight</b>
+                    <em>{st.fightsLeft > 0
+                        ? `${st.fightsLeft} of ${st.fightsPerDay} left today`
+                        : "None left — they come back at 5am"}</em>
+                </div>
+                {bout && !bout.over ? (
+                    <p className="ar-pick-note">{bout.foe?.name || "Your opponent"} is still standing — one fight at a time.</p>
+                ) : null}
+                {/* Hardest first, because the interesting fight should be the one you see. Members and
+                    Gauntlet tiers in ONE list: they resolve to the same thing server-side, and splitting
+                    them on screen would be asking somebody to compare two ladders to answer one question. */}
+                {FIGHT_OPTIONS(st).map((o) => {
+                    const ratio = o.power / Math.max(1, st.me?.power || 1);
+                    const band = ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy";
+                    return (
+                        <button key={o.key} type="button" className={`ar-pick-row is-${band}`}
+                            disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
+                            onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: o.target }); }}>
+                            <span className="ar-pick-who">
+                                <b>{o.name}</b>
+                                <em>{Math.round(o.damage || 0)} dmg · {Math.round(o.health || 0)} hp{o.beaten ? " · beaten" : ""}</em>
+                            </span>
+                            <span className="ar-pick-band">{BAND_WORD[band]}</span>
+                            <span className="ar-pick-pay">
+                                <b>{money(o.reward?.laurels || 0)}</b>
+                                <em>laurels{o.reward?.vp ? ` · +${o.reward.vp} vp` : ""}</em>
+                                {/* A defeat is a real outcome and the offer should say so up front, rather
+                                    than being something you only discover by losing. Members only — the
+                                    Gauntlet pays nothing for a loss on purpose. */}
+                                {o.reward?.lossLaurels ? <i>{money(o.reward.lossLaurels)} if you lose</i> : null}
+                            </span>
+                        </button>
+                    );
+                })}
+                {/* The old behaviour, kept as one row rather than as the only option: somebody who does not
+                    want to choose should not have to. */}
+                <button type="button" className="ar-pick-row is-auto"
+                    disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
+                    onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
+                    <span className="ar-pick-who">
+                        <b>{busy ? "Looking for an opponent…" : "Surprise me"}</b>
+                        <em>someone your own size</em>
+                    </span>
+                    <span className="ar-pick-band">even</span>
+                    <span className="ar-pick-pay"><em>matched</em></span>
+                </button>
+            </div>
 
             {/* The standings are context, not the job. Three rows, and the rest on request. */}
             {st.board?.length ? (
@@ -4365,6 +4427,40 @@ function Styles() {
                 filter: drop-shadow(0 2px 3px rgba(60,36,0,0.5)); }
             .ar-find b { display: block; font-family: var(--font-display); font-weight: 900; font-size: 1.06rem; }
             .ar-find em { display: block; font-style: normal; font-size: 0.78rem; opacity: .82; margin-top: 2px; }
+
+            /* ── THE FIGHT PICKER ────────────────────────────────────────────────────────────────────────
+               Rows, not cards: the whole point is comparing what each one PAYS against what each one is, and
+               a grid of tiles makes you read two axes to answer one question. Hardest first, so the
+               interesting fight is the one under your thumb. */
+            .ar-pick { margin: 14px 0 4px; display: grid; gap: 6px; }
+            .ar-pick-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+                padding: 0 2px 2px; }
+            .ar-pick-head b { font-family: var(--font-display); font-size: 1.02rem; color: #ffe9b8; }
+            .ar-pick-head em { font-style: normal; font-size: 11px; color: #98a0aa; }
+            .ar-pick-note { margin: 0 0 2px; font-size: 11px; color: #ffb35c; }
+            .ar-pick-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center;
+                gap: 10px; width: 100%; padding: 11px 13px; border-radius: 13px; cursor: pointer;
+                text-align: left; color: #eaf1f8; border: 1px solid rgba(255,255,255,0.1);
+                background: linear-gradient(180deg, rgba(26,22,34,0.92), rgba(16,13,22,0.94)); }
+            .ar-pick-row:active:not(:disabled) { transform: scale(.995); }
+            .ar-pick-row:disabled { cursor: default; opacity: .45; }
+            .ar-pick-who b { display: block; font-weight: 900; font-size: 0.96rem; }
+            .ar-pick-who em { display: block; font-style: normal; font-size: 10.5px; color: #98a0aa; margin-top: 2px; }
+            /* The band is the whole reason this screen exists: it is the word that tells you what you are
+               choosing, before the number that tells you what it pays. */
+            .ar-pick-band { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+                padding: 3px 8px; border-radius: 999px; border: 1px solid currentColor; opacity: .9; }
+            .ar-pick-row.is-easy .ar-pick-band { color: #8bf0b4; }
+            .ar-pick-row.is-even .ar-pick-band { color: #cbd3dc; }
+            .ar-pick-row.is-hard .ar-pick-band { color: #ffd75e; }
+            .ar-pick-row.is-brutal .ar-pick-band { color: #ff8f9a; }
+            .ar-pick-row.is-brutal { border-color: rgba(255,143,154,0.35); }
+            .ar-pick-pay { text-align: right; }
+            .ar-pick-pay b { display: block; font-family: var(--font-display); font-weight: 900;
+                font-size: 1.02rem; color: #ffd75e; }
+            .ar-pick-pay em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; }
+            .ar-pick-pay i { display: block; font-style: normal; font-size: 9.5px; color: #7d858f; margin-top: 1px; }
+            .ar-pick-row.is-auto { background: rgba(255,255,255,0.045); border-style: dashed; }
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             /* The drawer: it takes its space from the ring rather than from the page, and never more than a
