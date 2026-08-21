@@ -17019,10 +17019,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE HOLD. Its own control, under the copy, clear of the rod -- big enough for a thumb and nowhere near
    the gauge it drives. touch-action: none so a drag on it never becomes a page scroll mid-fight. */
-/* Across the bottom of the frame, over the water, and big -- it is the only control in the minigame and
-   the strip it sits on is the only part of the picture with nothing happening in it. Clear of the rod on
-   the right so it still covers none of the gauge. */
-.fwreel-hold { position: absolute; left: 12px; right: 74px; bottom: 12px;
+/* ── WHERE A THUMB ALREADY IS ────────────────────────────────────────────────────────────────────────
+   This was across the bottom of the water FRAME, which is not the bottom of anything a hand is near: the
+   frame sits mid-page, so the control landed around 60% down a phone and Luke had to reach up the screen
+   for it mid-fight. Luke: "I'd prefer the reel button to be easier for my thumb to reach."
+
+   Fixed to the bottom of the VIEWPORT instead. It is the only control that exists while a fish is on the
+   line, so it is honest for it to own the bottom of the screen for those six seconds, and it is in the
+   thumb arc no matter where the page happens to be scrolled. Capped and centred so a desktop does not get
+   a button a metre wide, and padded for the home indicator. */
+.fwreel-hold { position: fixed; left: 50%; transform: translateX(-50%);
+    width: min(560px, calc(100vw - 24px)); z-index: 40;
+    /* Clear of the chat bubble, which lives in the bottom-right corner of every page and would otherwise
+       sit on the right end of this. Still the bottom eighth of a phone, which is the part of the screen a
+       thumb reaches without moving the hand. */
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     pointer-events: auto; touch-action: none; cursor: pointer;
     padding: 16px 20px; border-radius: 16px; font-size: 15px; font-weight: 900; letter-spacing: 0.16em;
     color: #04121c; border: none; background: linear-gradient(180deg, #b6ffd4, #7effb2);
@@ -17030,12 +17041,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     -webkit-user-select: none; user-select: none; }
 /* Pressed reads instantly and without waiting on anything -- the whole point of a hold control is that the
    moment your thumb lands it is already doing something. */
-.fwreel-hold:active { transform: translateY(2px);
+.fwreel-hold:active { transform: translateX(-50%) translateY(2px);
     box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 3px 10px rgba(0,0,0,0.25);
     background: linear-gradient(180deg, #7effb2, #4fe39a); }
 
 /* THE COPY AND THE METER, bottom-left -- clear of the rod, and clear of the hero on the deck. */
-.fwreel-side { position: absolute; left: 12px; right: 74px; bottom: 72px;
+.fwreel-side { position: absolute; left: 12px; right: 74px; bottom: 26px;
     display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .fwreel-title { font-size: 13px; letter-spacing: 0.06em; color: #eaf6ff;
     text-shadow: 0 2px 6px rgba(0,0,0,0.85); }
