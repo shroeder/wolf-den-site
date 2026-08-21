@@ -19,7 +19,7 @@ import {
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
 import { ACCURACY_CAP, ACCURACY_FLOOR, DEFAULT_ACCURACY, DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
-import { ARMOUR_MAX_SHARE, EXTRA_TURN_MAX, critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { EXTRA_TURN_MAX, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -469,22 +469,17 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             //
             // It reduces the armour instead. 50% pierce means half their armour is not there.
             //
-            // ── AND ARMOUR CAN NEVER EAT THE WHOLE BLOW ──────────────────────────────────────────────
-            // Flat subtraction with a floor of 1 is fine while blows are large. It stops being fine the
-            // moment they are not: once armour approaches the raw blow, every swing clamps to 1 damage,
-            // the fight becomes an attrition race decided by regen and lifedrink, and the OUTCOME GOES
-            // BINARY — the same pairing wins every seed or loses every seed.
+            // ── ARMOUR TURNS A SHARE ASIDE ───────────────────────────────────────────────────────────
+            // A / (A + K), not subtraction — see drFrom in arena-kit.js for why, and for how K was picked.
+            // The short version: armour is bigger than damage for every member in this game, so subtraction
+            // pinned every blow to its cap and 550 armour played identically to 1800.
             //
-            // That is what broke the Long Road. The ladder cycles five archetypes, one of which is the
-            // WALL, and measured across six real builds the wall rungs were 0% while the rungs either side
-            // were 100%: rung 37 unwinnable, 38 free, 40 unwinnable, 41 free. A ladder that gets EASIER as
-            // you climb is the one rule Luke set as absolute, and it was armour doing it, not the rungs.
-            //
-            // So armour is still flat — it is subtraction, it is the stat people understand — but it can
-            // never remove more than ARMOUR_MAX_SHARE of the blow that hits it. A wall is still four times
-            // the fight anybody else is; it is no longer an unmovable object.
-            const softened = Math.min(def.armor * (1 - att.pierce), raw * ARMOUR_MAX_SHARE);
-            let blow = Math.max(1, Math.round(raw - softened));
+            // ONE FUNCTION FOR ALL THREE DAMAGE PATHS, which is the other half of the fix. The counter and
+            // the wild doublestrike below did their own uncapped `raw - armour`, so against anything with
+            // armour above your damage they landed on the 1-damage floor every single time. Luke: "when I
+            // counter attack why does it only do 1 damage." Because it was the one swing in the game that
+            // never got the cap. There is no cap now and there is no second copy of the arithmetic either.
+            let blow = Math.max(1, Math.round(raw * (1 - drFrom(def.armor, att.pierce))));
             // ── THE SHIELD ───────────────────────────────────────────────────────────────────────────
             // Rolled per blow, so a doublestrike gets two chances to be blocked rather than one verdict on
             // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
@@ -584,14 +579,14 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         if (wild === "doublestrike" || wild === "counter") {
             const cs = critStacks(att.critChance, rng);
             const craw = att.damage * (cs > 0 ? att.critMult * cs : 1);
-            const extra = Math.max(1, Math.round(craw - def.armor * (1 - att.pierce)));
+            const extra = Math.max(1, Math.round(craw * (1 - drFrom(def.armor, att.pierce))));
             def.hp -= extra;
             log.push({ t, who, dmg: extra, crit: cs > 0, wild, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
         if (def.hp > 0 && def.counter > 0 && rng() < def.counter) {
             const cs = critStacks(def.critChance, rng);
             const craw = def.damage * (cs > 0 ? def.critMult * cs : 1);
-            const cdealt = Math.max(1, Math.round(craw - att.armor * (1 - def.pierce)));
+            const cdealt = Math.max(1, Math.round(craw * (1 - drFrom(att.armor, def.pierce))));
             att.hp -= cdealt;
             log.push({ t, who: who === "me" ? "foe" : "me", dmg: cdealt, crit: cs > 0, stacks: cs, counter: true,
                 meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });

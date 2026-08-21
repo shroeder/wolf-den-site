@@ -912,7 +912,34 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 //
 // A ceiling on the SHARE fixes it without changing what armour is. At 0.75 the most armoured fighter in the
 // game still takes four times as long to kill; nobody is ever immune.
-export const ARMOUR_MAX_SHARE = 0.75;
+// ── ARMOUR IS DIMINISHING RETURNS, NOT SUBTRACTION ───────────────────────────────────────────────────────────
+// Luke: "I don't think armour should be capped. I think we should change it to be damage reduction — a lot of
+// ARPGs have a diminishing-returns armour system, and they base it off what the max armour amount realistically
+// ends up being."
+//
+// The cap existed because flat subtraction breaks down when armour approaches the blow: every swing clamps to
+// the 1-damage floor, the fight becomes an attrition race, and the outcome goes binary. That is what made the
+// Long Road's wall rungs unwinnable while the rungs either side were free. The cap patched the symptom.
+//
+// MEASURED, and this is why the change is not cosmetic: member armour runs 360 to 729 and member damage runs
+// 171 to 491. Armour is LARGER THAN DAMAGE for every member in the game, so under subtraction essentially
+// every blow was already pinned to the cap. The system was not "armour subtracts damage", it was "everybody
+// takes 25%, always" — which is where the 30-to-60-beat bouts came from.
+//
+// A / (A + K) needs no ceiling because it cannot reach 100%, and it separates values the cap flattened: today
+// 550 armour and 1800 armour are both exactly 75%.
+//
+// K IS CHOSEN OFF THE REAL CEILING, which is what Luke described. The Road tops out at 1806 armour, so K = 600
+// puts the hardest thing in the game at 75% — the old cap, now EARNED — while a typical member sits at 48%
+// and the best-geared at 55%. Luke's call, from a table of the alternatives.
+export const ARMOUR_K = 600;
+
+/** The share of a blow this much armour turns aside. `pierce` removes armour BEFORE the curve, so 50% pierce
+ *  means half their plate is not there — the same meaning it had under subtraction. */
+export const drFrom = (armour = 0, pierce = 0) => {
+    const eff = Math.max(0, (Number(armour) || 0) * (1 - Math.min(1, Math.max(0, Number(pierce) || 0))));
+    return eff / (eff + ARMOUR_K);
+};
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
 export const GUARD_BASE_SHARE = 0.10;
