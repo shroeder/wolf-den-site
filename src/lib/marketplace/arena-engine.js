@@ -261,6 +261,47 @@ export function counterBlow(b, mine) {
 
     return { dmg, crit, drank, burned, bled, doubled: roll.doubled, missed: false };
 }
+// ── EVERY FIELD A SWING IS RESOLVED FROM, NAMED ONCE ─────────────────────────────────────────────────────────
+// This exists because of a bug that had been live for as long as the current engine has: buildBout rebuilds
+// both fighters as a hand-written ALLOWLIST before writing them to bout_json, and that allowlist named twenty
+// of the thirty-five fields sideOf reads. The other twenty-seven — armour first among them — were computed by
+// fighterFrom, printed on the fighter card, and then dropped on the floor on the way into the fight.
+//
+// What that meant in a real bout: armour did nothing. Pierce did nothing, because there was no armour to
+// pierce. Every Warden node did nothing — block, thorns, guard, regen, ward. Every Runecaller node past the
+// burn chance did nothing — freeze, chill, surge, soulfire, cataclysm. Stun, haste, counter, grudge, wildProc:
+// nothing. Measured, the same two fighters won 100% with their kit and 85% with what production actually
+// handed the engine.
+//
+// The allowlist itself was right — bout_json should not swallow whatever happens to be on a fighter object.
+// What was wrong is that it was maintained BY HAND, in a different file from the function that decides what a
+// swing needs. So the list lives here now, beside sideOf, and buildBout spreads `fighterFields()` instead of
+// naming fields. A new mechanic added to sideOf without adding it here is caught by scripts/check-bout-fields,
+// which reads what sideOf actually touches rather than trusting either list.
+export const COMBAT_FIELDS = [
+    // the four numbers a card shows
+    "damage", "health", "critChance", "critMult", "speed", "dmgPct",
+    // mitigation and getting through it
+    "armor", "pierce", "blockChance", "blockReduction", "blockStack", "blockStackMax",
+    // the procs that come off affix points
+    "counter", "doublestrike", "lifesteal", "stun", "haste",
+    // over time, and what drinks from it
+    "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage", "burnLeech",
+    // the Warden's four, plus the ice that answers every blow
+    "guardChance", "guardSize", "regen", "thorns", "iceThorns", "grudge",
+    // the Runecaller's
+    "freeze", "chill", "ward", "wardRefill", "surge", "soulfire", "cataclysm",
+    // and the tree's flat shares, which add on top of the point-based versions above
+    "counterBonus", "doublestrikeBonus", "lifestealBonus", "stunBonus", "hasteBonus", "wildProc",
+];
+
+/** A fighter reduced to exactly what the ring needs, for writing into bout_json. Spread this; never retype it. */
+export function fighterFields(f = {}) {
+    const out = {};
+    for (const k of COMBAT_FIELDS) if (f[k] !== undefined && f[k] !== null) out[k] = f[k];
+    return out;
+}
+
 // ── A FIGHTER, IN THE SHAPE THE RING USES ────────────────────────────────────────────────────────────────────
 // Every affix, node and class trait converted to the units a swing is resolved in, once. This was `side`,
 // declared inside autoBout — fine while a bout was one function call, wrong the moment a fight has to be put

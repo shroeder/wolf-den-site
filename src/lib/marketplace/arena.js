@@ -34,7 +34,7 @@ import {
 } from "@/lib/marketplace/arena-skills.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
-import { arenaRating, autoBout } from "@/lib/marketplace/arena-engine.js";
+import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
@@ -1284,6 +1284,12 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             house: foe.house || null, houseName: foe.houseName || null,
             blurb: foe.blurb || null, color: foe.color || null,
             archetypeName: foe.archetypeName || null, spriteFallback: foe.spriteFallback || null,
+            // ── EVERYTHING THE RING RESOLVES A SWING FROM ────────────────────────────────────────────────
+            // Spread, not retyped. This was twenty hand-written fields and sideOf reads thirty-five, so the
+            // other fifteen — armour, thorns, block, guard, regen, ward, surge, freeze, chill, soulfire and
+            // the rest — were computed for this fighter and then dropped on the way into bout_json. See
+            // COMBAT_FIELDS in arena-engine.js for what that cost and why the list lives there now.
+            ...fighterFields(foeKit),
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed,
             // WHICH DISCIPLINE THEY FIGHT AS. The bout knew everyone's class and published nobody's, so the
@@ -1324,7 +1330,8 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         // fighter card is the number you actually hit for. A hidden multiplier in the raw product is the exact
         // shape of the "why do I do so little damage" complaint further down this file — the fix for that was
         // to stop hiding terms, and a town buff nobody can see would be a new one.
-        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
+        me: { ...fighterFields(me),
+            element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
             dr: me.dr ?? DEFAULT_DR,
