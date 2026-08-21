@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import SkillPanel from "@/components/arena/SkillPanel";
 import { CLASSES } from "@/lib/marketplace/arena-classes.js";
-import { SKILLS, skillPointsSpent, skillsForClass } from "@/lib/marketplace/arena-skills.js";
+import { SKILLS, skillPointsSpent, skillState, skillsForClass } from "@/lib/marketplace/arena-skills.js";
 
 // ── DEV ONLY: THE SKILL PANEL, ALL THREE CLASSES, EVERY STATE ────────────────────────────────────────────────
 // The panel's states are all BEHIND a point balance — locked needs zero points, ready needs one, and the node
@@ -61,14 +61,21 @@ function ClassBench({ c }) {
                     <button type="button" onClick={reset}>Reset</button>
                 </div>
             </header>
+            {/* The same shape getArenaState publishes, built here so the lab exercises the real component
+                rather than a variant of it that only exists to be looked at. */}
             <SkillPanel
-                classId={c.id}
-                taken={taken}
-                points={purse}
-                treeSpent={spent * 3 + 1}
-                colour={c.color}
-                onTake={take}
-                onNode={node}
+                busy={false}
+                progress={{
+                    classId: c.id,
+                    cls: c,
+                    points: { spent, available: 0, total: spent },
+                    skills: skillState(c.id, taken, purse),
+                    skillPoints: { total: spent + purse, spent, available: purse },
+                }}
+                onAct={(action, extra) => {
+                    if (action === "take_skill") take(extra.skillId);
+                    else if (action === "take_skill_node") node(extra.skillId, extra.nodeId);
+                }}
             />
         </section>
     );

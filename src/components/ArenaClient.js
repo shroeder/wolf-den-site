@@ -5,6 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FightInput from "@/components/arena/FightInput";
+import SkillPanel from "@/components/arena/SkillPanel";
 import { createPortal } from "react-dom";
 import {
     GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
@@ -2003,16 +2004,27 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             {err ? <p className="ar-err" ref={errRef}>{err}</p> : null}
 
             <div className="ar-tabs" role="tablist">
-                {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
+                {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", (st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)
+                        ? `Skills · ${(st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)}`
+                        : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}
-                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && st.progress?.points?.available ? " has-dot" : ""}`}
+                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && ((st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0)) ? " has-dot" : ""}`}
                         onClick={() => { Sfx.ui(); setTab(k); }}>{label}</button>
                 ))}
             </div>
 
             {tab === "tree" ? (
-                <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
-                    onAct={(action, extra) => act(action, extra)} />
+                <>
+                    {/* ── THE PANEL SITS ABOVE THE TREE ───────────────────────────────────────────────────
+                        Same tab, deliberately. They are one decision seen twice — every point spent below
+                        earns a point to spend up here — and putting them on separate tabs would hide that
+                        relationship behind a tap. The panel goes FIRST because it is the half you press in a
+                        fight; the tree is the half you read once and forget. */}
+                    <SkillPanel progress={st.progress} busy={busy}
+                        onAct={(action, extra) => act(action, extra)} />
+                    <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
+                        onAct={(action, extra) => act(action, extra)} />
+                </>
             ) : null}
 
             {tab === "train" ? (

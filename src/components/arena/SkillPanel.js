@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GiSwapBag } from "react-icons/gi";
 
-import { NODE_COST, SKILL_UNLOCK_COST, TREE_POINTS_PER_SKILL_POINT, skillState } from "@/lib/marketplace/arena-skills.js";
+import { NODE_COST, SKILL_UNLOCK_COST, TREE_POINTS_PER_SKILL_POINT } from "@/lib/marketplace/arena-skills.js";
 
 // ── THE SKILL PANEL ──────────────────────────────────────────────────────────────────────────────────────────
 // Separate from the passive tree on purpose, and the separation is the point. The tree is thirty-six numbers
@@ -173,12 +173,25 @@ function Detail({ s, busy, points, onTake, onNode, onClose }) {
     );
 }
 
-export default function SkillPanel({ classId, taken = {}, points = 0, treeSpent = 0, colour = "#b061ff",
-    busy = false, onTake = () => {}, onNode = () => {} }) {
+// Takes the SERVER'S view model rather than building its own — `progress.skills` is skillState() run on the
+// server, against the same bag it will validate a spend against. SkillTree takes `progress` for exactly this
+// reason: a screen that recomputes what it is allowed to offer is a screen that can drift from the answer.
+export default function SkillPanel({ progress, busy = false, onAct = () => {} }) {
     const [sel, setSel] = useState(null);
-    const skills = skillState(classId, taken, points);
+    const p = progress || {};
+    const skills = p.skills || [];
+    const pts = p.skillPoints || { total: 0, spent: 0, available: 0 };
+    const points = pts.available || 0;
+    const colour = p.cls?.color || "#b061ff";
+    const treeSpent = p.points?.spent || 0;
     const chosen = skills.find((s) => s.id === sel) || null;
     const toNext = TREE_POINTS_PER_SKILL_POINT - (treeSpent % TREE_POINTS_PER_SKILL_POINT);
+    const onTake = (id) => onAct("take_skill", { skillId: id });
+    const onNode = (skillId, nodeId) => onAct("take_skill_node", { skillId, nodeId });
+
+    // A member who has not picked a class has no panel to show — the tree tab asks them to choose first, and
+    // two screens asking the same question is one too many.
+    if (!p.classId) return null;
 
     return (
         <div className="skp" style={{ "--c": colour }}>
