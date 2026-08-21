@@ -588,15 +588,24 @@ export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult 
 // the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
 // ring calls, so an auto-resolved bout and a played one cannot disagree about what a swing is.
 //
-// ── BOTH FIGHTERS GET A HAND ─────────────────────────────────────────────────────────────────────────────────
-// Nobody is present here BY DEFINITION, so the alternative to giving both sides a competent hand is giving
-// neither one — and that makes an auto-resolved bout a systematically different fight from a played one, at
-// which point the simulator is measuring a game nobody plays. Both sides draw from houseHand, so the balance
-// numbers this produces are the balance of the game as it is actually fought.
+// ── BOTH FIGHTERS CAN BE DEALT A HAND, AND IN PRODUCTION THEY ARE NOT ────────────────────────────────────────
+// Nobody is present in an auto-resolved bout by definition, so once the interactive ring exists the honest
+// thing is to give BOTH sides a competent hand: otherwise an auto-resolved fight is systematically different
+// from a played one and the simulator is measuring a game nobody plays.
 //
-// `hands: false` turns it off, and exists for one purpose: proving this loop is still the same loop. The
-// equivalence test that guards the refactor runs with it off.
-export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000, hands = true } = {}) {
+// It defaults OFF, and that is a correction rather than a design choice. It shipped defaulting ON, which meant
+// resolveAuto — every arena challenge, Gauntlet tier, Road rung, plaza raid and hooked monster — quietly
+// changed under members who were told nothing. Measured: fights 3-8% shorter, a mirror down from 57% to 51%,
+// and a glass cannon against a tank down from 53% to 43%. Small, real, and nobody asked for it.
+//
+// It was written to make the SIMULATOR honest about a fight that does not exist yet. There is no consistency
+// to preserve between auto and played bouts while nothing is played, so there is no reason for it to be live
+// ahead of the ring.
+//
+// FLIP THIS TO TRUE the day the interactive ring is wired to a route, and not before — at that point an
+// auto-resolved defence and a played challenge have to be the same fight, and this is what makes them one.
+// The sims pass `hands: true` explicitly when they want to measure that future.
+export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000, hands = false } = {}) {
     const hand = () => (hands ? houseHand(rng) : { strike: 1, brace: 0 });
     const A = sideOf(me);
     const B = sideOf(foe);
