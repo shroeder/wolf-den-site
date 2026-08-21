@@ -16979,6 +16979,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* THE PERFECT CORE. A child of the bar, so it tracks it for free and grows with Gaff along with everything
    else. Sitting here banks nearly double -- and it is drawn as a brighter seam rather than a separate shape,
    because it is not a second target, it is the middle of the one you already have. */
+/* THE INNER RING. Between the band and the bullseye — see the three-ring note in FishingScene. */
+.fwreel-inner { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    border-radius: 14px; background: rgba(126,255,178,0.20);
+    border-top: 1px solid rgba(126,255,178,0.35); border-bottom: 1px solid rgba(126,255,178,0.35); }
+.fwreel.is-inner .fwreel-inner { background: rgba(126,255,178,0.34); }
 .fwreel-core { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
     border-radius: 14px; background: linear-gradient(180deg, rgba(255,236,150,0.42), rgba(255,215,94,0.24));
     border-top: 1px solid rgba(255,236,150,0.7); border-bottom: 1px solid rgba(255,236,150,0.7); }

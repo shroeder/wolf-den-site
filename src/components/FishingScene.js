@@ -54,8 +54,16 @@ const bandFor = (gaff = 0) => BAND_H + Math.max(0, Math.min(0.25, Number(gaff) |
 // frame rather than 1.0 — and that is the point: 100% has to be hard to be worth printing. The two other
 // changes push the other way (Gaff widens the whole bar, better bait calms the fish), so an invested angler
 // playing well lands in much the same place they always did.
-const CORE_SHARE = 0.42;         // the core is this fraction of the bar's height, centred
-const BAND_CREDIT = 0.55;        // banked per frame inside the bar but outside the core
+// ── THREE RINGS, NOT TWO ─────────────────────────────────────────────────────────────────────────────────────
+// The bar had an edge and a core, so holding the fish was a pass/fail with one bonus state — and the whole
+// middle of the range played identically. Luke: "make the bar have more sections."
+//
+// Three now, and the gap between them is what makes chasing the centre worth doing: drifting inside the bar
+// banks a third, the inner ring two thirds, dead centre the lot. Same total, three times the resolution.
+const CORE_SHARE = 0.30;         // the bullseye, as a fraction of the bar's height, centred
+const INNER_SHARE = 0.62;        // the ring around it
+const BAND_CREDIT = 0.34;        // banked per frame inside the bar but outside the inner ring
+const INNER_CREDIT = 0.68;       // and inside the inner ring but outside the core
 const CORE_CREDIT = 1.0;         // and inside the core
 
 // ── IT RUNS ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -311,11 +319,14 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             // averages the whole run, so the moments spent finding the fish used to cap the result before
             // you had seen where it was.
             const scoring = elapsed >= REEL_WARMUP_MS;
-            const inside = Math.abs(posRef.current - bandRef.current) <= half;
-            const inCore = Math.abs(posRef.current - bandRef.current) <= (BAND * CORE_SHARE) / 2;
+            const off = Math.abs(posRef.current - bandRef.current);
+            const inside = off <= half;
+            const inInner = off <= (BAND * INNER_SHARE) / 2;
+            const inCore = off <= (BAND * CORE_SHARE) / 2;
             if (scoring) {
                 totalRef.current += CORE_CREDIT;
                 if (inCore) bankRef.current += CORE_CREDIT;
+                else if (inInner) bankRef.current += INNER_CREDIT;
                 else if (inside) bankRef.current += BAND_CREDIT;
             }
             // Reel clicks while you are holding and on target — the feedback that says it is working. Tighter
@@ -358,7 +369,9 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
     const pos = posRef.current, band = bandRef.current;
     const half = BAND / 2;
     const inside = Math.abs(pos - band) <= half;
-    const inCore = Math.abs(pos - band) <= (BAND * CORE_SHARE) / 2;
+    const offNow = Math.abs(pos - band);
+    const inInner = offNow <= (BAND * INNER_SHARE) / 2;
+    const inCore = offNow <= (BAND * CORE_SHARE) / 2;
     const scoreNow = scoreOf(bankRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
     const title = warming ? "GET READY…"
@@ -378,6 +391,8 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
             <div className="fwreel-rod" role="presentation">
                 <div className="fwreel-band" style={{ bottom: `${(band - half) * 100}%`, height: `${BAND * 100}%` }}>
                     {/* THE CORE. Drawn as a child of the bar so it tracks it for free and scales with Gaff. */}
+                    {/* Drawn as children of the bar so both track it for free and scale with Gaff. */}
+                    <div className="fwreel-inner" style={{ height: `${INNER_SHARE * 100}%` }} />
                     <div className="fwreel-core" style={{ height: `${CORE_SHARE * 100}%` }} />
                 </div>
                 {/* THE FISH. It swims itself; your thumb drives the BAR. It was a glowing ball, which is

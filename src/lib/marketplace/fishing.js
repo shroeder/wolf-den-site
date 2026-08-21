@@ -671,6 +671,10 @@ function rollSpecies(rareTilt = 0) {
 //
 // It is also deliberately INVISIBLE: no live score, no percentage, no meter. You fish; you find out what you
 // caught when it surfaces. Watching a number tick up was what killed the reveal in the first place.
+// What a flawless reel is worth in RARITY, as opposed to size. Deliberately the same 0.75 gate the treasure
+// bump uses, so "a clean reel" means one thing everywhere in this file.
+const REEL_PROMOTE_AT = 0.75;
+const REEL_PROMOTE_MAX = 0.35;   // at a perfect reel, this often it comes up one tier rarer
 const SIZE_CURVE = 1.6;          // big specimens stay genuinely rare
 const REEL_FLOOR = 0.35;         // the most a flawless reel can lift the bottom, before the curve
 
@@ -886,8 +890,17 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     // the fight door would leave the cast dangling on a creature nobody can take. The cast turns up a fish
     // instead, which is what it would have been.
     const { combatOpenFor } = await import("@/lib/marketplace/arena.js");
+    // ── AND YOUR BAIT DOES NOT SUMMON A WORSE ONE ────────────────────────────────────────────────────────
+    // `rareTilt` used to be passed here, on the reasoning that "the water gives back what it was asked for".
+    // What it actually did: spend a mythic bait, and the monster that overrides your catch is pulled from a
+    // deeper band — a harder fight, more often lost, and the rare fish your bait just bought is discarded
+    // either way. Luke: "people are saying bait makes the outcome worse." On a cast that turned up a
+    // monster, it did: better tackle bought a stronger opponent and threw away the thing it was for.
+    //
+    // A monster is now the same monster whatever you baited with. Bait tilts the SPECIES roll, which is what
+    // it is sold as doing, and nothing else.
     const monster = (combatOpenFor(buyerId) && Math.random() < FISH_MONSTER_CHANCE)
-        ? rollFishMonster(rareTilt) : null;
+        ? rollFishMonster(0) : null;
     const state = {
         species: species.id,
         monster: monster ? monster.id : null,
@@ -965,7 +978,25 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     if (!taken?.fish_state) return { ok: false, error: "nothing_on_the_line" };
     // jsonb normally arrives parsed; tolerate a string in case a driver path hands it back raw.
     const state = typeof taken.fish_state === "string" ? (JSON.parse(taken.fish_state) || {}) : taken.fish_state;
-    const species = fishById(state.species) || FISH[0];
+    // ── AND A CLEAN REEL REACHES DEEPER ──────────────────────────────────────────────────────────────────
+    // Luke: "make the bar help get rarer stuff." Until now the reel only ever put a FLOOR under the size —
+    // land it perfectly and you were promised a fish that was not embarrassing, which is a strange thing to
+    // be excellent at. Treasure has always worked the other way: a clean reel bumps its tier a step (see
+    // below). The species had no such thing, so the same reel improved a chest and did nothing for a fish.
+    //
+    // It is a CHANCE, not a promotion, and it starts where the treasure bump starts. Below 0.75 nothing
+    // happens at all; at a flawless reel it is REEL_PROMOTE_MAX. One tier only, and mythic has nowhere to
+    // go — the ceiling is still luck, which is the rule the size roll is built on.
+    let species = fishById(state.species) || FISH[0];
+    const promoteQ = clamp01(quality);
+    if (promoteQ >= REEL_PROMOTE_AT && species.rarity !== "mythic") {
+        const over = (promoteQ - REEL_PROMOTE_AT) / (1 - REEL_PROMOTE_AT);
+        if (Math.random() < over * REEL_PROMOTE_MAX) {
+            const up = RARITY_ORDER[RARITY_RANK[species.rarity] + 1];
+            const pool = FISH.filter((f) => f.rarity === up);
+            if (pool.length) species = pool[Math.floor(Math.random() * pool.length)];
+        }
+    }
 
     // MISSED THE BITE. It took the bait and left — and the cast comes back, because a limited daily resource
     // should never evaporate on a reaction test.
