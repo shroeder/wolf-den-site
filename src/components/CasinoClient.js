@@ -70,6 +70,10 @@ export default function CasinoClient({ initial }) {
     // The last thing that was not gold. Cleared at the start of every play so it can never look like the
     // machine just paid out twice.
     const [prize, setPrize] = useState(null);
+    // What the pets did on this play, and the pet itself if one turned up. Separate from `prize` because a
+    // pet arriving is a different size of moment than a chest and must not quietly replace one.
+    const [note, setNote] = useState(null);
+    const [wonPet, setWonPet] = useState(null);
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -128,10 +132,37 @@ export default function CasinoClient({ initial }) {
     // The outcome is never in doubt by then: the server decided it before the first reel stopped. The
     // ceremony is presentation over a result already banked, which is the honest version of this — nothing
     // here can change what was rolled.
+    // ── WHAT THE PETS DID ────────────────────────────────────────────────────────────────────────────────
+    // Every machine ends here, which is the point: a prize, a free play, a refund and a pet arriving are the
+    // same four things wherever you were standing, and a floor where the slot celebrates differently from the
+    // wheel is a floor that has to be learned twice.
+    //
+    // It also fixes something the slot had on its own: `pull` cleared the prize banner and never set it, so
+    // the slot's chests were rolled by the server, banked, and never shown.
+    const absorb = useCallback((r) => {
+        if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
+        // The quiet ones. Said plainly and briefly — the pet paying for a pull is a nice thing to notice, not
+        // an event to stop the room for.
+        if (r.onHouse) setNote({ kind: "house", text: "On the house — your stake came back." });
+        else if (r.refund > 0) setNote({ kind: "refund", text: `The Croupier's Cat pushes ${money(r.refund)} back.` });
+        else setNote(null);
+        // The loud one. A casino pet is a 1-in-hundreds-to-thousands event and the rarest is 1 in 5,556, so
+        // it gets the room: its own banner, held until you walk away or play again, and the perk strip
+        // updates underneath it so the thing it BOUGHT you is visible in the same breath.
+        if (r.pet) {
+            setWonPet(r.pet);
+            Sfx.crit(1); Haptic.crit();
+            setSt((prev) => ({
+                ...prev,
+                perks: { ...(prev?.perks || {}), pets: [...(prev?.perks?.pets || []), { id: r.pet.id, name: r.pet.name }] },
+            }));
+        }
+    }, []);
+
     const pull = useCallback(async () => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null);
+        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null);
         Sfx.whoosh();
 
         // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
@@ -172,6 +203,7 @@ export default function CasinoClient({ initial }) {
 
             timers.current.push(setTimeout(() => {
                 setBusy(false);
+                absorb(r);
                 const three = r.reels[0] === r.reels[1] && r.reels[1] === r.reels[2];
                 if (r.won > 0) {
                     setFlash(three ? "big" : "win");
@@ -180,7 +212,7 @@ export default function CasinoClient({ initial }) {
                 }
             }, 780));
         }, MIN_SPIN));
-    }, [bet, busy]);
+    }, [bet, busy, absorb]);
 
     // ── THE WHEEL AND THE TICKET ─────────────────────────────────────────────────────────────────────────
     // Both are ONE ROLL, so they share a shape: take the bet, show the result, celebrate if it paid. The slot
@@ -189,7 +221,7 @@ export default function CasinoClient({ initial }) {
     const play = useCallback(async (body, onResult) => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setPrize(null);
+        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
         Sfx.whoosh();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -204,7 +236,7 @@ export default function CasinoClient({ initial }) {
         }
         onResult(r);
         setSt((p) => ({ ...p, gold: r.gold }));
-        if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
+        absorb(r);
         if (r.won > 0) {
             // A payout worth more than ten times the stake is the moment worth shaking the room for.
             const big = r.won >= r.bet * 10;
@@ -214,7 +246,7 @@ export default function CasinoClient({ initial }) {
         } else {
             Sfx.block(0.3);
         }
-    }, [busy]);
+    }, [busy, absorb]);
 
     const toggleNumber = useCallback((n) => {
         setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
@@ -231,6 +263,17 @@ export default function CasinoClient({ initial }) {
                 <b className="cas-name">The Casino</b>
                 <span className="cas-purse">{money(st?.gold)}<i>gold</i></span>
             </header>
+
+            {/* ── WHO IS WORKING THE FLOOR FOR YOU ────────────────────────────────────────────────────────
+                The five casino pets do nothing you can see at the moment they fire — a stake quietly comes
+                back, a prize rolls off a better shelf. A perk you cannot point at is a perk nobody believes
+                they have, so the ones you own sit at the top of the room by name. Nothing here when you own
+                none: an empty rail advertising five pets you have never seen is a nag, not a feature. */}
+            {(st?.perks?.pets || []).length ? (
+                <div className="cas-pets">
+                    {st.perks.pets.map((p) => <span key={p.id} className="cas-pet" title={p.perk || ""}>{p.name}</span>)}
+                </div>
+            ) : null}
 
             {/* ── THE ROOM ────────────────────────────────────────────────────────────────────────────────
                 Positioned in percentages so the floor is the same room on any screen: a machine at 50 is in
@@ -368,6 +411,21 @@ export default function CasinoClient({ initial }) {
                         Shared by every machine, because a prize is a prize wherever it came from — and it
                         sits ABOVE the stake row so it is the last thing you read before deciding to go
                         again. That placement is the whole reason it is worth showing. */}
+                    {/* ── THE PET TURNED UP ───────────────────────────────────────────────────────────
+                        The rarest thing on this floor: 1 in 455 plays at the kindest and 1 in 5,556 at the
+                        worst. It gets its own banner above everything else, and it says what the pet DOES —
+                        a prestige drop whose effect you have to go and look up is a drop that lands flat. */}
+                    {wonPet ? (
+                        <div className="cas-newpet">
+                            <b>{wonPet.name}</b>
+                            <em>{wonPet.hint || "Joins your collection"}</em>
+                            <i>{wonPet.perk || "works the floor from now on"}</i>
+                        </div>
+                    ) : null}
+
+                    {/* The quiet ones — a free play, a refund. One line, no ceremony. */}
+                    {note ? <p className={`cas-note is-${note.kind}`}>{note.text}</p> : null}
+
                     {prize ? (
                         <div className={`cas-prize${prize.jackpot ? " is-jackpot" : ""}`}>
                             {prize.spriteUrl ? (

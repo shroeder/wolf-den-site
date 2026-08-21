@@ -130,6 +130,26 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
     return grantDrop(buyerId, (await wishedFrom(buyerId, eligible)) || eligible[0], "fishing", { fishRarity });
 }
 
+// ── EXCLUSIVE CASINO PETS ────────────────────────────────────────────────────────────────────────────────────
+// The only source is a play on the casino floor. Rolled per play at absolute odds — the kindest is roughly 1
+// in 450 plays and the rarest, the Night Auditor, is about 1 in 5,500 — so they are a long chase rather than
+// a thing you clear in an evening, which is what "really late game, hard to find" has to mean in practice.
+//
+// Rarest first, so a double hit gives the scarcer pet. Same shape as the raid pets above, for the same
+// reason: one way to grant a pet, not two.
+export async function maybeGrantCasinoPet(buyerId) {
+    if (!buyerId) return null;
+    const owned = await ownedPetSet(buyerId);
+    const eligible = COLLECTIBLES
+        .filter(unlocked(buyerId))
+        .filter((p) => p.casinoExclusive && p.casinoChance > 0 && !owned.has(p.id))
+        .sort((a, b) => (a.casinoChance || 0) - (b.casinoChance || 0));
+    for (const pet of eligible) {
+        if (Math.random() < pet.casinoChance) return grantDrop(buyerId, pet, "casino", {});
+    }
+    return null;
+}
+
 // EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a genuine prestige trophy.
 // Each pet has its own ABSOLUTE per-raid-completion drop chance (`raidChance`), tuned to be exceedingly rare:
 // the easiest (mythic) ~0.025%, the rarest (eternal Golem's Heart) ~0.0005%. The Golem's Heart can ONLY drop

@@ -3,6 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
+import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 
 // ── THE CASINO ───────────────────────────────────────────────────────────────────────────────────────────────
 // A room off the town, owner-gated, laid out like the tavern: you walk left and right, other members walking
@@ -123,12 +125,28 @@ export async function spinSlot(buyerId, { bet } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const stake = clampBet(bet);
 
+    const perks = await casinoPerks(buyerId);
+    // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
+    // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
+    // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
+    // appears in the coin log is a play nobody can audit.
+    let onHouse = false;
     const paid = await db.queryOne(
         `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
         [buyerId, stake],
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_gold" };
     await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake } });
+
+    if (onTheHouse(perks)) {
+        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+            [buyerId, stake]).catch(() => null);
+        if (back) {
+            onHouse = true;
+            paid.gold = back.gold;
+            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "slot" } });
+        }
+    }
 
     const reels = [pickSymbol(), pickSymbol(), pickSymbol()];
     const mult = slotPayout(reels);
@@ -146,9 +164,67 @@ export async function spinSlot(buyerId, { bet } = {}) {
         }
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
-    const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf") });
-    return { ok: true, reels, mult, bet: stake, won, gold, prize };
+    const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === "wolf"), perks });
+    // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
+    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    return { ok: true, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
 }
+
+// ── WHAT THE CASINO PETS ARE WORTH ───────────────────────────────────────────────────────────────────────────
+// Five pets whose only source is this floor and whose only effect is on this floor. A pet that made you
+// better at fighting would be a pet everybody has to chase; these are for people who like the wheel.
+//
+// EVERY PERK IS BOUNDED, and that is not a style choice — the check script computes each machine's return
+// with ALL FIVE owned and fails if it crosses the ceiling. The ceiling is what makes these safe to hand out:
+// they cannot be tuned into a money printer by accident, because a printer is what the check is looking for.
+//
+//   freePlay     the stake comes back. Adds its own value straight onto the return.
+//   prizeChance  more non-gold prizes. Does not touch the gold maths at all.
+//   prizeTierUp  prizes roll from a better shelf.
+//   wheelRefund  a share of a LOSING wheel spin, so it only ever helps where the wheel already took it.
+export const CASINO_PETS = COLLECTIBLES.filter((p) => p.casinoExclusive && p.casinoPerk);
+
+// What a perk IS, in a sentence, written once. The floor shows it on the rail and the drop banner says it
+// at the moment the pet arrives — a prestige drop whose effect has to be looked up elsewhere lands flat.
+export function perkPhrase(k = {}) {
+    if (k.freePlay) return `Pays for about 1 play in ${Math.round(1 / k.freePlay)}`;
+    if (k.wheelRefund) return `Pushes ${Math.round(Math.min(1, k.wheelRefund / REFUND_CHANCE) * 100)}% back on the odd losing spin`;
+    if (k.prizeChance) return "Finds prizes the house missed";
+    if (k.prizeTierUp) return "Prizes come off a better shelf";
+    return "Works the floor";
+}
+
+/** A dropped pet, told what it does. maybeGrantCasinoPet is shared with every other pet source, so the
+ *  casino-specific half is added here rather than bent into the generic granter. */
+const withPerk = (pet) => {
+    if (!pet) return null;
+    const def = CASINO_PETS.find((p) => p.id === pet.id);
+    return { ...pet, perk: perkPhrase(def?.casinoPerk) };
+};
+
+/** Everything the pets in a member's collection add up to. Owned, not equipped: these are not combat pets
+ *  and making somebody re-equip to use the casino would be a rule nobody would guess. */
+export async function casinoPerks(buyerId) {
+    const out = { freePlay: 0, prizeChance: 0, prizeTierUp: false, wheelRefund: 0, pets: [] };
+    if (!buyerId) return out;
+    const rows = await db.query(
+        `SELECT item_id FROM mkt_item_collected WHERE buyer_id = $1`, [buyerId],
+    ).catch(() => []);
+    const owned = new Set(rows.map((r) => r.item_id));
+    for (const pet of CASINO_PETS) {
+        if (!owned.has(pet.id)) continue;
+        out.pets.push({ id: pet.id, name: pet.name, perk: perkPhrase(pet.casinoPerk) });
+        const k = pet.casinoPerk;
+        out.freePlay += k.freePlay || 0;
+        out.prizeChance += k.prizeChance || 0;
+        out.wheelRefund += k.wheelRefund || 0;
+        if (k.prizeTierUp) out.prizeTierUp = true;
+    }
+    return out;
+}
+
+/** The stake back, before anything else happens. Returns true when the house is paying for this one. */
+const onTheHouse = (perks) => (perks?.freePlay || 0) > 0 && Math.random() < perks.freePlay;
 
 // ── THE PRIZE ON TOP ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke's brief again: "it's a gold sink with a chance to win like chests, laurels, doubloons, pet stones,
@@ -192,11 +268,17 @@ const pickPrize = () => {
  * other play takes the flat chance. Granting goes through the SAME function a fishing haul uses, so a chest
  * from a slot machine and a chest from the sea are the same chest and land in the same place.
  */
-export async function rollCasinoPrize(buyerId, { jackpot = false } = {}) {
-    if (!jackpot && Math.random() >= PRIZE_CHANCE) return null;
-    const tier = jackpot
+export async function rollCasinoPrize(buyerId, { jackpot = false, perks = null } = {}) {
+    const chance = PRIZE_CHANCE + (perks?.prizeChance || 0);
+    if (!jackpot && Math.random() >= chance) return null;
+    let tier = jackpot
         ? (Math.random() < 0.35 ? "legendary" : "epic")
         : (Math.random() < 0.2 ? "rare" : "common");
+    // The Magpie never takes the smaller shiny.
+    if (perks?.prizeTierUp) {
+        const ladder = ["common", "rare", "epic", "legendary"];
+        tier = ladder[Math.min(ladder.length - 1, ladder.indexOf(tier) + 1)] || tier;
+    }
     const kind = jackpot && Math.random() < 0.5 ? "chest" : pickPrize();
     const prize = await grantHaul(buyerId, kind, tier).catch(() => null);
     if (prize) {
@@ -213,6 +295,37 @@ export async function rollCasinoPrize(buyerId, { jackpot = false } = {}) {
 // Twenty segments: nine gold, nine violet, and TWO wolves. The wolves are the house's edge made visible —
 // they are on the wheel where you can see them, rather than hidden in a payout that is quietly short.
 //
+// How often the Croupier's Cat pushes chips back. The PET carries the expected cost; this only decides
+// whether that cost arrives as a dribble or as a moment. See spinWheel.
+export const REFUND_CHANCE = 0.05;
+
+// ── EVERY PET OWNED ──────────────────────────────────────────────────────────────────────────────────────────
+// The worst case the odds have to survive. check-casino runs each machine's return through perkedRtp with
+// THIS and fails if any of them crosses the ceiling — so a perk cannot be nudged upward without the gate
+// noticing. Built from the pet list rather than typed out, because a hand-copied budget is a budget that
+// silently stops matching the pets.
+export const MAX_PERKS = CASINO_PETS.reduce((out, pet) => {
+    const k = pet.casinoPerk || {};
+    out.freePlay += k.freePlay || 0;
+    out.prizeChance += k.prizeChance || 0;
+    out.wheelRefund += k.wheelRefund || 0;
+    if (k.prizeTierUp) out.prizeTierUp = true;
+    return out;
+}, { freePlay: 0, prizeChance: 0, wheelRefund: 0, prizeTierUp: false });
+
+/**
+ * A machine's return once the pets are in play — the one formula, used by the games' pricing and by the
+ * check script, so the gate can never be checking arithmetic the floor does not run.
+ *   freePlay    hands the stake back on some plays, which adds its own rate straight onto the return
+ *   wheelRefund pays a share of a LOSS, and only on plays that were not already free
+ * prizeChance and prizeTierUp are deliberately absent: they buy chests, not gold, and folding a chest into
+ * a percentage produces a number that looks rigorous and is invented.
+ */
+export function perkedRtp(base, perks = MAX_PERKS, lossChance = 0) {
+    const free = Math.min(1, perks?.freePlay || 0);
+    return base + free + (1 - free) * lossChance * (perks?.wheelRefund || 0);
+}
+
 // Every bet on this wheel returns exactly 90%, which is deliberate: there is no "smart" bet to discover and
 // no trap bet to fall into. What you choose changes the SHAPE of the outcome — often and small, or rarely and
 // enormous — and never the value of it.
@@ -244,12 +357,28 @@ export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}
     if (!rule) return { ok: false, error: "bad_bet" };
     const stake = clampBet(bet);
 
+    const perks = await casinoPerks(buyerId);
+    // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
+    // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
+    // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
+    // appears in the coin log is a play nobody can audit.
+    let onHouse = false;
     const paid = await db.queryOne(
         `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
         [buyerId, stake],
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_gold" };
     await logCoin(buyerId, -stake, "casino_wheel_bet", { balanceAfter: paid.gold, meta: { bet: stake, choice } });
+
+    if (onTheHouse(perks)) {
+        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+            [buyerId, stake]).catch(() => null);
+        if (back) {
+            onHouse = true;
+            paid.gold = back.gold;
+            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "wheel" } });
+        }
+    }
 
     const seg = WHEEL[Math.floor(Math.random() * WHEEL.length)];
     const hit = rule.hits(seg, pick);
@@ -264,9 +393,26 @@ export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}
             await logCoin(buyerId, won, "casino_wheel_win", { balanceAfter: gold, meta: { bet: stake, choice, seg: seg.i } });
         }
     }
-    // Landing a wolf pocket ON a wolf bet — 2 in 20, and only if you called it.
-    const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf" });
-    return { ok: true, seg, choice, hit, bet: stake, won, gold, prize };
+    // ── THE CROUPIER'S CAT ─────────────────────────────────────────────────────────────────────────────────
+    // A share of a spin the wheel already took. Three rules keep it honest and one keeps it fun:
+    //   • only on a LOSS, so it can never compound with a win into something the ceiling did not price;
+    //   • never on a play that was already free, because refunding a stake nobody paid mints gold;
+    //   • the same expected cost either way — but paid RARELY and BIG (a quarter of the pile, one losing
+    //     spin in twenty) instead of a rounding error on every loss. A 1% dribble is invisible; the cat
+    //     sliding a stack back across the felt is the reason to want the cat.
+    let refund = 0;
+    if (!hit && !onHouse && perks.wheelRefund > 0 && Math.random() < REFUND_CHANCE) {
+        refund = Math.round(stake * Math.min(1, perks.wheelRefund / REFUND_CHANCE));
+        if (refund > 0) {
+            const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+                [buyerId, refund]).catch(() => null);
+            if (back) { gold = back.gold; await logCoin(buyerId, refund, "casino_wheel_refund", { balanceAfter: gold }); }
+            else refund = 0;
+        }
+    }
+    const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf", perks });
+    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    return { ok: true, seg, choice, hit, bet: stake, won, gold, prize, pet, onHouse, refund };
 }
 
 // ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -309,12 +455,28 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     if (clean.length !== KENO_PICKS) return { ok: false, error: "bad_ticket" };
     const stake = clampBet(bet);
 
+    const perks = await casinoPerks(buyerId);
+    // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
+    // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
+    // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
+    // appears in the coin log is a play nobody can audit.
+    let onHouse = false;
     const paid = await db.queryOne(
         `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
         [buyerId, stake],
     ).catch(() => null);
     if (!paid) return { ok: false, error: "no_gold" };
     await logCoin(buyerId, -stake, "casino_keno_bet", { balanceAfter: paid.gold, meta: { bet: stake, picks: clean } });
+
+    if (onTheHouse(perks)) {
+        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+            [buyerId, stake]).catch(() => null);
+        if (back) {
+            onHouse = true;
+            paid.gold = back.gold;
+            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "keno" } });
+        }
+    }
 
     // Draw without replacement, which is what makes the odds hypergeometric rather than binomial.
     const bag = Array.from({ length: KENO_POOL }, (_, i) => i + 1);
@@ -333,8 +495,9 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         }
     }
     // Five of five is 1 in 2,611 — the rarest thing on the floor, and the only one that is worth a certainty.
-    const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS });
-    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize };
+    const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
+    const pet = withPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize, pet, onHouse };
 }
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -391,5 +554,6 @@ export async function getCasinoState(buyerId) {
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
         wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },
+        perks: await casinoPerks(buyerId),
     };
 }

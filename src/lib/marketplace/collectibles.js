@@ -272,6 +272,39 @@ export const COLLECTIBLES = [
     // ── Raid-exclusive — ULTRA-RARE pets dropped ONLY by completing a live Wolf Den Town raid ───────────
     // No shop, chest, boss, spin, or item-unlock path — the sole source is coming down to the plaza and fighting
     // (and felling) Town raids, so they're a true badge of the pack's fiercest defenders. Filtered by the
+    // ── THE CASINO FIVE ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "maybe like five exclusive pets that are really late game things, hard to find — they're not
+    // super powerful pets, they just give casino bonuses."
+    //
+    // So: the only source is the casino floor, the odds are tiny, and NOT ONE OF THEM TOUCHES COMBAT.
+    // Their `casinoPerk` is read by casino.js and by nothing else, which is the whole point — a pet that
+    // makes you better at fighting is a pet everyone has to chase; a pet that makes the wheel a little
+    // kinder is a pet for people who like the wheel.
+    //
+    // Every perk is BOUNDED and the odds file proves it: check-casino computes each machine's return with
+    // ALL FIVE owned and fails if it crosses the ceiling. These pets cannot be tuned into a money printer
+    // by accident, because the printer is what the check is looking for.
+    { id: "copper_paw", name: "Copper Paw", Icon: GiCat, color: "#c98f4a", rarity: "rare", source: "casino",
+        casinoExclusive: true, casinoChance: 0.0022, casinoPerk: { freePlay: 0.015 },
+        activeStat: "gold_find", hint: "Sleeps on the change tray and occasionally pays for you",
+        spritePrompt: "a stout copper-furred shorthair cat curled on a pile of gold coins, one paw resting on a coin" },
+    { id: "tallyman", name: "The Tallyman", Icon: GiRaven, color: "#8794a3", rarity: "epic", source: "casino",
+        casinoExclusive: true, casinoChance: 0.0012, casinoPerk: { prizeChance: 0.0075 },
+        activeStat: "fortune", hint: "Counts what the house forgot to",
+        spritePrompt: "a sleek black raven wearing a tiny brass visor, holding a small counting token in its beak" },
+    { id: "gilded_magpie", name: "Gilded Magpie", Icon: GiRaven, color: "#ffd75e", rarity: "legendary", source: "casino",
+        casinoExclusive: true, casinoChance: 0.0006, casinoPerk: { prizeTierUp: true },
+        activeStat: "fortune", hint: "Never takes the smaller shiny",
+        spritePrompt: "an iridescent magpie with gold-tipped wings clutching a glittering jewel, black and white plumage shot through with gold" },
+    { id: "croupiers_cat", name: "The Croupier's Cat", Icon: GiCat, color: "#a982ff", rarity: "legendary", source: "casino",
+        casinoExclusive: true, casinoChance: 0.0005, casinoPerk: { wheelRefund: 0.012 },
+        activeStat: "fortune", hint: "Sits on the losing side of the wheel and disapproves",
+        spritePrompt: "an elegant violet-grey cat in a tiny croupier's waistcoat seated beside a roulette wheel, tail curled" },
+    { id: "night_auditor", name: "Night Auditor", Icon: GiOwl, color: "#9fc6dd", rarity: "mythic", source: "casino",
+        casinoExclusive: true, casinoChance: 0.00018, casinoPerk: { freePlay: 0.02 },
+        activeStat: "xp_gain", hint: "Works the floor at four in the morning and misses nothing",
+        spritePrompt: "a small pale grey owl in a threadbare waistcoat perched on a stack of ledgers, round spectacles, tired knowing eyes" },
+
     // `raidExclusive` flag in pet-drops.js maybeGrantRaidPet(); drop odds are tiny (best on a Golem boss kill).
     // `raidChance` = the ABSOLUTE per-raid-completion drop probability (Luke's spec: easiest 0.025% → hardest 0.0005%).
     { id: "warbanner_wolf", name: "Warbanner Wolf", Icon: GiWolfHead, color: "#e0433f", rarity: "mythic", source: "raid", raidExclusive: true, eliteOnly: true, raidChance: 0.00025, activeStat: "might", hint: "Rallied from a Town raid — the pack's fiercest", spritePrompt: "a battle-scarred grey war-wolf draped in a tattered crimson war banner, snarling and armored for battle" },

@@ -14,7 +14,7 @@
 import {
     SLOT_SYMBOLS, SLOT_PAYS, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
     WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
-    PRIZE_CHANCE, PRIZE_SHELF,
+    PRIZE_CHANCE, PRIZE_SHELF, CASINO_PETS, MAX_PERKS, perkedRtp, REFUND_CHANCE,
 } from "../src/lib/marketplace/casino.js";
 
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
@@ -120,6 +120,45 @@ console.log(`  a jackpot     certain, from a better shelf`);
 console.log(`  the shelf     ${PRIZE_SHELF.map((p) => p.kind).join(", ")}`);
 if (PRIZE_CHANCE > 0.05) {
     problems.push(`prizes land on ${pct(PRIZE_CHANCE)} of plays — that is often enough to be the reason to play, which makes the gold economy decorative`);
+}
+
+
+// ── AND NOW WITH EVERY PET ON THE FLOOR ──────────────────────────────────────────────────────────────────────
+// The five casino pets are the only content in the game that edits a payout table from outside it, which makes
+// them the likeliest way this floor ever turns into a money printer: each perk is small, none of them looks
+// dangerous alone, and nobody adding the sixth one would think to re-check the fifth.
+//
+// So the ceiling is enforced against the WORST case — one player holding all five, on the bet each machine
+// pays the most back on — using perkedRtp, the same function the floor prices with.
+console.log("\nWITH ALL FIVE PETS OWNED (the worst case the ceiling has to survive)");
+for (const pet of CASINO_PETS) {
+    const k = pet.casinoPerk;
+    const what = k.freePlay ? `${pct(k.freePlay)} of plays free`
+        : k.wheelRefund ? `${pct(k.wheelRefund)} of a losing wheel spin back (paid as ${pct(Math.min(1, k.wheelRefund / REFUND_CHANCE))} of the stake, ${pct(REFUND_CHANCE)} of losses)`
+        : k.prizeChance ? `+${pct(k.prizeChance)} prize chance`
+        : k.prizeTierUp ? "prizes roll from a better shelf" : "nothing";
+    console.log(`  ${pet.name.padEnd(18)} ${String(pet.rarity).padEnd(10)} 1 in ${String(Math.round(1 / pet.casinoChance).toLocaleString()).padStart(6)} plays   ${what}`);
+}
+console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.wheelRefund)} wheel refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
+
+const perked = [
+    { name: "the slot", r: perkedRtp(rtp) },
+    { name: "keno", r: perkedRtp(kr) },
+    ...Object.entries(WHEEL_BETS).map(([id, bet]) => {
+        // Worst bet FIRST: the refund only pays on a loss, so the long shots carry the most of it.
+        const loss = 1 - WHEEL.filter((seg) => bet.hits(seg, 0)).length / WHEEL.length;
+        return { name: `the wheel, ${bet.label}`, r: perkedRtp(wheelRtp(id, 0), MAX_PERKS, loss) };
+    }),
+].sort((a, b) => b.r - a.r);
+
+console.log("");
+for (const m of perked) {
+    const head = RTP_CEILING - m.r;
+    console.log(`  ${m.name.padEnd(22)} ${pct(m.r).padStart(7)}   ${(head >= 0 ? `${pct(head)} under` : `${pct(-head)} OVER`).padStart(14)} the ceiling`);
+    if (m.r > RTP_CEILING) {
+        problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — past the ${pct(RTP_CEILING)} ceiling. Lower a perk in collectibles.js or a payout in casino.js.`);
+    }
+    if (m.r >= 1) problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — that is a money printer with a lever on it`);
 }
 
 // ── THE VERDICT ──────────────────────────────────────────────────────────────────────────────────────────────

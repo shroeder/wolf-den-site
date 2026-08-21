@@ -17501,3 +17501,39 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-prize.is-jackpot { border-color: rgba(255,215,94,0.7); background: rgba(255,215,94,0.1);
     box-shadow: 0 0 26px rgba(255,215,94,0.28); }
 .cas-prize.is-jackpot b { color: #ffe9b8; }
+
+/* ── THE FIVE, AND WHAT THEY DO ──────────────────────────────────────────────────────────────────────
+   A casino pet's whole effect is invisible at the moment it fires: a stake comes back, a prize rolls off
+   a better shelf. So the ones you own are named at the top of the room — a perk nobody can point at is a
+   perk nobody believes they have. The rail renders only when you own something; five slots of grey
+   silhouettes advertising pets you have never seen is a nag rather than a feature. */
+.cas-pets { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
+.cas-pet { font-size: 10px; font-weight: 800; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 999px;
+    color: #ffe9b8; border: 1px solid rgba(255,215,94,0.34); background: rgba(255,215,94,0.09); }
+
+/* The quiet perks. One line, no animation worth the name — the house paying for a pull is a thing to
+   notice on your way past, not an event to stop the room for. */
+.cas-note { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: #ffe9b8;
+    animation: casNote .3s ease both; }
+.cas-note.is-refund { color: #d9c2ff; }
+@keyframes casNote { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── AND THE LOUD ONE ────────────────────────────────────────────────────────────────────────────────
+   1 in 455 plays at the kindest of the five and 1 in 5,556 at the rarest, so this is the biggest thing
+   that can happen on this floor and it is allowed to look like it. It says what the pet DOES, because a
+   prestige drop whose effect has to be looked up somewhere else lands flat. */
+.cas-newpet { position: relative; overflow: hidden; margin: 0 0 10px; padding: 12px 14px; border-radius: 14px;
+    border: 1px solid rgba(255,215,94,0.75); background: linear-gradient(160deg, rgba(255,215,94,0.16), rgba(169,130,255,0.12));
+    box-shadow: 0 0 34px rgba(255,215,94,0.3); text-align: center;
+    animation: casNewPet .6s cubic-bezier(.2,1.5,.35,1) both; }
+.cas-newpet b { display: block; font-size: 1.15rem; font-weight: 900; color: #ffe9b8; letter-spacing: 0.01em; }
+.cas-newpet em { display: block; font-style: normal; font-size: 11px; color: #e6dcc4; margin-top: 3px; }
+.cas-newpet i { display: block; font-style: normal; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #ffd75e; margin-top: 7px; opacity: 0.85; }
+/* A slow sweep of light across the card, once. It is the difference between a box appearing and something
+   arriving. */
+.cas-newpet::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.3) 50%, transparent 62%);
+    transform: translateX(-120%); animation: casSweep 1.5s ease .25s both; }
+@keyframes casNewPet { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes casSweep { to { transform: translateX(120%); } }
