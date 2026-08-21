@@ -95,6 +95,14 @@ export function describeAvatar(rawConfig) {
 // identity and redraw it as a full-body game character. The style tokens below are kept IDENTICAL to the
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
+// ── AND THE NUDGE IS NOT IN HERE, ON PURPOSE ─────────────────────────────────────────────────────────────────
+// This function's output is also the CHANGE DETECTOR: `pending` and `skipIfUnchanged` both work by comparing
+// the stored `avatar_sprite_prompt` against what this returns now. So any edit to this string — even one that
+// would not change a single member's picture — marks EVERY sprite in the game as stale and the cron redraws
+// the entire roster. That is a real bill, and Luke's instruction was explicit: "do not regenerate."
+//
+// So wording that is about HOW to draw rather than WHAT to draw lives in SPRITE_RULES below and is appended
+// at the moment the request is sent. Same instruction to the model, and no member is re-billed for it.
 export function buildSpritePrompt(config, gear = "") {
     // ── DO NOT ASK FOR GLASSES ON A FACE THAT HAS NONE ───────────────────────────────────────────────────
     // The feature list below used to read "...facial hair, glasses, and clothing..." for EVERY member, so the
@@ -112,6 +120,19 @@ export function buildSpritePrompt(config, gear = "") {
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
 export const DEFAULT_SPRITE_PROMPT = buildSpritePrompt(DEFAULT_AVATAR);
+
+// ── ONE WEAPON PER HAND ──────────────────────────────────────────────────────────────────────────────────────
+// The model likes to hand a hero a sword AND put a second identical sword on their hip, or give them two
+// shields. Luke: "might need some help with generating sprites so they don't double equip same hand... do not
+// regenerate, but in the future, whenever it happens to generate, maybe the prompt could nudge it."
+//
+// Which is exactly what this is: appended to every request from now on, applied to the next draw a member
+// earns on their own (a gear change or an avatar edit), and charged to nobody in the meantime. It is kept out
+// of buildSpritePrompt because that function doubles as the change detector — see the note above it.
+export const SPRITE_RULES = " ONE WEAPON PER HAND AND NO DUPLICATES: draw each piece of equipment exactly once "
+    + "and only where it belongs — a one-handed weapon is held in ONE hand and does not also appear sheathed, "
+    + "floating, or duplicated in the other hand; a shield goes on the arm that is not holding the weapon; "
+    + "never draw two of the same sword, axe or shield on one figure.";
 
 // Buyers whose sprite should be (re)drawn now. Redraw when the avatar's APPEARANCE or equipped GEAR changed
 // since the last draw (the art prompt includes equipped gear) — BUT never more than once per
@@ -313,7 +334,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, mo
     // A draw that came back cropped or full of holes is thrown away and redrawn rather than shipped. See
     // sprite-cleanup.js for why these are detected-and-redrawn instead of repaired.
     let verdict = { ok: true, problems: [] };
-    const url = await editImage(png, prompt, {
+    const url = await editImage(png, prompt + SPRITE_RULES, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
@@ -349,7 +370,7 @@ export async function setDefaultSpriteFromImage(base64) {
 export async function generateDefaultSprite() {
     const prompt = buildSpritePrompt(DEFAULT_AVATAR);
     const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
-    const url = await editImage(png, prompt, {
+    const url = await editImage(png, prompt + SPRITE_RULES, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
         model: SPRITE_MODEL, quality: SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
