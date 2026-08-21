@@ -206,6 +206,18 @@ function castSkill(ring, skill, att, def) {
         const frac = Math.max(0, B.hp) / B.maxHp;
         if (frac < skill.executeAt) mult += skill.executeMax * (1 - frac / skill.executeAt);
     }
+    // ── AND THE MIRROR OF IT, READING YOUR OWN WOUNDS ────────────────────────────────────────────────────────
+    // Execute's third branch. The same curve pointed at the caster instead of the target, which makes it the
+    // one term in the game that is worth MORE the worse the fight is going — the comeback button, and the only
+    // thing a cornered fighter has that a comfortable one does not.
+    //
+    // It ADDS to the execute term rather than replacing it, so a build that took a node from both branches
+    // gets both, and a fighter who is nearly dead swinging at somebody nearly dead gets the pair of them. That
+    // is the intended ceiling: it costs six points across two branches and neither capstone.
+    if (skill.desperateAt > 0 && A.maxHp > 0) {
+        const frac = Math.max(0, A.hp) / A.maxHp;
+        if (frac < skill.desperateAt) mult += skill.desperateMax * (1 - frac / skill.desperateAt);
+    }
 
     // ── AND FOR ONE BLOW, YOU ARE SOMEBODY ELSE ──────────────────────────────────────────────────────────────
     const was = {

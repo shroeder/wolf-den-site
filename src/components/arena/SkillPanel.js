@@ -111,7 +111,7 @@ function Detail({ s, busy, points, onTake, onNode, onClose }) {
             ) : (
                 <>
                     <div className="skp-nodes-lab">
-                        <span>Two branches</span>
+                        <span>Three branches</span>
                         <em>{NODE_COST} point a rung &middot; top down</em>
                     </div>
                     {/* ── TWO LADDERS, SIDE BY SIDE ────────────────────────────────────────────────────────
@@ -300,9 +300,31 @@ export default function SkillPanel({ classId, taken = {}, points = 0, treeSpent 
                     text-transform: uppercase; color: #9aa2ab; }
                 .skp-nodes-lab em { font-style: normal; font-size: 9.5px; color: #7d858f; }
 
-                /* Two columns even on a phone: seeing both ladders at once is the entire point of the
-                   screen, and stacking them turns the fork back into the flat list it replaced. */
-                .skp-branches { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+                /* ── THREE LADDERS ────────────────────────────────────────────────────────────────────
+                   Three columns wherever three columns fit, because seeing the ladders side by side is the
+                   entire point of the screen — stacking them turns the argument back into the flat list it
+                   replaced.
+                   Three does not fit a phone, though: 375px leaves about 100px a column once the page and
+                   panel padding are out, and a node card cannot be read at 100px. So the row SCROLLS rather
+                   than squeezing — a fixed floor per column, two and a bit visible, swipe for the third. The
+                   headers stay legible, which is what makes the third one findable rather than hidden. */
+                /* ── AND THE THIRD ONE HAS TO ANNOUNCE ITSELF ─────────────────────────────────────
+                   At 146px a column, two filled the phone exactly and the third sat flush against the edge
+                   with no sliver showing — a branch that exists, costs points, and that nobody would ever
+                   know to swipe for. 134px leaves about fifty pixels of the third column visible, which is
+                   the whole affordance: a cut-off card reads as "there is more" in a way that a clean edge
+                   never does. The fade is the belt to that brace. */
+                .skp-branches { display: grid; gap: 7px; grid-auto-flow: column;
+                    grid-auto-columns: minmax(134px, 1fr); overflow-x: auto; padding-bottom: 4px;
+                    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+                    -webkit-mask-image: linear-gradient(to right, #000 88%, rgba(0,0,0,.25));
+                    mask-image: linear-gradient(to right, #000 88%, rgba(0,0,0,.25)); }
+                .skp-branches > * { scroll-snap-align: start; }
+                /* Once all three genuinely fit, stop scrolling, drop the fade, and share the width evenly. */
+                @media (min-width: 560px) {
+                    .skp-branches { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr);
+                        overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+                }
                 .skp-branch { display: grid; gap: 5px; padding: 8px 7px 9px; border-radius: 13px;
                     background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.07); align-content: start; }
                 .skp-branch.is-full { border-color: color-mix(in srgb, var(--c) 55%, transparent);
@@ -334,7 +356,11 @@ export default function SkillPanel({ classId, taken = {}, points = 0, treeSpent 
                 .skp-rung:not(.is-held) img { filter: grayscale(1) brightness(.72); }
                 .skp-rung-id { min-width: 0; }
                 .skp-rung-id b { display: block; font-size: 11px; font-weight: 900; color: #dfe4ea; line-height: 1.2;
-                    overflow-wrap: anywhere; }
+                    /* break-word, not anywhere. "anywhere" lets the browser split a word to minimise the
+                       column even when the word would have fitted, which printed Exsanguinat/e on a phone.
+                       This only breaks a word that genuinely cannot fit.
+                       (And no backticks in here: the whole block is a template literal, so one ends it.) */
+                    overflow-wrap: break-word; }
                 .skp-cap-tag { display: block; margin-top: 1px; font-style: normal; font-size: 8px;
                     font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--c); }
                 .skp-rung-desc { display: block; margin-top: 5px; font-size: 10px; line-height: 1.4; color: #98a0aa; }

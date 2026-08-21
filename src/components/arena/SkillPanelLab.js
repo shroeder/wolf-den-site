@@ -79,7 +79,7 @@ export default function SkillPanelLab() {
         <main className="spl">
             <h1 className="spl-h1">Skill Panel &mdash; all three classes</h1>
             <p className="spl-note">
-                {SKILLS.length} skills, two branches of three in each, read live out of
+                {SKILLS.length} skills, three branches of three in each, read live out of
                 {" "}<code>arena-skills.js</code>. Buttons work; nothing is saved.
             </p>
             <div className="spl-grid">
