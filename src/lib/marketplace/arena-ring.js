@@ -134,6 +134,13 @@ function advance(ring, rng) {
         // and the stun skip that openTurn pushes — those were the lines still coming out blank. A wound
         // eating a third of somebody's health between two swings is not a footnote; it is frequently the
         // reason the fight went the way it did.
+        // ── COUNTED ON THE CLOCK, NOT ON YOUR TAPS ───────────────────────────────────────────────────────
+        // Reset the moment YOUR beat comes round, whether or not you get to use it. Counting from your last
+        // ACTION instead would have blamed the speed gap for a beat a freeze ate: Rimebind takes your turn,
+        // the ring rolls straight on to their next one, and the marker would have called that "faster" when
+        // the honest line — "You cannot act." — is already on screen one row above it.
+        if (mine) ring.foeRun = 0;
+        else ring.foeRun = (ring.foeRun || 0) + 1;
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });
@@ -145,6 +152,19 @@ function advance(ring, rng) {
         // actually theirs. Their skill choice happens the same way it always did — housePick, off their own
         // build — it simply no longer waits for a tap that was never a choice.
         if (!mine) {
+            // ── AND SAY SO WHEN THE CLOCK GIVES THEM TWO ─────────────────────────────────────────────────
+            // Luke: "something is up with attack speed. the enemy hit me twice then my turn, then they hit
+            // me twice again then I attack once." Nothing was up with it — measured against rung 31, the
+            // beats run 1:1 with a double every fourth exchange, which is exactly the 1.06 v 1.31 speed
+            // gap. The rule was working and it was invisible.
+            //
+            // It is invisible because of how a beat is PACKAGED: one tap comes back as your swing plus
+            // every foe beat the clock owes before your next one, so a double always lands in the two
+            // sentences immediately before "your turn" comes back. From the seat, that reads as them
+            // going twice and you going once — a bug, not a fighter who is faster than you.
+            //
+            // So the second one names itself. `foeRun` is counted at the top of this loop, off the clock
+            // rather than off your taps; anything past the first is a blow the clock gave them.
             const foeSkill = housePick(ring.foeSkills, ring.foeCd, {
                 selfFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
                 foeFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
@@ -162,7 +182,8 @@ function advance(ring, rng) {
                 });
             } else ring.log.push({ t: ring.t, who: "foe", cast: true, meShield: ring.A.shield, foeShield: ring.B.shield });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
-            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe" });
+            narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe",
+                again: ring.foeRun > 1 });
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
             for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
             closeTurn(ring);
@@ -314,7 +335,7 @@ function uncast(skill, att, state) {
 // fighter. Tagging the whole range with the caster's skill put their name on your reply: a counter of yours
 // came back as "Rupture", and the on-field callout reads `ability`, so the screen announced their move over
 // your answer to it.
-function narrate(ring, from, { name, skill = null, by = "me" }) {
+function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
     for (let i = from; i < ring.log.length; i += 1) {
         const l = ring.log[i];
         if (l.beat != null) continue;                 // already narrated (a thorn, a counter)
@@ -322,6 +343,9 @@ function narrate(ring, from, { name, skill = null, by = "me" }) {
         l.damage = l.dmg || 0;
         const answer = Boolean(l.thorns || l.counter);
         if (skill && l.who === by && !answer) l.ability = skill.name;
+        // Only on the mover's own line — a thorn or a counter is YOUR reply, and it is not the thing the
+        // clock handed them.
+        if (again && l.who === by && !answer) l.again = true;
         const mine = l.who === "me";
         const actor = mine ? "You" : name;
         const verb = mine ? "" : "s";
@@ -344,6 +368,10 @@ function narrate(ring, from, { name, skill = null, by = "me" }) {
         else if (l.counter) l.text = `${actor} answer${verb} — ${took}`;
         else if (l.ability) l.text = `${actor} cast${verb} ${l.ability} — ${took}`;
         else l.text = `${actor} strike${verb} — ${took}`;
+        // Said in the sentence as well as on the field, because the log is a drawer and the drawer is shut.
+        // Inserted before the dash rather than rebuilt, so it keeps whatever the line already said — the
+        // skill's name included — and the CRIT insertion below still finds the first dash after it.
+        if (l.again) l.text = l.text.replace(" — ", " again — ");
         if (l.crit && l.damage > 0) l.text = l.text.replace(" — ", " — CRIT ");
         if (l.frozen) l.text += " Frozen solid.";
         else if (l.burned) l.text += " It catches fire.";

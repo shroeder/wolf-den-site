@@ -1670,7 +1670,15 @@ export async function startBout(buyerId, targetId = null) {
         // what makes the tenth fight of a house the tenth fight is that it brings deeper moves than the nine
         // before it. npcAbilities gets nastier with tier, so a champion is read a tier band up.
         const kitTier = Math.max(1, Math.round(rung * 0.9) + (f.champion ? 8 : 0));
-        foeKit = { ...f, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(kitTier, f.archetype) };
+        // ── AND THE DECK, WHICH THIS BRANCH DID NOT GET ──────────────────────────────────────────────────
+        // npcSkills went into the town bout, the fishing bout and the Gauntlet tier, and MISSED the Road —
+        // which is the one Luke was playing when he reported a foe that "doesn't go water splash or icicle
+        // blast or something". Traced against rung 31: every beat of the fight was "Snare-Setter Wyn
+        // strikes", never a named move, because `skills` was never on the kit and `abilities` is a list the
+        // ring does not read. Read at the RUNG, so the depth of the deck climbs the Road with everything
+        // else; a champion is read a band up, same as its abilities are.
+        foeKit = { ...f, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(kitTier, f.archetype),
+            skills: npcSkills(kitTier, f.archetype) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.

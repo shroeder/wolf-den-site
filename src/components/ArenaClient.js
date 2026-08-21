@@ -1176,6 +1176,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
                 crit,
+                again: Boolean(last.again),
             });
             setResultAt(Date.now());
         }
@@ -1887,6 +1888,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             aria-hidden="true">
                             {clash.crit ? <b className="ar-critword">Critical</b> : null}
                             <em className="ar-move">{clash.move}</em>
+                            {/* WHY THEY JUST WENT TWICE. The clock can owe a faster fighter a second beat
+                                before yours comes round, and because one tap returns your swing plus every
+                                beat they are owed, that second blow always lands in the moment right before
+                                "your turn" comes back — which reads as broken attack speed rather than as
+                                somebody faster than you. Named here, on the blow itself. */}
+                            {clash.again ? <i className="ar-faster">faster · second blow</i> : null}
                         </div>
                     ) : null}
 
@@ -3225,6 +3232,10 @@ function Styles() {
             .ar-grade.is-theirs .ar-move { color: #cfe8ff; text-shadow: 0 2px 10px #000, 0 0 22px rgba(111,208,255,.8); }
             @keyframes arMove { from { opacity: 0; transform: translateY(-10px) scale(.9) }
                 to { opacity: 1; transform: none } }
+            /* Under the move, and deliberately quiet: it explains the blow, it is not the blow. */
+            .ar-faster { display: block; margin-top: 3px; font-style: normal; font-size: 9.5px; font-weight: 900;
+                letter-spacing: .16em; text-transform: uppercase; color: #ffd75e; text-shadow: 0 2px 8px #000;
+                animation: arMove .45s cubic-bezier(.2,1.4,.35,1) both; text-align: center; }
             .ar-grade span { font-size: 1.6rem; font-weight: 900; letter-spacing: .1em;
                 animation: arGrade .85s cubic-bezier(.2,1.4,.35,1) both; text-shadow: 0 3px 14px #000; }
             /* The best grade in the game gets the biggest moment — bigger, whiter, and it lands with a kick. */
