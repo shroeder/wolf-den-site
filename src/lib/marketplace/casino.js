@@ -147,6 +147,134 @@ export async function spinSlot(buyerId, { bet } = {}) {
     return { ok: true, reels, mult, bet: stake, won, gold };
 }
 
+// ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
+// Roulette, in the Den's own shape rather than a copy of Monte Carlo. A real European wheel returns 97.3%
+// (36/37) and an American one 94.7% — the first is above our ceiling and the second only just under it, and
+// both are the way they are because a physical wheel has to have 37 pockets. Ours does not.
+//
+// Twenty segments: nine gold, nine violet, and TWO wolves. The wolves are the house's edge made visible —
+// they are on the wheel where you can see them, rather than hidden in a payout that is quietly short.
+//
+// Every bet on this wheel returns exactly 90%, which is deliberate: there is no "smart" bet to discover and
+// no trap bet to fall into. What you choose changes the SHAPE of the outcome — often and small, or rarely and
+// enormous — and never the value of it.
+export const WHEEL = [
+    ...Array.from({ length: 9 }, (_, i) => ({ i, kind: "gold" })),
+    ...Array.from({ length: 9 }, (_, i) => ({ i: i + 9, kind: "violet" })),
+    { i: 18, kind: "wolf" }, { i: 19, kind: "wolf" },
+];
+
+export const WHEEL_BETS = {
+    gold:   { label: "Gold", pays: 2, hits: (seg) => seg.kind === "gold" },
+    violet: { label: "Violet", pays: 2, hits: (seg) => seg.kind === "violet" },
+    wolf:   { label: "Wolf", pays: 9, hits: (seg) => seg.kind === "wolf" },
+    // One pocket out of twenty. The long shot, and the only bet on the floor that can pay 18x.
+    single: { label: "One pocket", pays: 18, hits: (seg, pick) => seg.i === Number(pick) },
+};
+
+/** Exact return for one wheel bet, enumerated over all twenty pockets. */
+export function wheelRtp(betId, pick = 0) {
+    const bet = WHEEL_BETS[betId];
+    if (!bet) return 0;
+    const wins = WHEEL.filter((seg) => bet.hits(seg, pick)).length;
+    return (wins / WHEEL.length) * bet.pays;
+}
+
+export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const rule = WHEEL_BETS[choice];
+    if (!rule) return { ok: false, error: "bad_bet" };
+    const stake = clampBet(bet);
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, stake],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold" };
+    await logCoin(buyerId, -stake, "casino_wheel_bet", { balanceAfter: paid.gold, meta: { bet: stake, choice } });
+
+    const seg = WHEEL[Math.floor(Math.random() * WHEEL.length)];
+    const hit = rule.hits(seg, pick);
+    const won = hit ? Math.round(stake * rule.pays) : 0;
+
+    let gold = paid.gold;
+    if (won > 0) {
+        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+            [buyerId, won]).catch(() => null);
+        if (back) {
+            gold = back.gold;
+            await logCoin(buyerId, won, "casino_wheel_win", { balanceAfter: gold, meta: { bet: stake, choice, seg: seg.i } });
+        }
+    }
+    return { ok: true, seg, choice, hit, bet: stake, won, gold };
+}
+
+// ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// Pick five from forty; the house draws ten. What you are paid depends on how many of yours came up, and the
+// odds are HYPERGEOMETRIC — drawing without replacement — which is why the check script computes them with
+// factorials rather than sampling. Five hits out of five is a 1-in-2,600 event and no simulation short of
+// millions of runs would price it honestly.
+export const KENO_POOL = 40;
+export const KENO_PICKS = 5;
+export const KENO_DRAWN = 10;
+
+// By how many of your five came up. Nothing for two or fewer than two is deliberate — a game that pays on
+// almost every ticket is a game where nothing means anything.
+export const KENO_PAYS = { 0: 0, 1: 0, 2: 0.5, 3: 3, 4: 25, 5: 600 };
+
+const choose = (n, k) => {
+    if (k < 0 || k > n) return 0;
+    let r = 1;
+    for (let i = 1; i <= k; i += 1) r = (r * (n - k + i)) / i;
+    return r;
+};
+
+/** The exact chance of matching `k` of your picks. Hypergeometric, so this is arithmetic and not an estimate. */
+export function kenoChance(k) {
+    return (choose(KENO_PICKS, k) * choose(KENO_POOL - KENO_PICKS, KENO_DRAWN - k)) / choose(KENO_POOL, KENO_DRAWN);
+}
+
+export function kenoRtp() {
+    let r = 0;
+    for (let k = 0; k <= KENO_PICKS; k += 1) r += kenoChance(k) * (KENO_PAYS[k] || 0);
+    return r;
+}
+
+export async function playKeno(buyerId, { bet, picks = [] } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // The ticket is validated here and not trusted: a POST body can carry six numbers, or the same number
+    // five times, or 400. Either of those would break the odds this game was priced on.
+    const clean = [...new Set((Array.isArray(picks) ? picks : []).map((n) => Math.round(Number(n))))]
+        .filter((n) => n >= 1 && n <= KENO_POOL);
+    if (clean.length !== KENO_PICKS) return { ok: false, error: "bad_ticket" };
+    const stake = clampBet(bet);
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, stake],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold" };
+    await logCoin(buyerId, -stake, "casino_keno_bet", { balanceAfter: paid.gold, meta: { bet: stake, picks: clean } });
+
+    // Draw without replacement, which is what makes the odds hypergeometric rather than binomial.
+    const bag = Array.from({ length: KENO_POOL }, (_, i) => i + 1);
+    const drawn = [];
+    for (let i = 0; i < KENO_DRAWN; i += 1) drawn.push(...bag.splice(Math.floor(Math.random() * bag.length), 1));
+    const hits = clean.filter((n) => drawn.includes(n));
+    const won = Math.round(stake * (KENO_PAYS[hits.length] || 0));
+
+    let gold = paid.gold;
+    if (won > 0) {
+        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
+            [buyerId, won]).catch(() => null);
+        if (back) {
+            gold = back.gold;
+            await logCoin(buyerId, won, "casino_keno_win", { balanceAfter: gold, meta: { bet: stake, hits: hits.length } });
+        }
+    }
+    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold };
+}
+
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
 // Presence, exactly as the tavern does it — same table, same 90-second liveness, a different `zone`. Written
 // as its own pair of functions rather than a shared helper for now, because the tavern's copy carries chat
@@ -199,5 +327,7 @@ export async function getCasinoState(buyerId) {
         gold: Number(me?.gold) || 0,
         others,
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
+        wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
+        keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },
     };
 }

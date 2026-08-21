@@ -11,7 +11,10 @@
 // that can be computed.
 //
 // Run:  node scripts/check-casino.mjs   (or npm run check:casino)
-import { SLOT_SYMBOLS, SLOT_PAYS, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp } from "../src/lib/marketplace/casino.js";
+import {
+    SLOT_SYMBOLS, SLOT_PAYS, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
+    WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
+} from "../src/lib/marketplace/casino.js";
 
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
 const problems = [];
@@ -67,6 +70,41 @@ if (jackpot / rtp > 0.5) {
 const hitRate = contrib.reduce((n, c) => n + c.p, 0);
 console.log(`\n  hit rate     ${pct(hitRate)} of pulls pay something`);
 if (hitRate < 0.15) problems.push(`only ${pct(hitRate)} of pulls pay anything — that reads as a broken machine`);
+
+// ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
+// Every bet enumerated over all twenty pockets. They are meant to return the SAME amount as each other — a
+// wheel with a smart bet on it is a wheel with a trap bet on it.
+console.log("\nTHE WHEEL");
+const wheelReturns = [];
+for (const [id, bet] of Object.entries(WHEEL_BETS)) {
+    const r = wheelRtp(id, 0);
+    wheelReturns.push(r);
+    const wins = WHEEL.filter((seg) => bet.hits(seg, 0)).length;
+    console.log(`  ${bet.label.padEnd(11)} pays ${String(bet.pays).padStart(3)}x on ${String(wins).padStart(2)}/${WHEEL.length} pockets  ->  ${pct(r)}`);
+    if (r > RTP_CEILING) problems.push(`the wheel's ${bet.label} bet returns ${pct(r)}, above the ${pct(RTP_CEILING)} ceiling`);
+}
+const spread = Math.max(...wheelReturns) - Math.min(...wheelReturns);
+console.log(`  spread between bets ${pct(spread)}`);
+if (spread > 0.02) {
+    problems.push(`the wheel's bets return between ${pct(Math.min(...wheelReturns))} and ${pct(Math.max(...wheelReturns))} — one of them is strictly better, which makes the rest traps`);
+}
+
+// ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// Hypergeometric, computed with factorials. Five-of-five is rare enough that no simulation would price it
+// honestly without millions of runs, which is the whole argument for doing the arithmetic.
+console.log("\nKENO");
+let kenoTotal = 0;
+for (let k = 0; k <= KENO_PICKS; k += 1) {
+    const p = kenoChance(k);
+    kenoTotal += p;
+    const pay = KENO_PAYS[k] || 0;
+    const odds = p > 0 ? `1 in ${Math.round(1 / p).toLocaleString()}` : "never";
+    console.log(`  ${k} hit${k === 1 ? " " : "s"}  ${pct(p).padStart(8)}  ${odds.padStart(12)}  pays ${String(pay).padStart(4)}x  ->  ${pct(p * pay)}`);
+}
+const kr = kenoRtp();
+console.log(`  return       ${pct(kr)}`);
+if (Math.abs(kenoTotal - 1) > 1e-6) problems.push(`keno's outcome probabilities sum to ${kenoTotal.toFixed(6)}, not 1 — the maths is wrong`);
+if (kr > RTP_CEILING) problems.push(`keno returns ${pct(kr)}, above the ${pct(RTP_CEILING)} ceiling`);
 
 // ── THE VERDICT ──────────────────────────────────────────────────────────────────────────────────────────────
 if (problems.length) {

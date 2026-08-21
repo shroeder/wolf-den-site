@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getCasinoState, moveCasino, spinSlot } from "@/lib/marketplace/casino.js";
+import { getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib/marketplace/casino.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -47,6 +47,11 @@ export async function POST(request) {
                 // ── THE PULL ── the bet is validated and taken server-side. `bet` arriving from a POST body is
                 // a number somebody can type, so it is clamped in spinSlot rather than trusted here.
                 case "spin": return noStore(await spinSlot(buyer.id, { bet: b?.bet }));
+                // The wheel and the ticket. Both validate their own choice server-side — a bet id and a
+                // five-number ticket are the two things a POST body can most easily lie about, and either
+                // would break the odds these games were priced on.
+                case "wheel": return noStore(await spinWheel(buyer.id, { bet: b?.bet, choice: b?.choice, pick: b?.pick }));
+                case "keno": return noStore(await playKeno(buyer.id, { bet: b?.bet, picks: b?.picks }));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

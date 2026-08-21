@@ -20,8 +20,8 @@ const MACHINES = [
     { id: "slot", x: 12, label: "Wolf's Luck", kind: "Slots", live: true },
     { id: "slot2", x: 28, label: "Den Fortune", kind: "Slots", live: false },
     { id: "slot3", x: 44, label: "Moonrise", kind: "Slots", live: false },
-    { id: "roulette", x: 60, label: "The Wheel", kind: "Roulette", live: false },
-    { id: "keno", x: 75, label: "Keno", kind: "Keno", live: false },
+    { id: "roulette", x: 60, label: "The Wheel", kind: "Roulette", live: true },
+    { id: "keno", x: 75, label: "Keno", kind: "Keno", live: true },
     { id: "blackjack", x: 90, label: "The Table", kind: "Blackjack", live: false },
 ];
 
@@ -61,6 +61,12 @@ export default function CasinoClient({ initial }) {
     const [landed, setLanded] = useState(0);     // how many reels have stopped, 0..3
     const [flash, setFlash] = useState(null);    // "win" | "big" — the celebration, cleared on a timer
     const timers = useRef([]);
+    // The wheel: which bet is on the felt, and where it landed.
+    const [wheelBet, setWheelBet] = useState("gold");
+    const [wheel, setWheel] = useState(null);
+    // The ticket: five numbers of forty, and the last draw.
+    const [ticket, setTicket] = useState([]);
+    const [keno, setKeno] = useState(null);
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -173,11 +179,46 @@ export default function CasinoClient({ initial }) {
         }, MIN_SPIN));
     }, [bet, busy]);
 
+    // ── THE WHEEL AND THE TICKET ─────────────────────────────────────────────────────────────────────────
+    // Both are ONE ROLL, so they share a shape: take the bet, show the result, celebrate if it paid. The slot
+    // gets its own function because its ceremony is three separate landings; these two resolve at once and
+    // pretending otherwise would be theatre with nothing behind it.
+    const play = useCallback(async (body, onResult) => {
+        if (busy) return;
+        unlock();
+        setBusy(true); setErr(null); setFlash(null);
+        Sfx.whoosh();
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        }).then((x2) => x2.json()).catch(() => null);
+        setBusy(false);
+        if (!r?.ok) {
+            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+                : r?.error === "bad_ticket" ? "Pick five numbers first."
+                    : "That didn't go through.");
+            return;
+        }
+        onResult(r);
+        setSt((p) => ({ ...p, gold: r.gold }));
+        if (r.won > 0) {
+            // A payout worth more than ten times the stake is the moment worth shaking the room for.
+            const big = r.won >= r.bet * 10;
+            setFlash(big ? "big" : "win");
+            if (big) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+            timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
+        } else {
+            Sfx.block(0.3);
+        }
+    }, [busy]);
+
+    const toggleNumber = useCallback((n) => {
+        setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
+    }, []);
+
     // Every timer this component starts is cleared on unmount — walking out mid-spin must not leave a
     // callback firing into a component that is gone.
     useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
-
-    const canPlay = at?.live && !busy && (st?.gold || 0) >= bet;
 
     return (
         <section className="cas">
@@ -237,7 +278,55 @@ export default function CasinoClient({ initial }) {
                         <em>{at.live ? at.kind : "not built yet"}</em>
                     </div>
 
-                    {at.live ? (
+                    {/* Each machine draws its own game. The slot's ceremony is three landings; the wheel and
+                        the ticket resolve in one, so they get a result and a celebration and no theatre. */}
+                    {at.live && at.id === "roulette" ? (
+                        <>
+                            <div className="cas-wheel">
+                                {(st?.wheel?.segments || []).map((seg) => (
+                                    <span key={seg.i}
+                                        className={`cas-seg is-${seg.kind}${wheel?.seg?.i === seg.i ? " is-hit" : ""}`} />
+                                ))}
+                                {wheel ? (
+                                    <b className={`cas-wheel-out${wheel.hit ? " is-win" : ""}`}>
+                                        {wheel.hit ? `${money(wheel.won)} gold` : "The house takes it"}
+                                    </b>
+                                ) : <b className="cas-wheel-out">Place a bet</b>}
+                            </div>
+                            <div className="cas-picks">
+                                {Object.entries(st?.wheel?.bets || {}).map(([id, b2]) => (
+                                    <button key={id} type="button"
+                                        className={`cas-pick${wheelBet === id ? " is-on" : ""}`}
+                                        onClick={() => setWheelBet(id)}>
+                                        {b2.label}<i>{b2.pays}x</i>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
+
+                    {at.live && at.id === "keno" ? (
+                        <>
+                            <div className="cas-grid">
+                                {Array.from({ length: st?.keno?.pool || 40 }, (_, i) => i + 1).map((n) => {
+                                    const mine = ticket.includes(n);
+                                    const drew = keno?.drawn?.includes(n);
+                                    return (
+                                        <button key={n} type="button"
+                                            className={`cas-num${mine ? " is-mine" : ""}${drew ? " is-drawn" : ""}${mine && drew ? " is-hit" : ""}`}
+                                            onClick={() => toggleNumber(n)}>{n}</button>
+                                    );
+                                })}
+                            </div>
+                            <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}`}>
+                                {keno
+                                    ? `${keno.hits.length} of 5 — ${keno.won > 0 ? `${money(keno.won)} gold` : "nothing"}`
+                                    : `${ticket.length} of 5 picked`}
+                            </p>
+                        </>
+                    ) : null}
+
+                    {at.live && at.id === "slot" ? (
                         <>
                             <div className={`cas-reels${flash ? ` is-${flash}` : ""}`}>
                                 {(rolling || spin?.reels || ["moon", "bone", "doubloon"]).map((sym, i) => {
@@ -268,6 +357,14 @@ export default function CasinoClient({ initial }) {
                                 </p>
                             ) : <p className="cas-result">Pick a stake and pull.</p>}
 
+                        </>
+                    ) : null}
+
+                    {/* ONE STAKE ROW AND ONE BUTTON for every machine, because the stake is the same decision
+                        wherever you are standing and a floor where each cabinet invents its own controls is a
+                        floor you have to learn three times. */}
+                    {at.live ? (
+                        <>
                             <div className="cas-bets">
                                 {[25, 100, 500, 2500].map((v) => (
                                     <button key={v} type="button"
@@ -275,8 +372,17 @@ export default function CasinoClient({ initial }) {
                                         onClick={() => setBet(v)}>{money(v)}</button>
                                 ))}
                             </div>
-                            <button type="button" className="cas-pull" disabled={!canPlay} onClick={pull}>
-                                {busy ? "…" : (st?.gold || 0) < bet ? "Not enough gold" : `Pull · ${money(bet)}`}
+                            <button type="button" className="cas-pull"
+                                disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
+                                onClick={() => {
+                                    if (at.id === "slot") return pull();
+                                    if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
+                                    return play({ action: "keno", bet, picks: ticket }, setKeno);
+                                }}>
+                                {busy ? "…"
+                                    : (st?.gold || 0) < bet ? "Not enough gold"
+                                        : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
+                                            : `${at.id === "slot" ? "Pull" : at.id === "roulette" ? "Spin" : "Play"} · ${money(bet)}`}
                             </button>
                             {err ? <p className="cas-err">{err}</p> : null}
                         </>
