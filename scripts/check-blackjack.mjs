@@ -13,7 +13,7 @@
 //
 // Run:  node scripts/check-blackjack.mjs   (or npm run check:blackjack)
 import {
-    freshShoe, handValue, isBlackjack, playDealer, settleHand, basicStrategy,
+    freshShoe, handValue, isBlackjack, playDealer, settleHand, basicStrategy, canSplit, pairValue,
     BLACKJACK_RAKE, DECKS, DEALER_STANDS_ON, BLACKJACK_PAYS,
 } from "../src/lib/marketplace/blackjack-kit.js";
 import { RTP_CEILING, RTP_TARGET } from "../src/lib/marketplace/casino.js";
@@ -37,42 +37,75 @@ let returned = 0;
 let rakeTaken = 0;
 const tally = {};
 
+// One hand's worth of decisions, played to a stop. Split hands come back through here too, with `fromSplit`
+// set — which is what stops them being offered another split and what makes a 21 on them just a 21.
+function playOut(cards, up, shoe, { fromSplit = false, splitAces = false } = {}) {
+    let doubled = false;
+    // Split aces get exactly one card and the turn is over. It is the single most valuable rule in the game
+    // and leaving it out would price a table nobody would build.
+    if (fromSplit && splitAces) return { cards, doubled };
+    for (;;) {
+        const canDouble = cards.length === 2 && !doubled;
+        const move = basicStrategy(cards, up, canDouble, false);
+        if (move === "stand") break;
+        cards.push(shoe.pop());
+        if (move === "double") { doubled = true; break; }
+        if (handValue(cards).bust) break;
+    }
+    return { cards, doubled };
+}
+
+let splits = 0;
 for (let i = 0; i < HANDS; i += 1) {
     const shoe = freshShoe(rng);
-    const player = [shoe.pop(), shoe.pop()];
+    const opening = [shoe.pop(), shoe.pop()];
     const dealer = [shoe.pop(), shoe.pop()];
-    let doubled = false;
+    const up = dealer[0];
 
-    // The player's turn, unless somebody already has twenty-one.
-    if (!isBlackjack(player) && !isBlackjack(dealer)) {
-        for (;;) {
-            const canDouble = player.length === 2 && !doubled;
-            const move = basicStrategy(player, dealer[0], canDouble);
-            if (move === "stand") break;
-            player.push(shoe.pop());
-            if (move === "double") { doubled = true; break; }
-            if (handValue(player).bust) break;
-        }
+    // A natural on either side ends it before anybody chooses anything.
+    if (isBlackjack(opening) || isBlackjack(dealer)) {
+        const r = settleHand({ player: opening, dealer, stake: STAKE });
+        staked += r.bet; returned += r.back; rakeTaken += r.rake;
+        tally[r.outcome] = (tally[r.outcome] || 0) + 1;
+        continue;
     }
 
-    // The dealer only plays if there is still a hand to beat.
-    const finalDealer = handValue(player).bust || isBlackjack(player) || isBlackjack(dealer)
-        ? dealer
-        : playDealer(dealer, shoe);
+    // ── SPLIT OR NOT ────────────────────────────────────────────────────────────────────────────────────
+    // The split decision is taken first because it forks everything after it. Once, never twice: the table
+    // allows one split, so the simulation must too, or it prices a game the floor does not run.
+    const hands = [];
+    if (canSplit(opening) && basicStrategy(opening, up, true, true) === "split") {
+        splits += 1;
+        const splitAces = pairValue(opening[0]) === 11;
+        for (const card of opening) {
+            const h = [card, shoe.pop()];
+            hands.push({ ...playOut(h, up, shoe, { fromSplit: true, splitAces }), fromSplit: true });
+        }
+    } else {
+        hands.push({ ...playOut([...opening], up, shoe), fromSplit: false });
+    }
 
-    const r = settleHand({ player, dealer: finalDealer, stake: STAKE, doubled });
-    staked += r.bet;
-    returned += r.back;
-    rakeTaken += r.rake;
-    tally[r.outcome] = (tally[r.outcome] || 0) + 1;
+    // The dealer plays ONCE against however many hands are on the table, and only if any of them survived.
+    const alive = hands.some((h) => !handValue(h.cards).bust);
+    const finalDealer = alive ? playDealer(dealer, shoe) : dealer;
+
+    for (const h of hands) {
+        const r = settleHand({ player: h.cards, dealer: finalDealer, stake: STAKE, doubled: h.doubled, fromSplit: h.fromSplit });
+        staked += r.bet;
+        returned += r.back;
+        rakeTaken += r.rake;
+        const key = h.fromSplit ? `${r.outcome} (split)` : r.outcome;
+        tally[key] = (tally[key] || 0) + 1;
+    }
 }
 
 const rtp = returned / staked;
 
 console.log("THE TABLE");
-console.log(`  rules        ${DECKS} decks, dealer stands on ${DEALER_STANDS_ON}, blackjack pays ${BLACKJACK_PAYS}:1, double on two, no split`);
+console.log(`  rules        ${DECKS} decks, dealer stands on ${DEALER_STANDS_ON}, blackjack pays ${BLACKJACK_PAYS}:1, double on two, split once, double after split`);
 console.log(`  the rake     ${pct(BLACKJACK_RAKE)} of winnings — never of the stake`);
-console.log(`  hands        ${HANDS.toLocaleString()}, perfect basic strategy (SIMULATED, not enumerated)`);
+console.log(`  hands        ${HANDS.toLocaleString()}, perfect basic strategy including pairs (SIMULATED, not enumerated)`);
+console.log(`  split        ${(splits / HANDS * 100).toFixed(2)}% of hands were split`);
 console.log(`  return       ${pct(rtp)}   target ${pct(RTP_TARGET)}   ceiling ${pct(RTP_CEILING)}`);
 console.log(`  house edge   ${pct(1 - rtp)}`);
 console.log(`  of which rake ${pct(rakeTaken / staked)} — the rest is the game's own small edge`);
@@ -99,3 +132,4 @@ if (problems.length) {
     process.exit(1);
 }
 console.log(`\ncheck:blackjack — a perfect player gets ${pct(rtp)} back. The house keeps ${pct(1 - rtp)}.`);
+console.log("Splitting correctly is worth roughly half a point to the player; the rake absorbs it.");

@@ -13,9 +13,17 @@
 // win. Your stake always comes back whole. The table says the number out loud before you sit down, which is
 // the one version of a house edge a player can actually make a decision about.
 //
-// NO SPLITTING, deliberately, for now: splits fork the hand into two independently-playable states, and half
-// a split implementation is a way to lose track of somebody's gold. The table says so on its face rather than
-// silently refusing the button.
+// SPLITTING IS IN, and it is bounded on purpose. A pair may be split ONCE, into two hands played in order —
+// no re-splitting a split, because each extra fork multiplies the states a half-finished implementation can
+// lose somebody's gold in, and a fourth hand is not worth that. Two rules that are not optional:
+//
+//   • SPLIT ACES GET ONE CARD EACH and the turn ends. Without it, splitting aces is the single most
+//     profitable thing a player can do at a blackjack table and the rake was not priced for it.
+//   • TWENTY-ONE ON A SPLIT HAND IS NOT A BLACKJACK. It pays even money like any other twenty-one. Paying
+//     3:2 on it is a well-known way to hand the house edge away by accident.
+//
+// Doubling after a split IS allowed, which is the friendlier of the two conventions and is what the basic
+// strategy below assumes.
 //
 // NO SHOE MEMORY: the deck is fresh every hand. A persistent six-deck shoe is countable, and a countable shoe
 // on a website with an API is not a game, it is a withdrawal mechanism.
@@ -65,6 +73,22 @@ export function handValue(cards = []) {
 
 export const isBlackjack = (cards = []) => cards.length === 2 && handValue(cards).total === 21;
 
+/** The value a rank is worth for PAIRING purposes — a King and a Ten make a splittable pair of tens. */
+export const pairValue = (card) => {
+    const r = rankOf(card);
+    if (r === "A") return 11;
+    if (r === "K" || r === "Q" || r === "J" || r === "10") return 10;
+    return Number(r);
+};
+
+/** Two cards of the same value, and nothing has been split yet. */
+export const canSplit = (cards = [], alreadySplit = false) =>
+    !alreadySplit && cards.length === 2 && pairValue(cards[0]) === pairValue(cards[1]);
+
+/** A split hand that started from aces is finished after one card, whatever it drew. */
+export const aceSplitDone = (cards = [], fromSplit = false, splitAces = false) =>
+    fromSplit && splitAces && cards.length >= 2;
+
 /** The dealer's whole turn, played by the only rule the dealer has. */
 export function playDealer(cards, shoe) {
     const hand = [...cards];
@@ -78,11 +102,13 @@ export function playDealer(cards, shoe) {
 //
 // Returns what comes back to the player IN TOTAL, stake included: 0 on a loss, the stake on a push, and stake
 // plus the raked winnings otherwise.
-export function settleHand({ player, dealer, stake, doubled = false }) {
+export function settleHand({ player, dealer, stake, doubled = false, fromSplit = false }) {
     const bet = doubled ? stake * 2 : stake;
     const p = handValue(player);
     const d = handValue(dealer);
-    const pBJ = isBlackjack(player);
+    // Twenty-one on a hand that came out of a split is just twenty-one. Treating it as a natural and paying
+    // 3:2 is one of the classic ways a table gives its edge away without anybody noticing.
+    const pBJ = isBlackjack(player) && !fromSplit;
     const dBJ = isBlackjack(dealer);
 
     if (p.bust) return { back: 0, outcome: "bust", won: 0, rake: 0, bet };
@@ -110,14 +136,28 @@ function raked(bet, winnings, outcome) {
 // no split button.
 //
 // It is also the honest answer to "what should the table hint at", if a hint is ever added.
-export function basicStrategy(player, dealerUp, canDouble) {
+export function basicStrategy(player, dealerUp, canDouble, maySplit = false) {
     const { total, soft } = handValue(player);
-    const up = (() => {
-        const r = rankOf(dealerUp);
-        if (r === "A") return 11;
-        if (r === "K" || r === "Q" || r === "J" || r === "10") return 10;
-        return Number(r);
-    })();
+    // The dealer's up card as a number. Hoisted above the pair rows, which need it too.
+    const up = pairValue(dealerUp);
+
+    // ── THE PAIR ROWS ───────────────────────────────────────────────────────────────────────────────────
+    // Restored now that the table has a split button. They were left out while it did not, and leaving them
+    // out of the SIMULATION is what would matter: a check that prices a game where the player cannot split
+    // is a check that prices a different game from the one on the floor.
+    //
+    // Standard multi-deck chart, dealer standing on soft 17, doubling allowed after a split.
+    if (maySplit && player.length === 2 && pairValue(player[0]) === pairValue(player[1])) {
+        const pv = pairValue(player[0]);
+        // Aces and eights always. Tens and fives never — twenty and a hard ten are both far too good to break.
+        if (pv === 11 || pv === 8) return "split";
+        if (pv === 10 || pv === 5) { /* fall through and play the total */ }
+        else if (pv === 9) { if (up <= 6 || up === 8 || up === 9) return "split"; }
+        else if (pv === 7) { if (up <= 7) return "split"; }
+        else if (pv === 6) { if (up <= 6) return "split"; }
+        else if (pv === 4) { if (up === 5 || up === 6) return "split"; }
+        else if (pv === 3 || pv === 2) { if (up <= 7) return "split"; }
+    }
 
     if (soft) {
         if (total >= 19) return "stand";

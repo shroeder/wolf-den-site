@@ -695,11 +695,15 @@ export async function casinoOccupants(selfId) {
 /** What the room needs to draw itself: your purse, who else is here, and the machine's own numbers. */
 export async function getCasinoState(buyerId) {
     const [me, others] = await Promise.all([
-        db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // The avatar comes down with the gold. Everybody ELSE on this floor has been drawn with their own
+        // sprite since it opened (see casinoOccupants), which left the one person the player is actually
+        // looking at as the only blank on the screen.
+        db.queryOne(`SELECT gold, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         casinoOccupants(buyerId),
     ]);
     return {
         gold: Number(me?.gold) || 0,
+        me: { sprite: me?.avatar_sprite_url || null },
         others,
         // Every cabinet's table, so a machine can show what it pays without another round trip. Functions
         // are deliberately absent — the client renders the numbers, the server decides the outcome.

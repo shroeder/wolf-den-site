@@ -6,7 +6,7 @@ import { getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
-import { blackjackState, dealBlackjack, doubleBlackjack, hitBlackjack, standBlackjack } from "@/lib/marketplace/blackjack.js";
+import { blackjackState, dealBlackjack, doubleBlackjack, hitBlackjack, splitBlackjack, standBlackjack } from "@/lib/marketplace/blackjack.js";
 import { bingoState, buyBingoCard } from "@/lib/marketplace/bingo.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -60,7 +60,7 @@ export async function POST(request) {
                 // would break the odds these games were priced on.
                 case "wheel": return noStore(await spinWheel(buyer.id, { bet: b?.bet, choice: b?.choice, pick: b?.pick }));
                 case "keno": return noStore(await playKeno(buyer.id, { bet: b?.bet, picks: b?.picks }));
-                // ── THE TABLE ── four verbs instead of one, because a hand of blackjack is a conversation.
+                // ── THE TABLE ── five verbs instead of one, because a hand of blackjack is a conversation.
                 // None of them carries state from the client: which hand is in play, what is left in the
                 // shoe and whose turn it is are all read from the row, so the only thing a POST body can
                 // decide here is the size of the opening bet.
@@ -68,6 +68,7 @@ export async function POST(request) {
                 case "bj_hit": return noStore(await hitBlackjack(buyer.id));
                 case "bj_stand": return noStore(await standBlackjack(buyer.id));
                 case "bj_double": return noStore(await doubleBlackjack(buyer.id));
+                case "bj_split": return noStore(await splitBlackjack(buyer.id));
                 // ── THE HALL ── one verb. A card is bought, dealt and scored in a single answer, and the
                 // balls that follow on screen are a ceremony over a result already banked. What the ROUND
                 // shares is the forty numbers, not the moment of watching them: buy at any point in the

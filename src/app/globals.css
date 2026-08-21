@@ -17646,3 +17646,19 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border-color: rgba(255,215,94,0.7); animation: casBall .2s cubic-bezier(.2,1.6,.4,1) both; }
 @keyframes casBall { from { transform: scale(1.5); } to { transform: none; } }
 .cas-balls-idle { font-size: 11px; color: #98a0aa; }
+
+/* ── TWO HANDS ───────────────────────────────────────────────────────────────────────────────────────
+   A split makes two hands played in order. The one in play is lit; the other is dimmed rather than
+   hidden, because knowing what is waiting for you is half the reason to split in the first place. */
+.cas-seat.is-multi { padding: 8px 10px; border-radius: 10px; border: 1px solid transparent;
+    transition: opacity .2s ease, border-color .2s ease; }
+.cas-seat.is-multi:not(.is-turn) { opacity: 0.45; }
+.cas-seat.is-multi.is-turn { border-color: rgba(255,215,94,0.45); background: rgba(255,215,94,0.06); }
+/* The split button only appears on a hand the table will actually accept it on, so the row goes from
+   three columns to four rather than keeping a dead slot open for it. */
+.cas-acts.is-four { grid-template-columns: repeat(4, 1fr); }
+.cas-act.is-split { background: linear-gradient(180deg, #b6ffd4, #6fd0a0); }
+
+/* Your own hero on the floor. Sized to the same footprint the blank circle had, so nothing else moves. */
+.cas-you img { display: block; width: 38px; height: 38px; object-fit: contain;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)); }

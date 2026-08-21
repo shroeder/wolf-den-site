@@ -60,6 +60,18 @@ const OUTCOME = {
     dealer_blackjack: "Dealer had blackjack.",
 };
 
+// The same outcomes again, short — these label ONE hand of a split, where the full sentence would not fit
+// and would read oddly twice over ("The house takes it. The house takes it.").
+const OUTCOME_SHORT = {
+    blackjack: "blackjack",
+    win: "won",
+    dealer_bust: "won",
+    push: "push",
+    lose: "lost",
+    bust: "bust",
+    dealer_blackjack: "lost",
+};
+
 // A card, drawn in CSS like every other thing on this floor. Red suits red, black suits pale — the one piece
 // of card design that is not decoration, because it is how you read a hand at a glance.
 const SUIT_ART = { s: { glyph: "♠", red: false }, h: { glyph: "♥", red: true }, d: { glyph: "♦", red: true }, c: { glyph: "♣", red: false } };
@@ -454,8 +466,14 @@ export default function CasinoClient({ initial }) {
                     </div>
                 ))}
 
+                {/* YOU. Everybody else in the room has been drawn with their own avatar since the floor
+                    opened; your own hero was a plain circle, which made the one person you are actually
+                    looking at the only one who was not there. */}
                 <div className="cas-you" style={{ left: `${x}%` }}>
-                    <span className="cas-blank is-you" style={{ transform: `scaleX(${facing})` }} />
+                    {st?.me?.sprite ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={st.me.sprite} alt="" draggable="false" style={{ transform: `scaleX(${facing})` }} />
+                    ) : <span className="cas-blank is-you" style={{ transform: `scaleX(${facing})` }} />}
                 </div>
               </div>
             </div>
@@ -652,20 +670,30 @@ export default function CasinoClient({ initial }) {
                                     {!hand ? <span className="cas-card is-empty" /> : null}
                                 </div>
                             </div>
-                            <div className="cas-seat is-you">
-                                <span className="cas-seat-who">
-                                    You{hand ? ` · ${hand.playerValue.total}${hand.playerValue.soft && hand.playerValue.total <= 21 ? " soft" : ""}` : ""}
-                                    {hand?.doubled ? " · doubled" : ""}
-                                </span>
-                                <div className="cas-cards">
-                                    {(hand?.player || []).map((c, i) => <Card key={`p${i}${c}`} card={c} />)}
-                                    {!hand ? <span className="cas-card is-empty" /> : null}
+                            {/* YOUR HANDS — plural, because a split makes two of them and they are played in
+                                order. One hand is a list of length one, so there is no separate un-split
+                                layout to keep in step with this one. The hand in play is the lit one; the
+                                other is dimmed rather than hidden, because knowing what is waiting is half
+                                of why you split. */}
+                            {(hand?.hands || [null]).map((h, i) => (
+                                <div key={i} className={`cas-seat is-you${h && hand.hands.length > 1 ? " is-multi" : ""}${h?.isActive ? " is-turn" : ""}`}>
+                                    <span className="cas-seat-who">
+                                        {hand?.hands?.length > 1 ? `Hand ${i + 1}` : "You"}
+                                        {h ? ` · ${h.value.total}${h.value.soft && h.value.total <= 21 ? " soft" : ""}` : ""}
+                                        {h?.doubled ? " · doubled" : ""}
+                                        {h && !hand.open && h.outcome ? ` · ${OUTCOME_SHORT[h.outcome] || h.outcome}` : ""}
+                                    </span>
+                                    <div className="cas-cards">
+                                        {(h?.cards || []).map((c, j) => <Card key={`p${i}-${j}${c}`} card={c} />)}
+                                        {!h ? <span className="cas-card is-empty" /> : null}
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
                             <p className={`cas-result${hand && !hand.open && hand.won > 0 ? " is-win" : ""}`}>
                                 {!hand ? `Blackjack pays 3:2. The house rakes ${Math.round(rakeRate * 100)}% of what you win — never your stake.`
-                                    : hand.open ? "Hit, stand, or double."
-                                        : OUTCOME[hand.outcome] || "Hand over."}
+                                    : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
+                                        : hand.outcome === "split" ? "Both hands played."
+                                            : OUTCOME[hand.outcome] || "Hand over."}
                                 {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} gold` : ""}
                                 {hand && !hand.open && hand.rake > 0 ? ` (rake ${money(hand.rake)})` : ""}
                             </p>
@@ -711,27 +739,42 @@ export default function CasinoClient({ initial }) {
                         <>
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks
-                                a question that has no answer until the hand is over. */}
-                            <div className="cas-bets" hidden={at.id === "blackjack" && Boolean(hand?.open)}>
+                                a question that has no answer until the hand is over.
+                                NOT the `hidden` attribute: it works by the user-agent rule
+                                `[hidden] { display: none }`, which ANY display in a stylesheet outranks —
+                                and .cas-bets sets `display: flex`. It looked hidden in every screenshot that
+                                happened to catch a finished hand, and was there the whole time in an open
+                                one. Rendering nothing cannot be overridden by a stylesheet. */}
+                            {at.id === "blackjack" && hand?.open ? null : (
+                            <div className="cas-bets">
                                 {[25, 100, 500, 2500].map((v) => (
                                     <button key={v} type="button"
                                         className={`cas-bet${bet === v ? " is-on" : ""}`}
                                         onClick={() => setBet(v)}>{money(v)}</button>
                                 ))}
                             </div>
+                            )}
                             {at.id === "blackjack" && hand?.open ? (
                                 // MID-HAND the stake is already placed, so the stake row above is dead and
                                 // these three are the only decision on the screen.
-                                <div className="cas-acts">
+                                // Every button's legality comes from the SERVER's flags on the active hand,
+                                // never from the client working the rules out again. A Split button that
+                                // appears on a hand the table will refuse is worse than no button.
+                                <div className={`cas-acts${hand.hands?.[hand.active]?.canSplit ? " is-four" : ""}`}>
                                     <button type="button" className="cas-act" disabled={busy} onClick={() => table("bj_hit")}>Hit</button>
                                     <button type="button" className="cas-act is-stand" disabled={busy} onClick={() => table("bj_stand")}>Stand</button>
                                     <button type="button" className="cas-act is-double"
-                                        disabled={busy || !hand.canDouble || (st?.gold || 0) < hand.stake}
+                                        disabled={busy || !hand.hands?.[hand.active]?.canDouble || (st?.gold || 0) < hand.stake}
                                         onClick={() => table("bj_double")}>Double</button>
+                                    {hand.hands?.[hand.active]?.canSplit ? (
+                                        <button type="button" className="cas-act is-split"
+                                            disabled={busy || (st?.gold || 0) < hand.stake}
+                                            onClick={() => table("bj_split")}>Split</button>
+                                    ) : null}
                                 </div>
                             ) : null}
+                            {at.id === "blackjack" && hand?.open ? null : (
                             <button type="button" className="cas-pull"
-                                hidden={at.id === "blackjack" && Boolean(hand?.open)}
                                 disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
                                 onClick={() => {
                                     if (SLOTS.has(at.id)) return pull();
@@ -745,6 +788,7 @@ export default function CasinoClient({ initial }) {
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
+                            )}
                             {err ? <p className="cas-err">{err}</p> : null}
                         </>
                     ) : (
