@@ -237,6 +237,11 @@ export default function CasinoClient({ initial }) {
     // The floor's shared jackpot. Comes down with every state read and every pull, so it climbs on its own
     // while you watch it.
     const [pot, setPot] = useState(initial?.pot?.amount || 0);
+    // ── SITTING DOWN ─────────────────────────────────────────────────────────────────────────────────────
+    // The room is the lobby; a machine is a place you SIT AT. Walking the floor and then scrolling to a panel
+    // underneath it is two different things fighting for one screen — on a phone the reels and the button
+    // could not both be visible, which is the one thing a slot machine has to manage.
+    const [seated, setSeated] = useState(false);
     const [fx, setFx] = useState(null);      // what the features did on the last pull
     // The two shared games: what settled for you last, and a ticking clock for the round now open.
     const [settled, setSettled] = useState({});
@@ -284,11 +289,31 @@ export default function CasinoClient({ initial }) {
         setErr(null);
     }, []);
 
+    // Escape stands you up. A full-screen layer with no keyboard way out is a trap on desktop.
+    useEffect(() => {
+        if (!seated) return undefined;
+        const onKey = (e) => { if (e.key === "Escape") setSeated(false); };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [seated]);
+
+    // ── WHAT ELSE IS ON THE SCREEN ───────────────────────────────────────────────────────────────────────
+    // The social bubble is fixed to the bottom-right of every page in the Den, which is exactly where the
+    // pull button ends up on a machine — it sat ON the button, and a chat window opening because somebody
+    // reached for Pull is the sort of thing that gets blamed on the machine. The page behind is also frozen
+    // so a full-screen game does not scroll the room underneath it.
+    useEffect(() => {
+        if (!seated) return undefined;
+        document.body.classList.add("cas-seated");
+        return () => document.body.classList.remove("cas-seated");
+    }, [seated]);
+
     // What you are standing in front of. Recomputed from position rather than remembered, so walking away
     // closes the machine without anything having to tell it to.
     useEffect(() => {
         const near = MACHINES.find((m) => Math.abs(m.x - x) <= REACH);
         setAt(near || null);
+        if (!near) setSeated(false);   // walked away from the machine you were sat at
     }, [x]);
 
     // ── ONE PULL, AS AN EVENT ────────────────────────────────────────────────────────────────────────────
@@ -598,8 +623,11 @@ export default function CasinoClient({ initial }) {
               <div className="cas-world">
                 <div className="cas-floor" aria-hidden="true" />
                 {MACHINES.map((m) => (
-                    <div key={m.id} className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
-                        style={{ left: `${m.x}%` }}>
+                    <button key={m.id} type="button"
+                        className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
+                        style={{ left: `${m.x}%` }}
+                        aria-label={`${m.label} — ${m.live ? m.kind : "not built yet"}`}
+                        onClick={() => { setX(m.x); if (m.live) setSeated(true); }}>
                         {/* The cabinet, drawn rather than approximated. It was a gradient and a border for
                             as long as the floor plan was still being argued about, which was the right order
                             to do it in — art costs money to get wrong, and the plan changed three times. */}
@@ -609,7 +637,7 @@ export default function CasinoClient({ initial }) {
                         </span>
                         <b>{m.label}</b>
                         <em>{m.live ? m.kind : "soon"}</em>
-                    </div>
+                    </button>
                 ))}
 
                 {/* Everybody else, really here. Drawn behind you so your own hero is never hidden by a crowd. */}
@@ -637,7 +665,11 @@ export default function CasinoClient({ initial }) {
 
             <div className="cas-walk">
                 <button type="button" onClick={() => walk(-1)} aria-label="Walk left">◀</button>
-                <span>{at ? at.label : "walk to a machine"}</span>
+                {at?.live ? (
+                    <button type="button" className="cas-sit" onClick={() => setSeated(true)}>
+                        Play {at.label}
+                    </button>
+                ) : <span>{at ? at.label : "walk to a machine"}</span>}
                 <button type="button" onClick={() => walk(1)} aria-label="Walk right">▶</button>
             </div>
 
@@ -645,10 +677,17 @@ export default function CasinoClient({ initial }) {
                 Only rendered when you are standing at one, so the room is the screen and the game is
                 something you walk up to rather than a panel that is always there. */}
             {at ? (
-                <div className={`cas-panel${at.live ? "" : " is-dark"}`}>
+                <div className={`${seated ? "cas-stage" : "cas-panel"}${at.live ? "" : " is-dark"}`}
+                    role={seated ? "dialog" : undefined} aria-modal={seated ? "true" : undefined}
+                    aria-label={seated ? at.label : undefined}>
                     <div className="cas-panel-head">
+                        {seated ? (
+                            <button type="button" className="cas-leave" onClick={() => setSeated(false)}
+                                aria-label="Back to the floor">←</button>
+                        ) : null}
                         <b>{st?.slots?.[at.id]?.label || at.label}</b>
-                        <em>{at.live ? at.kind : "not built yet"}</em>
+                        {seated ? <span className="cas-purse-sm">{money(st?.gold)}<i>gold</i></span>
+                            : <em>{at.live ? at.kind : "not built yet"}</em>}
                     </div>
 
                     {/* ── WHICH MACHINE IS THIS ───────────────────────────────────────────────────────
@@ -703,11 +742,13 @@ export default function CasinoClient({ initial }) {
                                 {" · "}top {money(Math.max(...Object.values(st.slots[at.id].pays.three)))}x
                                 {" · "}returns {(st.slots[at.id].rtp * 100).toFixed(1)}%
                             </i>
-                            {/* The two features, named on the machine. A bonus nobody knows about is a
-                                bonus that fires and reads as the game glitching. */}
-                            {(st.slots[at.id].bonuses || []).map((b) => (
+                            {/* The features, named on the machine — a bonus nobody knows about is a bonus
+                                that fires and reads as the game glitching. Folded away once you are SAT at
+                                it, because by then you have read it and the screen is needed for the game:
+                                a phone cannot show three paragraphs and three reels and a button. */}
+                            {!seated ? (st.slots[at.id].bonuses || []).map((b) => (
                                 <em key={b.id}><b>{b.label}</b> {b.blurb}</em>
-                            ))}
+                            )) : null}
                         </p>
                     ) : null}
 
@@ -1008,7 +1049,7 @@ export default function CasinoClient({ initial }) {
                         wherever you are standing and a floor where each cabinet invents its own controls is a
                         floor you have to learn three times. */}
                     {at.live ? (
-                        <>
+                        <div className="cas-controls">
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks
                                 a question that has no answer until the hand is over.
@@ -1074,7 +1115,7 @@ export default function CasinoClient({ initial }) {
                             </button>
                             )}
                             {err ? <p className="cas-err">{err}</p> : null}
-                        </>
+                        </div>
                     ) : (
                         <p className="cas-soon">The lights are on and nothing is inside yet.</p>
                     )}
