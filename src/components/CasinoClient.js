@@ -36,7 +36,19 @@ const MACHINES = [
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
-const REACH = 9;
+// How close you have to stand for a machine to be usable, as a share of the floor. It was 9 against a
+// spacing of 11, which meant there was almost nowhere on the whole floor you were NOT at a cabinet — every
+// machine's reach very nearly touched its neighbour's, so spacing them out would have bought nothing. At 6
+// there is real room between them to stand in, which is the point of a room.
+const REACH = 6;
+
+// ── HOW FAST YOU WALK ────────────────────────────────────────────────────────────────────────────────────────
+// Percent of the floor per second, and the interval it is applied on. Not a frame loop: the room re-renders
+// nine cabinets, nine props and six lamps, and doing that sixty times a second to move one sprite is a lot of
+// work for a walk. Sixteen steps a second with the hero CSS-transitioned between them is indistinguishable and
+// costs a quarter as much.
+const WALK_TICK_MS = 62;
+const WALK_PER_SEC = 26;
 
 // How far behind the card before it each card lands, and the interval the deal's sounds are fired on. One
 // number, because the two drifting apart is the whole way this reads as broken.
@@ -399,7 +411,10 @@ export default function CasinoClient({ initial }) {
         const el = roomRef.current;
         if (!el) return;
         const world = el.scrollWidth;
-        el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "smooth" });
+        // INSTANT, not smooth. `x` now changes sixteen times a second while you walk, and a smooth scroll
+        // restarted that often never finishes one — the camera lurched and lagged behind the hero. It moves
+        // in the same small increments he does, which is smooth without being animated.
+        el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "auto" });
     }, [x]);
 
     // ── DEPTH ────────────────────────────────────────────────────────────────────────────────────────────
@@ -427,17 +442,72 @@ export default function CasinoClient({ initial }) {
     // yank you back across the floor on a later render.
     useEffect(() => {
         const want = new URLSearchParams(window.location.search).get("at");
+        // Arriving from a link puts you AT the machine rather than walking you the length of the floor to it:
+        // a link is a door, not a stroll.
         const m = MACHINES.find((mm) => mm.id === want);
         if (m) setX(m.x);
     }, []);
 
-    const walk = useCallback((dir) => {
+    // ── WALKING, WITHOUT STEPS ───────────────────────────────────────────────────────────────────────────
+    // Luke: "let me freely move." Every tap of an arrow moved you exactly 6% of the floor and no other amount
+    // was reachable, so the room had nine cabinets and about fifteen places you were allowed to stand. You
+    // could not walk up to something and stop next to it.
+    //
+    // `goal` is where you are heading, or null when you are still. Everything that moves you sets a goal and
+    // the loop below does the walking, which means holding an arrow, tapping a spot on the floor and arriving
+    // from a deep link are all the same one mechanism rather than three.
+    const [goal, setGoal] = useState(null);
+
+    useEffect(() => {
+        if (goal == null) return undefined;
+        const id = setInterval(() => {
+            setX((p) => {
+                const step = (WALK_PER_SEC * WALK_TICK_MS) / 1000;
+                const d = goal - p;
+                if (Math.abs(d) <= step) { setGoal(null); return goal; }
+                return p + Math.sign(d) * step;
+            });
+        }, WALK_TICK_MS);
+        return () => clearInterval(id);
+    }, [goal]);
+
+    // A footfall roughly every other tick while you are moving — a step per frame of a walk cycle would be a
+    // machine gun, and silence would be a hero on a conveyor belt.
+    useEffect(() => {
+        if (goal == null) return undefined;
+        const id = setInterval(() => Sfx.step(0.3 + Math.random() * 0.35), WALK_TICK_MS * 4);
+        return () => clearInterval(id);
+    }, [goal]);
+
+    const walkTo = useCallback((to) => {
         unlock();
-        // A footfall, not a click — and a slightly different one each time. See Sfx.step().
-        Sfx.step(0.35 + Math.random() * 0.35);
-        setFacing(dir);
-        setX((p) => Math.max(4, Math.min(96, p + dir * 6)));
         setErr(null);
+        // Read the position from the ref, not from inside a setX updater — an updater can be called twice
+        // and setting other state from within one is a side effect in a place React is allowed to repeat.
+        setFacing(to < xRef.current ? -1 : 1);
+        setGoal(Math.max(4, Math.min(96, to)));
+    }, []);
+
+    // Hold an arrow and you keep going until you let go or reach the wall. A tap still moves you a sensible
+    // amount, because the goal is only cleared on release and the loop has already run a few ticks by then.
+    // ── A TAP AND A HOLD ARE THE SAME GESTURE, MEASURED ──────────────────────────────────────────────────
+    // Holding walks until you let go. But releasing simply cleared the goal, so a TAP moved you one tick —
+    // about a pixel and a half of floor — where the old arrow moved you 6% of it. Free movement is not much
+    // use if the ordinary gesture stopped working.
+    // So a release that comes quickly is read as a step rather than as a stop: you get a proper stride, in
+    // the same continuous motion, and a long press still runs to the wall.
+    const heldAt = useRef(0);
+    const hold = useCallback((dir) => {
+        unlock(); setFacing(dir); heldAt.current = Date.now(); setGoal(dir < 0 ? 4 : 96);
+    }, []);
+    const release = useCallback((dir) => {
+        // Three handlers hang off each button (up, leave, cancel) and a real release fires more than one of
+        // them. Without this guard the second call reads heldAt as 0, decides the press was not quick, and
+        // cancels the step the first call just started.
+        if (!heldAt.current) return;
+        const quick = Date.now() - heldAt.current < 220;
+        heldAt.current = 0;
+        setGoal(quick ? Math.max(4, Math.min(96, xRef.current + (dir < 0 ? -9 : 9))) : null);
     }, []);
 
     // Escape stands you up. A full-screen layer with no keyboard way out is a trap on desktop.
@@ -922,7 +992,15 @@ export default function CasinoClient({ initial }) {
                 to one selector, waiting to collide the next time either got a rule. */}
             <div className="cas-roomwrap">
             <div className="cas-room" ref={roomRef}>
-              <div className="cas-world">
+              {/* ── TAP THE FLOOR AND WALK THERE ────────────────────────────────────────────────
+                  The most direct way to move in a room you are looking at. It sits UNDER the cabinets in
+                  the stacking order, so tapping a machine still opens the machine — this only ever catches
+                  the taps that landed on nothing. */}
+              <div className="cas-world" onClick={(e) => {
+                  if (e.target !== e.currentTarget && !e.target.classList?.contains("cas-floor")) return;
+                  const b = e.currentTarget.getBoundingClientRect();
+                  walkTo(((e.clientX - b.left) / b.width) * 100);
+              }}>
                 <div className="cas-floor" aria-hidden="true" />
 
                 {/* The lights, and the stuff you cannot play. Both inert — see DECOR and LAMPS. */}
@@ -971,11 +1049,16 @@ export default function CasinoClient({ initial }) {
                 {/* YOU. Everybody else in the room has been drawn with their own avatar since the floor
                     opened; your own hero was a plain circle, which made the one person you are actually
                     looking at the only one who was not there. */}
-                <div className="cas-you" style={{ left: `${x}%` }}>
+                <div className={`cas-you${goal != null ? " is-walking" : ""}`}
+                    style={{ left: `${x}%`, "--face": facing }}>
+                    {/* WHICH WAY HE FACES LIVES ON THE WRAPPER, not on the sprite. The walk animation sets
+                        `transform` on the sprite, and an animation wins against an inline style — so with the
+                        flip on the sprite he snapped to facing right the instant he started moving, which is
+                        the only time it matters. */}
                     {st?.me?.sprite ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={st.me.sprite} alt="" draggable="false" style={{ transform: `scaleX(${facing})` }} />
-                    ) : <span className="cas-blank is-you" style={{ transform: `scaleX(${facing})` }} />}
+                        <img src={st.me.sprite} alt="" draggable="false" />
+                    ) : <span className="cas-blank is-you" />}
                 </div>
               </div>
             </div>
@@ -989,13 +1072,20 @@ export default function CasinoClient({ initial }) {
             </div>
 
             <div className="cas-walk">
-                <button type="button" onClick={() => walk(-1)} aria-label="Walk left">◀</button>
+                {/* Pointer events rather than click, so a press that is HELD keeps walking. onPointerLeave
+                    and onPointerCancel matter as much as onPointerUp: a thumb that slides off the button
+                    mid-walk would otherwise leave you walking into the wall forever. */}
+                <button type="button" aria-label="Walk left"
+                    onPointerDown={() => hold(-1)} onPointerUp={() => release(-1)}
+                    onPointerLeave={() => release(-1)} onPointerCancel={() => release(-1)}>◀</button>
                 {at?.live ? (
                     <button type="button" className="cas-sit" onClick={() => setSeated(true)}>
                         Play {at.label}
                     </button>
                 ) : <span>{at ? at.label : "walk to a machine"}</span>}
-                <button type="button" onClick={() => walk(1)} aria-label="Walk right">▶</button>
+                <button type="button" aria-label="Walk right"
+                    onPointerDown={() => hold(1)} onPointerUp={() => release(1)}
+                    onPointerLeave={() => release(1)} onPointerCancel={() => release(1)}>▶</button>
             </div>
 
             {/* ── THE MACHINE YOU ARE AT ──────────────────────────────────────────────────────────────────

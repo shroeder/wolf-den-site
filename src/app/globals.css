@@ -17367,9 +17367,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* 340%, not 240%. Nine cabinets sit 11 points apart, which at 240% of a phone was 99px of gap for a 66px
    machine — they very nearly touched, and a row of touching machines is one object. Widening the floor
    buys the space without moving a single machine, because every position in this room is a percentage. */
-.cas-world { position: relative; width: 340%; height: 100%; }
-@media (min-width: 700px) { .cas-world { width: 210%; } }
-@media (min-width: 1024px) { .cas-world { width: 165%; } }
+/* Wider again. The machines sit 11 points apart and every position in this room is a percentage, so the
+   only way to put more floor between two cabinets is to make the floor longer — which costs nothing now
+   that walking it is continuous rather than fifteen fixed stops. */
+.cas-world { position: relative; width: 480%; height: 100%; cursor: pointer; }
+@media (min-width: 700px) { .cas-world { width: 290%; } }
+@media (min-width: 1024px) { .cas-world { width: 235%; } }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
    the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
    that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of
@@ -17499,7 +17502,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-mach.is-near { transform: translateX(-50%) translateY(-4px); }
 
 /* People. Yours is the solid one; everybody else is dimmer and behind. */
-.cas-other, .cas-you { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center; }
+.cas-other { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center; }
+/* The flip lives here rather than on the sprite — see the note in the component. */
+.cas-you { position: absolute; bottom: 6%; transform: translateX(-50%) scaleX(var(--face, 1)); text-align: center; }
+.cas-other, .cas-you { text-align: center;
+    /* The walk moves in sixteen small hops a second; this smooths the gaps between them into a stride. */
+    transition: left 62ms linear; }
 .cas-other { opacity: .8; }
 /* Sized against the cabinet, not against the old box — see the note on .cas-mach. Everybody else is a
    shade smaller than you as well as dimmer, which is the cheapest possible way of saying who the camera
@@ -18275,3 +18283,16 @@ body.cas-seated .social-fab { display: none; }
     font-size: clamp(10px, 2vh, 13px); font-weight: 900; color: #2a1f10;
     font-variant-numeric: tabular-nums; text-shadow: 0 1px 0 rgba(255,255,255,0.4);
     transform: translateY(calc(clamp(3px, 0.6vh, 5px) * -1.6)); }
+
+
+/* ── A HERO WHO IS ACTUALLY WALKING ───────────────────────────────────────────────────────────────────
+   A sprite sliding along the floor perfectly level is a hero on a conveyor belt. One small bob, on the
+   same clock as the footsteps, and he is walking. */
+.cas-you.is-walking img, .cas-you.is-walking .cas-blank { animation: casStride 248ms ease-in-out infinite; }
+@keyframes casStride {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25% { transform: translateY(-2.5px) rotate(-1.2deg); }
+    75% { transform: translateY(-1px) rotate(1.2deg); } }
+/* The sprite carries an inline scaleX for which way he is facing, and an animation that sets `transform`
+   would throw it away — so the flip moves to the wrapper, where nothing else is competing for it. */
+.cas-you img { transform-origin: 50% 100%; }
