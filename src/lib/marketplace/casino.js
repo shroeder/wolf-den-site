@@ -8,6 +8,9 @@ import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 import {
+    ROUND_MS, openBets, placeBet, roundEndsAt, roundOf, roundPlayers, settleBets,
+} from "@/lib/marketplace/casino-rounds.js";
+import {
     GAMBLE_WIN_CHANCE, SLOT_BONUSES, applyBonuses, bonusEv, emptyMeter, hasBonus, moonstruckMult,
 } from "@/lib/marketplace/slot-bonus.js";
 
@@ -664,69 +667,87 @@ export function wheelRtp(betId, pick = 0) {
     return (wins / WHEEL.length) * bet.pays;
 }
 
+// ── ONE WHEEL, EVERYBODY'S CHIPS ─────────────────────────────────────────────────────────────────────────────
+// The wheel is shared now: bets go on during a forty-five-second window, then it spins once and every chip on
+// the floor is scored against the same pocket. That is what roulette IS — a table where each player gets a
+// private wheel is a slot machine with a wheel painted on it.
+//
+// Which means a spin no longer resolves in the request that placed the bet, and it must not: you choose your
+// pocket, so a draw you could see before betting again would be an unlimited payout. The outcome does not
+// exist until the window shuts — see casino-rounds.js.
 export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const rule = WHEEL_BETS[choice];
     if (!rule) return { ok: false, error: "bad_bet" };
     const stake = clampBet(bet);
+    const cleanPick = Math.max(0, Math.min(WHEEL.length - 1, Math.round(Number(pick) || 0)));
+
+    // Anything owed from an earlier round is paid before the new bet goes on, so a player never has two
+    // rounds of winnings stacked up behind a stake they are about to place.
+    const settled = await settleWheel(buyerId);
 
     const perks = await casinoPerks(buyerId);
+    const placed = await placeBet(buyerId, "wheel", {
+        stake, choice: { bet: choice, pick: cleanPick }, reason: "casino_wheel_bet",
+    });
+    if (!placed.ok) return placed;
+
     // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
     // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
-    // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
-    // appears in the coin log is a play nobody can audit.
+    // it, so the ledger still shows the bet being placed and the stake coming back.
+    let gold = placed.gold;
     let onHouse = false;
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_wheel_bet", { balanceAfter: paid.gold, meta: { bet: stake, choice } });
-
     if (onTheHouse(perks)) {
         const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
             [buyerId, stake]).catch(() => null);
         if (back) {
             onHouse = true;
-            paid.gold = back.gold;
+            gold = back.gold;
             await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "wheel" } });
         }
     }
 
-    const seg = WHEEL[Math.floor(Math.random() * WHEEL.length)];
-    const hit = rule.hits(seg, pick);
-    const won = hit ? Math.round(stake * rule.pays) : 0;
+    // The bounty ticks when you PLAY, which is now: the chips are down. What the wheel does with them is a
+    // separate moment, and tying a daily task to it would mean a bounty you complete by waiting.
+    await tickCasinoQuests(buyerId, "wheel", 0);
 
-    let gold = paid.gold;
-    if (won > 0) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, won]).catch(() => null);
-        if (back) {
-            gold = back.gold;
-            await logCoin(buyerId, won, "casino_wheel_win", { balanceAfter: gold, meta: { bet: stake, choice, seg: seg.i } });
-        }
-    }
-    // ── THE CROUPIER'S CAT ─────────────────────────────────────────────────────────────────────────────────
-    // A share of a spin the wheel already took. Three rules keep it honest and one keeps it fun:
-    //   • only on a LOSS, so it can never compound with a win into something the ceiling did not price;
-    //   • never on a play that was already free, because refunding a stake nobody paid mints gold;
-    //   • the same expected cost either way — but paid RARELY and BIG (a quarter of the pile, one losing
-    //     spin in twenty) instead of a rounding error on every loss. A 1% dribble is invisible; the cat
-    //     sliding a stack back across the felt is the reason to want the cat.
-    let refund = 0;
-    if (!hit && !onHouse && perks.wheelRefund > 0 && Math.random() < REFUND_CHANCE) {
-        refund = Math.round(stake * Math.min(1, perks.wheelRefund / REFUND_CHANCE));
-        if (refund > 0) {
-            const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-                [buyerId, refund]).catch(() => null);
-            if (back) { gold = back.gold; await logCoin(buyerId, refund, "casino_wheel_refund", { balanceAfter: gold }); }
-            else refund = 0;
-        }
-    }
-    const prize = await rollCasinoPrize(buyerId, { jackpot: hit && choice === "wolf", perks });
-    await tickCasinoQuests(buyerId, "wheel", won);
+    return {
+        ok: true, placed: true, round: placed.round, closesAt: placed.closesAt,
+        bet: stake, choice, pick: cleanPick, gold, onHouse, settled,
+    };
+}
+
+/** One pocket, rolled once for the whole floor. Only ever called for a round that has already closed. */
+const rollWheel = () => ({ seg: WHEEL[Math.floor(Math.random() * WHEEL.length)] });
+
+/** Score one chip against the pocket the wheel actually stopped in. */
+function scoreWheel(choice, outcome, stake) {
+    const rule = WHEEL_BETS[choice?.bet];
+    if (!rule) return { won: 0, detail: { hit: false } };
+    const hit = rule.hits(outcome.seg, choice.pick);
+    return { won: hit ? Math.round(stake * rule.pays) : 0, detail: { hit, seg: outcome.seg } };
+}
+
+/**
+ * Pay out everything whose round has closed. Runs whenever anybody looks at the wheel, which is what makes
+ * a scheduler unnecessary — nothing has to happen the instant a round ends, it only has to have happened by
+ * the time somebody asks.
+ */
+export async function settleWheel(buyerId) {
+    const done = await settleBets(buyerId, "wheel", {
+        roll: rollWheel, score: scoreWheel, reason: "casino_wheel_win",
+    });
+    if (!done.length) return [];
+
+    // The floor's furniture fires once per settled round, not once per bet: two chips on one spin is one
+    // play, and rolling a prize per chip would price a feature nobody costed.
+    const perks = await casinoPerks(buyerId);
+    const jackpot = done.some((d) => d.detail?.hit && d.choice?.bet === "wolf");
+    const prize = await rollCasinoPrize(buyerId, { jackpot, perks });
     const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
-    return { ok: true, seg, choice, hit, bet: stake, won, gold, prize, pet, onHouse, refund };
+    const won = done.reduce((n, d) => n + d.won, 0);
+    if (won > 0) await tickCasinoQuests(buyerId, "wheel_win", won);
+    return done.map((d, i) => (i === 0 ? { ...d, prize, pet } : d));
 }
 
 // ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -760,66 +781,74 @@ export function kenoRtp() {
     return r;
 }
 
+// ── ONE DRAW, EVERYBODY'S TICKETS ────────────────────────────────────────────────────────────────────────────
+// Keno is shared too, and for the same reason the wheel is: everybody in the window plays the same ten balls.
+// A keno lounge where each player gets private numbers is a slot machine with a grid on it.
+//
+// And the same rule holds, harder: you PICK your numbers, so a draw visible before the window shuts would let
+// anybody buy a five-of-five ticket every round. The ten balls do not exist until the round is over.
 export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // The ticket is validated here and not trusted: a POST body can carry six numbers, or the same number
-    // five times, or 400. Either of those would break the odds this game was priced on.
+    // five times, or 400. Any of those would break the odds this game was priced on.
     const clean = [...new Set((Array.isArray(picks) ? picks : []).map((n) => Math.round(Number(n))))]
         .filter((n) => n >= 1 && n <= KENO_POOL);
     if (clean.length !== KENO_PICKS) return { ok: false, error: "bad_ticket" };
     const stake = clampBet(bet);
 
+    const settled = await settleKeno(buyerId);
     const perks = await casinoPerks(buyerId);
-    // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
-    // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
-    // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
-    // appears in the coin log is a play nobody can audit.
-    let onHouse = false;
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_keno_bet", { balanceAfter: paid.gold, meta: { bet: stake, picks: clean } });
+    const placed = await placeBet(buyerId, "keno", { stake, choice: { picks: clean }, reason: "casino_keno_bet" });
+    if (!placed.ok) return placed;
 
+    let gold = placed.gold;
+    let onHouse = false;
     if (onTheHouse(perks)) {
         const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
             [buyerId, stake]).catch(() => null);
         if (back) {
             onHouse = true;
-            paid.gold = back.gold;
+            gold = back.gold;
             await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "keno" } });
         }
     }
+    await tickCasinoQuests(buyerId, "keno", 0);
 
-    // Draw without replacement, which is what makes the odds hypergeometric rather than binomial.
-    const bag = Array.from({ length: KENO_POOL }, (_, i) => i + 1);
-    const drawn = [];
-    for (let i = 0; i < KENO_DRAWN; i += 1) drawn.push(...bag.splice(Math.floor(Math.random() * bag.length), 1));
-    const hits = clean.filter((n) => drawn.includes(n));
-    const won = Math.round(stake * (KENO_PAYS[hits.length] || 0));
-
-    let gold = paid.gold;
-    if (won > 0) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, won]).catch(() => null);
-        if (back) {
-            gold = back.gold;
-            await logCoin(buyerId, won, "casino_keno_win", { balanceAfter: gold, meta: { bet: stake, hits: hits.length } });
-        }
-    }
-    // Five of five is 1 in 2,611 — the rarest thing on the floor, and the only one that is worth a certainty.
-    const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
-    await tickCasinoQuests(buyerId, "keno", won);
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
-    return { ok: true, picks: clean, drawn, hits, bet: stake, won, gold, prize, pet, onHouse };
+    return { ok: true, placed: true, round: placed.round, closesAt: placed.closesAt, bet: stake, picks: clean, gold, onHouse, settled };
 }
 
-// ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
-// Presence, exactly as the tavern does it — same table, same 90-second liveness, a different `zone`. Written
-// as its own pair of functions rather than a shared helper for now, because the tavern's copy carries chat
-// bubbles and featured collectibles that the casino does not have machines for yet; when the casino grows
-// them, the two collapse into one.
+/** Ten balls from forty, drawn once for the whole floor. Only ever called for a round that has closed. */
+const rollKeno = () => {
+    const pool = Array.from({ length: KENO_POOL }, (_, i) => i + 1);
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return { drawn: pool.slice(0, KENO_DRAWN) };
+};
+
+function scoreKeno(choice, outcome, stake) {
+    const drawn = new Set(outcome.drawn || []);
+    const hits = (choice.picks || []).filter((n) => drawn.has(n));
+    const pays = KENO_PAYS[hits.length] || 0;
+    return { won: Math.round(stake * pays), detail: { hits, pays } };
+}
+
+export async function settleKeno(buyerId) {
+    const done = await settleBets(buyerId, "keno", { roll: rollKeno, score: scoreKeno, reason: "casino_keno_win" });
+    if (!done.length) return [];
+    const perks = await casinoPerks(buyerId);
+    const jackpot = done.some((d) => (d.detail?.hits || []).length === KENO_PICKS);
+    const prize = await rollCasinoPrize(buyerId, { jackpot, perks });
+    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    const won = done.reduce((n, d) => n + d.won, 0);
+    if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
+    return done.map((d, i) => (i === 0 ? { ...d, prize, pet } : d));
+}
+
+// ── WALKING THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────
+// Position is clamped server-side: `x` and `y` arrive in a POST body, and a member standing at x = 4000 would
+// be a member standing outside the room.
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
 
 export async function moveCasino(buyerId, { x, y, facing } = {}) {
@@ -858,6 +887,27 @@ export async function casinoOccupants(selfId) {
 }
 
 /** What the room needs to draw itself: your purse, who else is here, and the machine's own numbers. */
+// Everything the two shared games need drawn: the live round, its clock, who is in it, and whatever of
+// yours is still waiting on one. Settling runs FIRST — a member who closed the tab mid-round should be paid
+// before they are shown anything, not after they wonder where their gold went.
+async function sharedRounds(buyerId) {
+    const now = Date.now();
+    const out = {};
+    for (const game of ["wheel", "keno"]) {
+        const settled = game === "wheel" ? await settleWheel(buyerId) : await settleKeno(buyerId);
+        const round = roundOf(game, now);
+        out[game] = {
+            round,
+            msLeft: Math.max(0, roundEndsAt(game, round) - now),
+            roundMs: ROUND_MS[game],
+            players: await roundPlayers(game, round),
+            mine: await openBets(buyerId, game),
+            settled,
+        };
+    }
+    return out;
+}
+
 export async function getCasinoState(buyerId) {
     const [me, others] = await Promise.all([
         // The avatar comes down with the gold. Everybody ELSE on this floor has been drawn with their own
@@ -887,6 +937,10 @@ export async function getCasinoState(buyerId) {
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
         wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },
+        // ── THE TWO SHARED GAMES ────────────────────────────────────────────────────────────────────
+        // Which round is running, when it shuts, who is in it, and anything of yours still riding on one.
+        // Settled first, so a member who has been away collects before they see the room.
+        rounds: await sharedRounds(buyerId),
         perks: await casinoPerks(buyerId),
     };
 }

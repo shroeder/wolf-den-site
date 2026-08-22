@@ -17693,3 +17693,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Double or Nothing sits above the pull button — it is a decision about the money you just won, and it
    has to be answered before the next pull, so it goes where the next pull would be. */
 .cas-gamble { width: 100%; margin-bottom: 8px; }
+
+/* ── A SHARED ROUND ──────────────────────────────────────────────────────────────────────────────────
+   The clock and the company. Both halves matter: a countdown with nobody named on it is just a wait,
+   and being told somebody else is on the same numbers is the entire reason these two games are shared. */
+.cas-round { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin: 0 0 10px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(159,198,221,0.28); background: rgba(159,198,221,0.08); }
+.cas-round-clock { font-size: 12px; font-weight: 900; color: #9fc6dd; letter-spacing: 0.02em; }
+.cas-round-who { font-size: 9.5px; color: #98a0aa; text-align: right; }

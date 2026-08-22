@@ -48,6 +48,10 @@ const SYMBOL_ART = {
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
+// Seconds left on a round, from the end time the server sent. Recomputed on a local tick rather than polled:
+// the clock is the same for everybody and asking a server what time it is would be a request per second.
+const secsLeft = (closesAt) => Math.max(0, Math.ceil((closesAt - Date.now()) / 1000));
+
 // Every way a hand can end, said the way somebody would say it out loud. "dealer_bust" is a state name, not
 // a sentence, and a table that reports state names is a table that reads like a debug log.
 const OUTCOME = {
@@ -71,6 +75,27 @@ const OUTCOME_SHORT = {
     bust: "bust",
     dealer_blackjack: "lost",
 };
+
+// ── A SHARED ROUND, ON THE MACHINE'S FACE ────────────────────────────────────────────────────────────────────
+// The clock, who else is in it, and what you already have riding. All three matter: a countdown with nobody
+// named on it is just a wait, and the whole reason these two games became shared is that somebody else is
+// playing the same numbers.
+function Round({ game, st, tick, verb }) {
+    const r = st?.rounds?.[game];
+    if (!r) return null;
+    const left = secsLeft(r.closesAt ?? (Date.now() + (r.msLeft || 0)));
+    const mine = r.mine || [];
+    const others = (r.players || []).length;
+    return (
+        <div className="cas-round" data-tick={tick}>
+            <span className="cas-round-clock">{verb} in {left}s</span>
+            <span className="cas-round-who">
+                {others > 1 ? `${others} in this round` : others === 1 ? "you, so far" : "nobody yet"}
+                {mine.length ? ` · ${mine.length} of yours riding` : ""}
+            </span>
+        </div>
+    );
+}
 
 // A card, drawn in CSS like every other thing on this floor. Red suits red, black suits pale — the one piece
 // of card design that is not decoration, because it is how you read a hand at a glance.
@@ -140,6 +165,9 @@ export default function CasinoClient({ initial }) {
     // client keeps its own count of is a meter that disagrees with the one that pays.
     const [meters, setMeters] = useState(initial?.meters || {});
     const [fx, setFx] = useState(null);      // what the features did on the last pull
+    // The two shared games: what settled for you last, and a ticking clock for the round now open.
+    const [settled, setSettled] = useState({});
+    const [tick, setTick] = useState(0);
     const rakeRate = initial?.blackjack?.rakeRate ?? 0.2;
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -158,11 +186,11 @@ export default function CasinoClient({ initial }) {
 
     // Who else is on the floor. Polled rather than pushed, because a casino is not a fight — a few seconds of
     // staleness in where somebody is standing costs nothing.
+
+    // The countdown. One second of arithmetic, no requests — the round's end time came down with the state
+    // and the clock is the same for everybody, so there is nothing to ask anyone about.
     useEffect(() => {
-        const id = setInterval(async () => {
-            const r = await fetch("/api/marketplace/casino").then((x2) => x2.json()).catch(() => null);
-            if (r?.open) setSt((p) => ({ ...p, others: r.others, gold: r.gold }));
-        }, 6000);
+        const id = setInterval(() => setTick((n) => n + 1), 1000);
         return () => clearInterval(id);
     }, []);
 
@@ -306,6 +334,14 @@ export default function CasinoClient({ initial }) {
         }
         onResult(r);
         setSt((p) => ({ ...p, gold: r.gold }));
+        // A bet PLACED is not a result. The wheel and keno hand back a round to wait for, and celebrating
+        // at that moment would be the machine cheering for taking your money.
+        if (r.placed) {
+            setSt((p) => ({ ...p, rounds: { ...(p.rounds || {}), [r.round != null && body.action === "wheel" ? "wheel" : "keno"]: { ...(p.rounds?.[body.action] || {}), msLeft: Math.max(0, (r.closesAt || 0) - Date.now()), closesAt: r.closesAt } } }));
+            setSettled((p) => ({ ...p, [body.action]: null }));
+            Sfx.ui?.();
+            return;
+        }
         absorb(r);
         if (r.won > 0) {
             // A payout worth more than ten times the stake is the moment worth shaking the room for.
@@ -364,6 +400,26 @@ export default function CasinoClient({ initial }) {
     //
     // Nothing here can change the outcome, which is why the reveal is allowed to be pure presentation.
     const BALL_MS = 85;
+    useEffect(() => {
+        const id = setInterval(async () => {
+            const r = await fetch("/api/marketplace/casino").then((x2) => x2.json()).catch(() => null);
+            // The rounds ride along on the poll that was already running for the other people in the room.
+            // A shared game needs no channel of its own: the wheel spinning is something the floor learns
+            // the next time it looks, which is at most six seconds and usually less.
+            if (r?.open) {
+                setSt((p) => ({ ...p, others: r.others, gold: r.gold, rounds: r.rounds }));
+                // Anything that settled while you were away is announced rather than quietly banked.
+                for (const game of ["wheel", "keno"]) {
+                    const done = r.rounds?.[game]?.settled || [];
+                    if (done.length) setSettled((p) => ({ ...p, [game]: done }));
+                    const first = done.find((d) => d.prize || d.pet);
+                    if (first) absorb(first);
+                }
+            }
+        }, 6000);
+        return () => clearInterval(id);
+    }, [absorb]);
+
     const buyCard = useCallback(async () => {
         if (busy) return;
         unlock();
@@ -575,14 +631,23 @@ export default function CasinoClient({ initial }) {
                         the ticket resolve in one, so they get a result and a celebration and no theatre. */}
                     {at.live && at.id === "roulette" ? (
                         <>
+                            {/* ── THE ROUND ───────────────────────────────────────────────────────────
+                                One wheel for the whole floor. Everybody betting inside the window is on the
+                                same pocket, which is what roulette IS — and it is also why the result cannot
+                                arrive with the bet: you choose your pocket, so a spin you could see before
+                                betting again would be an unlimited payout. */}
+                            <Round game="wheel" st={st} tick={tick} verb="Spins" />
+
                             <div className="cas-wheel">
                                 {(st?.wheel?.segments || []).map((seg) => (
                                     <span key={seg.i}
-                                        className={`cas-seg is-${seg.kind}${wheel?.seg?.i === seg.i ? " is-hit" : ""}`} />
+                                        className={`cas-seg is-${seg.kind}${settled.wheel?.[0]?.outcome?.seg?.i === seg.i ? " is-hit" : ""}`} />
                                 ))}
-                                {wheel ? (
-                                    <b className={`cas-wheel-out${wheel.hit ? " is-win" : ""}`}>
-                                        {wheel.hit ? `${money(wheel.won)} gold` : "The house takes it"}
+                                {settled.wheel?.length ? (
+                                    <b className={`cas-wheel-out${settled.wheel.some((d) => d.won > 0) ? " is-win" : ""}`}>
+                                        {settled.wheel.some((d) => d.won > 0)
+                                            ? `${money(settled.wheel.reduce((n, d) => n + d.won, 0))} gold`
+                                            : "The house takes it"}
                                     </b>
                                 ) : <b className="cas-wheel-out">Place a bet</b>}
                             </div>
@@ -600,6 +665,17 @@ export default function CasinoClient({ initial }) {
 
                     {at.live && at.id === "keno" ? (
                         <>
+                            {/* Ten balls for the whole lounge — see the note on the wheel for why the draw
+                                cannot arrive with the ticket. */}
+                            <Round game="keno" st={st} tick={tick} verb="Drawn" />
+                            {settled.keno?.length ? (
+                                <p className={`cas-fx${settled.keno.some((d) => d.won > 0) ? " is-big" : ""}`}>
+                                    Drawn: {(settled.keno[0].outcome?.drawn || []).join(" · ")}
+                                    {settled.keno.some((d) => d.won > 0)
+                                        ? ` — ${money(settled.keno.reduce((n, d) => n + d.won, 0))} gold`
+                                        : " — nothing this time"}
+                                </p>
+                            ) : null}
                             <div className="cas-grid">
                                 {Array.from({ length: st?.keno?.pool || 40 }, (_, i) => i + 1).map((n) => {
                                     const mine = ticket.includes(n);
@@ -869,6 +945,8 @@ export default function CasinoClient({ initial }) {
                                     if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
                                     if (at.id === "bingo") return buyCard();
+                                    // Both of these now PLACE a bet on the open round rather than resolving
+                                    // one. The answer says when it closes; the result arrives on the poll.
                                     if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
@@ -877,7 +955,7 @@ export default function CasinoClient({ initial }) {
                                         ? `Free pull · ${meters[at.id].freePulls} left`
                                         : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
-                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
+                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Put chips down" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
                             )}
                             {err ? <p className="cas-err">{err}</p> : null}
