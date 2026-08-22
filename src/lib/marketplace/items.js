@@ -1236,9 +1236,20 @@ for (const it of ITEMS) {
 // actually WORKED their gear: enhanced every piece, and rerolled the affixes they did not want into the ones
 // they did. That is what a real player at that height has done, so it is what they should be facing.
 export const FORGE = {
-    // An affix can be forged up by half its printed value again (a +20 Might line caps at +10 forged). An
-    // affix the piece was NOT born with caps at +3 — see crafting.js, where `base` is 0 for those.
-    CAP_FRAC: 0.5,
+    // ── THERE IS NO PER-STAT CAP ANY MORE ────────────────────────────────────────────────────────────────
+    // This used to be CAP_FRAC: an affix could be forged up by half its printed value again and no further.
+    // Luke, 2026-08-22: "no caps." A forged line now grows for as long as you keep feeding it parts.
+    //
+    // What is left below is NOT that cap wearing a new name. NPC_LIFT is the Long Road's own model of how
+    // much a forged set is worth, and it happened to be written in terms of the cap because, while the cap
+    // existed, the cap WAS the answer. Deleting the cap and leaving that expression alone would have
+    // silently re-tuned the entire ladder, so the number the Road was actually built against is kept here,
+    // under its own name, decoupled.
+    //
+    // It is now a FLOOR on what the Road assumes rather than a ceiling on what you can reach: players can
+    // forge past it. Retuning it is a telemetry job, not a guess — run scripts/arena-report.mjs against real
+    // fights first.
+    NPC_LIFT: 0.5,
     // What an enhance adds to the piece ITSELF, per level, as a share of its own base.
     WEAPON_PER_LEVEL: [0.03, 0.05],
     ARMOUR_PER_LEVEL: [0.05, 0.08],

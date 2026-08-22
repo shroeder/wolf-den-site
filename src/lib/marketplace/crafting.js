@@ -35,7 +35,13 @@ const COMBINE_COST = 5; // 5 of tier N → 1 of tier N+1
 // A forged stat tops out at +40% of its BASE value (min +1). Keeps a fully-forged item a MODEST upgrade — never
 // the old runaway doubling. Past the cap the item still LEVELS (prestige border) but gains no more raw stats.
 // The forge's own numbers live in items.js so arena-npc.js can build a rung that has actually been forged.
-const ENHANCE_CAP_FRAC = FORGE.CAP_FRAC;
+// ── NO PER-STAT CAP ──────────────────────────────────────────────────────────────────────────────────────────
+// Luke, 2026-08-22: "no caps." A forged line grows for as long as you keep feeding it parts.
+//
+// What is still enforced, because it is a different rule and not a cap on a number: a piece can only hold
+// affixCeiling(rarity) LINES. The forge fills empty sockets and does not drill new ones — otherwise a common
+// item ends up carrying every stat in the game, which erases the rarity ladder from the other end. That is a
+// limit on how many things a piece does, not on how big any of them gets.
 
 // Salvaging a piece of gear → which tier + how many parts, by rarity.
 const SALVAGE = {
@@ -428,33 +434,21 @@ export async function combineAllAtTier(buyerId, tier) {
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
 
-// ── IS THIS PIECE AT ITS CEILING, AND WHERE IS THE CEILING ───────────────────────────────────────────────────
-// GrayKitsune: "Okay I didnt see a warning before upgrading my Rare ring to +6 that my +5 was max stats."
+// ── HOW MANY LINES A PIECE CAN STILL GAIN ────────────────────────────────────────────────────────────────────
+// GrayKitsune ran a Rare ring to +6 and found the stats had stopped moving at +5, with nothing warning him.
+// The per-stat cap that caused that is gone (see the note at the top of this file), so the stats never stop.
 //
-// The forge already worked this out — `allMaxed` comes back on the enhance RESULT and the modal prints
-// "Stats maxed — further forging earns prestige only". It arrives one beat too late to be any use: by the
-// time you read it, the parts are spent. The answer was never missing, it was just always given afterwards.
-//
-// So the rule moves out here and the card asks it BEFORE the spend. Extracted rather than re-derived on the
-// screen, for the reason this file already states about prices: a card that prints one thing and a server
-// that does another is the oldest bug in this codebase, and a ceiling is exactly the kind of number that
-// drifts once there are two of it.
-//
-// It is NOT a refusal. A maxed piece can still take stars and can still roll an attunement, and some people
-// will want both — so this is a thing the screen says, not a thing the server blocks.
+// What remains is the SOCKET count: a piece holds affixCeiling(rarity) lines, and once they are full the
+// forge can only make what is there bigger — which it now does forever. Reported here so a card can say so
+// before a pixel-perfect run is spent hoping for a brand-new stat that cannot land.
 export function forgeCeiling(item, bonus = {}) {
-    if (!item) return { maxed: false, socketsLeft: 0, capOf: () => 0, atCap: [] };
+    if (!item) return { socketsLeft: 0, full: false };
     const existing = Object.keys(item.stats || {})
         .filter((k) => STAT_META[k] && k !== "extra_strike" && !isIntrinsicStat(k));
-    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
     const forgedNew = Object.keys(bonus).filter((k) => !existing.includes(k)).length;
     const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
-    const newPool = socketsLeft > 0 ? addablePoolFor().filter((k) => !existing.includes(k)) : [];
-    const forgedKeys = Object.keys(bonus).filter((k) => (Number(bonus[k]) || 0) > 0);
-    // The same expression the enhance result uses, so the warning and the receipt cannot disagree.
-    const maxed = forgedKeys.length >= Math.min(4, existing.length + newPool.length)
-        && forgedKeys.every((k) => (Number(bonus[k]) || 0) >= capOf(k));
-    return { maxed, socketsLeft, capOf, atCap: existing.filter((k) => (Number(bonus[k]) || 0) >= capOf(k)) };
+    // `full` means this piece can gain no more LINES — every stat it has still grows without limit.
+    return { socketsLeft, full: socketsLeft <= 0 };
 }
 
 // ── REROLL ONE STAT, NOT THE WHOLE HAND ──────────────────────────────────────────────────────────────────────
@@ -502,8 +496,10 @@ export async function rerollStat(buyerId, itemId, stat) {
         // THE WHOLE VALUE MOVES. A swap is a RELOCATION of points already earned, not a new award, so the
         // per-stat forge cap deliberately does not apply here.
         //
-        // It used to. capOf() is `max(3, base * FRAC)` — and a swap can only ever target a stat the item does
-        // NOT have at base, so `base` was always 0 and the cap was always the floor of 3. Every swap on this
+        // It used to, back when there was one. capOf() was `max(3, base * FRAC)` — and a swap can only ever
+        // target a stat the item does NOT have at base, so `base` was always 0 and the cap was always the
+        // floor of 3. (The per-stat cap is gone entirely now; this note is kept because it explains why the
+        // line count is conserved.) Every swap on this
         // screen therefore capped at +3: a hard-won +7 Crit Chance came back as +3 of something and +4 left
         // stranded on the old line. That is the exact opposite of what a swap is for — nobody re-aims a big
         // roll in order to shrink it — and it also QUIETLY GREW THE AFFIX COUNT, because the leftover kept the
@@ -597,7 +593,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const doubleLevel = enhancePowers.has("master_s_mark") && oneIn(3);
 
     // ── THE PIECE'S OWN NUMBERS ARE NOT AFFIXES, AND `apply` CANNOT TELL ─────────────────────────────────
-    // `apply` adds ONE WHOLE POINT to whatever it is handed, and capOf floors every stat at +3. That is the
+    // `apply` adds ONE WHOLE POINT to whatever it is handed. That is the
     // right arithmetic for Might or Pierce, which are counted in points. It is catastrophic for the stats
     // counted in something else:
     //
@@ -629,10 +625,9 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
     const newPool = socketsLeft > 0 ? ADDABLE.filter((k) => !existing.includes(k)) : [];
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
-    // The shared rule — see forgeCeiling. Kept as a local alias so the code below reads the same as it did.
-    const { capOf } = forgeCeiling(item, parseBonus(cur?.stat_bonus));
+    // No cap. A line grows for as long as you feed it — see the note at the top of this file.
     const gained = {};
-    const apply = (k) => { if ((nextBonus[k] || 0) < capOf(k)) { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; } };
+    const apply = (k) => { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; };
     if (scenario > 0) {
         // Reach `scenario` DISTINCT stats: existing first, then (T3+) add brand-new stats to fill the count.
         //
@@ -652,7 +647,8 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         // useless: it would FILL the target list, and a full list stops the T3+ branch below from filling an
         // empty socket, so a nearly-finished piece would stop growing one enhance before it had to. Left
         // short instead, so a maxed-out piece spends its good rolls adding lines rather than repeating them.
-        const draw = existing.filter((k) => (nextBonus[k] || 0) < capOf(k));
+        // Every stat is always eligible now — nothing is ever finished, so nothing is ever skipped.
+        const draw = [...existing];
         const targets = [];
         while (targets.length < scenario && draw.length) {
             targets.push(draw.splice(Math.floor(Math.random() * draw.length), 1)[0]);
@@ -672,7 +668,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         // share of the piece's OWN BASE: 3-5% for a weapon's base damage, 5-8% for a piece of armour.
         //
         // Measured against the base, not the current value, so it is LINEAR — ten levels is ten times the
-        // step, not a compounding curve that runs away at the top. It is exempt from capOf for the same
+        // step, not a compounding curve that runs away at the top. It was exempt from the old per-stat cap for the same
         // reason: that cap exists to stop an affix outgrowing the item, and this IS the item.
         const baseKey = item.slot === "main_hand" ? "base_damage"
             : ARMOUR_SLOTS.has(item.slot) ? "armor" : null;
@@ -687,7 +683,8 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         for (let i = 0, extra = scenario - targets.length; i < extra; i += 1) apply(stack[i % stack.length]); // leftover points double up (e.g. a 1-stat item at T2)
     }
     const forgedKeys = Object.keys(nextBonus).filter((k) => (nextBonus[k] || 0) > 0);
-    const allMaxed = forgedKeys.length >= Math.min(4, existing.length + newPool.length) && forgedKeys.every((k) => (nextBonus[k] || 0) >= capOf(k));
+    // Stats no longer max out. What a piece CAN run out of is sockets — no more new lines, only bigger ones.
+    const allMaxed = socketsLeft <= 0;
     const bestGrade = (GRADE_RANK[grade] || 0) > (GRADE_RANK[cur?.best_grade] || 0) ? grade : cur?.best_grade || grade;
     // RARE ATTUNEMENT ROLL — a lucky enhance can add (or level up) a bonus utility affix that helps a spin-off
     // feature. Base chance + a bonus for a flawless strike + the Attunement forge upgrade. One affix per item.
@@ -772,9 +769,10 @@ export async function getForgeState(buyerId) {
             // subtracted from anything — deciding whether to melt a piece down means seeing the actual delta.
             statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
-            // Every stat already at its ceiling — so the card can say so before the parts are spent rather
-            // than the result modal saying it after. See forgeCeiling.
-            statsMaxed: forgeCeiling(it, enh?.bonus || {}).maxed,
+            // No sockets left: this piece can still grow every line it has, forever, but it cannot gain a
+            // NEW one — so a pixel-perfect run spent hoping for a brand-new stat cannot land. Said on the
+            // card, before the parts go in. See forgeCeiling.
+            socketsFull: forgeCeiling(it, enh?.bonus || {}).full,
             // What a reroll of THIS item would cost, from the same function that charges for it — a card that
             // prints one price and a server that takes another is the oldest bug in this codebase.
             // The forged lines themselves, so the modal can offer them one at a time rather than only

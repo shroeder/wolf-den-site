@@ -607,10 +607,11 @@ export default function BlacksmithClient({ initial }) {
                                         Rare ring at +5. Same rule, asked first (see forgeCeiling).
                                         Not a refusal: stars and attunements are still live, and some people
                                         are forging for those. It just stops being a surprise. */}
-                                    {rerolling.statsMaxed ? (
+                                    {rerolling.socketsFull ? (
                                         <span className="forge-maxed-warn">
-                                            Every stat on this piece is at its ceiling. Forging on raises its
-                                            stars and can still roll an attunement &mdash; it will not add stats.
+                                            Every socket on this piece is filled. Its stats will keep growing
+                                            &mdash; there is no ceiling on those &mdash; but a run good enough
+                                            to forge a brand-new stat has nowhere to put one.
                                         </span>
                                     ) : null}
                                     <span className={`forge-card-cost forge-enhance-cost${ok ? "" : " is-short"}`}>
@@ -1081,7 +1082,7 @@ export function EnhanceResultModal({ res, onClose }) {
                                     </span>
                                 </div>
                             ))}
-                            <div className="forge-er-note">{res.allMaxed ? "✦ Stats maxed — further forging earns prestige only" : addedCount ? "Your score was high enough to forge a whole new stat onto the item!" : "Higher scores forge more stats — a perfect run can add brand-new ones"}</div>
+                            <div className="forge-er-note">{res.allMaxed ? "✦ Every socket filled — stats keep growing, but no new ones can land" : addedCount ? "Your score was high enough to forge a whole new stat onto the item!" : "Higher scores forge more stats — a perfect run can add brand-new ones"}</div>
                         </div>
                     ) : null}
                     {/* RARE ATTUNEMENT — a bonus utility affix rolled onto the piece (or leveled up). The showpiece moment. */}

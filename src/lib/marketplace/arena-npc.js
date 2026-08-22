@@ -291,7 +291,9 @@ function npcProcs(tier, archKey) {
     // What the SET is worth in affixes at this height, before anybody touches a bench, lifted by how far the
     // pieces have been enhanced.
     const forge = npcForgeLevel(tier);
-    const lift = 1 + FORGE.CAP_FRAC * Math.min(1, forge / FORGE.MAX_LEVEL);
+    // NPC_LIFT, not the old CAP_FRAC — same value, so no rung moves today, but it is the Road's number now
+    // rather than a borrowed forge ceiling that no longer exists. See FORGE in items.js.
+    const lift = 1 + FORGE.NPC_LIFT * Math.min(1, forge / FORGE.MAX_LEVEL);
     const budget = ranked.reduce((n, r) => n + r.ceil * d * r.want, 0) * lift;
 
     // Then move it. Kept lines are weighted up and the rest down by the same fraction, so nothing is invented.
