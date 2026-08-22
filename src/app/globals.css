@@ -17455,7 +17455,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    it at the carpet hung the cabinet a caption's height in the air. The caption is lifted out of the flow
    below (position: absolute at top: 100%), which means this number is now the height of the caption strip
    and the cabinet's feet land exactly on it. */
-.cas-mach { position: absolute; bottom: 14%; transform: translateX(-50%); text-align: center;
+/* ── DOWN ON THE CARPET ───────────────────────────────────────────────────────────────────────────────
+   `bottom` is where the cabinet's FEET are, and at 14% they sat a clear gap above the painted carpet —
+   the machines read as hanging just off the floor rather than standing on it.
+   6% puts them into the patterned band. What was holding them up was the caption: it hangs BELOW the
+   cabinet, so the feet could never come lower than the caption is tall. Dropping the second caption line
+   on a working machine (see the component — the panel underneath already says what kind of game it is)
+   is what buys the room to come down. */
+.cas-mach { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center;
     width: clamp(78px, 15.6vh, 146px); transition: transform 140ms ease; }
 /* Every cabinet is a light source and throws a pool onto the carpet under it. This is most of what makes
    the row feel lit rather than pasted on, and it costs one pseudo-element. */
@@ -17492,7 +17499,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A machine that is not live is dimmed rather than differently drawn, so the row reads as one room. */
 .cas-mach:not(.is-live) .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)) grayscale(0.7) brightness(0.55); }
 .cas-mach b { position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
-    width: 130%; margin-top: 2px; font-size: clamp(9.5px, 1.9vh, 13px); font-weight: 900;
+    width: 130%; margin-top: 1px; font-size: clamp(9.5px, 1.9vh, 13px); font-weight: 900;
     line-height: 1.1; text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
 .cas-mach em { position: absolute; left: 50%; top: calc(100% + clamp(11px, 2.1vh, 15px));
     transform: translateX(-50%); width: 130%;
@@ -17502,9 +17509,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-mach.is-near { transform: translateX(-50%) translateY(-4px); }
 
 /* People. Yours is the solid one; everybody else is dimmer and behind. */
-.cas-other { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center; }
+.cas-other { position: absolute; bottom: 3%; transform: translateX(-50%); text-align: center; }
 /* The flip lives here rather than on the sprite — see the note in the component. */
-.cas-you { position: absolute; bottom: 6%; transform: translateX(-50%) scaleX(var(--face, 1)); text-align: center; }
+.cas-you { position: absolute; bottom: 3%; transform: translateX(-50%) scaleX(var(--face, 1)); text-align: center; }
 .cas-other, .cas-you { text-align: center;
     /* The walk moves in sixteen small hops a second; this smooths the gaps between them into a stride. */
     transition: left 62ms linear; }
@@ -17532,7 +17539,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     width: 160%; font-size: clamp(9px, 1.7vh, 12px); color: #b7bec7;
     text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
 
-.cas-walk { display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; gap: 8px; }
+/* One control, not three. The floor itself is how you move now — see the component — so this row is only
+   ever "the machine you are standing at", and it gets the whole width. */
+.cas-walk { display: grid; grid-template-columns: 1fr; align-items: center; gap: 8px; }
 .cas-walk button { padding: 11px 0; border-radius: 12px; font-size: 16px; cursor: pointer;
     color: #eaf1f8; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
 .cas-walk span { text-align: center; font-size: 11px; color: #98a0aa; letter-spacing: .1em;
@@ -18296,3 +18305,16 @@ body.cas-seated .social-fab { display: none; }
 /* The sprite carries an inline scaleX for which way he is facing, and an animation that sets `transform`
    would throw it away — so the flip moves to the wrapper, where nothing else is competing for it. */
 .cas-you img { transform-origin: 50% 100%; }
+
+
+/* ── THE FLOOR IS THE CONTROL ─────────────────────────────────────────────────────────────────────────
+   Tapping it walks you there, so it has to look tappable and it has to say so once. The hint fades out
+   the first time you actually move, because an instruction you have already followed is clutter. */
+/* TOP of the room, not the bottom. At the bottom it sat directly on the hero and the machine captions —
+   an instruction covering the thing it is instructing you about. */
+.cas-hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+    padding: 5px 12px; border-radius: 999px; pointer-events: none; z-index: 6;
+    font-size: 11px; font-weight: 800; letter-spacing: .04em; color: #e8dcc6;
+    background: rgba(10,7,16,0.62); border: 1px solid rgba(255,215,94,0.22);
+    backdrop-filter: blur(3px); animation: casHint 2.6s ease-in-out infinite; }
+@keyframes casHint { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }

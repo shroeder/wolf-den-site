@@ -457,6 +457,9 @@ export default function CasinoClient({ initial }) {
     // the loop below does the walking, which means holding an arrow, tapping a spot on the floor and arriving
     // from a deep link are all the same one mechanism rather than three.
     const [goal, setGoal] = useState(null);
+    // Whether they have walked at all yet — the floor's one-line instruction retires the moment it has
+    // been followed. An instruction you have already obeyed is clutter.
+    const [moved, setMoved] = useState(false);
 
     useEffect(() => {
         if (goal == null) return undefined;
@@ -482,33 +485,13 @@ export default function CasinoClient({ initial }) {
     const walkTo = useCallback((to) => {
         unlock();
         setErr(null);
+        setMoved(true);
         // Read the position from the ref, not from inside a setX updater — an updater can be called twice
         // and setting other state from within one is a side effect in a place React is allowed to repeat.
         setFacing(to < xRef.current ? -1 : 1);
         setGoal(Math.max(4, Math.min(96, to)));
     }, []);
 
-    // Hold an arrow and you keep going until you let go or reach the wall. A tap still moves you a sensible
-    // amount, because the goal is only cleared on release and the loop has already run a few ticks by then.
-    // ── A TAP AND A HOLD ARE THE SAME GESTURE, MEASURED ──────────────────────────────────────────────────
-    // Holding walks until you let go. But releasing simply cleared the goal, so a TAP moved you one tick —
-    // about a pixel and a half of floor — where the old arrow moved you 6% of it. Free movement is not much
-    // use if the ordinary gesture stopped working.
-    // So a release that comes quickly is read as a step rather than as a stop: you get a proper stride, in
-    // the same continuous motion, and a long press still runs to the wall.
-    const heldAt = useRef(0);
-    const hold = useCallback((dir) => {
-        unlock(); setFacing(dir); heldAt.current = Date.now(); setGoal(dir < 0 ? 4 : 96);
-    }, []);
-    const release = useCallback((dir) => {
-        // Three handlers hang off each button (up, leave, cancel) and a real release fires more than one of
-        // them. Without this guard the second call reads heldAt as 0, decides the press was not quick, and
-        // cancels the step the first call just started.
-        if (!heldAt.current) return;
-        const quick = Date.now() - heldAt.current < 220;
-        heldAt.current = 0;
-        setGoal(quick ? Math.max(4, Math.min(96, xRef.current + (dir < 0 ? -9 : 9))) : null);
-    }, []);
 
     // Escape stands you up. A full-screen layer with no keyboard way out is a trap on desktop.
     useEffect(() => {
@@ -996,10 +979,29 @@ export default function CasinoClient({ initial }) {
                   The most direct way to move in a room you are looking at. It sits UNDER the cabinets in
                   the stacking order, so tapping a machine still opens the machine — this only ever catches
                   the taps that landed on nothing. */}
+              {/* ── TAP THE FLOOR AND WALK THERE ────────────────────────────────────────────────
+                  Luke: "id prefer click to move vs the arrows." So the floor IS the control and the arrows
+                  are gone.
+                  The catch the arrows were quietly solving: the floor is nearly five screens wide, so most
+                  of it is not on screen to be tapped, and tapping the visible edge would only ever move you
+                  as far as the edge. A tap in the outer strip of the ROOM therefore means "keep going that
+                  way" — it walks you most of a screen further, so you can cross the whole floor in taps
+                  without ever needing a button that repeats.
+                  It sits under the cabinets in the stacking order, so tapping a machine still opens the
+                  machine; this only catches taps that landed on nothing. */}
               <div className="cas-world" onClick={(e) => {
                   if (e.target !== e.currentTarget && !e.target.classList?.contains("cas-floor")) return;
+                  const room = roomRef.current;
                   const b = e.currentTarget.getBoundingClientRect();
-                  walkTo(((e.clientX - b.left) / b.width) * 100);
+                  const to = ((e.clientX - b.left) / b.width) * 100;
+                  if (room) {
+                      const view = room.getBoundingClientRect();
+                      const edge = (e.clientX - view.left) / view.width;      // 0..1 across what you can SEE
+                      const span = (view.width / b.width) * 100;              // how much floor a screen holds
+                      if (edge < 0.16) { walkTo(xRef.current - span * 0.8); return; }
+                      if (edge > 0.84) { walkTo(xRef.current + span * 0.8); return; }
+                  }
+                  walkTo(to);
               }}>
                 <div className="cas-floor" aria-hidden="true" />
 
@@ -1031,7 +1033,11 @@ export default function CasinoClient({ initial }) {
                             <img src={`/images/casino/${m.id}.webp`} alt="" draggable="false" />
                         </span>
                         <b>{m.label}</b>
-                        <em>{m.live ? m.kind : "soon"}</em>
+                        {/* Only when there is something to warn about. On a working machine this repeated
+                            what the card directly underneath already says, and it was the line holding
+                            every cabinet up off the carpet — the caption hangs below the feet, so the feet
+                            can never come lower than the caption is tall. */}
+                        {!m.live ? <em>soon</em> : null}
                     </button>
                 ))}
 
@@ -1062,6 +1068,11 @@ export default function CasinoClient({ initial }) {
                 </div>
               </div>
             </div>
+            {/* Said once, and only until you have done it. It hangs on the ROOM WRAPPER, not inside the
+                world: the world is nearly five screens wide and scrolls, so `left: 50%` there is the middle
+                of the whole floor rather than the middle of what you can see — which put the hint somewhere
+                off in the dark by the roulette wheel. */}
+            {!moved ? <span className="cas-hint">Tap the floor to walk</span> : null}
             <div className="cas-vignette" aria-hidden="true" />
             {/* The floor has a tune: procedural, like every other scene in the Den. It mounts INSIDE the
                 hall because its toggle positions itself absolutely — hung off `.cas`, which is not a
@@ -1072,20 +1083,11 @@ export default function CasinoClient({ initial }) {
             </div>
 
             <div className="cas-walk">
-                {/* Pointer events rather than click, so a press that is HELD keeps walking. onPointerLeave
-                    and onPointerCancel matter as much as onPointerUp: a thumb that slides off the button
-                    mid-walk would otherwise leave you walking into the wall forever. */}
-                <button type="button" aria-label="Walk left"
-                    onPointerDown={() => hold(-1)} onPointerUp={() => release(-1)}
-                    onPointerLeave={() => release(-1)} onPointerCancel={() => release(-1)}>◀</button>
                 {at?.live ? (
                     <button type="button" className="cas-sit" onClick={() => setSeated(true)}>
                         Play {at.label}
                     </button>
                 ) : <span>{at ? at.label : "walk to a machine"}</span>}
-                <button type="button" aria-label="Walk right"
-                    onPointerDown={() => hold(1)} onPointerUp={() => release(1)}
-                    onPointerLeave={() => release(1)} onPointerCancel={() => release(1)}>▶</button>
             </div>
 
             {/* ── THE MACHINE YOU ARE AT ──────────────────────────────────────────────────────────────────
