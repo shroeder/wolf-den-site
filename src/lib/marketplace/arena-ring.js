@@ -42,7 +42,15 @@ function settle(ring) {
     if (ring.over) return true;
     if (ring.A.hp <= 0 || ring.B.hp <= 0) {
         ring.over = true;
-        ring.won = ring.B.hp <= 0 && ring.A.hp > 0;
+        // ── BOTH DOWN: THE ONE WHO SWUNG TAKES IT ────────────────────────────────────────────────────────
+        // SoullessShiitake: "occasionally we will both end up at 0 hp, but it still counts as a loss for me."
+        // Correct — `B.hp <= 0 && A.hp > 0` hands every mutual knockout to the house, so landing the killing
+        // blow and dying to the thorns that answered it was recorded as a defeat.
+        // A real draw is a bigger question than a bug fix (what it pays, whether it spends a daily bout,
+        // whether it counts on the Road) and that is Luke's to answer. This is the part that is simply
+        // wrong either way: if you both go down, whoever DELIVERED the blow wins it, which is symmetric —
+        // the same rule beats you when their swing is the one that empties both bars.
+        ring.won = ring.B.hp <= 0 && (ring.A.hp > 0 || ring.acting === "me");
         ring.awaiting = null;
         ring.incoming = null;
         return true;

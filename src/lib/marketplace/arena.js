@@ -1195,6 +1195,10 @@ function publicBout(b) {
 // a ladder rung you have to earn. Members and Gauntlet tiers go in the same hat; a real member is weighted up,
 // because beating a person is a better story than beating a dummy — but only when one of them is your size.
 const TARGET_RATIO = 0.95;   // their power against yours: a shade in your favour
+// ── HOW FAR FROM EVEN IS STILL A FIGHT ───────────────────────────────────────────────────────────────────────
+// Named once and applied to BOTH pools, because it used to be applied to only one — see matchArenaOpponent.
+// 0.5 either side of TARGET_RATIO puts an opponent between roughly half and one and a half times your power.
+const FAIR_GAP = 0.5;
 const SHORTLIST = 7;         // how many of the closest go in the hat
 const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your size
 
@@ -1304,7 +1308,20 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // A tier more than half a power-step away is not a fight, it is a formality — that is what put Straw
     // Dummies in front of a geared player. If nothing is close enough the Gauntlet stands down for this roll
     // rather than being forced in, and the members take it.
-    const fairNpcs = npcs.filter((n) => n.d <= 0.5);
+    const fairNpcs = npcs.filter((n) => n.d <= FAIR_GAP);
+    // ── AND SO DO PEOPLE ─────────────────────────────────────────────────────────────────────────────────
+    // The Gauntlet has always been filtered for fairness here; MEMBERS never were. `pickWithin(members, …)`
+    // takes the nearest few by distance, which sounds equivalent and is not: nearest is relative, and on a
+    // board of twenty the nearest person to the newest member is still the strongest player in the Den.
+    //
+    // Sunflower Jinxx: "the match me with someone random button says it's supposed to be an even fight but
+    // keeps putting me against Luke and Eric who are 400 and 800hp higher than me." GrayKitsune: "I don't
+    // understand why the game thinks I am 'even' with Eric and JT." They are both right, and it is this one
+    // missing filter — the button was promising something the matcher never checked.
+    //
+    // The Gauntlet is the fallback, which is the entire reason it exists: when nobody your size is online,
+    // you fight a tier your size rather than the nearest person who will flatten you.
+    const fairMembers = members.filter((m) => m.d <= FAIR_GAP);
     // A band fought in the last few bouts stands aside — the same preference-not-a-wall the member block is,
     // so a Den where only one band is ever fair still gets a fight rather than nothing.
     const freshNpcs = blockedBands.size ? fairNpcs.filter((n) => !blockedBands.has(npcFor(n.tier)?.band)) : fairNpcs;
@@ -1316,14 +1333,19 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // undefined and the Fight button came back with no match after a round trip.
     // Luke: "often times I hit the fight button and it makes a server request but then doesn't find a match".
     // Standing down is a preference, not a rule: if nobody else can take it, the nearest tier fights anyway.
-    if (!npcPool.length && !members.length) return npcs.length ? pickWithin(npcs, RESERVE_NPC + 1) : null;
-    if (!npcPool.length) return pickWithin(members, SHORTLIST);
-    if (!members.length) return pickWithin(npcPool, RESERVE_NPC + 1);
+    // Nobody fair anywhere: the nearest tier if there is one, otherwise the nearest person. Standing down
+    // is still a preference and not a rule — a fight you can lose beats no fight at all.
+    if (!npcPool.length && !fairMembers.length) {
+        if (npcs.length) return pickWithin(npcs, RESERVE_NPC + 1);
+        return members.length ? pickWithin(members, SHORTLIST) : null;
+    }
+    if (!npcPool.length) return pickWithin(fairMembers, SHORTLIST);
+    if (!fairMembers.length) return pickWithin(npcPool, RESERVE_NPC + 1);
     // `SHORTLIST - RESERVE_NPC` reserved seats for the Gauntlet in the member draw. With the share at zero
     // there is nothing to reserve them for, and holding two back would narrow the pool of PEOPLE for no
     // reason — which is the same mistake, one level down, that the reserve was invented to fix.
     if (GAUNTLET_SHARE > 0 && Math.random() < GAUNTLET_SHARE) return pickWithin(npcPool, RESERVE_NPC + 1);
-    return pickWithin(members, GAUNTLET_SHARE > 0 ? SHORTLIST - RESERVE_NPC : SHORTLIST);
+    return pickWithin(fairMembers, GAUNTLET_SHARE > 0 ? SHORTLIST - RESERVE_NPC : SHORTLIST);
 }
 
 /**

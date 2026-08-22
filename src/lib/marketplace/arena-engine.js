@@ -371,6 +371,9 @@ export const sideOf = (f) => ({
         // maximum every time you swing; thorns sends part of what you BLOCK back down the blade; and grudge
         // banks what has been done to you since your last swing and puts a share of it into the next one.
         guardChance: Math.max(0, Math.min(1, Number(f.guardChance) || 0)),
+        // Did this fighter lose their last turn — see the note at the top of openTurn. Carried on the side
+        // rather than on the ring so a raid, a fishing bout and an arena challenge all get the same rule.
+        lostLast: false,
         guardSize: Math.max(0, Number(f.guardSize) || 0),
         regen: Math.max(0, Number(f.regen) || 0),
         thorns: Math.max(0, Number(f.thorns) || 0),
@@ -602,6 +605,29 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
 // Both loops need that answer: the auto-resolver to skip the swing, and the interactive ring to know there is
 // no incoming blow to ask anybody to brace against.
 export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
+        // ── YOU CANNOT LOSE TWO TURNS IN A ROW ───────────────────────────────────────────────────────
+        // Reported by ValkyrieSylve, SoullessShiitake, Kaishiern and Sunflower Jinxx within a day of the
+        // rework, all describing the same thing from different angles: "starting the fight with a third of
+        // my health just gone", "I just got instantly KOd before the fight fully loaded in", "I was defeated
+        // before I could click anything", "getting stunned and frozen to the point where i just insta die".
+        //
+        // They were not describing a loading bug. Nothing anywhere stopped a fighter losing turn after turn:
+        // a stun decrements one per skipped turn, and chill is re-rolled independently EVERY turn at up to
+        // 60% — so a run of four lost turns in a row is a routine 13%, and the fight can be over before the
+        // member has pressed anything. Combined with the opening coin flip, half of those runs start before
+        // their first turn, which is why it reads as damage that was there when the screen loaded.
+        //
+        // This file already had the right principle written down for freeze — "a lock that renews itself is
+        // not a control effect, it is the end of the fight" — and it was never applied to lost turns in
+        // general. Now it is: whoever lost the last turn takes this one. Chill and freeze still cost you
+        // every other turn at worst, which is a real effect and not a death sentence.
+        //
+        // Only the TURN is guaranteed, never survival. Bleed and burn still tick and can still kill you
+        // where you stand, because a wound is damage rather than a lost turn — and walking into rung 97 on
+        // day one is still meant to remove you from the premises.
+        const owed = att.lostLast === true;
+        att.lostLast = false;
+
         // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
         // not stop you bleeding — and it can kill, which is the whole point of a wound.
         if (att.bleedLeft > 0) {
@@ -630,16 +656,22 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
             if (att.hp <= 0) return false;
         }
         if (att.stunned > 0) {
+            // Ticks down either way, so a freeze always expires on the schedule it promised — it just
+            // cannot take two turns back to back.
             att.stunned -= 1;
-            log.push({ t, who, stunnedSkip: true, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
-            return false;
+            if (!owed) {
+                att.lostLast = true;
+                log.push({ t, who, stunnedSkip: true, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
+                return false;
+            }
         }
         // ── CHILLED: THE TURN THAT DOES NOT HAPPEN ───────────────────────────────────────────────────
         // Chill used to multiply the other fighter's clock, which was the most invisible effect in the
         // game — a permanent 12% that never once produced a sentence. Rolled per turn it does the same
         // work and says so out loud. Rolled AFTER the stun check so the two never both fire on one turn
         // and print two reasons for one lost beat.
-        if (att.skipChance > 0 && rng() < att.skipChance) {
+        if (!owed && att.skipChance > 0 && rng() < att.skipChance) {
+            att.lostLast = true;
             log.push({ t, who, chilledSkip: true, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             return false;
         }
