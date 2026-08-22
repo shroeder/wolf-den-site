@@ -17,14 +17,18 @@ import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 // The art is CSS. Every cabinet on this floor is a gradient and a border, deliberately: art costs money to
 // generate and this is a layout to be argued with first. When the floor plan is right, the cabinets get
 // painted.
+// Nine cabinets now, re-spaced to fit. The five slots run first because they are the machines people walk in
+// for, then the two shared draws, then the games you sit down to.
 const MACHINES = [
-    { id: "slot", x: 10, label: "The Hunt", kind: "Slots", live: true },
-    { id: "slot2", x: 24, label: "The Harvest", kind: "Slots", live: true },
-    { id: "slot3", x: 38, label: "The Deep", kind: "Slots", live: true },
-    { id: "roulette", x: 52, label: "The Wheel", kind: "Roulette", live: true },
-    { id: "keno", x: 66, label: "Keno", kind: "Keno", live: true },
-    { id: "bingo", x: 80, label: "The Hall", kind: "Bingo", live: true },
-    { id: "blackjack", x: 94, label: "The Table", kind: "Blackjack", live: true },
+    { id: "slot", x: 8, label: "The Hunt", kind: "Slots", live: true },
+    { id: "slot2", x: 19, label: "The Harvest", kind: "Slots", live: true },
+    { id: "slot3", x: 30, label: "The Deep", kind: "Slots", live: true },
+    { id: "slot4", x: 41, label: "The Menagerie", kind: "Slots", live: true },
+    { id: "slot5", x: 52, label: "The Vault", kind: "Slots", live: true },
+    { id: "roulette", x: 63, label: "The Wheel", kind: "Roulette", live: true },
+    { id: "keno", x: 74, label: "Keno", kind: "Keno", live: true },
+    { id: "bingo", x: 85, label: "The Hall", kind: "Bingo", live: true },
+    { id: "blackjack", x: 96, label: "The Table", kind: "Blackjack", live: true },
 ];
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
@@ -34,7 +38,7 @@ const REACH = 9;
 // Which cabinets are slot machines. Three of them now, and they are not one machine in three paint jobs —
 // see SLOT_MACHINES in casino.js. The client does not decide anything about them: it sends which cabinet
 // you are standing at and draws whatever came back.
-const SLOTS = new Set(["slot", "slot2", "slot3"]);
+const SLOTS = new Set(["slot", "slot2", "slot3", "slot4", "slot5"]);
 
 // ── THE SYMBOLS ARE DRAWN NOW ────────────────────────────────────────────────────────────────────────────────
 // Every reel symbol was a Unicode glyph in a coloured box — a triangle standing in for a wolf. The art is per

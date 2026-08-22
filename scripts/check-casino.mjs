@@ -22,7 +22,7 @@ const pct = (n) => `${(n * 100).toFixed(2)}%`;
 const problems = [];
 
 // ── THE SLOTS ───────────────────────────────────────────────────────────────────────────────────────────────
-// Three cabinets, each enumerated over all 216 combinations. They are meant to differ in VOLATILITY and not
+// Every cabinet, each enumerated over all of its combinations exactly. They are meant to differ in VOLATILITY and not
 // in value: a floor where one machine is simply better is a floor with two traps on it, and nobody would
 // ever find out which was which by playing.
 const slotRtps = {};
@@ -109,8 +109,8 @@ for (const m of Object.values(SLOT_MACHINES)) {
 }
 
 // ── AND ARE THEY ACTUALLY DIFFERENT? ─────────────────────────────────────────────────────────────────────────
-// The reason for three cabinets is three SHAPES, not three paint jobs. If their returns and hit rates all
-// converge, the extra two are decoration and should be deleted rather than shipped.
+// The reason for five cabinets is five SHAPES, not five paint jobs. If their returns and hit rates all
+// converge, the extra ones are decoration and should be deleted rather than shipped.
 const spreadRtp = Math.max(...Object.values(slotRtps)) - Math.min(...Object.values(slotRtps));
 const hits = Object.values(SLOT_MACHINES).map((m) => slotHitRate(m.id));
 console.log(`\nTHE THREE TOGETHER`);

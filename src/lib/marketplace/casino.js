@@ -107,6 +107,29 @@ export const SLOT_THEMES = {
             moon: "cooking:r_porridge",
         },
     },
+    slot4: {
+        label: "The Menagerie",
+        blurb: "Pays often, and the top of it is a long way up.",
+        art: {
+            wolf: "pet:eternal_wolf",
+            chest: "pet:elder_dragon",
+            laurel: "pet:griffin",
+            bone: "pet:bear_cub",
+            moon: "pet:wolf_pup",
+        },
+    },
+    slot5: {
+        label: "The Vault",
+        blurb: "Half the pulls pay nothing. One of them pays 2,000x.",
+        art: {
+            wolf: "item:primordial_primordial_blade",
+            chest: "item:celestial_celestial_blade",
+            laurel: "item:eternal_infinity",
+            doubloon: "item:ascendant_crown",
+            bone: "item:golden_crown",
+            moon: "item:rusty_sword",
+        },
+    },
     slot3: {
         label: "The Deep",
         blurb: "Only triples pay. One of them pays 4,000x.",
@@ -123,19 +146,33 @@ export const SLOT_THEMES = {
 
 /** Resolve a theme's art, looking up anything that lives on Blob rather than in public/. */
 async function themeArt() {
-    const refs = [];
+    // Three of the five cabinets draw from tables rather than public/, so their refs are gathered by prefix
+    // and looked up in one query each. A machine whose art fails to resolve simply falls back to the generic
+    // reel set in the client — a missing sprite must never be a missing machine.
+    const want = { cooking: [], pet: [], item: [] };
     for (const t of Object.values(SLOT_THEMES)) {
-        for (const v of Object.values(t.art)) if (v.startsWith("cooking:")) refs.push(v.slice(8));
+        for (const v of Object.values(t.art)) {
+            const i = v.indexOf(":");
+            if (i > 0 && want[v.slice(0, i)]) want[v.slice(0, i)].push(v.slice(i + 1));
+        }
     }
-    const rows = refs.length
-        ? await db.query(`SELECT ref, url FROM mkt_cooking_sprite WHERE ref = ANY($1)`, [refs]).catch(() => [])
-        : [];
-    const byRef = Object.fromEntries(rows.map((r) => [r.ref, r.url]));
+    const [cook, pets, items] = await Promise.all([
+        want.cooking.length ? db.query(`SELECT ref AS k, url FROM mkt_cooking_sprite WHERE ref = ANY($1)`, [want.cooking]).catch(() => []) : [],
+        want.pet.length ? db.query(`SELECT pet_id AS k, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [want.pet]).catch(() => []) : [],
+        want.item.length ? db.query(`SELECT item_id AS k, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [want.item]).catch(() => []) : [],
+    ]);
+    const byKey = {
+        cooking: Object.fromEntries(cook.map((r) => [r.k, r.url])),
+        pet: Object.fromEntries(pets.map((r) => [r.k, r.url])),
+        item: Object.fromEntries(items.map((r) => [r.k, r.url])),
+    };
     const out = {};
     for (const [id, t] of Object.entries(SLOT_THEMES)) {
-        out[id] = Object.fromEntries(Object.entries(t.art)
-            .map(([sym, v]) => [sym, v.startsWith("cooking:") ? (byRef[v.slice(8)] || null) : v])
-            .filter(([, url]) => url));
+        out[id] = Object.fromEntries(Object.entries(t.art).map(([sym, v]) => {
+            const i = v.indexOf(":");
+            const src = i > 0 ? v.slice(0, i) : null;
+            return [sym, src && byKey[src] ? (byKey[src][v.slice(i + 1)] || null) : v];
+        }).filter(([, url]) => url));
     }
     return out;
 }
@@ -262,6 +299,46 @@ export const SLOT_MACHINES = {
         // Two, not one. A single star pays on 40% of pulls, which would have made the chase machine the
         // most frequent payer on the floor and quietly deleted the reason it exists.
         scatter: { id: "star", pays: { 2: 0.9 } },
+    },
+
+    slot4: {
+        id: "slot4",
+        label: "The Menagerie",
+        blurb: "Pays often, and the top of it is a long way up.",
+        // FIVE symbols, which sits this machine's pair frequency between Den Fortune's four and the six on
+        // the others — and the top prize is more than twice The Hunt's. Pays reasonably often AND has a
+        // real ceiling, which it can only afford by having very little in the middle.
+        symbols: [
+            { id: "wolf", label: "Eternal Wolf", weight: 1 },
+            { id: "chest", label: "Elder Dragon", weight: 4 },
+            { id: "laurel", label: "Griffin", weight: 8 },
+            { id: "bone", label: "Bear Cub", weight: 13 },
+            { id: "moon", label: "Wolf Pup", weight: 19 },
+        ],
+        pays: {
+            three: { wolf: 1500, chest: 120, laurel: 22, bone: 5, moon: 1.2 },
+            two: { wolf: 9, chest: 3, laurel: 1.2, bone: 0.6, moon: 0.28 },
+        },
+    },
+
+    slot5: {
+        id: "slot5",
+        label: "The Vault",
+        blurb: "Half the pulls pay nothing. One of them pays 2,000x.",
+        // Only the two commonest symbols pay on a pair, which is what drops this machine's hit rate into the
+        // gap between The Deep and The Hunt: most pulls are nothing, but when the vault opens it opens.
+        symbols: [
+            { id: "wolf", label: "Primordial Blade", weight: 1 },
+            { id: "chest", label: "Celestial Blade", weight: 3 },
+            { id: "laurel", label: "Infinity", weight: 5 },
+            { id: "doubloon", label: "Ascendant Crown", weight: 8 },
+            { id: "bone", label: "Golden Crown", weight: 12 },
+            { id: "moon", label: "Rusty Sword", weight: 16 },
+        ],
+        pays: {
+            three: { wolf: 2000, chest: 320, laurel: 90, doubloon: 30, bone: 8, moon: 2 },
+            two: { bone: 0.5, moon: 0.3 },
+        },
     },
 };
 

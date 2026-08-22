@@ -56,6 +56,14 @@ export const SLOT_BONUSES = {
         { id: "gamble", label: "Double or Nothing", blurb: "One coin flip on any win. Exactly even money — the only fair bet on the floor." },
         { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
+    slot4: [
+        { id: "nudge", label: "The Call", blurb: "Two eternal wolves and a miss — the third reel goes again, free." },
+        { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
+    ],
+    slot5: [
+        { id: "pack", label: "The Haul", blurb: "Three ascendant crowns opens the vault: ten free pulls." },
+        { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
+    ],
     slot3: [
         { id: "moonrise", label: "The Shoal", blurb: "Three starfish: eight free spins, every win doubled." },
         { id: "moonstruck", label: "The Undertow", blurb: "Every dead pull pulls harder — the multiplier on your next win keeps rising." },
