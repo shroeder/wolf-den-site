@@ -24,6 +24,7 @@ export const QUIET_SEEN = [
     "wolfden-market-announce-v1",
     "wolfden-mining-announce-v2",
     "wolfden-hh-seen",
+    "wolfden-arena-reopen-v1",
 ];
 
 // Overlays with no marker to seed — they are server-driven, so the only way to be rid of them is a stylesheet.

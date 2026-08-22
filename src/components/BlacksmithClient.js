@@ -1293,6 +1293,21 @@ export const FORGE_CSS = `
    beneath it has to sit on top of that card. */
 .forge-swapscrim { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 20px;
     background: rgba(8,4,2,0.8); backdrop-filter: blur(4px); animation: forgeFounderFade .2s ease both; }
+/* ── A MODAL TALLER THAN THE PHONE ────────────────────────────────────────────────────────────────────
+   David B: "i would like a scroll bar on a peice of gear at the forge as i cannot enhance my gear further
+   due to the button being off the screen."
+
+   Not a missing feature — a broken screen. None of the three scrims in this file capped the height of what
+   they hold, and all three CENTRE it, so a card taller than the viewport overflows off the top AND the
+   bottom of a position:fixed layer. The Enhance button is the last thing in that card, so on a piece with
+   enough forged lines to reroll it is simply unreachable, and there is nothing to scroll because the thing
+   that overflowed is not a scroll container.
+
+   One rule for all three, on the scrim's own child, so a modal added later is covered by the same fix.
+   It only engages when the card is actually too tall; a short one is untouched. */
+.forge-founder-scrim > *, .forge-swapscrim > *, .forge-mg-scrim > * {
+    max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; }
+
 .forge-founder-scrim { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 20px; background: rgba(8,4,2,0.72); backdrop-filter: blur(3px); animation: forgeFounderFade .2s ease both; }
 .forge-founder-card { position: relative; max-width: 340px; width: 100%; text-align: center; padding: 22px 22px 18px; border-radius: 18px;
     background: linear-gradient(180deg, #2a180c, #160c06); border: 1px solid rgba(255,150,60,0.4); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(255,140,40,0.28);
