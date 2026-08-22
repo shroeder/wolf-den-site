@@ -17407,15 +17407,36 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     letter-spacing: .12em; text-transform: uppercase; }
 
 .cas-reels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 8px; }
-.cas-reel { display: grid; place-items: center; height: 84px; border-radius: 12px;
-    font-size: 34px; color: var(--tone);
-    border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.35);
-    text-shadow: 0 0 18px var(--tone); }
-/* Each reel lands a beat after the one before it, which is the entire drama of a slot machine. */
-.cas-reel.is-rolled { animation: casDrop .34s cubic-bezier(.2,1.3,.35,1) both;
-    animation-delay: calc(var(--i) * 130ms); }
-@keyframes casDrop { from { opacity: 0; transform: translateY(-16px) scale(.9); }
-    to { opacity: 1; transform: none; } }
+/* ── A REEL IS A WINDOW ONTO A STRIP ─────────────────────────────────────────────────────────────────
+   Not a box whose contents get swapped — that is a slideshow. A strip that scrolls and decelerates onto
+   its symbol is a thing coming to rest, which is what you are actually waiting for. Every rule that
+   styled the old glyph box is deleted rather than left underneath: a font-size and a text-shadow still
+   winning behind an <img> is how a swapped-in sprite ends up in a box. */
+.cas-reel { position: relative; height: var(--cell, 84px); overflow: hidden; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,.05), rgba(0,0,0,.42)); }
+/* The lip of the machine — a little shadow top and bottom so the strip runs THROUGH the window rather
+   than sitting in it. */
+.cas-reel::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(0,0,0,.55), transparent 26%, transparent 74%, rgba(0,0,0,.55)); }
+.cas-strip { display: block; will-change: transform; }
+.cas-cell { display: flex; align-items: center; justify-content: center; height: var(--cell, 84px); }
+.cas-cell img { width: 64%; height: 64%; object-fit: contain; display: block; }
+
+/* Spinning: the strip runs on a loop and the symbols smear. The blur is what sells speed — a sharp
+   symbol moving fast reads as a stutter, because it is one. */
+.cas-reel.is-spin .cas-strip { animation: casRun .26s linear infinite; }
+.cas-reel.is-spin .cas-cell img { filter: blur(2px); opacity: .9; }
+@keyframes casRun { to { transform: translateY(calc(var(--cell, 84px) * -4)); } }
+
+/* Settled, and paying. The glow is the symbol's own colour, so a wolf line burns gold and a star violet. */
+.cas-reel.is-won { border-color: var(--tone);
+    box-shadow: inset 0 0 22px color-mix(in srgb, var(--tone) 35%, transparent), 0 0 18px color-mix(in srgb, var(--tone) 40%, transparent); }
+.cas-reel.is-won .cas-cell img { filter: drop-shadow(0 0 10px var(--tone)); }
+@media (prefers-reduced-motion: reduce) {
+    .cas-reel.is-spin .cas-strip { animation: none; }
+    .cas-reel.is-spin .cas-cell img { filter: none; }
+}
 
 .cas-result { margin: 0 0 10px; text-align: center; font-size: 12px; color: #98a0aa; }
 .cas-result.is-win { color: #ffd75e; font-weight: 900; font-size: 1.05rem;
@@ -17438,9 +17459,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* ── THE SPIN ────────────────────────────────────────────────────────────────────────────────────────
    A machine you watch. The blur while it cycles, the drop when it lands, and a shake on the reel that
    just stopped so the thunk is felt as well as heard. */
-.cas-reel.is-spin { animation: casSpin .28s linear infinite; filter: blur(0.4px); opacity: .92; }
+/* was: an animation on the reel BOX. The strip carries the motion now — animating both would move the
+   window and its contents in opposite directions. */
 @keyframes casSpin { 0% { transform: translateY(-12%); } 100% { transform: translateY(12%); } }
-.cas-reel.is-stop { animation: casLand .3s cubic-bezier(.2,1.5,.35,1) both; }
+/* was: a landing bounce on the box. The strip's own transition does the settling. */
 @keyframes casLand { 0% { transform: translateY(-22%) scale(1.06); }
     60% { transform: translateY(3%) scale(.98); } 100% { transform: none; } }
 

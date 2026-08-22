@@ -112,10 +112,21 @@ if (process.env.SHOT_COOKIE) {
         domain: new URL(url).hostname, path: "/",
     });
 }
+//
+// `key=value` is supported, and the word `now` means Date.now() — the same as shot.mjs, and for the same
+// reason: some markers are TIMESTAMPS rather than flags. The web-push prompt snoozes for a week by comparing
+// against Date.now(), so seeding it with "1" reads as "dismissed in 1970" and the banner appears anyway —
+// which it did, over the reels, from frame 11 of a film of a reel animation. The two rigs having different
+// seeding was the whole bug: the fix went into one of them.
 if (process.env.SHOT_SEEN) {
-    const keys = process.env.SHOT_SEEN.split(";").map((x) => x.trim()).filter(Boolean);
+    const setters = process.env.SHOT_SEEN.split(";").map((x) => x.trim()).filter(Boolean).map((entry) => {
+        const eq = entry.indexOf("=");
+        const key = eq === -1 ? entry : entry.slice(0, eq);
+        const raw = eq === -1 ? "1" : entry.slice(eq + 1);
+        return `localStorage.setItem(${JSON.stringify(key)}, ${raw === "now" ? "String(Date.now())" : JSON.stringify(raw)});`;
+    });
     await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `(() => { for (const k of ${JSON.stringify(keys)}) { try { localStorage.setItem(k, "1"); } catch {} } })();`,
+        source: `try { ${setters.join(" ")} } catch (e) {}`,
     });
 }
 // And the ones a localStorage marker cannot pre-empt, because the server decides they are due. The poll took

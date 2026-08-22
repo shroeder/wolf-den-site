@@ -36,15 +36,85 @@ const REACH = 9;
 // you are standing at and draws whatever came back.
 const SLOTS = new Set(["slot", "slot2", "slot3"]);
 
-const SYMBOL_ART = {
-    wolf: { glyph: "▲", tone: "#ffd75e" },
-    chest: { glyph: "■", tone: "#ff9f43" },
-    laurel: { glyph: "❖", tone: "#8bf0b4" },
-    doubloon: { glyph: "●", tone: "#ffe9b8" },
-    bone: { glyph: "▬", tone: "#cbd3dc" },
-    moon: { glyph: "◗", tone: "#9fc6dd" },
-    star: { glyph: "✦", tone: "#d9c2ff" },
+// ── THE SYMBOLS ARE DRAWN NOW ────────────────────────────────────────────────────────────────────────────────
+// Every reel symbol was a Unicode glyph in a coloured box — a triangle standing in for a wolf. The art is per
+// CABINET, not shared: Wolf's Luck burns brass, Den Fortune is honey-coloured, Moonrise is cold silver. Same
+// symbol IDs on every machine, so the paytables and both gates never notice; different pictures.
+const reelArt = (machineId, sym) => `/images/casino/reels/${machineId}-${sym}.webp`;
+
+// Kept only for the tone behind a symbol while its image loads, and for the glow colour on a win.
+const SYMBOL_TONE = {
+    wolf: "#ffd75e", chest: "#ff9f43", laurel: "#8bf0b4",
+    doubloon: "#ffe9b8", bone: "#cbd3dc", moon: "#9fc6dd", star: "#d9c2ff",
 };
+
+// ── ONE REEL ─────────────────────────────────────────────────────────────────────────────────────────────────
+// A real reel is a STRIP that scrolls and decelerates onto its result, not a box whose contents get swapped.
+// The difference is the whole feeling of the machine: swapping is a slideshow, and a strip that slows down is
+// a thing coming to rest, which is what you are actually waiting for.
+//
+// The strip is built once per pull: a run of random symbols with the RESULT on the end. Spinning translates it
+// upward on a loop; landing transitions to the last cell with a decelerating curve and a small overshoot, so
+// it settles rather than stops dead.
+//
+// EACH REEL STOPS ON ITS OWN CLOCK, and the third stops latest by a wide margin — that pause, with two symbols
+// already matching, is the entire drama of a slot machine and it cannot exist if all three land together.
+function Reel({ machineId, symbols, result, spinning, index, won }) {
+    const CELL = 84;
+    // ── THE STRIP MUST NOT RESHUFFLE UNDER A LANDED REEL ─────────────────────────────────────────────────
+    // `symbols` arrives as a fresh array on every parent render — it is built with .map() up in the panel —
+    // so keying the memo on the array itself means a new identity every time anything re-renders, and the
+    // countdown ticks once a second. On film the reels landed correctly and then quietly changed symbol
+    // three more times while the result text underneath stayed put.
+    //
+    // Keyed on the CONTENTS instead. The strip is then rebuilt exactly when it should be: a new result, or a
+    // new spin.
+    const symbolKey = symbols.join(",");
+    const strip = useMemo(() => {
+        const pool = symbols.length ? symbols : ["wolf"];
+        const run = Array.from({ length: 14 }, () => pool[Math.floor(Math.random() * pool.length)]);
+        return [...run, result || pool[0]];
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [symbolKey, result, spinning]);
+
+    // ── EACH REEL KEEPS ITS OWN CLOCK ────────────────────────────────────────────────────────────────────
+    // The first version staggered where each strip STOPPED but took the blur off all three at the same
+    // instant, because one `spinning` flag drove all of them. On film that reads as "the reels stopped, then
+    // adjusted themselves" — every symbol goes sharp together and the machine has already told you the answer
+    // before the third reel has finished moving.
+    //
+    // So a reel holds its own spin until its own moment. The third waits nearly three quarters of a second
+    // after the first, and that gap — two symbols matching, one still going — is the near-miss, which is the
+    // only reason anybody watches a slot machine at all.
+    const stopAt = [0, 220, 560][index] || 0;
+    const [held, setHeld] = useState(false);
+    useEffect(() => {
+        if (spinning) { setHeld(true); return undefined; }
+        const t = setTimeout(() => setHeld(false), stopAt);
+        return () => clearTimeout(t);
+    }, [spinning, stopAt]);
+
+    const running = spinning || held;
+    const landed = !running && result;
+    const offset = landed ? -(strip.length - 1) * CELL : 0;
+
+    return (
+        <span className={`cas-reel${running ? " is-spin" : ""}${landed ? " is-stop" : ""}${won ? " is-won" : ""}`}
+            style={{ "--tone": SYMBOL_TONE[result] || "#cbd3dc", "--cell": `${CELL}px` }}>
+            <span className="cas-strip"
+                style={landed
+                    ? { transform: `translateY(${offset}px)`, transition: "transform 520ms cubic-bezier(.14,.86,.28,1.04)" }
+                    : { transform: "translateY(0)" }}>
+                {strip.map((sym, i) => (
+                    <span className="cas-cell" key={i}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={reelArt(machineId, sym)} alt="" draggable="false" />
+                    </span>
+                ))}
+            </span>
+        </span>
+    );
+}
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
@@ -136,7 +206,7 @@ export default function CasinoClient({ initial }) {
     // follows you.
     const roomRef = useRef(null);
     // Reels mid-spin: the symbols cycling before they land. Null when the machine is at rest.
-    const [rolling, setRolling] = useState(null);
+    const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);     // how many reels have stopped, 0..3
     const [flash, setFlash] = useState(null);    // "win" | "big" — the celebration, cleared on a timer
     const timers = useRef([]);
@@ -260,13 +330,9 @@ export default function CasinoClient({ initial }) {
         setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null); setFx(null);
         Sfx.whoosh();
 
-        // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
-        // rather than freezing on the old result — and it cycles THIS cabinet's symbols, because a machine
-        // teasing you with a star it does not have is a machine lying about its own paytable.
-        const ids = (st?.slots?.[at.id]?.symbols || []).map((x) => x.id);
-        const spinner = setInterval(() => {
-            setRolling([0, 1, 2].map(() => ids[Math.floor(Math.random() * ids.length)]));
-        }, 70);
+        // The reels spin themselves — see the Reel component. All this has to do is say when, which means a
+        // slow network simply spins for longer instead of freezing on the previous result.
+        setSpinning(true);
 
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -274,27 +340,26 @@ export default function CasinoClient({ initial }) {
         }).then((x2) => x2.json()).catch(() => null);
 
         if (!r?.ok) {
-            clearInterval(spinner);
-            setRolling(null); setBusy(false);
+            setSpinning(false); setBusy(false);
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet." : "That didn't go through.");
             return;
         }
 
         // A minimum spin, so a fast answer still feels like a machine rather than a calculator.
-        const MIN_SPIN = 520;
+        const MIN_SPIN = 420;
         timers.current.push(setTimeout(() => {
-            clearInterval(spinner);
-            setRolling(null);
+            setSpinning(false);
             setSpin(r);
             setSt((p) => ({ ...p, gold: r.gold }));
 
-            // Reels stop one at a time. The gap widens for the last one — that pause IS the near-miss.
+            // One thud per reel as it settles, on the same clock the strips use. The third is late on
+            // purpose — that pause, with two symbols already matching, is the near-miss.
             [0, 1, 2].forEach((i) => {
                 timers.current.push(setTimeout(() => {
                     setLanded(i + 1);
-                    Sfx.impact(0.3 + i * 0.12);
-                    Haptic.hit(0.35);
-                }, i === 2 ? 620 : i * 230));
+                    Sfx.impact(0.3 + i * 0.14);
+                    Haptic.hit(i === 2 ? 0.55 : 0.35);
+                }, [640, 860, 1200][i]));
             });
 
             timers.current.push(setTimeout(() => {
@@ -308,7 +373,7 @@ export default function CasinoClient({ initial }) {
                     if (three) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
                     timers.current.push(setTimeout(() => setFlash(null), three ? 2200 : 1200));
                 }
-            }, 780));
+            }, 1320));
         }, MIN_SPIN));
     }, [bet, busy, absorb, at, st]);
 
@@ -703,18 +768,13 @@ export default function CasinoClient({ initial }) {
                                     those and a lie on the two that do not — Moonrise sat there displaying a
                                     doubloon it cannot roll. A machine teasing a symbol that is not on its
                                     reels is the one thing a paytable must never do. */}
-                                {(rolling || spin?.reels || idleReels).map((sym, i) => {
-                                    // A reel is SPINNING until its own stop lands. Each one is independent,
-                                    // which is what lets the third hang while the first two already match.
-                                    const stopped = !rolling && landed > i;
-                                    return (
-                                        <span key={i}
-                                            className={`cas-reel${rolling ? " is-spin" : ""}${stopped ? " is-stop" : ""}`}
-                                            style={{ "--tone": SYMBOL_ART[sym]?.tone || "#cbd3dc", "--i": i }}>
-                                            {SYMBOL_ART[sym]?.glyph || "?"}
-                                        </span>
-                                    );
-                                })}
+                                {[0, 1, 2].map((i) => (
+                                    <Reel key={i} index={i} machineId={at.id}
+                                        symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
+                                        result={spinning ? null : (spin?.reels?.[i] ?? idleReels[i])}
+                                        spinning={spinning}
+                                        won={Boolean(!spinning && spin?.won > 0)} />
+                                ))}
                                 {/* The celebration sits OVER the reels rather than beside them, so the win
                                     happens where you were already looking. */}
                                 {flash ? (
