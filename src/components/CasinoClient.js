@@ -807,7 +807,11 @@ export default function CasinoClient({ initial }) {
                                 bank it feeds. They GROW as they fill — the same pig, scaled — because "it
                                 gets bigger and bigger until it bursts" is the whole idea, and a progress bar
                                 is not that. */}
-                            {(st?.banks || []).length && meters[at.id]?.banks ? (
+                            {/* Only on the cabinet that HAS them. This checked that bank shapes existed at
+                                all — which they always do, they are a floor-wide constant — so three empty
+                                pigs appeared under Wolf's Luck and Moonrise, advertising a feature those
+                                machines do not have and can never fill. */}
+                            {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "banks") && meters[at.id]?.banks ? (
                                 <div className="cas-banks">
                                     {st.banks.map((bank) => {
                                         const held = meters[at.id].banks[bank.id] || { coins: 0 };
