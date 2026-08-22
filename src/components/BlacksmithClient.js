@@ -600,6 +600,19 @@ export default function BlacksmithClient({ initial }) {
                                             : scroll ? <>Enhance the piece &mdash; spend a 📜 Power Scroll</>
                                                 : <>Need {need} {part?.name || "parts"} to enhance</>}
                                     </button>
+                                    {/* ── SAID BEFORE THE PARTS GO IN ──────────────────────────────────────
+                                        The forge has always known when a piece is finished — `allMaxed`
+                                        comes back on the RESULT and the modal prints "Stats maxed". By then
+                                        the parts are spent, which is exactly what GrayKitsune ran into on a
+                                        Rare ring at +5. Same rule, asked first (see forgeCeiling).
+                                        Not a refusal: stars and attunements are still live, and some people
+                                        are forging for those. It just stops being a surprise. */}
+                                    {rerolling.statsMaxed ? (
+                                        <span className="forge-maxed-warn">
+                                            Every stat on this piece is at its ceiling. Forging on raises its
+                                            stars and can still roll an attunement &mdash; it will not add stats.
+                                        </span>
+                                    ) : null}
                                     <span className={`forge-card-cost forge-enhance-cost${ok ? "" : " is-short"}`}>
                                         {part?.sprite
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -1413,6 +1426,11 @@ export const FORGE_CSS = `
 .forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
 .forge-card.is-maxed { border-color: rgba(255,215,94,0.6); box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 0 16px rgba(255,215,94,0.18); }
 .forge-card-max { color: #ffd75e; font-weight: 900; }
+/* The ceiling warning. Amber rather than red: nothing has gone wrong and the button still works — this is
+   the forge saying what the spend buys before you make it, not an error. */
+.forge-maxed-warn { display: block; margin: 6px 0 2px; padding: 7px 9px; border-radius: 9px;
+    font-size: 11px; line-height: 1.45; color: #ffd9a0;
+    border: 1px solid rgba(255,190,90,0.35); background: rgba(255,190,90,0.09); }
 .forge-cost-ico { width: 16px; height: 16px; object-fit: contain; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); }
 .forge-lvl { position: absolute; top: 6px; right: 6px; font-size: 12px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffd75e,#f3b23a); border-radius: 999px; padding: 1px 7px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 .forge-lvl.inline { position: static; margin-left: 6px; }

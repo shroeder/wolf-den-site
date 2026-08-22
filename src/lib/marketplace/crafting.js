@@ -427,6 +427,36 @@ export async function combineAllAtTier(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
+
+// ── IS THIS PIECE AT ITS CEILING, AND WHERE IS THE CEILING ───────────────────────────────────────────────────
+// GrayKitsune: "Okay I didnt see a warning before upgrading my Rare ring to +6 that my +5 was max stats."
+//
+// The forge already worked this out — `allMaxed` comes back on the enhance RESULT and the modal prints
+// "Stats maxed — further forging earns prestige only". It arrives one beat too late to be any use: by the
+// time you read it, the parts are spent. The answer was never missing, it was just always given afterwards.
+//
+// So the rule moves out here and the card asks it BEFORE the spend. Extracted rather than re-derived on the
+// screen, for the reason this file already states about prices: a card that prints one thing and a server
+// that does another is the oldest bug in this codebase, and a ceiling is exactly the kind of number that
+// drifts once there are two of it.
+//
+// It is NOT a refusal. A maxed piece can still take stars and can still roll an attunement, and some people
+// will want both — so this is a thing the screen says, not a thing the server blocks.
+export function forgeCeiling(item, bonus = {}) {
+    if (!item) return { maxed: false, socketsLeft: 0, capOf: () => 0, atCap: [] };
+    const existing = Object.keys(item.stats || {})
+        .filter((k) => STAT_META[k] && k !== "extra_strike" && !isIntrinsicStat(k));
+    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
+    const forgedNew = Object.keys(bonus).filter((k) => !existing.includes(k)).length;
+    const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
+    const newPool = socketsLeft > 0 ? addablePoolFor().filter((k) => !existing.includes(k)) : [];
+    const forgedKeys = Object.keys(bonus).filter((k) => (Number(bonus[k]) || 0) > 0);
+    // The same expression the enhance result uses, so the warning and the receipt cannot disagree.
+    const maxed = forgedKeys.length >= Math.min(4, existing.length + newPool.length)
+        && forgedKeys.every((k) => (Number(bonus[k]) || 0) >= capOf(k));
+    return { maxed, socketsLeft, capOf, atCap: existing.filter((k) => (Number(bonus[k]) || 0) >= capOf(k)) };
+}
+
 // ── REROLL ONE STAT, NOT THE WHOLE HAND ──────────────────────────────────────────────────────────────────────
 // Luke: "you can enhance or reroll a stat to a different one specifically." The whole-spread reroll is a
 // gamble; this is a decision. You point at the line you do not want, its points move to a different stat, and
@@ -599,7 +629,8 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
     const newPool = socketsLeft > 0 ? ADDABLE.filter((k) => !existing.includes(k)) : [];
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
-    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC)); // per-stat forge cap (added stats: +3)
+    // The shared rule — see forgeCeiling. Kept as a local alias so the code below reads the same as it did.
+    const { capOf } = forgeCeiling(item, parseBonus(cur?.stat_bonus));
     const gained = {};
     const apply = (k) => { if ((nextBonus[k] || 0) < capOf(k)) { nextBonus[k] = (nextBonus[k] || 0) + 1; gained[k] = (gained[k] || 0) + 1; } };
     if (scenario > 0) {
@@ -741,6 +772,9 @@ export async function getForgeState(buyerId) {
             // subtracted from anything — deciding whether to melt a piece down means seeing the actual delta.
             statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
+            // Every stat already at its ceiling — so the card can say so before the parts are spent rather
+            // than the result modal saying it after. See forgeCeiling.
+            statsMaxed: forgeCeiling(it, enh?.bonus || {}).maxed,
             // What a reroll of THIS item would cost, from the same function that charges for it — a card that
             // prints one price and a server that takes another is the oldest bug in this codebase.
             // The forged lines themselves, so the modal can offer them one at a time rather than only
