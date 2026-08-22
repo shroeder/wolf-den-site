@@ -436,9 +436,6 @@ export default function CasinoClient({ initial }) {
     // the loop below does the walking, which means holding an arrow, tapping a spot on the floor and arriving
     // from a deep link are all the same one mechanism rather than three.
     const [goal, setGoal] = useState(null);
-    // Whether they have walked at all yet — the floor's one-line instruction retires the moment it has
-    // been followed. An instruction you have already obeyed is clutter.
-    const [moved, setMoved] = useState(false);
 
     useEffect(() => {
         if (goal == null) return undefined;
@@ -510,7 +507,6 @@ export default function CasinoClient({ initial }) {
     const walkTo = useCallback((to) => {
         unlock();
         setErr(null);
-        setMoved(true);
         // Read the position from the ref, not from inside a setX updater — an updater can be called twice
         // and setting other state from within one is a side effect in a place React is allowed to repeat.
         setFacing(to < xRef.current ? -1 : 1);
@@ -1089,11 +1085,6 @@ export default function CasinoClient({ initial }) {
                 </div>
               </div>
             </div>
-            {/* Said once, and only until you have done it. It hangs on the ROOM WRAPPER, not inside the
-                world: the world is nearly five screens wide and scrolls, so `left: 50%` there is the middle
-                of the whole floor rather than the middle of what you can see — which put the hint somewhere
-                off in the dark by the roulette wheel. */}
-            {!moved ? <span className="cas-hint">Tap the floor to walk</span> : null}
             <div className="cas-vignette" aria-hidden="true" />
             {/* The floor has a tune: procedural, like every other scene in the Den. It mounts INSIDE the
                 hall because its toggle positions itself absolutely — hung off `.cas`, which is not a
@@ -1103,6 +1094,13 @@ export default function CasinoClient({ initial }) {
             {!seated ? <SceneMusic vibe="casino" /> : null}
             </div>
 
+            {/* ── WHAT YOU ARE STANDING AT ────────────────────────────────────────────────────────────
+                The whole of the movement UI used to live here: two arrows, then an arrows-plus-hint
+                arrangement, then a hint on its own. All of it is gone. Tapping the floor is how you move
+                and dragging it is how you look around — both are what a person tries first on a scene
+                like this, and a room that has to explain itself in a pill is a room that has not earned
+                the gesture. What is left is the one thing this row was ever for: a way into the machine
+                you are standing in front of. */}
             <div className="cas-walk">
                 {at?.live ? (
                     <button type="button" className="cas-sit" onClick={() => setSeated(true)}>

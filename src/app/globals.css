@@ -18347,17 +18347,6 @@ body.cas-seated .social-fab { display: none; }
 .cas-you img { transform-origin: 50% 100%; }
 
 
-/* ── THE FLOOR IS THE CONTROL ─────────────────────────────────────────────────────────────────────────
-   Tapping it walks you there, so it has to look tappable and it has to say so once. The hint fades out
-   the first time you actually move, because an instruction you have already followed is clutter. */
-/* TOP of the room, not the bottom. At the bottom it sat directly on the hero and the machine captions —
-   an instruction covering the thing it is instructing you about. */
-.cas-hint { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
-    padding: 5px 12px; border-radius: 999px; pointer-events: none; z-index: 6;
-    font-size: 11px; font-weight: 800; letter-spacing: .04em; color: #e8dcc6;
-    background: rgba(10,7,16,0.62); border: 1px solid rgba(255,215,94,0.22);
-    backdrop-filter: blur(3px); animation: casHint 2.6s ease-in-out infinite; }
-@keyframes casHint { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }
 
 
 /* ── THE ROOM GOES EDGE TO EDGE ON A PHONE ────────────────────────────────────────────────────────────
