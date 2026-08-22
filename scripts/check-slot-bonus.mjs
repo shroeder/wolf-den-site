@@ -47,6 +47,7 @@ for (const m of Object.values(SLOT_MACHINES)) {
     let returned = 0;
     let freePulls = 0;
     let nudges = 0, nudgeHits = 0, tips = 0, tipTotal = 0, triggers = 0, struckPulls = 0;
+    const bursts = {}; const burstPaid = {};
 
     for (let i = 0; i < PULLS; i += 1) {
         const free = meter.freePulls > 0;
@@ -63,6 +64,7 @@ for (const m of Object.values(SLOT_MACHINES)) {
         if (fx.nudged) { nudges += 1; if (fx.nudged.hit) nudgeHits += 1; }
         if (fx.tipped) { tips += 1; tipTotal += fx.tipped; }
         if (fx.awarded) triggers += 1;
+        for (const b of fx.burst || []) { bursts[b.id] = (bursts[b.id] || 0) + 1; burstPaid[b.id] = (burstPaid[b.id] || 0) + b.paid; }
         if (fx.struck > 1) struckPulls += 1;
     }
 
@@ -70,7 +72,12 @@ for (const m of Object.values(SLOT_MACHINES)) {
     // are the feature, so counting them as stake would price the feature as if the player bought it.
     const measured = returned / staked;
     const paytable = slotRtp(m.id);
-    const priced = paytable + bonusEv(m.id, m, paytable, slotHitRate(m.id)).total;
+    // THE POT IS EXCLUDED from this comparison, deliberately. Its return is exactly its contribution rate by
+    // construction — everything paid in is eventually paid out — and it is a SHARED row that this simulation
+    // does not have and could not model with one player. What is being checked here is the code that runs per
+    // pull; the pot's correctness is an accounting identity, not a sampling question.
+    const ev = bonusEv(m.id, m, paytable, slotHitRate(m.id));
+    const priced = paytable + ev.total - (ev.pot || 0);
     const drift = measured - priced;
 
     // THE BAND COMES FROM THE MACHINE, not from a number somebody picked — see the note where it is used.
@@ -81,7 +88,7 @@ for (const m of Object.values(SLOT_MACHINES)) {
     const top = Math.max(...Object.values(m.pays.three));
 
     console.log(`${m.label.toUpperCase()}`);
-    console.log(`  priced       ${pct(priced)}   (paytable ${pct(paytable)} + features)`);
+    console.log(`  priced       ${pct(priced)}   (paytable ${pct(paytable)} + features, excluding the shared Pot)`);
     console.log(`  measured     ${pct(measured)}   over ${staked.toLocaleString()} paid pulls`);
     console.log(`  drift        ${(drift >= 0 ? "+" : "") + pct(drift)}  against a ±${pct(band)} band (four sigma — mostly this machine's ${top.toLocaleString()}x tail)`);
     if (freePulls) console.log(`  free pulls   ${freePulls.toLocaleString()} awarded and played (${pct(freePulls / PULLS)} of all pulls)`);
@@ -89,6 +96,9 @@ for (const m of Object.values(SLOT_MACHINES)) {
     if (tips) console.log(`  tray tipped  ${tips.toLocaleString()} times, ${(tipTotal / tips).toFixed(2)}x average`);
     if (struckPulls) console.log(`  moonstruck   ${struckPulls.toLocaleString()} wins paid at a raised multiplier`);
     if (triggers) console.log(`  triggers     ${triggers.toLocaleString()}`);
+    for (const [id, n] of Object.entries(bursts)) {
+        console.log(`  ${id.padEnd(11)}  burst ${n.toLocaleString()} times, ${(burstPaid[id] / n).toFixed(2)}x average, once every ${Math.round(staked / n).toLocaleString()} pulls`);
+    }
     console.log("");
 
     // ── THE TWO WAYS THIS CAN BE WRONG ───────────────────────────────────────────────────────────────────

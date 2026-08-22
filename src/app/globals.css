@@ -17724,3 +17724,56 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid rgba(159,198,221,0.28); background: rgba(159,198,221,0.08); }
 .cas-round-clock { font-size: 12px; font-weight: 900; color: #9fc6dd; letter-spacing: 0.02em; }
 .cas-round-who { font-size: 9.5px; color: #98a0aa; text-align: right; }
+
+/* ── THE POT ─────────────────────────────────────────────────────────────────────────────────────────
+   The floor's shared jackpot, above the reels because it is the reason to be at this machine rather
+   than a footnote about it. Gold on violet, and it climbs while you watch — everybody else's pulls
+   are feeding the same number. */
+.cas-pot { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0 0 10px;
+    padding: 10px 14px; border-radius: 14px;
+    border: 1px solid rgba(255,215,94,0.4);
+    background: linear-gradient(180deg, rgba(255,215,94,0.13), rgba(169,130,255,0.08)); }
+.cas-pot i { font-style: normal; font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase; color: #ffd75e; }
+.cas-pot b { font-size: 1.6rem; font-weight: 900; color: #ffe9b8; letter-spacing: .01em;
+    font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(255,215,94,.45); }
+.cas-pot em { font-style: normal; font-size: 8.5px; color: #98a0aa; }
+/* Taken. The one time this number is allowed to shout. */
+.cas-pot.is-won { border-color: #ffd75e; background: linear-gradient(180deg, rgba(255,215,94,.3), rgba(255,159,67,.16));
+    box-shadow: 0 0 34px rgba(255,215,94,.45); animation: casPotWin .5s cubic-bezier(.2,1.6,.35,1) both; }
+.cas-pot.is-won em { color: #ffd75e; font-weight: 900; letter-spacing: .12em; }
+@keyframes casPotWin { from { transform: scale(.88); } to { transform: none; } }
+
+/* ── THE PIGGY BANKS ─────────────────────────────────────────────────────────────────────────────────
+   One under each reel, and the reel a chest lands on is the bank it feeds. They GROW as they fill —
+   the same pig, scaled from 0.62 to 1 — because "it gets bigger and bigger until it bursts" is the
+   whole idea, and a progress bar is not that. */
+.cas-banks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 12px; }
+.cas-bank { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 8px 4px 6px; border-radius: 12px; min-height: 82px; justify-content: flex-end;
+    border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.28); }
+.cas-bank img { width: 54px; height: 54px; object-fit: contain; display: block;
+    /* the fill IS the size — 62% empty, full size fat */
+    transform: scale(calc(0.62 + var(--fill, 0) * 0.38));
+    transform-origin: bottom center;
+    transition: transform .45s cubic-bezier(.2,1.5,.35,1), filter .3s ease;
+    filter: drop-shadow(0 3px 5px rgba(0,0,0,.5)) saturate(calc(0.55 + var(--fill, 0) * 0.45)); }
+.cas-bank-n { font-family: inherit; font-size: 9.5px; font-weight: 800; color: #98a0aa; font-variant-numeric: tabular-nums; }
+.cas-bank-n i { font-style: normal; opacity: .55; }
+/* A coin just went in. A small kick, not a fanfare — this happens on most pulls. */
+.cas-bank.is-fed img { animation: casFed .34s cubic-bezier(.2,1.6,.35,1); }
+.cas-bank.is-fed .cas-bank-n { color: var(--tone); }
+@keyframes casFed { 30% { transform: scale(calc(0.62 + var(--fill,0) * 0.38 + .12)) translateY(-3px); } }
+/* And the moment it goes. */
+.cas-bank.is-burst { border-color: var(--tone); background: color-mix(in srgb, var(--tone) 18%, transparent);
+    box-shadow: 0 0 26px color-mix(in srgb, var(--tone) 45%, transparent); animation: casBurst .5s ease both; }
+.cas-bank.is-burst img { animation: casBurstPig .5s cubic-bezier(.2,1.7,.3,1) both; }
+@keyframes casBurst { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: none; } }
+@keyframes casBurstPig { 0% { transform: scale(1.2); } 55% { transform: scale(.5) rotate(-8deg); } 100% { transform: scale(.62); } }
+.cas-bank-pop { position: absolute; top: 2px; left: 0; right: 0; text-align: center;
+    font-size: 13px; font-weight: 900; color: var(--tone); text-shadow: 0 0 14px var(--tone);
+    animation: casPop .9s ease both; pointer-events: none; }
+@keyframes casPop { 0% { opacity: 0; transform: translateY(6px); } 25% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-14px); } }
+@media (prefers-reduced-motion: reduce) {
+    .cas-bank img, .cas-bank.is-fed img, .cas-bank.is-burst img { animation: none; }
+}

@@ -234,6 +234,9 @@ export default function CasinoClient({ initial }) {
     // Seeded from the server and replaced by every pull's answer, never incremented locally: a meter the
     // client keeps its own count of is a meter that disagrees with the one that pays.
     const [meters, setMeters] = useState(initial?.meters || {});
+    // The floor's shared jackpot. Comes down with every state read and every pull, so it climbs on its own
+    // while you watch it.
+    const [pot, setPot] = useState(initial?.pot?.amount || 0);
     const [fx, setFx] = useState(null);      // what the features did on the last pull
     // The two shared games: what settled for you last, and a ticking clock for the round now open.
     const [settled, setSettled] = useState({});
@@ -366,7 +369,9 @@ export default function CasinoClient({ initial }) {
                 setBusy(false);
                 absorb(r);
                 if (r.meter) setMeters((p) => ({ ...p, [r.machine]: r.meter }));
-                setFx({ nudged: r.nudged, awarded: r.awarded, tipped: r.tipped, struck: r.struck, free: r.free });
+                if (r.pot) setPot(r.pot.amount);
+                setFx({ nudged: r.nudged, awarded: r.awarded, tipped: r.tipped, struck: r.struck, free: r.free,
+                    fed: r.fed, burst: r.burst, potWon: r.potWon });
                 const three = r.reels[0] === r.reels[1] && r.reels[1] === r.reels[2];
                 if (r.won > 0) {
                     setFlash(three ? "big" : "win");
@@ -473,6 +478,7 @@ export default function CasinoClient({ initial }) {
             // the next time it looks, which is at most six seconds and usually less.
             if (r?.open) {
                 setSt((p) => ({ ...p, others: r.others, gold: r.gold, rounds: r.rounds }));
+                if (r.pot) setPot(r.pot.amount);
                 // Anything that settled while you were away is announced rather than quietly banked.
                 for (const game of ["wheel", "keno"]) {
                     const done = r.rounds?.[game]?.settled || [];
@@ -652,6 +658,19 @@ export default function CasinoClient({ initial }) {
                         the return is printed beside them because a floor that hides its own odds is a
                         floor that has something to hide. All three return within a point of each other,
                         which is exactly the thing worth being able to check. */}
+                    {/* ── THE POT ─────────────────────────────────────────────────────────────────────
+                        One number for the whole floor, fed by every bet on every cabinet, and any pull can
+                        take it. It sits ABOVE the reels because it is the reason to be at this machine
+                        rather than a footnote about it — and it climbs while you watch, because everybody
+                        else's pulls are feeding it too. */}
+                    {SLOTS.has(at.id) ? (
+                        <div className={`cas-pot${fx?.potWon ? " is-won" : ""}`}>
+                            <i>The Pot</i>
+                            <b>{money(fx?.potWon || pot)}</b>
+                            <em>{fx?.potWon ? "YOU TOOK IT" : "every cabinet feeds it"}</em>
+                        </div>
+                    ) : null}
+
                     {/* ── WHAT THIS CABINET REMEMBERS ─────────────────────────────────────────────────
                         The tray, the multiplier and any banked free pulls. Shown ALWAYS rather than only
                         when they are non-zero: a meter you only see once it has something in it is a meter
@@ -783,6 +802,32 @@ export default function CasinoClient({ initial }) {
                                     </span>
                                 ) : null}
                             </div>
+                            {/* ── THE PIGGY BANKS ─────────────────────────────────────────────────────
+                                Three of them, one under each reel, and which reel a chest lands on is which
+                                bank it feeds. They GROW as they fill — the same pig, scaled — because "it
+                                gets bigger and bigger until it bursts" is the whole idea, and a progress bar
+                                is not that. */}
+                            {(st?.banks || []).length && meters[at.id]?.banks ? (
+                                <div className="cas-banks">
+                                    {st.banks.map((bank) => {
+                                        const held = meters[at.id].banks[bank.id] || { coins: 0 };
+                                        const fill = Math.min(1, (held.coins || 0) / bank.holds);
+                                        const justFed = fx?.fed?.includes(bank.id);
+                                        const justBurst = fx?.burst?.find((b) => b.id === bank.id);
+                                        return (
+                                            <div key={bank.id}
+                                                className={`cas-bank${justFed ? " is-fed" : ""}${justBurst ? " is-burst" : ""}`}
+                                                style={{ "--tone": bank.tone, "--fill": fill }}>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={`/images/casino/bank_${bank.id}.webp`} alt={bank.label} draggable="false" />
+                                                <span className="cas-bank-n">{held.coins || 0}<i>/{bank.holds}</i></span>
+                                                {justBurst ? <span className="cas-bank-pop">+{money(Math.round(justBurst.paid * bet))}</span> : null}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : null}
+
                             {/* ── WHAT THE FEATURES JUST DID ──────────────────────────────────────────
                                 Each one gets a line, because a feature that fires silently is a feature the
                                 player experiences as the numbers behaving oddly. */}
@@ -793,6 +838,12 @@ export default function CasinoClient({ initial }) {
                             ) : null}
                             {fx?.struck > 1 ? <p className="cas-fx">Moonstruck — paid at {fx.struck.toFixed(2)}x.</p> : null}
                             {fx?.tipped ? <p className="cas-fx is-big">The tray tips out — {fx.tipped.toFixed(2)}x.</p> : null}
+                            {fx?.burst?.length ? (
+                                <p className="cas-fx is-big">
+                                    The {fx.burst.map((b) => b.id).join(" and ")} bank bursts!
+                                </p>
+                            ) : null}
+                            {fx?.potWon ? <p className="cas-fx is-big">THE POT — {money(fx.potWon)} gold.</p> : null}
                             {fx?.awarded ? (
                                 <p className="cas-fx is-big">
                                     {fx.awarded.id === "pack" ? "PACK CALL" : "MOONRISE"} — {fx.awarded.pulls} free pulls

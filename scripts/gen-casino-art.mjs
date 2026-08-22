@@ -136,6 +136,38 @@ const JOBS = {
             },
         ),
     },
+    // ── THE PIGGY BANKS ── three of them, and they must read as a SET at a glance: same pose, same
+    // silhouette, three metals. They are drawn EMPTY and get bigger on screen as they fill (a CSS scale off
+    // the fill fraction), which is why the pose has to be the same in all three — a set that changes shape
+    // between tiers cannot be scaled without looking like three different objects.
+    bank_copper: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A plump fantasy piggy bank made of hammered COPPER, seen straight on from the side, standing "
+            + "square, with a coin slot on its back and small sturdy feet. Warm reddish-brown metal, a little "
+            + "tarnished.",
+            { extra: "It must read at 64 pixels: one object, bold silhouette, no fine detail, no coins around it." },
+        ),
+    },
+    bank_silver: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A plump fantasy piggy bank made of polished SILVER, seen straight on from the side, standing "
+            + "square, with a coin slot on its back and small sturdy feet. Cool bright metal with cold blue "
+            + "highlights. IDENTICAL POSE AND SHAPE to a copper one — only the metal differs.",
+            { extra: "It must read at 64 pixels: one object, bold silhouette, no fine detail, no coins around it." },
+        ),
+    },
+    bank_gold: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A plump fantasy piggy bank made of solid GOLD, seen straight on from the side, standing square, "
+            + "with a coin slot on its back and small sturdy feet. Rich warm gold, glowing faintly. IDENTICAL "
+            + "POSE AND SHAPE to a copper one — only the metal differs.",
+            { extra: "It must read at 64 pixels: one object, bold silhouette, no fine detail, no coins around it." },
+        ),
+    },
+
     // ── The icon. One image, used on the town street and on the bounty card.
     icon: {
         size: "1024x1024",

@@ -11,7 +11,8 @@ import {
     ROUND_MS, openBets, placeBet, roundEndsAt, roundOf, roundPlayers, settleBets,
 } from "@/lib/marketplace/casino-rounds.js";
 import {
-    GAMBLE_WIN_CHANCE, SLOT_BONUSES, applyBonuses, bonusEv, emptyMeter, hasBonus, moonstruckMult,
+    BANKS, GAMBLE_WIN_CHANCE, POT_RATE, POT_SEED_SHARE, SLOT_BONUSES, applyBonuses, bonusEv, emptyBanks,
+    emptyMeter, hasBonus, moonstruckMult, potChance,
 } from "@/lib/marketplace/slot-bonus.js";
 
 // ── THE CASINO ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -106,7 +107,7 @@ export const SLOT_MACHINES = {
         // that ALREADY paid the wolf pair into one that pays the wolf triple, and that 2.2% is what the
         // rest of the table gives up to it.
         pays: {
-            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 8, bone: 8, moon: 4 },
+            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 8, bone: 8, moon: 3.2 },
             two: { wolf: 8, chest: 3, laurel: 1.5, doubloon: 1, bone: 0.5, moon: 0.4 },
         },
     },
@@ -138,7 +139,7 @@ export const SLOT_MACHINES = {
         // the prize, it is the thing that HANDS you the prize you have been filling all session.
         pays: {
             three: { wolf: 80, chest: 12, laurel: 3, moon: 1 },
-            two: { wolf: 7, chest: 2, laurel: 0.9, moon: 0.45 },
+            two: { wolf: 7, chest: 2, laurel: 0.83, moon: 0.3 },
         },
     },
 
@@ -171,7 +172,7 @@ export const SLOT_MACHINES = {
         // The scatter drops from 1.33x to 1.1x to pay for Moonstruck, which is funded by the dead pulls it
         // is made of.
         pays: {
-            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 2, bone: 1.2 },
+            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 2, bone: 1.1 },
             two: {},
         },
         // ── THE SCATTER ── stars pay wherever they land, not only in a line, and it takes TWO of them. It
@@ -180,7 +181,7 @@ export const SLOT_MACHINES = {
         //
         // Two, not one. A single star pays on 40% of pulls, which would have made the chase machine the
         // most frequent payer on the floor and quietly deleted the reason it exists.
-        scatter: { id: "star", pays: { 2: 1.1 } },
+        scatter: { id: "star", pays: { 2: 0.9 } },
     },
 };
 
@@ -263,16 +264,21 @@ const clampBet = (v) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(v)
 // Everything in it is in STAKE UNITS. See migration 394 for why that is not a detail.
 async function loadMeter(buyerId, machineId) {
     const row = await db.queryOne(
-        `SELECT tray, streak, free_pulls, free_mult, pending FROM mkt_casino_meter WHERE buyer_id = $1 AND machine = $2`,
+        // `banks` was missing from this list when the column was added, so every pull loaded three empty
+        // banks, fed them one coin, and saved that — 36 coins fed across 70 pulls left one coin standing.
+        // A meter that is written but never read is worse than one that does not exist.
+        `SELECT tray, streak, free_pulls, free_mult, pending, banks FROM mkt_casino_meter WHERE buyer_id = $1 AND machine = $2`,
         [buyerId, machineId],
     ).catch(() => null);
     if (!row) return emptyMeter();
+    const banks = typeof row.banks === "string" ? JSON.parse(row.banks || "{}") : (row.banks || {});
     return {
         tray: Number(row.tray) || 0,
         streak: Number(row.streak) || 0,
         freePulls: Number(row.free_pulls) || 0,
         freeMult: Number(row.free_mult) || 1,
         pending: Number(row.pending) || 0,
+        banks: Object.keys(banks).length ? banks : emptyBanks(),
     };
 }
 
@@ -280,18 +286,22 @@ async function loadMeter(buyerId, machineId) {
 // Naming less than the key is a 42P10 and naming a partial index without its WHERE is two weeks of silently
 // lost writes; this codebase has paid for both.
 const saveMeter = (buyerId, machineId, meter) => db.query(
-    `INSERT INTO mkt_casino_meter (buyer_id, machine, tray, streak, free_pulls, free_mult, pending, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `INSERT INTO mkt_casino_meter (buyer_id, machine, tray, streak, free_pulls, free_mult, pending, banks, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      ON CONFLICT (buyer_id, machine) DO UPDATE
-        SET tray = $3, streak = $4, free_pulls = $5, free_mult = $6, pending = $7, updated_at = NOW()`,
-    [buyerId, machineId, meter.tray, meter.streak, meter.freePulls, meter.freeMult, meter.pending],
+        SET tray = $3, streak = $4, free_pulls = $5, free_mult = $6, pending = $7, banks = $8, updated_at = NOW()`,
+    [buyerId, machineId, meter.tray, meter.streak, meter.freePulls, meter.freeMult, meter.pending,
+        JSON.stringify(meter.banks || emptyBanks())],
 ).catch(() => {});
 
 /** Every meter a member has, for the room to draw. */
 export async function casinoMeters(buyerId) {
     if (!buyerId) return {};
     const rows = await db.query(
-        `SELECT machine, tray, streak, free_pulls, free_mult, pending FROM mkt_casino_meter WHERE buyer_id = $1`,
+        // `banks` missing here too — the same omission as in loadMeter, in the other query that reads this
+        // table. The banks filled correctly on the server and the room drew three empty pigs, which is the
+        // worst version of the bug: nothing looks broken, the feature just silently does not exist.
+        `SELECT machine, tray, streak, free_pulls, free_mult, pending, banks FROM mkt_casino_meter WHERE buyer_id = $1`,
         [buyerId],
     ).catch(() => []);
     return Object.fromEntries(rows.map((r) => [r.machine, {
@@ -301,6 +311,7 @@ export async function casinoMeters(buyerId) {
         freeMult: Number(r.free_mult) || 1,
         pending: Number(r.pending) || 0,
         mult: moonstruckMult(Number(r.streak) || 0),
+        banks: (typeof r.banks === "string" ? JSON.parse(r.banks || "{}") : (r.banks || {})),
     }]));
 }
 
@@ -378,7 +389,17 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     const tipped = fx.tipped;
     const mult = fx.mult;
 
-    const won = Math.round(stake * mult);
+    // ── THE POT ──────────────────────────────────────────────────────────────────────────────────────────
+    // Fed by every PAID pull, and takeable by any of them. The chance is proportional to the stake, which is
+    // the only fair way: a 2,500 bet contributes a hundred times what a 25 bet does, so it must have a
+    // hundred times the chance. Anything else is a machine where the cheap bet is the smart bet.
+    let potWon = 0;
+    if (hasBonus(m.id, "pot") && !free) {
+        await feedPot(stake);
+        if (Math.random() < potChance(stake)) potWon = await takePot(buyerId);
+    }
+
+    const won = Math.round(stake * mult) + potWon;
 
     let gold = paid.gold;
     if (won > 0) {
@@ -415,6 +436,8 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     return {
         ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
+        fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
+        potWon: potWon > 0 ? potWon : null, pot: await readPot(),
         meter: { tray: meter.tray, streak: meter.streak, freePulls: meter.freePulls, freeMult: meter.freeMult, pending: meter.pending, mult: moonstruckMult(meter.streak) },
     };
 }
@@ -478,6 +501,64 @@ export async function casinoPerks(buyerId) {
 /** The stake back, before anything else happens. Returns true when the house is paying for this one. */
 const onTheHouse = (perks) => (perks?.freePlay || 0) > 0 && Math.random() < perks.freePlay;
 
+
+
+// ── THE POT ──────────────────────────────────────────────────────────────────────────────────────────────────
+// One row for the whole floor. Every slot bet on every cabinet feeds it and any pull on any machine can take
+// it, which is what makes a shared progressive worth more than three private ones: the number on the wall is
+// one everybody is building.
+//
+// `seed` is the part held back to start the NEXT pot, so a pot that was just won does not read as broken by
+// showing a zero. Both halves come out of the same contribution, so the return is still exactly POT_RATE.
+export async function readPot() {
+    const row = await db.queryOne(`SELECT amount, seed, won_by, won_amount, won_at FROM mkt_casino_pot WHERE id = 'floor'`)
+        .catch(() => null);
+    if (!row) return { amount: 0, seed: 0 };
+    return {
+        amount: Number(row.amount) || 0,
+        seed: Number(row.seed) || 0,
+        lastWin: row.won_at ? { amount: Number(row.won_amount) || 0, at: row.won_at } : null,
+    };
+}
+
+/** Every paid pull pays into the pot. Free pulls do not — nothing was staked, so there is nothing to take a
+ *  slice of, and crediting them would be the house feeding its own jackpot. */
+// ── ROUNDING A FRACTION OF A SMALL BET ───────────────────────────────────────────────────────────────────────
+// 3% of a 25 bet is 0.75 gold, and rounding that to 1 is a 33% overpayment on every minimum-stake pull —
+// which is most of them. Rounding the two halves SEPARATELY was worse still: 0.6 rounded to 1 and 0.15
+// rounded to 0, so the pot took more than its share and the seed never filled at all. Measured: 70 gold into
+// the pot over 70 pulls where 53 was owed.
+//
+// Stochastic rounding instead — take the whole number, then the fraction as a probability. Over any run of
+// pulls the average is exactly the rate, which is the property the ceiling was priced on; on a single pull it
+// is a coin nobody sees.
+const roundStochastic = (x) => Math.floor(x) + (Math.random() < (x % 1) ? 1 : 0);
+
+const feedPot = (stake) => db.query(
+    `UPDATE mkt_casino_pot SET amount = amount + $1, seed = seed + $2, updated_at = NOW() WHERE id = 'floor'`,
+    [roundStochastic(stake * POT_RATE * (1 - POT_SEED_SHARE)), roundStochastic(stake * POT_RATE * POT_SEED_SHARE)],
+).catch(() => {});
+
+/**
+ * Take the pot, if this pull took it.
+ *
+ * The whole amount moves in ONE conditional update — `amount = seed, seed = 0` guarded on the amount being
+ * unchanged — so two players hitting in the same instant cannot both be paid it. Whoever's update lands first
+ * wins it; the other reads back zero and is paid nothing, which is the only correct answer.
+ */
+async function takePot(buyerId) {
+    const before = await db.queryOne(`SELECT amount, seed FROM mkt_casino_pot WHERE id = 'floor'`).catch(() => null);
+    const amount = Number(before?.amount) || 0;
+    if (amount <= 0) return 0;
+    const claimed = await db.queryOne(
+        `UPDATE mkt_casino_pot
+            SET amount = seed, seed = 0, won_at = NOW(), won_by = $1, won_amount = $2, updated_at = NOW()
+          WHERE id = 'floor' AND amount = $2
+      RETURNING won_amount`,
+        [buyerId, amount],
+    ).catch(() => null);
+    return claimed ? amount : 0;
+}
 
 // ── WHAT THE BOUNTIES COUNT ──────────────────────────────────────────────────────────────────────────────────
 // One function for all three machines, so the fourth one somebody adds cannot quietly fail to tick a card.
@@ -934,6 +1015,8 @@ export async function getCasinoState(buyerId) {
             bonuses: SLOT_BONUSES[m.id] || [],
         }])),
         meters: await casinoMeters(buyerId),
+        pot: await readPot(),
+        banks: BANKS.map((b) => ({ id: b.id, label: b.label, reel: b.reel, holds: b.holds, tone: b.tone })),
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
         wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },

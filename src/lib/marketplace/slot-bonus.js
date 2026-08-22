@@ -18,7 +18,10 @@
 
 /** A meter that has never been played. Every field is in STAKE UNITS, never in gold — a player who changes
  *  stake mid-session must not be able to fill a tray at 25 and tip it out at 2,500. */
-export const emptyMeter = () => ({ tray: 0, streak: 0, freePulls: 0, freeMult: 1, pending: 0 });
+export const emptyMeter = () => ({ tray: 0, streak: 0, freePulls: 0, freeMult: 1, pending: 0, banks: emptyBanks() });
+
+/** Three empty banks. `coins` is the picture; `value` is what it pays, in STAKE UNITS. */
+export const emptyBanks = () => ({ copper: { coins: 0, value: 0 }, silver: { coins: 0, value: 0 }, gold: { coins: 0, value: 0 } });
 
 // ── THE TUNING ───────────────────────────────────────────────────────────────────────────────────────────────
 // Every number a feature costs, in one place, so check:casino can price them and so re-tuning one does not
@@ -46,14 +49,17 @@ export const SLOT_BONUSES = {
     slot: [
         { id: "nudge", label: "The Nudge", blurb: "Two wolves and a miss — the third reel goes again, free." },
         { id: "pack", label: "Pack Call", blurb: "Three doubloons calls the pack: ten free pulls." },
+        { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
     slot2: [
-        { id: "tray", label: "The Tray", blurb: "Every dead pull drops coins in the tray. Three moons tips it out." },
+        { id: "banks", label: "The Piggy Banks", blurb: "Every chest drops a coin into the bank under that reel. Copper fills fast, gold takes all session — and then it bursts." },
         { id: "gamble", label: "Double or Nothing", blurb: "One coin flip on any win. Exactly even money — the only fair bet on the floor." },
+        { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
     slot3: [
         { id: "moonrise", label: "Moonrise", blurb: "Three stars: eight free spins, every win doubled." },
         { id: "moonstruck", label: "Moonstruck", blurb: "Every dead pull raises the multiplier on your next win." },
+        { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
 };
 
@@ -151,7 +157,8 @@ export function bonusEv(machineId, machine, baseRtp, hitRate) {
         if (b.id === "nudge") out.nudge = nudgeEv(machine);
         else if (b.id === "pack") {
             out.pack = freePullEv(machineId, machine, baseRtp, { pulls: BONUS_TUNING.packPulls, trigger: BONUS_TUNING.packTrigger });
-        } else if (b.id === "tray") out.tray = trayEv(machine, hitRate);
+        } else if (b.id === "banks") out.banks = banksEv(machine);
+        else if (b.id === "pot") out.pot = potEv();
         else if (b.id === "gamble") out.gamble = gambleEv();
         else if (b.id === "moonrise") {
             out.moonrise = freePullEv(machineId, machine, baseRtp, { pulls: BONUS_TUNING.freeSpins, mult: BONUS_TUNING.freeMult, trigger: "star" });
@@ -215,6 +222,30 @@ export function applyBonuses({ machineId, machine, reels, meter, free, payout, r
         }
     }
 
+    // THE PIGGY BANKS — a chest on a reel drops a coin into the bank under that reel, and a bank that reaches
+    // its capacity bursts and pays what it holds, multiplied. Fed on FREE pulls too: the coin came off the
+    // reels, and a free pull's reels are as real as any other's.
+    if (hasBonus(machineId, "banks")) {
+        out.fed = [];
+        out.burst = [];
+        if (!meter.banks) meter.banks = emptyBanks();
+        for (const bank of BANKS) {
+            if (reels[bank.reel] !== COIN_SYMBOL) continue;
+            const b = meter.banks[bank.id] || { coins: 0, value: 0 };
+            b.coins += 1;
+            b.value += COIN_VALUE;
+            out.fed.push(bank.id);
+            if (b.coins >= bank.holds) {
+                const paid = b.value * bank.bonus;
+                mult += paid;
+                out.burst.push({ id: bank.id, coins: b.coins, paid });
+                b.coins = 0;
+                b.value = 0;
+            }
+            meter.banks[bank.id] = b;
+        }
+    }
+
     // TRIGGERS — only on a PAID pull. A feature that can award itself is a geometric series, and a geometric
     // series is how a paytable stops having an exact answer.
     if (!free) {
@@ -258,3 +289,66 @@ export function slotSigma(machine, payout) {
     }
     return Math.sqrt(Math.max(0, sq - mean * mean));
 }
+
+// ── THE PIGGY BANKS ──────────────────────────────────────────────────────────────────────────────────────────
+// Luke's idea, and the best one on the list: three banks in a row, a symbol drops a coin into one of them, and
+// they fatten until one bursts. Every other feature on this floor is a thing that HAPPENS TO YOU; this is the
+// only one you can watch coming.
+//
+// WHICH BANK GETS FED IS DECIDED BY WHICH REEL THE COIN LANDED ON — left reel feeds copper, middle silver,
+// right gold. That is worth more than picking at random: it means you can see, mid-spin, which bank a landing
+// chest is about to feed, and the reel that has not stopped yet is the one that decides it.
+//
+// IT REPLACES THE TRAY on Den Fortune rather than joining it. The Tray was the same idea with one tier and no
+// picture — coins go in on a dead pull, a triple tips it out. Three banks with different appetites is that
+// idea done properly, and running both would be two collect meters on one machine competing for the same
+// budget.
+//
+// THE BUDGET IS THE WHOLE DESIGN. A collect feature can only ever pay back what it was fed, so how big a
+// burst FEELS is decided entirely by how much of the machine's return is routed through it. The Tray carried
+// 3.85%, which would have made the gold bank worth about four times the stake after four hundred pulls —
+// technically a feature, emotionally nothing. These carry 8%, taken out of Den Fortune's pair table, which is
+// what turns the gold bank into a real moment.
+export const BANKS = [
+    { id: "copper", label: "Copper", reel: 0, holds: 12, bonus: 0.9, tone: "#c98f4a" },
+    { id: "silver", label: "Silver", reel: 1, holds: 34, bonus: 1.3, tone: "#cbd3dc" },
+    { id: "gold", label: "Gold", reel: 2, holds: 90, bonus: 2.2, tone: "#ffd75e" },
+];
+
+// What a single coin is worth, as a share of the stake it landed on. Stored in STAKE UNITS like every other
+// meter on this floor: a bank filled at 25 and burst at 2,500 would pay a hundred times what it was fed.
+export const COIN_VALUE = 0.09;
+/** The symbol that drops a coin. Den Fortune's chest is already the money symbol, so no new reel symbol and
+ *  no change to the weights — which means the paytable's own enumeration is untouched. */
+export const COIN_SYMBOL = "chest";
+
+/** Exact EV of the banks, per pull, as a multiple of the stake. Everything fed comes back multiplied by that
+ *  bank's bonus, so the arithmetic is the feed rate times the sum of the bonuses. */
+export function banksEv(machine) {
+    const total = machine.symbols.reduce((n, s) => n + s.weight, 0);
+    const sym = machine.symbols.find((s) => s.id === COIN_SYMBOL);
+    if (!sym) return 0;
+    const pPerReel = sym.weight / total;
+    return pPerReel * COIN_VALUE * BANKS.reduce((n, b) => n + b.bonus, 0);
+}
+
+// ── THE POT ──────────────────────────────────────────────────────────────────────────────────────────────────
+// A progressive, and deliberately a FLOOR-WIDE one: every slot bet on every cabinet feeds the same number, and
+// any pull on any machine can take it. One shared pot that visibly climbs is worth more than three private
+// ones, and it also spreads the cost — three points off each of three paytables instead of eight off one,
+// which matters because Moonrise's base game is already thin.
+//
+// WHY THE EV IS EXACTLY THE CONTRIBUTION RATE. Everything paid into the pot is eventually paid out of it —
+// that is what a progressive is — so in the steady state the return is the rate, and nothing else. The trigger
+// odds do not change what it returns; they change how RARE and how BIG, which is the only thing they are for.
+//
+// THE CHANCE IS PROPORTIONAL TO THE STAKE, which is the only fair way to do it: a 2,500 bet contributes a
+// hundred times what a 25 bet does, so it must have a hundred times the chance of taking the pot. Anything
+// else is a machine where the cheap bet is the smart bet.
+export const POT_RATE = 0.03;          // of every slot bet, into the pot
+export const POT_SEED_SHARE = 0.2;     // ...of which this much is held back to seed the NEXT pot
+export const POT_ODDS_PER_GOLD = 1 / 900_000;   // chance per pull = stake × this
+
+export const potEv = () => POT_RATE;
+/** The chance this pull takes the pot. Capped so a maximum bet cannot make it a coin flip. */
+export const potChance = (stake) => Math.min(0.02, Math.max(0, stake) * POT_ODDS_PER_GOLD);
