@@ -52,7 +52,9 @@ export function pointsFor(r) {
 // stored counter describing a tree that no longer exists.
 export function skillPointsFor(r) {
     const earned = skillPointsFrom(pointsSpent(r?.skill_tree || {}));
-    const spent = skillPointsSpent(r?.skills || {});
+    // Only what THIS class's skills cost — see skillPointsSpent. Points sunk into a class you no longer
+    // are were being held against you forever.
+    const spent = skillPointsSpent(r?.skills || {}, r?.arena_class || null);
     return { earned, spent, available: Math.max(0, earned - spent) };
 }
 
@@ -208,7 +210,14 @@ export async function respecTree(buyerId) {
     return { ok: true, cost, refunded: spent };
 }
 
-/** Change class for gold. Every point comes back, because none of them mean anything in the new tree. */
+/**
+ * Change class for gold. Every point comes back, because none of them mean anything in the new tree.
+ *
+ * ── AND THAT HAS TO INCLUDE THE ACTIVE SKILLS ────────────────────────────────────────────────────────────
+ * It emptied `skill_tree` and left `skills` alone, so the new class inherited the old one's active skills:
+ * unusable, invisible in a panel that only lists the current class, and still counted as spent points. The
+ * sentence above was the intent all along; it was only ever carried out on half the state.
+ */
 export async function respecClass(buyerId, classId) {
     const r = await row(buyerId);
     if (!r?.arena_class) return { ok: false, error: "no_class" };
@@ -219,7 +228,8 @@ export async function respecClass(buyerId, classId) {
     const paid = await spendGold(buyerId, cost, "arena_respec_class", { from: r.arena_class, to: classId });
     if (!paid.ok) return { ...paid, cost };
     await db.query(
-        `UPDATE mkt_arena SET arena_class = $2, skill_tree = '{}'::jsonb, class_respecs = class_respecs + 1
+        `UPDATE mkt_arena SET arena_class = $2, skill_tree = '{}'::jsonb, skills = '{}'::jsonb,
+                class_respecs = class_respecs + 1
           WHERE buyer_id = $1`, [buyerId, classId]
     ).catch(() => {});
     await trackActivity(buyerId, "arena_class_respec", { from: r.arena_class, to: classId, cost }).catch(() => {});

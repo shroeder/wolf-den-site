@@ -909,7 +909,8 @@ export async function getArenaState(buyerId, pre = {}) {
         if (mineIds.has(id) && Array.isArray(nodes)) mySkills[id] = nodes;
     }
     const skillEarned = skillPointsFrom(spentPts);
-    const skillSpent = skillPointsSpent(mySkills);
+    // Class-aware, or the panel prints a different number of spent points than the gate enforces.
+    const skillSpent = skillPointsSpent(mySkills, row?.arena_class || null);
     const skillAvail = Math.max(0, skillEarned - skillSpent);
 
     const progress = {

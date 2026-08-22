@@ -654,10 +654,25 @@ export function skillState(classId, taken = {}, pointsAvailable = 0) {
 }
 
 /** What a member has spent on skills, for the panel and for the respec price. */
-export function skillPointsSpent(taken = {}) {
+// ── AND ONLY THE ONES THIS CLASS CAN ACTUALLY USE ────────────────────────────────────────────────────────────
+// GrayKitsune: "Used the coin bought switch from Reaver to Warden, put my skill points in but now I can't put
+// any of my active skill points in."
+//
+// Changing class emptied the passive tree and left the ACTIVE skills bag untouched, so a Warden was still
+// carrying nine nodes of Rupture and four of Onslaught — Reaver skills, unusable, unreachable, and counted
+// here as spent. An unlock and a node each cost one, so his thirteen nodes and two unlocks came to exactly
+// the fifteen points his re-spent tree had just earned him. Available: nothing. He had paid gold to switch
+// class and the switch took every skill point he owned.
+//
+// `classId` is optional so the lab and the previews can still ask "what does this bag cost" in the abstract,
+// but every gate that decides whether a member may SPEND passes it. Fixing it on the read as well as on the
+// write means anybody already stranded is freed the moment this ships, with no migration to get wrong.
+export function skillPointsSpent(taken = {}, classId = null) {
     let n = 0;
     for (const [id, nodes] of Object.entries(taken || {})) {
-        if (!skillById(id) || !Array.isArray(nodes)) continue;
+        const sk = skillById(id);
+        if (!sk || !Array.isArray(nodes)) continue;
+        if (classId && sk.classId !== classId) continue;
         n += SKILL_UNLOCK_COST + nodes.length * NODE_COST;
     }
     return n;
