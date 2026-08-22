@@ -95,7 +95,10 @@ if (typeof window !== "undefined") muted = isMuted();
 // ── VOICE HELPERS ────────────────────────────────────────────────────────────────────────────────────────────
 const now = () => (ctx ? ctx.currentTime : 0);
 
-function tone({ freq = 440, type = "sine", at = 0, dur = 0.2, gain = 0.2, to = null, bus = null, detune = 0 }) {
+// Exported so other features can have their OWN voice rather than borrowing the arena's twenty sounds.
+// The casino needs a coin cascade, a reel clunk and a near-miss sigh; none of those belong in a fight, and
+// bolting them onto `Sfx` would grow one module into everything. See casino/casino-audio.js.
+export function tone({ freq = 440, type = "sine", at = 0, dur = 0.2, gain = 0.2, to = null, bus = null, detune = 0 }) {
     if (!ctx) return;
     const t = now() + at;
     const o = ctx.createOscillator();
@@ -113,7 +116,7 @@ function tone({ freq = 440, type = "sine", at = 0, dur = 0.2, gain = 0.2, to = n
     o.stop(t + dur + 0.02);
 }
 
-function noise({ at = 0, dur = 0.2, gain = 0.2, type = "lowpass", freq = 1200, q = 1, sweepTo = null, bus = null }) {
+export function noise({ at = 0, dur = 0.2, gain = 0.2, type = "lowpass", freq = 1200, q = 1, sweepTo = null, bus = null }) {
     if (!ctx || !noiseBuf) return;
     const t = now() + at;
     const s = ctx.createBufferSource();

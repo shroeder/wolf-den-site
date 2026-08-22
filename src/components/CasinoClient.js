@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FeatureDailies from "@/components/FeatureDailies";
 import SceneMusic from "@/components/SceneMusic";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
+import Burst from "@/components/casino/Burst";
+import { Cas } from "@/components/casino/casino-audio.js";
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
 // A room laid out like the tavern: you walk left and right along it, the other people in it are really there,
@@ -64,6 +66,26 @@ const DECOR = [
 // is what actually does the work, because a lamp that does not light anything is just a picture of a lamp.
 const LAMPS = [6, 25, 44, 63, 82, 99];
 
+// ── EACH CABINET BURNS A DIFFERENT COLOUR ────────────────────────────────────────────────────────────────────
+// Nine games sharing one gold accent is nine games that look like one game with the middle swapped out. Each
+// machine now drives a single `--acc` custom property, and everything on its screen that used to be hard-coded
+// gold reads from it: the reel frame, the win flash, the meters, the pot, the chosen bet, the result line.
+//
+// The colours are taken from the CABINET SPRITE, not picked freely — you walk up to a machine and then sit at
+// it, and the screen agreeing with the object you just looked at is the whole reason to do this. The Deep is
+// drawn in cold violet and blue, so its screen is; The Menagerie is russet and green.
+const ACCENT = {
+    slot: "#ffb648",        // The Hunt — brass, well used
+    slot2: "#ffd489",       // The Harvest — honey and copper
+    slot3: "#6fd8ff",       // The Deep — cold water
+    slot4: "#7fe0a0",       // The Menagerie — the green of its reels
+    slot5: "#cdd9ff",       // The Vault — blued steel
+    roulette: "#c9a3ff",    // violet, off the wheel's own pockets
+    keno: "#67e3d0",        // the lamps on the ticket board
+    bingo: "#ff9ec0",       // the caller's baize is green, so the card is not
+    blackjack: "#6fd39a",   // felt
+};
+
 // Which cabinets are slot machines. Three of them now, and they are not one machine in three paint jobs —
 // see SLOT_MACHINES in casino.js. The client does not decide anything about them: it sends which cabinet
 // you are standing at and draws whatever came back.
@@ -96,7 +118,6 @@ const SYMBOL_TONE = {
 // EACH REEL STOPS ON ITS OWN CLOCK, and the third stops latest by a wide margin — that pause, with two symbols
 // already matching, is the entire drama of a slot machine and it cannot exist if all three land together.
 function Reel({ art, machineId, symbols, result, spinning, index, won }) {
-    const CELL = 84;
     // ── THE STRIP MUST NOT RESHUFFLE UNDER A LANDED REEL ─────────────────────────────────────────────────
     // `symbols` arrives as a fresh array on every parent render — it is built with .map() up in the panel —
     // so keying the memo on the array itself means a new identity every time anything re-renders, and the
@@ -132,14 +153,21 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
 
     const running = spinning || held;
     const landed = !running && result;
-    const offset = landed ? -(strip.length - 1) * CELL : 0;
+
+    // ── HOW BIG A CELL IS, IS A CSS QUESTION ─────────────────────────────────────────────────────────────
+    // The cell height was a JS constant, so the reels were 84px whether they were tucked in a panel on the
+    // floor or filling a phone in full screen — which is how a full-screen slot ended up with three small
+    // reels and a quarter of a screen of nothing. The strip travels in MULTIPLES OF `--cell` instead of in
+    // computed pixels, so the whole thing scales from one CSS clamp and the landing maths cannot drift out
+    // of step with the drawing.
+    const steps = strip.length - 1;
 
     return (
         <span className={`cas-reel${running ? " is-spin" : ""}${landed ? " is-stop" : ""}${won ? " is-won" : ""}`}
-            style={{ "--tone": SYMBOL_TONE[result] || "#cbd3dc", "--cell": `${CELL}px` }}>
+            style={{ "--tone": SYMBOL_TONE[result] || "#cbd3dc" }}>
             <span className="cas-strip"
                 style={landed
-                    ? { transform: `translateY(${offset}px)`, transition: "transform 520ms cubic-bezier(.14,.86,.28,1.04)" }
+                    ? { transform: `translateY(calc(var(--cell) * ${-steps}))`, transition: "transform 520ms cubic-bezier(.14,.86,.28,1.04)" }
                     : { transform: "translateY(0)" }}>
                 {strip.map((sym, i) => (
                     <span className="cas-cell" key={i}>
@@ -246,6 +274,19 @@ export default function CasinoClient({ initial }) {
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);     // how many reels have stopped, 0..3
     const [flash, setFlash] = useState(null);    // "win" | "big" — the celebration, cleared on a timer
+    // ── THE TEASE ────────────────────────────────────────────────────────────────────────────────────────
+    // True for the third of a second when two reels match and the last one is still running. It is the whole
+    // reason anybody watches a slot machine, and until now it was happening with nothing on screen or in the
+    // speakers acknowledging it: the frame pulses and a note climbs for exactly as long as the gap lasts.
+    const [tease, setTease] = useState(false);
+    // What just came out of the machine — coins, shards, the pot. `id` only exists so a second burst REMOUNTS
+    // the component: a burst seeds its scatter once, on mount, so replaying one means giving it a new key.
+    const [burst, setBurst] = useState(null);
+    const burstId = useRef(0);
+    const throwBurst = useCallback((kind, tone) => {
+        burstId.current += 1;
+        setBurst({ id: burstId.current, kind, tone });
+    }, []);
     const timers = useRef([]);
     // The wheel: which bet is on the felt, and where it landed.
     const [wheelBet, setWheelBet] = useState("gold");
@@ -428,7 +469,10 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null); setFx(null);
-        Sfx.whoosh();
+        setTease(false); setBurst(null);
+        // A handle, not a click: a spring, a body, and the reels coming up to speed underneath. It runs for
+        // about as long as the request does, so a machine never sits silent waiting for the network.
+        Cas.pull();
 
         // The reels spin themselves — see the Reel component. All this has to do is say when, which means a
         // slow network simply spins for longer instead of freezing on the previous result.
@@ -452,14 +496,32 @@ export default function CasinoClient({ initial }) {
             setSpin(r);
             setSt((p) => ({ ...p, gold: r.gold }));
 
-            // One thud per reel as it settles, on the same clock the strips use. The third is late on
-            // purpose — that pause, with two symbols already matching, is the near-miss.
+            // One clunk per reel as it settles, on the same clock the strips use, PITCHED UP each time —
+            // rising pitch reads as rising tension with no explanation needed, and the third reel is where
+            // the tension is meant to be. The third is late on purpose: that pause, with two symbols already
+            // matching, is the near-miss.
+            const REEL_AT = [640, 860, 1200];
             [0, 1, 2].forEach((i) => {
                 timers.current.push(setTimeout(() => {
                     setLanded(i + 1);
-                    Sfx.impact(0.3 + i * 0.14);
+                    Cas.reelStop(i, i === 2 ? 0.85 : 0.45);
                     Haptic.hit(i === 2 ? 0.55 : 0.35);
-                }, [640, 860, 1200][i]));
+
+                    // Two matching, one still running. The riser is handed the EXACT gap that is left, so it
+                    // stops climbing at the same instant the reel stops — a riser that finishes early tells
+                    // you the answer before the machine does, which is worse than no riser at all.
+                    if (i === 1 && r.reels[0] === r.reels[1]) {
+                        setTease(true);
+                        Cas.anticipate(REEL_AT[2] - REEL_AT[1]);
+                        Haptic.hit(0.2);
+                    }
+                    if (i === 2) {
+                        setTease(false);
+                        // It climbed and came to nothing. Short and quiet: an almost is not a loss to be
+                        // rubbed in, it is the thing that makes you pull again.
+                        if (r.reels[0] === r.reels[1] && r.reels[1] !== r.reels[2]) Cas.nearMiss();
+                    }
+                }, REEL_AT[i]));
             });
 
             timers.current.push(setTimeout(() => {
@@ -470,10 +532,47 @@ export default function CasinoClient({ initial }) {
                 setFx({ nudged: r.nudged, awarded: r.awarded, tipped: r.tipped, struck: r.struck, free: r.free,
                     fed: r.fed, burst: r.burst, potWon: r.potWon });
                 const three = r.reels[0] === r.reels[1] && r.reels[1] === r.reels[2];
+                const acc = ACCENT[r.machine] || "#ffd75e";
+
+                // ── WHAT THE MACHINE SOUNDS LIKE WHEN IT PAYS ────────────────────────────────────────
+                // The cascade is scaled by the MULTIPLIER, not by the gold, because gold depends on what
+                // you staked and a 2x should sound like a 2x whether you bet 25 or 2,500.
                 if (r.won > 0) {
                     setFlash(three ? "big" : "win");
-                    if (three) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+                    const size = Math.min(1, Math.log10(Math.max(1, r.mult || 1)) / 2.4);
+                    if (three) { Cas.jackpot(); Haptic.crit(); throwBurst("hoard", acc); }
+                    else { Cas.coins(0.2 + size * 0.6); Haptic.hit(0.6); throwBurst("coin", acc); }
                     timers.current.push(setTimeout(() => setFlash(null), three ? 2200 : 1200));
+                } else if (!r.nudged && !r.awarded && !r.fed?.length) {
+                    // Most pulls lose. This is barely audible on purpose — a machine that makes a noise
+                    // about every dead pull is exhausting by the tenth.
+                    Cas.dud();
+                }
+
+                // ── AND WHAT EACH FEATURE SOUNDS LIKE ────────────────────────────────────────────────
+                // Staggered rather than fired together: three features can land on one pull, and three
+                // celebrations on the same frame is a single noise nobody can pick apart.
+                if (r.struck > 1) Cas.multUp(r.struck);
+                if (r.nudged) timers.current.push(setTimeout(() => Cas.nudge(), 60));
+                (r.fed || []).forEach((id, k) => {
+                    const tier = (st?.banks || []).findIndex((b) => b.id === id);
+                    const held = r.meter?.banks?.[id];
+                    const holds = (st?.banks || []).find((b) => b.id === id)?.holds || 1;
+                    timers.current.push(setTimeout(
+                        () => Cas.bankFeed(Math.max(0, tier), (held?.coins || 0) / holds), 140 + k * 95));
+                });
+                if (r.burst?.length) {
+                    const tier = (st?.banks || []).findIndex((b) => b.id === r.burst[0].id);
+                    timers.current.push(setTimeout(() => {
+                        Cas.bankBurst(Math.max(0, tier));
+                        throwBurst("shard", (st?.banks || [])[Math.max(0, tier)]?.tone || acc);
+                    }, 300));
+                }
+                if (r.awarded) timers.current.push(setTimeout(() => Cas.freePulls(r.awarded.pulls), 360));
+                // The Pot last and loudest. It is the only sound in the building built on stacked thirds,
+                // so when it plays nothing else in the room sounds like it.
+                if (r.potWon) {
+                    timers.current.push(setTimeout(() => { Cas.pot(); throwBurst("hoard", "#ffd75e"); }, 440));
                 }
             }, 1320));
         }, MIN_SPIN));
@@ -487,7 +586,10 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
-        Sfx.whoosh();
+        setBurst(null);
+        // Chips going down on the felt, not a UI blip — and never a wheel sound, because a bet on a shared
+        // round does not spin anything. The wheel turns when the round closes, for everybody at once.
+        Cas.chips();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify(body),
@@ -506,20 +608,23 @@ export default function CasinoClient({ initial }) {
         if (r.placed) {
             setSt((p) => ({ ...p, rounds: { ...(p.rounds || {}), [r.round != null && body.action === "wheel" ? "wheel" : "keno"]: { ...(p.rounds?.[body.action] || {}), msLeft: Math.max(0, (r.closesAt || 0) - Date.now()), closesAt: r.closesAt } } }));
             setSettled((p) => ({ ...p, [body.action]: null }));
-            Sfx.ui?.();
+            // The chips already said it. A second sound here would be the machine congratulating you for
+            // handing over a stake.
             return;
         }
         absorb(r);
+        const acc = ACCENT[body.action === "wheel" ? "roulette" : "keno"];
         if (r.won > 0) {
             // A payout worth more than ten times the stake is the moment worth shaking the room for.
             const big = r.won >= r.bet * 10;
             setFlash(big ? "big" : "win");
-            if (big) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+            if (big) { Cas.jackpot(); Haptic.crit(); throwBurst("hoard", acc); }
+            else { Cas.coins(0.35); Haptic.hit(0.6); throwBurst("coin", acc); }
             timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
         } else {
-            Sfx.block(0.3);
+            Cas.lose();
         }
-    }, [busy, absorb]);
+    }, [busy, absorb, throwBurst]);
 
     // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────
     // Four verbs against one endpoint. The client sends no state at all — not which hand, not what is in it —
@@ -529,8 +634,10 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null);
-        if (action === "bj_deal") { setPrize(null); setNote(null); setWonPet(null); }
-        Sfx.whoosh();
+        if (action === "bj_deal") { setPrize(null); setNote(null); setWonPet(null); setBurst(null); }
+        // Chips on a deal, a card off the shoe on anything else. A blackjack table is the one machine in
+        // the building with no motor in it, and it should not sound like it has one.
+        if (action === "bj_deal") Cas.chips(); else Cas.card();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action, ...body }),
@@ -547,17 +654,21 @@ export default function CasinoClient({ initial }) {
         if (r.gold != null) setSt((p) => ({ ...p, gold: r.gold }));
         // A card landing is a small sound; the hand ENDING is the moment. Splitting them is what keeps a hit
         // from feeling like a result.
-        if (r.hand && r.hand.open) { Sfx.impact(0.4); Haptic.hit(0.35); return; }
+        // A card landing is a small sound; the hand ENDING is the moment. The deal already played its own
+        // sound above, so an open hand needs nothing more.
+        if (r.hand && r.hand.open) { Haptic.hit(0.35); return; }
         absorb(r);
         const beat = r.hand?.outcome;
-        if (beat === "blackjack") { setFlash("big"); Sfx.crit(0.9); Haptic.crit(); }
-        else if (r.won > 0) { setFlash("win"); Sfx.gemSet?.(); Haptic.hit(0.6); }
-        else if (beat === "push") { Sfx.block(0.2); }
-        else { Sfx.block(0.3); Haptic.hit(0.25); }
+        const acc = ACCENT.blackjack;
+        if (beat === "blackjack") { setFlash("big"); Cas.jackpot(); Haptic.crit(); throwBurst("hoard", acc); }
+        else if (r.won > 0) { setFlash("win"); Cas.coins(0.4); Haptic.hit(0.6); throwBurst("coin", acc); }
+        else if (beat === "push") { Cas.push(); }
+        else if (beat === "bust") { Cas.bust(); Haptic.hit(0.4); }
+        else { Cas.lose(); Haptic.hit(0.25); }
         if (r.won > 0 || beat === "blackjack") {
             timers.current.push(setTimeout(() => setFlash(null), beat === "blackjack" ? 2200 : 1200));
         }
-    }, [busy, absorb]);
+    }, [busy, absorb, throwBurst]);
 
     // ── THE HALL ────────────────────────────────────────────────────────────────────────────────────────
     // One request buys the card, deals it and scores it. What happens next on screen is a ceremony over a
@@ -592,8 +703,8 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
-        setCard(null); setCalled(0);
-        Sfx.whoosh();
+        setCard(null); setCalled(0); setBurst(null);
+        Cas.chips();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action: "bingo", bet }),
@@ -613,7 +724,12 @@ export default function CasinoClient({ initial }) {
             const at = i * BALL_MS + (late ? (i - (r.drawn.length - 5)) * 220 : 0);
             timers.current.push(setTimeout(() => {
                 setCalled(i + 1);
-                Sfx.ui?.();
+                // Each ball is pitched off its own NUMBER, so a draw is a different little melody every
+                // round rather than the same pop forty times. The last five are already slowed down; they
+                // also land harder, because by then you can see what you need.
+                Cas.ball(r.drawn[i] || i);
+                if ((r.card || []).flat?.().includes?.(r.drawn[i])) Cas.daub();
+                if (late) Haptic.hit(0.2);
             }, at));
         });
         const total = (r.drawn?.length || 0) * BALL_MS + 5 * 220 + 260;
@@ -623,11 +739,15 @@ export default function CasinoClient({ initial }) {
             if (r.won > 0) {
                 const big = r.mult >= 8;
                 setFlash(big ? "big" : "win");
-                if (big) { Sfx.crit(0.9); Haptic.crit(); } else { Sfx.gemSet?.(); Haptic.hit(0.6); }
+                // One chime per line, spaced out. A card can complete six lines in a round and six
+                // fanfares would be absurd — the fanfare is reserved for the ones that actually pay big.
+                (r.lines || []).forEach((_, k) => timers.current.push(setTimeout(() => Cas.line(k + 1), k * 160)));
+                if (big) { timers.current.push(setTimeout(() => Cas.jackpot(), 220)); Haptic.crit(); throwBurst("hoard", ACCENT.bingo); }
+                else { timers.current.push(setTimeout(() => Cas.coins(0.35), 220)); Haptic.hit(0.6); throwBurst("coin", ACCENT.bingo); }
                 timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
-            } else Sfx.block(0.3);
+            } else Cas.lose();
         }, total));
-    }, [bet, busy, absorb]);
+    }, [bet, busy, absorb, throwBurst]);
 
     // Three of whatever this cabinet actually rolls, taken from the middle of its own symbol list so the
     // idle machine is neither promising a jackpot nor showing three blanks.
@@ -644,8 +764,10 @@ export default function CasinoClient({ initial }) {
     const gamble = useCallback(async () => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null);
-        Sfx.whoosh();
+        setBusy(true); setErr(null); setFlash(null); setBurst(null);
+        // A coin genuinely spinning in the air. The wobble is a detune that widens as it slows, which is
+        // the one sound in the building that is a physical object rather than a machine.
+        Cas.flip(700);
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action: "gamble", machine: at?.id }),
@@ -656,9 +778,9 @@ export default function CasinoClient({ initial }) {
         setMeters((p) => ({ ...p, [r.machine]: { ...(p[r.machine] || {}), pending: 0 } }));
         setFx({ gambled: { won: r.won, amount: r.staked, payout: r.payout } });
         if (r.won) {
-            setFlash("win"); Sfx.crit(0.8); Haptic.crit();
+            setFlash("win"); Cas.coins(0.6); Haptic.crit(); throwBurst("coin", ACCENT[at?.id] || "#ffd75e");
             timers.current.push(setTimeout(() => setFlash(null), 1400));
-        } else { Sfx.block(0.4); Haptic.hit(0.5); }
+        } else { Cas.bust(); Haptic.hit(0.5); }
     }, [busy, at]);
 
     const toggleNumber = useCallback((n) => {
@@ -691,9 +813,11 @@ export default function CasinoClient({ initial }) {
             {/* ── THE ROOM ────────────────────────────────────────────────────────────────────────────────
                 Positioned in percentages so the floor is the same room on any screen: a machine at 50 is in
                 the middle of a phone and the middle of a desktop, rather than drifting with the viewport. */}
-            {/* `.cas-hall` exists only so the vignette has something to hang on that does not scroll. Put it
-                on `.cas-room` and it becomes part of the scrollable area and slides off to the left. */}
-            <div className="cas-hall">
+            {/* This wrapper exists only so the vignette has something to hang on that does NOT scroll: put
+                it on `.cas-room` and it joins the scrollable area and slides off to the left. It was called
+                `.cas-hall` for about a day, which is the bingo hall's class — two unrelated things answering
+                to one selector, waiting to collide the next time either got a rule. */}
+            <div className="cas-roomwrap">
             <div className="cas-room" ref={roomRef}>
               <div className="cas-world">
                 <div className="cas-floor" aria-hidden="true" />
@@ -776,6 +900,7 @@ export default function CasinoClient({ initial }) {
                 something you walk up to rather than a panel that is always there. */}
             {at ? (
                 <div className={`${seated ? "cas-stage" : "cas-panel"}${at.live ? "" : " is-dark"}`}
+                    style={{ "--acc": ACCENT[at.id] || "#ffd75e" }}
                     role={seated ? "dialog" : undefined} aria-modal={seated ? "true" : undefined}
                     aria-label={seated ? at.label : undefined}>
                     <div className="cas-panel-head">
@@ -925,7 +1050,7 @@ export default function CasinoClient({ initial }) {
 
                     {at.live && SLOTS.has(at.id) ? (
                         <>
-                            <div className={`cas-reels${flash ? ` is-${flash}` : ""}`}>
+                            <div className={`cas-reels${flash ? ` is-${flash}` : ""}${tease ? " is-tease" : ""}`}>
                                 {/* IDLE, the reels show three of THIS cabinet's own symbols. They were
                                     hard-coded to moon/bone/doubloon, which is fine on the machine that has
                                     those and a lie on the two that do not — Moonrise sat there displaying a
@@ -936,7 +1061,10 @@ export default function CasinoClient({ initial }) {
                                         symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
                                         result={spinning ? null : (spin?.reels?.[i] ?? idleReels[i])}
                                         spinning={spinning}
-                                        won={Boolean(!spinning && spin?.won > 0)} />
+                                        // The winning frames light when the LAST reel is down, not when the
+                                        // first one is. Lighting them the moment the request came back lit a
+                                        // paying line while two reels were still turning.
+                                        won={Boolean(landed >= 3 && spin?.won > 0)} />
                                 ))}
                                 {/* The celebration sits OVER the reels rather than beside them, so the win
                                     happens where you were already looking. */}
@@ -945,6 +1073,10 @@ export default function CasinoClient({ initial }) {
                                         {flash === "big" ? "JACKPOT" : "WIN"}
                                     </span>
                                 ) : null}
+                                {/* Something actually comes out of the machine. Keyed on the burst id so a
+                                    second win REMOUNTS it — see the note in Burst.js on why a burst seeds
+                                    its scatter exactly once. */}
+                                {burst ? <Burst key={burst.id} kind={burst.kind} tone={burst.tone} /> : null}
                             </div>
                             {/* ── THE PIGGY BANKS ─────────────────────────────────────────────────────
                                 Three of them, one under each reel, and which reel a chest lands on is which
@@ -1004,13 +1136,25 @@ export default function CasinoClient({ initial }) {
                                 </p>
                             ) : null}
 
-                            {spin ? (
+                            {/* ── THE MACHINE DOES NOT ANSWER EARLY ───────────────────────────────────
+                                This read straight off `spin`, which is set the instant the server replies —
+                                so "Nothing. Again?" appeared 180ms in, with two reels still turning. On film
+                                that is unmistakable: the machine tells you the answer and then spends another
+                                second pretending to decide, which throws away the near-miss, the riser and
+                                the third reel all at once.
+                                `landed` counts the reels that have actually come to rest. Nothing is said
+                                until all three have. */}
+                            {spin && landed >= 3 ? (
                                 <p className={`cas-result${spin.won > 0 ? " is-win" : ""}`}>
                                     {spin.won > 0
                                         ? `${money(spin.won)} gold — ${spin.mult}x`
                                         : "Nothing. Again?"}
                                 </p>
-                            ) : <p className="cas-result">Pick a stake and pull.</p>}
+                            ) : (
+                                // A non-breaking space rather than nothing, so the reels do not jump upward
+                                // for a second every single pull.
+                                <p className="cas-result">{spinning || landed > 0 ? " " : "Pick a stake and pull."}</p>
+                            )}
 
                         </>
                     ) : null}

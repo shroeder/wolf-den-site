@@ -595,7 +595,16 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
         fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
         potWon: potWon > 0 ? potWon : null, pot: await readPot(),
-        meter: { tray: meter.tray, streak: meter.streak, freePulls: meter.freePulls, freeMult: meter.freeMult, pending: meter.pending, mult: moonstruckMult(meter.streak) },
+        // ── `banks` GOES IN THE PROJECTION. EVERY TIME. ─────────────────────────────────────────────────
+        // Third time this column has been left out of a list of meter fields, and the third distinct bug:
+        // missing from loadMeter it fed banks that never filled; missing from casinoMeters the room drew
+        // three empty pigs; missing HERE the whole piggy-bank row vanished the moment you pulled, because
+        // the client replaces its meter wholesale with whatever this returns.
+        // It also silently defeated the bank-feed sound, which pitches itself by how full the bank is.
+        meter: {
+            tray: meter.tray, streak: meter.streak, freePulls: meter.freePulls, freeMult: meter.freeMult,
+            pending: meter.pending, mult: moonstruckMult(meter.streak), banks: meter.banks,
+        },
     };
 }
 

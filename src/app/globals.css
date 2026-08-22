@@ -17340,7 +17340,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    34vh rather than 30. The cap matters more than the floor: the room only has to be tall enough that a
    cabinet and the person standing at it are both fully in it, and every pixel above that is taken off the
    machine controls. The fold rule above still holds — this is four points, not a new proportion. */
-.cas-hall { position: relative; }
+.cas-roomwrap { position: relative; }
 .cas-room { position: relative; height: clamp(168px, 34vh, 320px); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
@@ -17426,7 +17426,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* ── THE VIGNETTE ────────────────────────────────────────────────────────────────────────────────────
    Over everything, including the machines, which is why it cannot be a background layer — a background
    paints behind the content and would leave nine brightly-lit cabinets floating in a darkened room. It
-   hangs on `.cas-hall` rather than `.cas-room` so it does not scroll away with the floor. */
+   hangs on `.cas-roomwrap` rather than `.cas-room` so it does not scroll away with the floor. */
 .cas-vignette { position: absolute; inset: 0; border-radius: 16px; pointer-events: none;
     background: radial-gradient(115% 88% at 50% 62%, transparent 42%, rgba(6,3,12,0.72) 100%); }
 
@@ -17565,18 +17565,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 }
 
 .cas-result { margin: 0 0 10px; text-align: center; font-size: 12px; color: #98a0aa; }
-.cas-result.is-win { color: #ffd75e; font-weight: 900; font-size: 1.05rem;
-    text-shadow: 0 0 18px rgba(255,215,94,.5); }
+.cas-result.is-win { color: var(--acc, #ffd75e); font-weight: 900; font-size: 1.05rem;
+    text-shadow: 0 0 18px color-mix(in srgb, var(--acc, #ffd75e) 50%, transparent); }
 
 .cas-bets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
 .cas-bet { padding: 9px 0; border-radius: 10px; font-size: 12px; font-weight: 900; cursor: pointer;
     color: #cbd3dc; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
 .cas-bet.is-on { color: #22180a; border-color: transparent;
-    background: linear-gradient(180deg, #ffd75e, #e0a91e); }
+    background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000)); }
 
 .cas-pull { width: 100%; padding: 16px; border-radius: 13px; cursor: pointer;
     font-family: var(--font-display); font-size: 1.05rem; font-weight: 900; letter-spacing: .1em;
-    color: #22180a; border: none; background: linear-gradient(180deg, #ffd75e, #d99a1e);
+    color: #22180a; border: none; background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000));
     box-shadow: 0 6px 18px rgba(180,120,20,0.4); }
 .cas-pull:disabled { filter: grayscale(.6) brightness(.7); cursor: default; box-shadow: none; }
 .cas-err { margin: 8px 0 0; text-align: center; font-size: 11px; color: #ff9f9f; }
@@ -17594,21 +17594,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE WIN. Gold floods the frame; a jackpot keeps it and shakes the whole bank. */
 .cas-reels { position: relative; }
-.cas-reels.is-win .cas-reel, .cas-reels.is-big .cas-reel { border-color: rgba(255,215,94,.7);
-    box-shadow: inset 0 0 30px rgba(255,215,94,.22), 0 0 22px rgba(255,215,94,.3); }
+.cas-reels.is-win .cas-reel, .cas-reels.is-big .cas-reel { border-color: color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent);
+    box-shadow: inset 0 0 30px color-mix(in srgb, var(--acc, #ffd75e) 22%, transparent), 0 0 22px color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent); }
 .cas-reels.is-big { animation: casShake .42s ease-in-out 2; }
 @keyframes casShake { 0%,100% { transform: none; } 25% { transform: translateX(-4px) rotate(-.4deg); }
     75% { transform: translateX(4px) rotate(.4deg); } }
 .cas-pop { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
     font-family: var(--font-display); font-weight: 900; letter-spacing: .18em; color: #fff6cc;
-    text-shadow: 0 3px 16px #000, 0 0 34px rgba(255,215,94,.95);
+    text-shadow: 0 3px 16px #000, 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 95%, transparent);
     animation: casPop .5s cubic-bezier(.2,1.5,.3,1) both; }
-.cas-pop.is-win { font-size: 1.5rem; }
-.cas-pop.is-big { font-size: 2.1rem; color: #fff; animation: casPop .5s cubic-bezier(.2,1.5,.3,1) both,
+.cas-pop.is-win { font-size: 2rem; }
+.cas-pop.is-big { font-size: 2.9rem; color: #fff; animation: casPop .5s cubic-bezier(.2,1.5,.3,1) both,
     casGlow 1s ease-in-out infinite alternate .5s; }
 @keyframes casPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
-@keyframes casGlow { from { text-shadow: 0 3px 16px #000, 0 0 30px rgba(255,215,94,.8); }
-    to { text-shadow: 0 3px 16px #000, 0 0 54px rgba(255,215,94,1); } }
+@keyframes casGlow { from { text-shadow: 0 3px 16px #000, 0 0 30px color-mix(in srgb, var(--acc, #ffd75e) 80%, transparent); }
+    to { text-shadow: 0 3px 16px #000, 0 0 54px color-mix(in srgb, var(--acc, #ffd75e) 100%, transparent); } }
 
 /* The pull button has weight: it sinks when pressed and dims while the reels are still deciding. */
 .cas-pull:active:not(:disabled) { transform: translateY(2px);
@@ -17630,14 +17630,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-wheel-out { position: absolute; inset: 0; display: grid; place-items: center;
     font-family: var(--font-display); font-size: 0.95rem; color: #eaf1f8;
     text-shadow: 0 2px 10px #000, 0 0 18px #000; pointer-events: none; }
-.cas-wheel-out.is-win { color: #fff6cc; text-shadow: 0 2px 10px #000, 0 0 26px rgba(255,215,94,.95); }
+.cas-wheel-out.is-win { color: #fff6cc; text-shadow: 0 2px 10px #000, 0 0 26px color-mix(in srgb, var(--acc, #ffd75e) 95%, transparent); }
 
 .cas-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
 .cas-pick { padding: 8px 0; border-radius: 10px; font-size: 10.5px; font-weight: 900; cursor: pointer;
     color: #cbd3dc; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
 .cas-pick i { display: block; font-style: normal; font-size: 9px; color: #98a0aa; margin-top: 1px; }
 .cas-pick.is-on { color: #22180a; border-color: transparent;
-    background: linear-gradient(180deg, #ffd75e, #e0a91e); }
+    background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000)); }
 .cas-pick.is-on i { color: rgba(34,24,10,.7); }
 
 /* ── THE TICKET ──────────────────────────────────────────────────────────────────────────────────────
@@ -17646,11 +17646,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0 8px; }
 .cas-num { aspect-ratio: 1; border-radius: 7px; font-size: 11px; font-weight: 900; cursor: pointer;
     color: #98a0aa; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
-.cas-num.is-mine { color: #eaf1f8; border-color: rgba(255,215,94,0.6); background: rgba(255,215,94,0.12); }
+.cas-num.is-mine { color: #eaf1f8; border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 12%, transparent); }
 .cas-num.is-drawn { color: #cbd3dc; background: rgba(169,130,255,0.22); border-color: rgba(169,130,255,0.5); }
 .cas-num.is-hit { color: #22180a; border-color: transparent;
-    background: linear-gradient(180deg, #ffd75e, #e0a91e);
-    box-shadow: 0 0 14px rgba(255,215,94,.7); animation: casHit .34s cubic-bezier(.2,1.5,.3,1) both; }
+    background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); animation: casHit .34s cubic-bezier(.2,1.5,.3,1) both; }
 @keyframes casHit { from { transform: scale(.6); } to { transform: none; } }
 
 /* ── WHAT YOU WON THAT WAS NOT GOLD ──────────────────────────────────────────────────────────────────
@@ -17665,9 +17665,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-prize img { width: 38px; height: 38px; object-fit: contain; flex: none; }
 .cas-prize b { display: block; font-size: 0.95rem; font-weight: 900; color: #b6ffd4; }
 .cas-prize em { display: block; font-style: normal; font-size: 10px; color: #98a0aa; margin-top: 1px; }
-.cas-prize.is-jackpot { border-color: rgba(255,215,94,0.7); background: rgba(255,215,94,0.1);
-    box-shadow: 0 0 26px rgba(255,215,94,0.28); }
-.cas-prize.is-jackpot b { color: #ffe9b8; }
+.cas-prize.is-jackpot { border-color: color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 10%, transparent);
+    box-shadow: 0 0 26px color-mix(in srgb, var(--acc, #ffd75e) 28%, transparent); }
+.cas-prize.is-jackpot b { color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); }
 
 /* ── THE FIVE, AND WHAT THEY DO ──────────────────────────────────────────────────────────────────────
    A casino pet's whole effect is invisible at the moment it fires: a stake comes back, a prize rolls off
@@ -17676,11 +17676,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    silhouettes advertising pets you have never seen is a nag rather than a feature. */
 .cas-pets { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
 .cas-pet { font-size: 10px; font-weight: 800; letter-spacing: 0.02em; padding: 3px 9px; border-radius: 999px;
-    color: #ffe9b8; border: 1px solid rgba(255,215,94,0.34); background: rgba(255,215,94,0.09); }
+    color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 9%, transparent); }
 
 /* The quiet perks. One line, no animation worth the name — the house paying for a pull is a thing to
    notice on your way past, not an event to stop the room for. */
-.cas-note { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: #ffe9b8;
+.cas-note { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff);
     animation: casNote .3s ease both; }
 .cas-note.is-refund { color: #d9c2ff; }
 @keyframes casNote { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -17690,13 +17690,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    that can happen on this floor and it is allowed to look like it. It says what the pet DOES, because a
    prestige drop whose effect has to be looked up somewhere else lands flat. */
 .cas-newpet { position: relative; overflow: hidden; margin: 0 0 10px; padding: 12px 14px; border-radius: 14px;
-    border: 1px solid rgba(255,215,94,0.75); background: linear-gradient(160deg, rgba(255,215,94,0.16), rgba(169,130,255,0.12));
-    box-shadow: 0 0 34px rgba(255,215,94,0.3); text-align: center;
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 75%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--acc, #ffd75e) 16%, transparent), rgba(169,130,255,0.12));
+    box-shadow: 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent); text-align: center;
     animation: casNewPet .6s cubic-bezier(.2,1.5,.35,1) both; }
-.cas-newpet b { display: block; font-size: 1.15rem; font-weight: 900; color: #ffe9b8; letter-spacing: 0.01em; }
+.cas-newpet b { display: block; font-size: 1.15rem; font-weight: 900; color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); letter-spacing: 0.01em; }
 .cas-newpet em { display: block; font-style: normal; font-size: 11px; color: #e6dcc4; margin-top: 3px; }
 .cas-newpet i { display: block; font-style: normal; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #ffd75e; margin-top: 7px; opacity: 0.85; }
+    color: var(--acc, #ffd75e); margin-top: 7px; opacity: 0.85; }
 /* A slow sweep of light across the card, once. It is the difference between a box appearing and something
    arriving. */
 .cas-newpet::after { content: ""; position: absolute; inset: 0;
@@ -17715,7 +17715,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-seat + .cas-seat { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.09); }
 .cas-seat-who { display: block; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
     color: #9db6a4; margin-bottom: 6px; }
-.cas-seat.is-you .cas-seat-who { color: #ffe9b8; }
+.cas-seat.is-you .cas-seat-who { color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); }
 .cas-cards { display: flex; flex-wrap: wrap; gap: 6px; min-height: 62px; }
 
 /* Each card deals itself in — a hand that appears fully formed reads as a number, and a hand that lands
@@ -17740,7 +17740,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    bigger would be the table telling you what to do. */
 .cas-acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
 .cas-act { padding: 13px 6px; border-radius: 12px; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.02em;
-    color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e); border: 1px solid rgba(0,0,0,0.3);
+    color: #0e1116; background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e)); border: 1px solid rgba(0,0,0,0.3);
     box-shadow: 0 3px 0 rgba(0,0,0,0.35); cursor: pointer; }
 .cas-act:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.35); }
 .cas-act:disabled { opacity: 0.4; cursor: default; }
@@ -17763,7 +17763,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-hall-top { text-align: center; font-size: 10px; color: #9fc6dd; margin-bottom: 8px; }
 
 .cas-bhead, .cas-bcard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: #ffd75e; }
+.cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
 .cas-bcard { margin-top: 5px; }
 .cas-bcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
     border-radius: 8px; font-size: 13px; font-weight: 800; color: #cbd3dc;
@@ -17771,14 +17771,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     transition: background .18s ease, color .18s ease, transform .18s ease; }
 /* A daub. It lands with a little pop, because the whole appeal of bingo is watching your own card fill in
    — a grid that arrives already completed is a receipt. */
-.cas-bcell.is-hit { color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e);
-    border-color: rgba(255,215,94,0.6); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
+.cas-bcell.is-hit { color: #0e1116; background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
+    border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
 /* The free square is ALWAYS marked — that is what free means — so it must not be styled as though it is
    waiting for a ball. This rule sat AFTER .is-hit and overrode its background, so the one cell on the card
    that is marked before the game starts was the one cell that looked empty. Set the whole daubed look here
    rather than only the colour; a rule that wins on one property and loses on another is worse than either. */
 .cas-bcell.is-free, .cas-bcell.is-free.is-hit { color: #0e1116;
-    background: linear-gradient(180deg, #ffe9b8, #ffd75e); border-color: rgba(255,215,94,0.6); animation: none; }
+    background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e)); border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); animation: none; }
 /* The line that paid, marked once the balls have stopped. */
 .cas-bcell.is-line { box-shadow: 0 0 0 2px rgba(126,255,178,0.75), 0 0 16px rgba(126,255,178,0.4); }
 @keyframes casDaub { from { transform: scale(1.35); } to { transform: none; } }
@@ -17790,8 +17790,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-size: 10px; font-weight: 800; color: #98a0aa;
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
 /* The one that just came out. It is bigger and gold for exactly one ball's worth of time. */
-.cas-ball.is-new { color: #0e1116; background: linear-gradient(180deg, #ffe9b8, #ffd75e);
-    border-color: rgba(255,215,94,0.7); animation: casBall .2s cubic-bezier(.2,1.6,.4,1) both; }
+.cas-ball.is-new { color: #0e1116; background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
+    border-color: color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); animation: casBall .2s cubic-bezier(.2,1.6,.4,1) both; }
 @keyframes casBall { from { transform: scale(1.5); } to { transform: none; } }
 .cas-balls-idle { font-size: 11px; color: #98a0aa; }
 
@@ -17801,7 +17801,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-seat.is-multi { padding: 8px 10px; border-radius: 10px; border: 1px solid transparent;
     transition: opacity .2s ease, border-color .2s ease; }
 .cas-seat.is-multi:not(.is-turn) { opacity: 0.45; }
-.cas-seat.is-multi.is-turn { border-color: rgba(255,215,94,0.45); background: rgba(255,215,94,0.06); }
+.cas-seat.is-multi.is-turn { border-color: color-mix(in srgb, var(--acc, #ffd75e) 45%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 6%, transparent); }
 /* The split button only appears on a hand the table will actually accept it on, so the row goes from
    three columns to four rather than keeping a dead slot open for it. */
 .cas-acts.is-four { grid-template-columns: repeat(4, 1fr); }
@@ -17821,21 +17821,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-meter i { font-style: normal; font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #98a0aa; }
 .cas-meter b { font-size: 12px; font-weight: 900; color: #cbd3dc; }
 /* Something in it. Gold, because on this floor gold is the colour of a thing that is going to pay. */
-.cas-meter.is-full { border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.1); }
-.cas-meter.is-full b { color: #ffe9b8; }
+.cas-meter.is-full { border-color: color-mix(in srgb, var(--acc, #ffd75e) 50%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 10%, transparent); }
+.cas-meter.is-full b { color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); }
 .cas-meter.is-free { border-color: rgba(126,255,178,0.5); background: rgba(126,255,178,0.1); }
 .cas-meter.is-free b { color: #b6ffd4; }
 
 /* The two features, named on the machine's own face. A bonus nobody knows about is a bonus that fires
    and reads as the game glitching. */
 .cas-vol em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; margin-top: 5px; line-height: 1.35; }
-.cas-vol em b { color: #ffd75e; font-weight: 800; }
+.cas-vol em b { color: var(--acc, #ffd75e); font-weight: 800; }
 
 /* And what one just did. One line each, arriving with the result rather than instead of it. */
 .cas-fx { margin: 0 0 6px; text-align: center; font-size: 11px; font-weight: 800; color: #9fc6dd;
     animation: casFx .3s ease both; }
-.cas-fx.is-big { font-size: 13px; color: #ffe9b8; letter-spacing: 0.02em;
-    text-shadow: 0 0 14px rgba(255,215,94,0.5); }
+.cas-fx.is-big { font-size: 13px; color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); letter-spacing: 0.02em;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--acc, #ffd75e) 50%, transparent); }
 @keyframes casFx { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 /* Double or Nothing sits above the pull button — it is a decision about the money you just won, and it
@@ -17857,16 +17857,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    are feeding the same number. */
 .cas-pot { display: flex; flex-direction: column; align-items: center; gap: 1px; margin: 0 0 10px;
     padding: 10px 14px; border-radius: 14px;
-    border: 1px solid rgba(255,215,94,0.4);
-    background: linear-gradient(180deg, rgba(255,215,94,0.13), rgba(169,130,255,0.08)); }
-.cas-pot i { font-style: normal; font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase; color: #ffd75e; }
-.cas-pot b { font-size: 1.6rem; font-weight: 900; color: #ffe9b8; letter-spacing: .01em;
-    font-variant-numeric: tabular-nums; text-shadow: 0 0 22px rgba(255,215,94,.45); }
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 40%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 13%, transparent), rgba(169,130,255,0.08)); }
+.cas-pot i { font-style: normal; font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--acc, #ffd75e); }
+.cas-pot b { font-size: 1.6rem; font-weight: 900; color: color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff); letter-spacing: .01em;
+    font-variant-numeric: tabular-nums; text-shadow: 0 0 22px color-mix(in srgb, var(--acc, #ffd75e) 45%, transparent); }
 .cas-pot em { font-style: normal; font-size: 8.5px; color: #98a0aa; }
 /* Taken. The one time this number is allowed to shout. */
-.cas-pot.is-won { border-color: #ffd75e; background: linear-gradient(180deg, rgba(255,215,94,.3), rgba(255,159,67,.16));
-    box-shadow: 0 0 34px rgba(255,215,94,.45); animation: casPotWin .5s cubic-bezier(.2,1.6,.35,1) both; }
-.cas-pot.is-won em { color: #ffd75e; font-weight: 900; letter-spacing: .12em; }
+.cas-pot.is-won { border-color: var(--acc, #ffd75e); background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent), color-mix(in srgb, var(--acc, #ffd75e) 16%, transparent));
+    box-shadow: 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 45%, transparent); animation: casPotWin .5s cubic-bezier(.2,1.6,.35,1) both; }
+.cas-pot.is-won em { color: var(--acc, #ffd75e); font-weight: 900; letter-spacing: .12em; }
 @keyframes casPotWin { from { transform: scale(.88); } to { transform: none; } }
 
 /* ── THE PIGGY BANKS ─────────────────────────────────────────────────────────────────────────────────
@@ -17914,7 +17914,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-stage { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
     height: 100dvh; padding: 0; margin: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain;
     background:
-        radial-gradient(120% 55% at 50% 0%, rgba(255,215,94,.09), transparent 62%),
+        radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 9%, transparent), transparent 62%),
         linear-gradient(180deg, #17102180, #0d0913 34%), #0d0913;
     animation: casSit .22s ease both; }
 @keyframes casSit { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: none; } }
@@ -17928,7 +17928,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-stage .cas-panel-head b { text-align: center; font-size: 1.05rem; }
 .cas-leave { width: 40px; height: 40px; border-radius: 11px; font-size: 18px; cursor: pointer;
     color: #eaf1f8; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); }
-.cas-purse-sm { font-size: 12px; font-weight: 900; color: #ffd75e; white-space: nowrap; }
+.cas-purse-sm { font-size: 12px; font-weight: 900; color: var(--acc, #ffd75e); white-space: nowrap; }
 .cas-purse-sm i { font-style: normal; font-size: 8.5px; color: #98a0aa; margin-left: 3px; }
 
 /* Everything between the title bar and the controls is the game, and it gets whatever room is left. */
@@ -17957,7 +17957,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Getting in: the walk row's middle becomes the way to sit down once you are stood at something live. */
 .cas-sit { padding: 11px 8px; border-radius: 12px; cursor: pointer;
     font-weight: 900; font-size: 13px; letter-spacing: .02em; color: #160f04;
-    border: 1px solid rgba(0,0,0,.3); background: linear-gradient(180deg, #ffe9b8, #ffd75e);
+    border: 1px solid rgba(0,0,0,.3); background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
     box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 .cas-sit:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
 /* The cabinets in the room are buttons now, so they must not look like form controls. */
@@ -17995,3 +17995,112 @@ body.cas-seated .social-fab { display: none; }
 .cas-cell img { position: relative;
     filter: drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 2px 4px rgba(0,0,0,.7)); }
 .cas-reel.is-won .cas-cell img { filter: drop-shadow(0 0 1px rgba(255,255,255,.6)) drop-shadow(0 0 10px var(--tone)); }
+
+
+/* ══ THE CASINO, POLISHED ═══════════════════════════════════════════════════════════════════════════
+   Everything below is the difference between a machine that computes an outcome and a machine anybody
+   wants to pull twice. The maths was finished and gated weeks ago; none of this touches it. */
+
+/* ── HOW BIG A REEL IS ───────────────────────────────────────────────────────────────────────────────
+   `--cell` is the single number the whole reel is built from: the window's height, each cell's height,
+   and how far the strip travels to land (the component multiplies it, rather than computing pixels of
+   its own, so the maths cannot drift out of step with the drawing).
+   In the panel on the floor it is a thumbnail of the game. Sat at the machine it is the game. */
+.cas-reel { --cell: clamp(72px, 21vw, 96px); }
+.cas-stage .cas-reel { --cell: clamp(110px, 31vw, 168px); }
+/* On a laptop the stage is the full width of the screen, and three reels stretched across 1280px are
+   letterboxes. The bank of reels is a fixed object; it gets a width and sits in the middle. */
+.cas-stage .cas-reels { max-width: 520px; margin-left: auto; margin-right: auto; gap: 10px; }
+
+/* Symbols fill more of their cell now — at 64% a wolf sat in the middle of a lot of empty box, which
+   reads as a picture of a symbol rather than as the symbol. */
+.cas-cell img { width: 74%; height: 74%; }
+
+/* ── THE TEASE ───────────────────────────────────────────────────────────────────────────────────────
+   Two reels match and the third is still running. This is the only moment in a slot machine that
+   anybody actually watches, and it was happening with nothing on screen acknowledging it.
+   The two that landed brighten and hold; the one still going gets a pulsing frame. Deliberately NOT a
+   full win flash — it has not won anything yet, and a machine that celebrates a maybe is a machine that
+   cannot be believed when it celebrates a yes. */
+.cas-reels.is-tease .cas-reel:nth-child(1),
+.cas-reels.is-tease .cas-reel:nth-child(2) {
+    border-color: color-mix(in srgb, var(--acc, #ffd75e) 65%, transparent);
+    box-shadow: inset 0 0 18px color-mix(in srgb, var(--acc, #ffd75e) 20%, transparent); }
+.cas-reels.is-tease .cas-reel:nth-child(3) { animation: casTease .34s ease-in-out infinite alternate; }
+@keyframes casTease {
+    from { box-shadow: inset 0 0 10px color-mix(in srgb, var(--acc, #ffd75e) 12%, transparent); }
+    to { box-shadow: inset 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 42%, transparent),
+        0 0 20px color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent); } }
+
+/* ── WHAT COMES OUT OF THE MACHINE ───────────────────────────────────────────────────────────────────
+   See Burst.js. Every arc is computed in JS and arrives as plain pixels, so this is only the motion.
+   The container has no size and no hit area: it hangs at the centre of the reels and throws.
+
+   The coins ARC — up and out, then down past where they started. A particle that only flies outward is
+   an explosion; money falls. That is the whole difference between the two keyframes below. */
+/* ── AN ABSOLUTE CHILD OF A GRID IS PLACED IN A CELL, NOT OVER THE GRID ──────────────────────────────
+   `.cas-reels` is a three-column grid. An absolutely positioned child still gets AUTO-PLACED into a grid
+   area, and that area — not the whole grid — becomes its containing block. So `inset: 0` on the WIN pop
+   resolved to the middle reel, and the celebration for a three-reel win happened inside one of them,
+   behind the symbol. Same for the coins, which were being thrown from the middle cell rather than the
+   middle of the machine.
+   Spanning every track and every row puts them back over the whole bank. */
+.cas-pop, .cas-burst { grid-area: 1 / 1 / -1 / -1; }
+.cas-burst { position: absolute; left: 50%; top: 58%; width: 0; height: 0; pointer-events: none;
+    z-index: 4; }
+.cas-burst i { position: absolute; left: 0; top: 0; width: var(--s); height: var(--s);
+    margin-left: calc(var(--s) / -2); margin-top: calc(var(--s) / -2);
+    border-radius: 50%;
+    /* A struck coin, not a dot: a bright edge, a body in the accent, and a dark rim so it reads against
+       the lit reels it is flying over. */
+    background:
+        radial-gradient(60% 60% at 34% 28%, #fff, transparent 60%),
+        radial-gradient(120% 120% at 50% 50%, var(--tone), color-mix(in srgb, var(--tone) 55%, #000) 78%);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--tone) 70%, transparent);
+    animation: casCoin var(--life) cubic-bezier(.22,.62,.36,1) var(--t) both; }
+@keyframes casCoin {
+    0% { transform: translate(0, 0) scale(.35) rotate(0); opacity: 0; }
+    9% { opacity: 1; }
+    52% { transform: translate(var(--x), var(--y)) scale(1) rotate(calc(var(--r) * .55)); opacity: 1; }
+    100% { transform: translate(calc(var(--x) * 1.18), var(--f)) scale(.78) rotate(var(--r)); opacity: 0; } }
+
+/* Shards do not come back. Flat, fast, and they stop — the difference between something breaking and
+   something being paid out. */
+.cas-burst.is-shard i { border-radius: 2px;
+    background: linear-gradient(150deg, #fff 0 18%, var(--tone) 18% 70%, color-mix(in srgb, var(--tone) 45%, #000) 70%);
+    animation-name: casShard; animation-timing-function: cubic-bezier(.12,.8,.3,1); }
+@keyframes casShard {
+    0% { transform: translate(0, 0) scale(.3) rotate(0); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translate(var(--x), var(--f)) scale(1) rotate(var(--r)); opacity: 0; } }
+
+/* The Pot throws the same coins, larger and for longer. */
+.cas-burst.is-hoard i { box-shadow: 0 0 14px color-mix(in srgb, var(--tone) 85%, transparent); }
+
+/* ── AND THE ROOM'S STANDING RULE ────────────────────────────────────────────────────────────────────
+   The Den's animations deliberately ignore prefers-reduced-motion — see the note on that elsewhere —
+   but a particle system is the one place where "deliberately ignores it" becomes "throws forty moving
+   objects at somebody who asked for none". The burst is the celebration; the win is the number, and
+   the number is still there. */
+@media (prefers-reduced-motion: reduce) {
+    .cas-burst { display: none; }
+    .cas-reels.is-tease .cas-reel:nth-child(3) { animation: none;
+        box-shadow: inset 0 0 24px color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent); }
+}
+
+/* ── THE PULL BUTTON BELONGS TO THE MACHINE ──────────────────────────────────────────────────────────
+   It was gold on every cabinet, which made the one control you actually press the only thing on screen
+   that did not change when you walked to a different machine. */
+.cas-pull { color: #0d1017; background: linear-gradient(180deg,
+        color-mix(in srgb, var(--acc, #ffd75e) 88%, #fff),
+        color-mix(in srgb, var(--acc, #ffd75e) 62%, #000));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent); }
+.cas-pull:active:not(:disabled) { box-shadow: 0 2px 8px color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent); }
+/* A machine that is thinking should look like it is thinking, not like it is broken. */
+.cas-pull:disabled { filter: saturate(.35) brightness(.66); }
+
+/* The stage's own light takes the accent too, so sitting down at The Deep is visibly a different room
+   from sitting down at The Hunt. */
+.cas-stage { background:
+        radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 13%, transparent), transparent 62%),
+        linear-gradient(180deg, #17102180, #0d0913 34%), #0d0913; }

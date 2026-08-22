@@ -28,6 +28,15 @@
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
+import { QUIET_HIDE, QUIET_SEEN, quiet } from "./lib/shot-quiet.mjs";
+
+// ── SHOT_QUIET=1 ── seed every known "already seen this" marker and hide every known scrim, so a shot is of
+// the page rather than of whichever launch card this profile has not dismissed yet. See lib/shot-quiet.mjs.
+if (process.env.SHOT_QUIET) {
+    process.env.SHOT_SEEN = quiet(process.env.SHOT_SEEN, QUIET_SEEN, ";");
+    process.env.SHOT_HIDE = quiet(process.env.SHOT_HIDE, QUIET_HIDE, ",");
+}
+
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const url = process.argv[2];
 const out = process.argv[3];
@@ -142,7 +151,10 @@ if (process.env.SHOT_SEEN) {
         const eq = entry.indexOf("=");
         const key = eq === -1 ? entry : entry.slice(0, eq);
         const raw = eq === -1 ? "1" : entry.slice(eq + 1);
-        const value = raw === "now" ? "String(Date.now())" : JSON.stringify(raw);
+        const value = raw === "now" ? "String(Date.now())"
+            // The daily check-in remembers the STORE-LOCAL DAY it last ran, not a flag and not a timestamp.
+            : raw === "now-day" ? 'new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date())'
+                : JSON.stringify(raw);
         return `localStorage.setItem(${JSON.stringify(key)}, ${value});`;
     });
     await send("Page.addScriptToEvaluateOnNewDocument", {
