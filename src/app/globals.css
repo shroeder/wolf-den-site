@@ -17371,9 +17371,22 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
        of the scroll (the component feeds `--par`) is the entire fix, and because the wall tiles there is
        no edge to run off however far the floor is walked. */
     background-position: calc(var(--par, 0px) * -0.45) 82%, center;
-    /* The window. It scrolls, but never by dragging — the camera follows the walk buttons, so a stray
-       swipe cannot leave you looking at a wall you are not standing near. */
-    overflow-x: hidden; scrollbar-width: none; }
+    /* ── THE WINDOW, AND YOU CAN MOVE IT ──────────────────────────────────────────────────────────────
+       This used to read "it scrolls, but never by dragging" — the camera followed the walk buttons and a
+       stray swipe could leave you looking at a wall you were not standing near. The walk buttons are gone
+       and Luke asked for Town's free look, so the rule is reversed: swipe the floor and the camera goes
+       where you put it. Walking re-centres it on you, which is the answer to the worry the old rule had.
+
+       This container was ALWAYS a scroll container — it was simply locked shut. Opening it is most of the
+       feature: momentum, rubber-banding and 1:1 finger tracking all arrive native, and the parallax reads
+       `scrollLeft` so the wall starts responding to your finger without a line of new code.
+
+       `touch-action` is deliberately left at its default. Pinning it to `pan-x` would trap vertical page
+       scrolling that STARTS inside the room — and the room is now 46vh, so that is most of the screen.
+       Left alone, the browser picks pan-x or pan-y from the direction of the gesture, which is right. */
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    cursor: grab; }
+.cas-room:active { cursor: grabbing; }
 .cas-room::-webkit-scrollbar { display: none; }
 /* The floor itself, wider than the window. Everything inside is positioned as a % of THIS. */
 /* 340%, not 240%. Nine cabinets sit 11 points apart, which at 240% of a phone was 99px of gap for a 66px

@@ -482,6 +482,52 @@ export default function CasinoClient({ initial }) {
         return () => clearInterval(id);
     }, [goal]);
 
+    // ── DRAG THE FLOOR ───────────────────────────────────────────────────────────────────────────────────
+    // On a phone the native scroll does all of this already, so the only thing that runs there is the
+    // movement bookkeeping. On DESKTOP a native horizontal scroller does not respond to a click-drag at
+    // all, so a mouse pointer drives `scrollLeft` by hand.
+    //
+    // CAPTURE IS TAKEN ONLY ONCE THE GESTURE IS A PAN, NEVER ON POINTERDOWN. Town's camera carries the
+    // scar: capturing on pointerdown retargets the pointerup, and a mouse click is dispatched to the
+    // common ancestor of down and up — so every button in the scene stopped receiving clicks on desktop,
+    // while touch was unaffected, which is why it hid for so long.
+    //
+    // The useful side effect of capturing late: on a real drag the click lands on the ROOM rather than on
+    // whichever cabinet the press started on, so dragging across a machine cannot open it.
+    const pan = useRef({ down: false, moved: false, startX: 0, lastX: 0, mouse: false, cap: null });
+
+    const panDown = useCallback((e) => {
+        pan.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX,
+            mouse: e.pointerType === "mouse", cap: null };
+    }, []);
+    const panMove = useCallback((e) => {
+        const d = pan.current;
+        if (!d.down) return;
+        // Mostly-horizontal, or a vertical page scroll that happens to start on the floor counts as a pan
+        // and eats the tap that follows it. `startY` has to actually be recorded for this test to mean
+        // anything — without it the vertical term is always zero and every gesture reads as a drag.
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 4
+            && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) {
+            d.moved = true;
+            if (d.mouse) { try { e.currentTarget.setPointerCapture(e.pointerId); d.cap = e.pointerId; } catch { /* ok */ } }
+        }
+        if (!d.moved) return;
+        if (d.mouse) e.currentTarget.scrollLeft -= e.clientX - d.lastX;
+        d.lastX = e.clientX;
+    }, []);
+    const panUp = useCallback((e) => {
+        const d = pan.current;
+        d.down = false;
+        if (d.cap != null) { try { e.currentTarget.releasePointerCapture(d.cap); } catch { /* ok */ } d.cap = null; }
+    }, []);
+    // True once, if the gesture that just finished was a drag. Read by everything clickable on the floor,
+    // because a swipe that ends over a cabinet must not also open it.
+    const draggedJustNow = useCallback(() => {
+        if (!pan.current.moved) return false;
+        pan.current.moved = false;
+        return true;
+    }, []);
+
     const walkTo = useCallback((to) => {
         unlock();
         setErr(null);
@@ -974,34 +1020,30 @@ export default function CasinoClient({ initial }) {
                 `.cas-hall` for about a day, which is the bingo hall's class — two unrelated things answering
                 to one selector, waiting to collide the next time either got a rule. */}
             <div className="cas-roomwrap">
-            <div className="cas-room" ref={roomRef}>
+            <div className="cas-room" ref={roomRef}
+                onPointerDown={panDown} onPointerMove={panMove}
+                onPointerUp={panUp} onPointerCancel={panUp}>
               {/* ── TAP THE FLOOR AND WALK THERE ────────────────────────────────────────────────
                   The most direct way to move in a room you are looking at. It sits UNDER the cabinets in
                   the stacking order, so tapping a machine still opens the machine — this only ever catches
                   the taps that landed on nothing. */}
               {/* ── TAP THE FLOOR AND WALK THERE ────────────────────────────────────────────────
-                  Luke: "id prefer click to move vs the arrows." So the floor IS the control and the arrows
-                  are gone.
-                  The catch the arrows were quietly solving: the floor is nearly five screens wide, so most
-                  of it is not on screen to be tapped, and tapping the visible edge would only ever move you
-                  as far as the edge. A tap in the outer strip of the ROOM therefore means "keep going that
-                  way" — it walks you most of a screen further, so you can cross the whole floor in taps
-                  without ever needing a button that repeats.
-                  It sits under the cabinets in the stacking order, so tapping a machine still opens the
-                  machine; this only catches taps that landed on nothing. */}
+                  The floor is the control: tap it and you walk there, and walking re-centres the camera on
+                  you. It sits under the cabinets in the stacking order, so tapping a machine still opens
+                  the machine; this only catches taps that landed on nothing.
+
+                  There used to be an "edge tap travels a screen" branch here, because with the camera
+                  locked to the hero most of the floor was never on screen to be tapped. You can drag the
+                  floor now, so it was solving a problem that no longer exists — and it meant a mis-tap near
+                  the edge flung you across the room for no reason. Gone.
+
+                  A DRAG IS NOT A TAP. A swipe that finishes over the floor would otherwise also walk you
+                  there, which makes free look feel like it fights you. See draggedJustNow. */}
               <div className="cas-world" onClick={(e) => {
+                  if (draggedJustNow()) return;
                   if (e.target !== e.currentTarget && !e.target.classList?.contains("cas-floor")) return;
-                  const room = roomRef.current;
                   const b = e.currentTarget.getBoundingClientRect();
-                  const to = ((e.clientX - b.left) / b.width) * 100;
-                  if (room) {
-                      const view = room.getBoundingClientRect();
-                      const edge = (e.clientX - view.left) / view.width;      // 0..1 across what you can SEE
-                      const span = (view.width / b.width) * 100;              // how much floor a screen holds
-                      if (edge < 0.16) { walkTo(xRef.current - span * 0.8); return; }
-                      if (edge > 0.84) { walkTo(xRef.current + span * 0.8); return; }
-                  }
-                  walkTo(to);
+                  walkTo(((e.clientX - b.left) / b.width) * 100);
               }}>
                 <div className="cas-floor" aria-hidden="true" />
 
@@ -1024,7 +1066,7 @@ export default function CasinoClient({ initial }) {
                         className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
                         style={{ left: `${m.x}%` }}
                         aria-label={`${m.label} — ${m.live ? m.kind : "not built yet"}`}
-                        onClick={() => { setX(m.x); if (m.live) setSeated(true); }}>
+                        onClick={() => { if (draggedJustNow()) return; setX(m.x); if (m.live) setSeated(true); }}>
                         {/* The cabinet, drawn rather than approximated. It was a gradient and a border for
                             as long as the floor plan was still being argued about, which was the right order
                             to do it in — art costs money to get wrong, and the plan changed three times. */}
