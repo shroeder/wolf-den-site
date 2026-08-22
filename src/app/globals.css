@@ -17504,12 +17504,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Sized against the cabinet, not against the old box — see the note on .cas-mach. Everybody else is a
    shade smaller than you as well as dimmer, which is the cheapest possible way of saying who the camera
    is following. */
-.cas-other img, .cas-blank { display: block; width: clamp(52px, 10.5vh, 99px);
-    height: clamp(52px, 10.5vh, 99px); object-fit: contain; object-position: bottom; }
-.cas-you img, .cas-you .cas-blank { width: clamp(62px, 12.4vh, 117px); height: clamp(62px, 12.4vh, 117px); }
+/* ── AND THE PEOPLE ARE PEOPLE-SIZED ──
+   These were set against the cabinet box, but a hero sprite does not fill its box: it is drawn with air
+   above the head and below the feet, so a 12.4vh box put a figure noticeably shorter than that next to a
+   machine that fills its own frame edge to edge. Sized against what actually READS on screen instead —
+   the hero now stands about level with the top of a cabinet, which is what a person at a slot machine
+   looks like. */
+.cas-other img, .cas-blank { display: block; width: clamp(48px, 9.6vh, 90px);
+    height: clamp(48px, 9.6vh, 90px); object-fit: contain; object-position: bottom; }
+.cas-you img, .cas-you .cas-blank { width: clamp(58px, 11.5vh, 108px); height: clamp(58px, 11.5vh, 108px); }
 /* You stand in a pool of your own, so the hero is never a dark shape against a dark carpet. */
 .cas-you::before { content: ""; position: absolute; left: 50%; bottom: 0;
-    width: clamp(48px, 9.6vh, 91px); height: clamp(10px, 2vh, 19px);
+    width: clamp(46px, 9.2vh, 86px); height: clamp(11px, 2.2vh, 21px);
     transform: translateX(-50%); pointer-events: none;
     background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.6), transparent 70%); }
 .cas-blank { border-radius: 50%; background: rgba(255,255,255,0.14); }
@@ -17807,8 +17813,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-acts.is-four { grid-template-columns: repeat(4, 1fr); }
 .cas-act.is-split { background: linear-gradient(180deg, #b6ffd4, #6fd0a0); }
 
-/* Your own hero on the floor. Sized to the same footprint the blank circle had, so nothing else moves. */
-.cas-you img { display: block; width: 38px; height: 38px; object-fit: contain;
+/* Your own hero on the floor. The SIZE lives with everybody else's up by .cas-other — this rule used to set
+   it to 38px here as well, and being later in the file it quietly won every argument. Three separate passes
+   at making the room bigger all edited the rule above this one and changed nothing on screen.
+   Exactly the landmine the room CSS warns about elsewhere: when an element is reshaped, the old rule has to
+   be DELETED, not left underneath. Only the shadow is this rule's business now. */
+.cas-you img { display: block; object-fit: contain;
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)); }
 
 /* ── WHAT A CABINET REMEMBERS ABOUT YOU ──────────────────────────────────────────────────────────────
