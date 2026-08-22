@@ -149,6 +149,22 @@ const ELEMENT_VOICE = {
 // glancing hit and a fight-ending one are audibly different without a second asset.
 export const Sfx = {
     ui() { tone({ freq: 660, type: "triangle", dur: 0.05, gain: 0.06 }); },
+    // ── A FOOTFALL ON CARPET ── not a UI click. Crossing the casino floor is a dozen taps in a row, and
+    // `ui()` at that rate is a metronome: it has a clear pitch, so twelve of them is a note being held.
+    // This is deliberately pitch-less — a soft low thump and a scuff of filtered noise — and the caller
+    // varies the weight slightly so no two steps are identical.
+    step(weight = 0.5) {
+        const w = Math.max(0, Math.min(1, weight));
+        tone({ freq: 98 - w * 22, to: 44, type: "sine", dur: 0.07, gain: 0.1 + w * 0.06 });
+        noise({ dur: 0.05, gain: 0.05 + w * 0.04, type: "lowpass", freq: 900, sweepTo: 260 });
+    },
+    // Walking into reach of a machine: one soft two-note lift. The sound of a cabinet noticing you, and
+    // quiet enough that it never competes with what the machine itself does once you are playing it.
+    arrive() {
+        tone({ freq: 587, type: "triangle", dur: 0.09, gain: 0.045 });
+        tone({ at: 0.055, freq: 880, type: "triangle", dur: 0.22, gain: 0.045 });
+        noise({ at: 0.055, dur: 0.11, gain: 0.02, type: "highpass", freq: 5200 });
+    },
 
     /** Something being swung, before it connects. The anticipation half of a hit. */
     whoosh(at = 0) {

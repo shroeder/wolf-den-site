@@ -99,14 +99,24 @@ if (process.env.SHOT_HIDE) {
     await send("Page.addScriptToEvaluateOnNewDocument", {
         source: `(() => {
             const put = () => {
+                // At document-start there may be no head AND no documentElement yet. This used to call
+                // .appendChild on null, which threw — and because the throw happened BEFORE the listener
+                // below was registered, the whole hook died silently and SHOT_HIDE hid nothing at all. A
+                // screenshot rig that quietly ignores half its arguments is worse than one that fails.
+                const root = document.head || document.documentElement;
+                if (!root) return false;
                 const s = document.createElement("style");
                 s.textContent = ${JSON.stringify(css)};
-                (document.head || document.documentElement).appendChild(s);
+                root.appendChild(s);
+                return true;
             };
-            put();
-            // Announcements mount after hydration and some replace the head, so the rule is re-applied once
-            // the document is ready rather than only at document-start.
+            // Listener FIRST, so a failed early attempt cannot cost us the retry.
             document.addEventListener("DOMContentLoaded", put);
+            // Announcements mount after hydration and some replace the head, so keep trying until the rule
+            // is in a document that still has it.
+            put();
+            let n = 0;
+            const t = setInterval(() => { put(); if (++n > 40) clearInterval(t); }, 100);
         })();`,
     });
 }

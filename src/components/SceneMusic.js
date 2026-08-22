@@ -24,6 +24,8 @@ const CHORD = {
 const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each of the 8 eighth-notes in a bar
 // Town lead melody over the 4-bar loop (step 0..31 = eighth-notes). Sparse + singable; null = rest.
 const TOWN_LEAD = { 0: 64, 3: 67, 8: 71, 11: 67, 16: 69, 19: 72, 24: 72, 27: 69 };
+// The casino's lead. Late, lazy entries that come in behind the beat and hold — a lounge line, not a chase.
+const CASINO_LEAD = { 2: 69, 6: 72, 10: 71, 14: 69, 18: 67, 22: 69, 26: 72, 30: 74 };
 // Raid lead — urgent, driving, higher register.
 const RAID_LEAD = { 0: 76, 2: 74, 4: 72, 6: 74, 8: 76, 12: 79, 16: 72, 18: 71, 20: 72, 24: 76, 26: 77, 28: 79 };
 // Sea battle — a SHANTY, not a chase. Dotted, swung-feeling phrases that land hard on the downbeat and hold,
@@ -33,6 +35,13 @@ const SEA_LEAD = { 0: 69, 4: 72, 6: 74, 8: 76, 14: 74, 16: 72, 20: 69, 22: 67, 2
 
 const VIBES = {
     town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
+    // ── THE CASINO FLOOR ── Am -> Dm -> G -> C is a TURNAROUND: it never resolves, it just keeps handing
+    // you back to the top, which is exactly the feeling a room full of machines is trying to produce. Slow
+    // enough to stand around in, a soft sine arp for the glassy lounge shimmer over the top, and a fat
+    // triangle bass walking underneath. The lead enters late in each bar and holds, because anything that
+    // pushes would be nagging by the third loop — and people stand in this room for half an hour.
+    casino: { bpm: 92, lpf: 1150, prog: ["Am", "Dm", "G", "C"], lead: CASINO_LEAD, arpType: "sine",
+        arpGain: 0.055, bassType: "triangle", bassGain: 0.2, arpRelease: 0.7, master: 0.36 },
     tavern: { bpm: 76, lpf: 950, prog: ["Am", "F", "C", "G"], lead: null, arpType: "triangle", arpGain: 0.05, bassType: "sine", bassGain: 0.17, arpRelease: 0.95, master: 0.4 },
     // Raid — a fast, tense minor loop with a driving bass + urgent lead; kicks in while a town event is active.
     raid: { bpm: 144, lpf: 2500, prog: ["Am", "Em", "Dm", "E"], lead: RAID_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.22, arpRelease: 0.28, master: 0.46 },

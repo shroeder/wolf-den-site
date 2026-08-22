@@ -77,6 +77,69 @@ const JOBS = {
             + "them. Austere and expensive-looking — the machine you approach rather than sit at.",
         ),
     },
+    slot4: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            `${CABINET} In warm russet wood with brass fittings, its cabinet sides carved as a menagerie of
+            beasts. Its display shows three reels lit deep GREEN, a wolf pup and a griffin glowing on them,
+            and a small brass cage of fireflies hanging from one corner. Alive and busy.`
+                .replace(/\s+/g, " "),
+        ),
+    },
+    slot5: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            `${CABINET} The heaviest machine on the floor: a squat armoured strongbox of a cabinet in blued
+            steel and gold, with a great riveted vault door built into its lower half and a spoked brass
+            handwheel on it. Its display shows three reels lit hard WHITE and gold, a crown glowing on the
+            middle one. Expensive, shut, and rarely open.`
+                .replace(/\s+/g, " "),
+        ),
+    },
+
+    // ── THE ROOM DRESSING ────────────────────────────────────────────────────────────────────────
+    // Nine cabinets in a row is a shop display. These are what make it a floor: things standing between
+    // the machines that nobody can play. They are drawn to the SAME rules as the cabinets — straight on,
+    // flat, no ground shadow of their own (the CSS adds one, and a baked shadow would double up) —
+    // because they are composited into the same row and any one of them looking three-quarter-on is the
+    // thing that gives the whole room away as a collage.
+    decor_plant: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A tall potted fan palm in a heavy tarnished brass urn, seen straight on from the front, flat "
+            + "elevation, standing upright. Dark green fronds, a little overgrown.",
+            { extra: "It must read at 46 pixels wide: bold silhouette, no fine detail, no cast shadow, no floor." },
+        ),
+    },
+    decor_rope: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A pair of short brass stanchions with a swag of deep VIOLET velvet rope hanging between them, "
+            + "seen straight on from the front, flat elevation. Wider than it is tall.",
+            { extra: "It must read at 46 pixels wide: bold silhouette, no fine detail, no cast shadow, no floor." },
+        ),
+    },
+    decor_stool: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A single tall padded gaming stool, seen straight on from the front, flat elevation: dark wood "
+            + "legs with a brass footrail and a round seat in deep red buttoned leather.",
+            { extra: "It must read at 46 pixels wide: bold silhouette, no fine detail, no cast shadow, no floor." },
+        ),
+    },
+    // The lamps. These hang from the top of the room and the CSS throws a cone of light down from each, so
+    // the sprite has to be lit from WITHIN and have nothing above it — a chain that fades out, not a
+    // ceiling, because there is no ceiling in the picture for it to be attached to.
+    decor_lamp: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A small ornate hanging chandelier of tarnished brass and violet glass, lit warm gold from "
+            + "within, hanging on a short chain, seen straight on from the front in flat elevation. The "
+            + "chain runs off the top edge of the frame. No ceiling.",
+            { extra: "It must read at 46 pixels wide: bold silhouette, no fine detail, no cast shadow." },
+        ),
+    },
+
     // ── The wheel and the ticket board.
     roulette: {
         size: "1024x1024",
@@ -123,12 +186,15 @@ const JOBS = {
     room: {
         size: "1536x1024",
         prompt: housePrompt(
-            "The back wall of a lavish fantasy casino hall at night, seen DEAD-ON in flat side elevation with "
-            + "NO perspective and NO vanishing point — the wall runs exactly parallel to the picture plane, "
-            + "like a theatre backdrop or the background of a side-scrolling game. Deep violet panelled walls "
-            + "with tall gold-framed arches, heavy draped curtains between them, warm gold wall lamps at even "
-            + "spacing all the way across, and a dark patterned carpet strip along the bottom. Completely "
-            + "empty: no tables, no machines, no furniture, no people.",
+            "The back wall of a lavish fantasy casino hall at night, seen DEAD-ON in flat side elevation "
+            + "with NO perspective and NO vanishing point — the wall runs exactly parallel to the picture "
+            + "plane, like a theatre backdrop or the background of a side-scrolling game. An arcade of "
+            + "tall gold-framed arches in deep violet panelling, and THROUGH each arch a glimpse of a "
+            + "darker second hall behind, so the wall has real depth in it rather than being one flat "
+            + "plane. Heavy draped crimson curtains between the arches, warm gold wall lamps at even "
+            + "spacing all the way across each throwing a visible pool of light on the panelling, gilded "
+            + "wolf-head medallions above the arch keystones, and a rich patterned carpet in violet and "
+            + "gold along the bottom. Completely empty: no tables, no machines, no furniture, no people.",
             {
                 framing: "scene",
                 extra: "The composition must be evenly weighted from left to right with no centre of focus, "
@@ -249,9 +315,12 @@ await Promise.all(Array.from({ length: 3 }, async () => {
                 // webp at the size it is actually drawn at. The cabinets render about 90px wide and the room
                 // about 900 — shipping 1024px PNGs of either would be several megabytes of a page that has to
                 // open on a phone in a shop.
+                // The room is sized by HEIGHT, not width. It is mirror-tiled to 3:1 before publishing (see
+                // the note on the wall), and a width cap on a 3:1 image throws away two thirds of its
+                // vertical resolution — the wall came out 427px tall for a room that draws it at 320.
                 const wide = job.size === "1536x1024";
                 const webp = await sharp(buf)
-                    .resize({ width: wide ? 1280 : 384, height: wide ? 854 : 384, fit: "inside" })
+                    .resize(wide ? { height: 620, fit: "inside" } : { width: 384, height: 384, fit: "inside" })
                     .webp({ quality: 88 })
                     .toBuffer();
                 fs.writeFileSync(path.join(PUBLIC, `${name}.webp`), webp);

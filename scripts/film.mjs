@@ -137,10 +137,15 @@ if (process.env.SHOT_HIDE) {
     const css = `${sel} { display: none !important; }`;
     await send("Page.addScriptToEvaluateOnNewDocument", {
         source: `(() => {
-            const put = () => { const s = document.createElement("style");
+            // At document-start there may be no head AND no documentElement yet, and .appendChild on null
+            // throws — which killed the whole hook before the retry below was ever registered, so
+            // SHOT_HIDE silently hid nothing. Same bug as shot.mjs had.
+            const put = () => { const root = document.head || document.documentElement;
+                if (!root) return;
+                const s = document.createElement("style");
                 s.textContent = ${JSON.stringify(css)};
-                (document.head || document.documentElement).appendChild(s); };
-            put(); document.addEventListener("DOMContentLoaded", put);
+                root.appendChild(s); };
+            document.addEventListener("DOMContentLoaded", put); put();
             // A modal that mounts after hydration outlives a style added at document-start if the app
             // replaces the head, so re-apply on an interval for the first few seconds too.
             let n = 0; const iv = setInterval(() => { put(); if (++n > 20) clearInterval(iv); }, 200);

@@ -20,3 +20,4 @@ road-sheet-ingame.png
 # Scratch scripts from a debugging session — never part of the build.
 scripts/tmp-*.mjs
 scripts/_tmp-*.mjs
+.casino-art/

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FeatureDailies from "@/components/FeatureDailies";
+import SceneMusic from "@/components/SceneMusic";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -34,6 +35,34 @@ const MACHINES = [
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
 const REACH = 9;
+
+// ── WHAT ELSE IS IN THE ROOM ────────────────────────────────────────────────────────────────────────────
+// Nine cabinets in a row is a shop display. What makes it a FLOOR is the stuff between them that nobody can
+// play — a palm in a brass urn, a rope you are not meant to cross, a stool somebody left out. They sit in the
+// gaps between machines (the cabinets are 11 apart, so these go on the midpoints) and at the door.
+//
+// All of it is inert: no handler, no focus, aria-hidden. A decoration you can tap is a machine that does
+// nothing, which is worse than no decoration at all.
+//
+// `back` stands a prop against the wall instead of out on the carpet — smaller, dimmer and higher up, so the
+// same three pictures read as a room with depth rather than a row of stickers on one line.
+const DECOR = [
+    { id: "rope", x: 2.5 },
+    { id: "plant", x: 13.5, back: true },
+    { id: "stool", x: 24.5 },
+    { id: "plant", x: 35.5 },
+    { id: "rope", x: 46.5, back: true },
+    { id: "stool", x: 57.5 },
+    { id: "plant", x: 68.5, back: true },
+    { id: "stool", x: 79.5 },
+    { id: "plant", x: 90.5 },
+];
+
+// ── THE LIGHTING ────────────────────────────────────────────────────────────────────────────────────────
+// Chandeliers, hung at a wider spacing than anything on the floor so the two rhythms do not line up and turn
+// the room into wallpaper. Each one is a sprite plus a cone of light thrown down onto the carpet — the cone
+// is what actually does the work, because a lamp that does not light anything is just a picture of a lamp.
+const LAMPS = [6, 25, 44, 63, 82, 99];
 
 // Which cabinets are slot machines. Three of them now, and they are not one machine in three paint jobs —
 // see SLOT_MACHINES in casino.js. The client does not decide anything about them: it sends which cabinet
@@ -288,9 +317,31 @@ export default function CasinoClient({ initial }) {
         el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "smooth" });
     }, [x]);
 
+    // ── DEPTH ────────────────────────────────────────────────────────────────────────────────────────────
+    // The wall is painted on the scroll container itself, which means it did not move AT ALL: walking the
+    // floor slid nine cabinets across a completely static backdrop, and a backdrop that never moves reads as
+    // a photograph behind the furniture rather than a room you are in.
+    //
+    // Shifting its background-position by a fraction of the scroll is the whole fix. It moves at 45% of the
+    // speed of the things standing in front of it, which is what parallax is, and because the wall tiles
+    // there is no edge to run off no matter how far the floor is walked.
+    useEffect(() => {
+        const el = roomRef.current;
+        if (!el) return undefined;
+        let raf = 0;
+        const onScroll = () => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => { raf = 0; el.style.setProperty("--par", `${el.scrollLeft}px`); });
+        };
+        onScroll();
+        el.addEventListener("scroll", onScroll, { passive: true });
+        return () => { el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
+    }, []);
+
     const walk = useCallback((dir) => {
         unlock();
-        Sfx.ui();
+        // A footfall, not a click — and a slightly different one each time. See Sfx.step().
+        Sfx.step(0.35 + Math.random() * 0.35);
         setFacing(dir);
         setX((p) => Math.max(4, Math.min(96, p + dir * 6)));
         setErr(null);
@@ -319,7 +370,12 @@ export default function CasinoClient({ initial }) {
     // closes the machine without anything having to tell it to.
     useEffect(() => {
         const near = MACHINES.find((m) => Math.abs(m.x - x) <= REACH);
-        setAt(near || null);
+        // Coming into reach of a machine says so — once, on the step that arrives, and never again while you
+        // stand at the same one. A chime on every step would be the room nagging.
+        setAt((prev) => {
+            if (near && prev?.id !== near.id) Sfx.arrive();
+            return near || null;
+        });
         if (!near) setSeated(false);   // walked away from the machine you were sat at
     }, [x]);
 
@@ -626,9 +682,27 @@ export default function CasinoClient({ initial }) {
             {/* ── THE ROOM ────────────────────────────────────────────────────────────────────────────────
                 Positioned in percentages so the floor is the same room on any screen: a machine at 50 is in
                 the middle of a phone and the middle of a desktop, rather than drifting with the viewport. */}
+            {/* `.cas-hall` exists only so the vignette has something to hang on that does not scroll. Put it
+                on `.cas-room` and it becomes part of the scrollable area and slides off to the left. */}
+            <div className="cas-hall">
             <div className="cas-room" ref={roomRef}>
               <div className="cas-world">
                 <div className="cas-floor" aria-hidden="true" />
+
+                {/* The lights, and the stuff you cannot play. Both inert — see DECOR and LAMPS. */}
+                {LAMPS.map((lx) => (
+                    <div key={`lamp${lx}`} className="cas-lamp" style={{ left: `${lx}%` }} aria-hidden="true">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/casino/decor_lamp.webp" alt="" draggable="false" />
+                    </div>
+                ))}
+                {DECOR.map((d, i) => (
+                    <div key={`d${i}`} className={`cas-decor${d.back ? " is-back" : ""}`}
+                        style={{ left: `${d.x}%` }} aria-hidden="true">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/images/casino/decor_${d.id}.webp`} alt="" draggable="false" />
+                    </div>
+                ))}
                 {MACHINES.map((m) => (
                     <button key={m.id} type="button"
                         className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
@@ -668,6 +742,14 @@ export default function CasinoClient({ initial }) {
                     ) : <span className="cas-blank is-you" style={{ transform: `scaleX(${facing})` }} />}
                 </div>
               </div>
+            </div>
+            <div className="cas-vignette" aria-hidden="true" />
+            {/* The floor has a tune: procedural, like every other scene in the Den. It mounts INSIDE the
+                hall because its toggle positions itself absolutely — hung off `.cas`, which is not a
+                positioned box, the button would have escaped to the corner of the page. In the corner of
+                the room is where it belongs anyway. Silenced while you are sat at a machine: the machine
+                has its own sounds and those are the point. */}
+            {!seated ? <SceneMusic vibe="casino" /> : null}
             </div>
 
             <div className="cas-walk">
