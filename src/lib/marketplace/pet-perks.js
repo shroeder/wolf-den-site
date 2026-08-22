@@ -270,7 +270,26 @@ export function capSystemPerk(key, value) {
     return cap == null ? value : Math.min(cap, value);
 }
 
-function perkDesc(key, v, level = 1) {
+// ── AN ENSHRINED ABILITY IS NOT "WHILE EQUIPPED" ─────────────────────────────────────────────────────────────
+// SoullessShiitake: "for level 6 pets, some of the lightstone abilities have the verbiage that its only while
+// the pet it equipped, is that true?" It is not true, and the sentence saying so was making Lightstones look
+// strictly worse than Darkstones on exactly the pets whose ability is an earner or a farm passive.
+//
+// pet-stones.js states the contract in as many words: "enshrining keeps the ability PERMANENTLY, whether that
+// pet is equipped or not. That is the promise, and it is the same promise on both." combinePetBonuses honours
+// it — an enshrined pet is applied whether or not it is out. Only the DESCRIPTION disagreed, because it is
+// generated from one switch that is also used for ordinary equipped pets, where "while equipped" is correct.
+//
+// Rewritten at the end rather than case by case, so a clause added to a new perk tomorrow is covered too.
+function perkDesc(key, v, level = 1, { enshrined = false } = {}) {
+    const line = perkDescRaw(key, v, level);
+    if (!enshrined || typeof line !== "string") return line;
+    return line
+        .replace(/while equipped/g, "whether it is out or not")
+        .replace(/at the equipped rate/g, "at the enshrined rate");
+}
+
+function perkDescRaw(key, v, level = 1) {
     switch (key) {
         case "might": return `+${v}% damage — passive auto-damage AND your daily strike`;
         case "crit_chance": return `+${v}% crit chance — passive and your daily strike`;
@@ -378,7 +397,8 @@ export function ascensionEffectView(pet, stone) {
         // harder. Worth saying which, because it changes whether the pet's own card still tells the whole story.
         adds: eff.kind === "graft",
         value: scaled,
-        desc: perkDesc(key, scaled, PET_ENSHRINED_LEVEL),
+        // Enshrined, so the wording must not promise a leash it does not have — see perkDesc.
+        desc: perkDesc(key, scaled, PET_ENSHRINED_LEVEL, { enshrined: true }),
         note: eff.note || null,
     };
 }
