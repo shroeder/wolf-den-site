@@ -40,3 +40,36 @@ const STAFF_BUYER_IDS = new Set([
 export function isHouse(buyerId) {
     return isOwner(buyerId) || (Boolean(buyerId) && STAFF_BUYER_IDS.has(String(buyerId)));
 }
+
+// ── BARRED FROM THE REAL-WORLD PRIZES, AND NOT TOLD ──────────────────────────────────────────────────────────
+// A separate list from the house one, and it has to be separate for two reasons.
+//
+// THE FIRST IS THAT IT IS SILENT. `isHouse` is sent to the boss screen as `raffleHouse` and draws a banner
+// saying the house does not enter — which is right for staff, who know and would say so themselves. This list
+// draws nothing. The screen looks exactly as it did; the name is simply never in the hat. Somebody who has
+// been quietly barred and can see they have been barred just makes another account.
+//
+// THE SECOND IS THAT IT MEANS SOMETHING DIFFERENT. Staff are excluded because it would look bad for the shop
+// to hand its own prize to its own people, and they lose nothing they earned. This list is a consequence:
+// members who obtained their standing in a way that took the prize off somebody who played straight.
+//
+// Everything in-game still pays. XP, chests, spin tokens, pet rolls — all untouched, exactly as for staff.
+// This gate is only ever asked about the thing that costs the shop money off its own shelf.
+//
+// 2026-08-22 — hudson (trev.mielke@gmail.com). Ran a second account, tkmielke17, created the day before the
+// first transfer and sharing a surname; it earned 114,945 gold and handed 98,225 of it — 85% of everything it
+// ever made — to this account across fourteen one-way trades and auction buys in eleven days. That was 31% of
+// all the gold this account has ever received, it went into consumables, and consumables are boss damage: he
+// leads the current boss by 47% on FEWER swings than second place. The prizes are physical and come off a
+// shelf in Montgomery. See scripts/check-alts.mjs, which now finds this shape in a single query.
+const PRIZE_BARRED_BUYER_IDS = new Set([
+    "4fed7f13-8931-45b8-a014-71367b9fcba6", // hudson
+]);
+
+/**
+ * Barred from the real-world draw, silently. Checked wherever `isHouse` is checked for the RAFFLE POOL, and
+ * nowhere that reaches the client — see the note above on why the difference matters.
+ */
+export function barredFromPrizes(buyerId) {
+    return Boolean(buyerId) && PRIZE_BARRED_BUYER_IDS.has(String(buyerId));
+}

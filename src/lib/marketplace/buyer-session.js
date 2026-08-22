@@ -229,7 +229,7 @@ export async function resolveBuyerSession(token) {
         return null;
     }
     const row = await db.queryOne(
-        `SELECT s.id AS session_id, s.expires_at, s.revoked_at, b.id, b.email, b.display_name
+        `SELECT s.id AS session_id, s.expires_at, s.revoked_at, b.id, b.email, b.display_name, b.banned_at
          FROM mkt_buyer_session s
          JOIN mkt_buyer b ON b.id = s.buyer_id
          WHERE s.token_hash = $1`,
@@ -238,6 +238,14 @@ export async function resolveBuyerSession(token) {
     if (!row || row.revoked_at || new Date(row.expires_at) <= new Date()) {
         return null;
     }
+    // ── A BANNED ACCOUNT RESOLVES TO NOBODY ──────────────────────────────────────────────────────────────
+    // Checked HERE rather than at login, because every authenticated request comes through this function and
+    // only some of them are logins. Revoking sessions was the only tool before this and it is not one: it
+    // signs an account out, and it signs straight back in.
+    //
+    // It reads to the account as being signed out, which is the least informative failure available — there
+    // is no banner to screenshot and nothing that says which of the two accounts gave it away.
+    if (row.banned_at) return null;
     await db.query(`UPDATE mkt_buyer_session SET last_used_at = NOW() WHERE id = $1`, [row.session_id]);
     return { sessionId: row.session_id, buyer: mapBuyer(row) };
 }

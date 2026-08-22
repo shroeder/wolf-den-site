@@ -12,7 +12,7 @@ import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-
 import { getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
-import { isHouse, isOwner } from "@/lib/marketplace/owner.js";
+import { barredFromPrizes, isHouse, isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -954,10 +954,12 @@ async function finalizeBossKill(bossId) {
     // this function hands out, the pet rolls, the chests, the XP, the spin token. They are out of the hat for
     // the physical prize only, and only for three, which at the current cadence is about a month.
     const lockedOut = await raffleLockedIds(bossId).catch(() => new Set());
-    const rafflePool = pool.filter((p) => !isHouse(p.id) && !lockedOut.has(p.id));
+    // barredFromPrizes sits beside isHouse everywhere isHouse decides the POOL, and nowhere that decides
+    // what the screen says. A silent bar that announces itself is not a silent bar.
+    const rafflePool = pool.filter((p) => !isHouse(p.id) && !barredFromPrizes(p.id) && !lockedOut.has(p.id));
     const inRaffle = new Set(rafflePool.map((p) => p.id));
     for (const [buyerId, bonus] of petBonuses) {
-        if (inRaffle.has(buyerId) || isHouse(buyerId) || lockedOut.has(buyerId)) continue;
+        if (inRaffle.has(buyerId) || isHouse(buyerId) || barredFromPrizes(buyerId) || lockedOut.has(buyerId)) continue;
         const tickets = fortuneTickets(bonus?.stats?.fortune || 0, boss);
         if (tickets > 0) rafflePool.push({ id: buyerId, dmg: 0, tickets });
     }
@@ -967,7 +969,9 @@ async function finalizeBossKill(bossId) {
     // dropped rather than the draw — the house exclusion is NOT, because that one is a promise, not a
     // fairness dial.
     if (!rafflePool.length && boss.prize_name) {
-        for (const p of pool) if (!isHouse(p.id)) rafflePool.push(p);
+        // The cooldown is dropped when it would empty the hat; the house exclusion is not, "because that one
+        // is a promise, not a fairness dial". A bar is the same kind of thing, so it survives here too.
+        for (const p of pool) if (!isHouse(p.id) && !barredFromPrizes(p.id)) rafflePool.push(p);
     }
     if (rafflePool.length && boss.prize_name) {
         const totalTickets = rafflePool.reduce((s, p) => s + p.tickets, 0);
