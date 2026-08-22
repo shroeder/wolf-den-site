@@ -18,9 +18,9 @@ import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 // generate and this is a layout to be argued with first. When the floor plan is right, the cabinets get
 // painted.
 const MACHINES = [
-    { id: "slot", x: 10, label: "Wolf's Luck", kind: "Slots", live: true },
-    { id: "slot2", x: 24, label: "Den Fortune", kind: "Slots", live: true },
-    { id: "slot3", x: 38, label: "Moonrise", kind: "Slots", live: true },
+    { id: "slot", x: 10, label: "The Hunt", kind: "Slots", live: true },
+    { id: "slot2", x: 24, label: "The Harvest", kind: "Slots", live: true },
+    { id: "slot3", x: 38, label: "The Deep", kind: "Slots", live: true },
     { id: "roulette", x: 52, label: "The Wheel", kind: "Roulette", live: true },
     { id: "keno", x: 66, label: "Keno", kind: "Keno", live: true },
     { id: "bingo", x: 80, label: "The Hall", kind: "Bingo", live: true },
@@ -40,7 +40,10 @@ const SLOTS = new Set(["slot", "slot2", "slot3"]);
 // Every reel symbol was a Unicode glyph in a coloured box — a triangle standing in for a wolf. The art is per
 // CABINET, not shared: Wolf's Luck burns brass, Den Fortune is honey-coloured, Moonrise is cold silver. Same
 // symbol IDs on every machine, so the paytables and both gates never notice; different pictures.
-const reelArt = (machineId, sym) => `/images/casino/reels/${machineId}-${sym}.webp`;
+// The Den's own sprites first — pets, fish, foes, dishes — falling back to the generic set drawn for the
+// casino if a theme has no picture for a symbol. See SLOT_THEMES in casino.js.
+const reelArt = (art, machineId, sym) =>
+    art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
 
 // Kept only for the tone behind a symbol while its image loads, and for the glow colour on a win.
 const SYMBOL_TONE = {
@@ -59,7 +62,7 @@ const SYMBOL_TONE = {
 //
 // EACH REEL STOPS ON ITS OWN CLOCK, and the third stops latest by a wide margin — that pause, with two symbols
 // already matching, is the entire drama of a slot machine and it cannot exist if all three land together.
-function Reel({ machineId, symbols, result, spinning, index, won }) {
+function Reel({ art, machineId, symbols, result, spinning, index, won }) {
     const CELL = 84;
     // ── THE STRIP MUST NOT RESHUFFLE UNDER A LANDED REEL ─────────────────────────────────────────────────
     // `symbols` arrives as a fresh array on every parent render — it is built with .map() up in the panel —
@@ -108,7 +111,7 @@ function Reel({ machineId, symbols, result, spinning, index, won }) {
                 {strip.map((sym, i) => (
                     <span className="cas-cell" key={i}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={reelArt(machineId, sym)} alt="" draggable="false" />
+                        <img src={reelArt(art, machineId, sym)} alt="" draggable="false" />
                     </span>
                 ))}
             </span>
@@ -718,12 +721,17 @@ export default function CasinoClient({ initial }) {
                         <div className="cas-meters">
                             {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "tray") ? (
                                 <span className={`cas-meter${meters[at.id].tray > 0 ? " is-full" : ""}`}>
-                                    <i>The Tray</i><b>{(meters[at.id].tray || 0).toFixed(2)}x</b>
+                                    <i>{(st?.slots?.[at.id]?.bonuses || []).find((b) => b.id === "tray")?.label || "The Tray"}</i>
+                                    <b>{(meters[at.id].tray || 0).toFixed(2)}x</b>
                                 </span>
                             ) : null}
                             {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "moonstruck") ? (
                                 <span className={`cas-meter${(meters[at.id].mult || 1) > 1 ? " is-full" : ""}`}>
-                                    <i>Moonstruck</i><b>{(meters[at.id].mult || 1).toFixed(2)}x</b>
+                                    {/* The bonus's own name, not a hard-coded one — the machine it lives on
+                                        is themed now, and a fish cabinet reading "Moonstruck" is a label
+                                        left behind by a rename. */}
+                                    <i>{(st?.slots?.[at.id]?.bonuses || []).find((b) => b.id === "moonstruck")?.label || "Multiplier"}</i>
+                                    <b>{(meters[at.id].mult || 1).toFixed(2)}x</b>
                                 </span>
                             ) : null}
                             {meters[at.id].freePulls > 0 ? (
@@ -829,7 +837,7 @@ export default function CasinoClient({ initial }) {
                                     doubloon it cannot roll. A machine teasing a symbol that is not on its
                                     reels is the one thing a paytable must never do. */}
                                 {[0, 1, 2].map((i) => (
-                                    <Reel key={i} index={i} machineId={at.id}
+                                    <Reel key={i} index={i} machineId={at.id} art={st?.art}
                                         symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
                                         result={spinning ? null : (spin?.reels?.[i] ?? idleReels[i])}
                                         spinning={spinning}

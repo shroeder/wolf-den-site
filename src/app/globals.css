@@ -17849,3 +17849,15 @@ body.cas-seated .social-fab { display: none; }
     .cas-stage .cas-reels, .cas-stage .cas-felt, .cas-stage .cas-wheel,
     .cas-stage .cas-banks, .cas-stage .cas-bcard, .cas-stage .cas-bhead { margin-left: auto; margin-right: auto; }
 }
+
+/* ── THEMED SPRITES NEED LIGHT ───────────────────────────────────────────────────────────────────────
+   The reel symbols are the Den's own art now, and a lot of it was drawn to sit on a lit background —
+   an arena foe in dark armour vanished almost completely against a near-black reel. A soft pool of
+   light behind each symbol and a hard rim on the sprite itself separates any of them from the window,
+   without touching the art. */
+.cas-cell { position: relative; }
+.cas-cell::before { content: ""; position: absolute; width: 76%; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.14), rgba(255,255,255,.05) 45%, transparent 70%); }
+.cas-cell img { position: relative;
+    filter: drop-shadow(0 0 1px rgba(255,255,255,.55)) drop-shadow(0 2px 4px rgba(0,0,0,.7)); }
+.cas-reel.is-won .cas-cell img { filter: drop-shadow(0 0 1px rgba(255,255,255,.6)) drop-shadow(0 0 10px var(--tone)); }

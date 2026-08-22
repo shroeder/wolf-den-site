@@ -60,6 +60,86 @@ export const MAX_BET = 5000;
 //
 // The symbols are the Den's own currency of meaning: the wolf is the house, and the things below it are the
 // things a member already wants.
+
+// ── THE CABINETS ARE THEMED FROM THE DEN'S OWN SPRITE LIBRARY ────────────────────────────────────────────────
+// The reels were sixteen symbols drawn specially for them, which was fine and completely disconnected from
+// everything else in the game. The Den already owns 113 pet sprites, 469 item sprites, 137 cooking sprites, a
+// shelf of fish and a ladder of arena foes — so a slot machine can be a machine about the GAME rather than a
+// machine with generic treasure on it, and it costs nothing to draw.
+//
+// THE SYMBOL IDS DO NOT MOVE. Every weight, every payout line and both gates are keyed on `wolf`, `chest`,
+// `laurel` and the rest, and none of that changes — only the picture each one shows. A re-theme cannot alter
+// a single number, which is exactly why it is safe to do this to machines that are already tuned.
+//
+// The ladders are chosen to MATCH THE WEIGHTS: the rarest symbol on each machine is that set's most fearsome
+// thing, and the commonest is its most ordinary. On The Deep the jackpot is a leviathan and the blank is a
+// sardine; on The Hunt the jackpot is an ascendant and the blank is a straw dummy. And the scatter symbol on
+// The Deep is called `star`, so it is a starfish, which is the sort of accident worth keeping.
+//
+// `cooking:` refs are resolved from mkt_cooking_sprite at read time — those sprites live on Blob rather than
+// in public/, so the server has to look them up.
+export const SLOT_THEMES = {
+    slot: {
+        label: "The Hunt",
+        blurb: "Pays often. Tops out at 700x.",
+        art: {
+            // Picked off a contact sheet of all ten foes for READABILITY, not just for rank. The first cut
+            // used `nightmare` and `veteran` — both dark armour on a near-black reel, and the nightmare
+            // very nearly vanished. A reel symbol that cannot be told apart at a glance is a reel symbol
+            // that has failed, however good the character art is.
+            wolf: "/images/arena/npc/ascendant.webp",     // the winged one. The jackpot.
+            chest: "/images/arena/npc/titan.webp",        // grey stone, unmistakable silhouette
+            laurel: "/images/arena/npc/colossus.webp",    // bronze, with a furnace burning in its chest
+            doubloon: "/images/arena/npc/warlord.webp",
+            bone: "/images/arena/npc/regular.webp",
+            moon: "/images/arena/npc/straw.webp",         // the training dummy. The blank.
+        },
+    },
+    slot2: {
+        label: "The Harvest",
+        blurb: "Pays more often than not. Rarely pays big.",
+        art: {
+            // The Wolf's Table is the Den's grandest dish, so it is the jackpot. The gold pie is the symbol
+            // that drops a coin in a piggy bank, which is the right shape for it.
+            wolf: "cooking:r_wolfs_table",
+            chest: "cooking:r_gold_pie",
+            laurel: "cooking:r_harvest_pie",
+            moon: "cooking:r_porridge",
+        },
+    },
+    slot3: {
+        label: "The Deep",
+        blurb: "Only triples pay. One of them pays 4,000x.",
+        art: {
+            wolf: "/images/fish/fish_leviathan.png",
+            moon: "/images/fish/fish_kraken.png",
+            chest: "/images/fish/fish_whale.png",
+            laurel: "/images/fish/fish_swordfish.png",
+            star: "/images/fish/fish_starfish.png",
+            bone: "/images/fish/fish_sardine.png",
+        },
+    },
+};
+
+/** Resolve a theme's art, looking up anything that lives on Blob rather than in public/. */
+async function themeArt() {
+    const refs = [];
+    for (const t of Object.values(SLOT_THEMES)) {
+        for (const v of Object.values(t.art)) if (v.startsWith("cooking:")) refs.push(v.slice(8));
+    }
+    const rows = refs.length
+        ? await db.query(`SELECT ref, url FROM mkt_cooking_sprite WHERE ref = ANY($1)`, [refs]).catch(() => [])
+        : [];
+    const byRef = Object.fromEntries(rows.map((r) => [r.ref, r.url]));
+    const out = {};
+    for (const [id, t] of Object.entries(SLOT_THEMES)) {
+        out[id] = Object.fromEntries(Object.entries(t.art)
+            .map(([sym, v]) => [sym, v.startsWith("cooking:") ? (byRef[v.slice(8)] || null) : v])
+            .filter(([, url]) => url));
+    }
+    return out;
+}
+
 // ── THREE MACHINES, AND WHY THEY ARE NOT ONE MACHINE PAINTED THREE WAYS ──────────────────────────────────────
 // A row of cabinets that differ only in their artwork is a row of one cabinet. What actually makes somebody
 // choose a machine is VOLATILITY — how often it pays against how much it pays when it does — and that is a
@@ -76,7 +156,7 @@ export const MAX_BET = 5000;
 export const SLOT_MACHINES = {
     slot: {
         id: "slot",
-        label: "Wolf's Luck",
+        label: "The Hunt",
         blurb: "Pays often. Tops out at 700x.",
         symbols: [
             { id: "wolf", label: "Wolf", weight: 1 },
@@ -114,7 +194,7 @@ export const SLOT_MACHINES = {
 
     slot2: {
         id: "slot2",
-        label: "Den Fortune",
+        label: "The Harvest",
         blurb: "Pays more often than not. Rarely pays big.",
         // FOUR symbols, where Wolf's Luck has six — and that, not the weights, is what makes this the
         // grinder. How often three reels show a repeat is driven almost entirely by how FEW distinct
@@ -145,7 +225,7 @@ export const SLOT_MACHINES = {
 
     slot3: {
         id: "slot3",
-        label: "Moonrise",
+        label: "The Deep",
         blurb: "Only triples pay. One of them pays 4,000x.",
         symbols: [
             { id: "wolf", label: "Wolf", weight: 1 },
@@ -1014,6 +1094,9 @@ export async function getCasinoState(buyerId) {
             rtp: slotRtp(m.id) + bonusEv(m.id, m, slotRtp(m.id), slotHitRate(m.id)).total,
             bonuses: SLOT_BONUSES[m.id] || [],
         }])),
+        // The themed reel art, resolved — see SLOT_THEMES. Sent rather than hard-coded in the client
+        // because a third of it lives on Blob and only the server can look it up.
+        art: await themeArt(),
         meters: await casinoMeters(buyerId),
         pot: await readPot(),
         banks: BANKS.map((b) => ({ id: b.id, label: b.label, reel: b.reel, holds: b.holds, tone: b.tone })),

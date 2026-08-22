@@ -57,8 +57,8 @@ export const SLOT_BONUSES = {
         { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
     slot3: [
-        { id: "moonrise", label: "Moonrise", blurb: "Three stars: eight free spins, every win doubled." },
-        { id: "moonstruck", label: "Moonstruck", blurb: "Every dead pull raises the multiplier on your next win." },
+        { id: "moonrise", label: "The Shoal", blurb: "Three starfish: eight free spins, every win doubled." },
+        { id: "moonstruck", label: "The Undertow", blurb: "Every dead pull pulls harder — the multiplier on your next win keeps rising." },
         { id: "pot", label: "The Pot", blurb: "Every bet on every cabinet feeds one shared jackpot. Any pull can take it." },
     ],
 };
