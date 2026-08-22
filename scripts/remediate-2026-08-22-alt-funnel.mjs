@@ -64,4 +64,26 @@ await trackActivity(HUDSON, "admin_adjustment", {
     fundedShare: FUNDED_SHARE,
 }).catch(() => {});
 
+// ── THE PART THE LEDGER DOES NOT SHOW ────────────────────────────────────────────────────────────────────────
+// Reversing the gold and the XP misses what the gold had ALREADY been turned into and not yet spent. He was
+// holding eighteen live boosts bought inside the funded window: six stacked "×2 boss damage" potions and
+// twelve strike potions worth thirty-five extra swings. None of it appears as gold, none of it appears as XP,
+// and all of it was still running.
+//
+// Damage potions MULTIPLY — memberDamageMult reduces with `*` — so six of them is 2^6 = 64x, clamped by
+// BOSS_MULT_CAP to 20x. Two or three already buy the ceiling. That is the real mechanism behind a 47% damage
+// lead on FEWER swings than second place: gold converts directly into maximum boss damage.
+//
+// Only the LIVE ones are cleared. Anything already expired is spent and gone, and reaching back further would
+// be inventing a punishment rather than undoing a transfer.
+const boosts = await db.query(
+    `DELETE FROM mkt_user_boost WHERE buyer_id = $1 AND expires_at > NOW() RETURNING kind, magnitude`,
+    [HUDSON],
+).catch(() => []);
+const dmg = boosts.filter((b) => b.kind === "damage");
+const strikes = boosts.filter((b) => b.kind === "strikes");
+console.log(`  boosts cleared: ${boosts.length} live — ${dmg.length} damage (${2 ** dmg.length}x, capped to 20x) `
+    + `and ${strikes.length} strike potions worth ${strikes.reduce((n, b) => n + Number(b.magnitude), 0)} extra swings`);
+await trackActivity(HUDSON, "admin_adjustment", { kind: "alt_funnel_boosts_cleared", cleared: boosts.length }).catch(() => {});
+
 console.log(`\nDone. gold ${row.gold.toLocaleString()}, xp ${Number(row.xp).toLocaleString()}.`);
