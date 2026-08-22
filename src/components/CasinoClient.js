@@ -259,10 +259,17 @@ const SUIT_ART = { s: { glyph: "♠", red: false }, h: { glyph: "♥", red: true
 function Card({ card, delay = 0, flip = false, dead = false }) {
     const rank = String(card).slice(0, -1);
     const suit = SUIT_ART[String(card).slice(-1)] || SUIT_ART.s;
+    // A rank in the corner and a pip in the middle was a token, not a card. Real indices in BOTH corners
+    // (the lower one rotated, the way a card is readable from either side of a table) and a pip big enough
+    // to be the thing you actually read the hand from. A court card gets a heavier centre so a face is
+    // distinguishable from a number at a glance, which is most of what reading a hand is.
+    const court = rank === "J" || rank === "Q" || rank === "K";
     return (
-        <span className={`cas-card${suit.red ? " is-red" : ""}${flip ? " is-turn" : ""}${dead ? " is-dead" : ""}`}
+        <span className={`cas-card${suit.red ? " is-red" : ""}${flip ? " is-turn" : ""}${dead ? " is-dead" : ""}${court ? " is-court" : ""}${rank === "A" ? " is-ace" : ""}`}
             style={delay ? { "--d": `${delay}ms` } : undefined}>
-            <b>{rank}</b><i>{suit.glyph}</i>
+            <span className="cas-ix"><b>{rank}</b><i>{suit.glyph}</i></span>
+            <span className="cas-pip">{suit.glyph}</span>
+            <span className="cas-ix is-br"><b>{rank}</b><i>{suit.glyph}</i></span>
         </span>
     );
 }
@@ -1355,6 +1362,20 @@ export default function CasinoClient({ initial }) {
                         thing you are reading. It is genuinely not in the payload while the hand is open. */}
                     {seated && at.live && at.id === "blackjack" ? (
                         <div className="cas-felt">
+                            {/* ── THE TABLE ITSELF ────────────────────────────────────────────────
+                                The felt was a rounded rectangle with a green gradient on it, which is why
+                                the whole game read as a form. A real table tells you the rules before you
+                                sit down — they are printed on the baize — and it has an arc, a rail and a
+                                shoe for the cards to come from. All of it inert and aria-hidden: it is
+                                furniture, and the deal animation now flies cards out of something that is
+                                actually there. */}
+                            <span className="cas-felt-arc" aria-hidden="true" />
+                            <span className="cas-felt-rules" aria-hidden="true">
+                                <b>BLACKJACK PAYS 3 TO 2</b>
+                                <i>Dealer must stand on 17</i>
+                            </span>
+                            <span className="cas-shoe" aria-hidden="true" />
+
                             <div className="cas-seat">
                                 <span className="cas-seat-who">Dealer{hand && !hand.dealerHidden && bjSettled ? ` · ${hand.dealerValue.total}` : ""}</span>
                                 <div className="cas-cards">
@@ -1392,6 +1413,19 @@ export default function CasinoClient({ initial }) {
                                     </div>
                                 </div>
                             ))}
+                            {/* ── WHAT IS ACTUALLY ON THE TABLE ──────────────────────────────────
+                                The stake was a number inside a button at the bottom of the screen, which is
+                                the one place on a blackjack table money never is. It sits in the betting
+                                spot now, as chips, and it doubles when you double — so the thing you stand
+                                to lose is on the felt in front of you rather than in the UI. */}
+                            <div className={`cas-spot${hand?.open ? " is-live" : ""}`} aria-hidden="true">
+                                <span className="cas-spot-ring" />
+                                <span className="cas-stack">
+                                    {[0, 1, 2].map((i) => <span key={i} className="cas-chip" style={{ "--i": i }} />)}
+                                    <em>{money(hand?.hands?.[0]?.doubled ? bet * 2 : bet)}</em>
+                                </span>
+                            </div>
+
                             <p className={`cas-result${hand && !hand.open && hand.won > 0 ? " is-win" : ""}`}>
                                 {!hand ? `Blackjack pays 3:2. The house rakes ${Math.round(rakeRate * 100)}% of what you win — never your stake.`
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
