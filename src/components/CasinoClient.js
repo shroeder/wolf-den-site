@@ -417,27 +417,6 @@ export default function CasinoClient({ initial }) {
         el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "auto" });
     }, [x]);
 
-    // ── DEPTH ────────────────────────────────────────────────────────────────────────────────────────────
-    // The wall is painted on the scroll container itself, which means it did not move AT ALL: walking the
-    // floor slid nine cabinets across a completely static backdrop, and a backdrop that never moves reads as
-    // a photograph behind the furniture rather than a room you are in.
-    //
-    // Shifting its background-position by a fraction of the scroll is the whole fix. It moves at 45% of the
-    // speed of the things standing in front of it, which is what parallax is, and because the wall tiles
-    // there is no edge to run off no matter how far the floor is walked.
-    useEffect(() => {
-        const el = roomRef.current;
-        if (!el) return undefined;
-        let raf = 0;
-        const onScroll = () => {
-            if (raf) return;
-            raf = requestAnimationFrame(() => { raf = 0; el.style.setProperty("--par", `${el.scrollLeft}px`); });
-        };
-        onScroll();
-        el.addEventListener("scroll", onScroll, { passive: true });
-        return () => { el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
-    }, []);
-
     // ...and the walk to it. Runs once: after this the position is yours, and a link should not be able to
     // yank you back across the floor on a later render.
     useEffect(() => {

@@ -17359,18 +17359,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
        point precisely so it can do this — a perspective backdrop is only correct from one camera position,
        and this camera pans. The gradient stays underneath as the colour the room is when the image has not
        arrived yet, so a slow connection gets a dark violet hall rather than a white one. */
-    /* Sized at 122% of the room, not 100%. The wall tile is 3:1, so at 100% its arches came out 75px wide
-       with an 84px cabinet standing in front of them — furniture bigger than the architecture, which reads
-       as a doll house. Oversizing it pushes the arches past the machines and crops the dead cornice off the
-       top, which is the half of the picture nothing was using. */
-    background: url("/images/casino/room.webp") repeat-x center / auto 122%,
-        radial-gradient(120% 80% at 50% 0%, #2a1636 0%, #140d1c 55%, #0a0710 100%);
-    /* ── PARALLAX ── the wall is FURTHER AWAY than the cabinets and has to move more slowly than they do.
-       A background on a scroll container is pinned to the element, not to the content, so this wall did
-       not move at all: walking the floor slid nine machines across a still photograph. Shifting it by 45%
-       of the scroll (the component feeds `--par`) is the entire fix, and because the wall tiles there is
-       no edge to run off however far the floor is walked. */
-    background-position: calc(var(--par, 0px) * -0.45) 82%, center;
+    /* The colour the room is before the wall arrives. A slow connection gets a dark violet hall rather
+       than a white box; the wall itself now lives on the floor below, not here. */
+    background: radial-gradient(120% 80% at 50% 0%, #2a1636 0%, #140d1c 55%, #0a0710 100%);
     /* ── THE WINDOW, AND YOU CAN MOVE IT ──────────────────────────────────────────────────────────────
        This used to read "it scrolls, but never by dragging" — the camera followed the walk buttons and a
        stray swipe could leave you looking at a wall you were not standing near. The walk buttons are gone
@@ -17403,7 +17394,23 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Tied to the room as well, with the old percentage kept as a floor for short screens. The desktop widths
    below still override this — a very long floor is a hike on a screen that can already see four
    cabinets at once. */
-.cas-world { position: relative; width: max(480%, calc(var(--room) * 5.7)); height: 100%; cursor: pointer; }
+.cas-world { position: relative; width: max(480%, calc(var(--room) * 5.7)); height: 100%; cursor: pointer;
+    /* ── THE WALL IS PART OF THE FLOOR ────────────────────────────────────────────────────────────────
+       Luke: "the bg and the foreground should match scroll no paralax."
+
+       It used to sit on `.cas-room`, and a background on a SCROLL CONTAINER is pinned to the element
+       rather than to its contents — so the wall did not move at all while nine cabinets slid across it.
+       The fix for that was a scroll listener feeding a `--par` custom property into a background-position
+       calc, which moved it at 45% of the floor's speed.
+
+       Painting it on the WORLD instead makes it move at exactly the floor's speed, natively, because the
+       world is the thing that scrolls. Matching the foreground is not a smaller multiplier — it is no
+       multiplier at all, and it deletes the listener, the rAF and the custom property with it.
+
+       Sized at 122% of the room: the tile is 3:1, so at 100% its arches came out narrower than the
+       cabinets standing in front of them, which reads as a doll house. The overflow crops the dead
+       cornice off the top, which is the half of the picture nothing was using. */
+    background: url("/images/casino/room.webp") repeat-x left 82% / auto 122%; }
 @media (min-width: 700px) { .cas-world { width: 290%; } }
 @media (min-width: 1024px) { .cas-world { width: 235%; } }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
