@@ -21,3 +21,6 @@ road-sheet-ingame.png
 scripts/tmp-*.mjs
 scripts/_tmp-*.mjs
 .casino-art/
+
+# throwaway session-minting helpers used by the shot rig; never committed
+scripts/_*.mjs
