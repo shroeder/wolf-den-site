@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib/marketplace/casino.js";
+import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib/marketplace/casino.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
@@ -54,7 +54,11 @@ export async function POST(request) {
                 case "move": return noStore(await moveCasino(buyer.id, { x: b?.x, y: b?.y, facing: b?.facing }));
                 // ── THE PULL ── the bet is validated and taken server-side. `bet` arriving from a POST body is
                 // a number somebody can type, so it is clamped in spinSlot rather than trusted here.
-                case "spin": return noStore(await spinSlot(buyer.id, { bet: b?.bet }));
+                case "spin": return noStore(await spinSlot(buyer.id, { bet: b?.bet, machine: b?.machine }));
+                // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
+                // being gambled is what the last paid pull actually won, which is not a thing a POST gets
+                // an opinion about.
+                case "gamble": return noStore(await gambleWin(buyer.id, { machine: b?.machine }));
                 // The wheel and the ticket. Both validate their own choice server-side — a bet id and a
                 // five-number ticket are the two things a POST body can most easily lie about, and either
                 // would break the odds these games were priced on.

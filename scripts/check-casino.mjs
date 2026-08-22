@@ -16,6 +16,7 @@ import {
     WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
     PRIZE_CHANCE, PRIZE_SHELF, CASINO_PETS, MAX_PERKS, perkedRtp, REFUND_CHANCE,
 } from "../src/lib/marketplace/casino.js";
+import { SLOT_BONUSES, bonusEv } from "../src/lib/marketplace/slot-bonus.js";
 
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
 const problems = [];
@@ -30,7 +31,7 @@ for (const m of Object.values(SLOT_MACHINES)) {
     const total = syms.reduce((n, x) => n + x.weight, 0);
     const rtp = slotRtp(m.id);
     const hitRate = slotHitRate(m.id);
-    slotRtps[m.id] = rtp;
+    slotRtps[m.id] = rtp;   // paytable only; the real number is set below once its features are priced
 
     console.log(`\n${m.label.toUpperCase()}  —  ${m.blurb}`);
     console.log(`  symbols      ${syms.length}, ${total} weight across the reel`);
@@ -39,11 +40,36 @@ for (const m of Object.values(SLOT_MACHINES)) {
     console.log(`  house edge   ${pct(1 - rtp)}`);
     console.log(`  hit rate     ${pct(hitRate)} of pulls pay something`);
 
-    if (rtp > RTP_CEILING) {
-        problems.push(`${m.label} returns ${pct(rtp)}, above the ${pct(RTP_CEILING)} ceiling — it is a money printer`);
+    // ── AND WHAT THE FEATURES COST ───────────────────────────────────────────────────────────────────────
+    // A bonus takes its return OUT of the base game — the ceiling does not move because a machine grew a
+    // feature. So the paytable's number is only half the machine, and this is the other half: each feature
+    // priced exactly, added on, and the total checked against the ceiling below.
+    //
+    // A feature whose cost cannot be computed cannot ship, because the gate would be checking arithmetic
+    // that no longer describes the machine.
+    const ev = bonusEv(m.id, m, rtp, hitRate);
+    const withBonuses = rtp + ev.total;
+    
+    if ((SLOT_BONUSES[m.id] || []).length) {
+        console.log("  bonuses");
+        for (const b of SLOT_BONUSES[m.id]) {
+            const cost = ev[b.id] || 0;
+            console.log(`    ${b.label.padEnd(18)} ${(cost >= 0 ? "+" : "") + pct(cost)}   ${b.blurb}`);
+        }
+        console.log(`  paytable     ${pct(rtp)}  +  features ${pct(ev.total)}  =  ${pct(withBonuses)}`);
     }
-    if (rtp >= 1) {
-        problems.push(`${m.label} returns ${pct(rtp)} — every pull is free money and the Den's economy is over`);
+
+    slotRtps[m.id] = withBonuses;
+    if (withBonuses > RTP_CEILING) {
+        problems.push(`${m.label} returns ${pct(withBonuses)} with its features, above the ${pct(RTP_CEILING)} ceiling — it is a money printer`);
+    }
+    if (withBonuses >= 1) {
+        problems.push(`${m.label} returns ${pct(withBonuses)} — every pull is free money and the Den's economy is over`);
+    }
+    // A machine whose features are worth almost nothing has decoration rather than features. The point of
+    // funding them out of the paytable is that they carry a real share of what the machine pays.
+    if ((SLOT_BONUSES[m.id] || []).length && Math.abs(ev.total) < 0.01 && ev.total <= 0) {
+        problems.push(`${m.label}'s features are worth ${pct(ev.total)} — they are decoration, not features`);
     }
 
     // ── WHERE THE MONEY GOES ─────────────────────────────────────────────────────────────────────────────

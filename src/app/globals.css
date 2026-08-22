@@ -17662,3 +17662,34 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Your own hero on the floor. Sized to the same footprint the blank circle had, so nothing else moves. */
 .cas-you img { display: block; width: 38px; height: 38px; object-fit: contain;
     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6)); }
+
+/* ── WHAT A CABINET REMEMBERS ABOUT YOU ──────────────────────────────────────────────────────────────
+   The tray, the multiplier, banked free pulls. Shown always rather than only when they hold something —
+   a meter you only see once it has something in it is a meter nobody knows they are filling. */
+.cas-meters { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 8px; }
+.cas-meter { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    transition: border-color .2s ease, background .2s ease; }
+.cas-meter i { font-style: normal; font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #98a0aa; }
+.cas-meter b { font-size: 12px; font-weight: 900; color: #cbd3dc; }
+/* Something in it. Gold, because on this floor gold is the colour of a thing that is going to pay. */
+.cas-meter.is-full { border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.1); }
+.cas-meter.is-full b { color: #ffe9b8; }
+.cas-meter.is-free { border-color: rgba(126,255,178,0.5); background: rgba(126,255,178,0.1); }
+.cas-meter.is-free b { color: #b6ffd4; }
+
+/* The two features, named on the machine's own face. A bonus nobody knows about is a bonus that fires
+   and reads as the game glitching. */
+.cas-vol em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; margin-top: 5px; line-height: 1.35; }
+.cas-vol em b { color: #ffd75e; font-weight: 800; }
+
+/* And what one just did. One line each, arriving with the result rather than instead of it. */
+.cas-fx { margin: 0 0 6px; text-align: center; font-size: 11px; font-weight: 800; color: #9fc6dd;
+    animation: casFx .3s ease both; }
+.cas-fx.is-big { font-size: 13px; color: #ffe9b8; letter-spacing: 0.02em;
+    text-shadow: 0 0 14px rgba(255,215,94,0.5); }
+@keyframes casFx { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* Double or Nothing sits above the pull button — it is a decision about the money you just won, and it
+   has to be answered before the next pull, so it goes where the next pull would be. */
+.cas-gamble { width: 100%; margin-bottom: 8px; }

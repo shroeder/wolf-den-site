@@ -7,6 +7,9 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
+import {
+    GAMBLE_WIN_CHANCE, SLOT_BONUSES, applyBonuses, bonusEv, emptyMeter, hasBonus, moonstruckMult,
+} from "@/lib/marketplace/slot-bonus.js";
 
 // ── THE CASINO ───────────────────────────────────────────────────────────────────────────────────────────────
 // A room off the town, owner-gated, laid out like the tavern: you walk left and right, other members walking
@@ -90,8 +93,17 @@ export const SLOT_MACHINES = {
         // pay LESS THAN THE BET on purpose — a moon pair returns 0.4x, so it is a win that is really a
         // smaller loss. That is exactly what slot machines do, and it is honest here because the number on
         // screen is the number you actually got.
+        // ── FUNDING THE FEATURES ────────────────────────────────────────────────────────────────────
+        // Three doubloons paid 20x and was the third-biggest line on the machine. It now pays 8x and CALLS
+        // THE PACK — ten free pulls — which is worth about as much again, arriving as a run of pulls you
+        // watch rather than a number that flashes once. That is the whole trade a bonus makes: the same
+        // money, spent on something that takes longer and feels like an event.
+        //
+        // The Nudge is not funded from anywhere, because it is not new money: it only ever converts a hand
+        // that ALREADY paid the wolf pair into one that pays the wolf triple, and that 2.2% is what the
+        // rest of the table gives up to it.
         pays: {
-            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 20, bone: 8, moon: 4 },
+            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 8, bone: 8, moon: 4 },
             two: { wolf: 8, chest: 3, laurel: 1.5, doubloon: 1, bone: 0.5, moon: 0.4 },
         },
     },
@@ -118,9 +130,12 @@ export const SLOT_MACHINES = {
         // rather than the 0.15x a machine like this could get away with. A grinder whose constant small
         // wins are all a fifth of the stake is not a grinder, it is a slower shredder telling you it is
         // paying you.
+        // The Tray tips out on a moon triple, so the moon lines are what pay for it. Three moons returns
+        // your stake exactly now rather than 1.2x — which is the right shape anyway: the triple is no longer
+        // the prize, it is the thing that HANDS you the prize you have been filling all session.
         pays: {
-            three: { wolf: 80, chest: 12, laurel: 3, moon: 1.2 },
-            two: { wolf: 7, chest: 2, laurel: 0.9, moon: 0.5 },
+            three: { wolf: 80, chest: 12, laurel: 3, moon: 1 },
+            two: { wolf: 7, chest: 2, laurel: 0.9, moon: 0.45 },
         },
     },
 
@@ -145,8 +160,15 @@ export const SLOT_MACHINES = {
         // 4x that one line alone paid 40% of the bet back forever. On a machine like this the common
         // symbol's triple has to be worth almost nothing, and here it is worth 1.2x — a hand back, plus a
         // little, which is the right size for the thing that happens all the time.
+        // Three stars paid 15x — the single biggest line on the machine. It pays 2x now and OPENS
+        // MOONRISE: eight free spins at double. That is worth roughly what the 15x was, and the difference
+        // between them is the entire argument for bonuses — one is a number that appears and is gone, the
+        // other is eight spins you get to watch knowing every one of them is doubled.
+        //
+        // The scatter drops from 1.33x to 1.1x to pay for Moonstruck, which is funded by the dead pulls it
+        // is made of.
         pays: {
-            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 15, bone: 1.2 },
+            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 2, bone: 1.2 },
             two: {},
         },
         // ── THE SCATTER ── stars pay wherever they land, not only in a line, and it takes TWO of them. It
@@ -155,7 +177,7 @@ export const SLOT_MACHINES = {
         //
         // Two, not one. A single star pays on 40% of pulls, which would have made the chase machine the
         // most frequent payer on the floor and quietly deleted the reason it exists.
-        scatter: { id: "star", pays: { 2: 1.33 } },
+        scatter: { id: "star", pays: { 2: 1.1 } },
     },
 };
 
@@ -229,6 +251,56 @@ const pickSymbol = (machineId = "slot") => {
 
 const clampBet = (v) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(v) || 0)));
 
+
+// ── WHAT A MACHINE REMEMBERS ABOUT YOU ───────────────────────────────────────────────────────────────────────
+// Four of the six bonuses carry state between pulls, so a pull stopped being a pure function of the reels.
+// The meter is per player PER MACHINE — a tray filled at Den Fortune has nothing to do with a streak at
+// Moonrise, and sharing one row between cabinets would let a feature on one fund a feature on another.
+//
+// Everything in it is in STAKE UNITS. See migration 394 for why that is not a detail.
+async function loadMeter(buyerId, machineId) {
+    const row = await db.queryOne(
+        `SELECT tray, streak, free_pulls, free_mult, pending FROM mkt_casino_meter WHERE buyer_id = $1 AND machine = $2`,
+        [buyerId, machineId],
+    ).catch(() => null);
+    if (!row) return emptyMeter();
+    return {
+        tray: Number(row.tray) || 0,
+        streak: Number(row.streak) || 0,
+        freePulls: Number(row.free_pulls) || 0,
+        freeMult: Number(row.free_mult) || 1,
+        pending: Number(row.pending) || 0,
+    };
+}
+
+// The key is (buyer_id, machine) and it is a real PRIMARY KEY, so this ON CONFLICT names the whole of it.
+// Naming less than the key is a 42P10 and naming a partial index without its WHERE is two weeks of silently
+// lost writes; this codebase has paid for both.
+const saveMeter = (buyerId, machineId, meter) => db.query(
+    `INSERT INTO mkt_casino_meter (buyer_id, machine, tray, streak, free_pulls, free_mult, pending, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+     ON CONFLICT (buyer_id, machine) DO UPDATE
+        SET tray = $3, streak = $4, free_pulls = $5, free_mult = $6, pending = $7, updated_at = NOW()`,
+    [buyerId, machineId, meter.tray, meter.streak, meter.freePulls, meter.freeMult, meter.pending],
+).catch(() => {});
+
+/** Every meter a member has, for the room to draw. */
+export async function casinoMeters(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db.query(
+        `SELECT machine, tray, streak, free_pulls, free_mult, pending FROM mkt_casino_meter WHERE buyer_id = $1`,
+        [buyerId],
+    ).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.machine, {
+        tray: Number(r.tray) || 0,
+        streak: Number(r.streak) || 0,
+        freePulls: Number(r.free_pulls) || 0,
+        freeMult: Number(r.free_mult) || 1,
+        pending: Number(r.pending) || 0,
+        mult: moonstruckMult(Number(r.streak) || 0),
+    }]));
+}
+
 /**
  * ONE PULL.
  *
@@ -246,20 +318,34 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     const m = slotMachine(machine);
     const stake = clampBet(bet);
 
+    // A pull banked by Pack Call or Moonrise costs nothing. The meter is read BEFORE the stake is taken,
+    // because whether there is a stake to take is the first thing it decides.
+    const meter = await loadMeter(buyerId, m.id);
+    const free = meter.freePulls > 0;
+
     const perks = await casinoPerks(buyerId);
     // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
     // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
     // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
     // appears in the coin log is a play nobody can audit.
     let onHouse = false;
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
+    let paid;
+    if (free) {
+        // No debit, no ledger row for a bet that was not placed — and the free pull is spent here so a
+        // failure further down cannot hand out the same pull twice.
+        meter.freePulls -= 1;
+        paid = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        if (!paid) return { ok: false, error: "no_gold" };
+    } else {
+        paid = await db.queryOne(
+            `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+            [buyerId, stake],
+        ).catch(() => null);
+        if (!paid) return { ok: false, error: "no_gold" };
+        await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
+    }
 
-    if (onTheHouse(perks)) {
+    if (!free && onTheHouse(perks)) {
         const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
             [buyerId, stake]).catch(() => null);
         if (back) {
@@ -270,7 +356,25 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     }
 
     const reels = [pickSymbol(m.id), pickSymbol(m.id), pickSymbol(m.id)];
-    const mult = slotPayout(reels, m.id);
+
+    // ── WHAT THE FEATURES DO TO THIS PULL ────────────────────────────────────────────────────────────────
+    // All six live in slot-bonus.js, as one pure function, because logic that decides payouts and lives
+    // inside a database call can only be checked by spending money. check:slot-bonus plays millions of pulls
+    // through the same function this line calls.
+    const fx = applyBonuses({
+        machineId: m.id,
+        machine: m,
+        reels,
+        meter,
+        free,
+        payout: (r) => slotPayout(r, m.id),
+        rollSymbol: () => pickSymbol(m.id),
+    });
+    const { nudged, awarded } = fx;
+    const struck = fx.struck;
+    const tipped = fx.tipped;
+    const mult = fx.mult;
+
     const won = Math.round(stake * mult);
 
     let gold = paid.gold;
@@ -298,7 +402,18 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
     await tickCasinoQuests(buyerId, "slot", won);
     const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
-    return { ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse };
+
+    // Double or Nothing gambles the win that is SITTING THERE, so the amount is remembered rather than sent
+    // back up and trusted on the way in. Only on a paid pull: gambling a free pull's winnings would be a
+    // coin flip on money that cost nothing, which is a different game.
+    meter.pending = hasBonus(m.id, "gamble") && won > 0 && !free ? won : 0;
+    await saveMeter(buyerId, m.id, meter);
+
+    return {
+        ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse,
+        free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
+        meter: { tray: meter.tray, streak: meter.streak, freePulls: meter.freePulls, freeMult: meter.freeMult, pending: meter.pending, mult: moonstruckMult(meter.streak) },
+    };
 }
 
 // ── WHAT THE CASINO PETS ARE WORTH ───────────────────────────────────────────────────────────────────────────
@@ -433,6 +548,56 @@ export async function rollCasinoPrize(buyerId, { jackpot = false, perks = null }
         await trackActivity(buyerId, "casino_prize", { kind: prize.kind, tier, jackpot }).catch(() => {});
     }
     return prize ? { ...prize, tier, jackpot } : null;
+}
+
+
+/**
+ * DOUBLE OR NOTHING.
+ *
+ * The only bet in the building with no edge on it: exactly even money, entirely optional, and it costs the
+ * ceiling nothing because its expected value is precisely zero. A gamble feature at 48% would be the house
+ * taking a second bite out of a win it has already raked, which is the sort of thing a player finds out
+ * about eventually and never forgives.
+ *
+ * The amount comes from the METER, never from the request. `pending` is what the last paid pull actually
+ * won, recorded server-side, so the size of the gamble is not something a POST body gets an opinion about.
+ */
+export async function gambleWin(buyerId, { machine } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const m = slotMachine(machine);
+    if (!hasBonus(m.id, "gamble")) return { ok: false, error: "no_gamble" };
+
+    const meter = await loadMeter(buyerId, m.id);
+    const stake = Math.round(meter.pending || 0);
+    if (stake <= 0) return { ok: false, error: "nothing_to_gamble" };
+
+    // The win is already in the player's gold, so the gamble takes it back first and pays the result. Taking
+    // it back with the same `gold >= $2` guard every other bet uses means a gamble can never go through on
+    // gold that has already been spent elsewhere.
+    const taken = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, stake],
+    ).catch(() => null);
+    if (!taken) return { ok: false, error: "no_gold" };
+    await logCoin(buyerId, -stake, "casino_gamble_bet", { balanceAfter: taken.gold, meta: { machine: m.id } });
+
+    const won = Math.random() < GAMBLE_WIN_CHANCE;
+    let gold = taken.gold;
+    if (won) {
+        const back = await db.queryOne(
+            `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, stake * 2],
+        ).catch(() => null);
+        if (back) {
+            gold = back.gold;
+            await logCoin(buyerId, stake * 2, "casino_gamble_win", { balanceAfter: gold, meta: { machine: m.id } });
+        }
+    }
+
+    // Win or lose, the gamble is over — a win cannot be rolled again, or "even money" becomes a martingale
+    // and the variance stops being anything the floor priced.
+    meter.pending = 0;
+    await saveMeter(buyerId, m.id, meter);
+    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, gold };
 }
 
 // ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -709,8 +874,16 @@ export async function getCasinoState(buyerId) {
         // are deliberately absent — the client renders the numbers, the server decides the outcome.
         slots: Object.fromEntries(Object.values(SLOT_MACHINES).map((m) => [m.id, {
             id: m.id, label: m.label, blurb: m.blurb, symbols: m.symbols, pays: m.pays,
-            scatter: m.scatter || null, rtp: slotRtp(m.id), hitRate: slotHitRate(m.id),
+            scatter: m.scatter || null, hitRate: slotHitRate(m.id),
+            // ── THE NUMBER ON THE MACHINE'S FACE ────────────────────────────────────────────────────
+            // The paytable PLUS its features, because that is what the machine returns. Sending the bare
+            // paytable had Den Fortune advertising 84.0% while actually paying 87.9% — under-reporting is
+            // the safe direction to be wrong in and it is still wrong, and it is the one number on this
+            // floor a player might check.
+            rtp: slotRtp(m.id) + bonusEv(m.id, m, slotRtp(m.id), slotHitRate(m.id)).total,
+            bonuses: SLOT_BONUSES[m.id] || [],
         }])),
+        meters: await casinoMeters(buyerId),
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
         wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },

@@ -135,6 +135,11 @@ export default function CasinoClient({ initial }) {
     // through the forty balls, which is the only thing the animation actually advances.
     const [card, setCard] = useState(null);
     const [called, setCalled] = useState(0);
+    // What each cabinet remembers about you — the tray filling, the multiplier climbing, free pulls banked.
+    // Seeded from the server and replaced by every pull's answer, never incremented locally: a meter the
+    // client keeps its own count of is a meter that disagrees with the one that pays.
+    const [meters, setMeters] = useState(initial?.meters || {});
+    const [fx, setFx] = useState(null);      // what the features did on the last pull
     const rakeRate = initial?.blackjack?.rakeRate ?? 0.2;
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -224,7 +229,7 @@ export default function CasinoClient({ initial }) {
     const pull = useCallback(async () => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null);
+        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null); setFx(null);
         Sfx.whoosh();
 
         // Cycle the reels while we wait. Cleared when the result lands, so a slow network spins longer
@@ -267,6 +272,8 @@ export default function CasinoClient({ initial }) {
             timers.current.push(setTimeout(() => {
                 setBusy(false);
                 absorb(r);
+                if (r.meter) setMeters((p) => ({ ...p, [r.machine]: r.meter }));
+                setFx({ nudged: r.nudged, awarded: r.awarded, tipped: r.tipped, struck: r.struck, free: r.free });
                 const three = r.reels[0] === r.reels[1] && r.reels[1] === r.reels[2];
                 if (r.won > 0) {
                     setFlash(three ? "big" : "win");
@@ -407,6 +414,29 @@ export default function CasinoClient({ initial }) {
         return [syms[mid], syms[syms.length - 1], syms[Math.max(0, mid - 1)]];
     }, [st, at]);
 
+    // ── DOUBLE OR NOTHING ────────────────────────────────────────────────────────────────────────────────
+    // The amount is not sent — the server gambles what its own meter says the last paid pull won. All this
+    // does is say yes.
+    const gamble = useCallback(async () => {
+        if (busy) return;
+        unlock();
+        setBusy(true); setErr(null); setFlash(null);
+        Sfx.whoosh();
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "gamble", machine: at?.id }),
+        }).then((x2) => x2.json()).catch(() => null);
+        setBusy(false);
+        if (!r?.ok) { setErr("That didn't go through."); return; }
+        setSt((p) => ({ ...p, gold: r.gold }));
+        setMeters((p) => ({ ...p, [r.machine]: { ...(p[r.machine] || {}), pending: 0 } }));
+        setFx({ gambled: { won: r.won, amount: r.staked, payout: r.payout } });
+        if (r.won) {
+            setFlash("win"); Sfx.crit(0.8); Haptic.crit();
+            timers.current.push(setTimeout(() => setFlash(null), 1400));
+        } else { Sfx.block(0.4); Haptic.hit(0.5); }
+    }, [busy, at]);
+
     const toggleNumber = useCallback((n) => {
         setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
     }, []);
@@ -501,6 +531,30 @@ export default function CasinoClient({ initial }) {
                         the return is printed beside them because a floor that hides its own odds is a
                         floor that has something to hide. All three return within a point of each other,
                         which is exactly the thing worth being able to check. */}
+                    {/* ── WHAT THIS CABINET REMEMBERS ─────────────────────────────────────────────────
+                        The tray, the multiplier and any banked free pulls. Shown ALWAYS rather than only
+                        when they are non-zero: a meter you only see once it has something in it is a meter
+                        nobody knows they are filling. */}
+                    {SLOTS.has(at.id) && meters[at.id] ? (
+                        <div className="cas-meters">
+                            {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "tray") ? (
+                                <span className={`cas-meter${meters[at.id].tray > 0 ? " is-full" : ""}`}>
+                                    <i>The Tray</i><b>{(meters[at.id].tray || 0).toFixed(2)}x</b>
+                                </span>
+                            ) : null}
+                            {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "moonstruck") ? (
+                                <span className={`cas-meter${(meters[at.id].mult || 1) > 1 ? " is-full" : ""}`}>
+                                    <i>Moonstruck</i><b>{(meters[at.id].mult || 1).toFixed(2)}x</b>
+                                </span>
+                            ) : null}
+                            {meters[at.id].freePulls > 0 ? (
+                                <span className="cas-meter is-free">
+                                    <i>Free pulls</i><b>{meters[at.id].freePulls}{meters[at.id].freeMult > 1 ? ` · ${meters[at.id].freeMult}x` : ""}</b>
+                                </span>
+                            ) : null}
+                        </div>
+                    ) : null}
+
                     {SLOTS.has(at.id) && st?.slots?.[at.id] ? (
                         <p className="cas-vol">
                             <span>{st.slots[at.id].blurb}</span>
@@ -509,6 +563,11 @@ export default function CasinoClient({ initial }) {
                                 {" · "}top {money(Math.max(...Object.values(st.slots[at.id].pays.three)))}x
                                 {" · "}returns {(st.slots[at.id].rtp * 100).toFixed(1)}%
                             </i>
+                            {/* The two features, named on the machine. A bonus nobody knows about is a
+                                bonus that fires and reads as the game glitching. */}
+                            {(st.slots[at.id].bonuses || []).map((b) => (
+                                <em key={b.id}><b>{b.label}</b> {b.blurb}</em>
+                            ))}
                         </p>
                     ) : null}
 
@@ -588,6 +647,28 @@ export default function CasinoClient({ initial }) {
                                     </span>
                                 ) : null}
                             </div>
+                            {/* ── WHAT THE FEATURES JUST DID ──────────────────────────────────────────
+                                Each one gets a line, because a feature that fires silently is a feature the
+                                player experiences as the numbers behaving oddly. */}
+                            {fx?.nudged ? (
+                                <p className={`cas-fx${fx.nudged.hit ? " is-big" : ""}`}>
+                                    {fx.nudged.hit ? "THE NUDGE — and it lands." : "The Nudge: the third reel goes again…"}
+                                </p>
+                            ) : null}
+                            {fx?.struck > 1 ? <p className="cas-fx">Moonstruck — paid at {fx.struck.toFixed(2)}x.</p> : null}
+                            {fx?.tipped ? <p className="cas-fx is-big">The tray tips out — {fx.tipped.toFixed(2)}x.</p> : null}
+                            {fx?.awarded ? (
+                                <p className="cas-fx is-big">
+                                    {fx.awarded.id === "pack" ? "PACK CALL" : "MOONRISE"} — {fx.awarded.pulls} free pulls
+                                    {fx.awarded.mult > 1 ? `, everything doubled` : ""}.
+                                </p>
+                            ) : null}
+                            {fx?.gambled ? (
+                                <p className={`cas-fx${fx.gambled.won ? " is-big" : ""}`}>
+                                    {fx.gambled.won ? `Doubled — ${money(fx.gambled.payout)} gold.` : `Gone. ${money(fx.gambled.amount)} gold on the flip.`}
+                                </p>
+                            ) : null}
+
                             {spin ? (
                                 <p className={`cas-result${spin.won > 0 ? " is-win" : ""}`}>
                                     {spin.won > 0
@@ -773,6 +854,14 @@ export default function CasinoClient({ initial }) {
                                     ) : null}
                                 </div>
                             ) : null}
+                            {/* Double or Nothing goes ABOVE the pull button, because it is a decision about
+                                the money you just won and it has to be answered before the next pull — so it
+                                sits where the next pull would be. */}
+                            {SLOTS.has(at.id) && (meters[at.id]?.pending || 0) > 0 ? (
+                                <button type="button" className="cas-act is-split cas-gamble" disabled={busy} onClick={gamble}>
+                                    Double or nothing · {money(meters[at.id].pending)}
+                                </button>
+                            ) : null}
                             {at.id === "blackjack" && hand?.open ? null : (
                             <button type="button" className="cas-pull"
                                 disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
@@ -784,7 +873,9 @@ export default function CasinoClient({ initial }) {
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
                                 {busy ? "…"
-                                    : (st?.gold || 0) < bet ? "Not enough gold"
+                                    : SLOTS.has(at.id) && (meters[at.id]?.freePulls || 0) > 0
+                                        ? `Free pull · ${meters[at.id].freePulls} left`
+                                        : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Spin" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
