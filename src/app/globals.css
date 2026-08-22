@@ -17331,17 +17331,29 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* The room. Deep and warm, with the floor catching the light from the cabinets. */
 /* ── HOW TALL THE ROOM IS ALLOWED TO BE ──────────────────────────────────────────────────────────────
-   300px flat, and on a real phone that put every machine's controls below the fold: site chrome and the
-   HUD take ~150px, the room took 300, the walk row 56, and the panel started at 500 on a screen with
-   441 usable. You walked into a casino you could not reach the buttons in.
-   The room is the ATMOSPHERE; the machine is the game. When there is not enough screen for both, the
-   room is what gives way. */
-/* ── A ROOM YOU CAN STAND A PERSON IN ────────────────────────────────────────────────────────────────
-   34vh rather than 30. The cap matters more than the floor: the room only has to be tall enough that a
-   cabinet and the person standing at it are both fully in it, and every pixel above that is taken off the
-   machine controls. The fold rule above still holds — this is four points, not a new proportion. */
-.cas-roomwrap { position: relative; }
-.cas-room { position: relative; height: clamp(168px, 34vh, 320px); margin: 10px 0; border-radius: 16px;
+   THE OLD RULE, AND WHY IT NO LONGER APPLIES. This was capped hard — 30vh, then 34 — because the machine
+   used to render INLINE underneath the room: site chrome and the HUD took ~150px, the room 300, the walk
+   row 56, and the panel started at 500 on a screen with 441 usable. You walked into a casino you could not
+   reach the buttons in. So the room gave way, every time, because the room is the atmosphere and the
+   machine is the game.
+   That trade is gone. Playing happens in a full-screen modal now, so the only thing sharing this screen
+   with the room is a preview card you are reading, not a control you are reaching for. The room can have
+   the space back.
+   Luke: "can we make the experience larger on screen."
+   46vh, and the cap moves with it. Everything standing in the room is sized in vh off this same number —
+   cabinets, hero, props, lamps, the wall itself — so this one value makes the whole scene bigger rather
+   than making a taller box with the same furniture rattling around in it. */
+/* ── AND IT REALLY IS ONE NUMBER NOW ──────────────────────────────────────────────────────────────────
+   Everything in this room used to be sized in `vh` INDEPENDENTLY — the cabinets at 17.3vh, the hero at
+   11.5, the props at 8.9 — which were tuned against a 34vh room and silently meant nothing once the room
+   itself moved. Taking the room to 46vh made every object in it 26% SMALLER relative to the space, which
+   is the opposite of the ask and exactly what the previous version of this comment claimed could not
+   happen.
+   `--room` is the height, and every object below is a fraction OF IT. The fractions are the ones that were
+   tuned by eye at 34vh, so the scene is unchanged in proportion — and changing how big the casino feels is
+   now genuinely one number. */
+.cas-roomwrap { position: relative; --room: clamp(210px, 46vh, 460px); }
+.cas-room { position: relative; height: var(--room); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
        point precisely so it can do this — a perspective backdrop is only correct from one camera position,
@@ -17370,7 +17382,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Wider again. The machines sit 11 points apart and every position in this room is a percentage, so the
    only way to put more floor between two cabinets is to make the floor longer — which costs nothing now
    that walking it is continuous rather than fifteen fixed stops. */
-.cas-world { position: relative; width: 480%; height: 100%; cursor: pointer; }
+/* ── AND THE FLOOR GROWS WITH THEM ────────────────────────────────────────────────────────────────────
+   Spacing between cabinets is a percentage of the floor, and the floor was a percentage of the VIEWPORT
+   WIDTH — while the cabinets themselves scale with the room HEIGHT. On a tall narrow phone those pull in
+   opposite directions: the machines grew with the taller room and the gaps between them did not, so
+   making the scene bigger quietly undid the spacing that was asked for a change earlier.
+   Tied to the room as well, with the old percentage kept as a floor for short screens. The desktop widths
+   below still override this — a very long floor is a hike on a screen that can already see four
+   cabinets at once. */
+.cas-world { position: relative; width: max(480%, calc(var(--room) * 5.7)); height: 100%; cursor: pointer; }
 @media (min-width: 700px) { .cas-world { width: 290%; } }
 @media (min-width: 1024px) { .cas-world { width: 235%; } }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
@@ -17387,7 +17407,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* ── THE CHANDELIERS ─────────────────────────────────────────────────────────────────────────────────
    Hung 19 points apart against the machines 11, so the two rhythms never line up — a light directly over
    every machine would turn the room into wallpaper. */
-.cas-lamp { position: absolute; top: 0; transform: translateX(-50%); width: clamp(30px, 6.1vh, 58px);
+.cas-lamp { position: absolute; top: 0; transform: translateX(-50%); width: calc(var(--room) * 0.179);
     pointer-events: none; }
 .cas-lamp img { display: block; width: 100%; height: auto;
     filter: drop-shadow(0 0 12px rgba(255,200,110,0.55)); }
@@ -17396,7 +17416,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    to hang these is that the floor underneath them gets brighter. Screen blend so it ADDS light rather than
    painting a grey wedge over the wall, and it stops short of the carpet so the pool below can meet it. */
 .cas-lamp::after { content: ""; position: absolute; left: 50%; top: 55%;
-    width: clamp(115px, 23vh, 216px); height: clamp(122px, 24.5vh, 230px);
+    width: calc(var(--room) * 0.676); height: calc(var(--room) * 0.721);
     transform: translateX(-50%); pointer-events: none; mix-blend-mode: screen;
     /* Every radius reaches an edge of the box, so the glow fades out on all four sides and there is no
        straight line anywhere in it. Anchoring the origin at the TOP edge instead — the obvious way to draw
@@ -17416,15 +17436,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    See DECOR in the component. Inert on purpose: no pointer events at all, so a palm can never eat a tap
    meant for the machine behind it. */
 .cas-decor { position: absolute; bottom: 11%; transform: translateX(-50%);
-    width: clamp(44px, 8.9vh, 84px); pointer-events: none; }
+    width: calc(var(--room) * 0.262); pointer-events: none; }
 .cas-decor img { display: block; width: 100%; height: auto;
     filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); }
 .cas-decor::before { content: ""; position: absolute; left: 50%; bottom: -2px;
-    width: 76%; height: clamp(5px, 1.1vh, 10px); transform: translateX(-50%); pointer-events: none;
+    width: 76%; height: calc(var(--room) * 0.032); transform: translateX(-50%); pointer-events: none;
     background: radial-gradient(50% 50% at 50% 50%, rgba(4,2,8,0.62), transparent 74%); }
 /* Against the wall rather than out on the carpet: smaller, higher and dimmer. Three sprites, two
    distances, and the row stops reading as one line of stickers. */
-.cas-decor.is-back { bottom: 22%; width: clamp(32px, 6.4vh, 61px); opacity: .8; filter: brightness(0.78); }
+.cas-decor.is-back { bottom: 22%; width: calc(var(--room) * 0.188); opacity: .8; filter: brightness(0.78); }
 
 /* ── THE VIGNETTE ────────────────────────────────────────────────────────────────────────────────────
    Over everything, including the machines, which is why it cannot be a background layer — a background
@@ -17463,21 +17483,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    on a working machine (see the component — the panel underneath already says what kind of game it is)
    is what buys the room to come down. */
 .cas-mach { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center;
-    width: clamp(78px, 15.6vh, 146px); transition: transform 140ms ease; }
+    width: calc(var(--room) * 0.459); transition: transform 140ms ease; }
 /* Every cabinet is a light source and throws a pool onto the carpet under it. This is most of what makes
    the row feel lit rather than pasted on, and it costs one pseudo-element. */
 .cas-mach-body::after { content: ""; position: absolute; left: 50%; bottom: -9px;
-    width: clamp(80px, 16vh, 150px); height: clamp(20px, 4vh, 38px);
+    width: calc(var(--room) * 0.47); height: calc(var(--room) * 0.118);
     transform: translateX(-50%); pointer-events: none; mix-blend-mode: screen;
     background: radial-gradient(50% 50% at 50% 50%, rgba(255,196,104,0.38), transparent 72%); }
-.cas-mach.is-near .cas-mach-body::after { width: clamp(94px, 18.8vh, 176px);
+.cas-mach.is-near .cas-mach-body::after { width: calc(var(--room) * 0.553);
     background: radial-gradient(50% 50% at 50% 50%, rgba(255,215,94,0.62), transparent 72%); }
 /* A machine that is not built yet is not lit either — dark furniture, not a dead bulb in a lit box. */
 .cas-mach:not(.is-live) .cas-mach-body::after { opacity: .22; }
 /* The cabinet is a SPRITE now, so the box that used to draw it is only a place to stand and a ground
    shadow. Every rule that painted the old gradient is deleted rather than left underneath — a background
    and a border still winning behind a transparent PNG is how a swapped-in sprite ends up in a box. */
-.cas-mach-body { display: block; height: clamp(86px, 17.3vh, 163px); position: relative; }
+.cas-mach-body { display: block; height: calc(var(--room) * 0.509); position: relative; }
 /* `object-fit: contain` CENTRES the sprite in its box. The box is taller than it is wide, so a square
    cabinet sprite was drawn with equal empty space above and below it — the machine floated a few pixels
    clear of the carpet no matter where the box was put, and every attempt to fix it by moving the box moved
@@ -17489,7 +17509,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    light the cabinet CASTS; this is the light it blocks, and it is the thing that actually reads as weight.
    Neither one alone is convincing — a lit object with no shadow looks pasted on. */
 .cas-mach-body::before { content: ""; position: absolute; left: 50%; bottom: -3px; z-index: 1;
-    width: 74%; height: clamp(7px, 1.5vh, 14px); transform: translateX(-50%); pointer-events: none;
+    width: 74%; height: calc(var(--room) * 0.044); transform: translateX(-50%); pointer-events: none;
     background: radial-gradient(50% 50% at 50% 50%, rgba(4,2,8,0.75), rgba(4,2,8,0.28) 55%, transparent 76%); }
 .cas-mach:not(.is-live) .cas-mach-body::before { opacity: .5; }
 /* The machine you are standing at lights up. On a sprite this has to be a GLOW rather than a border —
@@ -17499,11 +17519,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A machine that is not live is dimmed rather than differently drawn, so the row reads as one room. */
 .cas-mach:not(.is-live) .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)) grayscale(0.7) brightness(0.55); }
 .cas-mach b { position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
-    width: 130%; margin-top: 1px; font-size: clamp(9.5px, 1.9vh, 13px); font-weight: 900;
+    width: 130%; margin-top: 1px; font-size: clamp(10px, calc(var(--room) * 0.056), 15px); font-weight: 900;
     line-height: 1.1; text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
-.cas-mach em { position: absolute; left: 50%; top: calc(100% + clamp(11px, 2.1vh, 15px));
+.cas-mach em { position: absolute; left: 50%; top: calc(100% + calc(var(--room) * 0.062));
     transform: translateX(-50%); width: 130%;
-    font-style: normal; font-size: clamp(7.5px, 1.5vh, 10px); color: #b7bec7;
+    font-style: normal; font-size: clamp(8px, calc(var(--room) * 0.044), 12px); color: #b7bec7;
     text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710;
     letter-spacing: .12em; text-transform: uppercase; }
 .cas-mach.is-near { transform: translateX(-50%) translateY(-4px); }
@@ -17525,12 +17545,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    machine that fills its own frame edge to edge. Sized against what actually READS on screen instead —
    the hero now stands about level with the top of a cabinet, which is what a person at a slot machine
    looks like. */
-.cas-other img, .cas-blank { display: block; width: clamp(48px, 9.6vh, 90px);
-    height: clamp(48px, 9.6vh, 90px); object-fit: contain; object-position: bottom; }
-.cas-you img, .cas-you .cas-blank { width: clamp(58px, 11.5vh, 108px); height: clamp(58px, 11.5vh, 108px); }
+.cas-other img, .cas-blank { display: block; width: calc(var(--room) * 0.282);
+    height: calc(var(--room) * 0.282); object-fit: contain; object-position: bottom; }
+.cas-you img, .cas-you .cas-blank { width: calc(var(--room) * 0.338); height: calc(var(--room) * 0.338); }
 /* You stand in a pool of your own, so the hero is never a dark shape against a dark carpet. */
 .cas-you::before { content: ""; position: absolute; left: 50%; bottom: 0;
-    width: clamp(46px, 9.2vh, 86px); height: clamp(11px, 2.2vh, 21px);
+    width: calc(var(--room) * 0.271); height: calc(var(--room) * 0.065);
     transform: translateX(-50%); pointer-events: none;
     background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.6), transparent 70%); }
 .cas-blank { border-radius: 50%; background: rgba(255,255,255,0.14); }
@@ -18318,3 +18338,20 @@ body.cas-seated .social-fab { display: none; }
     background: rgba(10,7,16,0.62); border: 1px solid rgba(255,215,94,0.22);
     backdrop-filter: blur(3px); animation: casHint 2.6s ease-in-out infinite; }
 @keyframes casHint { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }
+
+
+/* ── THE ROOM GOES EDGE TO EDGE ON A PHONE ────────────────────────────────────────────────────────────
+   `.cas` insets everything by 12px so the cards below have a margin, which is right for a card and wrong
+   for a room: a scene with a gutter down both sides reads as a picture of a place rather than the place.
+   Pulled full-bleed on phones only — on a wide screen the room is already narrower than the viewport and
+   stretching it further would just make a very long, very short letterbox. */
+@media (max-width: 700px) {
+    .cas-roomwrap { margin-left: -12px; margin-right: -12px; }
+    .cas-room { border-radius: 0; border-left: none; border-right: none; }
+    .cas-vignette { border-radius: 0; }
+}
+
+/* The header above it earns less room now — it carries a back link, a title, and a gold figure the HUD
+   directly above is already showing. Tightened rather than removed: the back link is the only way out. */
+.cas-top { padding: 2px 0 4px; }
+.cas-name { font-size: 1rem; }
