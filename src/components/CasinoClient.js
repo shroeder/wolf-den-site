@@ -223,11 +223,12 @@ export default function CasinoClient({ initial }) {
     // getting to the far end is thirteen taps, which is fine when you are wandering and tedious when you came
     // back for one thing. It also makes a machine linkable — from a bounty card, a badge, a message.
     // Unknown or missing name just starts you at the door, so a bad link is a walk rather than an error.
-    const [x, setX] = useState(() => {
-        if (typeof window === "undefined") return 14;
-        const want = new URLSearchParams(window.location.search).get("at");
-        return MACHINES.find((m) => m.id === want)?.x ?? 14;
-    });
+    // Reading ?at= in the INITIALISER is a server/client branch: the server has no window and renders you at
+    // the door, the client renders you at the machine, and React reports a hydration mismatch it explicitly
+    // says it will not patch up. Every deep link into the casino — from a bounty card, a badge, a message —
+    // logged an error. Starting at the door on both sides and walking to the machine in an effect is the same
+    // result one frame later, with the two renders agreeing.
+    const [x, setX] = useState(14);
     const [facing, setFacing] = useState(1);
     const [at, setAt] = useState(null);          // the machine you are standing at
     const [bet, setBet] = useState(100);
@@ -336,6 +337,14 @@ export default function CasinoClient({ initial }) {
         onScroll();
         el.addEventListener("scroll", onScroll, { passive: true });
         return () => { el.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
+    }, []);
+
+    // ...and the walk to it. Runs once: after this the position is yours, and a link should not be able to
+    // yank you back across the floor on a later render.
+    useEffect(() => {
+        const want = new URLSearchParams(window.location.search).get("at");
+        const m = MACHINES.find((mm) => mm.id === want);
+        if (m) setX(m.x);
     }, []);
 
     const walk = useCallback((dir) => {

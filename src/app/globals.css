@@ -17416,6 +17416,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     width: clamp(44px, 8.9vh, 84px); pointer-events: none; }
 .cas-decor img { display: block; width: 100%; height: auto;
     filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); }
+.cas-decor::before { content: ""; position: absolute; left: 50%; bottom: -2px;
+    width: 76%; height: clamp(5px, 1.1vh, 10px); transform: translateX(-50%); pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(4,2,8,0.62), transparent 74%); }
 /* Against the wall rather than out on the carpet: smaller, higher and dimmer. Three sprites, two
    distances, and the row stops reading as one line of stickers. */
 .cas-decor.is-back { bottom: 22%; width: clamp(32px, 6.4vh, 61px); opacity: .8; filter: brightness(0.78); }
@@ -17444,8 +17447,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    than the old 13% put the cabinets — so the whole row stood an inch above the floor on nothing at all.
    The two lines of caption below each cabinet are what take up the remaining space, and they read fine
    lying on the carpet. */
-.cas-mach { position: absolute; bottom: 3%; transform: translateX(-50%); text-align: center;
-    width: clamp(64px, 12.9vh, 121px); transition: transform 140ms ease; }
+/* ── STANDING ON THE FLOOR ──
+   `bottom` is the bottom of the BUTTON, and the button is sprite-then-two-lines-of-caption — so anchoring
+   it at the carpet hung the cabinet a caption's height in the air. The caption is lifted out of the flow
+   below (position: absolute at top: 100%), which means this number is now the height of the caption strip
+   and the cabinet's feet land exactly on it. */
+.cas-mach { position: absolute; bottom: 14%; transform: translateX(-50%); text-align: center;
+    width: clamp(78px, 15.6vh, 146px); transition: transform 140ms ease; }
 /* Every cabinet is a light source and throws a pool onto the carpet under it. This is most of what makes
    the row feel lit rather than pasted on, and it costs one pseudo-element. */
 .cas-mach-body::after { content: ""; position: absolute; left: 50%; bottom: -9px;
@@ -17459,39 +17467,56 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The cabinet is a SPRITE now, so the box that used to draw it is only a place to stand and a ground
    shadow. Every rule that painted the old gradient is deleted rather than left underneath — a background
    and a border still winning behind a transparent PNG is how a swapped-in sprite ends up in a box. */
-.cas-mach-body { display: block; height: clamp(70px, 14.1vh, 133px); position: relative; }
+.cas-mach-body { display: block; height: clamp(86px, 17.3vh, 163px); position: relative; }
+/* `object-fit: contain` CENTRES the sprite in its box. The box is taller than it is wide, so a square
+   cabinet sprite was drawn with equal empty space above and below it — the machine floated a few pixels
+   clear of the carpet no matter where the box was put, and every attempt to fix it by moving the box moved
+   the gap along with it. `object-position: bottom` parks the sprite on the floor of its own box. */
 .cas-mach-body img { display: block; width: 100%; height: 100%; object-fit: contain;
+    object-position: bottom;
     filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)); }
+/* A CONTACT SHADOW: the small hard dark patch where an object meets the ground. The warm pool below is
+   light the cabinet CASTS; this is the light it blocks, and it is the thing that actually reads as weight.
+   Neither one alone is convincing — a lit object with no shadow looks pasted on. */
+.cas-mach-body::before { content: ""; position: absolute; left: 50%; bottom: -3px; z-index: 1;
+    width: 74%; height: clamp(7px, 1.5vh, 14px); transform: translateX(-50%); pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 50%, rgba(4,2,8,0.75), rgba(4,2,8,0.28) 55%, transparent 76%); }
+.cas-mach:not(.is-live) .cas-mach-body::before { opacity: .5; }
 /* The machine you are standing at lights up. On a sprite this has to be a GLOW rather than a border —
    a border would draw a rectangle around a die-cut object and give away that it is a picture. */
 .cas-mach.is-near .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6))
     drop-shadow(0 0 10px rgba(255,215,94,0.75)); }
 /* A machine that is not live is dimmed rather than differently drawn, so the row reads as one room. */
 .cas-mach:not(.is-live) .cas-mach-body img { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.6)) grayscale(0.7) brightness(0.55); }
-.cas-mach b { display: block; margin-top: 3px; font-size: clamp(9.5px, 1.9vh, 13px); font-weight: 900;
+.cas-mach b { position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    width: 130%; margin-top: 2px; font-size: clamp(9.5px, 1.9vh, 13px); font-weight: 900;
     line-height: 1.1; text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
-.cas-mach em { display: block; font-style: normal; font-size: clamp(8px, 1.6vh, 11px); color: #b7bec7;
+.cas-mach em { position: absolute; left: 50%; top: calc(100% + clamp(11px, 2.1vh, 15px));
+    transform: translateX(-50%); width: 130%;
+    font-style: normal; font-size: clamp(7.5px, 1.5vh, 10px); color: #b7bec7;
     text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710;
     letter-spacing: .12em; text-transform: uppercase; }
 .cas-mach.is-near { transform: translateX(-50%) translateY(-4px); }
 
 /* People. Yours is the solid one; everybody else is dimmer and behind. */
-.cas-other, .cas-you { position: absolute; bottom: 3%; transform: translateX(-50%); text-align: center; }
+.cas-other, .cas-you { position: absolute; bottom: 6%; transform: translateX(-50%); text-align: center; }
 .cas-other { opacity: .8; }
 /* Sized against the cabinet, not against the old box — see the note on .cas-mach. Everybody else is a
    shade smaller than you as well as dimmer, which is the cheapest possible way of saying who the camera
    is following. */
-.cas-other img, .cas-blank { display: block; width: clamp(42px, 8.6vh, 81px);
-    height: clamp(42px, 8.6vh, 81px); object-fit: contain; }
-.cas-you img, .cas-you .cas-blank { width: clamp(49px, 9.8vh, 92px); height: clamp(49px, 9.8vh, 92px); }
+.cas-other img, .cas-blank { display: block; width: clamp(52px, 10.5vh, 99px);
+    height: clamp(52px, 10.5vh, 99px); object-fit: contain; object-position: bottom; }
+.cas-you img, .cas-you .cas-blank { width: clamp(62px, 12.4vh, 117px); height: clamp(62px, 12.4vh, 117px); }
 /* You stand in a pool of your own, so the hero is never a dark shape against a dark carpet. */
-.cas-you::before { content: ""; position: absolute; left: 50%; bottom: -3px;
-    width: clamp(44px, 8.9vh, 84px); height: clamp(12px, 2.5vh, 23px);
+.cas-you::before { content: ""; position: absolute; left: 50%; bottom: 0;
+    width: clamp(48px, 9.6vh, 91px); height: clamp(10px, 2vh, 19px);
     transform: translateX(-50%); pointer-events: none;
     background: radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,0.6), transparent 70%); }
 .cas-blank { border-radius: 50%; background: rgba(255,255,255,0.14); }
 .cas-blank.is-you { background: linear-gradient(180deg, #ffd75e, #ff9f43); }
-.cas-other b { display: block; font-size: 9px; color: #98a0aa; }
+.cas-other b { position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    width: 160%; font-size: clamp(9px, 1.7vh, 12px); color: #b7bec7;
+    text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
 
 .cas-walk { display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; gap: 8px; }
 .cas-walk button { padding: 11px 0; border-radius: 12px; font-size: 16px; cursor: pointer;
@@ -17910,6 +17935,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-stage > *:not(.cas-panel-head):not(.cas-controls) { flex: none; padding-left: 14px; padding-right: 14px; }
 .cas-stage .cas-reels, .cas-stage .cas-felt, .cas-stage .cas-wheel,
 .cas-stage .cas-banks, .cas-stage .cas-bcard, .cas-stage .cas-bhead { margin-left: 14px; margin-right: 14px; }
+
+/* ── AND THE GAME SITS IN THE MIDDLE OF WHAT IS LEFT ──
+   The controls claimed ALL the slack with their auto margin, so a short machine — a slot is three reels and
+   two lines of text — hung from the title bar with a quarter of the screen of nothing under it. A second
+   auto margin on the first thing after the head makes flexbox split the slack between them instead, which
+   centres the game without measuring anything. On a machine with more in it than fits (bingo, blackjack)
+   there is no slack, both margins collapse to zero, and this rule does nothing at all. */
+.cas-stage .cas-panel-head + * { margin-top: auto; }
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
