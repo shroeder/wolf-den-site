@@ -1269,6 +1269,23 @@ export default function CasinoClient({ initial }) {
 
                     {seated && at.live && SLOTS.has(at.id) ? (
                         <>
+                            {/* ── THE MACHINE, NOT THREE BOXES ────────────────────────────────────
+                                Luke: "make it really look like a slot machine screen not just 3 boxes."
+                                It was three rounded cards floating on a dark page with gaps between them,
+                                which is a form with pictures in it. A slot machine is one object: a lit
+                                marquee with the machine's name on it, a single recessed glass panel with
+                                three WINDOWS cut into it rather than three separate cards, a payline drawn
+                                across the middle with a marker at each edge, and curved glass over the
+                                whole thing. Every part of that is CSS and takes its colour from the
+                                cabinet you are sat at, so The Vault is blued steel and The Deep is cold
+                                water without a second asset.
+                                The tray at the bottom is where the piggy banks live, which is where a coin
+                                tray is on a real machine. */}
+                            <div className="cas-cab">
+                                <span className="cas-cab-top" aria-hidden="true">
+                                    <i />{st?.slots?.[at.id]?.label || at.label}<i />
+                                </span>
+                                <div className="cas-glass">
                             <div className={`cas-reels${flash ? ` is-${flash}` : ""}${tease ? " is-tease" : ""}`}>
                                 {/* IDLE, the reels show three of THIS cabinet's own symbols. They were
                                     hard-coded to moon/bone/doubloon, which is fine on the machine that has
@@ -1297,6 +1314,13 @@ export default function CasinoClient({ initial }) {
                                     its scatter exactly once. */}
                                 {burst ? <Burst key={burst.id} kind={burst.kind} tone={burst.tone} /> : null}
                             </div>
+                                    {/* The payline. On a real cabinet it is painted on the glass, which is
+                                        why it sits OVER the reels rather than between them, and why it has
+                                        a marker at each edge — the markers are what tell you which row is
+                                        the one being paid. */}
+                                    <span className="cas-payline" aria-hidden="true"><i /><i /></span>
+                                    <span className="cas-gloss" aria-hidden="true" />
+                                </div>
                             {/* ── THE PIGGY BANKS ─────────────────────────────────────────────────────
                                 Three of them, one under each reel, and which reel a chest lands on is which
                                 bank it feeds. They GROW as they fill — the same pig, scaled — because "it
@@ -1326,6 +1350,7 @@ export default function CasinoClient({ initial }) {
                                     })}
                                 </div>
                             ) : null}
+                            </div>
 
                             {/* ── WHAT THE FEATURES JUST DID ──────────────────────────────────────────
                                 Each one gets a line, because a feature that fires silently is a feature the

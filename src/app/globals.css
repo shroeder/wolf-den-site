@@ -17601,12 +17601,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    its symbol is a thing coming to rest, which is what you are actually waiting for. Every rule that
    styled the old glyph box is deleted rather than left underneath: a font-size and a text-shadow still
    winning behind an <img> is how a swapped-in sprite ends up in a box. */
-.cas-reel { position: relative; height: var(--cell, 84px); overflow: hidden; border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,.05), rgba(0,0,0,.42)); }
+/* A WINDOW, not a card. Three reels in one glass panel are separated by a rule the width of the frame's
+   own metal — the gaps and rounded corners that used to be here are what made them read as three separate
+   objects sitting on a page. */
+.cas-reel { position: relative; height: var(--cell, 84px); overflow: hidden; border-radius: 0;
+    border: none; border-right: 2px solid rgba(0,0,0,.55);
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--acc, #ffd75e) 12%, transparent);
+    background: radial-gradient(120% 80% at 50% 30%, rgba(255,255,255,.05), rgba(0,0,0,.5)); }
+.cas-reel:last-child { border-right: none; }
 /* The lip of the machine — a little shadow top and bottom so the strip runs THROUGH the window rather
    than sitting in it. */
-.cas-reel::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 12px;
+.cas-reel::after { content: ""; position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(180deg, rgba(0,0,0,.55), transparent 26%, transparent 74%, rgba(0,0,0,.55)); }
 .cas-strip { display: block; will-change: transform; }
 .cas-cell { display: flex; align-items: center; justify-content: center; height: var(--cell, 84px); }
@@ -17657,8 +17662,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE WIN. Gold floods the frame; a jackpot keeps it and shakes the whole bank. */
 .cas-reels { position: relative; }
-.cas-reels.is-win .cas-reel, .cas-reels.is-big .cas-reel { border-color: color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent);
-    box-shadow: inset 0 0 30px color-mix(in srgb, var(--acc, #ffd75e) 22%, transparent), 0 0 22px color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent); }
+.cas-reels.is-win .cas-reel, .cas-reels.is-big .cas-reel {
+    box-shadow: inset 0 0 30px color-mix(in srgb, var(--acc, #ffd75e) 26%, transparent); }
 .cas-reels.is-big { animation: casShake .42s ease-in-out 2; }
 @keyframes casShake { 0%,100% { transform: none; } 25% { transform: translateX(-4px) rotate(-.4deg); }
     75% { transform: translateX(4px) rotate(.4deg); } }
@@ -18177,10 +18182,13 @@ body.cas-seated .social-fab { display: none; }
    its own, so the maths cannot drift out of step with the drawing).
    In the panel on the floor it is a thumbnail of the game. Sat at the machine it is the game. */
 .cas-reel { --cell: clamp(72px, 21vw, 96px); }
-.cas-stage .cas-reel { --cell: clamp(110px, 31vw, 168px); }
+/* Squarer, and taller. A reel window that is wider than it is tall reads as a letterbox with a picture in
+   it; a real reel is at least as tall as it is wide, and the stage had two hundred pixels of dead space
+   above and below the machine to give it. */
+.cas-stage .cas-reel { --cell: clamp(124px, 36vw, 196px); }
 /* On a laptop the stage is the full width of the screen, and three reels stretched across 1280px are
    letterboxes. The bank of reels is a fixed object; it gets a width and sits in the middle. */
-.cas-stage .cas-reels { max-width: 520px; margin-left: auto; margin-right: auto; gap: 10px; }
+.cas-stage .cas-reels { max-width: none; margin: 0; gap: 0; }
 
 /* Symbols fill more of their cell now — at 64% a wolf sat in the middle of a lot of empty box, which
    reads as a picture of a symbol rather than as the symbol. */
@@ -18194,8 +18202,7 @@ body.cas-seated .social-fab { display: none; }
    cannot be believed when it celebrates a yes. */
 .cas-reels.is-tease .cas-reel:nth-child(1),
 .cas-reels.is-tease .cas-reel:nth-child(2) {
-    border-color: color-mix(in srgb, var(--acc, #ffd75e) 65%, transparent);
-    box-shadow: inset 0 0 18px color-mix(in srgb, var(--acc, #ffd75e) 20%, transparent); }
+    box-shadow: inset 0 0 22px color-mix(in srgb, var(--acc, #ffd75e) 24%, transparent); }
 .cas-reels.is-tease .cas-reel:nth-child(3) { animation: casTease .34s ease-in-out infinite alternate; }
 @keyframes casTease {
     from { box-shadow: inset 0 0 10px color-mix(in srgb, var(--acc, #ffd75e) 12%, transparent); }
@@ -18339,3 +18346,69 @@ body.cas-seated .social-fab { display: none; }
    directly above is already showing. Tightened rather than removed: the back link is the only way out. */
 .cas-top { padding: 2px 0 4px; }
 .cas-name { font-size: 1rem; }
+
+
+/* ══ THE CABINET ════════════════════════════════════════════════════════════════════════════════════
+   Luke: "make it really look like a slot machine screen not just 3 boxes."
+
+   It was three rounded cards with gaps between them on a dark page — a form with pictures in it. A slot
+   machine is ONE OBJECT, and the parts that say so are cheap: a lit marquee with the machine's name, a
+   single recessed glass panel with three windows cut into it, a payline painted across the middle, and
+   curved glass over the lot. None of this is art, and every colour comes from `--acc`, so The Vault is
+   blued steel and The Deep is cold water without a second asset. */
+.cas-cab { max-width: 460px; margin: 0 auto clamp(8px, 1.8vh, 14px); border-radius: 18px 18px 14px 14px;
+    padding: 0 clamp(8px, 1.6vh, 13px) clamp(8px, 1.6vh, 13px);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 16%, #171019) 0%,
+            color-mix(in srgb, var(--acc, #ffd75e) 7%, #120c16) 42%, #0d0812 100%);
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent);
+    box-shadow: 0 18px 44px rgba(0,0,0,.55),
+        inset 0 1px 0 color-mix(in srgb, var(--acc, #ffd75e) 40%, transparent),
+        inset 0 -18px 30px rgba(0,0,0,.5); }
+
+/* The marquee. A name in a lit strip across the top is the single most recognisable thing about a
+   cabinet, and the rules under it already tell you WHICH machine — this tells you that you are at one. */
+.cas-cab-top { display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: clamp(6px, 1.4vh, 11px) 4px; font-family: var(--font-display);
+    font-size: clamp(11px, 2.2vh, 15px); font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--acc, #ffd75e) 40%, #fff);
+    text-shadow: 0 0 16px color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); }
+/* The two lamps either side of the name, which is what a marquee actually is. */
+.cas-cab-top i { flex: none; width: 7px; height: 7px; border-radius: 50%;
+    background: color-mix(in srgb, var(--acc, #ffd75e) 85%, #fff);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--acc, #ffd75e) 90%, transparent);
+    animation: casBulb 1.9s ease-in-out infinite alternate; }
+.cas-cab-top i:last-child { animation-delay: -.95s; }
+@keyframes casBulb { from { opacity: .35; } to { opacity: 1; } }
+
+/* The glass. Recessed, so the reels sit INSIDE the machine rather than on top of it — the inset shadow
+   at the top is the whole trick, and it is what a gap between three cards can never produce. */
+.cas-glass { position: relative; border-radius: 10px; overflow: hidden;
+    border: 2px solid rgba(0,0,0,.55);
+    box-shadow: inset 0 6px 14px rgba(0,0,0,.75), inset 0 -6px 14px rgba(0,0,0,.55),
+        0 1px 0 color-mix(in srgb, var(--acc, #ffd75e) 22%, transparent); }
+
+/* The payline, painted ON the glass. The markers at each edge are the part that does the work: they are
+   what tell you which row is the one being paid, which is otherwise invisible on a single-row machine. */
+.cas-payline { position: absolute; left: 0; right: 0; top: 50%; height: 0; pointer-events: none; z-index: 3;
+    border-top: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent); }
+.cas-payline i { position: absolute; top: 50%; width: 0; height: 0;
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+    transform: translateY(-50%); }
+.cas-payline i:first-child { left: 0; border-left: 7px solid color-mix(in srgb, var(--acc, #ffd75e) 75%, transparent); }
+.cas-payline i:last-child { right: 0; border-right: 7px solid color-mix(in srgb, var(--acc, #ffd75e) 75%, transparent); }
+/* On a win the line is the thing that lights, because the line is what paid. */
+.cas-reels.is-win ~ .cas-payline, .cas-reels.is-big ~ .cas-payline {
+    border-top-color: color-mix(in srgb, var(--acc, #ffd75e) 90%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); }
+
+/* Curved glass. One soft diagonal sheen across the top third — enough to read as a covered window, little
+   enough that it never fights the symbols underneath. */
+.cas-gloss { position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background: linear-gradient(158deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,.03) 26%, transparent 46%); }
+
+/* The tray. The piggy banks were floating under the machine; on a cabinet this is where the coins come
+   out, so it is drawn as a recess in the cabinet's own body. */
+.cas-cab .cas-banks { margin: clamp(7px, 1.5vh, 12px) 0 0; padding: clamp(6px, 1.3vh, 10px) 8px;
+    border-radius: 9px; background: rgba(0,0,0,.34);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,.6); }
