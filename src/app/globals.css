@@ -17731,7 +17731,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
     background: linear-gradient(180deg, #f6f3ea, #ddd6c6); border: 1px solid rgba(0,0,0,0.35);
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    animation: casDeal .28s cubic-bezier(.2,1.3,.35,1) both; }
+    /* `--d` is set per card by the component from one flat index across the dealer and every hand, so a
+       hand ARRIVES instead of appearing. Only cards new this beat carry a delay — the rest are keyed by
+       their own value, stay mounted, and never re-animate. */
+    animation: casDeal .3s cubic-bezier(.2,1.25,.35,1) var(--d, 0ms) both;
+    transform-origin: 50% 100%; }
 .cas-card b { font-size: 0.95rem; font-weight: 900; color: #1a1d22; line-height: 1; }
 .cas-card i { font-style: normal; font-size: 0.8rem; color: #1a1d22; line-height: 1; }
 .cas-card.is-red b, .cas-card.is-red i { color: #c0392b; }
@@ -17740,7 +17744,44 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border-color: rgba(255,255,255,0.2); }
 .cas-card.is-empty { background: rgba(255,255,255,0.04); border-style: dashed; border-color: rgba(255,255,255,0.12);
     box-shadow: none; animation: none; }
-@keyframes casDeal { from { opacity: 0; transform: translateY(-14px) rotate(-6deg); } to { opacity: 1; transform: none; } }
+/* Off the shoe, not down from the ceiling: a card comes IN from the upper right, spinning slightly, and
+   settles. The overshoot is what makes it land on a table rather than fade in over one. */
+@keyframes casDeal {
+    0% { opacity: 0; transform: translate(26px, -30px) rotate(14deg) scale(.9); }
+    55% { opacity: 1; }
+    100% { opacity: 1; transform: none; } }
+
+/* ── THE HOLE CARD TURNING ────────────────────────────────────────────────────────────────────────────
+   The one moment blackjack is actually about, and it used to be a purple swatch swapping itself for a
+   card between two frames. It comes in EDGE-ON and rotates to face up, which needs no second face and no
+   backface-visibility rules: a card seen exactly from its own edge is already invisible.
+   The brightness dip in the middle is the light going off it as it passes through vertical. */
+.cas-card.is-turn { animation: casTurn .56s cubic-bezier(.25,.85,.3,1) both; }
+@keyframes casTurn {
+    0% { transform: perspective(420px) rotateY(90deg) translateX(6px); filter: brightness(.5); }
+    55% { filter: brightness(1.35); }
+    72% { transform: perspective(420px) rotateY(-9deg) scale(1.07); }
+    100% { transform: none; filter: none; } }
+
+/* ── AND WHEN IT GOES WRONG ───────────────────────────────────────────────────────────────────────────
+   A bust was a word in a sentence under the cards. The hand itself should break: the seat shakes once,
+   the cards go grey and tip over. Once — a table that keeps shaking is a table with a fault. */
+.cas-seat.is-bust { animation: casBust .42s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes casBust {
+    0%, 100% { transform: none; }
+    18% { transform: translateX(-6px); }
+    38% { transform: translateX(5px); }
+    58% { transform: translateX(-3px); }
+    78% { transform: translateX(2px); } }
+.cas-card.is-dead { filter: grayscale(.72) brightness(.72); transform: rotate(-3deg); transition: filter .3s ease, transform .3s ease; }
+.cas-seat.is-bust .cas-seat-who { color: #ff9f9f; }
+
+/* Twenty-one on two. The seat lights rather than the screen — the table is where you are looking. */
+.cas-seat.is-blackjack { border-color: rgba(255,215,94,.65);
+    box-shadow: inset 0 0 26px rgba(255,215,94,.16), 0 0 22px rgba(255,215,94,.26);
+    animation: casBjPop .45s cubic-bezier(.2,1.5,.3,1) both; }
+@keyframes casBjPop { from { transform: scale(.97); } to { transform: none; } }
+.cas-seat.is-blackjack .cas-seat-who { color: #ffe9b8; }
 
 /* Hit / Stand / Double. Three equal buttons because they are three equal decisions — sizing one of them
    bigger would be the table telling you what to do. */

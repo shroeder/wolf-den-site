@@ -215,6 +215,34 @@ export const Cas = {
         });
     },
 
+    // ── THE HOLE CARD TURNING ────────────────────────────────────────────────────────────────────────────
+    // The one moment blackjack is actually about. Everything else at this table is you deciding; this is the
+    // table answering, and it had no sound at all. Card stock rolling over its own edge, then the slap as it
+    // lands face up — the pause between the two is what makes it a reveal rather than a card appearing.
+    turn() {
+        noise({ dur: 0.11, gain: 0.06, type: "bandpass", freq: 1500, sweepTo: 4200, q: 1.1 });
+        tone({ freq: 260, to: 520, type: "triangle", dur: 0.13, gain: 0.035 });
+        noise({ at: 0.19, dur: 0.07, gain: 0.13, type: "lowpass", freq: 2400, sweepTo: 600 });
+        tone({ at: 0.19, freq: 150, to: 62, type: "sine", dur: 0.12, gain: 0.13 });
+    },
+
+    // The shoe, at the top of a hand. Short and dry — it is punctuation before the deal, not an event.
+    shoe() {
+        for (let i = 0; i < 4; i += 1) {
+            noise({ at: i * 0.045, dur: 0.05, gain: 0.045, type: "highpass", freq: 3000 + i * 400 });
+        }
+    },
+
+    // Twenty-one on two cards. Not the jackpot fanfare — that belongs to the machines — but the table's own
+    // small, certain sound: a rising pair that resolves immediately, because a blackjack is not a suspense.
+    blackjack() {
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+            tone({ at: i * 0.06, freq: f, type: "triangle", dur: 0.5 - i * 0.06, gain: 0.07 });
+        });
+        tone({ freq: 130.8, to: 261.6, type: "triangle", dur: 0.5, gain: 0.08 });
+        noise({ at: 0.05, dur: 0.35, gain: 0.035, type: "highpass", freq: 5200 });
+    },
+
     // A card leaving the shoe: paper, not a click.
     card() {
         noise({ dur: 0.075, gain: 0.075, type: "highpass", freq: 2600, sweepTo: 6200 });

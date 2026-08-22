@@ -38,6 +38,10 @@ const MACHINES = [
 // arriving rather than threading a needle.
 const REACH = 9;
 
+// How far behind the card before it each card lands, and the interval the deal's sounds are fired on. One
+// number, because the two drifting apart is the whole way this reads as broken.
+const DEAL_MS = 145;
+
 // ── WHAT ELSE IS IN THE ROOM ────────────────────────────────────────────────────────────────────────────
 // Nine cabinets in a row is a shop display. What makes it a FLOOR is the stuff between them that nobody can
 // play — a palm in a brass urn, a rope you are not meant to cross, a stool somebody left out. They sit in the
@@ -244,11 +248,20 @@ function Round({ game, st, tick, verb }) {
 // A card, drawn in CSS like every other thing on this floor. Red suits red, black suits pale — the one piece
 // of card design that is not decoration, because it is how you read a hand at a glance.
 const SUIT_ART = { s: { glyph: "♠", red: false }, h: { glyph: "♥", red: true }, d: { glyph: "♦", red: true }, c: { glyph: "♣", red: false } };
-function Card({ card }) {
+// ── ONE CARD ─────────────────────────────────────────────────────────────────────────────────────────────────
+// `delay` staggers it behind the cards dealt before it, so a hand ARRIVES rather than appearing. Only cards
+// that are new this render carry one — React keys the rest by their own value, so they stay mounted and never
+// re-animate, which is what stops the whole table re-dealing itself every time you hit.
+//
+// `flip` is the hole card turning over, and it is the only moment at this table worth animating properly:
+// everything else is you deciding, this is the table answering. It comes in edge-on and rotates to face up,
+// which needs no second face and no backface-visibility — a card seen from its own edge is invisible.
+function Card({ card, delay = 0, flip = false, dead = false }) {
     const rank = String(card).slice(0, -1);
     const suit = SUIT_ART[String(card).slice(-1)] || SUIT_ART.s;
     return (
-        <span className={`cas-card${suit.red ? " is-red" : ""}`}>
+        <span className={`cas-card${suit.red ? " is-red" : ""}${flip ? " is-turn" : ""}${dead ? " is-dead" : ""}`}
+            style={delay ? { "--d": `${delay}ms` } : undefined}>
             <b>{rank}</b><i>{suit.glyph}</i>
         </span>
     );
@@ -289,6 +302,19 @@ export default function CasinoClient({ initial }) {
     // reason anybody watches a slot machine, and until now it was happening with nothing on screen or in the
     // speakers acknowledging it: the frame pulses and a note climbs for exactly as long as the gap lasts.
     const [tease, setTease] = useState(false);
+    // ── THE TABLE DEALS, IT DOES NOT APPEAR ──────────────────────────────────────────────────────────────
+    // A blackjack hand arrived fully formed: four cards mounted on the same frame, one animation between
+    // them, no sound, and the hole card was a purple swatch that swapped itself for a real one. The result
+    // was correct and there was nothing to watch.
+    // `bjFrom` is the index the cards dealt THIS beat start at — everything before it is already on the felt
+    // and must not re-animate. `bjFlip` is the hole card turning, which is the only moment at this table
+    // worth animating properly.
+    const [bjFrom, setBjFrom] = useState(0);
+    const [bjFlip, setBjFlip] = useState(false);
+    // True once every card of this beat is on the felt. The totals wait for it — see the seat header.
+    const [bjSettled, setBjSettled] = useState(true);
+    const bjSeen = useRef(0);
+    const bjHidden = useRef(false);
     // What just came out of the machine — coins, shards, the pot. `id` only exists so a second burst REMOUNTS
     // the component: a burst seeds its scatter once, on mount, so replaying one means giving it a new key.
     const [burst, setBurst] = useState(null);
@@ -645,9 +671,9 @@ export default function CasinoClient({ initial }) {
         unlock();
         setBusy(true); setErr(null); setFlash(null);
         if (action === "bj_deal") { setPrize(null); setNote(null); setWonPet(null); setBurst(null); }
-        // Chips on a deal, a card off the shoe on anything else. A blackjack table is the one machine in
-        // the building with no motor in it, and it should not sound like it has one.
-        if (action === "bj_deal") Cas.chips(); else Cas.card();
+        // Chips down, then the shoe. The cards themselves are voiced by the reveal effect, on the same clock
+        // the animation uses — firing one here as well would sound a card that is not on the felt yet.
+        if (action === "bj_deal") { Cas.chips(); timers.current.push(setTimeout(() => Cas.shoe(), 140)); }
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action, ...body }),
@@ -670,7 +696,9 @@ export default function CasinoClient({ initial }) {
         absorb(r);
         const beat = r.hand?.outcome;
         const acc = ACCENT.blackjack;
-        if (beat === "blackjack") { setFlash("big"); Cas.jackpot(); Haptic.crit(); throwBurst("hoard", acc); }
+        // The table's own sound, not the machines' fanfare — a blackjack is certain rather than suspenseful,
+        // and it should not borrow the noise a 700x pull makes.
+        if (beat === "blackjack") { setFlash("big"); Cas.blackjack(); Haptic.crit(); throwBurst("hoard", acc); }
         else if (r.won > 0) { setFlash("win"); Cas.coins(0.4); Haptic.hit(0.6); throwBurst("coin", acc); }
         else if (beat === "push") { Cas.push(); }
         else if (beat === "bust") { Cas.bust(); Haptic.hit(0.4); }
@@ -759,6 +787,21 @@ export default function CasinoClient({ initial }) {
         }, total));
     }, [bet, busy, absorb, throwBurst]);
 
+    // ── EVERY CARD ON THE FELT, IN DEALING ORDER ─────────────────────────────────────────────────────────
+    // One flat index across the dealer and every hand, so a card knows how far behind the one before it it
+    // should land without any part of the layout having to count for itself. A split just adds more cards to
+    // the end of the same list.
+    const bjView = useMemo(() => {
+        if (!hand) return null;
+        const dealer = hand.dealer || [];
+        const hands = hand.hands || [];
+        let i = 0;
+        const dealerAt = dealer.map(() => i++);
+        const holeAt = hand.dealerHidden ? i++ : -1;
+        const handsAt = hands.map((h) => (h.cards || []).map(() => i++));
+        return { total: i, dealerAt, holeAt, handsAt };
+    }, [hand]);
+
     // Three of whatever this cabinet actually rolls, taken from the middle of its own symbol list so the
     // idle machine is neither promising a jackpot nor showing three blanks.
     const idleReels = useMemo(() => {
@@ -767,6 +810,49 @@ export default function CasinoClient({ initial }) {
         const mid = Math.floor(syms.length / 2);
         return [syms[mid], syms[syms.length - 1], syms[Math.max(0, mid - 1)]];
     }, [st, at]);
+
+    // ── ONE SOUND PER CARD, ON THE SAME CLOCK THE CSS USES ───────────────────────────────────────────────
+    // The stagger lives in CSS (a per-card animation-delay) and the sounds live here, both driven off the
+    // same DEAL_MS, because a card that lands silently and a sound with no card are the two ways this goes
+    // wrong. Anything already on the felt is skipped: React keys each card by its own value, so those stay
+    // mounted and never re-animate, and re-playing their sounds would deal the whole table again every time
+    // you hit.
+    useEffect(() => {
+        if (at?.id !== "blackjack") return undefined;
+        if (!hand || !bjView) { bjSeen.current = 0; bjHidden.current = false; setBjFrom(0); setBjFlip(false); return undefined; }
+        const total = bjView.total;
+        // A new hand has FEWER cards than the one it replaced (or the same), and everything on it is new.
+        // A hit only ever grows the count, and only the tail of it is new.
+        const fresh = total <= bjSeen.current;
+        const from = fresh ? 0 : bjSeen.current;
+        setBjFrom(from);
+        // ── THE TABLE DOES NOT SAY THE TOTAL BEFORE THE CARDS LAND ───────────────────────────────────
+        // It printed "YOU · 16 SOFT" while the second card was still in the air, which is the same flaw the
+        // slot had when it announced "Nothing. Again?" with two reels still turning: the answer arrives
+        // before the thing that produces it, and the deal becomes decoration over a number you already read.
+        // The count is NOT recomputed here from the visible cards — that would be a second implementation of
+        // hand valuation living on the screen, which is exactly the trap the bingo card avoids. It simply
+        // waits.
+        if (total > from) setBjSettled(false);
+        timers.current.push(setTimeout(() => setBjSettled(true), Math.max(0, total - from) * DEAL_MS + 240));
+        for (let i = from; i < total; i += 1) {
+            timers.current.push(setTimeout(() => { Cas.card(); Haptic.hit(0.12); }, (i - from) * DEAL_MS));
+        }
+        // ── AND THE TURN ─────────────────────────────────────────────────────────────────────────────
+        // The hole card going face up is the table answering, and it is the whole reason anybody is still
+        // looking at the screen. It gets its own sound, its own animation and a heavier tap than a deal.
+        const turned = bjHidden.current && !hand.dealerHidden;
+        bjHidden.current = Boolean(hand.dealerHidden);
+        if (turned) {
+            setBjFlip(true);
+            timers.current.push(setTimeout(() => Cas.turn(), 40));
+            timers.current.push(setTimeout(() => Haptic.hit(0.45), 240));
+            timers.current.push(setTimeout(() => setBjFlip(false), 700));
+        }
+        bjSeen.current = total;
+        return undefined;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hand, bjView, at?.id]);
 
     // ── DOUBLE OR NOTHING ────────────────────────────────────────────────────────────────────────────────
     // The amount is not sent — the server gambles what its own meter says the last paid pull won. All this
@@ -1270,10 +1356,16 @@ export default function CasinoClient({ initial }) {
                     {seated && at.live && at.id === "blackjack" ? (
                         <div className="cas-felt">
                             <div className="cas-seat">
-                                <span className="cas-seat-who">Dealer{hand && !hand.dealerHidden ? ` · ${hand.dealerValue.total}` : ""}</span>
+                                <span className="cas-seat-who">Dealer{hand && !hand.dealerHidden && bjSettled ? ` · ${hand.dealerValue.total}` : ""}</span>
                                 <div className="cas-cards">
-                                    {(hand?.dealer || []).map((c, i) => <Card key={`d${i}${c}`} card={c} />)}
-                                    {hand?.dealerHidden ? <span className="cas-card is-down" aria-label="face down" /> : null}
+                                    {(hand?.dealer || []).map((c, i) => (
+                                        <Card key={`d${i}${c}`} card={c}
+                                            delay={Math.max(0, (bjView?.dealerAt?.[i] ?? 0) - bjFrom) * DEAL_MS}
+                                            // Index 1 is the hole card — the only one that ever turns.
+                                            flip={bjFlip && i === 1} />
+                                    ))}
+                                    {hand?.dealerHidden ? <span className="cas-card is-down" aria-label="face down"
+                                        style={{ "--d": `${Math.max(0, (bjView?.holeAt ?? 0) - bjFrom) * DEAL_MS}ms` }} /> : null}
                                     {!hand ? <span className="cas-card is-empty" /> : null}
                                 </div>
                             </div>
@@ -1283,15 +1375,19 @@ export default function CasinoClient({ initial }) {
                                 other is dimmed rather than hidden, because knowing what is waiting is half
                                 of why you split. */}
                             {(hand?.hands || [null]).map((h, i) => (
-                                <div key={i} className={`cas-seat is-you${h && hand.hands.length > 1 ? " is-multi" : ""}${h?.isActive ? " is-turn" : ""}`}>
+                                <div key={i} className={`cas-seat is-you${h && hand.hands.length > 1 ? " is-multi" : ""}${h?.isActive ? " is-turn" : ""}${h?.outcome === "bust" ? " is-bust" : ""}${h?.outcome === "blackjack" ? " is-blackjack" : ""}`}>
                                     <span className="cas-seat-who">
                                         {hand?.hands?.length > 1 ? `Hand ${i + 1}` : "You"}
-                                        {h ? ` · ${h.value.total}${h.value.soft && h.value.total <= 21 ? " soft" : ""}` : ""}
+                                        {h && bjSettled ? ` · ${h.value.total}${h.value.soft && h.value.total <= 21 ? " soft" : ""}` : ""}
                                         {h?.doubled ? " · doubled" : ""}
                                         {h && !hand.open && h.outcome ? ` · ${OUTCOME_SHORT[h.outcome] || h.outcome}` : ""}
                                     </span>
                                     <div className="cas-cards">
-                                        {(h?.cards || []).map((c, j) => <Card key={`p${i}-${j}${c}`} card={c} />)}
+                                        {(h?.cards || []).map((c, j) => (
+                                            <Card key={`p${i}-${j}${c}`} card={c}
+                                                delay={Math.max(0, (bjView?.handsAt?.[i]?.[j] ?? 0) - bjFrom) * DEAL_MS}
+                                                dead={h?.outcome === "bust"} />
+                                        ))}
                                         {!h ? <span className="cas-card is-empty" /> : null}
                                     </div>
                                 </div>
