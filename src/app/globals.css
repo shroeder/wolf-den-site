@@ -17587,9 +17587,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-walk span { text-align: center; font-size: 11px; color: #98a0aa; letter-spacing: .1em;
     text-transform: uppercase; }
 
-.cas-panel { margin-top: 12px; padding: 14px; border-radius: 15px;
-    border: 1px solid rgba(255,215,94,0.22); background: rgba(20,14,28,0.9); }
-.cas-panel.is-dark { border-color: rgba(255,255,255,0.08); opacity: .75; }
+/* `.cas-panel` and `.cas-panel.is-dark` lived here until the floor card was removed — walking up to a
+   cabinet no longer prints anything under the room, so there is no panel to style. The HEAD survives
+   because the stage still has one: a way out, the machine's name, and your purse. */
 .cas-panel-head { display: flex; align-items: baseline; justify-content: space-between; }
 .cas-panel-head b { font-family: var(--font-display); font-size: 1.02rem; color: #ffe9b8; }
 .cas-panel-head em { font-style: normal; font-size: 10px; color: #98a0aa;

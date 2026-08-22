@@ -107,14 +107,6 @@ const ACCENT = {
 // you are standing at and draws whatever came back.
 const SLOTS = new Set(["slot", "slot2", "slot3", "slot4", "slot5"]);
 
-// The one sentence that decides whether you sit down at each of the four that are not slot machines. Slots
-// describe themselves out of their own paytable (hit rate, top multiple, return); these cannot, because the
-// interesting thing about them is not a number — it is that somebody else is playing the same one.
-const KIND_BLURB = {
-    keno: "Pick five of forty. Everyone holding a ticket this round plays the same ten balls.",
-    bingo: "Forty balls and one card, and the whole hall plays the same forty. A line gets your card back.",
-    blackjack: "You against the house, one hand at a time. The hole card is not on this screen until it turns.",
-};
 
 // ── THE SYMBOLS ARE DRAWN NOW ────────────────────────────────────────────────────────────────────────────────
 // Every reel symbol was a Unicode glyph in a coloured box — a triangle standing in for a wolf. The art is per
@@ -1110,22 +1102,26 @@ export default function CasinoClient({ initial }) {
                 ) : <span>{at ? at.label : "walk to a machine"}</span>}
             </div>
 
-            {/* ── THE MACHINE YOU ARE AT ──────────────────────────────────────────────────────────────────
-                Only rendered when you are standing at one, so the room is the screen and the game is
-                something you walk up to rather than a panel that is always there. */}
-            {at ? (
-                <div className={`${seated ? "cas-stage" : "cas-panel"}${at.live ? "" : " is-dark"}`}
+            {/* ── THE MACHINE YOU ARE SAT AT ──────────────────────────────────────────────────────────────
+                Luke: "we dont need to show the info under the button."
+
+                Walking up to a cabinet used to print a card underneath the room — its name, the Pot, the
+                odds and every bonus it has. That card existed because moving play into the modal had left
+                the floor with nothing under it, and it turned out to be an answer to a question nobody was
+                asking: you are looking at the machine, the button says which one it is, and everything the
+                card listed is on the machine's own screen the moment you sit down. What it actually did was
+                push the floor's bounties below the fold.
+
+                So there is no panel any more, only the stage. Nothing renders here until you sit. */}
+            {seated && at ? (
+                <div className={`cas-stage${at.live ? "" : " is-dark"}`}
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e" }}
-                    role={seated ? "dialog" : undefined} aria-modal={seated ? "true" : undefined}
-                    aria-label={seated ? at.label : undefined}>
+                    role="dialog" aria-modal="true" aria-label={at.label}>
                     <div className="cas-panel-head">
-                        {seated ? (
-                            <button type="button" className="cas-leave" onClick={() => setSeated(false)}
-                                aria-label="Back to the floor">←</button>
-                        ) : null}
+                        <button type="button" className="cas-leave" onClick={() => setSeated(false)}
+                            aria-label="Back to the floor">←</button>
                         <b>{st?.slots?.[at.id]?.label || at.label}</b>
-                        {seated ? <span className="cas-purse-sm">{money(st?.gold)}<i>gold</i></span>
-                            : <em>{at.live ? at.kind : "not built yet"}</em>}
+                        <span className="cas-purse-sm">{money(st?.gold)}<i>gold</i></span>
                     </div>
 
                     {/* ── STANDING AT A MACHINE IS NOT PLAYING IT ──────────────────────────────────
@@ -1193,25 +1189,6 @@ export default function CasinoClient({ initial }) {
                         </div>
                     ) : null}
 
-                    {/* ── AND THE FOUR THAT ARE NOT SLOTS ──────────────────────────────────────────────
-                        The pot, the meters and the volatility line above are all slot-only, so with the play
-                        surfaces moved into the modal these four cabinets had a card with nothing on it but
-                        their own name. Each gets the one sentence that actually decides whether you sit
-                        down — for three of them that is "you are not playing alone", which is the whole
-                        reason they were built as shared rounds. */}
-                    {!SLOTS.has(at.id) && at.live && !seated ? (
-                        <p className="cas-vol">
-                            <span>{KIND_BLURB[at.id]}</span>
-                            {at.id === "bingo" && st?.bingo?.pays ? (
-                                <i>a line pays {st.bingo.pays[1] ?? 1}x · six pays {money(st.bingo.pays[6] ?? 300)}x</i>
-                            ) : at.id === "keno" && st?.keno ? (
-                                <i>five of {st.keno.pool || 40} · all five is the one worth waiting for</i>
-                            ) : at.id === "blackjack" ? (
-                                <i>blackjack pays 3:2 · dealer stands on 17 · split once</i>
-                            ) : null}
-                        </p>
-                    ) : null}
-
                     {SLOTS.has(at.id) && st?.slots?.[at.id] ? (
                         <p className="cas-vol">
                             <span>{st.slots[at.id].blurb}</span>
@@ -1220,19 +1197,12 @@ export default function CasinoClient({ initial }) {
                                 {" · "}top {money(Math.max(...Object.values(st.slots[at.id].pays.three)))}x
                                 {" · "}returns {(st.slots[at.id].rtp * 100).toFixed(1)}%
                             </i>
-                            {/* The features, named on the machine — a bonus nobody knows about is a bonus
-                                that fires and reads as the game glitching. Folded away once you are SAT at
-                                it, because by then you have read it and the screen is needed for the game:
-                                a phone cannot show three paragraphs and three reels and a button. */}
-                            {!seated ? (st.slots[at.id].bonuses || []).map((b) => (
-                                <em key={b.id}><b>{b.label}</b> {b.blurb}</em>
-                            )) : null}
                         </p>
                     ) : null}
 
                     {/* Each machine draws its own game. The slot's ceremony is three landings; the ticket
                         resolves in one, so it gets a result and a celebration and no theatre. */}
-                    {seated && at.live && at.id === "keno" ? (
+                    {at.live && at.id === "keno" ? (
                         <>
                             {/* ── THE ROUND ───────────────────────────────────────────────────────────
                                 Ten balls for the whole lounge. Everybody holding a ticket inside the window
@@ -1267,7 +1237,7 @@ export default function CasinoClient({ initial }) {
                         </>
                     ) : null}
 
-                    {seated && at.live && SLOTS.has(at.id) ? (
+                    {at.live && SLOTS.has(at.id) ? (
                         <>
                             {/* ── THE MACHINE, NOT THREE BOXES ────────────────────────────────────
                                 Luke: "make it really look like a slot machine screen not just 3 boxes."
@@ -1408,7 +1378,7 @@ export default function CasinoClient({ initial }) {
                         down with the result rather than worked out here — the server already knows which
                         ones paid, and a screen that recomputes them is a second implementation of the rules
                         that can disagree with the one that paid the money. */}
-                    {seated && at.live && at.id === "bingo" ? (
+                    {at.live && at.id === "bingo" ? (
                         <div className="cas-hall">
                             <div className="cas-hall-top">
                                 <span>{st?.bingo?.players?.length
@@ -1464,7 +1434,7 @@ export default function CasinoClient({ initial }) {
                         Dealer on top, you below, the way a table is laid out — and the face-down card is
                         drawn face-down rather than left out, because the shape of the hand is the whole
                         thing you are reading. It is genuinely not in the payload while the hand is open. */}
-                    {seated && at.live && at.id === "blackjack" ? (
+                    {at.live && at.id === "blackjack" ? (
                         <div className="cas-felt">
                             {/* ── THE TABLE ITSELF ────────────────────────────────────────────────
                                 The felt was a rounded rectangle with a green gradient on it, which is why
@@ -1549,7 +1519,7 @@ export default function CasinoClient({ initial }) {
                         The rarest thing on this floor: 1 in 455 plays at the kindest and 1 in 5,556 at the
                         worst. It gets its own banner above everything else, and it says what the pet DOES —
                         a prestige drop whose effect you have to go and look up is a drop that lands flat. */}
-                    {seated && wonPet ? (
+                    {wonPet ? (
                         <div className="cas-newpet">
                             <b>{wonPet.name}</b>
                             <em>{wonPet.hint || "Joins your collection"}</em>
@@ -1558,9 +1528,9 @@ export default function CasinoClient({ initial }) {
                     ) : null}
 
                     {/* The quiet ones — a free play, a refund. One line, no ceremony. */}
-                    {seated && note ? <p className={`cas-note is-${note.kind}`}>{note.text}</p> : null}
+                    {note ? <p className={`cas-note is-${note.kind}`}>{note.text}</p> : null}
 
-                    {seated && prize ? (
+                    {prize ? (
                         <div className={`cas-prize${prize.jackpot ? " is-jackpot" : ""}`}>
                             {prize.spriteUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -1576,7 +1546,7 @@ export default function CasinoClient({ initial }) {
                     {/* ONE STAKE ROW AND ONE BUTTON for every machine, because the stake is the same decision
                         wherever you are standing and a floor where each cabinet invents its own controls is a
                         floor you have to learn three times. */}
-                    {at.live && seated ? (
+                    {at.live ? (
                         <div className="cas-controls">
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks
