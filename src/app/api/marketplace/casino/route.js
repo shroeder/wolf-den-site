@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot, spinWheel } from "@/lib/marketplace/casino.js";
+import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
@@ -59,10 +59,9 @@ export async function POST(request) {
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets
                 // an opinion about.
                 case "gamble": return noStore(await gambleWin(buyer.id, { machine: b?.machine }));
-                // The wheel and the ticket. Both validate their own choice server-side — a bet id and a
+                // The ticket validates its own picks server-side — a list of numbers from a
                 // five-number ticket are the two things a POST body can most easily lie about, and either
                 // would break the odds these games were priced on.
-                case "wheel": return noStore(await spinWheel(buyer.id, { bet: b?.bet, choice: b?.choice, pick: b?.pick }));
                 case "keno": return noStore(await playKeno(buyer.id, { bet: b?.bet, picks: b?.picks }));
                 // ── THE TABLE ── five verbs instead of one, because a hand of blackjack is a conversation.
                 // None of them carries state from the client: which hand is in play, what is left in the

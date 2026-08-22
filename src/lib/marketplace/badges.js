@@ -222,7 +222,6 @@ export async function getMemberMetrics(buyerId) {
         `SELECT COUNT(*) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet'))::int AS plays,
                 COALESCE(-SUM(delta) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet')), 0)::bigint AS wagered,
                 COUNT(*) FILTER (WHERE reason = 'casino_slot_win' AND meta->>'jackpot' = 'true')::int AS jackpots,
-                COUNT(*) FILTER (WHERE reason = 'casino_wheel_win' AND meta->>'choice' = 'single')::int AS pockets,
                 COUNT(*) FILTER (WHERE reason = 'casino_keno_win' AND (meta->>'hits')::int = 5)::int AS perfect
            FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'`,
         [buyerId],
@@ -327,7 +326,6 @@ export async function getMemberMetrics(buyerId) {
         casinoPlays: casinoRow?.plays || 0,
         casinoWagered: Number(casinoRow?.wagered || 0),
         casinoJackpots: casinoRow?.jackpots || 0,
-        casinoPockets: casinoRow?.pockets || 0,
         casinoPerfect: casinoRow?.perfect || 0,
         casinoPets: casinoPetRow?.n || 0,
     };
@@ -807,7 +805,8 @@ export function progressForRule(rule, threshold, m) {
         case "casino_plays": return { current: m.casinoPlays, target: t };       // pulls, spins and tickets
         case "casino_wagered": return { current: m.casinoWagered, target: t };   // lifetime gold across the floor
         case "casino_jackpot": return { current: m.casinoJackpots, target: t };  // three wolves on the slot
-        case "casino_pocket": return { current: m.casinoPockets, target: t };    // called a single pocket on the wheel
+        // `casino_pocket` lived here until the wheel was removed. Its badge ("Called It") was held by
+        // nobody, so it went with the game rather than becoming a trophy that can never be earned.
         case "casino_perfect": return { current: m.casinoPerfect, target: t };   // five of five on a keno ticket
         case "casino_pets": return { current: m.casinoPets, target: t };         // how many of the five you hold
         default: return { current: 0, target: t || 1 };

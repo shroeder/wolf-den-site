@@ -610,7 +610,7 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
 
 // ── WHAT THE CASINO PETS ARE WORTH ───────────────────────────────────────────────────────────────────────────
 // Five pets whose only source is this floor and whose only effect is on this floor. A pet that made you
-// better at fighting would be a pet everybody has to chase; these are for people who like the wheel.
+// better at fighting would be a pet everybody has to chase; these are for people who like the floor.
 //
 // EVERY PERK IS BOUNDED, and that is not a style choice — the check script computes each machine's return
 // with ALL FIVE owned and fails if it crosses the ceiling. The ceiling is what makes these safe to hand out:
@@ -619,14 +619,14 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
 //   freePlay     the stake comes back. Adds its own value straight onto the return.
 //   prizeChance  more non-gold prizes. Does not touch the gold maths at all.
 //   prizeTierUp  prizes roll from a better shelf.
-//   wheelRefund  a share of a LOSING wheel spin, so it only ever helps where the wheel already took it.
+//   lossRefund   a share of a LOSING keno round, so it only ever helps where the house already took it.
 export const CASINO_PETS = COLLECTIBLES.filter((p) => p.casinoExclusive && p.casinoPerk);
 
 // What a perk IS, in a sentence, written once. The floor shows it on the rail and the drop banner says it
 // at the moment the pet arrives — a prestige drop whose effect has to be looked up elsewhere lands flat.
 export function perkPhrase(k = {}) {
     if (k.freePlay) return `Pays for about 1 play in ${Math.round(1 / k.freePlay)}`;
-    if (k.wheelRefund) return `Pushes ${Math.round(Math.min(1, k.wheelRefund / REFUND_CHANCE) * 100)}% back on the odd losing spin`;
+    if (k.lossRefund) return `Pushes ${Math.round(Math.min(1, k.lossRefund / REFUND_CHANCE) * 100)}% back on the odd losing ticket`;
     if (k.prizeChance) return "Finds prizes the house missed";
     if (k.prizeTierUp) return "Prizes come off a better shelf";
     return "Works the floor";
@@ -643,7 +643,7 @@ export const withCasinoPerk = (pet) => {
 /** Everything the pets in a member's collection add up to. Owned, not equipped: these are not combat pets
  *  and making somebody re-equip to use the casino would be a rule nobody would guess. */
 export async function casinoPerks(buyerId) {
-    const out = { freePlay: 0, prizeChance: 0, prizeTierUp: false, wheelRefund: 0, pets: [] };
+    const out = { freePlay: 0, prizeChance: 0, prizeTierUp: false, lossRefund: 0, pets: [] };
     if (!buyerId) return out;
     // OWNERSHIP LIVES IN mkt_cosmetic_unlock. This read mkt_item_collected, which is the COMPENDIUM — every
     // piece of gear you have ever seen — so it matched nothing a pet drop ever writes and every perk on this
@@ -658,7 +658,7 @@ export async function casinoPerks(buyerId) {
         const k = pet.casinoPerk;
         out.freePlay += k.freePlay || 0;
         out.prizeChance += k.prizeChance || 0;
-        out.wheelRefund += k.wheelRefund || 0;
+        out.lossRefund += k.lossRefund || 0;
         if (k.prizeTierUp) out.prizeTierUp = true;
     }
     return out;
@@ -728,7 +728,7 @@ async function takePot(buyerId) {
 
 // ── WHAT THE BOUNTIES COUNT ──────────────────────────────────────────────────────────────────────────────────
 // One function for all three machines, so the fourth one somebody adds cannot quietly fail to tick a card.
-// The per-game metric is what lets a bounty ask for the WHEEL specifically rather than for "gamble more",
+// The per-game metric is what lets a bounty ask for KENO specifically rather than for "gamble more",
 // which is the difference between a bounty and a nag.
 export async function tickCasinoQuests(buyerId, game, won) {
     await bumpQuestProgress(buyerId, "casino_play", 1).catch(() => {});
@@ -850,16 +850,15 @@ export async function gambleWin(buyerId, { machine } = {}) {
     return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, gold };
 }
 
-// ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
-// Roulette, in the Den's own shape rather than a copy of Monte Carlo. A real European wheel returns 97.3%
-// (36/37) and an American one 94.7% — the first is above our ceiling and the second only just under it, and
-// both are the way they are because a physical wheel has to have 37 pockets. Ours does not.
+// ── THE CROUPIER'S CAT ───────────────────────────────────────────────────────────────────────────────────────
+// How often it pushes chips back. The PET carries the expected cost; this only decides whether that cost
+// arrives as a dribble or as a moment — a twelfth of a percent paid on every single loss is a rounding error
+// nobody notices, and the same money paid at 5% is a thing that happens to you. See settleKeno.
 //
-// Twenty segments: nine gold, nine violet, and TWO wolves. The wolves are the house's edge made visible —
-// they are on the wheel where you can see them, rather than hidden in a payout that is quietly short.
-//
-// How often the Croupier's Cat pushes chips back. The PET carries the expected cost; this only decides
-// whether that cost arrives as a dribble or as a moment. See spinWheel.
+// IT USED TO PAY NOTHING AT ALL. `casinoPerks` returned the number, `perkedRtp` priced it into the ceiling,
+// the floor's rail advertised it and the client had a banner waiting for `r.refund` — and no code anywhere
+// ever set that field. A legendary pet at 1 in 2,000 plays, costed into the gate, doing nothing since the day
+// it shipped. It was attached to the wheel, and removing the wheel is what finally made somebody look at it.
 export const REFUND_CHANCE = 0.05;
 
 // ── EVERY PET OWNED ──────────────────────────────────────────────────────────────────────────────────────────
@@ -871,130 +870,22 @@ export const MAX_PERKS = CASINO_PETS.reduce((out, pet) => {
     const k = pet.casinoPerk || {};
     out.freePlay += k.freePlay || 0;
     out.prizeChance += k.prizeChance || 0;
-    out.wheelRefund += k.wheelRefund || 0;
+    out.lossRefund += k.lossRefund || 0;
     if (k.prizeTierUp) out.prizeTierUp = true;
     return out;
-}, { freePlay: 0, prizeChance: 0, wheelRefund: 0, prizeTierUp: false });
+}, { freePlay: 0, prizeChance: 0, lossRefund: 0, prizeTierUp: false });
 
 /**
  * A machine's return once the pets are in play — the one formula, used by the games' pricing and by the
  * check script, so the gate can never be checking arithmetic the floor does not run.
  *   freePlay    hands the stake back on some plays, which adds its own rate straight onto the return
- *   wheelRefund pays a share of a LOSS, and only on plays that were not already free
+ *   lossRefund pays a share of a LOSS, and only on plays that were not already free
  * prizeChance and prizeTierUp are deliberately absent: they buy chests, not gold, and folding a chest into
  * a percentage produces a number that looks rigorous and is invented.
  */
 export function perkedRtp(base, perks = MAX_PERKS, lossChance = 0) {
     const free = Math.min(1, perks?.freePlay || 0);
-    return base + free + (1 - free) * lossChance * (perks?.wheelRefund || 0);
-}
-
-// Every bet on this wheel returns exactly 90%, which is deliberate: there is no "smart" bet to discover and
-// no trap bet to fall into. What you choose changes the SHAPE of the outcome — often and small, or rarely and
-// enormous — and never the value of it.
-export const WHEEL = [
-    ...Array.from({ length: 9 }, (_, i) => ({ i, kind: "gold" })),
-    ...Array.from({ length: 9 }, (_, i) => ({ i: i + 9, kind: "violet" })),
-    { i: 18, kind: "wolf" }, { i: 19, kind: "wolf" },
-];
-
-export const WHEEL_BETS = {
-    gold:   { label: "Gold", pays: 2, hits: (seg) => seg.kind === "gold" },
-    violet: { label: "Violet", pays: 2, hits: (seg) => seg.kind === "violet" },
-    wolf:   { label: "Wolf", pays: 9, hits: (seg) => seg.kind === "wolf" },
-    // One pocket out of twenty. The long shot, and the only bet on the floor that can pay 18x.
-    single: { label: "One pocket", pays: 18, hits: (seg, pick) => seg.i === Number(pick) },
-};
-
-/** Exact return for one wheel bet, enumerated over all twenty pockets. */
-export function wheelRtp(betId, pick = 0) {
-    const bet = WHEEL_BETS[betId];
-    if (!bet) return 0;
-    const wins = WHEEL.filter((seg) => bet.hits(seg, pick)).length;
-    return (wins / WHEEL.length) * bet.pays;
-}
-
-// ── ONE WHEEL, EVERYBODY'S CHIPS ─────────────────────────────────────────────────────────────────────────────
-// The wheel is shared now: bets go on during a forty-five-second window, then it spins once and every chip on
-// the floor is scored against the same pocket. That is what roulette IS — a table where each player gets a
-// private wheel is a slot machine with a wheel painted on it.
-//
-// Which means a spin no longer resolves in the request that placed the bet, and it must not: you choose your
-// pocket, so a draw you could see before betting again would be an unlimited payout. The outcome does not
-// exist until the window shuts — see casino-rounds.js.
-export async function spinWheel(buyerId, { bet, choice = "gold", pick = 0 } = {}) {
-    if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const rule = WHEEL_BETS[choice];
-    if (!rule) return { ok: false, error: "bad_bet" };
-    const stake = clampBet(bet);
-    const cleanPick = Math.max(0, Math.min(WHEEL.length - 1, Math.round(Number(pick) || 0)));
-
-    // Anything owed from an earlier round is paid before the new bet goes on, so a player never has two
-    // rounds of winnings stacked up behind a stake they are about to place.
-    const settled = await settleWheel(buyerId);
-
-    const perks = await casinoPerks(buyerId);
-    const placed = await placeBet(buyerId, "wheel", {
-        stake, choice: { bet: choice, pick: cleanPick }, reason: "casino_wheel_bet",
-    });
-    if (!placed.ok) return placed;
-
-    // ── ON THE HOUSE ─────────────────────────────────────────────────────────────────────────────────────
-    // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
-    // it, so the ledger still shows the bet being placed and the stake coming back.
-    let gold = placed.gold;
-    let onHouse = false;
-    if (onTheHouse(perks)) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, stake]).catch(() => null);
-        if (back) {
-            onHouse = true;
-            gold = back.gold;
-            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "wheel" } });
-        }
-    }
-
-    // The bounty ticks when you PLAY, which is now: the chips are down. What the wheel does with them is a
-    // separate moment, and tying a daily task to it would mean a bounty you complete by waiting.
-    await tickCasinoQuests(buyerId, "wheel", 0);
-
-    return {
-        ok: true, placed: true, round: placed.round, closesAt: placed.closesAt,
-        bet: stake, choice, pick: cleanPick, gold, onHouse, settled,
-    };
-}
-
-/** One pocket, rolled once for the whole floor. Only ever called for a round that has already closed. */
-const rollWheel = () => ({ seg: WHEEL[Math.floor(Math.random() * WHEEL.length)] });
-
-/** Score one chip against the pocket the wheel actually stopped in. */
-function scoreWheel(choice, outcome, stake) {
-    const rule = WHEEL_BETS[choice?.bet];
-    if (!rule) return { won: 0, detail: { hit: false } };
-    const hit = rule.hits(outcome.seg, choice.pick);
-    return { won: hit ? Math.round(stake * rule.pays) : 0, detail: { hit, seg: outcome.seg } };
-}
-
-/**
- * Pay out everything whose round has closed. Runs whenever anybody looks at the wheel, which is what makes
- * a scheduler unnecessary — nothing has to happen the instant a round ends, it only has to have happened by
- * the time somebody asks.
- */
-export async function settleWheel(buyerId) {
-    const done = await settleBets(buyerId, "wheel", {
-        roll: rollWheel, score: scoreWheel, reason: "casino_wheel_win",
-    });
-    if (!done.length) return [];
-
-    // The floor's furniture fires once per settled round, not once per bet: two chips on one spin is one
-    // play, and rolling a prize per chip would price a feature nobody costed.
-    const perks = await casinoPerks(buyerId);
-    const jackpot = done.some((d) => d.detail?.hit && d.choice?.bet === "wolf");
-    const prize = await rollCasinoPrize(buyerId, { jackpot, perks });
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
-    const won = done.reduce((n, d) => n + d.won, 0);
-    if (won > 0) await tickCasinoQuests(buyerId, "wheel_win", won);
-    return done.map((d, i) => (i === 0 ? { ...d, prize, pet } : d));
+    return base + free + (1 - free) * lossChance * (perks?.lossRefund || 0);
 }
 
 // ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1029,7 +920,7 @@ export function kenoRtp() {
 }
 
 // ── ONE DRAW, EVERYBODY'S TICKETS ────────────────────────────────────────────────────────────────────────────
-// Keno is shared too, and for the same reason the wheel is: everybody in the window plays the same ten balls.
+// Keno is SHARED: everybody holding a ticket in the window plays the same ten balls, which is what keno is.
 // A keno lounge where each player gets private numbers is a slot machine with a grid on it.
 //
 // And the same rule holds, harder: you PICK your numbers, so a draw visible before the window shuts would let
@@ -1089,8 +980,29 @@ export async function settleKeno(buyerId) {
     const prize = await rollCasinoPrize(buyerId, { jackpot, perks });
     const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     const won = done.reduce((n, d) => n + d.won, 0);
+
+    // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
+    // This is the line that never existed. `perkedRtp` has priced this refund into the ceiling since the
+    // pet shipped and nothing ever paid it, so the gate was checking arithmetic the floor did not run —
+    // the one thing every comment in this file says must never happen.
+    //
+    // Only on a LOSING round, only on the stake that actually lost, and only sometimes: REFUND_CHANCE
+    // decides whether the pet's budget arrives as a dribble nobody notices or as a moment. Paid before the
+    // prize roll so the two can land on the same ticket without one masking the other.
+    let refund = 0;
+    if (perks.lossRefund > 0 && won <= 0) {
+        const lost = done.reduce((n, d) => n + (Number(d.stake) || 0), 0);
+        if (lost > 0 && Math.random() < REFUND_CHANCE) {
+            refund = Math.max(1, Math.round(lost * Math.min(1, perks.lossRefund / REFUND_CHANCE)));
+            const back = await db.queryOne(
+                `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, refund],
+            ).catch(() => null);
+            if (back) await logCoin(buyerId, refund, "casino_cat_refund", { balanceAfter: back.gold, meta: { game: "keno" } });
+            else refund = 0;
+        }
+    }
     if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
-    return done.map((d, i) => (i === 0 ? { ...d, prize, pet } : d));
+    return done.map((d, i) => (i === 0 ? { ...d, prize, pet, refund } : d));
 }
 
 // ── WALKING THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────
@@ -1140,8 +1052,8 @@ export async function casinoOccupants(selfId) {
 async function sharedRounds(buyerId) {
     const now = Date.now();
     const out = {};
-    for (const game of ["wheel", "keno"]) {
-        const settled = game === "wheel" ? await settleWheel(buyerId) : await settleKeno(buyerId);
+    for (const game of ["keno"]) {
+        const settled = await settleKeno(buyerId);
         const round = roundOf(game, now);
         out[game] = {
             round,
@@ -1187,7 +1099,6 @@ export async function getCasinoState(buyerId) {
         pot: await readPot(),
         banks: BANKS.map((b) => ({ id: b.id, label: b.label, reel: b.reel, holds: b.holds, tone: b.tone })),
         slot: { symbols: SLOT_SYMBOLS, pays: SLOT_PAYS, minBet: MIN_BET, maxBet: MAX_BET },
-        wheel: { segments: WHEEL, bets: Object.fromEntries(Object.entries(WHEEL_BETS).map(([k, v]) => [k, { label: v.label, pays: v.pays }])) },
         keno: { pool: KENO_POOL, picks: KENO_PICKS, drawn: KENO_DRAWN, pays: KENO_PAYS },
         // ── THE TWO SHARED GAMES ────────────────────────────────────────────────────────────────────
         // Which round is running, when it shuts, who is in it, and anything of yours still riding on one.

@@ -72,7 +72,9 @@ export const FEATURE_DAILIES = {
     // anything: you either got it or you did not, and nothing you chose changed it.
     casino: [
         { key: "cas_play5", label: "Play 5 times on the floor", metric: "casino_play", need: 5, reward: { gold: 150 }, rewardLabel: "+150 gold" },
-        { key: "cas_wheel1", label: "Take a spin on the wheel", metric: "casino_wheel", need: 1, reward: { gold: 110 }, rewardLabel: "+110 gold" },
+        // Was "take a spin on the wheel" until the wheel was removed. Keno is the shared round now, and it
+        // is the same ask: put a ticket on a timed draw with other people rather than pull a lever alone.
+        { key: "cas_keno1", label: "Buy a keno ticket", metric: "casino_keno", need: 1, reward: { gold: 110 }, rewardLabel: "+110 gold" },
         { key: "cas_win1", label: "Win on any machine", metric: "casino_win", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
     ],
 };

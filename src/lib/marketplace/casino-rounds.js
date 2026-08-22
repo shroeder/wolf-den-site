@@ -23,7 +23,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // No scheduler and no cron: a round is arithmetic on the clock, and it resolves when somebody next looks.
 
 /** How long bets stay open. Short enough that a solo player is not sat waiting, long enough to be shared. */
-export const ROUND_MS = { keno: 45_000, wheel: 45_000 };
+export const ROUND_MS = { keno: 45_000 };
 
 export const roundOf = (game, nowMs) => Math.floor(nowMs / (ROUND_MS[game] || 45_000));
 export const roundEndsAt = (game, round) => (round + 1) * (ROUND_MS[game] || 45_000);

@@ -28,10 +28,11 @@ const MACHINES = [
     { id: "slot3", x: 30, label: "The Deep", kind: "Slots", live: true },
     { id: "slot4", x: 41, label: "The Menagerie", kind: "Slots", live: true },
     { id: "slot5", x: 52, label: "The Vault", kind: "Slots", live: true },
-    { id: "roulette", x: 63, label: "The Wheel", kind: "Roulette", live: true },
-    { id: "keno", x: 74, label: "Keno", kind: "Keno", live: true },
-    { id: "bingo", x: 85, label: "The Hall", kind: "Bingo", live: true },
-    { id: "blackjack", x: 96, label: "The Table", kind: "Blackjack", live: true },
+    // Shifted down 11 apiece when the wheel came out, so the row has no hole in the middle of it. The
+    // decorations sit on the midpoints of this spacing and follow automatically.
+    { id: "keno", x: 63, label: "Keno", kind: "Keno", live: true },
+    { id: "bingo", x: 74, label: "The Hall", kind: "Bingo", live: true },
+    { id: "blackjack", x: 85, label: "The Table", kind: "Blackjack", live: true },
 ];
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
@@ -96,7 +97,6 @@ const ACCENT = {
     slot3: "#6fd8ff",       // The Deep — cold water
     slot4: "#7fe0a0",       // The Menagerie — the green of its reels
     slot5: "#cdd9ff",       // The Vault — blued steel
-    roulette: "#c9a3ff",    // violet, off the wheel's own pockets
     keno: "#67e3d0",        // the lamps on the ticket board
     bingo: "#ff9ec0",       // the caller's baize is green, so the card is not
     blackjack: "#6fd39a",   // felt
@@ -111,7 +111,6 @@ const SLOTS = new Set(["slot", "slot2", "slot3", "slot4", "slot5"]);
 // describe themselves out of their own paytable (hit rate, top multiple, return); these cannot, because the
 // interesting thing about them is not a number — it is that somebody else is playing the same one.
 const KIND_BLURB = {
-    roulette: "One wheel for the whole floor. Everybody who bets inside the window rides the same pocket.",
     keno: "Pick five of forty. Everyone holding a ticket this round plays the same ten balls.",
     bingo: "Forty balls and one card, and the whole hall plays the same forty. A line gets your card back.",
     blackjack: "You against the house, one hand at a time. The hole card is not on this screen until it turns.",
@@ -343,9 +342,6 @@ export default function CasinoClient({ initial }) {
         setBurst({ id: burstId.current, kind, tone });
     }, []);
     const timers = useRef([]);
-    // The wheel: which bet is on the felt, and where it landed.
-    const [wheelBet, setWheelBet] = useState("gold");
-    const [wheel, setWheel] = useState(null);
     // The ticket: five numbers of forty, and the last draw.
     const [ticket, setTicket] = useState([]);
     const [keno, setKeno] = useState(null);
@@ -563,7 +559,7 @@ export default function CasinoClient({ initial }) {
     // ── WHAT THE PETS DID ────────────────────────────────────────────────────────────────────────────────
     // Every machine ends here, which is the point: a prize, a free play, a refund and a pet arriving are the
     // same four things wherever you were standing, and a floor where the slot celebrates differently from the
-    // wheel is a floor that has to be learned twice.
+    // wheel is a floor that has to be learned twice. (The wheel is gone; the shape it set is not.)
     //
     // It also fixes something the slot had on its own: `pull` cleared the prize banner and never set it, so
     // the slot's chests were rolled by the server, banked, and never shown.
@@ -709,8 +705,8 @@ export default function CasinoClient({ initial }) {
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
         setBurst(null);
-        // Chips going down on the felt, not a UI blip — and never a wheel sound, because a bet on a shared
-        // round does not spin anything. The wheel turns when the round closes, for everybody at once.
+        // Chips going down on the felt, not a UI blip. A bet on a shared round resolves nothing yet — the
+        // draw happens when the round closes, for everybody at once.
         Cas.chips();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -725,17 +721,17 @@ export default function CasinoClient({ initial }) {
         }
         onResult(r);
         setSt((p) => ({ ...p, gold: r.gold }));
-        // A bet PLACED is not a result. The wheel and keno hand back a round to wait for, and celebrating
+        // A bet PLACED is not a result. Keno hands back a round to wait for, and celebrating
         // at that moment would be the machine cheering for taking your money.
         if (r.placed) {
-            setSt((p) => ({ ...p, rounds: { ...(p.rounds || {}), [r.round != null && body.action === "wheel" ? "wheel" : "keno"]: { ...(p.rounds?.[body.action] || {}), msLeft: Math.max(0, (r.closesAt || 0) - Date.now()), closesAt: r.closesAt } } }));
+            setSt((p) => ({ ...p, rounds: { ...(p.rounds || {}), keno: { ...(p.rounds?.keno || {}), msLeft: Math.max(0, (r.closesAt || 0) - Date.now()), closesAt: r.closesAt } } }));
             setSettled((p) => ({ ...p, [body.action]: null }));
             // The chips already said it. A second sound here would be the machine congratulating you for
             // handing over a stake.
             return;
         }
         absorb(r);
-        const acc = ACCENT[body.action === "wheel" ? "roulette" : "keno"];
+        const acc = ACCENT.keno;
         if (r.won > 0) {
             // A payout worth more than ten times the stake is the moment worth shaking the room for.
             const big = r.won >= r.bet * 10;
@@ -806,13 +802,13 @@ export default function CasinoClient({ initial }) {
         const id = setInterval(async () => {
             const r = await fetch("/api/marketplace/casino").then((x2) => x2.json()).catch(() => null);
             // The rounds ride along on the poll that was already running for the other people in the room.
-            // A shared game needs no channel of its own: the wheel spinning is something the floor learns
+            // A shared game needs no channel of its own: the draw is something the floor learns
             // the next time it looks, which is at most six seconds and usually less.
             if (r?.open) {
                 setSt((p) => ({ ...p, others: r.others, gold: r.gold, rounds: r.rounds }));
                 if (r.pot) setPot(r.pot.amount);
                 // Anything that settled while you were away is announced rather than quietly banked.
-                for (const game of ["wheel", "keno"]) {
+                for (const game of ["keno"]) {
                     const done = r.rounds?.[game]?.settled || [];
                     if (done.length) setSettled((p) => ({ ...p, [game]: done }));
                     const first = done.find((d) => d.prize || d.pet);
@@ -1135,7 +1131,7 @@ export default function CasinoClient({ initial }) {
                     {/* ── STANDING AT A MACHINE IS NOT PLAYING IT ──────────────────────────────────
                         Luke: "id rather we only show the interaction with the games in a full screen modal."
 
-                        Every play surface below — the reels, the wheel, the ticket, the card, the table, the
+                        Every play surface below — the reels, the ticket, the card, the table, the
                         stake row and the button — is gated on `seated`. Walking up to a cabinet gives you the
                         CARD: what it is, what it pays, how often, and what its features do. Playing it is a
                         thing you sit down for.
@@ -1208,8 +1204,6 @@ export default function CasinoClient({ initial }) {
                             <span>{KIND_BLURB[at.id]}</span>
                             {at.id === "bingo" && st?.bingo?.pays ? (
                                 <i>a line pays {st.bingo.pays[1] ?? 1}x · six pays {money(st.bingo.pays[6] ?? 300)}x</i>
-                            ) : at.id === "roulette" && st?.wheel?.bets ? (
-                                <i>{Object.values(st.wheel.bets).map((b) => `${b.label} ${b.pays}x`).join(" · ")}</i>
                             ) : at.id === "keno" && st?.keno ? (
                                 <i>five of {st.keno.pool || 40} · all five is the one worth waiting for</i>
                             ) : at.id === "blackjack" ? (
@@ -1236,46 +1230,15 @@ export default function CasinoClient({ initial }) {
                         </p>
                     ) : null}
 
-                    {/* Each machine draws its own game. The slot's ceremony is three landings; the wheel and
-                        the ticket resolve in one, so they get a result and a celebration and no theatre. */}
-                    {seated && at.live && at.id === "roulette" ? (
-                        <>
-                            {/* ── THE ROUND ───────────────────────────────────────────────────────────
-                                One wheel for the whole floor. Everybody betting inside the window is on the
-                                same pocket, which is what roulette IS — and it is also why the result cannot
-                                arrive with the bet: you choose your pocket, so a spin you could see before
-                                betting again would be an unlimited payout. */}
-                            <Round game="wheel" st={st} tick={tick} verb="Spins" />
-
-                            <div className="cas-wheel">
-                                {(st?.wheel?.segments || []).map((seg) => (
-                                    <span key={seg.i}
-                                        className={`cas-seg is-${seg.kind}${settled.wheel?.[0]?.outcome?.seg?.i === seg.i ? " is-hit" : ""}`} />
-                                ))}
-                                {settled.wheel?.length ? (
-                                    <b className={`cas-wheel-out${settled.wheel.some((d) => d.won > 0) ? " is-win" : ""}`}>
-                                        {settled.wheel.some((d) => d.won > 0)
-                                            ? `${money(settled.wheel.reduce((n, d) => n + d.won, 0))} gold`
-                                            : "The house takes it"}
-                                    </b>
-                                ) : <b className="cas-wheel-out">Place a bet</b>}
-                            </div>
-                            <div className="cas-picks">
-                                {Object.entries(st?.wheel?.bets || {}).map(([id, b2]) => (
-                                    <button key={id} type="button"
-                                        className={`cas-pick${wheelBet === id ? " is-on" : ""}`}
-                                        onClick={() => setWheelBet(id)}>
-                                        {b2.label}<i>{b2.pays}x</i>
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    ) : null}
-
+                    {/* Each machine draws its own game. The slot's ceremony is three landings; the ticket
+                        resolves in one, so it gets a result and a celebration and no theatre. */}
                     {seated && at.live && at.id === "keno" ? (
                         <>
-                            {/* Ten balls for the whole lounge — see the note on the wheel for why the draw
-                                cannot arrive with the ticket. */}
+                            {/* ── THE ROUND ───────────────────────────────────────────────────────────
+                                Ten balls for the whole lounge. Everybody holding a ticket inside the window
+                                plays the same ten, which is what keno IS — and it is also why the draw
+                                cannot arrive with the ticket: you choose your five, so a draw you could see
+                                before buying again would be an unlimited payout. */}
                             <Round game="keno" st={st} tick={tick} verb="Drawn" />
                             {settled.keno?.length ? (
                                 <p className={`cas-fx${settled.keno.some((d) => d.won > 0) ? " is-big" : ""}`}>
@@ -1643,7 +1606,6 @@ export default function CasinoClient({ initial }) {
                                     if (at.id === "bingo") return buyCard();
                                     // Both of these now PLACE a bet on the open round rather than resolving
                                     // one. The answer says when it closes; the result arrives on the poll.
-                                    if (at.id === "roulette") return play({ action: "wheel", bet, choice: wheelBet }, setWheel);
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
                                 {busy ? "…"
@@ -1651,7 +1613,7 @@ export default function CasinoClient({ initial }) {
                                         ? `Free pull · ${meters[at.id].freePulls} left`
                                         : (st?.gold || 0) < bet ? "Not enough gold"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
-                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "roulette" ? "Put chips down" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
+                                            : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
                             )}
                             {err ? <p className="cas-err">{err}</p> : null}

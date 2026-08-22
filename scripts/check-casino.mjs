@@ -13,7 +13,7 @@
 // Run:  node scripts/check-casino.mjs   (or npm run check:casino)
 import {
     SLOT_MACHINES, slotHitRate, RTP_CEILING, RTP_TARGET, slotPayout, slotRtp,
-    WHEEL, WHEEL_BETS, wheelRtp, KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
+    KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
     PRIZE_CHANCE, PRIZE_SHELF, CASINO_PETS, MAX_PERKS, perkedRtp, REFUND_CHANCE,
 } from "../src/lib/marketplace/casino.js";
 import { SLOT_BONUSES, bonusEv } from "../src/lib/marketplace/slot-bonus.js";
@@ -125,33 +125,20 @@ if (Math.max(...hits) - Math.min(...hits) < 0.15) {
 
 const rtp = slotRtps.slot;   // the floor's headline number, for the closing line and the perk maths below
 
-// ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────────────────
-// Every bet enumerated over all twenty pockets. They are meant to return the SAME amount as each other — a
-// wheel with a smart bet on it is a wheel with a trap bet on it.
-console.log("\nTHE WHEEL");
-const wheelReturns = [];
-for (const [id, bet] of Object.entries(WHEEL_BETS)) {
-    const r = wheelRtp(id, 0);
-    wheelReturns.push(r);
-    const wins = WHEEL.filter((seg) => bet.hits(seg, 0)).length;
-    console.log(`  ${bet.label.padEnd(11)} pays ${String(bet.pays).padStart(3)}x on ${String(wins).padStart(2)}/${WHEEL.length} pockets  ->  ${pct(r)}`);
-    if (r > RTP_CEILING) problems.push(`the wheel's ${bet.label} bet returns ${pct(r)}, above the ${pct(RTP_CEILING)} ceiling`);
-}
-const spread = Math.max(...wheelReturns) - Math.min(...wheelReturns);
-console.log(`  spread between bets ${pct(spread)}`);
-if (spread > 0.02) {
-    problems.push(`the wheel's bets return between ${pct(Math.min(...wheelReturns))} and ${pct(Math.max(...wheelReturns))} — one of them is strictly better, which makes the rest traps`);
-}
-
 // ── KENO ─────────────────────────────────────────────────────────────────────────────────────────────────────
 // Hypergeometric, computed with factorials. Five-of-five is rare enough that no simulation would price it
 // honestly without millions of runs, which is the whole argument for doing the arithmetic.
 console.log("\nKENO");
 let kenoTotal = 0;
+// How often a ticket pays NOTHING. The Croupier's Cat refunds a share of exactly those, so the perked table
+// below has to be handed this number — without it the gate prices a refund of zero while the floor pays one,
+// which is the one failure every comment in this file is written to prevent.
+let kenoLoss = 0;
 for (let k = 0; k <= KENO_PICKS; k += 1) {
     const p = kenoChance(k);
     kenoTotal += p;
     const pay = KENO_PAYS[k] || 0;
+    if (pay <= 0) kenoLoss += p;
     const odds = p > 0 ? `1 in ${Math.round(1 / p).toLocaleString()}` : "never";
     console.log(`  ${k} hit${k === 1 ? " " : "s"}  ${pct(p).padStart(8)}  ${odds.padStart(12)}  pays ${String(pay).padStart(4)}x  ->  ${pct(p * pay)}`);
 }
@@ -187,21 +174,16 @@ console.log("\nWITH ALL FIVE PETS OWNED (the worst case the ceiling has to survi
 for (const pet of CASINO_PETS) {
     const k = pet.casinoPerk;
     const what = k.freePlay ? `${pct(k.freePlay)} of plays free`
-        : k.wheelRefund ? `${pct(k.wheelRefund)} of a losing wheel spin back (paid as ${pct(Math.min(1, k.wheelRefund / REFUND_CHANCE))} of the stake, ${pct(REFUND_CHANCE)} of losses)`
+        : k.lossRefund ? `${pct(k.lossRefund)} of a losing keno ticket back (paid as ${pct(Math.min(1, k.lossRefund / REFUND_CHANCE))} of the stake, ${pct(REFUND_CHANCE)} of losses)`
         : k.prizeChance ? `+${pct(k.prizeChance)} prize chance`
         : k.prizeTierUp ? "prizes roll from a better shelf" : "nothing";
     console.log(`  ${pet.name.padEnd(18)} ${String(pet.rarity).padEnd(10)} 1 in ${String(Math.round(1 / pet.casinoChance).toLocaleString()).padStart(6)} plays   ${what}`);
 }
-console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.wheelRefund)} wheel refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
+console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.lossRefund)} keno refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
 
 const perked = [
     ...Object.values(SLOT_MACHINES).map((m) => ({ name: m.label, r: perkedRtp(slotRtps[m.id]) })),
-    { name: "keno", r: perkedRtp(kr) },
-    ...Object.entries(WHEEL_BETS).map(([id, bet]) => {
-        // Worst bet FIRST: the refund only pays on a loss, so the long shots carry the most of it.
-        const loss = 1 - WHEEL.filter((seg) => bet.hits(seg, 0)).length / WHEEL.length;
-        return { name: `the wheel, ${bet.label}`, r: perkedRtp(wheelRtp(id, 0), MAX_PERKS, loss) };
-    }),
+    { name: "keno", r: perkedRtp(kr, MAX_PERKS, kenoLoss) },
 ].sort((a, b) => b.r - a.r);
 
 console.log("");

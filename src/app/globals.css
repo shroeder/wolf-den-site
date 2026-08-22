@@ -17681,31 +17681,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Twenty pockets drawn as a ring of segments rather than a spinning disc: the pocket that came up is
    what matters, and a real rotation would need the wheel to stop on a known index, which is animation
    work for information a highlight already carries. The two wolf pockets are visible on purpose — the
-   house edge is on the felt where you can count it. */
-.cas-wheel { position: relative; display: flex; gap: 3px; align-items: stretch;
-    height: 56px; margin: 12px 0 10px; padding: 5px; border-radius: 12px;
-    background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); }
-.cas-seg { flex: 1; border-radius: 4px; transition: transform 160ms ease, box-shadow 160ms ease; }
-.cas-seg.is-gold { background: linear-gradient(180deg, #ffd75e, #c98f1a); }
-.cas-seg.is-violet { background: linear-gradient(180deg, #a982ff, #5f3fb0); }
-.cas-seg.is-wolf { background: linear-gradient(180deg, #f5f7fa, #97a3b4); }
-.cas-seg.is-hit { transform: scaleY(1.28); box-shadow: 0 0 18px rgba(255,255,255,0.85); }
-.cas-wheel-out { position: absolute; inset: 0; display: grid; place-items: center;
-    font-family: var(--font-display); font-size: 0.95rem; color: #eaf1f8;
-    text-shadow: 0 2px 10px #000, 0 0 18px #000; pointer-events: none; }
-.cas-wheel-out.is-win { color: #fff6cc; text-shadow: 0 2px 10px #000, 0 0 26px color-mix(in srgb, var(--acc, #ffd75e) 95%, transparent); }
-
-.cas-picks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
-.cas-pick { padding: 8px 0; border-radius: 10px; font-size: 10.5px; font-weight: 900; cursor: pointer;
-    color: #cbd3dc; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
-.cas-pick i { display: block; font-style: normal; font-size: 9px; color: #98a0aa; margin-top: 1px; }
-.cas-pick.is-on { color: #22180a; border-color: transparent;
-    background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000)); }
-.cas-pick.is-on i { color: rgba(34,24,10,.7); }
-
-/* ── THE TICKET ──────────────────────────────────────────────────────────────────────────────────────
-   Forty numbers. Yours are marked before the draw and stay marked through it, so a hit is your mark and
-   the draw agreeing rather than a colour you have to decode after the fact. */
 .cas-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0 8px; }
 .cas-num { aspect-ratio: 1; border-radius: 7px; font-size: 11px; font-weight: 900; cursor: pointer;
     color: #98a0aa; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
