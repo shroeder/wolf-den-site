@@ -405,26 +405,31 @@ export default function CasinoClient({ initial }) {
         return () => clearInterval(id);
     }, []);
 
-    // Keep the window centred on you. Written imperatively rather than as a transform because scrollLeft
-    // needs no arithmetic about percentages of percentages, and the browser smooths it for free.
-    useEffect(() => {
-        const el = roomRef.current;
-        if (!el) return;
-        const world = el.scrollWidth;
-        // INSTANT, not smooth. `x` now changes sixteen times a second while you walk, and a smooth scroll
-        // restarted that often never finishes one — the camera lurched and lagged behind the hero. It moves
-        // in the same small increments he does, which is smooth without being animated.
-        el.scrollTo({ left: (world * x) / 100 - el.clientWidth / 2, behavior: "auto" });
-    }, [x]);
-
-    // ...and the walk to it. Runs once: after this the position is yours, and a link should not be able to
-    // yank you back across the floor on a later render.
+    // ── THE CAMERA IS YOURS ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "remove the camera snap on tap."
+    //
+    // This used to re-centre on the hero every time `x` changed — which, since walking moves him sixteen
+    // times a second, meant the view was dragged along behind him for the whole walk and any framing you
+    // had set by dragging the floor was thrown away the moment you tapped it. Two controls fighting over
+    // one thing: you aim the camera, and then the game aims it somewhere else.
+    //
+    // It only runs ONCE now, to put you on screen when the room opens. After that the floor stays exactly
+    // where you left it and the hero walks around inside the frame you chose. Nothing is ever lost by this:
+    // a tap can only target a spot you can SEE, so walking always ends inside the current view.
+    //
+    // Merged with the deep link because they are the same job — decide where the camera starts — and as two
+    // effects they both ran on mount and the second one's `setX` landed after the first had already framed
+    // the wrong place.
     useEffect(() => {
         const want = new URLSearchParams(window.location.search).get("at");
-        // Arriving from a link puts you AT the machine rather than walking you the length of the floor to it:
-        // a link is a door, not a stroll.
+        // Arriving from a link puts you AT the machine rather than walking you the length of the floor to
+        // it: a link is a door, not a stroll.
         const m = MACHINES.find((mm) => mm.id === want);
         if (m) setX(m.x);
+        const el = roomRef.current;
+        if (!el) return;
+        const startX = m ? m.x : xRef.current;
+        el.scrollTo({ left: (el.scrollWidth * startX) / 100 - el.clientWidth / 2, behavior: "auto" });
     }, []);
 
     // ── WALKING, WITHOUT STEPS ───────────────────────────────────────────────────────────────────────────
