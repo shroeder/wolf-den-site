@@ -121,6 +121,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
     // One bag per reel, off the machine's real strips — see stripFor.
     const strips = useMemo(() => slot5(machineId).strips, [machineId]);
+    // Does this cabinet tumble? Decides whether the owner row offers a forced chain.
+    const cascades = useMemo(() => Boolean(slot5(machineId).cascade), [machineId]);
 
     // ── A MACHINE NOBODY IS PLAYING SITS STILL ───────────────────────────────────────────────────────
     // Luke: "dont have this screen iterate over random symbols when you arent playing it."
@@ -581,8 +583,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             {owner ? (
                 <div className="s5-owner">
                     <i>owner</i>
-                    <button type="button" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
-                    <button type="button" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
+                    <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
+                    <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
+                    {cascades ? (
+                        <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>
+                    ) : null}
                 </div>
             ) : null}
 
