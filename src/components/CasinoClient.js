@@ -1357,7 +1357,12 @@ export default function CasinoClient({ initial }) {
                         The tray, the multiplier and any banked free pulls. Shown ALWAYS rather than only
                         when they are non-zero: a meter you only see once it has something in it is a meter
                         nobody knows they are filling. */}
-                    {SLOTS.has(at.id) && meters[at.id] ? (
+                    {/* NOT ON A FIVE-REEL CABINET, which has none of these. It was rendering anyway, as an
+                        empty element of zero height — invisible, but still a flex item, so it took HALF the
+                        auto margin meant to centre the machine and left the whole cabinet sitting low with a
+                        screen of void above it. An element that draws nothing and still occupies layout is
+                        the hardest kind to find by looking. */}
+                    {SLOTS.has(at.id) && !SLOTS5[at.id] && meters[at.id] ? (
                         <div className="cas-meters">
                             {(st?.slots?.[at.id]?.bonuses || []).some((b) => b.id === "tray") ? (
                                 <span className={`cas-meter${meters[at.id].tray > 0 ? " is-full" : ""}`}>
