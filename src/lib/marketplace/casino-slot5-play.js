@@ -74,10 +74,15 @@ export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.
         grid: r.grid,
-        lines: r.base.wins.filter((w) => w.kind === "line"),
+        // ── EVERY LINE ARRIVES ALREADY IN CHIPS ──────────────────────────────────────────────────────
+        // The screen used to multiply each line by the rate itself and round, which is the same conversion
+        // written twice — and the copy rounded per line instead of once, so a three-doubloon line printed
+        // "0 chips" under a line it had just drawn across the grid. Converted here, by the same function
+        // that pays the total, and the client only renders the number.
+        lines: r.base.wins.filter((w) => w.kind === "line").map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
         scatters: r.base.scatters,
         scatterWin: r.base.wins.find((w) => w.kind === "scatter") || null,
-        free: r.free ? { offer: offer.id, label: offer.label, spins: r.free.spins.map((s) => ({ grid: s.grid, total: s.total, wins: s.wins })), total: r.free.total } : null,
+        free: r.free ? { offer: offer.id, label: offer.label, spins: r.free.spins.map((s) => ({ grid: s.grid, total: s.total, wins: s.wins })), total: r.free.total, chips: chipsFor(stake, r.free.total / stake) } : null,
         pick: r.pick ? { picked: r.pick.picked, mult: r.pick.mult, total: r.pick.total } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,

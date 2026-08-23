@@ -13,15 +13,29 @@ import { db } from "@/lib/db";
 // CHIP_RATE chips however the spins fell. Everything about what a chip is WORTH is then decided by the prices
 // below and nowhere else. Change this number and you have repriced the entire casino, which is the point:
 // there is exactly one lever.
-export const CHIP_RATE = 0.08;
+// 0.25 rather than 0.08, and the reason is RESOLUTION rather than generosity. At 0.08 a whole 1x win on a
+// 100-gold spin was 8 chips, so the entire machine was quantised in eighths — and the smallest paying line on
+// The Hunt, three doubloons, came to 0.4 chips and rounded to NOTHING. Caught by playing it on the live site:
+// "3 doubloon — 0 chips". A machine that draws a winning line across the screen and pays zero for it is
+// broken, whatever the maths says. Tripling the rate triples the store prices with it, so nothing about what
+// a chip BUYS has changed — only how finely a win can be expressed.
+export const CHIP_RATE = 0.25;
 
-// What a bet of `gold` mints, on an average-luck spin. The machines' payouts are multiples of the bet, so the
-// conversion happens once, here, at the point the win is awarded.
-export const chipsFor = (gold, multiple) => Math.max(0, Math.round(gold * multiple * CHIP_RATE));
+// What a bet of `gold` mints. The machines' payouts are multiples of the bet and know nothing about chips;
+// the conversion happens once, here.
+//
+// AND ANYTHING THAT PAID AT ALL PAYS AT LEAST ONE CHIP. Rounding is not allowed to turn a win into a loss:
+// the line lit, the screen said it paid, and a zero underneath that is the machine contradicting itself.
+export const chipsFor = (gold, multiple) => {
+    const raw = gold * multiple * CHIP_RATE;
+    if (raw <= 0) return 0;
+    return Math.max(1, Math.round(raw));
+};
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
-// Priced against the rate above. At CHIP_RATE 0.08 a member staking 1,000 gold takes about 80 chips, so a
-// 400-chip item is roughly 5,000 gold through the machines — an evening, not a month, and not a coffee break.
+// Priced against the rate above, and REPRICED WITH IT: when the rate went 0.08 -> 0.25 every price here was
+// multiplied by the same 3.125, so the gold behind each item did not move. check:chips prints that gold, which
+// is the only number these prices can honestly be judged by — a chip on its own means nothing.
 //
 // THE PRICES ARE THE ECONOMY. There is no gold in this list on purpose: chips converting back to gold would
 // re-create the loop the whole design exists to break, and it is the one thing that can turn a generous
@@ -38,30 +52,30 @@ export const CHIP_STORE = [
     // caught before a member pays for a decoration that does not exist.
 
     // ── COSMETIC ── the safe shelf. Nothing here touches combat or the gold economy, so it can be generous.
-    { id: "deco_lamp", kind: "decoration", ref: "deco_lamp_post", name: "Lamp Post", price: 160, once: true,
+    { id: "deco_lamp", kind: "decoration", ref: "deco_lamp_post", name: "Lamp Post", price: 500, once: true,
         blurb: "The light outside a room where it is always evening." },
-    { id: "deco_lights", kind: "decoration", ref: "deco_lantern_string", name: "String Lights", price: 220, once: true,
+    { id: "deco_lights", kind: "decoration", ref: "deco_lantern_string", name: "String Lights", price: 690, once: true,
         blurb: "Strung over the tables. Never switched off." },
-    { id: "deco_idol", kind: "decoration", ref: "deco_golden_idol", name: "Golden Idol", price: 900, once: true,
+    { id: "deco_idol", kind: "decoration", ref: "deco_golden_idol", name: "Golden Idol", price: 2800, once: true,
         blurb: "It has watched a great many people lose." },
 
     // ── POWER ── the expensive shelf, and the reason the rate above matters. These are real, so they are
     // priced like it: a fourth-water gem is several evenings of play, not an afternoon.
-    { id: "gem_ruby3", kind: "gems", ref: "ruby_t3", name: "Ruby, Third Water", price: 520,
+    { id: "gem_ruby3", kind: "gems", ref: "ruby_t3", name: "Ruby, Third Water", price: 1600,
         blurb: "Cut, sized and ready for a socket." },
-    { id: "gem_any4", kind: "gems", ref: "sapphire_t4", name: "Sapphire, Fourth Water", price: 1400,
+    { id: "gem_any4", kind: "gems", ref: "sapphire_t4", name: "Sapphire, Fourth Water", price: 4400,
         blurb: "The good stuff. The counter does not haggle." },
-    { id: "parts_t3", kind: "parts", ref: [3, 40], name: "A Handful of Parts", price: 150,
+    { id: "parts_t3", kind: "parts", ref: [3, 40], name: "A Handful of Parts", price: 470,
         blurb: "Forty third-tier forge parts." },
-    { id: "parts_t4", kind: "parts", ref: [4, 25], name: "A Case of Parts", price: 420,
+    { id: "parts_t4", kind: "parts", ref: [4, 25], name: "A Case of Parts", price: 1310,
         blurb: "Twenty-five fourth-tier forge parts." },
 
     // ── CONSUMABLES ── small, repeatable, and the thing most likely to be bought on the way out.
     { id: "pack_house", kind: "consumables", ref: ["pot_adrenaline", "elixir_renewal", "sail_lucky_lure"],
-        name: "The House Pack", price: 240,
+        name: "The House Pack", price: 750,
         blurb: "A draught, an elixir and a lure. Compliments of the floor." },
     { id: "pack_forge", kind: "consumables", ref: ["forge_power_scroll", "forge_enchant_scroll"],
-        name: "The Smith's Envelope", price: 380,
+        name: "The Smith's Envelope", price: 1190,
         blurb: "Two scrolls the forge will be glad to see." },
 ];
 export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id) || null;

@@ -140,7 +140,7 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
         if (phase !== "lines" || showLine < 0 || !result) return null;
         const w = result.lines[showLine];
         if (!w) return null;
-        return { line: lines[w.line], count: w.count, symbol: w.symbol, amount: w.amount };
+        return { line: lines[w.line], count: w.count, symbol: w.symbol, chips: w.chips };
     }, [phase, showLine, result, lines]);
 
     return (
@@ -175,7 +175,7 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
             {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
-                    : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{Math.round(lit.amount * (result?.rate || 1))}</b> chips</span>
+                    : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{lit.chips.toLocaleString()}</b> chips</span>
                     : result?.wonChips ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
                     : result ? <span className="s5-dim">No line this time.</span>
                     : <span className="s5-dim">Twenty lines. Pick your deal and pull.</span>}
@@ -199,7 +199,7 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
             {phase === "free" && result?.free ? (
                 <div className="s5-feature">
                     <h4>The moon is up — {result.free.label}</h4>
-                    <p>{result.free.spins.length} spins ran. <b>{Math.round(result.free.total * (result.rate || 1)).toLocaleString()}</b> chips.</p>
+                    <p>{result.free.spins.length} spins ran. <b>{Number(result.free.chips || 0).toLocaleString()}</b> chips.</p>
                     <button type="button" className="s5-go" onClick={() => setPhase(result.pick ? "pick" : "done")}>Go on</button>
                 </div>
             ) : null}
