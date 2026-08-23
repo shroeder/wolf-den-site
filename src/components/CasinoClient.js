@@ -1189,14 +1189,15 @@ export default function CasinoClient({ initial }) {
                         </div>
                     ) : null}
 
+                    {/* Luke: "we dont have to show the odds on each." The hit rate, the top multiple and the
+                        return used to print under the blurb. It was there because a floor that hides its own
+                        odds is a floor with something to hide — but three percentages above the reels is a
+                        spec sheet, and the machine is right there to be played. The numbers have not gone
+                        anywhere: check:casino prints every one of them and refuses the build if any cabinet
+                        drifts. */}
                     {SLOTS.has(at.id) && st?.slots?.[at.id] ? (
                         <p className="cas-vol">
                             <span>{st.slots[at.id].blurb}</span>
-                            <i>
-                                pays on {Math.round(st.slots[at.id].hitRate * 100)}% of pulls
-                                {" · "}top {money(Math.max(...Object.values(st.slots[at.id].pays.three)))}x
-                                {" · "}returns {(st.slots[at.id].rtp * 100).toFixed(1)}%
-                            </i>
                         </p>
                     ) : null}
 

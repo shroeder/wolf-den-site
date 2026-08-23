@@ -50,6 +50,29 @@ export const CASINO_ZONE = "casino";
 export const RTP_CEILING = 0.95;     // above this a machine is a money printer; the check script refuses it
 export const RTP_TARGET = 0.88;      // what the tables are actually tuned to
 
+// ── NO WIN PAYS LESS THAN THE STAKE ──────────────────────────────────────────────────────────────────────────
+// Luke: "its lame to get .2 to 1.2 very lame."
+//
+// He is right, and it was the single worst thing about this floor. Every cabinet used to buy most of its hit
+// rate with pairs of its COMMONEST symbol — The Hunt paid 0.4x on two Moons, which land one pull in four, and
+// The Menagerie paid 0.28x on two Wolf Pups. Those combinations were 17% of the return between them and every
+// one of them handed back less than had gone in. A machine that lights up, plays a sound, prints "60 gold" and
+// leaves you 40 down has not paid you; it has taken your money slowly and congratulated you for it.
+//
+// So the rule is now absolute and the check script has no opinion about it because it does not need one: THE
+// SMALLEST WINNING COMBINATION ON EVERY MACHINE PAYS 2x. There is nothing on this floor that pays back less
+// than it took.
+//
+// WHAT THAT COSTS, honestly: hit rates fall from 60-74% to 12-23%, because on three reels any combination
+// frequent enough to lift the hit rate that high cannot be afforded at 2x inside an 88% return. The money did
+// not vanish — it moved into the top of the tables, which is where the same budget buys something worth
+// remembering. The Hunt's jackpot went 700x -> 1,500x, The Menagerie's 1,500x -> 3,000x, The Vault's
+// 2,000x -> 4,000x, and the middle of every table roughly doubled.
+//
+// The bonuses are what keep the floor busy between wins, and they were always the better answer to "it feels
+// dead" than a 0.4x dribble: the nudge, the free pulls, the banks filling and the Pot climbing all fire on
+// pulls that pay nothing.
+
 export const MIN_BET = 25;
 export const MAX_BET = 5000;
 
@@ -81,7 +104,7 @@ export const MAX_BET = 5000;
 export const SLOT_THEMES = {
     slot: {
         label: "The Hunt",
-        blurb: "Pays often. Tops out at 700x.",
+        blurb: "Steady hunting, and nothing here pays small.",
         art: {
             // Picked off a contact sheet of all ten foes for READABILITY, not just for rank. The first cut
             // used `nightmare` and `veteran` — both dark armour on a near-black reel, and the nightmare
@@ -97,7 +120,7 @@ export const SLOT_THEMES = {
     },
     slot2: {
         label: "The Harvest",
-        blurb: "Pays more often than not. Rarely pays big.",
+        blurb: "The kindest machine on the floor, and the shortest ceiling.",
         art: {
             // The Wolf's Table is the Den's grandest dish, so it is the jackpot. The gold pie is the symbol
             // that drops a coin in a piggy bank, which is the right shape for it.
@@ -109,7 +132,7 @@ export const SLOT_THEMES = {
     },
     slot4: {
         label: "The Menagerie",
-        blurb: "Pays often, and the top of it is a long way up.",
+        blurb: "The same patience as The Hunt, for twice the top prize.",
         art: {
             wolf: "pet:eternal_wolf",
             chest: "pet:elder_dragon",
@@ -120,7 +143,7 @@ export const SLOT_THEMES = {
     },
     slot5: {
         label: "The Vault",
-        blurb: "Half the pulls pay nothing. One of them pays 2,000x.",
+        blurb: "Rarely opens. Opens enormously.",
         art: {
             wolf: "item:primordial_primordial_blade",
             chest: "item:celestial_celestial_blade",
@@ -132,7 +155,7 @@ export const SLOT_THEMES = {
     },
     slot3: {
         label: "The Deep",
-        blurb: "Only triples pay. One of them pays 4,000x.",
+        blurb: "Only triples and starfish pay. One triple pays a fortune.",
         art: {
             wolf: "/images/fish/fish_leviathan.png",
             moon: "/images/fish/fish_kraken.png",
@@ -194,7 +217,7 @@ export const SLOT_MACHINES = {
     slot: {
         id: "slot",
         label: "The Hunt",
-        blurb: "Pays often. Tops out at 700x.",
+        blurb: "Steady hunting, and nothing here pays small.",
         symbols: [
             { id: "wolf", label: "Wolf", weight: 1 },
             { id: "chest", label: "Chest", weight: 3 },
@@ -224,15 +247,15 @@ export const SLOT_MACHINES = {
         // that ALREADY paid the wolf pair into one that pays the wolf triple, and that 2.2% is what the
         // rest of the table gives up to it.
         pays: {
-            three: { wolf: 700, chest: 100, laurel: 35, doubloon: 8, bone: 8, moon: 3.2 },
-            two: { wolf: 8, chest: 3, laurel: 1.5, doubloon: 1, bone: 0.5, moon: 0.4 },
+            three: { wolf: 1500, chest: 120, laurel: 30, doubloon: 10, bone: 4, moon: 2 },
+            two: { wolf: 40, chest: 9, laurel: 3.5, doubloon: 2 },
         },
     },
 
     slot2: {
         id: "slot2",
         label: "The Harvest",
-        blurb: "Pays more often than not. Rarely pays big.",
+        blurb: "The kindest machine on the floor, and the shortest ceiling.",
         // FOUR symbols, where Wolf's Luck has six — and that, not the weights, is what makes this the
         // grinder. How often three reels show a repeat is driven almost entirely by how FEW distinct
         // symbols there are: six symbols cannot be made to pay "more often than not" at any payout, and the
@@ -255,15 +278,15 @@ export const SLOT_MACHINES = {
         // your stake exactly now rather than 1.2x — which is the right shape anyway: the triple is no longer
         // the prize, it is the thing that HANDS you the prize you have been filling all session.
         pays: {
-            three: { wolf: 80, chest: 12, laurel: 3, moon: 1 },
-            two: { wolf: 7, chest: 2, laurel: 0.83, moon: 0.3 },
+            three: { wolf: 200, chest: 22, laurel: 4, moon: 2 },
+            two: { wolf: 12, chest: 2 },
         },
     },
 
     slot3: {
         id: "slot3",
         label: "The Deep",
-        blurb: "Only triples pay. One of them pays 4,000x.",
+        blurb: "Only triples and starfish pay. One triple pays a fortune.",
         symbols: [
             { id: "wolf", label: "Wolf", weight: 1 },
             { id: "moon", label: "Moon", weight: 2 },
@@ -289,7 +312,7 @@ export const SLOT_MACHINES = {
         // The scatter drops from 1.33x to 1.1x to pay for Moonstruck, which is funded by the dead pulls it
         // is made of.
         pays: {
-            three: { wolf: 4000, moon: 1200, chest: 200, laurel: 40, star: 2, bone: 1.1 },
+            three: { wolf: 2500, moon: 500, chest: 100, laurel: 20, star: 3, bone: 2 },
             two: {},
         },
         // ── THE SCATTER ── stars pay wherever they land, not only in a line, and it takes TWO of them. It
@@ -298,13 +321,13 @@ export const SLOT_MACHINES = {
         //
         // Two, not one. A single star pays on 40% of pulls, which would have made the chase machine the
         // most frequent payer on the floor and quietly deleted the reason it exists.
-        scatter: { id: "star", pays: { 2: 0.9 } },
+        scatter: { id: "star", pays: { 2: 2 } },
     },
 
     slot4: {
         id: "slot4",
         label: "The Menagerie",
-        blurb: "Pays often, and the top of it is a long way up.",
+        blurb: "The same patience as The Hunt, for twice the top prize.",
         // FIVE symbols, which sits this machine's pair frequency between Den Fortune's four and the six on
         // the others — and the top prize is more than twice The Hunt's. Pays reasonably often AND has a
         // real ceiling, which it can only afford by having very little in the middle.
@@ -316,15 +339,15 @@ export const SLOT_MACHINES = {
             { id: "moon", label: "Wolf Pup", weight: 19 },
         ],
         pays: {
-            three: { wolf: 1500, chest: 120, laurel: 22, bone: 5, moon: 1.2 },
-            two: { wolf: 9, chest: 3, laurel: 1.2, bone: 0.6, moon: 0.28 },
+            three: { wolf: 3000, chest: 90, laurel: 18, bone: 4, moon: 2 },
+            two: { wolf: 30, chest: 5, laurel: 2 },
         },
     },
 
     slot5: {
         id: "slot5",
         label: "The Vault",
-        blurb: "Half the pulls pay nothing. One of them pays 2,000x.",
+        blurb: "Rarely opens. Opens enormously.",
         // Only the two commonest symbols pay on a pair, which is what drops this machine's hit rate into the
         // gap between The Deep and The Hunt: most pulls are nothing, but when the vault opens it opens.
         symbols: [
@@ -336,8 +359,8 @@ export const SLOT_MACHINES = {
             { id: "moon", label: "Rusty Sword", weight: 16 },
         ],
         pays: {
-            three: { wolf: 2000, chest: 320, laurel: 90, doubloon: 30, bone: 8, moon: 2 },
-            two: { bone: 0.5, moon: 0.3 },
+            three: { wolf: 4000, chest: 320, laurel: 70, doubloon: 20, bone: 5, moon: 2 },
+            two: { wolf: 40, chest: 8, laurel: 3 },
         },
     },
 };
