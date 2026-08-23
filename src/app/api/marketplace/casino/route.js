@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
+import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
+import { chipShelf } from "@/lib/marketplace/chips.js";
+import { buyWithChips } from "@/lib/marketplace/chip-store.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
@@ -55,6 +58,16 @@ export async function POST(request) {
                 // ── THE PULL ── the bet is validated and taken server-side. `bet` arriving from a POST body is
                 // a number somebody can type, so it is clamped in spinSlot rather than trusted here.
                 case "spin": return noStore(await spinSlot(buyer.id, { bet: b?.bet, machine: b?.machine }));
+                // ── THE FIVE-REEL MACHINE ── gold in, chips out. Its own action rather than a flag on the
+                // one above, because it shares nothing with it: a different engine, a different currency and
+                // a different response shape. Two games behind one verb is how a payout path gets confused
+                // about which table it is paying from.
+                case "spin5":
+                    return noStore(await spinSlot5(buyer.id, { bet: b?.bet, machine: b?.machine, offerId: b?.offer }));
+                // ── THE COUNTER ── the shelf, and buying off it. The price is read from the catalog in code,
+                // never from the body; `item` is only a key.
+                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id)) });
+                case "chip_buy": return noStore(await buyWithChips(buyer.id, String(b?.item || "")));
                 // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets
                 // an opinion about.

@@ -27,6 +27,7 @@
     "check:tree": "node scripts/check-tree.mjs",
     "check:casino": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-casino.mjs",
     "check:slot5": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-slot5.mjs",
+    "check:chips": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-chips.mjs",
     "check:blackjack": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-blackjack.mjs",
     "check:bingo": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-bingo.mjs",
     "check:slot-bonus": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-slot-bonus.mjs",

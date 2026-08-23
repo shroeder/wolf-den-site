@@ -1,0 +1,106 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { logCoin } from "@/lib/marketplace/coins.js";
+import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { slot5, playSpin, FREE_SPIN_OFFERS, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
+
+// ── PLAYING THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
+// Gold in, chips out, and the gold never comes back. That asymmetry is the whole design (see chips.js), and it
+// makes this function simpler than the three-reel one it stands beside: there is no payout to compute in the
+// staked currency, no RTP ceiling to respect, and no way for a bug here to mint gold.
+//
+// THE BET IS TAKEN FIRST AND ATOMICALLY. `gold >= $2` inside the UPDATE, so two taps cannot spend the same
+// coin, and if that write does not come back nothing else happens — there is no version of this where the
+// reels roll on credit.
+//
+// THE SPIN IS RESOLVED ON THE SERVER, once, and the client is handed a transcript to play back. The free-spin
+// OFFER is the one thing the member decides, and it is decided before the round runs, so the choice cannot be
+// made after seeing what it would have paid.
+
+const clampBet = (n) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(n) || MIN_BET)));
+
+// The floor is still owner-gated. Same gate the rest of the casino uses; the machine is finished long before
+// the room is opened, and un-gating is a deliberate act somewhere else.
+const OPEN = false;
+export const slot5OpenFor = (buyerId) => OPEN || isOwner(buyerId);
+
+/**
+ * One press of the button.
+ *
+ * `offerId` names which free-spin deal the member has chosen. It is read even when no free spins trigger,
+ * because the screen offers the choice up front — you pick your deal, then you spin, which is what makes it a
+ * decision rather than a menu that appears at the moment it stops mattering.
+ */
+export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    if (!slot5OpenFor(buyerId)) return { ok: false, error: "closed" };
+
+    const m = slot5(machine);
+    const stake = clampBet(bet);
+    // An unknown offer falls back to the middle one rather than erroring: it arrives in a POST body, and all
+    // three are worth the same to within half a percent, so a lie about it buys nothing.
+    const offer = FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1];
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, stake],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold" };
+    await logCoin(buyerId, -stake, "casino_slot5_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
+
+    const r = playSpin(m, { bet: stake, offerId: offer.id });
+
+    // ── CONVERTED ONCE, AT THE END ───────────────────────────────────────────────────────────────────────
+    // The engine works in multiples of the bet and knows nothing about chips; the rate is applied here and
+    // only here. Rounding once on the total rather than per win matters: three lines paying 0.4 chips each
+    // round to zero individually and to one together, and a machine that pays nothing for a three-line win
+    // is a machine somebody will rightly call broken.
+    const won = chipsFor(stake, r.total / stake);
+    let chips = null;
+    if (won > 0) {
+        chips = await moveChips(buyerId, won, "slot5", {
+            ref: m.id,
+            meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, pick: r.pick ? r.pick.total / stake : 0 },
+        });
+    }
+
+    return {
+        ok: true,
+        gold: Number(paid.gold),
+        chips: chips ?? await chipsOf(buyerId),
+        bet: stake,
+        // The grid, and everything the grid turned into. The client animates from this and computes nothing.
+        grid: r.grid,
+        lines: r.base.wins.filter((w) => w.kind === "line"),
+        scatters: r.base.scatters,
+        scatterWin: r.base.wins.find((w) => w.kind === "scatter") || null,
+        free: r.free ? { offer: offer.id, label: offer.label, spins: r.free.spins.map((s) => ({ grid: s.grid, total: s.total, wins: s.wins })), total: r.free.total } : null,
+        pick: r.pick ? { picked: r.pick.picked, mult: r.pick.mult, total: r.pick.total } : null,
+        // In chips, which is the only number on this screen a member should have to hold in their head.
+        wonChips: won,
+        // And the multiple, for the "big win" threshold — see the note on celebration below.
+        multiple: r.total / stake,
+        rate: CHIP_RATE,
+        lineCount: LINES.length,
+    };
+}
+
+async function chipsOf(buyerId) {
+    const row = await db.queryOne(`SELECT COALESCE(chips, 0)::bigint AS chips FROM mkt_buyer WHERE id = $1`, [buyerId]);
+    return Number(row?.chips || 0);
+}
+
+// ── WHAT COUNTS AS A WIN WORTH CELEBRATING ───────────────────────────────────────────────────────────────────
+// About seven wins in ten on a twenty-line machine pay back less than the stake. That is not a trick — it is
+// what twenty lines BUYS: a line hit several times a minute instead of a dead screen. But a machine that
+// throws a fanfare at a 0.4x is doing the thing Luke objected to in the first place ("its lame to get .2 to
+// 1.2"), and real cabinets do exactly that on purpose. It has a name in the trade, "a loss disguised as a
+// win", and it is the one thing about them worth refusing to copy.
+//
+// So the line lights, the chips tick up, and that is all. The horns are for wins that actually beat the stake,
+// and the big celebration is for wins that beat it several times over.
+export const CELEBRATE_AT = 1;      // below this: the line lights and the counter moves, nothing else
+export const BIG_WIN_AT = 10;       // and this is where the room stops what it is doing
