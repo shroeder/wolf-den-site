@@ -324,7 +324,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 {phase === "spin" ? <span className="s5-dim">…</span>
                     : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{lit.chips.toLocaleString()}</b> chips</span>
                     : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
-                    : result ? <span className="s5-dim">No line this time.</span>
+                    : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
+                    : result ? <span className="s5-dim" />
                     : <span className="s5-dim">Twenty lines.</span>}
             </div>
 
