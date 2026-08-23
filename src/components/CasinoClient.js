@@ -1263,7 +1263,10 @@ export default function CasinoClient({ initial }) {
             <div className="cas-walk">
                 {at?.live ? (
                     <button type="button" className="cas-sit" onClick={() => setSeated(true)}>
-                        Play {at.label}
+                        {/* You do not "Play The Counter". It is the one thing on this floor that is not a
+                            game, and a button offering to play it is the screen not knowing what it is
+                            standing in front of. */}
+                        {at.id === "store" ? "Spend your chips" : `Play ${at.label}`}
                     </button>
                 ) : <span>{at ? at.label : "walk to a machine"}</span>}
             </div>

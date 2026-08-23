@@ -17394,7 +17394,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Tied to the room as well, with the old percentage kept as a floor for short screens. The desktop widths
    below still override this — a very long floor is a hike on a screen that can already see four
    cabinets at once. */
-.cas-world { position: relative; width: max(480%, calc(var(--room) * 5.7)); height: 100%; cursor: pointer;
+/* WIDE ENOUGH FOR NINE. Sized for eight cabinets, it left the ninth — the counter, at 96% — hanging over
+   the end: measured on the deployed page at scrollWidth 1801 against a world of 1722, and those 79 stray
+   pixels were a black strip of nothing to the right of the painted floor, with the member's own sprite
+   standing under a broken image in it. A location's `x` is a percentage OF THIS WIDTH, so the last one
+   only fits if 4% of the world is wider than half a cabinet. */
+.cas-world { position: relative; width: max(540%, calc(var(--room) * 6.4)); height: 100%; cursor: pointer;
     /* ── THE WALL IS PART OF THE FLOOR ────────────────────────────────────────────────────────────────
        Luke: "the bg and the foreground should match scroll no paralax."
 
@@ -17411,8 +17416,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
        cabinets standing in front of them, which reads as a doll house. The overflow crops the dead
        cornice off the top, which is the half of the picture nothing was using. */
     background: url("/images/casino/room.webp") repeat-x left 82% / auto 122%; }
-@media (min-width: 700px) { .cas-world { width: 290%; } }
-@media (min-width: 1024px) { .cas-world { width: 235%; } }
+@media (min-width: 700px) { .cas-world { width: 326%; } }
+@media (min-width: 1024px) { .cas-world { width: 264%; } }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
    the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
    that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of

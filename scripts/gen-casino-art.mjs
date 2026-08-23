@@ -52,6 +52,19 @@ const CABINET =
     + "glowing display panel in the upper half and a lever or button plate below.";
 
 const JOBS = {
+    // ── THE COUNTER ── the one thing on this floor that is NOT a cabinet, so it deliberately breaks the
+    // shared silhouette above. A cashier's window reads as furniture rather than a game, which is the whole
+    // point: it is where you stop playing and spend what you won. Wider than tall, low, and open.
+    store: {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A fantasy casino cashier's counter seen straight on from the front — a low, wide, waist-height "
+            + "desk of dark stained wood with a tarnished brass grille above it and a wolf-motif carved into "
+            + "the front panel. Neat stacks of gaming chips and a small brass scale sit on the counter top, "
+            + "lit by a single hanging lamp. No reels, no lever, no glowing display. Quiet, orderly, closed "
+            + "for nobody.",
+        ),
+    },
     // ── The three slot machines. Same cabinet, three different burns — the volatility of each one made
     // visible, because the player is choosing between them before they read a word.
     slot: {
