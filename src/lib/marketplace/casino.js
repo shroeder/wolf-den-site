@@ -1,4 +1,5 @@
 import "server-only";
+import { CHIP_RATE } from "@/lib/marketplace/chips.js";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -1104,6 +1105,10 @@ export async function getCasinoState(buyerId) {
         // purse on that screen shows both — see chips.js. Sent from the first load rather than only in a spin
         // response, or a member who walks in and does not pull is told they have none.
         chips: Number(me?.chips) || 0,
+        // And the rate, so a paytable can print what a line is actually worth in chips before a single spin
+        // has happened. The client must never keep its own copy of this — it moved once already, 0.08 to
+        // 0.25, and a hardcoded copy would have quoted every payout three times too low.
+        chipRate: CHIP_RATE,
         me: { sprite: me?.avatar_sprite_url || null },
         others,
         // Every cabinet's table, so a machine can show what it pays without another round trip. Functions

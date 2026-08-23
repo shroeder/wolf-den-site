@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, slot5 } from "@/lib/marketplace/casino-slot5.js";
+import Paytable from "@/components/casino/Paytable.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -53,7 +54,7 @@ function stripFor(bag, land) {
     return [...Array.from({ length: 9 }, draw), ...land];
 }
 
-export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, stakes = [25, 100, 500, 2500], busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -62,6 +63,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | done
     const [picked, setPicked] = useState([]);      // chests turned over so far
+    const [pays, setPays] = useState(false);       // is the paytable open
     const timers = useRef([]);
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
@@ -184,6 +186,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
     return (
         <div className="s5">
+            {pays ? <Paytable kind="five" machineId={machineId} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
             {/* ── THE GRID ────────────────────────────────────────────────────────────────────────────── */}
             {/* ── A MACHINE, NOT A GRID ON A PAGE ─────────────────────────────────────────────────────
                 Luke: "setting the slot machine screen apart from the background." It was a dark grid on a
@@ -191,7 +194,15 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 brass frame with weight to it, a recessed glass panel that is visibly deeper than the
                 surface around it, and a lit marquee saying which machine you are at. */}
             <div className="s5-cab">
-                <span className="s5-marquee" aria-hidden="true"><i />THE HUNT<i /></span>
+                {/* ── AND A WAY TO READ THE MACHINE ───────────────────────────────────────────────
+                    On the marquee, right-hand end, which is where a real cabinet puts it. A slot is the
+                    only game in the building whose rules are invisible while you play it: you can watch a
+                    blackjack hand and work out what happened, but nobody can watch a reel and deduce that
+                    four bones beat three laurels or that the moon does not pay on a line at all. */}
+                <span className="s5-marquee"><i aria-hidden="true" />{slot5(machineId).label.toUpperCase()}<i aria-hidden="true" />
+                    <button type="button" className="s5-pays" onClick={() => setPays(true)}
+                        aria-label="What this machine pays">PAYS</button>
+                </span>
             <div className="s5-window">
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (

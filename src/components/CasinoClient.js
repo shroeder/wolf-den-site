@@ -9,6 +9,7 @@ import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena
 import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
+import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 
@@ -432,6 +433,9 @@ export default function CasinoClient({ initial }) {
     // underneath it is two different things fighting for one screen — on a phone the reels and the button
     // could not both be visible, which is the one thing a slot machine has to manage.
     const [seated, setSeated] = useState(false);
+    // The paytable, for the cabinets that do not draw their own. Held here rather than inside the reels
+    // because it is a property of the MACHINE, not of a spin.
+    const [pays, setPays] = useState(false);
     // The room's one sound flag. Read after mount, never during render — it lives in localStorage and the
     // server has no idea what it says, so touching it while rendering is a hydration mismatch.
     const [soundOff, setSoundOff] = useState(false);
@@ -632,6 +636,10 @@ export default function CasinoClient({ initial }) {
     // The signature plays on arrival: three notes off the cabinet's own scale, which is the machine saying
     // which one it is before you have pulled anything. Standing up puts the kit back on the neutral voice so
     // the floor's own sounds do not keep the last cabinet's key.
+    // A paytable belongs to the machine that opened it. Left standing, it would still be over the screen
+    // after you stood up and walked to a different cabinet, describing the one you left.
+    useEffect(() => { setPays(false); }, [at?.id, seated]);
+
     useEffect(() => {
         if (!seated || !at) return undefined;
         Cas.at(at.id).signature();
@@ -1452,6 +1460,7 @@ export default function CasinoClient({ initial }) {
                             chips={st?.chips}
                             bet={bet}
                             onBet={setBet}
+                            rate={st?.chipRate}
                             busy={busy} />
                     ) : at.live && SLOTS.has(at.id) ? (
                         <>
@@ -1467,6 +1476,16 @@ export default function CasinoClient({ initial }) {
                                 water without a second asset.
                                 The tray at the bottom is where the piggy banks live, which is where a coin
                                 tray is on a real machine. */}
+                            {/* Same button, same place, on the cabinets that have not been rebuilt yet —
+                                see the note in Paytable. A floor where one machine tells you what it pays
+                                and the next does not is worse than one where none of them do. */}
+                            <button type="button" className="cas-pays" onClick={() => setPays(true)}>
+                                What it pays
+                            </button>
+                            {pays ? (
+                                <Paytable kind="three" machineId={at.id} table={st?.slots?.[at.id]}
+                                    bet={bet} onClose={() => setPays(false)} />
+                            ) : null}
                             <div className="cas-cab">
                                 <span className="cas-cab-top" aria-hidden="true">
                                     <i />{st?.slots?.[at.id]?.label || at.label}<i />
