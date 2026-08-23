@@ -116,13 +116,28 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             cascades: r.chain.cascades,
             trigger: m.cascade?.trigger || null,
             label: m.cascade?.label || null,
-            steps: r.chain.steps.map((st) => ({
-                grid: st.grid,
-                broken: st.broken,
-                mult: st.mult,
-                chips: chipsFor(stake, st.paid / stake),
-                wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
-            })),
+            // ── A RUNNING TOTAL, NOT A SUM OF PARTS ──────────────────────────────────────────────
+            // `chips` here is what the WHOLE SPIN is worth up to and including this break, not what this
+            // break paid. It has to be, because chipsFor rounds up and floors any win at one chip, so
+            // seven separately-rounded steps summed to 42 on a spin that paid 32 — the counter climbed
+            // past the payout and then fell back to it. A machine that overstates what it owes you and
+            // then corrects itself is worse than one that pays nothing.
+            //
+            // Running the same rounding over the running gold instead means every value on screen is a
+            // real chip figure and the last one IS the payout, exactly.
+            steps: (() => {
+                let run = 0;
+                return r.chain.steps.map((st) => {
+                    run += st.paid;
+                    return {
+                        grid: st.grid,
+                        broken: st.broken,
+                        mult: st.mult,
+                        chips: chipsFor(stake, run / stake),
+                        wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                    };
+                });
+            })(),
         } : null,
         // ── THE LOCKS ────────────────────────────────────────────────────────────────────────────────
         // What the member built before the door opened. Sent whole; the taps reveal it in order.

@@ -125,7 +125,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const cascades = useMemo(() => Boolean(slot5(machineId).cascade), [machineId]);
     // The multiplier the chain has climbed to. Read straight off the step on screen rather than kept in its
     // own state, so it can never disagree with the grid it is sitting on top of.
-    const mult = (phase === "tumble" && result?.chain?.steps[Math.max(0, chainAt)]?.mult) || 1;
+    // ── AND IT STAYS UP FOR THE PAYOUT ───────────────────────────────────────────────────────────────
+    // Both of these used to be tied to `phase === "tumble"` and so vanished on the frame the chain ended,
+    // which is the frame the payout starts counting. The ladder climbed to x20, the x20 disappeared, and
+    // then a number arrived with nothing on screen explaining where it came from. A multiplier is the
+    // REASON for the payout; it has to still be there when the payout lands.
+    const chaining = phase === "tumble" || (phase === "done" && Boolean(result?.chain));
+    const mult = (chaining && result?.chain?.steps[Math.max(0, chainAt)]?.mult) || 1;
 
     // ── A MACHINE NOBODY IS PLAYING SITS STILL ───────────────────────────────────────────────────────
     // Luke: "dont have this screen iterate over random symbols when you arent playing it."
@@ -220,7 +226,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setActiveWins(st.wins);
         setDropping(i === 0 ? [] : (chain.steps[i - 1].broken || []));
         setBreaking([]);
-        if (st.chips > 0) setChainWon((n) => n + st.chips);
+        // A RUNNING TOTAL, SET NOT ADDED. Each step carries what the whole spin is worth so far (see the
+        // note on the server side), so adding them would count every break as many times as breaks remain.
+        setChainWon(st.chips);
 
         // ── AND IT ACCELERATES ───────────────────────────────────────────────────────────────────────
         // The first version held every break for 920ms and the chain read as a slideshow: a line lit, sat
@@ -506,7 +514,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
                     Keyed by its own value, which is what makes it re-mount and replay the slam on every
                     step instead of animating once and then silently updating its text. */}
-                {phase === "tumble" && mult > 1 ? (
+                {chaining && mult > 1 ? (
                     <div className="s5-bigmult" key={mult} aria-hidden="true"><b>&times;{mult}</b></div>
                 ) : null}
             </div>
@@ -544,7 +552,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 Breaks so far against the number that opens the free round, and what the spin has taken. The
                 multiplier used to live here too and has moved onto the glass; what is left is the pair of
                 numbers you check rather than watch, which is what this strip is for. */}
-            {phase === "tumble" && result?.chain ? (
+            {chaining && result?.chain ? (
                 <div className={`s5-tumble${result.chain.trigger && chainAt + 1 >= result.chain.trigger - 2 ? " is-close" : ""}`}>
                     <span><i>Breaks</i><b>{chainAt + 1}{result.chain.trigger ? ` / ${result.chain.trigger}` : ""}</b></span>
                     <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
