@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FeatureDailies from "@/components/FeatureDailies";
 import SceneMusic from "@/components/SceneMusic";
-import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
+import { GiSoundOn, GiSoundOff } from "react-icons/gi";
+import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena-audio.js";
 import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
 
@@ -22,6 +23,41 @@ import { Cas } from "@/components/casino/casino-audio.js";
 // painted.
 // Nine cabinets now, re-spaced to fit. The five slots run first because they are the machines people walk in
 // for, then the two shared draws, then the games you sit down to.
+// -- THE SOUND SWITCH THE CASINO NEVER HAD ---------------------------------------------------------------------
+// Luke: "there is still no sound effects for the slots spinning or stopping or winning or losing."
+//
+// The sounds were all there and all being called -- traced on the live site with trusted taps: the context
+// comes up running, the oscillators start, the reels clunk. What was NOT there was any way to find out that
+// they had been turned OFF, or to turn them back on.
+//
+// Casino sound effects run on the arena's audio module, and so does the arena's MUTE: one flag in
+// localStorage under `wolfden.arena.muted`, set by a button that only exists inside a fight. Press mute once
+// during a bout -- weeks ago, on another screen, for an unrelated reason -- and every sound this room makes is
+// silenced forever, with nothing anywhere in the casino to show it or undo it. The music kept playing through
+// all of it, because SceneMusic builds its own context with its own separate mute, which is exactly the
+// symptom: a floor with music and no machines.
+//
+// So the room gets its own switch. It is the arena's flag, not a second one -- two mutes that disagree is a
+// worse bug than no mute at all -- it is just finally reachable from the room it silences.
+function SoundToggle() {
+    // Read AFTER mount. The flag lives in localStorage and the server has no idea what it says, so touching it
+    // during render is a hydration mismatch: the server would emit "on" and the client might mean "off".
+    const [off, setOff] = useState(false);
+    useEffect(() => { setOff(isMuted()); }, []);
+    return (
+        <button type="button" data-sfx-toggle
+            onClick={() => { const next = !off; setOff(next); setMuted(next); if (!next) { unlock(); Cas.coin(2); } }}
+            aria-label={off ? "Turn sound effects on" : "Turn sound effects off"}
+            title={off ? "Sound effects are off" : "Sound effects are on"}
+            className={`cas-sfxbtn${off ? " is-off" : ""}`}>
+            {/* A glyph, not an emoji -- see the same note in SceneMusic. And the OFF state is coloured rather
+                than merely different, because "my sound is broken" is the report this button exists to answer
+                and it has to be legible at a glance from across a phone. */}
+            {off ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+        </button>
+    );
+}
+
 const MACHINES = [
     { id: "slot", x: 8, label: "The Hunt", kind: "Slots", live: true },
     { id: "slot2", x: 19, label: "The Harvest", kind: "Slots", live: true },
@@ -525,6 +561,21 @@ export default function CasinoClient({ initial }) {
         document.body.classList.add("cas-seated");
         return () => document.body.classList.remove("cas-seated");
     }, [seated]);
+
+    // -- THE FIRST TOUCH, WHATEVER IT WAS ----------------------------------------------------------------
+    // A browser will not start audio until a real gesture, and `unlock()` was only wired to the handful of
+    // handlers that make a sound themselves -- walking, pulling, dealing. Anything that fired before one of
+    // those was dropped on the floor: `tone()` opens with `if (!ctx) return`, so a sound requested before the
+    // context exists is not queued, delayed or logged, it simply never happened. The cabinet's signature on
+    // sitting down was exactly that sound, and so was the arrival chime if you reached a machine by dragging.
+    //
+    // One listener, on the first pointerdown anywhere in the room, in the capture phase so nothing can stop it
+    // first. After that the context is up and every later sound has somewhere to land.
+    useEffect(() => {
+        const go = () => unlock();
+        window.addEventListener("pointerdown", go, { once: true, capture: true });
+        return () => window.removeEventListener("pointerdown", go, { capture: true });
+    }, []);
 
     // -- AND THE MACHINE'S OWN VOICE ---------------------------------------------------------------------
     // Every sound the cabinet makes from here -- the handle, the reels, the coins, the fanfare, the sigh
@@ -1122,9 +1173,9 @@ export default function CasinoClient({ initial }) {
                 AudioContext and re-ask for the autoplay gesture every time you sat down or stood up.
                 Seated it drops below the header (64px of it: 40px button, 12px padding either side) so it
                 does not sit on the gold; on the floor it is exactly where it has always been. */}
-            <div style={{ position: "fixed", right: 10, top: seated ? 74 : 10, zIndex: 62,
-                display: "grid", placeItems: "center" }}>
+            <div className="cas-audiobar" style={{ top: seated ? 74 : 10 }}>
                 <SceneMusic vibe={seated && at ? at.id : "casino"} place="inline" />
+                <SoundToggle />
             </div>
             </div>
 
