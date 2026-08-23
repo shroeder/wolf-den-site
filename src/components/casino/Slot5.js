@@ -565,9 +565,16 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 thing the base game never does, which is the screen's undivided attention. */}
             {phase === "freeIntro" && result?.free ? (
                 <div className="s5-shout" role="status">
-                    <i>The moon is up</i>
+                    {/* ── SAY WHAT WAS BUILT, NOT WHAT THE CABINET USUALLY GIVES ──────────────────
+                        On The Vault the round is not the machine's — the member just spent six taps
+                        stacking it, and the fanfare announced "Ten spins" and dropped the multiplier
+                        they had been watching climb. The one line that must name the round is the one
+                        that named it wrong. */}
+                    <i>{result.built ? "You built it" : "The moon is up"}</i>
                     <b>FREE SPINS</b>
-                    <em>{result.free.label}</em>
+                    <em>{result.built
+                        ? `${result.free.spins.length} spins at ×${result.free.mult}`
+                        : result.free.label}</em>
                 </div>
             ) : null}
 

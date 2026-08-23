@@ -19040,6 +19040,12 @@ body.cas-seated .social-fab { display: none; }
    they sit above the board and larger than it, and each JUMPS as it grows, because a gain you feel is
    worth more than a gain you read. */
 .lk { display: grid; gap: 12px; padding: 16px 12px; border-radius: 16px;
+    /* ── IT HAS TO FILL THE STAGE ────────────────────────────────────────────────────────────────
+       As a content-sized block this was a strip of 35px buttons across the top of a phone with five
+       hundred pixels of black underneath it, which reads as a screen that failed to load rather than
+       as the best mechanic on the floor. The rows are weighted instead: the counters take what they
+       need, the board takes everything left, and the button sits on the floor of the stage. */
+    grid-template-rows: auto auto 1fr auto; align-content: stretch;
     background: linear-gradient(180deg, #1d2333, #0f1119);
     border: 1px solid rgba(168, 85, 247, .35); box-shadow: 0 8px 26px rgba(0, 0, 0, .55);
     animation: penIn .4s cubic-bezier(.2, 1.3, .4, 1) both; }
@@ -19049,18 +19055,21 @@ body.cas-seated .social-fab { display: none; }
 .lk-head p { margin: 0; font-size: 12px; color: #a8b2bd; }
 
 .lk-built { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.lk-built > span { display: grid; gap: 1px; justify-items: center; padding: 10px 6px; border-radius: 13px;
+.lk-built > span { display: grid; gap: 2px; justify-items: center; padding: 16px 6px; border-radius: 14px;
     background: rgba(168, 85, 247, .12); border: 1px solid rgba(168, 85, 247, .3); }
-.lk-built b { font-family: var(--font-display); font-size: 1.9rem; line-height: 1; color: #fff;
+.lk-built b { font-family: var(--font-display); font-size: 2.6rem; line-height: 1; color: #fff;
     font-variant-numeric: tabular-nums; text-shadow: 0 0 16px rgba(168, 85, 247, .7); }
 .lk-built i { font-style: normal; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
     color: #b9a6d8; }
 .lk-built > span.is-up { animation: lkUp .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes lkUp { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
-.lk-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
-.lk-tile { position: relative; aspect-ratio: 1; border-radius: 12px; cursor: pointer;
-    display: grid; place-items: center; font-size: 17px; font-weight: 900;
+.lk-board { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 9px;
+    align-content: center; overflow: visible; }
+/* No aspect-ratio: the board owns the height now and the tiles divide it, so ten locks fill the stage
+   as two proper rows rather than sitting as a strip at the top of it. */
+.lk-tile { position: relative; min-height: 62px; border-radius: 14px; cursor: pointer;
+    display: grid; place-items: center; font-size: 24px; font-weight: 900;
     border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .05); color: #8f98a3;
     transition: transform .15s ease, opacity .3s ease; }
 .lk-tile:active { transform: scale(.93); }
@@ -19074,7 +19083,11 @@ body.cas-seated .social-fab { display: none; }
 .lk-tile.is-out { opacity: .22; }
 .lk-face { display: grid; place-items: center; font-variant-numeric: tabular-nums; }
 
-.lk-pop { position: absolute; top: 36%; left: 50%; z-index: 3; white-space: nowrap; pointer-events: none;
+/* "+2 spins" is a wider pill than the 60px tile it belongs to, so on the outer columns it hangs past
+   the board. Centring is already handled by penPop's own translate; what this needs is somewhere to
+   hang, which is why .lk keeps its overflow visible and the board carries side padding. */
+.lk-pop { position: absolute; top: 30%; left: 50%; z-index: 3;
+    white-space: nowrap; pointer-events: none;
     padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 900;
     animation: penPop 1.1s cubic-bezier(.2, 1.4, .3, 1) both; }
 .lk-pop.is-spins { background: #7ad4ff; color: #06222e; }
