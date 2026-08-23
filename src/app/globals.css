@@ -18631,3 +18631,65 @@ body.cas-seated .social-fab { display: none; }
 .s5-cell.is-wild::after { content: ""; position: absolute; inset: 12%; border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent); pointer-events: none; }
 .s5-cell img { position: relative; z-index: 1; }
+
+/* ── THE CONTROL PANEL ────────────────────────────────────────────────────────────────────────────────
+   Luke: "proffesionalize the wager buttons and spin button." They were four fat yellow rectangles and a
+   fifth fatter one, which is a form, not a machine. Every real cabinet — brass or phone — has the same
+   two parts instead: a readout you glance at, and one big button you press over and over. */
+
+/* A READOUT. Small caps, tabular figures, hairline dividers. These are numbers you check, not read. */
+.s5-readout { display: grid; grid-template-columns: repeat(3, 1fr); border-radius: 11px; overflow: hidden;
+    background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .08); }
+.s5-readout > span { display: grid; gap: 1px; justify-items: center; padding: 7px 4px;
+    border-right: 1px solid rgba(255, 255, 255, .07); }
+.s5-readout > span:last-child { border-right: none; }
+.s5-readout i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #7d8792; }
+.s5-readout b { font-size: 15px; font-weight: 800; color: #eaf1f8; font-variant-numeric: tabular-nums; }
+.s5-ro-chips b { color: var(--acc, #ffd75e); }
+
+/* ONE STEPPER, NOT FOUR BUTTONS. It scales to any number of stakes without growing, and it shows the bet
+   as a VALUE rather than as the selected one of a row. */
+.s5-panel { display: grid; grid-template-columns: 1fr auto; gap: 9px; align-items: stretch; }
+.s5-stepper { display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; border-radius: 12px;
+    background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); overflow: hidden; }
+.s5-stepper button { border: none; background: rgba(255, 255, 255, .05); color: #e8dcc6; cursor: pointer;
+    font-size: 21px; font-weight: 700; line-height: 1; height: 100%; }
+.s5-stepper button:active { background: rgba(255, 255, 255, .12); }
+.s5-stepper button:disabled { color: #4a525b; cursor: default; background: rgba(255, 255, 255, .02); }
+.s5-stepper > span { display: grid; gap: 1px; justify-items: center; padding: 6px 2px; }
+.s5-stepper i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #7d8792; }
+.s5-stepper b { font-size: 17px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+
+/* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
+   bar, and because nothing else on the screen is round. */
+.s5-spin { width: 88px; height: 88px; border-radius: 999px; border: none; cursor: pointer;
+    font-family: var(--font-display); font-size: 15px; font-weight: 900; letter-spacing: .1em;
+    color: #2a1c05; background: radial-gradient(circle at 50% 32%, #ffe9a8, #f0c04e 52%, #c9932c 100%);
+    box-shadow: 0 4px 0 #8d6716, 0 10px 22px rgba(0, 0, 0, .5), inset 0 2px 4px rgba(255, 255, 255, .5); }
+.s5-spin:active { transform: translateY(3px); box-shadow: 0 1px 0 #8d6716, 0 4px 12px rgba(0, 0, 0, .5); }
+.s5-spin:disabled { cursor: default; filter: grayscale(.45) brightness(.75); box-shadow: 0 4px 0 #4c412a; }
+.s5-spin-wait { display: block; width: 22px; height: 22px; margin: 0 auto; border-radius: 999px;
+    border: 3px solid rgba(42, 28, 5, .25); border-top-color: #2a1c05; animation: s5Wait .6s linear infinite; }
+@keyframes s5Wait { to { transform: rotate(360deg); } }
+
+/* ── AND THE SAME PANEL ON THE THREE-REEL CABINETS ────────────────────────────────────────────────────
+   "this feedback applies to all slots." Those still use the floor's shared stake row and Pull button, so
+   they get the same treatment rather than a second look — four chunky rectangles on one machine and a
+   stepper on the next is a floor you have to learn twice. */
+.cas-stage .cas-bets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cas-stage .cas-bet { padding: 9px 4px; border-radius: 10px; font-size: 13px; font-weight: 800;
+    border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .04); color: #cbd3dc;
+    font-variant-numeric: tabular-nums; }
+.cas-stage .cas-bet.is-on { border-color: var(--acc, #ffd75e); color: #2a1c05;
+    background: linear-gradient(180deg, #ffe9a8, #e8b63e); }
+.cas-stage .cas-pull { border-radius: 14px; font-family: var(--font-display); letter-spacing: .06em;
+    color: #2a1c05; background: radial-gradient(circle at 50% 0%, #ffe9a8, #f0c04e 60%, #c9932c 100%);
+    box-shadow: 0 4px 0 #8d6716, 0 9px 20px rgba(0, 0, 0, .45), inset 0 2px 3px rgba(255, 255, 255, .45); }
+.cas-stage .cas-pull:active { transform: translateY(3px); box-shadow: 0 1px 0 #8d6716; }
+
+/* The Leave button is a word now, so it cannot be a 40px square. */
+.cas-stage .cas-leave { width: auto; min-width: 62px; padding: 0 13px; height: 36px; border-radius: 999px;
+    font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.cas-stage .cas-panel-head { grid-template-columns: auto 1fr auto; }

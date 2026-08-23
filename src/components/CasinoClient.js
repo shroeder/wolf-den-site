@@ -1311,8 +1311,11 @@ export default function CasinoClient({ initial }) {
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e" }}
                     role="dialog" aria-modal="true" aria-label={at.label}>
                     <div className="cas-panel-head">
+                        {/* A WORD, NOT AN ARROW. An arrow in the corner of a full-screen game is browser
+                            furniture — it reads as "go back a page", which on a machine you have money in is
+                            the one thing you want to be sure about before you tap it. */}
                         <button type="button" className="cas-leave" onClick={() => setSeated(false)}
-                            aria-label="Back to the floor">←</button>
+                            aria-label="Leave this machine">Leave</button>
                         <b>{st?.slots?.[at.id]?.label || at.label}</b>
                         <span className="cas-purse-sm">{money(st?.gold)}<i>gold</i></span>
                     </div>
@@ -1340,18 +1343,15 @@ export default function CasinoClient({ initial }) {
                         the return is printed beside them because a floor that hides its own odds is a
                         floor that has something to hide. All three return within a point of each other,
                         which is exactly the thing worth being able to check. */}
-                    {/* ── THE POT ─────────────────────────────────────────────────────────────────────
-                        One number for the whole floor, fed by every bet on every cabinet, and any pull can
-                        take it. It sits ABOVE the reels because it is the reason to be at this machine
-                        rather than a footnote about it — and it climbs while you watch, because everybody
-                        else's pulls are feeding it too. */}
-                    {SLOTS.has(at.id) ? (
-                        <div className={`cas-pot${fx?.potWon ? " is-won" : ""}`}>
-                            <i>The Pot</i>
-                            <b>{money(fx?.potWon || pot)}</b>
-                            <em>{fx?.potWon ? "YOU TOOK IT" : "every cabinet feeds it"}</em>
-                        </div>
-                    ) : null}
+                    {/* ── THE POT IS NOT ON THIS SCREEN ANY MORE ──────────────────────────────────────
+                        It sat above the reels, a large number and a caption, and it was the first thing on a
+                        machine you had just sat down at — before the reels, before the bet, before anything
+                        you can act on. Luke: "you can remove the pot." A jackpot you cannot see is not the
+                        thing that makes somebody pull the handle; the reels are.
+
+                        The MECHANIC is untouched — every three-reel bet still feeds it and any pull can still
+                        take it, and taking it still announces itself over the reels (see cas-fx below). Only
+                        the standing display is gone. */}
 
                     {/* ── WHAT THIS CABINET REMEMBERS ─────────────────────────────────────────────────
                         The tray, the multiplier and any banked free pulls. Shown ALWAYS rather than only
@@ -1388,17 +1388,10 @@ export default function CasinoClient({ initial }) {
                         spec sheet, and the machine is right there to be played. The numbers have not gone
                         anywhere: check:casino prints every one of them and refuses the build if any cabinet
                         drifts. */}
-                    {/* FROM WHICHEVER TABLE THIS CABINET ACTUALLY PLAYS ON. The five-reel machines have
-                        their own blurb and their own game; reading the old three-reel one described a
-                        machine that is no longer there — "nothing here pays small" over a twenty-line
-                        screen where most wins are a fraction of the stake by design. */}
-                    {SLOTS5[at.id] ? (
-                        <p className="cas-vol"><span>{SLOTS5[at.id].blurb}</span></p>
-                    ) : SLOTS.has(at.id) && st?.slots?.[at.id] ? (
-                        <p className="cas-vol">
-                            <span>{st.slots[at.id].blurb}</span>
-                        </p>
-                    ) : null}
+                    {/* The cabinet's blurb used to print here, under the Pot. Luke: "yiu can remove the
+                        description below the pot as well." Both were text above the game explaining the
+                        game, on a screen whose entire job is the game — and the machine's name is already
+                        in the header and on its own marquee. */}
 
                     {/* Each machine draws its own game. The slot's ceremony is three landings; the ticket
                         resolves in one, so it gets a result and a celebration and no theatre. */}

@@ -61,9 +61,17 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | done
-    const [offer, setOffer] = useState("mid");
     const [picked, setPicked] = useState([]);      // chests turned over so far
     const timers = useRef([]);
+
+    // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
+    // bet is owned by the room (every cabinet shares it) and a second copy here would drift from it.
+    const betIndex = Math.max(0, stakes.indexOf(bet));
+    const locked = busy || spinning || phase === "pick";
+    const step = (d) => {
+        const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
+        if (next !== bet) { onBet?.(next); Cas.chips(); }
+    };
 
     const clearTimers = useCallback(() => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
     useEffect(() => () => clearTimers(), [clearTimers]);
@@ -96,7 +104,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setFiller(strips.map((bag) => stripFor(bag, [])));
         Cas.pull();
 
-        const r = await onSpin(offer);
+        // The middle deal, always — see the note where the chooser used to be.
+        const r = await onSpin("mid");
         if (!r?.ok) { setSpinning(false); setPhase("idle"); return; }
 
         setResult(r);
@@ -128,7 +137,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 setPhase(r.free ? "free" : r.pick ? "pick" : "done");
             }, r.lines.length * LINE_MS));
         }, after));
-    }, [busy, spinning, onSpin, offer, clearTimers]);
+    }, [busy, spinning, onSpin, clearTimers]);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
     // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
@@ -232,19 +241,16 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     : <span className="s5-dim">Twenty lines. Pick your deal and pull.</span>}
             </div>
 
-            {/* ── THE DEAL, CHOSEN BEFORE YOU SPIN ────────────────────────────────────────────────────── */}
-            {/* All three are worth the same to within half a percent — measured, and the gate fails if they
-                drift. So this is a real choice about the SHAPE of a round rather than a quiz with a right
-                answer, and it is asked UP FRONT: a choice offered at the moment it triggers is a choice made
-                after you already know it triggered, which is a menu, not a decision. */}
-            <div className="s5-offers" role="radiogroup" aria-label="Free spins deal">
-                {[["many", "20 spins", "×2"], ["mid", "10 spins", "×4"], ["few", "7 spins", "sticky wilds"]].map(([id, a, b]) => (
-                    <button key={id} type="button" role="radio" aria-checked={offer === id}
-                        className={`s5-offer${offer === id ? " is-on" : ""}`} onClick={() => { setOffer(id); Cas.chips(); }}>
-                        <b>{a}</b><i>{b}</i>
-                    </button>
-                ))}
-            </div>
+            {/* ── THE DEAL CHOOSER IS GONE ────────────────────────────────────────────────────────────
+                Three buttons offering twenty spins at 2x, ten at 4x or seven with sticky wilds. Luke: "remove
+                the spins buttons, its too complicated." He is right about the placement even though the
+                mechanic is sound: it was a question about a bonus round that arrives once in ninety-three
+                spins, asked permanently, on the main screen, above the button you actually came to press.
+                Ninety-two times out of ninety-three it was three buttons that did nothing.
+
+                The round still runs — it takes the middle deal, ten spins at four times, which is the one
+                that was selected by default anyway. The choice is worth having back one day, but INSIDE the
+                round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
 
             {/* ── THE FREE SPINS ──────────────────────────────────────────────────────────────────────── */}
             {phase === "free" && result?.free ? (
@@ -272,25 +278,41 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
-            {/* ── ITS OWN STAKE ROW ───────────────────────────────────────────────────────────────────
-                The floor's shared stake row and Pull button are hidden under this machine, because a
-                cabinet with its own Spin inside its own frame plus the floor's Pull underneath it is two
-                buttons forty pixels apart that play two DIFFERENT games — the shared one plays the
-                three-reel table for gold. Hiding it means the stake has to live here instead. */}
-            <div className="s5-bets">
-                {stakes.map((v) => (
-                    <button key={v} type="button" className={`s5-bet${bet === v ? " is-on" : ""}`}
-                        disabled={spinning || phase === "pick"}
-                        onClick={() => { onBet?.(v); Cas.chips(); }}>{v.toLocaleString()}</button>
-                ))}
+            {/* ── THE CONTROL PANEL ───────────────────────────────────────────────────────────────────
+                Luke: "proffesionalize the wager buttons and spin button."
+
+                They were four fat yellow rectangles and a fifth fatter one, which is a form. Every real
+                cabinet has the same two-part panel instead, and it is the same on a machine in a casino as it
+                is in a video slot on a phone:
+
+                  A READOUT — balance, bet, and what the last spin paid — in one strip of small caps and
+                  tabular figures, because these are numbers you glance at rather than read.
+
+                  A BET STEPPER AND ONE BIG BUTTON. A stepper is one control instead of four, it scales to any
+                  number of stakes without growing, and it puts the amount itself on screen as a value rather
+                  than as the selected one of a row. The spin button is then the only large thing in the
+                  panel, which is exactly the hierarchy — there is one thing you press over and over. */}
+            <div className="s5-readout">
+                <span><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
+                <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                {/* CHIPS, not "win". What the last spin paid is already announced above the panel and then
+                    gone; the number worth a permanent slot is the pile you are building, because that is the
+                    one you are playing FOR and the one the counter charges against. */}
+                <span className="s5-ro-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
             </div>
-            <button type="button" className="s5-pull" onClick={pull} disabled={busy || spinning || phase === "pick"}>
-                {spinning ? "…" : `Spin · ${bet.toLocaleString()}`}
-            </button>
-            <p className="s5-purse">
-                <span>{Number(gold || 0).toLocaleString()} gold</span>
-                <span className="s5-chipcount">{Number(chips || 0).toLocaleString()} chips</span>
-            </p>
+
+            <div className="s5-panel">
+                <div className="s5-stepper">
+                    <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
+                        onClick={() => step(-1)}>−</button>
+                    <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                    <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
+                        onClick={() => step(1)}>+</button>
+                </div>
+                <button type="button" className="s5-spin" onClick={pull} disabled={locked}>
+                    {spinning ? <span className="s5-spin-wait" aria-hidden="true" /> : "SPIN"}
+                </button>
+            </div>
         </div>
     );
 }
