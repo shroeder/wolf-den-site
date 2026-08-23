@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
-import { symbolTone, symbolRole, slot5 } from "@/lib/marketplace/casino-slot5.js";
+import { symbolTone, symbolRole, symbolName, slot5 } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import PettingPen from "@/components/casino/PettingPen.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
@@ -407,7 +407,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 expression position is a parse error, and it is one this file has already made once. */}
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
-                    : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{lit.chips.toLocaleString()}</b> chips</span>
+                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> chips</span>
                     : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
                     : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
                     : result ? <span className="s5-dim" />

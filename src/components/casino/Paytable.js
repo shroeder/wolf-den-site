@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { SLOTS5, lookFor, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { SLOTS5, lookFor, symbolName, LINES } from "@/lib/marketplace/casino-slot5.js";
 
 // ── WHAT IT PAYS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Every real cabinet has this behind a button and it is not decoration: a slot machine is the only game in the
@@ -26,7 +26,10 @@ import { SLOTS5, lookFor, LINES } from "@/lib/marketplace/casino-slot5.js";
 //
 // Same resolver, same fallback, one place. If the reels can draw it, so can this.
 const artFor = (art, machineId, sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
-const pretty = (id) => id.charAt(0).toUpperCase() + id.slice(1);
+// WHAT THIS CABINET CALLS IT. The symbol ids are shared across all five machines and the art is not, so
+// capitalising the id printed "Wolf" under a picture of a jam roll on The Harvest and under a cut amethyst
+// on The Vault. The name comes from the same map the colour does.
+const pretty = (id, machineId) => symbolName(id, machineId);
 
 const ROLE_WORD = {
     wild: "WILD",
@@ -117,7 +120,7 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={artFor(art, machineId, r.id)} alt="" />
                                 <em>
-                                    {pretty(r.id)}
+                                    {pretty(r.id, machineId)}
                                     {ROLE_WORD[r.role] ? <u>{ROLE_WORD[r.role]}</u> : null}
                                 </em>
                             </span>
@@ -136,17 +139,17 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                     <ul className="pt-notes">
                         <li>Lines pay <b>left to right</b> from the first reel. A run that starts on reel two pays nothing.</li>
                         <li>
-                            <b style={{ color: lookFor(machineId, m.wild)?.tone }}>{pretty(m.wild)}</b> is <b>wild</b> —
-                            it stands in for any symbol except the {m.scatter}, and it only appears on the middle three reels.
+                            <b style={{ color: lookFor(machineId, m.wild)?.tone }}>{pretty(m.wild, machineId)}</b> is <b>wild</b> —
+                            it stands in for any symbol except the {pretty(m.scatter, machineId)}, and it only appears on the middle three reels.
                         </li>
                         <li>
-                            <b style={{ color: lookFor(machineId, m.scatter)?.tone }}>{pretty(m.scatter)}</b> pays from
+                            <b style={{ color: lookFor(machineId, m.scatter)?.tone }}>{pretty(m.scatter, machineId)}</b> pays from
                             <b> anywhere</b>, on your whole bet rather than on a line. Three of them open the free spins.
                         </li>
                         <li>
                             {m.second?.kind === "hold"
-                                ? <>{m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{m.second.trigger}s</b> anywhere open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.</>
-                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{m.bonus}s</b> anywhere open <b>{m.second?.label || "the pick"}</b>.</>}
+                                ? <>{m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{pretty(m.second.trigger, machineId)}s</b> anywhere open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.</>
+                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{pretty(m.bonus, machineId)}s</b> anywhere open <b>{m.second?.label || "the pick"}</b>.</>}
                         </li>
                         <li>The free round here: <b>{m.free?.label}</b>.</li>
                     </ul>
