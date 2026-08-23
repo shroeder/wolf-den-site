@@ -18839,7 +18839,7 @@ body.cas-seated .social-fab { display: none; }
 .pen-say { margin: -4px 0 0; text-align: center; font-size: 12px; color: #e8dcc6;
     text-shadow: 0 1px 5px rgba(0, 0, 0, .9); }
 
-.pen-field { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.pen-field { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 8px; }
 .pen-pet { position: relative; display: grid; justify-items: center; gap: 2px; padding: 7px 3px 5px;
     border-radius: 13px; cursor: pointer; border: 1px solid rgba(255, 255, 255, .16);
     background: rgba(12, 8, 18, .42); backdrop-filter: blur(2px);
@@ -18847,8 +18847,12 @@ body.cas-seated .social-fab { display: none; }
 .pen-pet img { width: 100%; aspect-ratio: 1; object-fit: contain; display: block;
     filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .6)); }
 .pen-noart { display: grid; place-items: center; width: 100%; aspect-ratio: 1; font-size: 20px; color: #6b7580; }
-.pen-name { font-size: 8.5px; line-height: 1.25; color: #e8dcc6; text-align: center;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
+.pen-name { font-size: 9px; line-height: 1.3; color: #e8dcc6; text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .95); }
+/* What a petted animal DID sits on a plate, because it prints over the sprite and a text shadow is not
+   enough against a bright pet on a bright field. */
+.pen-pet.is-done .pen-name { color: #fff; font-weight: 700; border-radius: 999px; padding: 1px 6px;
+    background: rgba(10, 6, 16, .72); }
 /* Not-yet-petted animals breathe, so the pen is alive before you touch it. Staggered off the child index
    so they are not a chorus line. */
 .pen-pet:not(:disabled) { animation: penIdle 2.6s ease-in-out infinite; }
@@ -18867,7 +18871,10 @@ body.cas-seated .social-fab { display: none; }
 .pen-pet.is-out { opacity: .22; animation: none; }
 
 /* The reward, on the animal that gave it. */
-.pen-pop { position: absolute; top: -6px; left: 50%; z-index: 3; white-space: nowrap;
+/* ON the animal, not above it. Anchored to the middle of the pet rather than its top edge — a pop that
+   floats off the top of the grid lands on the instruction line for anything in the first row, which is
+   exactly where it was appearing. */
+.pen-pop { position: absolute; top: 38%; left: 50%; z-index: 3; white-space: nowrap;
     padding: 3px 9px; border-radius: 999px; font-size: 13px; font-weight: 900;
     font-variant-numeric: tabular-nums; pointer-events: none;
     animation: penPop 1.1s cubic-bezier(.2, 1.4, .3, 1) both; }
@@ -18875,9 +18882,9 @@ body.cas-seated .social-fab { display: none; }
 .pen-pop.is-mult { background: #b47cff; color: #17091f; box-shadow: 0 3px 16px rgba(180, 124, 255, .75); }
 .pen-pop.is-end { background: #ff6f7d; color: #2a0509; font-size: 10px; }
 @keyframes penPop {
-    from { opacity: 0; transform: translate(-50%, 6px) scale(.7); }
-    35% { opacity: 1; transform: translate(-50%, -16px) scale(1.12); }
-    to { opacity: 1; transform: translate(-50%, -22px) scale(1); }
+    from { opacity: 0; transform: translate(-50%, 8px) scale(.7); }
+    35% { opacity: 1; transform: translate(-50%, -10px) scale(1.14); }
+    to { opacity: 1; transform: translate(-50%, -16px) scale(1); }
 }
 
 .pen-go { width: 100%; padding: 13px; border-radius: 14px; border: none; cursor: pointer;
@@ -18885,3 +18892,10 @@ body.cas-seated .social-fab { display: none; }
     background: linear-gradient(180deg, #ffe9a8, #e8b63e);
     box-shadow: 0 4px 0 #8d6716, 0 9px 20px rgba(0, 0, 0, .5);
     animation: penIn .3s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+/* ── THE BONUS FILLS THE BOARD ────────────────────────────────────────────────────────────────────────
+   The machine is centred in the stage by auto margins, which is right for a cabinet and wrong for a
+   takeover: the pen was a card floating in the middle of a mostly empty screen. A bonus round that has
+   replaced the game should occupy the space the game was in. */
+.cas-stage .s5.is-bonus { margin: 0; flex: 1 1 auto; display: flex; }
+.cas-stage .s5.is-bonus .pen { flex: 1 1 auto; align-content: center; }

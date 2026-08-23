@@ -122,7 +122,9 @@ export default function PettingPen({ pick, onDone }) {
                 {over ? "That is the lot. Well done." : "Pet them one at a time. One of them will have had enough."}
             </p>
 
-            <div className="pen-field">
+            {/* THREE ACROSS FOR A SMALL FLOCK, FOUR FOR A BIG ONE. Nine pets in four columns leaves a single
+                animal orphaned on its own row, which reads as a mistake rather than a paddock. */}
+            <div className="pen-field" style={{ "--cols": cards.length <= 9 ? 3 : 4 }}>
                 {cards.map((c, i) => {
                     const p = pets[i] || {};
                     const done = turned.includes(i);
