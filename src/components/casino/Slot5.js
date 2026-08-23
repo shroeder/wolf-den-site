@@ -26,6 +26,14 @@ const SETTLE_MS = 340;
 const LANDS_AT = STOP_AT.map((t) => t + SETTLE_MS);
 // How long each winning line is drawn before the next one, when several paid.
 const LINE_MS = 620;
+// ── THE FREE ROUND RUNS ON ITS OWN CLOCK ─────────────────────────────────────────────────────────────────────
+// Ten spins at the base-game pace would be fifteen seconds of watching. Free spins on a real cabinet are FAST —
+// the reels barely settle before the next one goes — and the speed is most of what makes a round feel like a
+// run of luck rather than ten separate spins. Under a second each, so ten of them is about eight.
+const FREE_STOP_AT = [0, 55, 110, 165, 220];
+const FREE_SETTLE_MS = 230;
+const FREE_LANDS_AT = FREE_STOP_AT.map((t) => t + FREE_SETTLE_MS);
+const FREE_HOLD_MS = 330;   // how long a landed free spin sits before the next one goes
 // Below this a win is not celebrated — see CELEBRATE_AT in casino-slot5-play.js. Seven wins in ten on a
 // twenty-line machine pay back less than the stake; that is what twenty lines buys, and a machine that
 // throws a fanfare at every one of them is doing the exact thing this rework existed to stop.
@@ -64,6 +72,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | done
     const [picked, setPicked] = useState([]);      // chests turned over so far
     const [pays, setPays] = useState(false);       // is the paytable open
+    const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
+    const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
     const timers = useRef([]);
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
@@ -102,6 +112,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         unlock();
         clearTimers();
         setResult(null); setShowLine(-1); setCounted(0); setPicked([]); setLanded(0);
+        setFreeIdx(-1); setFreeWon(0);
         setPhase("spin"); setSpinning(true);
         setFiller(strips.map((bag) => stripFor(bag, [])));
         Cas.pull();
@@ -126,26 +137,84 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             }, LANDS_AT[i]));
         });
 
-        // Then the lines, one at a time.
+        // ── WHAT HAPPENS AFTER THE REELS STOP ────────────────────────────────────────────────────────
+        // Lines first, then the free round if there is one, then the pick. `nextAfterLines` is where the
+        // three are sequenced, so a spin that pays lines AND triggers both features still plays them in an
+        // order somebody can follow.
+        const nextAfterLines = () => {
+            if (r.free) { announceFree(r); return; }
+            setPhase(r.pick ? "pick" : "done");
+        };
+
         const after = LANDS_AT[REELS - 1] + 260;
         timers.current.push(setTimeout(() => {
-            if (!r.lines.length && !r.scatterWin) { setPhase(r.free || r.pick ? "free" : "done"); return; }
+            if (!r.lines.length && !r.scatterWin) { nextAfterLines(); return; }
             setPhase("lines");
             r.lines.forEach((_, i) => {
                 timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * LINE_MS));
             });
-            timers.current.push(setTimeout(() => {
-                setShowLine(-1);
-                setPhase(r.free ? "free" : r.pick ? "pick" : "done");
-            }, r.lines.length * LINE_MS));
+            timers.current.push(setTimeout(() => { setShowLine(-1); nextAfterLines(); }, r.lines.length * LINE_MS));
         }, after));
     }, [busy, spinning, onSpin, clearTimers]);
+
+    // ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
+    // Luke: "i didn't even know that I got the free Spin bonus because there was nothing, nothing popped off
+    // in like celebrated for me."
+    //
+    // He is right and it was the worst omission on the machine. Free spins arrive once in ninety-three spins;
+    // it is the rarest thing that happens here and it was being delivered as a small brown card with a
+    // sentence on it. A bonus round that does not announce itself is a bonus round nobody knows they had.
+    //
+    // So the room stops. A full-cabinet card, the fanfare, a hard haptic, and a beat of nothing else — and
+    // then the round runs, rather than the round having already run somewhere off screen.
+    const announceFree = useCallback((r) => {
+        setPhase("freeIntro");
+        setFreeWon(0);
+        setFreeIdx(-1);
+        Cas.jackpot();
+        Haptic.crit();
+        timers.current.push(setTimeout(() => runFree(r, 0), 2100));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── AND THEN YOU WATCH IT ────────────────────────────────────────────────────────────────────────────
+    // One spin at a time, on the fast clock, with the total climbing. Recursive rather than a loop of timers
+    // so a round can be cut short cleanly — clearTimers on a new pull stops it wherever it is instead of
+    // leaving eight queued spins to land on top of the next game.
+    const runFree = useCallback((r, i) => {
+        const round = r.free;
+        if (!round || i >= round.spins.length) {
+            setPhase(r.pick ? "pick" : "freeDone");
+            return;
+        }
+        const sp = round.spins[i];
+        setPhase("free");
+        setFreeIdx(i);
+        setGrid(sp.grid);
+        setLanded(0);
+        FREE_STOP_AT.forEach((_, k) => {
+            timers.current.push(setTimeout(() => {
+                setLanded(k + 1);
+                Cas.reelStop(k, 0.3);
+            }, FREE_LANDS_AT[k]));
+        });
+        timers.current.push(setTimeout(() => {
+            if (sp.chips > 0) {
+                setFreeWon((n) => n + sp.chips);
+                Cas.coins(Math.min(1, sp.chips / 400));
+                Haptic.hit(0.35);
+            }
+            timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
+        }, FREE_LANDS_AT[REELS - 1] + 60));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
     // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
     // only part of a win that lasts longer than a second.
     useEffect(() => {
-        if (!result?.wonChips || phase === "spin") return undefined;
+        // Counts only once everything has played — same reason as the line above it.
+        if (!result?.wonChips || phase !== "done") return undefined;
         const target = result.wonChips;
         if (counted >= target) return undefined;
         const step = Math.max(1, Math.round(target / 26));
@@ -207,7 +276,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
-                            style={{ "--settle": `${SETTLE_MS}ms`, "--delay": `${STOP_AT[reel]}ms` }}>
+                            style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
                             <div className="s5-strip">
                                 {/* Chooses between two things already drawn. Nothing here is random, so a
                                     re-render cannot change what is on the reels. */}
@@ -244,10 +313,17 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             </div>
 
             {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
+            {/* NOT UNTIL THE WHOLE SPIN HAS FINISHED PLAYING. `wonChips` is the total including the free
+                round and the pick, so showing it the moment the reels stopped printed the answer above a
+                bonus round that had not been watched yet — the ten spins would then run with their own
+                outcome already on screen. It waits for "done".
+
+                The comment lives HERE rather than inside the ternary below, because a JSX comment in an
+                expression position is a parse error, and it is one this file has already made once. */}
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
                     : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{lit.chips.toLocaleString()}</b> chips</span>
-                    : result?.wonChips ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
+                    : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
                     : result ? <span className="s5-dim">No line this time.</span>
                     : <span className="s5-dim">Twenty lines.</span>}
             </div>
@@ -263,11 +339,34 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 that was selected by default anyway. The choice is worth having back one day, but INSIDE the
                 round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
 
-            {/* ── THE FREE SPINS ──────────────────────────────────────────────────────────────────────── */}
-            {phase === "free" && result?.free ? (
+            {/* ── THE ANNOUNCEMENT ────────────────────────────────────────────────────────────────────
+                Over the cabinet, because the cabinet is what it happened on. It holds for two seconds with
+                nothing else moving, which is the whole point: the rarest event on the machine gets the one
+                thing the base game never does, which is the screen's undivided attention. */}
+            {phase === "freeIntro" && result?.free ? (
+                <div className="s5-shout" role="status">
+                    <i>The moon is up</i>
+                    <b>FREE SPINS</b>
+                    <em>{result.free.spins.length} spins, everything &times;{result.free.mult}</em>
+                </div>
+            ) : null}
+
+            {/* ── AND THE ROUND, WHILE IT RUNS ────────────────────────────────────────────────────────
+                A counter of where you are and what the round has paid so far. It sits under the reels
+                rather than over them — during a free round the reels are the thing you are watching, and
+                this is the score. */}
+            {phase === "free" ? (
+                <div className="s5-freebar">
+                    <span><i>Free spin</i><b>{freeIdx + 1} / {result?.free?.spins.length}</b></span>
+                    <span className="s5-freemult">&times;{result?.free?.mult}</span>
+                    <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
+                </div>
+            ) : null}
+
+            {phase === "freeDone" && result?.free ? (
                 <div className="s5-feature">
-                    <h4>The moon is up — {result.free.label}</h4>
-                    <p>{result.free.spins.length} spins ran. <b>{Number(result.free.chips || 0).toLocaleString()}</b> chips.</p>
+                    <h4>The hunt is over</h4>
+                    <p><b>{freeWon.toLocaleString()}</b> chips from {result.free.spins.length} free spins.</p>
                     <button type="button" className="s5-go" onClick={() => setPhase(result.pick ? "pick" : "done")}>Go on</button>
                 </div>
             ) : null}

@@ -82,7 +82,25 @@ export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
         lines: r.base.wins.filter((w) => w.kind === "line").map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
         scatters: r.base.scatters,
         scatterWin: r.base.wins.find((w) => w.kind === "scatter") || null,
-        free: r.free ? { offer: offer.id, label: offer.label, spins: r.free.spins.map((s) => ({ grid: s.grid, total: s.total, wins: s.wins })), total: r.free.total, chips: chipsFor(stake, r.free.total / stake) } : null,
+        // ── THE FREE ROUND, SPIN BY SPIN ─────────────────────────────────────────────────────────────
+        // Every grid, in order, with what each one paid — because the round is PLAYED on the screen rather
+        // than summarised. A member who is handed "10 spins ran, 81 chips" has not had a bonus round; they
+        // have had a receipt for one.
+        //
+        // Per-spin chips are converted here, by the same function that pays the total, so the counter can
+        // climb as the round runs without the client doing any arithmetic of its own.
+        free: r.free ? {
+            offer: offer.id,
+            label: offer.label,
+            mult: FREE_SPIN_OFFERS.find((o) => o.id === offer.id)?.mult || 1,
+            spins: r.free.spins.map((sp) => ({
+                grid: sp.grid,
+                wins: sp.wins,
+                chips: chipsFor(stake, sp.total / stake),
+            })),
+            total: r.free.total,
+            chips: chipsFor(stake, r.free.total / stake),
+        } : null,
         pick: r.pick ? { picked: r.pick.picked, mult: r.pick.mult, total: r.pick.total } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,

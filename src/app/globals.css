@@ -18752,3 +18752,32 @@ body.cas-seated .social-fab { display: none; }
 .cas-pays { display: block; margin: 0 auto 8px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
     font-size: 11px; font-weight: 800; border: 1px solid rgba(255, 255, 255, .14);
     background: rgba(255, 255, 255, .05); color: #cbd3dc; }
+
+/* ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
+   The announcement, over the cabinet, holding for two seconds with nothing else moving. Free spins come
+   once in ninety-three spins; it is the rarest thing that happens on this machine and it was arriving as
+   a small card with a sentence on it. This is the one moment the base game never gets: the screen's
+   undivided attention. */
+.s5-shout { position: absolute; inset: 0; z-index: 8; display: grid; place-content: center; gap: 2px;
+    text-align: center; border-radius: 16px; pointer-events: none;
+    background: radial-gradient(60% 60% at 50% 45%, rgba(122, 212, 255, .3), rgba(8, 5, 14, .93) 72%);
+    animation: s5Shout .4s cubic-bezier(.2, 1.4, .4, 1) both; }
+.s5-shout i { font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: .2em;
+    text-transform: uppercase; color: #7ad4ff; }
+.s5-shout b { font-family: var(--font-display); font-size: 2.1rem; line-height: 1.05; color: #fff;
+    text-shadow: 0 0 22px rgba(122, 212, 255, .9), 0 0 44px rgba(122, 212, 255, .5); }
+.s5-shout em { font-style: normal; font-size: 12.5px; color: #cbe9fb; }
+@keyframes s5Shout { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: none; } }
+
+/* And the score while the round runs. Under the reels, because during a free round the reels are the
+   thing you are watching and this is the scoreboard, not the event. */
+.s5-freebar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 11px;
+    background: rgba(122, 212, 255, .1); border: 1px solid rgba(122, 212, 255, .3); }
+.s5-freebar span { display: grid; gap: 1px; }
+.s5-freebar span:last-child { justify-items: end; }
+.s5-freebar i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: #8fb8cd; }
+.s5-freebar b { font-size: 14px; font-weight: 800; color: #eaf6ff; font-variant-numeric: tabular-nums; }
+.s5-freemult { font-family: var(--font-display); font-size: 1.15rem; color: #7ad4ff;
+    text-shadow: 0 0 12px rgba(122, 212, 255, .7); }
