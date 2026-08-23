@@ -119,22 +119,108 @@ export async function ownedOnce(buyerId) {
     return new Set(rows.map((r) => r.item_id));
 }
 
+// ── WHAT YOU ARE ACTUALLY BUYING ─────────────────────────────────────────────────────────────────────────────
+// Luke: "everything you are purchasing in the casino shop has a sprite for it, and we should be able to
+// inspect what we are buying to see what it does."
+//
+// Both halves were true and neither was on the screen. Every one of these things is drawn — gems carry an art
+// path and their exact stats, forge parts carry a sprite and a name, consumables carry a sprite and a sentence
+// describing their effect, decorations carry a generated sprite and a farm buff — and the shelf was showing a
+// name, a blurb I wrote, and a price. Somebody spending four thousand chips on a Sapphire could not see the
+// sapphire or find out that it gives +9 Fortune.
+//
+// So the catalogue is resolved against the same sources the owning features read, and every line of detail is
+// GENERATED from the real numbers rather than typed here. A hand-written "+7 might" is a line that goes stale
+// the first time somebody retunes a gem, and it goes stale silently.
+async function detailFor(item) {
+    switch (item.kind) {
+        case "gems": {
+            const { GEMS } = await import("@/lib/marketplace/gems.js");
+            const g = GEMS.find((x) => x.id === item.ref);
+            if (!g) return null;
+            return {
+                art: g.art,
+                blurb: g.blurb,
+                lines: Object.entries(g.stats || {}).map(([k, v]) => ({ label: statLabel(k), value: `+${v}` })),
+                foot: "Socket it into a piece of gear at the Jewelcutter.",
+            };
+        }
+        case "parts": {
+            const { PART_TIERS } = await import("@/lib/marketplace/crafting.js");
+            const [tier, count] = item.ref;
+            const t = PART_TIERS.find((x) => x.tier === tier);
+            return {
+                art: t?.sprite || null,
+                blurb: `${count} x ${t?.name || `tier ${tier}`}.`,
+                lines: [{ label: "Tier", value: String(tier) }, { label: "Count", value: String(count) }],
+                foot: "Spent at the Forge to combine and enhance gear.",
+            };
+        }
+        case "consumables": {
+            const { CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
+            const arts = await db.query(
+                `SELECT consumable_id AS k, url FROM mkt_consumable_sprite WHERE consumable_id = ANY($1)`,
+                [item.ref]).catch(() => []);
+            const byId = new Map(arts.map((r) => [r.k, r.url]));
+            return {
+                art: byId.get(item.ref[0]) || null,
+                blurb: `${item.ref.length} items.`,
+                // ONE LINE PER THING IN THE PACK, each with what it actually does — a pack sold as "a tonic
+                // and a scroll" is a pack nobody can price.
+                lines: item.ref.map((id) => ({
+                    label: CONSUMABLES[id]?.name || id,
+                    value: CONSUMABLES[id]?.desc || "",
+                    art: byId.get(id) || null,
+                })),
+                foot: null,
+            };
+        }
+        case "decoration": {
+            const { DECORATIONS, DECO_STATS } = await import("@/lib/marketplace/decorations.js");
+            const d = DECORATIONS.find((x) => x.id === item.ref);
+            const art = await db.queryOne(`SELECT url FROM mkt_deco_sprite WHERE deco_id = $1`, [item.ref]).catch(() => null);
+            const buff = d?.buff ? Object.entries(d.buff)[0] : null;
+            return {
+                art: art?.url || null,
+                blurb: d?.rarity ? `${d.rarity[0].toUpperCase()}${d.rarity.slice(1)} decoration.` : null,
+                lines: buff
+                    ? [{ label: DECO_STATS[buff[0]]?.label || buff[0], value: `+${buff[1]}${DECO_STATS[buff[0]]?.suffix || ""}` }]
+                    : [{ label: "Effect", value: "Looks good. Nothing more." }],
+                foot: "Place it anywhere on your farm.",
+            };
+        }
+        default: return null;
+    }
+}
+
+// Turned into words rather than raw keys — `might` on a card is a variable name that escaped.
+const STAT_WORDS = {
+    might: "Might", fortune: "Fortune", vigor: "Vigor", vigour: "Vigour", guile: "Guile",
+    crit: "Crit chance", critPower: "Crit power", armour: "Armour", armor: "Armour", health: "Health",
+};
+const statLabel = (k) => STAT_WORDS[k] || k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+
 /**
  * The shelf as this member sees it: once-only things they already own are marked rather than hidden, because
  * a shelf that quietly shrinks reads as things going missing.
  */
 export async function chipShelf(buyerId) {
     const [balance, owned] = await Promise.all([chipBalance(buyerId), ownedOnce(buyerId)]);
+    const details = await Promise.all(CHIP_STORE.map((i) => detailFor(i).catch(() => null)));
     return {
         balance,
         // The rate goes with the shelf so the screen can print the GOLD behind every price without keeping
-        // its own copy of it. A second copy of this number is a shelf that lies the day the rate moves — and
-        // it moved once already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started
-        // quoting prices three times too low.
+        // its own copy of it. A second copy is a shelf that lies the day the rate moves — and it moved once
+        // already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started quoting prices
+        // three times too low.
         rate: CHIP_RATE,
-        items: CHIP_STORE.map((i) => ({
+        items: CHIP_STORE.map((i, n) => ({
             id: i.id, kind: i.kind, name: i.name, blurb: i.blurb, price: i.price,
             once: Boolean(i.once), owned: owned.has(i.id), afford: balance >= i.price,
+            ...(details[n] || {}),
+            // The shelf's own blurb wins over the catalogue's — it is written for this counter.
+            blurb: i.blurb,
+            detail: details[n]?.blurb || null,
         })),
     };
 }
