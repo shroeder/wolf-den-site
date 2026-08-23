@@ -69,6 +69,16 @@ const REFUSALS = {
     // Kept for any bout still in flight that was opened under the old six-a-bout rule.
     no_braces: "You are out of braces for this bout.",
     recently_fought: "You just fought them. Five more bouts before a rematch.",
+    // ── THE TAP THAT DID NOTHING AND SAID NOTHING ────────────────────────────────────────────────────────
+    // `no_bout` means the server has no fight it can take a beat for, while the screen is still showing one.
+    // That combination used to be completely silent: the refusal comes back carrying a full state, so it took
+    // the refresh branch below, set the screen, and printed no sentence anywhere. You tapped, the fight sat
+    // there, and there was nothing to read and nothing to report — which is why it reached us as "I end up
+    // staying unable to do anything" rather than as an error.
+    //
+    // With staleBout fixed the state that comes back with this now has no bout in it, so the screen clears
+    // itself and the sentence is the explanation for why the fight just vanished.
+    no_bout: "That fight could not be resumed, so it has been cleared. Pick your next one.",
 };
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
@@ -921,6 +931,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // in front of it — see the playback effect. Only for the two that throw something; a dismiss or a
         // seen has no blow to show.
         if (action === "act" || action === "forfeit") instant.current = true;
+        // Once you have swung, it is not a fight you walked back into any more — it is just your fight.
+        if (action === "act" || action === "forfeit") setResumed(false);
         // A fight YOU start plays from the opening blow. Anything else — a refresh, a return to the tab —
         // opens where the fight actually is.
         if (action === "start") startedHere.current = true;
@@ -940,7 +952,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // branch that says why.
             if (r?.partial && r?.ok !== false && action !== "dismiss") {
                 setSt((prev) => (prev ? { ...prev, bout: r.bout } : prev));
-            } else if (r?.unlocked && !r?.partial && action !== "dismiss") setSt(r);
+            } else if (r?.unlocked && !r?.partial && action !== "dismiss") {
+                // ── A FULL STATE CAN ALSO BE A NO ─────────────────────────────────────────────────────────
+                // This branch used to be the whole handling: set the screen, say nothing. But a refusal that
+                // rebuilds the state — `no_bout` is the one that bit us — arrives here carrying `ok: false`,
+                // and the sentence explaining it was dropped on the floor. The result is a tap that changes
+                // the screen slightly and never tells you why, which is indistinguishable from a dead button.
+                // Refreshing and explaining are not alternatives; a refusal gets both.
+                setSt(r);
+                if (r.ok === false && r.error) setErr(REFUSALS[r.error] || `That didn't go through (${r.error}).`);
+            }
             else if (action === "dismiss") {
                 // LAST RESORT, and the important one. The bout is finished either way — the win is already
                 // banked server-side — so if the request fails there is no reason to hold somebody hostage on
@@ -1071,6 +1092,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     }, []);
 
     const [shown, setShown] = useState(0);
+    // True only for a bout this screen walked back INTO rather than started — see the effect below.
+    const [resumed, setResumed] = useState(false);
     // Set the moment a command is sent, spent on the first line that comes back — see the effect below.
     const instant = useRef(false);
     const boutKey = String(raw?.foe?.id || "");
@@ -1107,6 +1130,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const openAtEnd = !startedHere.current && logAll.length > 0;
         startedHere.current = false;
         setShown(openAtEnd ? logAll.length : 0);
+        // ── AND SAY SO, BECAUSE OTHERWISE IT READS AS A BROKEN FIGHT ─────────────────────────────────
+        // Opening at the end is right — you cannot walk out of a fight and have it forgotten — but it puts
+        // somebody in front of a round-25 transcript and a health bar at 4% with nothing explaining either.
+        // ValkyrieSylve, on the Road: "Just tried the road again, starting on round 8 before making a choice
+        // and at 62 health left.... think it's still broken." It was not broken. It was the fight they had
+        // already been in, resumed exactly as it stood, and the screen never said the word "resumed".
+        // Two members reported the Road as broken in the same week and this is the half of it that was
+        // working as designed — which is the worst kind, because there is nothing to find in the logs.
+        setResumed(openAtEnd);
     }, [boutKey, logAll.length, clearRing]);
     // A shorter transcript than the cursor is standing on cannot be the same fight — rematch, forfeit, or a
     // bout cleared out from under the screen. Anything else only ever GROWS, and growth is the normal case:
@@ -2228,6 +2260,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     screen that had not finished telling you what the first one did. `playing` is the
                     playback cursor still catching up to the transcript; between them they cover the whole
                     time a beat is in the air. */}
+                {resumed && !bout.over ? (
+                    <p className="ar-resumed">
+                        Picking up the fight you left — round {(bout.beat || 1).toLocaleString()}, and your health is where you
+                        left it. Nothing has been reset.
+                    </p>
+                ) : null}
                 <FightInput bout={bout} busy={busy || playing} onAct={(skillId) => act("act", { skillId })} />
 
                 {err ? <p className="ar-err">{err}</p> : null}
@@ -2972,6 +3010,11 @@ function Styles() {
             /* The skip sits with the other in-fight controls and is deliberately quiet — it is an exit from
                the spectacle, not a feature of it. */
             .ar-skip { color: #cdd5df; }
+            .ar-resumed {
+                margin: 0 0 8px; padding: 9px 12px; border-radius: 11px;
+                background: rgba(255, 215, 94, .09); border: 1px solid rgba(255, 215, 94, .28);
+                color: #f0dda6; font-size: 12px; font-weight: 700; line-height: 1.45; text-align: center;
+            }
             .ar-btn { padding: 12px 22px; border-radius: 12px; border: none; cursor: pointer;
                 font-size: 0.95rem; font-weight: 900; color: #2a0d10;
                 background: linear-gradient(180deg, #ffc4ca, #ff6f7d);

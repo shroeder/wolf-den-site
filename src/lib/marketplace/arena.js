@@ -1100,7 +1100,22 @@ export async function seenArena(buyerId) {
 // would come out NaN, which is a health bar that never moves and a fight that can never end. There is no
 // honest way to convert it (the old numbers were derived from a stat sum that no longer means anything), so
 // it is retired rather than migrated: the challenge is not spent, and a new fight is one tap away.
-const staleBout = (b) => Boolean(b) && !b.over && (b.me?.damage == null || b.foe?.damage == null);
+// ── A BOUT NOBODY CAN PLAY IS NOT A BOUT ─────────────────────────────────────────────────────────────────
+// "Stale" means: this is not over, and it can never be finished from inside the game. Both halves matter,
+// because a bout that is neither over NOR playable is the worst state in the Arena — the screen loads it as a
+// live fight, every tap is refused, and all three start paths below refuse to open a new fight while it sits
+// there. The member is bricked. The only way out is Forfeit, which costs them a loss for a bug.
+//
+// It used to test only the first clause, and that clause dates from an era before the ring: fighters with no
+// `damage` stat. So a bout saved AFTER that era but BEFORE the ring shipped passed the staleness test — it
+// has damage stats — and then failed `playable()`, which wants a ring. Nothing retired it and nothing could
+// play it. Found in prod: one member sitting on a beat-4 bout from the tap-timing era, `over: false`, keys
+// `clash` / `incoming` / `opener` and no `ring`, still blocking every fight they tried to start.
+//
+// `!b.ring` is therefore the same kind of statement as the two beside it, not a new rule: playable() is the
+// authority on what can take a beat, and anything it turns away that is not finished is by definition stale.
+// GrayKitsune: "I'm stuck in a freeze loop where I end up staying unable to do anything."
+export const staleBout = (b) => Boolean(b) && !b.over && (b.me?.damage == null || b.foe?.damage == null || !b.ring);
 
 // The client never sees the opponent's next pick — only what has already happened.
 function publicBout(b) {
@@ -2327,7 +2342,7 @@ async function settle(buyerId, b, row = null) {
 // A bout that has a ring is one somebody is playing. Anything older — a transcript from before this shipped,
 // or a bout built while the flag was off — has no ring and cannot take a beat; it is already finished and the
 // screen is only playing it back.
-const playable = (b) => Boolean(b && !b.over && b.ring);
+export const playable = (b) => Boolean(b && !b.over && b.ring);
 
 /**
  * YOUR BEAT. The only thing a member is ever asked for — see the timing tombstone in arena-kit.js.

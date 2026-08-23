@@ -20,6 +20,9 @@
 // It runs the REAL ring — the same openRing/act the request handler calls — because a second implementation
 // of a beat is exactly how this codebase got into trouble before. See the header of sim-arena.mjs.
 import { act, openRing, ringResult } from "../src/lib/marketplace/arena-ring.js";
+// The two predicates that decide whether a saved bout can still be played, imported rather than restated —
+// see the brick invariant at the foot of this file.
+import { staleBout, playable } from "../src/lib/marketplace/arena.js";
 
 const RUNS = Number(process.argv[2] || 4000);
 
@@ -72,6 +75,28 @@ for (const pair of PAIRINGS) {
     if (bad.length) fail += 1;
     console.log(`  ${pair.name.padEnd(22)} ${bad.length ? `FAIL — ${bad.join(", ")}` : "ok"}`
         + `   (${capped} of ${RUNS} hit the beat cap)`);
+}
+
+// ── AND THE ONE THAT BRICKED A MEMBER: NO UNPLAYABLE, UNFINISHED, UNRETIRED BOUT ─────────────────────────
+// A bout is in exactly one of three states, and the three must cover everything: FINISHED (over), PLAYABLE
+// (has a ring and can take a beat), or STALE (retired, so the screen drops it and a new fight can start).
+// A bout that is none of the three is a brick — the Arena shows it as a live fight, every tap is refused,
+// and all three start paths refuse to open a new one while it sits there. Found in prod on a real member's
+// row: a beat-4 bout from the tap-timing era, `over: false`, no `ring`, blocking every fight they started.
+//
+// Asserted against the REAL predicates rather than a restatement of them, because a copy of a rule is the
+// thing that goes out of date — see the note on staleBout in arena.js.
+for (const { name, b } of [
+    { name: "live ring", b: { over: false, me: { damage: 1 }, foe: { damage: 1 }, ring: {} } },
+    { name: "finished", b: { over: true, me: { damage: 1 }, foe: { damage: 1 } } },
+    { name: "pre-damage-stat", b: { over: false, me: {}, foe: {} } },
+    // THE ONE THAT BROKE. Damage stats present, so the old staleness test passed it; no ring, so playable()
+    // refused it. Neither retired nor playable, and nothing in the game could move it.
+    { name: "pre-ring, unfinished", b: { over: false, me: { damage: 1 }, foe: { damage: 1 } } },
+]) {
+    if (b.over || playable(b) || staleBout(b)) continue;
+    fail += 1;
+    console.log(`  BRICK — a "${name}" bout is neither finished, playable, nor stale`);
 }
 
 // NOT COVERED HERE: the mutual knockout. Two fighters emptying both bars on one blow could not be provoked
