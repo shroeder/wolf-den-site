@@ -7,6 +7,7 @@ import { symbolTone, symbolRole, symbolName, slot5 } from "@/lib/marketplace/cas
 import Paytable from "@/components/casino/Paytable.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
 import TheLocks from "@/components/casino/TheLocks.js";
+import TheWarren from "@/components/casino/TheWarren.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -317,6 +318,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
             if (r.free) { flashTrigger(r.free.byCascade ? null : m.scatter, () => announceFree(r)); return; }
             if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
+            if (r.warren) { flashTrigger(m.bonus, () => setPhase("warren")); return; }
             if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
             setPhase("done");
         };
@@ -340,6 +342,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 // The symbol that opened it — a hold's coin, or the bonus symbol for the locking round.
                 // Flashing the wrong one is worse than flashing none.
                 if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
+                if (r.warren) { flashTrigger(m.bonus, () => setPhase("warren")); return; }
                 if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
                 setPhase("done");
             },
@@ -483,7 +486,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setLanded(REELS);
         // And then whatever was still queued behind it, in the same order the round would have reached it.
         if (round === "free" && r.locked) { announceFree(r, "locked"); return; }
-        setPhase(r.hold ? "pick" : "freeDone");
+        setPhase(r.hold ? "pick" : r.warren ? "warren" : "freeDone");
     }, [clearTimers, round, announceFree]);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
@@ -528,6 +531,17 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         return (
             <div className="s5 is-bonus">
                 <TheLocks built={result.built} onDone={() => announceFree(result)} />
+            </div>
+        );
+    }
+
+    // ── THE WARREN TAKES THE WHOLE SCREEN ────────────────────────────────────────────────────────────────
+    // Five rooms deep, its own backgrounds, its own animals. It cannot share a stage with a slot cabinet and
+    // it does not try to.
+    if (phase === "warren" && result?.warren) {
+        return (
+            <div className="s5 is-bonus">
+                <TheWarren warren={result.warren} onDone={() => setPhase("done")} />
             </div>
         );
     }
@@ -720,7 +734,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         off to the locking round before it sets this phase — so the only thing that can
                         still be queued behind it is a hold. This read `result.pick`, which no longer
                         exists, and so always fell through to "done". */}
-                    <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : "done")}>Go on</button>
+                    <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Go on</button>
                 </div>
             ) : null}
 

@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
-import { slot5, playSpin, FREE_SPIN_OFFERS, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, HOARD_MOUNDS } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
@@ -55,7 +55,7 @@ function forcedSpin(m, stake, offerId, want) {
     for (let i = 0; i < FORCE_TRIES; i += 1) {
         const p = playSpin(m, { bet: stake, offerId });
         if (want === "free" && p.free) return p;
-        if (want === "pick" && (p.locked || p.hold)) return p;
+        if (want === "pick" && (p.locked || p.hold || p.warren)) return p;
         // A DEEP TUMBLE, ON DEMAND. The chain that opens the free round is one spin in a hundred and thirty
         // two by design, which makes the single most elaborate animation on the floor the one nobody can
         // look at — including me, which is how it shipped unwatched the first time.
@@ -66,6 +66,37 @@ function forcedSpin(m, stake, offerId, want) {
     }
     // Never hang and never lie: if it could not find one, the member gets an ordinary spin.
     return null;
+}
+
+// ── WHAT COMES OUT OF A BURROW ───────────────────────────────────────────────────────────────────────────────
+// One pool per stage, chosen so the animals get rarer and stranger as the warren gets deeper — field mice and
+// chicks near the surface, phoenixes and dragons at the bottom. All of them are pets the Den already draws;
+// none of this is new art.
+const WARREN_PETS = {
+    hollow: ["field_mouse", "pantry_mouse", "bunny", "hedgehog", "frog", "chick", "fox_kit", "beaver"],
+    sunken: ["crab", "axolotl", "seahorse", "jellyfish", "turtle", "tropical_fish", "penguin", "reef_seahorse"],
+    ember: ["cinder_scarab", "ember_whelp", "imp", "molten_salamander", "pit_beetle", "spice_moth", "cinder_hound"],
+    astral: ["fairy", "geode_sprite", "spirit_fox", "lantern_jelly", "raven", "owl", "stormcrow", "butterfly"],
+    kinghoard: ["gilded_magpie", "golden_goose", "radiant_phoenix", "elder_dragon", "unicorn", "griffin", "pegasus"],
+};
+const WARREN_ELDER = "eternal_wolf";
+
+let warrenArtCache = null;
+async function warrenArt() {
+    // Cached for the life of the server process: it is the same hundred rows for every member and every
+    // round, and a bonus that hits the database for its own art on every trigger is a bonus that gets
+    // slower the more popular it is.
+    if (warrenArtCache) return warrenArtCache;
+    const want = [...new Set([...Object.values(WARREN_PETS).flat(), WARREN_ELDER])];
+    const rows = await db.query(`SELECT pet_id AS k, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [want])
+        .catch(() => []);
+    const by = Object.fromEntries(rows.map((r) => [r.k, r.url]));
+    warrenArtCache = {
+        pets: Object.fromEntries(Object.entries(WARREN_PETS)
+            .map(([k, ids]) => [k, ids.map((id) => by[id]).filter(Boolean)])),
+        elder: by[WARREN_ELDER] || null,
+    };
+    return warrenArtCache;
 }
 
 export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) {
@@ -232,6 +263,34 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),
         } : null,
+        // ── THE WARREN ───────────────────────────────────────────────────────────────────────────────
+        // Every stage, every burrow, every critter, resolved before the first tap — the screen reveals, it
+        // never decides, which is the same rule the rest of this file follows and the reason a round can be
+        // replayed exactly from a bug report. Chips are converted here so the count-up on screen is real
+        // money rather than the client's arithmetic.
+        warren: r.warren ? {
+            label: m.second?.label || "The Warren",
+            board: 9,
+            reached: r.warren.reached,
+            full: r.warren.full,
+            stages: r.warren.stages.map((st) => ({
+                key: st.key,
+                name: st.name,
+                opened: st.opened.map((n) => (n.kind === "pups"
+                    ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
+                    : { kind: n.kind })),
+            })),
+            hoard: r.warren.hoard ? {
+                mounds: HOARD_MOUNDS,
+                opened: r.warren.hoard.opened.map((o) => (o.kind === "mound"
+                    ? { kind: "mound", chips: chipsFor(stake, (o.value * (stake / LINES.length)) / stake) }
+                    : { kind: "mother" })),
+            } : null,
+            chips: chipsFor(stake, r.warren.total / stake),
+            // The animals, by stage, so the screen shows the member's own world rather than numbered boxes.
+            art: await warrenArt(),
+        } : null,
+
         // ── TEN SPINS, AND EVERY WILD LOCKS ──────────────────────────────────────────────────────────
         // Deliberately the SAME SHAPE as `free`, because it is the same thing — a round of spins the screen
         // plays one at a time — and the client should not need a second player for it. What is different is

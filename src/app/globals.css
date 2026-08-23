@@ -18948,6 +18948,7 @@ body.cas-seated .social-fab { display: none; }
    past the right edge of the phone. `min-width: 0` because a grid child of a flex item refuses to
    shrink below its content otherwise, which is the same overflow arriving by a different road. */
 .cas-stage .s5.is-bonus .lk,
+.cas-stage .s5.is-bonus .wr,
 .cas-stage .s5.is-bonus .hs { flex: 1 1 auto; min-width: 0; align-content: start; }
 .cas-stage .s5.is-bonus .pen-field { margin-top: auto; }
 
@@ -19193,3 +19194,113 @@ body.cas-seated .social-fab { display: none; }
 .s5-freemult.s5-held { display: inline-flex; align-items: baseline; gap: 4px; }
 .s5-freemult.s5-held u { text-decoration: none; font-family: var(--font-body, inherit); font-size: 9px;
     font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a8b2bd; }
+
+/* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
+   Five rooms deep, and the room is the point — each stage is a different painted place behind the
+   burrows, so going deeper is something you SEE rather than a number going up.
+
+   The animation here is the feature rather than decoration: a burrow rocks, then critters hop out one at
+   a time and the total ticks with each one. Four separate timings, deliberately not collapsed into one —
+   see the note in TheWarren.js. */
+.wr { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; gap: 12px;
+    padding: 14px 12px 16px; border-radius: 16px; isolation: isolate;
+    border: 1px solid rgba(255, 226, 150, .3); box-shadow: 0 8px 26px rgba(0, 0, 0, .55);
+    animation: penIn .4s cubic-bezier(.2, 1.3, .4, 1) both; }
+.wr-bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover;
+    border-radius: 16px; }
+/* The room sits BEHIND the burrows rather than competing with them, and all five paintings have their
+   own brightness — so one veil, and the numbers stay readable in every room. */
+.wr-veil { position: absolute; inset: 0; z-index: -1; border-radius: 16px;
+    background: linear-gradient(180deg, rgba(8, 6, 14, .78), rgba(8, 6, 14, .55) 45%, rgba(8, 6, 14, .88)); }
+
+.wr-head { display: grid; justify-items: center; gap: 1px; }
+.wr-head i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2em;
+    text-transform: uppercase; color: #ffe6a4; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
+.wr-head b { font-family: var(--font-display); font-size: 2.7rem; line-height: 1.02; color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 20px rgba(255, 214, 120, .7), 0 2px 4px rgba(0, 0, 0, .9);
+    animation: hsTick .34s cubic-bezier(.2, 1.6, .4, 1); }
+.wr-head em { font-style: normal; font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+    color: #b8b0a0; }
+/* THE LADDER, MADE VISIBLE. Six pips. Somebody who has never reached the bottom can see there is one. */
+.wr-depth { display: flex; gap: 5px; margin-top: 6px; }
+.wr-depth span { width: 20px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, .16); }
+.wr-depth span.is-on { background: #ffd75e; box-shadow: 0 0 8px rgba(255, 215, 94, .8); }
+
+.wr-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-self: center;
+    justify-self: center; width: 100%; max-width: 300px; }
+
+.wr-nest { position: relative; aspect-ratio: 1; border-radius: 14px; cursor: pointer; border: none;
+    overflow: visible;
+    background: radial-gradient(circle at 50% 38%, #4a3a22, #241a10 70%);
+    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 226, 150, .25),
+        0 4px 12px rgba(0, 0, 0, .5);
+    transition: transform .16s ease, opacity .35s ease; }
+.wr-nest:active:not(:disabled) { transform: scale(.94); }
+/* The mouth of the burrow — a dark hole with a lip, so a tile reads as something you open rather than as
+   a button with a gradient on it. */
+.wr-lid { position: absolute; inset: 22%; border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #1a1208, #06040a 78%);
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95), 0 0 0 2px rgba(255, 226, 150, .22); }
+.is-hoard .wr-nest { background: radial-gradient(circle at 50% 38%, #6b5a22, #2e2510 70%);
+    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 226, 150, .45),
+        0 0 18px rgba(255, 215, 94, .35), 0 4px 12px rgba(0, 0, 0, .5); }
+
+/* THE SHAKE IS WHERE THE HOPE LIVES. Seven hundred milliseconds of a burrow rocking before anything is
+   known. Collapsing this into the reveal is exactly what turns the feature back into tap-and-read. */
+.wr-nest.is-shaking { animation: wrShake .7s cubic-bezier(.36, .07, .19, .97); z-index: 3; }
+@keyframes wrShake {
+    0%, 100% { transform: rotate(0) scale(1); }
+    12% { transform: rotate(-7deg) scale(1.05); }
+    28% { transform: rotate(6deg) scale(1.07); }
+    44% { transform: rotate(-8deg) scale(1.09); }
+    60% { transform: rotate(7deg) scale(1.11); }
+    78% { transform: rotate(-4deg) scale(1.13); }
+}
+.wr-nest.is-open { opacity: .28; cursor: default; }
+.wr-nest.is-open .wr-lid { box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95); }
+
+/* ── AND THEY HOP OUT ─────────────────────────────────────────────────────────────────────────────────
+   One at a time, arcing up out of the burrow they came from — anchored to that tile rather than to the
+   middle of the screen, because an animal appearing somewhere other than the hole you opened is just a
+   number with a picture on it. */
+.wr-hop { position: absolute; left: 50%; top: 50%; z-index: 5; pointer-events: none;
+    display: grid; justify-items: center; gap: 2px;
+    animation: wrHop 1.5s cubic-bezier(.25, .9, .35, 1) both; }
+.wr-hop img { width: 54px; height: 54px; object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .75)); }
+.wr-hop u { text-decoration: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 900;
+    background: #ffd75e; color: #2a1c05; box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+    font-variant-numeric: tabular-nums; }
+@keyframes wrHop {
+    0% { transform: translate(-50%, -20%) scale(.4); opacity: 0; }
+    22% { transform: translate(calc(-50% + var(--dx) * .55), calc(-50% - var(--lift))) scale(1.06); opacity: 1; }
+    38% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * .72)) scale(1); opacity: 1; }
+    72% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * .82)) scale(1); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * 1.5)) scale(.9); opacity: 0; }
+}
+
+.wr-say { margin: 0; min-height: 16px; text-align: center; font-size: 12px; color: #c2bab0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
+.wr-go { width: 100%; padding: 13px; border-radius: 14px; border: none; cursor: pointer;
+    font-family: var(--font-display); font-size: 1rem; font-weight: 900; color: #2a1c05;
+    background: linear-gradient(180deg, #ffe9a8, #e8b63e); box-shadow: 0 4px 0 #8d6716, 0 9px 20px rgba(0, 0, 0, .5);
+    animation: penIn .3s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+/* ── THE THREE MOMENTS ────────────────────────────────────────────────────────────────────────────────
+   The Elder, the Hoard, the Mother. Each takes the whole screen because each is the only thing happening
+   — a level change announced in a strip under the board is a level change nobody noticed. */
+.wr-shout { position: absolute; inset: 0; z-index: 9; display: grid; align-content: center;
+    justify-items: center; gap: 4px; padding: 20px; text-align: center; pointer-events: none;
+    border-radius: 16px; animation: s5MoreIn .3s ease-out both; }
+.wr-shout img { width: 132px; height: 132px; object-fit: contain; margin-bottom: 4px;
+    animation: s5MoreSlam .55s cubic-bezier(.15, 1.6, .35, 1) both; }
+.wr-shout b { font-family: var(--font-display); font-size: 2.5rem; line-height: 1; font-weight: 900;
+    color: #fff; animation: s5MoreSlam .5s cubic-bezier(.15, 1.7, .35, 1) .06s both; }
+.wr-shout em { font-style: normal; font-size: 12.5px; color: #d8d0c4; max-width: 260px; }
+.wr-shout.is-elder { background: radial-gradient(circle at 50% 45%, rgba(180, 124, 255, .42), rgba(6, 4, 12, .92) 66%); }
+.wr-shout.is-elder b { text-shadow: 0 0 18px rgba(180, 124, 255, 1), 0 0 48px rgba(120, 60, 255, .8); }
+.wr-shout.is-hoard { background: radial-gradient(circle at 50% 45%, rgba(255, 215, 94, .5), rgba(12, 8, 2, .93) 66%); }
+.wr-shout.is-hoard b { font-size: 3.1rem; text-shadow: 0 0 22px rgba(255, 215, 94, 1), 0 0 60px rgba(255, 150, 30, .9); }
+.wr-shout.is-mother { background: radial-gradient(circle at 50% 45%, rgba(200, 60, 50, .42), rgba(10, 4, 4, .94) 66%); }
+.wr-shout.is-mother b { text-shadow: 0 0 18px rgba(255, 90, 70, .95), 0 0 44px rgba(180, 30, 20, .8); }

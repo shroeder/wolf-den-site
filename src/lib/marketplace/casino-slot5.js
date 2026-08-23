@@ -197,10 +197,11 @@ const HUNT = {
     scatterPays: { 3: 1.11, 4: 5.09, 5: 33.3 },
     // Its free round is the only one on the floor you CHOOSE the shape of — see FREE_SPIN_OFFERS.
     free: { kind: "deals", spins: 10, label: "Ten spins, four times" },
-    // ── TEN SPINS, AND EVERY WOLF STAYS ──────────────────────────────────────────────────────────────
-    // The board you are playing on gets better as the round runs down, which is the opposite of how a
-    // losing streak feels and is exactly why people chase it. See STICKY.
-    second: { kind: "sticky", spins: 10, label: "Ten spins, and every wolf stays where it lands" },
+    // ── DOWN THROUGH THE WARREN ──────────────────────────────────────────────────────────────────────
+    // Five rooms, each deeper and richer than the last, and a sixth past the end of them that most people
+    // will never see. See runWarren. The locking-wilds round lives on The Deep now, so the two cabinets
+    // are no longer one bonus in two skins.
+    second: { kind: "warren", label: "The Warren" },
 };
 
 // ── AND THE OTHER FOUR ───────────────────────────────────────────────────────────────────────────────────────
@@ -681,6 +682,113 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
     return { total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round };
 }
 
+// ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────────────
+// Luke described this one exactly: "you pick an egg and it kind of bounces and then something pops out, most
+// of the time it's these little ducks and they jump out one by one and they keep adding up the score over and
+// over again till they're done jumping out... eventually you either pick the bear which ends the bonus or you
+// get [the hero] and it's this huge event and then it goes to the next screen that's a new background, the
+// eggs look better and you just keep going, and every stage you get deeper the reward is higher and more
+// ducks jump out... and at the fifth stage it takes you to a completely new screen with these giant domes."
+//
+// WHY THIS IS NOT THE PICK HE THREW OUT, even though you are still tapping things. The pick was tap-a-tile-
+// read-a-number: one tap, one flat value, no state. Three things make this different, and all three are the
+// reason it is worth building:
+//
+//   1. A TAP OPENS A SEQUENCE, NOT A NUMBER. Critters come out one at a time and the total climbs with each
+//      one. You do not know how many are coming, so every burrow is its own small build.
+//   2. THE ROUND HAS A LADDER. Five stages, each a different place with better art and bigger animals, and
+//      the deeper you are the more comes out of every burrow. The bonus you are in gets structurally better.
+//   3. THE END IS A REAL PLACE. Past the fifth stage is The Hoard, which most people will never see —
+//      1 round in 32 — and which is worth telling somebody about.
+//
+// The maths, all of it decided here and only revealed by the taps:
+//   nine burrows per stage — seven hold critters, one holds the Elder (deeper), one holds the Warren Mother
+//   (over). So advancing is a coin flip, roughly two or three burrows open per stage, and the fifth stage is
+//   one round in sixteen.
+// Each rung is worth roughly 1.8x the one above it, so the ladder is felt rather than announced: a critter
+// out of an Ember burrow is visibly a bigger number than one out of the Hollow, before you have counted
+// anything. Measured shape at these values — median 8x the bet, mean 32x, one round in a hundred over 400x,
+// and the ceiling near 750x, which the old pick could not approach because a board you can clear has a hard
+// top. Half of all rounds still end in the first room; the difference is that they no longer pay nothing.
+const WARREN_STAGES = [
+    { key: "hollow", name: "The Hollow", pups: [1, 3], value: 15 },
+    { key: "sunken", name: "The Sunken Run", pups: [2, 4], value: 28 },
+    { key: "ember", name: "The Ember Seam", pups: [2, 5], value: 50 },
+    { key: "astral", name: "The Star Warren", pups: [3, 6], value: 90 },
+    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 155 },
+];
+// The room past the last stage. Six mounds, one of which is the Mother — so it pays two or three times on
+// average and can, very rarely, pay five.
+export const HOARD_MOUNDS = 6;
+const HOARD_VALUE = 645;
+
+export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
+    const NESTS = 9;
+    const stages = [];
+    let total = 0;
+    let stage = 0;
+    let ended = false;
+
+    while (stage < WARREN_STAGES.length && !ended) {
+        const cfg = WARREN_STAGES[stage];
+        // Seven critter burrows, one Elder, one Mother — shuffled, then opened in order. Decided before the
+        // first tap, exactly like every other board on this floor: the taps reveal, they do not decide.
+        const board = [
+            ...Array.from({ length: NESTS - 2 }, () => ({ kind: "pups" })),
+            { kind: "elder" }, { kind: "mother" },
+        ];
+        for (let i = board.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(rng() * (i + 1));
+            [board[i], board[j]] = [board[j], board[i]];
+        }
+
+        const opened = [];
+        for (const nest of board) {
+            if (nest.kind === "pups") {
+                // How many come out, and what each is worth. The count is the drama; the value is the money.
+                const [lo, hi] = cfg.pups;
+                const n = lo + Math.floor(rng() * (hi - lo + 1));
+                const pups = Array.from({ length: n }, () => cfg.value * (0.7 + rng() * 0.9));
+                total += pups.reduce((a, v) => a + v, 0) * lineBet;
+                opened.push({ kind: "pups", pups });
+                continue;
+            }
+            opened.push({ kind: nest.kind });
+            break;   // the Elder takes you down, the Mother sends you home. Either way this stage is done.
+        }
+
+        const last = opened[opened.length - 1];
+        stages.push({ stage, key: cfg.key, name: cfg.name, board: board.length, opened });
+        if (last.kind === "mother") { ended = true; break; }
+        stage += 1;
+    }
+
+    // ── THE HOARD ────────────────────────────────────────────────────────────────────────────────────────
+    // Only if the Elder was found on all five stages. A different room, a different mechanic, and the reason
+    // anybody tells anybody else about this machine.
+    let hoard = null;
+    if (!ended && stage >= WARREN_STAGES.length) {
+        const mounds = [
+            ...Array.from({ length: HOARD_MOUNDS - 1 }, () => ({ kind: "mound" })),
+            { kind: "mother" },
+        ];
+        for (let i = mounds.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(rng() * (i + 1));
+            [mounds[i], mounds[j]] = [mounds[j], mounds[i]];
+        }
+        const opened = [];
+        for (const mound of mounds) {
+            if (mound.kind === "mother") { opened.push({ kind: "mother" }); break; }
+            const value = HOARD_VALUE * (0.55 + rng() * 1.1);
+            total += value * lineBet;
+            opened.push({ kind: "mound", value });
+        }
+        hoard = { opened };
+    }
+
+    return { total, stages, hoard, reached: stages.length, full: Boolean(hoard) };
+}
+
 // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────────────
 // The other kind of bonus round, and the reason The Harvest and The Menagerie do not simply have The Hunt's.
 // Six or more coins land, every coin LOCKS in place, and you get three respins — every new coin resets the
@@ -757,7 +865,7 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         : first;
 
     let total = base.total;
-    let free = null; let locked = null; let hold = null; let built = null;
+    let free = null; let locked = null; let hold = null; let built = null; let warren = null;
 
     // ── EARNED BY WATCHING ───────────────────────────────────────────────────────────────────────────
     // Enough consecutive breaks opens the free round whether or not a scatter ever landed. It is the only
@@ -789,6 +897,9 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         if (m.second?.kind === "hold") {
             hold = runHold(m, m.second, { lineBet, rng });
             total += hold.total;
+        } else if (m.second?.kind === "warren") {
+            warren = runWarren(m, { lineBet, rng });
+            total += warren.total;
         } else if (m.second?.kind === "sticky") {
             // ── STICKY ───────────────────────────────────────────────────────────────────────────────
             // Ten free spins in which every wild that lands STAYS THERE for the rest of the round. It is
@@ -810,5 +921,5 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
             total += locked.total;
         }
     }
-    return { grid, base, chain, free, locked, hold, built, total, bet };
+    return { grid, base, chain, free, locked, hold, built, warren, total, bet };
 }
