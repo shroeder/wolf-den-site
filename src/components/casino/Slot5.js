@@ -71,6 +71,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // One bag per reel, off the machine's real strips — see stripFor.
     const strips = useMemo(() => slot5(machineId).strips, [machineId]);
 
+    // ── A MACHINE NOBODY IS PLAYING SITS STILL ───────────────────────────────────────────────────────
+    // Luke: "dont have this screen iterate over random symbols when you arent playing it."
+    //
+    // It did, and it was not an animation — it was a bug that looked like one. `stripFor` was being called
+    // INSIDE the render, so every re-render drew a fresh set of random symbols, and this screen re-renders
+    // for reasons that have nothing to do with the reels: the Pot ticking up, the purse changing, a message
+    // arriving. The machine appeared to be idly playing itself in front of you, which is both wrong and a
+    // small lie about what a reel does when it is not moving.
+    //
+    // Both faces are drawn ONCE and held. `idle` is what the machine shows before its first spin and never
+    // changes; `filler` is the blur a reel runs during a spin, regenerated in pull() so two spins in a row
+    // do not run the same picture past you — but regenerated on a TAP, not on a render.
+    const [idle] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, []).slice(0, ROWS)));
+    const [filler, setFiller] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, [])));
+
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
     const pull = useCallback(async () => {
         if (busy || spinning) return;
@@ -78,6 +93,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         clearTimers();
         setResult(null); setShowLine(-1); setCounted(0); setPicked([]); setLanded(0);
         setPhase("spin"); setSpinning(true);
+        setFiller(strips.map((bag) => stripFor(bag, [])));
         Cas.pull();
 
         const r = await onSpin(offer);
@@ -173,9 +189,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
                             style={{ "--settle": `${SETTLE_MS}ms`, "--delay": `${STOP_AT[reel]}ms` }}>
                             <div className="s5-strip">
+                                {/* Chooses between two things already drawn. Nothing here is random, so a
+                                    re-render cannot change what is on the reels. */}
                                 {(grid && landed > reel
                                     ? grid[reel]
-                                    : stripFor(strips[reel], grid?.[reel] || stripFor(strips[reel], []).slice(0, 3))
+                                    : spinning || result
+                                        ? [...filler[reel], ...(grid?.[reel] || idle[reel])]
+                                        : idle[reel]
                                 ).map((sym, i) => (
                                     // EVERY CELL CARRIES ITS SYMBOL'S COLOUR. The wash behind the symbol is
                                     // the same hue the symbol was drawn in — one map, see SYMBOL_LOOK — so a
