@@ -104,6 +104,31 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.
         grid: r.grid,
+        // ── THE TUMBLE ───────────────────────────────────────────────────────────────────────────────
+        // A cascading machine sends the WHOLE chain: every grid, which cells broke, the multiplier at that
+        // break, and what it paid. The screen shatters and drops from this list — it decides nothing, the
+        // same as everywhere else, and it means a cascade can be replayed exactly for a bug report.
+        chain: r.chain ? {
+            cascades: r.chain.cascades,
+            trigger: m.cascade?.trigger || null,
+            label: m.cascade?.label || null,
+            steps: r.chain.steps.map((st) => ({
+                grid: st.grid,
+                broken: st.broken,
+                mult: st.mult,
+                chips: chipsFor(stake, st.paid / stake),
+                wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+            })),
+        } : null,
+        // ── THE LOCKS ────────────────────────────────────────────────────────────────────────────────
+        // What the member built before the door opened. Sent whole; the taps reveal it in order.
+        built: r.built ? {
+            picked: r.built.picked,
+            spins: r.built.spins,
+            base: m.free?.spins || 8,
+            mult: r.built.mult,
+            label: m.second?.label || "The Locks",
+        } : null,
         // ── EVERY LINE ARRIVES ALREADY IN CHIPS ──────────────────────────────────────────────────────
         // The screen used to multiply each line by the rate itself and round, which is the same conversion
         // written twice — and the copy rounded per line instead of once, so a three-doubloon line printed
@@ -125,6 +150,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // Which of the five shapes this cabinet's round is — the screen names it, because "ten spins"
             // means something different on a machine whose multiplier climbs than on one whose wilds stick.
             kind: r.free.kind || m.free?.kind || "deals",
+            // Opened by the tumbling rather than by a scatter — the screen says which, because they feel
+            // completely different and only one of them is something you watched happen.
+            byCascade: Boolean(r.free.byCascade),
+            mult: r.free.mult || 1,
             added: r.free.added || 0,
             mult: FREE_SPIN_OFFERS.find((o) => o.id === offer.id)?.mult || 1,
             // Each free spin carries its winning LINES in chips, exactly like the base spin does, because the

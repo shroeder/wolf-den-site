@@ -238,16 +238,24 @@ const HARVEST = {
         { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 5, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 5, 4: 31, 5: 262 },
-        chest: { 3: 2.6, 4: 13.5, 5: 94 },
-        laurel: { 3: 1.3, 4: 6.5, 5: 37 },
-        doubloon: { 3: 0.6, 4: 3.1, 5: 15.5 },
-        bone: { 3: 0.4, 4: 1.6, 5: 7.5 },
+        wolf: { 3: 1.96, 4: 12, 5: 102 },
+        chest: { 3: 1.02, 4: 5.5, 5: 37 },
+        laurel: { 3: 0.51, 4: 2.54, 5: 14.5 },
+        doubloon: { 3: 0.23, 4: 1.21, 5: 6 },
+        bone: { 3: 0.16, 4: 0.63, 5: 2.93 },
     },
-    scatterPays: { 3: 0.8, 4: 3.1, 5: 15.5 },
+    scatterPays: { 3: 0.31, 4: 1.21, 5: 6 },
+    // ── THE CASCADE MACHINE ──────────────────────────────────────────────────────────────────────────
+    // Every win is threshed away and what is above falls into the hole, so a win MAKES the next win
+    // possible and the multiplier climbs with each break. Five breaks in one spin opens the free round —
+    // a bonus earned by watching rather than by landing three of anything.
+    // EIGHT BREAKS. Measured over 200,000 spins: the mean chain is 1.56 and eight-plus happens once in 132,
+    // which is real bonus-round rarity — and unlike a scatter you can WATCH it approaching. Five would have
+    // been one spin in seventeen, which is not a bonus, it is the base game with a fanfare.
+    cascade: { trigger: 8, label: "The Threshing" },
     free: { kind: "growing", spins: 14, label: "Fourteen spins, and the multiplier climbs" },
     second: { kind: "hold", trigger: "doubloon", need: 9, spins: 3, label: "The Wagon",
-        values: [1, 1, 1, 1.6, 1.6, 2.6, 4, 8], full: 105 },
+        values: [0.39, 0.39, 0.39, 0.63, 0.63, 1.02, 1.56, 3.13], full: 41 },
 };
 
 const DEEP = {
@@ -315,23 +323,28 @@ const VAULT = {
     // BRUTAL. The rarest wild on the floor and the fewest paying combinations, against the highest ladder in
     // the free round. Everything about this cabinet is a long wait for one number.
     strips: [
-        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 4, wolf: 0 },
+        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 6, wolf: 0 },
         { bone: 34, doubloon: 23, laurel: 12, chest: 5, moon: 0, wolf: 4 },
-        { bone: 34, doubloon: 22, laurel: 11, chest: 5, moon: 3, wolf: 5 },
+        { bone: 34, doubloon: 22, laurel: 11, chest: 5, moon: 5, wolf: 5 },
         { bone: 34, doubloon: 23, laurel: 12, chest: 5, moon: 0, wolf: 4 },
-        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 3, wolf: 0 },
+        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 5, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 29, 4: 221, 5: 2905 },
-        chest: { 3: 8, 4: 64, 5: 639 },
-        laurel: { 3: 2.9, 4: 18.5, 5: 151 },
-        doubloon: { 4: 6.5, 5: 46 },
-        bone: { 5: 13 },
+        wolf: { 3: 21, 4: 159, 5: 2092 },
+        chest: { 3: 6, 4: 46, 5: 460 },
+        laurel: { 3: 2.09, 4: 13.5, 5: 109 },
+        doubloon: { 4: 4.5, 5: 33 },
+        bone: { 5: 9.5 },
     },
-    scatterPays: { 3: 1.2, 4: 6, 5: 41 },
-    free: { kind: "ladder", spins: 20, label: "Twenty spins, and the ladder runs x2 to x10" },
-    second: { kind: "pick", board: "locks", label: "The Locks",
-        chips: [11.5, 11.5, 11.5, 26, 26, 81], mults: [3, 5] },
+    scatterPays: { 3: 0.86, 4: 4.5, 5: 30 },
+    // ── YOU BUILD YOUR OWN ROUND ─────────────────────────────────────────────────────────────────────
+    // Every lock you turn adds spins or multiplier. One of them opens the door and the round begins with
+    // whatever you managed to stack. Nothing on the board is a loss.
+    // EIGHT BEFORE YOU TOUCH A LOCK, so the round is worth something even if the first tile is the door —
+    // the mechanic only works if there is no bad outcome, and opening on the first pick must still be a
+    // real free round rather than a shrug.
+    free: { kind: "built", spins: 8, label: "Turn the locks, then the door opens" },
+    second: { kind: "build", label: "The Locks" },
 };
 
 export const SLOTS5 = { slot: HUNT, slot2: HARVEST, slot3: DEEP, slot4: MENAGERIE, slot5: VAULT };
@@ -374,7 +387,11 @@ export function evaluate(m, grid, { lineBet = 1, mult = 1 } = {}) {
         if (!pay) continue;
         const amount = pay * lineBet * mult;
         total += amount;
-        wins.push({ kind: "line", line: i, symbol: lead, count: n, amount });
+        // WHICH CELLS. A cascade cannot break the winning symbols without knowing which ones they are, and
+        // the line-drawing overlay wants the same list. Cheap to carry, impossible to reconstruct later.
+        const cells = [];
+        for (let reel = 0; reel < n; reel += 1) cells.push(reel * ROWS + line[reel]);
+        wins.push({ kind: "line", line: i, symbol: lead, count: n, amount, cells });
     }
 
     // Scatters pay from anywhere, on the total bet.
@@ -463,7 +480,8 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
             }
         }
 
-        const mult = offer.kind === "growing" ? (i + 1)
+        const mult = offer.kind === "fixed" ? (offer.mult || 1)
+            : offer.kind === "growing" ? (i + 1)
             : offer.kind === "ladder" ? (LADDER[i % LADDER.length])
             : (offer.mult || 1);
 
@@ -487,6 +505,114 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
         i += 1;
     }
     return { total, spins, stuck, added };
+}
+
+// ── BUILDING YOUR OWN FREE ROUND ─────────────────────────────────────────────────────────────────────────────
+// Luke: "you reveal tiles that give you extra spins and extra multiplier going into a free spins, and then if
+// you pick the wrong one, it begins the free spin bonus."
+//
+// The best mechanic on the floor, and it is worth saying why because the reason is not obvious: THERE IS NO
+// BAD OUTCOME. Every tile is a gift — more spins, a bigger multiplier — and the "wrong" one does not take
+// anything away, it starts the thing you were building towards. The tension is entirely "how much more dare I
+// stack before it goes", and the answer is never a punishment.
+//
+// That is the opposite of the pick it replaces, where one tile ended the round and took the board with it.
+// Same interaction, same number of taps, completely different feeling: one is nerve under threat, the other
+// is greed with no downside, and the second is the one people replay.
+export const VAULT_TILES = [
+    { kind: "spins", value: 2 }, { kind: "spins", value: 2 }, { kind: "spins", value: 3 },
+    { kind: "spins", value: 3 }, { kind: "spins", value: 5 },
+    { kind: "mult", value: 1 }, { kind: "mult", value: 1 }, { kind: "mult", value: 2 },
+    { kind: "mult", value: 3 },
+    { kind: "launch" },
+];
+
+export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } = {}) {
+    const board = VAULT_TILES.map((t) => ({ ...t }));
+    for (let i = board.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rng() * (i + 1));
+        [board[i], board[j]] = [board[j], board[i]];
+    }
+    let spins = baseSpins;
+    let mult = baseMult;
+    const picked = [];
+    for (const tile of board) {
+        picked.push(tile);
+        if (tile.kind === "launch") break;
+        if (tile.kind === "spins") spins += tile.value;
+        else mult += tile.value;
+    }
+    return { picked, spins, mult };
+}
+
+// ── CASCADES ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "we should have one that cascades... the winning paylines get fractured, and then they break, and then
+// the new symbols fall down, and then there can be increased multipliers based on how many times that happens
+// sequentially without having to spin, and also initiate a bonus game based on that."
+//
+// This is the single biggest thing missing from the floor, and it is missing for a structural reason: every
+// other machine here resolves a spin in ONE step. A cascade is a spin that keeps going — you press the button
+// once and the machine argues with itself for eight seconds — and that is exactly why it feels advanced. The
+// player is not doing anything. They are watching something unfold that they started.
+//
+// THREE THINGS COMPOUND, which is what makes it more than an animation:
+//   1. every win breaks, and what is above falls into the hole, so a win MAKES the next win possible
+//   2. the multiplier climbs with each consecutive break and resets only when the tumbling stops
+//   3. enough breaks in a single spin opens the free round — a bonus you earned by watching rather than by
+//      landing three of something
+//
+// The whole chain is resolved here and sent as a list of steps. The screen animates the steps; it decides
+// nothing, the same as everywhere else.
+const CASCADE_MULT = [1, 2, 3, 5, 8, 12, 20];
+
+export function runCascade(m, grid, { lineBet = 1, rng = Math.random } = {}) {
+    const steps = [];
+    let total = 0;
+    let n = 0;
+    let working = grid.map((col) => col.slice());
+
+    // A hard ceiling. A cascade can in principle refill into another win forever, and a spin that never
+    // resolves is a request that never returns.
+    while (n < 20) {
+        const mult = CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)];
+        const r = evaluate(m, working, { lineBet, mult });
+        const lineWins = r.wins.filter((w) => w.kind === "line");
+        // The scatter pays once, on the first pass only — otherwise a tumbling machine pays its scatter
+        // five times for one grid.
+        const paid = n === 0 ? r.total : lineWins.reduce((a, w) => a + w.amount, 0);
+        total += paid;
+
+        // Every cell that took part in a win. A Set because two lines crossing share cells, and breaking
+        // one twice would leave a hole the fall cannot fill.
+        const broken = new Set();
+        for (const w of lineWins) for (const c of w.cells) broken.add(c);
+
+        steps.push({
+            grid: working.map((col) => col.slice()),
+            wins: lineWins,
+            scatterWin: n === 0 ? (r.wins.find((w) => w.kind === "scatter") || null) : null,
+            broken: [...broken],
+            mult,
+            paid,
+            cascade: n,
+        });
+
+        if (!broken.size) break;
+
+        // ── AND THEY FALL ────────────────────────────────────────────────────────────────────────────
+        // Per column: keep what survived in order, then push new symbols on TOP. Drawn from that reel's own
+        // strip, because a refill from a generic pool would put wilds on reels that cannot hold them — the
+        // exact bug the idle reels already had once.
+        working = working.map((col, reel) => {
+            const kept = col.filter((_, row) => !broken.has(reel * ROWS + row));
+            const need = ROWS - kept.length;
+            const fresh = Array.from({ length: need }, () => pick(m.strips[reel], rng));
+            return [...fresh, ...kept];
+        });
+        n += 1;
+    }
+
+    return { total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] };
 }
 
 // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────────────
@@ -584,22 +710,47 @@ export function runPick(m, { lineBet = 1, rng = Math.random } = {}) {
 export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = {}) {
     const lineBet = bet / LINES.length;
     const grid = spinGrid(m, rng);
-    const base = evaluate(m, grid, { lineBet });
-    let total = base.total;
-    let free = null; let pick = null; let hold = null;
 
-    if (base.freeSpins) {
-        // THE HUNT IS THE ONLY CABINET YOU CHOOSE. Everywhere else the round has one shape, and that shape is
-        // the machine's identity rather than a setting — see the note on SLOTS5.
-        const offer = m.free?.kind === "deals"
-            ? (FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1])
-            : { id: m.free.kind, kind: m.free.kind, label: m.free.label, spins: m.free.spins, mult: 1, sticky: false };
+    // The landing, always — a cascading machine still has a first grid, and the scatter and bonus counts
+    // come off it before anything has broken.
+    const first = evaluate(m, grid, { lineBet });
+
+    // ── A CASCADING MACHINE RESOLVES ITSELF ──────────────────────────────────────────────────────────
+    // The base "spin" becomes a CHAIN rather than a grid: press once and the machine argues with itself for
+    // several seconds. Everything downstream reads the chain's first step as the landing and its running
+    // total as what the spin paid. See runCascade.
+    const chain = m.cascade ? runCascade(m, grid, { lineBet, rng }) : null;
+    const base = chain
+        ? { ...first, wins: chain.steps[0].wins, total: chain.total }
+        : first;
+
+    let total = base.total;
+    let free = null; let pick = null; let hold = null; let built = null;
+
+    // ── EARNED BY WATCHING ───────────────────────────────────────────────────────────────────────────
+    // Enough consecutive breaks opens the free round whether or not a scatter ever landed. It is the only
+    // way into a bonus on this floor that has nothing to do with what the reels stopped on.
+    const byCascade = Boolean(chain && m.cascade && chain.cascades >= m.cascade.trigger);
+
+    if (first.freeSpins || byCascade) {
+        let offer;
+        if (m.free?.kind === "built") {
+            // THE VAULT BUILDS ITS OWN. The picking happens first and decides the round that follows.
+            built = runBuild(m, { rng, baseSpins: m.free.spins, baseMult: 1 });
+            offer = { id: "built", kind: "fixed", label: m.free.label, spins: built.spins, mult: built.mult, sticky: false };
+        } else if (m.free?.kind === "deals") {
+            offer = FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1];
+        } else {
+            offer = { id: m.free.kind, kind: m.free.kind, label: m.free.label, spins: m.free.spins, mult: 1, sticky: false };
+        }
         free = runFreeSpins(m, offer, { lineBet, rng });
         free.kind = offer.kind || "deals";
         free.label = offer.label;
+        free.mult = offer.mult || 1;
+        free.byCascade = byCascade && !first.freeSpins;
         total += free.total;
     }
-    if (base.pick) {
+    if (first.pick && m.second?.kind !== "build") {
         if (m.second?.kind === "hold") {
             hold = runHold(m, m.second, { lineBet, rng });
             total += hold.total;
@@ -608,5 +759,5 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
             total += pick.total;
         }
     }
-    return { grid, base, free, pick, hold, total, bet };
+    return { grid, base, chain, free, pick, hold, built, total, bet };
 }

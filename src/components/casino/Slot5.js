@@ -7,6 +7,7 @@ import { symbolTone, symbolRole, symbolName, slot5 } from "@/lib/marketplace/cas
 import Paytable from "@/components/casino/Paytable.js";
 import PettingPen from "@/components/casino/PettingPen.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
+import TheLocks from "@/components/casino/TheLocks.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -93,6 +94,14 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // The symbol currently being flashed because it just triggered something — the scatter before the free
     // round, the chest before the pick. Null the rest of the time.
     const [flashSym, setFlashSym] = useState(null);
+    // ── THE TUMBLE ───────────────────────────────────────────────────────────────────────────────────
+    // `breaking` is the cells mid-shatter; `dropping` is the cells that have just fallen in and want their
+    // entrance animation. Both are cleared as the chain advances — a cascade is a sequence of short states
+    // rather than one long one, which is what lets each break read as its own event.
+    const [breaking, setBreaking] = useState([]);
+    const [dropping, setDropping] = useState([]);
+    const [chainAt, setChainAt] = useState(-1);
+    const [chainWon, setChainWon] = useState(0);
     // The last response, for the skip. A ref because skipFree is called from a handler that must not be
     // rebuilt every time the result changes.
     const resultRef = useRef(null);
@@ -182,6 +191,54 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         }, landsAt[REELS - 1] + 230));
     }, []);
 
+    // ── PLAYING A CASCADE ────────────────────────────────────────────────────────────────────────────────
+    // Press once and the machine argues with itself. Each break is four beats, and they are separately
+    // timed on purpose — a tumble where everything happens at the same speed is an animation, and a tumble
+    // where the shatter is sharp and the fall has weight is a machine:
+    //
+    //   land   the grid arrives and its wins light
+    //   break  the winning cells shatter (fast — it should feel like something snapping)
+    //   fall   the next grid replaces it and the new symbols drop in from above
+    //   hold   a beat to read the multiplier before the next one starts
+    //
+    // Recursive rather than a queue of timers, so a new spin cuts it cleanly instead of leaving six queued
+    // breaks to land on top of the next game.
+    const runChain = useCallback((r, i) => {
+        const chain = r.chain;
+        if (!chain || i >= chain.steps.length) {
+            setBreaking([]); setDropping([]);
+            return Promise.resolve();
+        }
+        const st = chain.steps[i];
+        setChainAt(i);
+        setGrid(st.grid);
+        setActiveWins(st.wins);
+        setDropping(i === 0 ? [] : (chain.steps[i - 1].broken || []));
+        setBreaking([]);
+        if (st.chips > 0) setChainWon((n) => n + st.chips);
+
+        return new Promise((done) => {
+            // Light the wins on this grid.
+            timers.current.push(setTimeout(() => {
+                if (!st.broken.length) { setActiveWins([]); done(); return; }
+                setShowLine(0);
+                Cas.coin(Math.min(4, i));
+                // Then break them.
+                timers.current.push(setTimeout(() => {
+                    setShowLine(-1);
+                    setBreaking(st.broken);
+                    Cas.reelStop(Math.min(4, i), 0.5);
+                    Haptic.hit(0.3 + Math.min(0.5, i * 0.08));
+                    // And let the next grid fall into the hole.
+                    timers.current.push(setTimeout(() => {
+                        runChain(r, i + 1).then(done);
+                    }, 260));
+                }, 420));
+            }, i === 0 ? 120 : 240));
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
     const pull = useCallback(async (force) => {
         if (busy || spinning) return;
@@ -189,6 +246,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         clearTimers();
         setResult(null); setShowLine(-1); setCounted(0); setLanded(0);
         setFreeIdx(-1); setFreeWon(0);
+        setChainAt(-1); setChainWon(0); setBreaking([]); setDropping([]);
         setPhase("spin"); setSpinning(true);
         setFiller(strips.map((bag) => stripFor(bag, [])));
         Cas.pull();
@@ -205,10 +263,29 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         // ── WHAT HAPPENS AFTER THE REELS STOP ────────────────────────────────────────────────────────
         // Lines first, then the free round if there is one, then the pick. Sequenced here so a spin that
         // pays lines AND triggers both features still plays them in an order somebody can follow.
+        const after = () => {
+            const m = slot5(machineId);
+            if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
+            if (r.free) { flashTrigger(r.free.byCascade ? null : m.scatter, () => announceFree(r)); return; }
+            if (r.pick || r.hold) { flashTrigger(r.hold ? r.hold.trigger : m.bonus, () => setPhase("pick")); return; }
+            setPhase("done");
+        };
+
+        // A CASCADING MACHINE TUMBLES INSTEAD OF DRAWING LINES. The reels still land the same way; what
+        // follows is a chain rather than a list of lines to light one at a time.
+        if (r.chain) {
+            playGrid(r.grid, [], {
+                stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
+                onDone: () => { setPhase("tumble"); runChain(r, 0).then(after); },
+            });
+            return;
+        }
+
         playGrid(r.grid, r.lines, {
             stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
             onDone: () => {
                 const m = slot5(machineId);
+                if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
                 if (r.free) { flashTrigger(m.scatter, () => announceFree(r)); return; }
                 if (r.pick || r.hold) {
                     // The symbol that opened it — a hold's coin or a pick's bonus symbol, whichever this
@@ -219,7 +296,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 setPhase("done");
             },
         });
-    }, [busy, spinning, onSpin, clearTimers, playGrid, flashTrigger, machineId]);
+    }, [busy, spinning, onSpin, clearTimers, playGrid, flashTrigger, machineId, runChain]);
 
     // ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
     // Luke: "i didn't even know that I got the free Spin bonus because there was nothing, nothing popped off
@@ -323,6 +400,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // ── THE BONUS TAKES THE WHOLE BOARD ──────────────────────────────────────────────────────────────────
     // Before the cabinet, the readout, the panel and the owner row — all of it. A bonus round that plays in a
     // strip under the reels is a bonus round competing with the machine it came from.
+    // ── THE LOCKS COME BEFORE THE ROUND THEY BUILD ───────────────────────────────────────────────────────
+    // Its own phase, ahead of the free spins, because the whole mechanic is that the picking DECIDES the
+    // round. Announcing free spins first and then asking you to build them is the same information in the
+    // wrong order.
+    if (phase === "build" && result?.built) {
+        return (
+            <div className="s5 is-bonus">
+                <TheLocks built={result.built} onDone={() => announceFree(result)} />
+            </div>
+        );
+    }
+
     if (phase === "pick" && (result?.pick || result?.hold)) {
         return (
             <div className="s5 is-bonus">
@@ -376,8 +465,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}`}
-                                        key={i} style={{ "--tone": symbolTone(sym, machineId) }}>
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}`}
+                                        key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
                                             className={`${lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""}${flashSym && sym === flashSym && landed > reel ? " is-flash-img" : ""}`.trim()} />
@@ -424,6 +513,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 The round still runs — it takes the middle deal, ten spins at four times, which is the one
                 that was selected by default anyway. The choice is worth having back one day, but INSIDE the
                 round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
+
+            {/* ── THE TUMBLE COUNTER ──────────────────────────────────────────────────────────────────
+                The break count and the multiplier it has climbed to, while it is happening. This is the
+                whole tension of a cascading machine — you are watching a number go up that you cannot
+                influence — and it needs somewhere to live that is not the reels. */}
+            {phase === "tumble" && result?.chain ? (
+                <div className={`s5-tumble${result.chain.trigger && chainAt + 1 >= result.chain.trigger - 2 ? " is-close" : ""}`}>
+                    <span><i>Breaks</i><b>{chainAt + 1}{result.chain.trigger ? ` / ${result.chain.trigger}` : ""}</b></span>
+                    <span className="s5-tmult">&times;{result.chain.steps[Math.max(0, chainAt)]?.mult ?? 1}</span>
+                    <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
+                </div>
+            ) : null}
 
             {/* ── THE ANNOUNCEMENT ────────────────────────────────────────────────────────────────────
                 Over the cabinet, because the cabinet is what it happened on. It holds for two seconds with
