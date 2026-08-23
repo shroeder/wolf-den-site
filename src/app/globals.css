@@ -17623,6 +17623,28 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-reel.is-spin .cas-cell img { filter: blur(2px); opacity: .9; }
 @keyframes casRun { to { transform: translateY(calc(var(--cell, 84px) * -4)); } }
 
+/* ── AND COMING TO REST ───────────────────────────────────────────────────────────────────────────────
+   The strip used to carry `transition: transform 520ms` in its inline style for the landing, and that
+   transition has never once run. While a reel spins, its transform belongs to the `casRun` ANIMATION —
+   and an animated value is applied above the cascade, so it is not the computed value a transition
+   watches. Remove the animation and the computed transform has not "changed" as far as transitions are
+   concerned; the strip simply jumps from wherever the loop had it to its final cell. Measured: the reels
+   reached their final position within about 15ms of being released, when the code intended 520ms of
+   deceleration. The comment two rules down still said "the strip's own transition does the settling".
+
+   A from-only keyframe is the fix, and it is the one thing that composes correctly here: with no `to`
+   block the animation interpolates from the offset below TO the element's own computed transform, which
+   is the inline one naming this spin's symbol. So it decelerates onto the right cell without the
+   keyframe needing to know which cell that is. `both` holds the end state.
+
+   Three cells of run-up is enough to read as a reel arriving rather than a card being turned over. The
+   duration comes from JS as `--settle`, because the sound is timed off the same number — see the reel
+   clock in CasinoClient. */
+.cas-reel.is-stop .cas-strip {
+    animation: casSettle var(--settle, 340ms) cubic-bezier(.17, .84, .32, 1) both;
+}
+@keyframes casSettle { from { transform: translateY(calc(var(--cell, 84px) * -11)); } }
+
 /* Settled, and paying. The glow is the symbol's own colour, so a wolf line burns gold and a star violet. */
 .cas-reel.is-won { border-color: var(--tone);
     box-shadow: inset 0 0 22px color-mix(in srgb, var(--tone) 35%, transparent), 0 0 18px color-mix(in srgb, var(--tone) 40%, transparent); }
@@ -17656,7 +17678,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* was: an animation on the reel BOX. The strip carries the motion now — animating both would move the
    window and its contents in opposite directions. */
 @keyframes casSpin { 0% { transform: translateY(-12%); } 100% { transform: translateY(12%); } }
-/* was: a landing bounce on the box. The strip's own transition does the settling. */
+/* was: a landing bounce on the box. The strip's own casSettle animation does the settling. */
 @keyframes casLand { 0% { transform: translateY(-22%) scale(1.06); }
     60% { transform: translateY(3%) scale(.98); } 100% { transform: none; } }
 

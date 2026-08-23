@@ -42,6 +42,10 @@ export const QUIET_HIDE = [
     ".xp-toast",
     // Feature-launch cards are inline-styled with no class of their own; the aria-label is the only handle.
     "[aria-label^='New feature']",
+    // The web-push permission card. Same failure as .xp-toast above and found the same way: it anchors to the
+    // bottom of the viewport, which is where the casino's Pull button is, so "Not now" was sitting ON the
+    // button and three measurement runs came back reporting reels that never moved.
+    ".webpush-prompt",
 ];
 
 /** Merge the quiet list into an env value, keeping anything the caller asked for. */

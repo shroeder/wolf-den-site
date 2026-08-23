@@ -175,6 +175,26 @@ const SYMBOL_TONE = {
 //
 // EACH REEL STOPS ON ITS OWN CLOCK, and the third stops latest by a wide margin — that pause, with two symbols
 // already matching, is the entire drama of a slot machine and it cannot exist if all three land together.
+// -- ONE CLOCK FOR THE REELS ----------------------------------------------------------------------------------
+// Luke: "the reel stop sounds dont match the reels stopping."
+//
+// They did not, by 620ms, and the reason is the oldest one there is: the picture and the sound each kept their
+// own copy of the timing. The reels were released on [0, 220, 560] inside the Reel component and the clunks
+// were played on [640, 860, 1200] inside the pull handler -- two arrays, in two files' worth of code, that
+// nobody could see at the same time. Measured on the live site by sampling each strip's real transform every
+// animation frame against a timestamp on every oscillator the sound kit starts:
+//
+//     reel      came to rest        clunk fired      drift
+//       0            631 ms            1259 ms      +628 ms
+//       1            848 ms            1481 ms      +633 ms
+//       2           1198 ms            1816 ms      +618 ms
+//
+// So the numbers live here, once, and both halves read them. A clunk is the reel HITTING its stop, which is
+// the end of the settle, not the beginning of it.
+const REEL_STOP_AT = [0, 220, 560];   // when each reel is released, after the spin ends
+const REEL_SETTLE_MS = 340;           // and how long it then takes to decelerate onto its symbol
+const REEL_LANDS_AT = REEL_STOP_AT.map((t) => t + REEL_SETTLE_MS);
+
 function Reel({ art, machineId, symbols, result, spinning, index, won }) {
     // ── THE STRIP MUST NOT RESHUFFLE UNDER A LANDED REEL ─────────────────────────────────────────────────
     // `symbols` arrives as a fresh array on every parent render — it is built with .map() up in the panel —
@@ -201,7 +221,7 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
     // So a reel holds its own spin until its own moment. The third waits nearly three quarters of a second
     // after the first, and that gap — two symbols matching, one still going — is the near-miss, which is the
     // only reason anybody watches a slot machine at all.
-    const stopAt = [0, 220, 560][index] || 0;
+    const stopAt = REEL_STOP_AT[index] || 0;
     const [held, setHeld] = useState(false);
     useEffect(() => {
         if (spinning) { setHeld(true); return undefined; }
@@ -225,7 +245,7 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
             style={{ "--tone": SYMBOL_TONE[result] || "#cbd3dc" }}>
             <span className="cas-strip"
                 style={landed
-                    ? { transform: `translateY(calc(var(--cell) * ${-steps}))`, transition: "transform 520ms cubic-bezier(.14,.86,.28,1.04)" }
+                    ? { transform: `translateY(calc(var(--cell) * ${-steps}))`, "--settle": `${REEL_SETTLE_MS}ms` }
                     : { transform: "translateY(0)" }}>
                 {strip.map((sym, i) => (
                     <span className="cas-cell" key={i}>
@@ -680,7 +700,9 @@ export default function CasinoClient({ initial }) {
             // rising pitch reads as rising tension with no explanation needed, and the third reel is where
             // the tension is meant to be. The third is late on purpose: that pause, with two symbols already
             // matching, is the near-miss.
-            const REEL_AT = [640, 860, 1200];
+            // Derived from the reels' own clock -- see REEL_STOP_AT. This used to be a second hand-written
+            // array and it had drifted 620ms out of step with the picture.
+            const REEL_AT = REEL_LANDS_AT;
             [0, 1, 2].forEach((i) => {
                 timers.current.push(setTimeout(() => {
                     setLanded(i + 1);
