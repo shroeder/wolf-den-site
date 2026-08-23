@@ -19346,3 +19346,53 @@ body.cas-seated .social-fab { display: none; }
 .wr-shout.is-hoard b { font-size: 3.1rem; text-shadow: 0 0 22px rgba(255, 215, 94, 1), 0 0 60px rgba(255, 150, 30, .9); }
 .wr-shout.is-mother { background: radial-gradient(circle at 50% 45%, rgba(200, 60, 50, .42), rgba(10, 4, 4, .94) 66%); }
 .wr-shout.is-mother b { text-shadow: 0 0 18px rgba(255, 90, 70, .95), 0 0 44px rgba(180, 30, 20, .8); }
+
+/* ── THE HOARD ────────────────────────────────────────────────────────────────────────────────────────
+   Luke, on the reference machine: "the dome actually a big thing full screen and it needs to look
+   amazing. we wouldnt use a dome but something more theme appropriate."
+
+   So this is not the wall with better eggs on it, it is a different screen. Three colossal geodes filling
+   the phone, and cracking one does not empty a board — three more rise. It is the only room in the game
+   where the objects are bigger than the text, and that is the point: after five rooms of 74px eggs, the
+   change of SCALE is what says you have arrived somewhere. */
+.wr-hoard { position: relative; display: grid; align-content: center; justify-items: center;
+    grid-row: 2 / span 2; align-self: stretch; }
+.wr-geodes { display: grid; grid-template-columns: repeat(3, 1fr); align-items: end; gap: 2px;
+    width: 100%; }
+
+.wr-geode { position: relative; border: none; background: none; padding: 0; cursor: pointer;
+    transition: transform .2s ease, opacity .5s ease, filter .5s ease;
+    /* Staggered in, tallest last, so the three arrive as an event rather than appearing all at once. */
+    animation: wrRise .6s cubic-bezier(.2, 1.4, .4, 1) calc(var(--i) * 130ms) both; }
+.wr-geode img { width: 100%; object-fit: contain;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .85)); }
+/* The middle one stands taller, which is what makes three objects a composition instead of a row. */
+.wr-geode:nth-child(2) { transform: translateY(-16px) scale(1.14); z-index: 2; }
+.wr-geode:nth-child(2):active:not(:disabled) { transform: translateY(-16px) scale(1.06); }
+.wr-geode:active:not(:disabled) { transform: scale(.95); }
+@keyframes wrRise {
+    from { transform: translateY(70px) scale(.7); opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Cracking one: it swells, flares white-hot from the inside, and blows out. */
+.wr-geode.is-cracking { z-index: 4; animation: wrCrack .7s cubic-bezier(.3, 1.3, .4, 1) both; }
+.wr-geode.is-cracking img { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .85))
+    drop-shadow(0 0 40px rgba(255, 240, 190, .95)) brightness(1.5); }
+@keyframes wrCrack {
+    0% { transform: scale(1) rotate(0); }
+    25% { transform: scale(1.16) rotate(-2deg); }
+    50% { transform: scale(1.1) rotate(2deg); }
+    100% { transform: scale(1.3) rotate(0); }
+}
+.wr-geode.is-gone { opacity: 0; transform: scale(1.5); pointer-events: none; }
+/* The two you did not take dim away rather than vanishing, so the choice you made stays legible. */
+.wr-geode.is-passed { opacity: .18; filter: grayscale(.85); }
+
+/* WHAT WAS IN IT. Set enormous, because in this room the numbers are the whole reward and there is
+   nothing else on screen competing for the space. */
+.wr-haul { position: absolute; inset: 0; display: grid; place-content: center; pointer-events: none; }
+.wr-haul b { font-family: var(--font-display); font-size: 4.6rem; line-height: 1; font-weight: 900;
+    color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 22px rgba(255, 215, 94, 1), 0 0 60px rgba(255, 150, 30, .9), 0 4px 0 rgba(0, 0, 0, .6);
+    animation: s5MoreSlam .55s cubic-bezier(.15, 1.7, .35, 1) both; }

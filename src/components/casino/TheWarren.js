@@ -66,8 +66,12 @@ export default function TheWarren({ warren, onDone }) {
     const pool = warren?.art?.pets?.[room] || [];
     const hoard = warren?.hoard;
 
-    // The burrows on screen. In the warren proper there are nine; in the Hoard there are six mounds.
-    const slots = inHoard ? (hoard?.mounds || 6) : (warren?.board || 9);
+    // Fifteen eggs on the wall; the Hoard shows three geodes and then three MORE, so it is never a board
+    // being emptied — it is the same choice, again, until she is behind one.
+    const slots = warren?.board || 15;
+    // Which stone each of the three is, this time round. Rotated by how many have been cracked so the
+    // trio changes between picks rather than the same three rising again.
+    const GEODES = ["amethyst", "emerald", "ruby"];
 
     // ── OPENING ONE ──────────────────────────────────────────────────────────────────────────────────────
     // The tapped burrow is not the one the server chose — the server chose an ORDER, and this maps the slot
@@ -121,6 +125,9 @@ export default function TheWarren({ warren, onDone }) {
             await wait(SETTLE_MS);
             setHops([]);
             setAt((n) => n + 1);
+            // In the Hoard the board is never spent — three more rise. Clearing `spent` is what brings
+            // them back, and bumping `at` rotates which three stones they are.
+            if (inHoard) setSpent([]);
             setBusy(false);
             return;
         }
@@ -179,12 +186,42 @@ export default function TheWarren({ warren, onDone }) {
                 </div>
             </div>
 
+            {/* ── THE HOARD ───────────────────────────────────────────────────────────────────────────
+                Luke, on the reference: "the dome actually a big thing full screen and it needs to look
+                amazing. we wouldnt use a dome but something more theme appropriate."
+
+                So it is not the wall with better eggs on it — it is a different screen. Three colossal
+                geodes, most of the phone tall, and cracking one does not empty a board: three more rise.
+                The only room in the game where the objects are bigger than the text. */}
+            {inHoard ? (
+                <div className="wr-hoard">
+                    <div className="wr-geodes" key={at}>
+                        {GEODES.map((g, i) => (
+                            <button key={g} type="button"
+                                className={`wr-geode${shaking === i ? " is-cracking" : ""}${spent.includes(i) ? " is-gone" : ""}${spent.length && !spent.includes(i) ? " is-passed" : ""}`}
+                                disabled={busy || done || spent.length > 0}
+                                onClick={() => open(i)}
+                                aria-label="Crack this geode open"
+                                style={{ "--i": i }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={`/images/casino/warren/geode-${GEODES[(i + at) % 3]}.png`} alt="" draggable="false" />
+                            </button>
+                        ))}
+                    </div>
+                    {hops.length ? (
+                        <div className="wr-haul">
+                            <b>+{hops[hops.length - 1].chips.toLocaleString()}</b>
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
             {/* ── THE WALL ────────────────────────────────────────────────────────────────────────────
                 Fifteen eggs, five across, hanging above an open floor — which is what the machine Luke
                 pointed at actually looks like, and it beats a three-by-three grid of holes for a reason
                 that is not only cosmetic: a wall reads as a PLACE with things in it, and it leaves the
                 bottom of the screen empty for the animals to land in. */}
-            <div className="wr-wall">
+            {!inHoard ? <div className="wr-wall">
                 {Array.from({ length: slots }, (_, i) => (
                     <button key={`${stage}-${inHoard}-${i}`} type="button"
                         className={`wr-egg${shaking === i ? " is-shaking" : ""}${spent.includes(i) ? " is-open" : ""}`}
@@ -195,12 +232,12 @@ export default function TheWarren({ warren, onDone }) {
                         <img src={`/images/casino/warren/${inHoard ? "dome" : room}.png`} alt="" draggable="false" />
                     </button>
                 ))}
-            </div>
+            </div> : null}
 
             {/* ── AND THE FLOOR THEY LAND ON ──────────────────────────────────────────────────────────
                 Deliberately empty. It is where everything that comes out of an egg ends up, and an empty
                 third of the screen is not wasted space here — it is the stage. */}
-            <div className="wr-floor">
+            {!inHoard ? <div className="wr-floor">
                 {hops.map((h) => (
                     <span key={h.id} className={`wr-critter${h.flip ? " is-flip" : ""}`}
                         style={{ left: `${h.x}%`, "--delay": `${h.delay}ms` }}>
@@ -211,13 +248,13 @@ export default function TheWarren({ warren, onDone }) {
                             : null}
                     </span>
                 ))}
-            </div>
+            </div> : null}
 
             <p className="wr-say">
                 {done ? "That is the warren emptied."
                     : busy ? " "
-                    : inHoard ? "Open a mound. One of them is her."
-                    : "Open a burrow. One holds the Elder, one holds the Mother."}
+                    : inHoard ? "Crack one open. She is behind one of them."
+                    : "Open an egg. One holds the Elder, one holds the Mother."}
             </p>
 
             {done ? (

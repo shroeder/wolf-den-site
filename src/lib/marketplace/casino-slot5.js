@@ -186,15 +186,15 @@ const HUNT = {
     // solve it with nine or ten symbols; with four, the commonest one has to be a symbol you are pleased to
     // see FOUR of and indifferent to three of, which is exactly the job blanks do on a physical reel strip.
     pays: {
-        wolf: { 3: 14.8, 4: 134, 5: 1851 },
-        chest: { 3: 5.09, 4: 44.4, 5: 444 },
-        laurel: { 3: 1.85, 4: 13.4, 5: 111 },
-        doubloon: { 3: 0.93, 4: 5.09, 5: 37 },
-        bone: { 4: 1.85, 5: 14.8 },
+        wolf: { 3: 14.7, 4: 132, 5: 1830 },
+        chest: { 3: 5.03, 4: 43.9, 5: 439 },
+        laurel: { 3: 1.83, 4: 13.2, 5: 110 },
+        doubloon: { 3: 0.92, 4: 5.03, 5: 36.6 },
+        bone: { 4: 1.83, 5: 14.7 },
     },
     // Scatters pay a multiple of the TOTAL bet, not the line bet, because they do not sit on a line. This is
     // the one payout a player can always find without understanding paylines.
-    scatterPays: { 3: 1.11, 4: 5.09, 5: 33.3 },
+    scatterPays: { 3: 1.1, 4: 5.03, 5: 33 },
     // Its free round is the only one on the floor you CHOOSE the shape of — see FREE_SPIN_OFFERS.
     free: { kind: "deals", spins: 10, label: "Ten spins, four times" },
     // ── DOWN THROUGH THE WARREN ──────────────────────────────────────────────────────────────────────
@@ -717,10 +717,12 @@ const WARREN_STAGES = [
     { key: "astral", name: "The Star Warren", pups: [3, 6], value: 48 },
     { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 84 },
 ];
-// The room past the last stage. Six mounds, one of which is the Mother — so it pays two or three times on
-// average and can, very rarely, pay five.
-export const HOARD_MOUNDS = 6;
-const HOARD_VALUE = 645;
+// ── THE ROOM PAST THE LAST ROOM ──────────────────────────────────────────────────────────────────────────────
+// Three colossal geodes, one crack at a time, and it keeps going until the Mother is behind one. Written as a
+// RUNNING CHANCE rather than a shuffled board of six, because the screen shows three and then three MORE — a
+// fixed board would either run out of objects or lie about how many are left.
+const HOARD_END = 0.28;
+const HOARD_VALUE = 560;
 
 export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     // ── FIFTEEN, NOT NINE ────────────────────────────────────────────────────────────────────────────────
@@ -774,17 +776,11 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     // anybody tells anybody else about this machine.
     let hoard = null;
     if (!ended && stage >= WARREN_STAGES.length) {
-        const mounds = [
-            ...Array.from({ length: HOARD_MOUNDS - 1 }, () => ({ kind: "mound" })),
-            { kind: "mother" },
-        ];
-        for (let i = mounds.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(rng() * (i + 1));
-            [mounds[i], mounds[j]] = [mounds[j], mounds[i]];
-        }
         const opened = [];
-        for (const mound of mounds) {
-            if (mound.kind === "mother") { opened.push({ kind: "mother" }); break; }
+        // Capped at a dozen for the reason every loop in this file is capped: a round that cannot end is a
+        // request that never returns. At a 28% end chance, twelve is far past anything that will happen.
+        for (let i = 0; i < 12; i += 1) {
+            if (rng() < HOARD_END) { opened.push({ kind: "mother" }); break; }
             const value = HOARD_VALUE * (0.55 + rng() * 1.1);
             total += value * lineBet;
             opened.push({ kind: "mound", value });

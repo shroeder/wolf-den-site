@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
-import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, HOARD_MOUNDS } from "@/lib/marketplace/casino-slot5.js";
+import { slot5, playSpin, FREE_SPIN_OFFERS, LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
@@ -281,7 +281,6 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                     : { kind: n.kind })),
             })),
             hoard: r.warren.hoard ? {
-                mounds: HOARD_MOUNDS,
                 opened: r.warren.hoard.opened.map((o) => (o.kind === "mound"
                     ? { kind: "mound", chips: chipsFor(stake, (o.value * (stake / LINES.length)) / stake) }
                     : { kind: "mother" })),

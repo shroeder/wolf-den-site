@@ -47,22 +47,49 @@ const EGGS = {
         + "lines etched across the shell, tiny white stars sparkling within the translucent crystal",
     kinghoard: "an ornate golden egg wrapped in engraved gold filigree bands, set with three large cut "
         + "gemstones — one ruby, one emerald, one sapphire — polished gleaming precious metal, jewelled and regal",
-    // The Hoard is a different room and a different object: Luke's reference ends on "these giant domes".
-    dome: "a large rounded treasure dome or mound, heaped gold coins beneath a polished domed golden lid with "
-        + "an engraved rim, gemstones set around the base, gleaming and heavy",
+};
+
+// ── THE HOARD'S THREE ────────────────────────────────────────────────────────────────────────────────────────
+// The reference machine ends on three colossal onion domes filling the whole screen — "pick a dome". Luke:
+// "the dome actually a big thing full screen and it needs to look amazing. we wouldnt use a dome but
+// something more theme appropriate."
+//
+// Domes are Russian architecture; five rooms down a wolf warren there is no architecture at all. GEODES are
+// the answer: they are the one object that is enormous, obviously full of treasure, and belongs in deep rock
+// — and the Den already runs on cut gems (the Jewelcutter, the Vault's whole symbol ladder), so a wall of
+// crystal reads as money here without anything having to say so.
+//
+// Three of them, drawn BIG rather than as icons: these render most of a phone screen tall, so unlike the
+// eggs they can carry real detail, and they should. Each is a different stone so the three read as a choice
+// rather than as one object repeated.
+const GEODES = {
+    "geode-amethyst": "a colossal cracked-open geode boulder, its hollow interior packed with enormous "
+        + "violet amethyst crystals catching the light, rough grey stone rind on the outside, deep purple "
+        + "inner glow, a few loose gems and gold coins spilled at its base",
+    "geode-emerald": "a colossal cracked-open geode boulder, its hollow interior packed with enormous "
+        + "brilliant green emerald crystals, rough mossy grey stone rind on the outside, deep green inner "
+        + "glow, a few loose gems and gold coins spilled at its base",
+    "geode-ruby": "a colossal cracked-open geode boulder, its hollow interior packed with enormous glowing "
+        + "crimson ruby crystals, rough dark stone rind on the outside, hot red inner glow, a few loose gems "
+        + "and gold coins spilled at its base",
 };
 
 const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
 const FORCE = process.argv.includes("--force");
 
 let made = 0, skipped = 0;
-for (const [id, subject] of Object.entries(EGGS)) {
+for (const [id, subject] of Object.entries({ ...EGGS, ...GEODES })) {
     if (only && !only.has(id)) continue;
     const dest = `${OUT}/${id}.png`;
     if (fs.existsSync(dest) && !FORCE) { skipped += 1; continue; }
-    const shape = id === "dome" ? "" : "Upright egg shape, wider at the bottom, seen straight on. ";
-    const prompt = `${subject}. ${shape}${DIE_CUT} ${HOUSE} Must read clearly at 74 pixels tall — strong `
-        + `outline, few large shapes, no fine detail. ${NEGATIVE}`;
+    const big = id.startsWith("geode-");
+    // The eggs are 74px and must survive it — few shapes, no detail. The geodes fill most of a phone, so
+    // the opposite note applies: they get to be intricate, and they should be.
+    const shape = big ? "" : "Upright egg shape, wider at the bottom, seen straight on. ";
+    const scale = big
+        ? "Renders LARGE, roughly 300 pixels tall — rich detail, many facets, dramatic interior light."
+        : "Must read clearly at 74 pixels tall — strong outline, few large shapes, no fine detail.";
+    const prompt = `${subject}. ${shape}${DIE_CUT} ${HOUSE} ${scale} ${NEGATIVE}`;
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -75,7 +102,7 @@ for (const [id, subject] of Object.entries(EGGS)) {
     // visibly smaller than its neighbours in a wall of fifteen, which reads as a broken sprite.
     const buf = await sharp(Buffer.from(b64, "base64"))
         .trim({ threshold: 6 })
-        .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .resize(big ? 640 : 256, big ? 640 : 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png({ compressionLevel: 9 }).toBuffer();
     fs.writeFileSync(dest, buf);
     made += 1;
