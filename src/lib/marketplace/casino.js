@@ -107,18 +107,21 @@ export const SLOT_THEMES = {
     slot: {
         label: "The Hunt",
         blurb: "Steady hunting, and nothing here pays small.",
-        art: {
-            // Picked off a contact sheet of all ten foes for READABILITY, not just for rank. The first cut
-            // used `nightmare` and `veteran` — both dark armour on a near-black reel, and the nightmare
-            // very nearly vanished. A reel symbol that cannot be told apart at a glance is a reel symbol
-            // that has failed, however good the character art is.
-            wolf: "/images/arena/npc/ascendant.webp",     // the winged one. The jackpot.
-            chest: "/images/arena/npc/titan.webp",        // grey stone, unmistakable silhouette
-            laurel: "/images/arena/npc/colossus.webp",    // bronze, with a furnace burning in its chest
-            doubloon: "/images/arena/npc/warlord.webp",
-            bone: "/images/arena/npc/regular.webp",
-            moon: "/images/arena/npc/straw.webp",         // the training dummy. The blank.
-        },
+        // ── NO ART OVERRIDE. THE HUNT DRAWS ITS OWN SYMBOLS NOW ──────────────────────────────────────
+        // This used to map the six symbols onto arena NPC sprites — the winged ascendant as the jackpot, a
+        // stone titan, a bronze colossus — chosen off a contact sheet for readability against each other.
+        // That was the right call when the alternative was a generic set, and it is the wrong one now: The
+        // Hunt has purpose-drawn symbols with a COLOUR LADDER, one hue per symbol by rank and role, and
+        // every one of those foes is brown, grey or gold.
+        //
+        // Which means the override was undoing the exact thing it was replaced for. Luke, on the first
+        // monotone version: "i think one of these is a wild, but because its all monotone, its really hard
+        // to tell." The arena foes brought that straight back — five armoured men in a row, the violet wolf
+        // and the ice-blue moon both gone.
+        //
+        // With no `art` key the resolver falls through to /images/casino/reels/slot-*.webp, which is where
+        // those drawings live. The other cabinets keep their themes: they have no dedicated set yet, and a
+        // theme is much better than a broken image. See SYMBOL_LOOK.
     },
     slot2: {
         label: "The Harvest",
