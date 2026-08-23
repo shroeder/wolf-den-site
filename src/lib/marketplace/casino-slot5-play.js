@@ -168,7 +168,13 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // climb as the round runs without the client doing any arithmetic of its own.
         free: r.free ? {
             offer: offer.id,
-            label: offer.label,
+            // ── THE CABINET'S OWN LABEL ──────────────────────────────────────────────────────────
+            // `offer` in this file is always a FREE_SPIN_OFFERS entry — the deal chooser's, which only
+            // The Hunt uses — so every cabinet on the floor announced its bonus as "Ten spins". The
+            // Harvest opened fourteen tumbling spins at double and the fanfare said "Ten spins"; The
+            // Vault opened a round the member had just built and said the same. The engine sets the
+            // real one on the round it produced.
+            label: r.free.label || offer.label,
             // Which of the five shapes this cabinet's round is — the screen names it, because "ten spins"
             // means something different on a machine whose multiplier climbs than on one whose wilds stick.
             kind: r.free.kind || m.free?.kind || "deals",

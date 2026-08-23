@@ -239,13 +239,13 @@ const HARVEST = {
         { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 5, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 1.39, 4: 8.53, 5: 72.5 },
-        chest: { 3: 0.73, 4: 3.91, 5: 26.3 },
-        laurel: { 3: 0.36, 4: 1.81, 5: 10.3 },
-        doubloon: { 3: 0.16, 4: 0.86, 5: 4.27 },
-        bone: { 3: 0.11, 4: 0.45, 5: 2.08 },
+        wolf: { 3: 1.54, 4: 9.45, 5: 80.3 },
+        chest: { 3: 0.81, 4: 4.33, 5: 29.1 },
+        laurel: { 3: 0.4, 4: 2.01, 5: 11.4 },
+        doubloon: { 3: 0.18, 4: 0.95, 5: 4.73 },
+        bone: { 3: 0.12, 4: 0.5, 5: 2.3 },
     },
-    scatterPays: { 3: 0.22, 4: 0.86, 5: 4.27 },
+    scatterPays: { 3: 0.24, 4: 0.95, 5: 4.73 },
     // ── THE CASCADE MACHINE ──────────────────────────────────────────────────────────────────────────
     // Every win is threshed away and what is above falls into the hole, so a win MAKES the next win
     // possible and the multiplier climbs with each break. Five breaks in one spin opens the free round —
@@ -263,7 +263,7 @@ const HARVEST = {
     // The chain IS the multiplier here. The round just doubles it, every spin, and the depth does the rest.
     free: { kind: "fixed", spins: 14, mult: 2, label: "Fourteen spins, every one of them tumbling, at double" },
     second: { kind: "hold", trigger: "doubloon", need: 9, spins: 3, label: "The Wagon",
-        values: [0.28, 0.28, 0.28, 0.45, 0.45, 0.73, 1.11, 2.23], full: 29.2 },
+        values: [0.31, 0.31, 0.31, 0.5, 0.5, 0.81, 1.23, 2.47], full: 32.4 },
 };
 
 const DEEP = {
@@ -282,16 +282,16 @@ const DEEP = {
         { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 18.9, 4: 143, 5: 1909 },
-        chest: { 3: 5.58, 4: 42.9, 5: 429 },
-        laurel: { 3: 1.89, 4: 12.4, 5: 105 },
-        doubloon: { 4: 4.29, 5: 33.5 },
-        bone: { 5: 9.44 },
+        wolf: { 3: 20.3, 4: 154, 5: 2051 },
+        chest: { 3: 6, 4: 46.1, 5: 461 },
+        laurel: { 3: 2.03, 4: 13.3, 5: 113 },
+        doubloon: { 4: 4.61, 5: 36 },
+        bone: { 5: 10.1 },
     },
-    scatterPays: { 3: 0.94, 4: 4.29, 5: 28.3 },
+    scatterPays: { 3: 1.01, 4: 4.61, 5: 30.4 },
     free: { kind: "expanding", spins: 14, label: "Fourteen spins, and every wild takes its whole reel" },
     second: { kind: "pick", board: "trawl", label: "The Trawl",
-        chips: [6.87, 6.87, 6.87, 14.2, 14.2, 14.2, 42.9], mults: [2, 3, 5] },
+        chips: [7.38, 7.38, 7.38, 15.3, 15.3, 15.3, 46.1], mults: [2, 3, 5] },
 };
 
 const MENAGERIE = {
@@ -473,9 +473,17 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
     let left = offer.spins;
     let i = 0;
     let added = 0;      // spins bought by retriggering
-    // A hard stop. `retrigger` can in principle buy spins forever, and a round that never ends is a request
-    // that never returns — this is the same class of bug as a fight that cannot finish.
-    const CEILING = 120;
+    // ── A HARD STOP, AND A WATCHABLE ONE ─────────────────────────────────────────────────────────────────
+    // Two jobs. The first is that retriggering can in principle buy spins forever and a round that never
+    // ends is a request that never returns — the same class of bug as a fight that cannot finish.
+    //
+    // The second only appeared once retriggering was universal: a Harvest round that fired three times ran
+    // to FIFTY-SIX spins, and at roughly two seconds a tumbling spin that is over two minutes of watching.
+    // Luke asked to see free spins play out rather than be speedrun, and this is the far side of that —
+    // long enough that the Skip button stops being an escape hatch and becomes the only sane choice.
+    //
+    // Forty is about ninety seconds at the free clock, which is a long bonus rather than a chore.
+    const CEILING = 40;
 
     // ── EVERY ROUND RETRIGGERS, ON THE CONDITION THAT OPENED IT ──────────────────────────────────────────
     // Luke: "any free spins bonus should be retriggerable by getting the same condition during the free spin."

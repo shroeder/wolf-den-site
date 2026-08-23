@@ -138,6 +138,19 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // REASON for the payout; it has to still be there when the payout lands.
     // A chain can now be running in either place — the base spin, or a free spin — so both the badge and
     // the counter read whichever one is live rather than only the base result's.
+    // ── HOW LONG THE ROUND IS, AS FAR AS THE PLAYER KNOWS ────────────────────────────────────────────────
+    // The server sends the finished round, so `spins.length` is the length AFTER every retrigger — and the
+    // bar read "1 / 56 +42" on the first spin of a round that had not retriggered yet. Three retriggers
+    // spoiled before one of them happened, which is the same mistake as the hold showing its final total
+    // from frame one and the free round's payout printing before the round: the ending laid over the
+    // beginning.
+    //
+    // Counted from the spins ALREADY PLAYED instead, so the number grows when the shout says it does.
+    const roundGrew = (result?.free?.spins || [])
+        .slice(0, Math.max(0, freeIdx + 1))
+        .reduce((a, sp) => a + (sp.retrigger?.spins || 0), 0);
+    const roundLen = (result?.free?.base || result?.free?.spins?.length || 0) + roundGrew;
+
     const liveChain = freeChain || ((phase === "tumble" || phase === "done") ? result?.chain : null);
     const chaining = Boolean(liveChain) && (phase === "tumble" || phase === "free" || phase === "done");
     const mult = (chaining && liveChain?.steps[Math.max(0, chainAt)]?.mult) || 1;
@@ -420,6 +433,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (!r?.free) return;
         setShowLine(-1);
         setActiveWins([]);
+        // Skipping IS asking for the end, so the full length is the right thing to land on.
         setFreeIdx(r.free.spins.length - 1);
         setFreeWon(r.free.spins.reduce((a, sp) => a + sp.chips, 0));
         setGrid(r.free.spins[r.free.spins.length - 1].grid);
@@ -635,8 +649,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
             {phase === "free" ? (
                 <div className="s5-freebar">
-                    <span><i>Free spin</i><b>{freeIdx + 1} / {result?.free?.spins.length}
-                        {result?.free?.added ? <u>+{result.free.added}</u> : null}</b></span>
+                    <span><i>Free spin</i><b>{freeIdx + 1} / {roundLen}
+                        {roundGrew ? <u>+{roundGrew}</u> : null}</b></span>
                     <span className="s5-freemult">&times;{result?.free?.mult}</span>
                     <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
                     {/* For the twentieth round rather than the first. The chips were decided on the server
