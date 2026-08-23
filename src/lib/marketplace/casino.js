@@ -178,8 +178,13 @@ async function themeArt() {
     // and looked up in one query each. A machine whose art fails to resolve simply falls back to the generic
     // reel set in the client — a missing sprite must never be a missing machine.
     const want = { cooking: [], pet: [], item: [] };
+    // ── A THEME WITHOUT AN ART KEY IS A CABINET THAT DRAWS ITS OWN ───────────────────────────────────
+    // The Hunt has purpose-drawn symbols and no override, and this loop assumed every theme had one:
+    // `Object.values(undefined)` throws, which took out themeArt, which took out getCasinoState, which
+    // took out the whole casino. The screenshot rig caught it by refusing to shoot a page whose machine
+    // never opened — a missing sprite must never be a missing machine, and for ten minutes it was.
     for (const t of Object.values(SLOT_THEMES)) {
-        for (const v of Object.values(t.art)) {
+        for (const v of Object.values(t.art || {})) {
             const i = v.indexOf(":");
             if (i > 0 && want[v.slice(0, i)]) want[v.slice(0, i)].push(v.slice(i + 1));
         }
@@ -196,7 +201,7 @@ async function themeArt() {
     };
     const out = {};
     for (const [id, t] of Object.entries(SLOT_THEMES)) {
-        out[id] = Object.fromEntries(Object.entries(t.art).map(([sym, v]) => {
+        out[id] = Object.fromEntries(Object.entries(t.art || {}).map(([sym, v]) => {
             const i = v.indexOf(":");
             const src = i > 0 ? v.slice(0, i) : null;
             return [sym, src && byKey[src] ? (byKey[src][v.slice(i + 1)] || null) : v];
