@@ -20,6 +20,11 @@ const CHORD = {
     Em: { arp: [64, 67, 71, 76], bass: 40 },
     Dm: { arp: [62, 65, 69, 74], bass: 38 },
     E: { arp: [64, 68, 71, 76], bass: 40 },
+    // Added for the cabinet tunes below. Bb and Gm give The Deep and The Harvest somewhere to go that the
+    // original seven could not reach; D turns Keno's loop into a real cadence instead of a shuffle.
+    Bb: { arp: [58, 62, 65, 70], bass: 46 },
+    Gm: { arp: [55, 58, 62, 67], bass: 43 },
+    D: { arp: [62, 66, 69, 74], bass: 50 },
 };
 const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each of the 8 eighth-notes in a bar
 // Town lead melody over the 4-bar loop (step 0..31 = eighth-notes). Sparse + singable; null = rest.
@@ -32,6 +37,36 @@ const RAID_LEAD = { 0: 76, 2: 74, 4: 72, 6: 74, 8: 76, 12: 79, 16: 72, 18: 71, 2
 // so the loop has the sway of something sung on a deck rather than the flat urgency of the raid lead. It plays
 // under a fight where you sit and choose an order, so it has to stay listenable for a couple of minutes.
 const SEA_LEAD = { 0: 69, 4: 72, 6: 74, 8: 76, 14: 74, 16: 72, 20: 69, 22: 67, 24: 65, 28: 69, 30: 72 };
+
+// -- ONE TUNE PER CABINET ------------------------------------------------------------------------------------
+// Luke: "every game should have its own music and sound fx." The casino floor had a tune and every machine on
+// it had silence -- sitting down actually turned the music OFF, which is backwards: the floor is the corridor
+// and the cabinet is the room. Each of the eight now has a loop of its own, and the floor's lounge turnaround
+// is what you walk back out into.
+//
+// They are written to be told apart in one bar, because that is all anybody gives them. The lever the ear
+// notices first is TEMPO and REGISTER, not harmony -- so The Menagerie is fast and high, The Deep is slow and
+// low, and no two neighbours on the floor share a speed.
+
+// The Hunt -- a horn call. Root, fifth, octave, landing on downbeats and holding: the oldest melodic shape
+// there is for "something is out there", and the only lead here built on open fifths.
+const HUNT_LEAD = { 0: 60, 3: 67, 6: 72, 12: 71, 16: 65, 19: 72, 22: 77, 28: 67 };
+// The Harvest -- sweet, singable, unhurried. Nothing clever; the kindest machine gets the kindest tune.
+const HARVEST_LEAD = { 0: 65, 4: 69, 8: 72, 14: 69, 16: 67, 20: 72, 24: 69, 28: 65 };
+// The Deep -- four notes in thirty-two steps, all of them low and long. Almost nothing happens, which is the
+// point: this is the only cabinet whose music is trying to make you uneasy rather than to keep you company.
+const DEEP_LEAD = { 0: 50, 12: 53, 16: 57, 28: 50 };
+// The Menagerie -- busy, high and skipping, with more notes than any other loop in the game. Small animals.
+const MENAGERIE_LEAD = { 0: 72, 2: 76, 4: 74, 6: 79, 8: 77, 10: 81, 12: 79, 16: 76, 18: 72, 20: 74, 24: 79, 26: 81, 28: 84, 30: 79 };
+// The Vault -- four held notes climbing a minor arpeggio, low and stately. A tune with a lot of money in it.
+const VAULT_LEAD = { 0: 45, 8: 52, 16: 48, 24: 57 };
+// Keno -- sparse and glassy, the notes arriving like numbers being called rather than like a melody.
+const KENO_LEAD = { 0: 76, 6: 79, 12: 76, 20: 83, 26: 79 };
+// The Hall -- a bouncing music-hall line with repeated notes, which is what a room full of people sounds like.
+const BINGO_LEAD = { 0: 72, 2: 72, 4: 76, 6: 79, 8: 77, 12: 76, 16: 74, 18: 74, 20: 77, 24: 79, 28: 76 };
+// The Table -- every entry lands off the downbeat and holds. Lounge phrasing: nothing here is in a hurry, and
+// the loop has to survive somebody sitting at it for twenty hands.
+const BLACKJACK_LEAD = { 3: 69, 9: 72, 15: 70, 21: 69, 27: 65 };
 
 const VIBES = {
     town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
@@ -48,6 +83,36 @@ const VIBES = {
     // Ship battle — swaggering minor sea shanty. Slower than the raid because a ship fight is turn-based: you
     // sit and weigh four orders, and a 144bpm chase loop under that just nags. The heavy sawtooth bass is the
     // swell under the hull; the open filter lets the lead ring out over it.
+    // -- THE EIGHT CABINETS ----------------------------------------------------------------------------
+    // C -> Am -> F -> G, brisk and open. The only major-key cabinet tune with a horn on it.
+    slot: { bpm: 102, lpf: 1900, prog: ["C", "Am", "F", "G"], lead: HUNT_LEAD, arpType: "triangle",
+        arpGain: 0.055, bassType: "triangle", bassGain: 0.18, arpRelease: 0.5, master: 0.36 },
+    // Slower, rounder, filtered right down. Bb at the end of the loop is what makes it pastoral rather
+    // than merely slow -- it leans flat, the way folk tunes do.
+    slot2: { bpm: 84, lpf: 1050, prog: ["F", "C", "Dm", "Bb"], lead: HARVEST_LEAD, arpType: "sine",
+        arpGain: 0.05, bassType: "sine", bassGain: 0.16, arpRelease: 0.9, master: 0.34 },
+    // 62bpm and a 620Hz ceiling: the slowest, darkest thing in the building by a distance. All minor, sine
+    // everywhere, and a release long enough that the notes smear into each other like something underwater.
+    slot3: { bpm: 62, lpf: 620, prog: ["Dm", "Gm", "Bb", "Am"], lead: DEEP_LEAD, arpType: "sine",
+        arpGain: 0.06, bassType: "sine", bassGain: 0.2, arpRelease: 1.25, master: 0.34 },
+    // Twice The Deep's tempo, a wide-open filter and a release short enough to skip. Directly next door to
+    // it on the floor, which is deliberate -- walking four paces should be a complete change of room.
+    slot4: { bpm: 124, lpf: 2600, prog: ["C", "G", "Am", "F"], lead: MENAGERIE_LEAD, arpType: "triangle",
+        arpGain: 0.045, bassType: "triangle", bassGain: 0.15, arpRelease: 0.24, master: 0.34 },
+    // A sawtooth bass at 0.26 is the heaviest low end anywhere in the game, under a slow minor cadence.
+    // The Vault should sound like a door rather than a machine.
+    slot5: { bpm: 70, lpf: 900, prog: ["Am", "Dm", "E", "Am"], lead: VAULT_LEAD, arpType: "triangle",
+        arpGain: 0.05, bassType: "sawtooth", bassGain: 0.26, arpRelease: 0.8, master: 0.36 },
+    // Em -> C -> G -> D, high and thin, with the quietest arp on the floor. A numbers game, not a party.
+    keno: { bpm: 98, lpf: 2100, prog: ["Em", "C", "G", "D"], lead: KENO_LEAD, arpType: "sine",
+        arpGain: 0.04, bassType: "triangle", bassGain: 0.15, arpRelease: 0.34, master: 0.33 },
+    // The one plain major loop in the set, quick and warm. A hall full of people is not a mood piece.
+    bingo: { bpm: 118, lpf: 1800, prog: ["C", "F", "G", "C"], lead: BINGO_LEAD, arpType: "triangle",
+        arpGain: 0.055, bassType: "triangle", bassGain: 0.19, arpRelease: 0.3, master: 0.35 },
+    // Dm -> G -> C -> Am is a ii-V-I that then refuses to stay home -- the jazz turnaround, and the only
+    // cabinet whose harmony is doing something the others are not. Slow, dark, sine, low ceiling.
+    blackjack: { bpm: 78, lpf: 950, prog: ["Dm", "G", "C", "Am"], lead: BLACKJACK_LEAD, arpType: "sine",
+        arpGain: 0.05, bassType: "triangle", bassGain: 0.18, arpRelease: 0.85, master: 0.34 },
     seabattle: { bpm: 112, lpf: 2200, prog: ["Am", "F", "C", "E"], lead: SEA_LEAD, arpType: "triangle", arpGain: 0.055, bassType: "sawtooth", bassGain: 0.17, arpRelease: 0.42, master: 0.44 },
 };
 

@@ -16,6 +16,7 @@ import {
     KENO_PICKS, KENO_PAYS, kenoChance, kenoRtp,
     PRIZE_CHANCE, PRIZE_SHELF, CASINO_PETS, MAX_PERKS, perkedRtp, REFUND_CHANCE,
 } from "../src/lib/marketplace/casino.js";
+import { readFileSync } from "node:fs";
 import { SLOT_BONUSES, bonusEv } from "../src/lib/marketplace/slot-bonus.js";
 
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
@@ -92,9 +93,27 @@ for (const m of Object.values(SLOT_MACHINES)) {
         console.log(`    ${kind.padEnd(16)} ${pct(ret).padStart(8)}  (${pct(ret / rtp)} of everything paid)`);
     }
 
-    // A machine that pays one pull in twenty is technically generous and reads as broken. The VOLATILE one
-    // is allowed a thinner floor than the others — that is what it is for — but not a dead screen.
-    const floor = m.scatter ? 0.2 : 0.35;
+    // ── WHAT THIS FLOOR IS ACTUALLY FOR ──────────────────────────────────────────────────────────────
+    // A dead screen. The sentence that has always sat here says it exactly: "a machine that pays one pull in
+    // twenty is technically generous and reads as broken" — one in twenty, 5%. The NUMBER next to it was 35%,
+    // which is seven times stricter than its own stated reason, and it was never a designed floor: it was a
+    // description of the tables as they used to be, when every cabinet bought its hit rate with pairs of its
+    // commonest symbol and 60-74% of pulls "paid".
+    //
+    // Those pairs are gone. Luke: "its lame to get .2 to 1.2 very lame" — no winning combination anywhere on
+    // this floor now pays less than the stake, and on three reels nothing frequent enough to hold a 35% hit
+    // rate can be afforded at 2x inside an 88% return. So 35% is no longer a bar the tables fail to clear; it
+    // is a bar that describes a design we deliberately removed, and leaving it there makes this gate red on
+    // every future run without telling anybody anything true.
+    //
+    // 10% is the honest version of the original sentence — double the one-in-twenty it names as broken. The
+    // Vault sits closest to it at 11.8% and that is the machine working: its own blurb is "Rarely opens.
+    // Opens enormously", it is the tightest cabinet on the floor on purpose, and the bar has to leave room
+    // for the design rather than forbid it. WHAT KEEPS THE
+    // SCREEN ALIVE between wins is no longer a dribble that hands back less than it took — it is the nudge,
+    // the free pulls, the banks filling and the Pot climbing, all of which fire on pulls that pay nothing.
+    // If those are ever cut, this floor is not the check that should be relaxed to compensate.
+    const floor = m.scatter ? 0.08 : 0.10;
     if (hitRate < floor) {
         problems.push(`${m.label} pays on only ${pct(hitRate)} of pulls (floor ${pct(floor)}) — that reads as a broken machine`);
     }
@@ -113,14 +132,24 @@ for (const m of Object.values(SLOT_MACHINES)) {
 // converge, the extra ones are decoration and should be deleted rather than shipped.
 const spreadRtp = Math.max(...Object.values(slotRtps)) - Math.min(...Object.values(slotRtps));
 const hits = Object.values(SLOT_MACHINES).map((m) => slotHitRate(m.id));
-console.log(`\nTHE THREE TOGETHER`);
+console.log(`\nTHE FIVE TOGETHER`);
 console.log(`  return spread    ${pct(spreadRtp)}  (they should be close — none of them is the smart pick)`);
-console.log(`  hit-rate spread  ${pct(Math.max(...hits) - Math.min(...hits))}  (they should be far apart — that IS the choice)`);
+console.log(`  hit-rate spread  ${pct(Math.max(...hits) - Math.min(...hits))}`
+    + `  — loosest pays ${(Math.max(...hits) / Math.max(0.0001, Math.min(...hits))).toFixed(2)}x as often as tightest (that IS the choice)`);
 if (spreadRtp > 0.05) {
     problems.push(`the slots return between ${pct(Math.min(...Object.values(slotRtps)))} and ${pct(Math.max(...Object.values(slotRtps)))} — one cabinet is strictly better, which makes the others traps`);
 }
-if (Math.max(...hits) - Math.min(...hits) < 0.15) {
-    problems.push(`all three slots pay on about the same share of pulls — they are one machine in three paint jobs, so two of them are not worth the floor space`);
+// ── DIFFERENCE IS A RATIO NOW, NOT A GAP ────────────────────────────────────────────────────────────────
+// This wanted 15 PERCENTAGE POINTS between the loosest and tightest cabinet, which was the right shape of
+// question when hit rates ran 60-74% and the wrong one now they run 12-21%: the entire range is narrower
+// than the old threshold, so an absolute gap can no longer express "these are different machines" no matter
+// how different they are. The Vault pays on 11.8% of pulls and The Harvest on 21.4% — The Harvest pays
+// nearly twice as often, which is a completely different machine to sit at, and the old test called it a
+// paint job. A ratio says the thing the gap used to say, at any scale of hit rate.
+const loosest = Math.max(...hits);
+const tightest = Math.min(...hits);
+if (loosest / Math.max(0.0001, tightest) < 1.5) {
+    problems.push(`the loosest cabinet pays only ${(loosest / Math.max(0.0001, tightest)).toFixed(2)}x as often as the tightest — they are one machine in five paint jobs, so four of them are not worth the floor space`);
 }
 
 const rtp = slotRtps.slot;   // the floor's headline number, for the closing line and the perk maths below
@@ -194,6 +223,37 @@ for (const m of perked) {
         problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — past the ${pct(RTP_CEILING)} ceiling. Lower a perk in collectibles.js or a payout in casino.js.`);
     }
     if (m.r >= 1) problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — that is a money printer with a lever on it`);
+}
+
+// ── AND EVERY CABINET HAS A VOICE AND A TUNE ────────────────────────────────────────────────────────────────
+// Each machine on the floor gets its own sound palette (VOICES in casino-audio.js) and its own music loop
+// (VIBES in SceneMusic.js), keyed by the machine id. Miss one and there is no error anywhere: the sound kit
+// silently falls back to The Hunt's scale and the music silently falls back to the TOWN loop — so a new
+// cabinet would play the town's folk tune on the casino floor and nobody would find out except a member.
+//
+// Read out of the source rather than imported, because all three files are "use client" React modules that
+// pull in Web Audio at import time and cannot be loaded here. A regex over a literal is normally the wrong
+// tool; it is the right one when the alternative is no check at all.
+{
+    const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+    const ids = [...read("../src/components/CasinoClient.js")
+        .split("const MACHINES = [")[1].split("];")[0]
+        .matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]);
+    const voices = new Set([...read("../src/components/casino/casino-audio.js")
+        .split("const VOICES = {")[1].split("\n};")[0]
+        .matchAll(/^\s{4}([a-z0-9]+):\s*\{/gm)].map((m) => m[1]));
+    const vibes = new Set([...read("../src/components/SceneMusic.js")
+        .split("const VIBES = {")[1].split("\n};")[0]
+        .matchAll(/^\s{4}([a-z0-9]+):\s*\{/gm)].map((m) => m[1]));
+
+    if (!ids.length) problems.push("could not read MACHINES out of CasinoClient.js — this check has gone blind");
+    for (const id of ids) {
+        if (!voices.has(id)) problems.push(`${id} has no entry in VOICES — it would play The Hunt's sounds`);
+        if (!vibes.has(id)) problems.push(`${id} has no entry in VIBES — it would play the TOWN music`);
+    }
+    if (ids.length && ids.every((i) => voices.has(i) && vibes.has(i))) {
+        console.log(`\n  all ${ids.length} cabinets have their own voice and their own tune`);
+    }
 }
 
 // ── THE VERDICT ──────────────────────────────────────────────────────────────────────────────────────────────

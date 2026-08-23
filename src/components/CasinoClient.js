@@ -526,6 +526,20 @@ export default function CasinoClient({ initial }) {
         return () => document.body.classList.remove("cas-seated");
     }, [seated]);
 
+    // -- AND THE MACHINE'S OWN VOICE ---------------------------------------------------------------------
+    // Every sound the cabinet makes from here -- the handle, the reels, the coins, the fanfare, the sigh
+    // after a near miss -- is drawn from this machine's scale and register rather than from one shared set.
+    // See VOICES in casino-audio.js for what a voice actually changes.
+    //
+    // The signature plays on arrival: three notes off the cabinet's own scale, which is the machine saying
+    // which one it is before you have pulled anything. Standing up puts the kit back on the neutral voice so
+    // the floor's own sounds do not keep the last cabinet's key.
+    useEffect(() => {
+        if (!seated || !at) return undefined;
+        Cas.at(at.id).signature();
+        return () => { Cas.at("slot"); };
+    }, [seated, at]);
+
     // What you are standing in front of. Recomputed from position rather than remembered, so walking away
     // closes the machine without anything having to tell it to.
     useEffect(() => {
@@ -1084,7 +1098,34 @@ export default function CasinoClient({ initial }) {
                 positioned box, the button would have escaped to the corner of the page. In the corner of
                 the room is where it belongs anyway. Silenced while you are sat at a machine: the machine
                 has its own sounds and those are the point. */}
-            {!seated ? <SceneMusic vibe="casino" /> : null}
+            {/* -- THE ROOM YOU ARE IN, NOT THE ROOM YOU CAME FROM ----------------------------------
+                This was `{!seated ? <SceneMusic vibe="casino" /> : null}`, on the reasoning that a
+                machine has its own sounds and those are the point. The sounds were the point; the
+                SILENCE was not. Sitting at a cabinet turned the music off and left you with a room tone
+                and a button, which is the opposite way round from how a floor works -- the floor is the
+                corridor and the cabinet is the room you went there to be in.
+
+                One mount, kept alive across sitting down and standing up, with the vibe following the
+                machine. It stays mounted on purpose: SceneMusic swaps its loop when `vibe` changes
+                (fading out and back in), whereas unmounting and remounting would tear down the whole
+                AudioContext and re-ask for the autoplay gesture every single time you sat down. */}
+            {/* -- AND A MUTE YOU CAN ACTUALLY REACH ------------------------------------------------
+                SceneMusic positions its own toggle absolutely against the nearest positioned ancestor,
+                at z-index 9. That was fine while the music only played on the floor. It is not fine now
+                the music follows you into a cabinet: `.cas-stage` is `position: fixed` at z-index 60, so
+                the button was buried under the machine the moment you sat down — music playing, with no
+                way to turn it off. A mute control that disappears exactly when the sound starts is worse
+                than no music.
+
+                A fixed wrapper above the stage, with the toggle `inline` inside it so SceneMusic does not
+                also try to place itself. It only MOVES, it never remounts: remounting would tear down the
+                AudioContext and re-ask for the autoplay gesture every time you sat down or stood up.
+                Seated it drops below the header (64px of it: 40px button, 12px padding either side) so it
+                does not sit on the gold; on the floor it is exactly where it has always been. */}
+            <div style={{ position: "fixed", right: 10, top: seated ? 74 : 10, zIndex: 62,
+                display: "grid", placeItems: "center" }}>
+                <SceneMusic vibe={seated && at ? at.id : "casino"} place="inline" />
+            </div>
             </div>
 
             {/* ── WHAT YOU ARE STANDING AT ────────────────────────────────────────────────────────────

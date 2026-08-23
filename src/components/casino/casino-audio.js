@@ -28,19 +28,92 @@ import { noise, tone } from "@/components/arena/arena-audio.js";
 // fault. A pentatonic has no semitone in it, so no two notes drawn from it can clash; that is the property
 // being used, and it is why an arbitrary number of these can overlap and still sound deliberate.
 const PENT = [523.25, 587.33, 659.25, 783.99, 880.0];
-const pent = (o = 0) => PENT[Math.floor(Math.random() * PENT.length)] * (2 ** o);
+
+// -- EVERY CABINET HAS ITS OWN VOICE --------------------------------------------------------------------------
+// Luke: "every game should have its own music and sound fx." Eight cabinets sharing one set of sounds is eight
+// machines that are the same machine wearing different pictures -- and a real floor is the opposite of that.
+// You can tell, blindfolded and from across the room, which cabinet somebody just hit.
+//
+// A VOICE rather than eight copies of the file. Every sound in here already takes arguments (see the header),
+// so the cheap and correct move is to give those arguments a per-cabinet source instead of writing `coins()`
+// eight times and then maintaining eight of them. What a voice sets:
+//
+//   scale     the notes every random pitch is drawn from -- coins, balls, daubs, the bank. This is the single
+//             biggest difference between two cabinets, because it is what the ear actually keys on. Most are
+//             major pentatonics at different roots; The Deep's is MINOR, which is why it is the only machine
+//             in the building whose money sounds slightly wrong.
+//   stopType  the waveform of a reel coming to rest, and stopHz its pitch. A square at 190 is a mechanism; a
+//             sine at 104 is something heavy settling in water; a sawtooth at 118 is a vault door.
+//   ringHz    the little metal ring on top of the clunk. High and bright, or low and dull.
+//   bodyHz    the low body under the handle -- how big the machine is.
+//   winRoot   the root the fanfare and the riser are built on, so the announcement is in the cabinet's key.
+//
+// The three table games are voiced too: Keno is cool and high because it is a numbers game, the Hall is warm
+// and communal, and the Table is low and smoky and does not want to be a slot machine at all.
+const VOICES = {
+    // Woodland and brass. The brightest, most ordinary major pentatonic in the building -- The Hunt is the
+    // cabinet everything else is heard against.
+    slot: { scale: PENT, stopType: "square", stopHz: 190, ringHz: 3200, bodyHz: 150, winRoot: 261.63 },
+    // A fifth down and softer everywhere. Pastoral, wooden, barely any metal on it: the kindest machine on
+    // the floor should not sound like a machine.
+    slot2: { scale: [392.0, 440.0, 493.88, 587.33, 659.25], stopType: "triangle", stopHz: 148, ringHz: 1900, bodyHz: 118, winRoot: 196.0 },
+    // -- THE ONE IN A MINOR KEY ----------------------------------------------------------------------
+    // C minor pentatonic, an octave down, sine everything, and the ring nearly gone. Nothing else in the
+    // casino is in a minor key; that is deliberate and it is the whole character of this cabinet. Its coins
+    // sound like they are being counted somewhere cold.
+    slot3: { scale: [261.63, 311.13, 349.23, 392.0, 466.16], stopType: "sine", stopHz: 104, ringHz: 1250, bodyHz: 74, winRoot: 174.61 },
+    // E major pentatonic, high and quick. Small bright animals -- this one chirps.
+    slot4: { scale: [659.25, 739.99, 830.61, 987.77, 1108.73], stopType: "triangle", stopHz: 252, ringHz: 4600, bodyHz: 196, winRoot: 329.63 },
+    // A sawtooth reel stop and a low body: heavy, metallic, slow. The Vault is the only cabinet whose reels
+    // sound like they weigh something.
+    slot5: { scale: [349.23, 392.0, 440.0, 523.25, 587.33], stopType: "sawtooth", stopHz: 118, ringHz: 2600, bodyHz: 88, winRoot: 174.61 },
+    // -- AND THE THREE THAT ARE NOT SLOTS ------------------------------------------------------------
+    // Keno: high, cool, glassy. Its balls are numbers rather than fruit and they should sound like it.
+    keno: { scale: [587.33, 659.25, 739.99, 880.0, 987.77], stopType: "sine", stopHz: 210, ringHz: 5200, bodyHz: 132, winRoot: 293.66 },
+    // The Hall: warm and round, the sound of a room full of people rather than a machine.
+    bingo: { scale: [440.0, 493.88, 554.37, 659.25, 739.99], stopType: "triangle", stopHz: 168, ringHz: 2300, bodyHz: 110, winRoot: 220.0 },
+    // The Table: low and smoky, nothing that sparkles. Cards and chips, and no bells anywhere near it.
+    blackjack: { scale: [329.63, 369.99, 415.3, 493.88, 554.37], stopType: "sine", stopHz: 126, ringHz: 1500, bodyHz: 82, winRoot: 164.81 },
+};
+
+// The cabinet currently being played. Set by `Cas.at()` when a member sits down; the floor keeps The Hunt's
+// voice, which is the neutral one. Module state rather than a ninth argument on twenty-five functions --
+// there is one pair of ears and one machine in front of them.
+let voice = VOICES.slot;
 
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
+const pent = (o = 0) => voice.scale[Math.floor(Math.random() * voice.scale.length)] * (2 ** o);
+// The nth note of the current cabinet's scale, for the sounds that CLIMB rather than scatter.
+const step = (i, o = 0) => voice.scale[((i % voice.scale.length) + voice.scale.length) % voice.scale.length] * (2 ** o);
 
 export const Cas = {
+    // -- SITTING DOWN -------------------------------------------------------------------------------------
+    // Point every following sound at this cabinet's voice. An unknown id falls back to The Hunt rather than
+    // throwing, because an id typo must not silence the floor.
+    at(id) {
+        voice = VOICES[id] || VOICES.slot;
+        return this;
+    },
+
+    // The figure a cabinet plays when you sit at it -- rising through its own scale, so the eight machines
+    // announce themselves in eight different keys and The Deep announces itself in a minor one. This is the
+    // first thing you hear at a machine and it is the whole promise of the voice system in half a second.
+    signature() {
+        [0, 2, 4].forEach((n, i) => {
+            tone({ at: i * 0.075, freq: step(n), type: "triangle", dur: 0.42 - i * 0.06, gain: 0.05 });
+            tone({ at: i * 0.075, freq: step(n) * 2, type: "sine", dur: 0.28, gain: 0.018 });
+        });
+        tone({ freq: voice.bodyHz, to: voice.bodyHz * 0.62, type: "sine", dur: 0.34, gain: 0.07 });
+    },
+
     // ── THE HANDLE ───────────────────────────────────────────────────────────────────────────────────────
     // Mechanism, not a UI blip: a spring under tension, a low body, and the reels picking up speed. It has to
     // be long enough to cover the request going out, or the machine feels like it did nothing and then
     // suddenly had an answer.
     pull() {
         noise({ dur: 0.16, gain: 0.13, type: "bandpass", freq: 520, sweepTo: 2400, q: 1.1 });
-        tone({ freq: 150, to: 62, type: "sawtooth", dur: 0.2, gain: 0.14 });
-        tone({ at: 0.04, freq: 84, to: 200, type: "triangle", dur: 0.5, gain: 0.07 });
+        tone({ freq: voice.bodyHz, to: voice.bodyHz * 0.41, type: "sawtooth", dur: 0.2, gain: 0.14 });
+        tone({ at: 0.04, freq: voice.bodyHz * 0.56, to: voice.bodyHz * 1.33, type: "triangle", dur: 0.5, gain: 0.07 });
         // The reels themselves, coming up to speed underneath.
         noise({ at: 0.05, dur: 0.75, gain: 0.05, type: "bandpass", freq: 240, sweepTo: 900, q: 0.7 });
     },
@@ -52,11 +125,11 @@ export const Cas = {
     reelStop(index = 0, weight = 0.5) {
         const w = clamp01(weight);
         const up = 1 + index * 0.16;
-        tone({ freq: 190 * up, to: 76 * up, type: "square", dur: 0.075, gain: 0.11 + w * 0.05 });
-        tone({ freq: 96 * up, to: 44, type: "sine", dur: 0.14, gain: 0.2 });
+        tone({ freq: voice.stopHz * up, to: voice.stopHz * 0.4 * up, type: voice.stopType, dur: 0.075, gain: 0.11 + w * 0.05 });
+        tone({ freq: voice.stopHz * 0.5 * up, to: 44, type: "sine", dur: 0.14, gain: 0.2 });
         noise({ dur: 0.06, gain: 0.13, type: "lowpass", freq: 2400, sweepTo: 420 });
         // A little metal ring on top, so it is a mechanism stopping rather than a box being shut.
-        noise({ at: 0.005, dur: 0.1, gain: 0.045, type: "bandpass", freq: 3200 * up, q: 5 });
+        noise({ at: 0.005, dur: 0.1, gain: 0.045, type: "bandpass", freq: voice.ringHz * up, q: 5 });
     },
 
     // ── THE RISER ────────────────────────────────────────────────────────────────────────────────────────
@@ -66,22 +139,25 @@ export const Cas = {
     // because the reel timings are the component's business and a riser that ends early is worse than none.
     anticipate(ms = 340) {
         const d = Math.max(0.12, ms / 1000);
-        tone({ freq: 330, to: 990, type: "sawtooth", dur: d, gain: 0.055 });
-        tone({ freq: 660, to: 1980, type: "triangle", dur: d, gain: 0.035 });
+        // Climbing from the cabinet's own root rather than a fixed 330, so the most valuable sound on the
+        // floor is also the one that most obviously belongs to the machine making it.
+        const r = voice.winRoot;
+        tone({ freq: r * 1.26, to: r * 3.78, type: "sawtooth", dur: d, gain: 0.055 });
+        tone({ freq: r * 2.52, to: r * 7.56, type: "triangle", dur: d, gain: 0.035 });
         noise({ dur: d, gain: 0.03, type: "bandpass", freq: 800, sweepTo: 5200, q: 1.6 });
     },
 
     // The riser resolved into nothing. A short fall — the sound of the room letting its breath out. Kept
     // QUIET and short: a loss that announces itself as loudly as a win is a machine that nags.
     nearMiss() {
-        tone({ freq: 494, to: 262, type: "triangle", dur: 0.26, gain: 0.06 });
-        tone({ at: 0.03, freq: 370, to: 196, type: "sine", dur: 0.3, gain: 0.045 });
+        tone({ freq: step(3), to: step(0, -1), type: "triangle", dur: 0.26, gain: 0.06 });
+        tone({ at: 0.03, freq: step(1, -1), to: step(0, -1) * 0.75, type: "sine", dur: 0.3, gain: 0.045 });
     },
 
     // A pull that simply did nothing. Almost inaudible on purpose — most pulls lose, and a machine that
     // makes a noise about every one of them is exhausting by the tenth.
     dud() {
-        tone({ freq: 150, to: 92, type: "sine", dur: 0.1, gain: 0.05 });
+        tone({ freq: voice.bodyHz, to: voice.bodyHz * 0.61, type: "sine", dur: 0.1, gain: 0.05 });
     },
 
     // ── MONEY ────────────────────────────────────────────────────────────────────────────────────────────
@@ -99,12 +175,12 @@ export const Cas = {
             t += 0.028 + Math.random() * (0.05 - s * 0.03);
         }
         // The body underneath the sparkle — without it a cascade is tinsel with no weight behind it.
-        tone({ freq: 132, to: 70, type: "sine", dur: 0.22 + s * 0.2, gain: 0.11 + s * 0.08 });
+        tone({ freq: voice.bodyHz * 0.88, to: voice.bodyHz * 0.47, type: "sine", dur: 0.22 + s * 0.2, gain: 0.11 + s * 0.08 });
     },
 
     // A single coin dropping into a bank.
     coin(pitch = 0) {
-        tone({ freq: PENT[pitch % PENT.length] * 2, type: "triangle", dur: 0.11, gain: 0.06 });
+        tone({ freq: step(pitch, 1), type: "triangle", dur: 0.11, gain: 0.06 });
         noise({ dur: 0.03, gain: 0.03, type: "highpass", freq: 6000 });
     },
 
@@ -113,7 +189,7 @@ export const Cas = {
     // built on stacked thirds: everything else is pentatonic and pentatonic cannot make a chord that sounds
     // like an announcement. When this plays it is the only thing in the room that sounds like this.
     jackpot() {
-        const root = 261.63;
+        const root = voice.winRoot;
         [0, 4, 7, 12, 16, 19, 24].forEach((semi, i) => {
             const f = root * (2 ** (semi / 12));
             tone({ at: i * 0.075, freq: f, type: "triangle", dur: 0.9 - i * 0.05, gain: 0.075 });
@@ -171,7 +247,7 @@ export const Cas = {
     freePulls(n = 8) {
         const steps = Math.min(8, Math.max(3, Math.round(n / 2)));
         for (let i = 0; i < steps; i += 1) {
-            tone({ at: i * 0.07, freq: PENT[i % PENT.length] * (i > 4 ? 2 : 1), type: "triangle", dur: 0.3, gain: 0.06 });
+            tone({ at: i * 0.07, freq: step(i, i > 4 ? 1 : 0), type: "triangle", dur: 0.3, gain: 0.06 });
         }
         tone({ freq: 98, to: 196, type: "triangle", dur: 0.6, gain: 0.08 });
     },
@@ -198,7 +274,7 @@ export const Cas = {
     // A numbered ball landing. Pitched off the ball's own number, so a draw is a little melody that is
     // different every round instead of the same pop ten times.
     ball(n = 0) {
-        tone({ freq: PENT[n % PENT.length] * (n > 20 ? 2 : 1), type: "sine", dur: 0.16, gain: 0.06 });
+        tone({ freq: step(n, n > 20 ? 1 : 0), type: "sine", dur: 0.16, gain: 0.06 });
         noise({ dur: 0.05, gain: 0.05, type: "bandpass", freq: 1800, q: 2.4, sweepTo: 700 });
     },
 
