@@ -52,22 +52,30 @@ function rowsForFive(machineId, bet, rate) {
     return { rows: [...rows, sc], heads: ["3", "4", "5"], m };
 }
 
-/** The three-reel table: triples and pairs, in gold. */
-function rowsForThree(table) {
+/**
+ * The three-reel table: pairs and triples, in GOLD — those cabinets have not been converted and still pay
+ * the currency you staked.
+ *
+ * MULTIPLIED BY THE BET, like the five-reel one. The first cut printed the raw table (`wolf: 200`) under a
+ * heading that said chips, which was wrong twice over: wrong currency, and a number that is a multiplier
+ * rather than a payout. 200 on a 100 bet is twenty thousand gold, and "200" is the one thing it is not.
+ */
+function rowsForThree(table, bet) {
     if (!table?.pays) return null;
     const three = table.pays.three || {};
     const two = table.pays.two || {};
+    const at = (v) => (v ? Math.max(1, Math.round(v * bet)) : null);
     const ids = [...new Set([...Object.keys(three), ...Object.keys(two)])];
     const rows = ids
         .map((id) => ({ id, role: table.scatter?.id === id ? "scatter" : "low", tone: "#cbd3dc",
-            cells: [two[id] || null, three[id] || null] }))
+            cells: [at(two[id]), at(three[id])] }))
         .sort((a, b) => (b.cells[1] || 0) - (a.cells[1] || 0));
     return { rows, heads: ["2", "3"], m: null };
 }
 
 export default function Paytable({ machineId, kind, table, bet, rate = 0.25, onClose }) {
     const built = useMemo(
-        () => (kind === "five" ? rowsForFive(machineId, bet, rate) : rowsForThree(table)),
+        () => (kind === "five" ? rowsForFive(machineId, bet, rate) : rowsForThree(table, bet)),
         [kind, machineId, bet, rate, table],
     );
     if (!built) return null;
@@ -82,8 +90,11 @@ export default function Paytable({ machineId, kind, table, bet, rate = 0.25, onC
                     <b>What it pays</b>
                     <button type="button" className="pt-x" onClick={onClose} aria-label="Close">✕</button>
                 </div>
+                {/* THE UNIT IS NOT THE SAME ON EVERY CABINET. The five-reel machines pay chips; the ones
+                    that have not been rebuilt still pay the gold you staked. Saying "chips" on both was the
+                    kind of wrong that a member only finds out by being paid something else. */}
                 <p className="pt-sub">
-                    In chips, at a bet of <b>{bet.toLocaleString()}</b>
+                    In {kind === "five" ? "chips" : "gold"}, at a bet of <b>{bet.toLocaleString()}</b>
                     {kind === "five" ? <> across {LINES.length} lines</> : null}. Raise the bet and every number
                     here rises with it.
                 </p>
