@@ -62,7 +62,7 @@ function stripFor(bag, land) {
     return [...Array.from({ length: 9 }, draw), ...land];
 }
 
-export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -107,7 +107,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [filler, setFiller] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, [])));
 
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
-    const pull = useCallback(async () => {
+    const pull = useCallback(async (force) => {
         if (busy || spinning) return;
         unlock();
         clearTimers();
@@ -118,7 +118,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         Cas.pull();
 
         // The middle deal, always — see the note where the chooser used to be.
-        const r = await onSpin("mid");
+        const r = await onSpin("mid", typeof force === "string" ? force : null);
         if (!r?.ok) { setSpinning(false); setPhase("idle"); return; }
 
         setResult(r);
@@ -389,6 +389,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
+            {/* ── ⚠ OWNER ONLY — REMOVE BEFORE THE FLOOR OPENS ────────────────────────────────────────
+                On the master "remove before launch" checklist with the server half. Free spins come once in
+                ninety-three spins and the pick once in two hundred and thirty-three, which makes both of them
+                nearly impossible to LOOK at — the first time the free round was seen on screen it had to be
+                faked, and a fake only proves the half that was already fine.
+
+                The server re-rolls whole spins until one triggers naturally and plays that, so what appears
+                here is a real spin with a real payout and no special-case code near the money. The gate is
+                server-side; this row being hidden is not the permission check. */}
+            {owner ? (
+                <div className="s5-owner">
+                    <i>owner</i>
+                    <button type="button" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
+                    <button type="button" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
+                </div>
+            ) : null}
+
             {/* ── THE CONTROL PANEL ───────────────────────────────────────────────────────────────────
                 Luke: "proffesionalize the wager buttons and spin button."
 
@@ -421,7 +438,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
                         onClick={() => step(1)}>+</button>
                 </div>
-                <button type="button" className="s5-spin" onClick={pull} disabled={locked}>
+                <button type="button" className="s5-spin" onClick={() => pull(null)} disabled={locked}>
                     {spinning ? <span className="s5-spin-wait" aria-hidden="true" /> : "SPIN"}
                 </button>
             </div>

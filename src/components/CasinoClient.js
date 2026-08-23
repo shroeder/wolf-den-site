@@ -699,10 +699,10 @@ export default function CasinoClient({ initial }) {
     // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
     // response shape. Two games behind one verb is how a payout path gets confused about which table it is
     // paying from. Returns the raw response to the component, which does all the revealing.
-    const spin5 = useCallback(async (offerId) => {
+    const spin5 = useCallback(async (offerId, force) => {
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "spin5", bet, machine: at?.id, offer: offerId }),
+            body: JSON.stringify({ action: "spin5", bet, machine: at?.id, offer: offerId, force: force || undefined }),
         }).then((x) => x.json()).catch(() => null);
         if (!r?.ok) {
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
@@ -1461,6 +1461,7 @@ export default function CasinoClient({ initial }) {
                             bet={bet}
                             onBet={setBet}
                             rate={st?.chipRate}
+                            owner={st?.owner}
                             busy={busy} />
                     ) : at.live && SLOTS.has(at.id) ? (
                         <>

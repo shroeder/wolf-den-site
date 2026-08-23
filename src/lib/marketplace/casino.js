@@ -1,4 +1,5 @@
 import "server-only";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { CHIP_RATE } from "@/lib/marketplace/chips.js";
 
 import { db } from "@/lib/db";
@@ -1109,6 +1110,8 @@ export async function getCasinoState(buyerId) {
         // has happened. The client must never keep its own copy of this — it moved once already, 0.08 to
         // 0.25, and a hardcoded copy would have quoted every payout three times too low.
         chipRate: CHIP_RATE,
+        // ⚠ Owner only, and only so the machine can show its force-a-bonus buttons. Goes with them.
+        owner: isOwner(buyerId),
         me: { sprite: me?.avatar_sprite_url || null },
         others,
         // Every cabinet's table, so a machine can show what it pays without another round trip. Functions

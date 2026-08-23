@@ -63,7 +63,7 @@ export async function POST(request) {
                 // a different response shape. Two games behind one verb is how a payout path gets confused
                 // about which table it is paying from.
                 case "spin5":
-                    return noStore(await spinSlot5(buyer.id, { bet: b?.bet, machine: b?.machine, offerId: b?.offer }));
+                    return noStore(await spinSlot5(buyer.id, { bet: b?.bet, machine: b?.machine, offerId: b?.offer, force: b?.force }));
                 // ── THE COUNTER ── the shelf, and buying off it. The price is read from the catalog in code,
                 // never from the body; `item` is only a key.
                 case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id)) });

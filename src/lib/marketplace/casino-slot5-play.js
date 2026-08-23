@@ -34,7 +34,33 @@ export const slot5OpenFor = (buyerId) => OPEN || isOwner(buyerId);
  * because the screen offers the choice up front — you pick your deal, then you spin, which is what makes it a
  * decision rather than a menu that appears at the moment it stops mattering.
  */
-export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
+// ── ⚠ OWNER-ONLY: FORCE A BONUS ─────────────────────────────────────────────────────────────────────────────
+// REMOVE BEFORE THE FLOOR OPENS. Registered on the master "remove before launch" checklist.
+//
+// Free spins come once in ninety-three spins and the pick once in two hundred and thirty-three, which makes
+// both of them nearly impossible to LOOK at. Getting the free round on screen for the first time meant either
+// spending four thousand gold hunting one or building a fake response — and a fake response only proves the
+// code downstream of the fetch, which is exactly the half that was already fine.
+//
+// REJECTION SAMPLING, NOT A RIGGED GRID. It re-rolls whole spins until one of them naturally triggers, and
+// then plays THAT. So the spin on screen is a real spin the engine actually produced, with real reels and a
+// real payout, and there is not one line of special-case code anywhere near the payout path — which is the
+// part that would be dangerous to have a test hook in.
+//
+// The chips it mints are logged under their own reason so a forced spin can never be mistaken for play when
+// the floor's numbers are read.
+const FORCE_TRIES = 40000;
+function forcedSpin(m, stake, offerId, want) {
+    for (let i = 0; i < FORCE_TRIES; i += 1) {
+        const p = playSpin(m, { bet: stake, offerId });
+        if (want === "free" && p.free) return p;
+        if (want === "pick" && p.pick) return p;
+    }
+    // Never hang and never lie: if it could not find one, the member gets an ordinary spin.
+    return null;
+}
+
+export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     if (!slot5OpenFor(buyerId)) return { ok: false, error: "closed" };
 
@@ -51,7 +77,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
     if (!paid) return { ok: false, error: "no_gold" };
     await logCoin(buyerId, -stake, "casino_slot5_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
 
-    const r = playSpin(m, { bet: stake, offerId: offer.id });
+    // The force is read from the request but only honoured for the owner — a POST body is something anybody
+    // can write, and "the button is hidden" is not a permission check.
+    const want = isOwner(buyerId) && (force === "free" || force === "pick") ? force : null;
+    const r = (want && forcedSpin(m, stake, offer.id, want)) || playSpin(m, { bet: stake, offerId: offer.id });
 
     // ── CONVERTED ONCE, AT THE END ───────────────────────────────────────────────────────────────────────
     // The engine works in multiples of the bet and knows nothing about chips; the rate is applied here and
@@ -61,7 +90,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId } = {}) {
     const won = chipsFor(stake, r.total / stake);
     let chips = null;
     if (won > 0) {
-        chips = await moveChips(buyerId, won, "slot5", {
+        chips = await moveChips(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
             meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, pick: r.pick ? r.pick.total / stake : 0 },
         });
