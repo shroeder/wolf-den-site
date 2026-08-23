@@ -49,7 +49,10 @@ const FREE_HOLD_MS = 420;   // how long a finished free spin sits before the nex
 const CELEBRATE_AT = 1;
 const BIG_WIN_AT = 10;
 
-const art = (machineId, sym) => `/images/casino/reels/${machineId}-${sym}.webp`;
+// Same resolver as the reels on the three-reel cabinets and the paytable — see the note in Paytable.js.
+// Several machines draw their symbols from the Den's own sprites, which live on Blob under unpredictable
+// names, so a path built from the machine id only works for the cabinets that happen to have a generic set.
+const artFor = (art, machineId, sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
 
 // The strip a reel runs before it stops: filler, then the three symbols it is actually going to show.
 //
@@ -71,7 +74,7 @@ function stripFor(bag, land) {
     return [...Array.from({ length: 9 }, draw), ...land];
 }
 
-export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -86,6 +89,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // Whichever win list is currently being drawn — the base spin's, or the free spin on screen. `lit` reads
     // this rather than the base result, which is what lets a free spin light its own lines.
     const [activeWins, setActiveWins] = useState([]);
+    // The symbol currently being flashed because it just triggered something — the scatter before the free
+    // round, the chest before the pick. Null the rest of the time.
+    const [flashSym, setFlashSym] = useState(null);
     // The last response, for the skip. A ref because skipFree is called from a handler that must not be
     // rebuilt every time the result changes.
     const resultRef = useRef(null);
@@ -120,6 +126,29 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // do not run the same picture past you — but regenerated on a TAP, not on a render.
     const [idle] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, []).slice(0, ROWS)));
     const [filler, setFiller] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, [])));
+
+    // ── THE SYMBOLS THAT DID IT, BEFORE THE THING THEY DID ───────────────────────────────────────────────
+    // Luke: "the payline triggering a bonus should be glowing and flashing before the bonus triggers."
+    //
+    // The moons landed and then a card appeared. Nothing on the machine ever connected the two, so the bonus
+    // arrived as an announcement rather than as a consequence — and the three symbols that had just done the
+    // rarest thing on the reels sat there looking like every other symbol.
+    //
+    // A slot's whole grammar is that the reels tell you and the screen confirms it. So the triggering symbols
+    // pulse, one sound each in rising pitch as they light, everything else dims, and only then does the round
+    // begin. It is a beat and a half, and it is the difference between being told you won a bonus and
+    // watching yourself win one.
+    const flashTrigger = useCallback((sym, then) => {
+        setPhase("trigger");
+        setFlashSym(sym);
+        // One ding per symbol, climbing. Three moons is three notes going up — the oldest trick there is for
+        // "something is being counted, and it is not finished yet".
+        for (let i = 0; i < 5; i += 1) {
+            timers.current.push(setTimeout(() => Cas.coin(i * 2), 120 + i * 190));
+        }
+        Haptic.hit(0.4);
+        timers.current.push(setTimeout(() => { setFlashSym(null); then(); }, 1450));
+    }, []);
 
     // ── PLAYING ONE GRID ─────────────────────────────────────────────────────────────────────────────────
     // Reels in from the left, then every winning line drawn in turn. The base spin and every free spin go
@@ -178,11 +207,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         playGrid(r.grid, r.lines, {
             stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
             onDone: () => {
-                if (r.free) { announceFree(r); return; }
-                setPhase(r.pick ? "pick" : "done");
+                const m = slot5(machineId);
+                if (r.free) { flashTrigger(m.scatter, () => announceFree(r)); return; }
+                if (r.pick) { flashTrigger(m.bonus, () => setPhase("pick")); return; }
+                setPhase("done");
             },
         });
-    }, [busy, spinning, onSpin, clearTimers, playGrid]);
+    }, [busy, spinning, onSpin, clearTimers, playGrid, flashTrigger, machineId]);
 
     // ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
     // Luke: "i didn't even know that I got the free Spin bonus because there was nothing, nothing popped off
@@ -212,7 +243,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         const round = r.free;
         if (!round || i >= round.spins.length) {
             setActiveWins([]);
-            setPhase(r.pick ? "pick" : "freeDone");
+            setPhase("freeDone");
             return;
         }
         const sp = round.spins[i];
@@ -298,7 +329,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
     return (
         <div className="s5">
-            {pays ? <Paytable kind="five" machineId={machineId} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
+            {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
             {/* ── THE GRID ────────────────────────────────────────────────────────────────────────────── */}
             {/* ── A MACHINE, NOT A GRID ON A PAGE ─────────────────────────────────────────────────────
                 Luke: "setting the slot machine screen apart from the background." It was a dark grid on a
@@ -315,7 +346,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-pays" onClick={() => setPays(true)}
                         aria-label="What this machine pays">PAYS</button>
                 </span>
-            <div className="s5-window">
+            {/* ── WHAT THE WINDOW IS DOING ────────────────────────────────────────────────────────────
+                On the WINDOW rather than as a sibling selector. The dimming used to be written
+                `.s5-lines ~ .s5-grid .s5-cell img:not(.is-lit)`, and the grid comes BEFORE the svg in this
+                markup — so `~` never matched and nothing has ever dimmed behind a winning line. A state
+                class on the container cannot be defeated by the order of two elements. */}
+            <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}`}>
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
@@ -334,11 +370,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym)}`} key={i}
-                                        style={{ "--tone": symbolTone(sym) }}>
+                                    <span className={`s5-cell is-${symbolRole(sym)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}`}
+                                        key={i} style={{ "--tone": symbolTone(sym) }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={art(machineId, sym)} alt="" draggable="false"
-                                            className={lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""} />
+                                        <img src={artFor(art, machineId, sym)} alt="" draggable="false"
+                                            className={`${lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""}${flashSym && sym === flashSym && landed > reel ? " is-flash-img" : ""}`.trim()} />
                                     </span>
                                 ))}
                             </div>

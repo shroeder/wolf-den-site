@@ -18,7 +18,14 @@ import { SLOTS5, SYMBOL_LOOK, LINES } from "@/lib/marketplace/casino-slot5.js";
 // ones pay on pairs and triples. Same table, different columns, because a member walking from one to the other
 // should not have to learn a second way of reading the same thing.
 
-const art = (machineId, sym) => `/images/casino/reels/${machineId}-${sym}.webp`;
+// ── THE SAME ART THE REELS USE ───────────────────────────────────────────────────────────────────────────────
+// A naked path was wrong and looked fine on the only cabinet that was checked. Reel art is resolved through a
+// map the SERVER builds (see themeArt): several machines draw their symbols from the Den's own sprites — pets,
+// fish, foes — which live on Blob and have no predictable filename, and only three cabinets have a generic
+// set on disk at all. So The Menagerie's paytable was five broken-image icons.
+//
+// Same resolver, same fallback, one place. If the reels can draw it, so can this.
+const artFor = (art, machineId, sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
 const pretty = (id) => id.charAt(0).toUpperCase() + id.slice(1);
 
 const ROLE_WORD = {
@@ -73,7 +80,7 @@ function rowsForThree(table, bet) {
     return { rows, heads: ["2", "3"], m: null };
 }
 
-export default function Paytable({ machineId, kind, table, bet, rate = 0.25, onClose }) {
+export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25, onClose }) {
     const built = useMemo(
         () => (kind === "five" ? rowsForFive(machineId, bet, rate) : rowsForThree(table, bet)),
         [kind, machineId, bet, rate, table],
@@ -108,7 +115,7 @@ export default function Paytable({ machineId, kind, table, bet, rate = 0.25, onC
                         <div key={r.id} className={`pt-row is-${r.role}`} style={{ "--tone": r.tone }}>
                             <span className="pt-what">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={art(machineId, r.id)} alt="" />
+                                <img src={artFor(art, machineId, r.id)} alt="" />
                                 <em>
                                     {pretty(r.id)}
                                     {ROLE_WORD[r.role] ? <u>{ROLE_WORD[r.role]}</u> : null}

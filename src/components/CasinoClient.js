@@ -1462,6 +1462,7 @@ export default function CasinoClient({ initial }) {
                             onBet={setBet}
                             rate={st?.chipRate}
                             owner={st?.owner}
+                            art={st?.art}
                             busy={busy} />
                     ) : at.live && SLOTS.has(at.id) ? (
                         <>
@@ -1485,7 +1486,7 @@ export default function CasinoClient({ initial }) {
                             </button>
                             {pays ? (
                                 <Paytable kind="three" machineId={at.id} table={st?.slots?.[at.id]}
-                                    bet={bet} onClose={() => setPays(false)} />
+                                    art={st?.art} bet={bet} onClose={() => setPays(false)} />
                             ) : null}
                             <div className="cas-cab">
                                 <span className="cas-cab-top" aria-hidden="true">

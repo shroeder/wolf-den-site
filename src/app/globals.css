@@ -18488,7 +18488,24 @@ body.cas-seated .social-fab { display: none; }
 /* A symbol on the line that is currently being drawn. Everything else dims, so the line reads at a glance
    instead of the player having to trace it. */
 .s5-cell img.is-lit { filter: drop-shadow(0 0 9px var(--acc, #ffd75e)) brightness(1.15); }
-.s5-lines ~ .s5-grid .s5-cell img:not(.is-lit) { opacity: .45; }
+/* DEAD RULE, REPLACED. This was `.s5-lines ~ .s5-grid ...` and the grid comes BEFORE the svg in the
+   markup, so the sibling combinator never matched and nothing has ever dimmed behind a winning line. The
+   state now lives on the window, where the order of two children cannot defeat it. */
+.s5-window.is-lining .s5-cell img:not(.is-lit) { opacity: .38; }
+
+/* ── THE SYMBOLS THAT DID IT ──────────────────────────────────────────────────────────────────────────
+   Before the bonus, not after. The moons land, they pulse, everything else goes dark, and only then does
+   the round begin — so the bonus arrives as a consequence of something you watched rather than as an
+   announcement out of nowhere. */
+.s5-window.is-flashing .s5-cell img:not(.is-flash-img) { opacity: .22; filter: grayscale(.6); }
+.s5-cell.is-flash::before { animation: s5FlashGlow .42s ease-in-out infinite alternate; }
+.s5-cell.is-flash img { animation: s5FlashPop .42s ease-in-out infinite alternate;
+    filter: drop-shadow(0 0 12px var(--tone)) brightness(1.25) !important; }
+@keyframes s5FlashGlow {
+    from { background: radial-gradient(circle, color-mix(in srgb, var(--tone) 40%, transparent), transparent 70%); }
+    to { background: radial-gradient(circle, color-mix(in srgb, var(--tone) 85%, transparent), transparent 78%); }
+}
+@keyframes s5FlashPop { from { transform: scale(1); } to { transform: scale(1.16); } }
 
 /* Spinning, and coming to rest. Same construction as the three-reel cabinet: a looping keyframe for the
    run, and a FROM-ONLY keyframe for the landing so it interpolates to the strip's own inline transform
