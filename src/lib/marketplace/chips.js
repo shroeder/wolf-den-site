@@ -127,6 +127,11 @@ export async function chipShelf(buyerId) {
     const [balance, owned] = await Promise.all([chipBalance(buyerId), ownedOnce(buyerId)]);
     return {
         balance,
+        // The rate goes with the shelf so the screen can print the GOLD behind every price without keeping
+        // its own copy of it. A second copy of this number is a shelf that lies the day the rate moves — and
+        // it moved once already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started
+        // quoting prices three times too low.
+        rate: CHIP_RATE,
         items: CHIP_STORE.map((i) => ({
             id: i.id, kind: i.kind, name: i.name, blurb: i.blurb, price: i.price,
             once: Boolean(i.once), owned: owned.has(i.id), afford: balance >= i.price,

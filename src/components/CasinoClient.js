@@ -9,6 +9,7 @@ import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena
 import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
 import Slot5 from "@/components/casino/Slot5.js";
+import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -76,6 +77,11 @@ const MACHINES = [
     { id: "keno", x: 63, label: "Keno", kind: "Keno", live: true },
     { id: "bingo", x: 74, label: "The Hall", kind: "Bingo", live: true },
     { id: "blackjack", x: 85, label: "The Table", kind: "Blackjack", live: true },
+    // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────
+    // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
+    // floor to reach it and you pass everything you could have been playing on the way back. It is the only
+    // thing in the room that is not a game, and the only place chips are worth anything.
+    { id: "store", x: 96, label: "The Counter", kind: "Chips", live: true },
 ];
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
@@ -686,6 +692,25 @@ export default function CasinoClient({ initial }) {
         setSt((p) => (p ? { ...p, gold: r.gold, chips: r.chips } : p));
         return r;
     }, [bet, at]);
+
+    // The shelf, and buying off it. Both go straight through to the server: the price is read from the
+    // catalog there and `item` is only a key, so nothing this screen sends can change what anything costs.
+    const shelf = useCallback(async () => {
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "chip_shelf" }),
+        }).then((x) => x.json()).catch(() => null);
+        return r?.ok ? r : { items: [] };
+    }, []);
+
+    const buyChip = useCallback(async (item) => {
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "chip_buy", item }),
+        }).then((x) => x.json()).catch(() => null);
+        if (r?.ok) setSt((p) => (p ? { ...p, chips: r.balance } : p));
+        return r || { ok: false };
+    }, []);
 
     const pull = useCallback(async () => {
         if (busy) return;
@@ -1391,7 +1416,9 @@ export default function CasinoClient({ initial }) {
                         TABLE rather than a flag, so a cabinet becomes new the moment its maths does and
                         there is no state in which the screen and the paytable disagree about which game
                         this is. */}
-                    {at.live && SLOTS5[at.id] ? (
+                    {at.live && at.id === "store" ? (
+                        <ChipStore chips={st?.chips} onBuy={buyChip} onRefresh={shelf} />
+                    ) : at.live && SLOTS5[at.id] ? (
                         <Slot5
                             machineId={at.id}
                             symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
@@ -1717,7 +1744,7 @@ export default function CasinoClient({ initial }) {
                         three-reel game, on the three-reel table, for gold. Shot on the deployed page and
                         there they both were, "Spin · 100" above and "Pull · 100" below, forty pixels apart.
                         One machine, one button. */}
-                    {at.live && !SLOTS5[at.id] ? (
+                    {at.live && !SLOTS5[at.id] && at.id !== "store" ? (
                         <div className="cas-controls">
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks
