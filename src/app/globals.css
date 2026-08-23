@@ -17399,7 +17399,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    pixels were a black strip of nothing to the right of the painted floor, with the member's own sprite
    standing under a broken image in it. A location's `x` is a percentage OF THIS WIDTH, so the last one
    only fits if 4% of the world is wider than half a cabinet. */
+/* AND NOTHING MAY SCROLL PAST THE PAINTED FLOOR. The room's scroll area is whatever its contents reach,
+   and the contents reach further than the floor does: a lamp sits at 99%, decorations sit on midpoints,
+   and each is centred with translateX(-50%) so half of it hangs off the end. Measured on the deployed
+   page: a world of 1,938 inside a scrollWidth of 2,015, and those 77 pixels were a strip of bare
+   background at the right-hand end of the room that you could scroll into and stand in. Containing the
+   world makes the scrollable area exactly the floor, which is the only honest answer — the alternative is
+   chasing every decoration that overhangs. */
 .cas-world { position: relative; width: max(540%, calc(var(--room) * 6.4)); height: 100%; cursor: pointer;
+    overflow: hidden;
     /* ── THE WALL IS PART OF THE FLOOR ────────────────────────────────────────────────────────────────
        Luke: "the bg and the foreground should match scroll no paralax."
 
