@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
+import { SYMBOL_LOOK } from "../src/lib/marketplace/casino-slot5.js";
 import { priceRun, quality, requirePreview } from "./lib/gen-guard.mjs";
 import "./lib/ai-trace.mjs";
 
@@ -49,15 +50,19 @@ const READABLE =
 
 // Three houses, three moods. The mood line goes on every symbol of that cabinet so a reel reads as a set.
 const MACHINES = {
+    // ── THE HUNT ── the cabinet with no shared mood line, and the only one that reads at a glance.
+    // Its six symbols take their colour from SYMBOL_LOOK instead, one hue each, assigned by rank and role.
+    // See the note there: a mood line makes a reel a SET at the cost of making it legible, and legible wins.
+    // The set is held together by the drawing style and the frame, which is what those are for.
     slot: {
-        mood: "Warm polished BRASS and deep gold, lit like a lamp is on it, rich and well-used and inviting.",
+        mood: null,
         symbols: {
-            wolf: "a howling wolf's head in profile, carved from gold",
-            chest: "a small treasure chest with its lid open and gold light spilling out",
-            laurel: "a golden laurel wreath",
-            doubloon: "a single thick gold coin seen face-on, a wolf's head stamped on it",
-            bone: "a clean white bone, the classic dog-bone shape, on a brass mount",
-            moon: "a crescent moon in warm pale gold",
+            wolf: "a howling wolf's head in profile",
+            chest: "a small treasure chest with its lid thrown open and light spilling out",
+            laurel: "a laurel wreath",
+            doubloon: "a single thick coin seen face-on, a wolf's head stamped on it",
+            bone: "a clean bone, the classic dog-bone shape",
+            moon: "a crescent moon",
         },
     },
     slot2: {
@@ -87,9 +92,12 @@ const jobs = [];
 for (const [machineId, m] of Object.entries(MACHINES)) {
     if (ONLY.length && !ONLY.includes(machineId)) continue;
     for (const [symId, subject] of Object.entries(m.symbols)) {
+        // A cabinet with no `mood` colours PER SYMBOL instead — see SYMBOL_LOOK. The colour line goes first
+        // in the extra, before the readability rules, because it is the thing most likely to be diluted.
+        const look = m.mood ? m.mood : `${SYMBOL_LOOK[symId]?.look || ""}. Everything about this symbol is that colour — it is the one thing that tells it apart from the other five on the reel.`;
         jobs.push({
             name: `${machineId}-${symId}`,
-            prompt: housePrompt(`A slot-machine reel symbol: ${subject}.`, { extra: `${m.mood} ${READABLE}` }),
+            prompt: housePrompt(`A slot-machine reel symbol: ${subject}.`, { extra: `${look} ${READABLE}` }),
         });
     }
 }

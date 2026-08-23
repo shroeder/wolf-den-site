@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
+import { symbolTone, symbolRole } from "@/lib/marketplace/casino-slot5.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -146,6 +147,13 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
     return (
         <div className="s5">
             {/* ── THE GRID ────────────────────────────────────────────────────────────────────────────── */}
+            {/* ── A MACHINE, NOT A GRID ON A PAGE ─────────────────────────────────────────────────────
+                Luke: "setting the slot machine screen apart from the background." It was a dark grid on a
+                dark page with a hairline border, which reads as a table. A real cabinet is an OBJECT: a
+                brass frame with weight to it, a recessed glass panel that is visibly deeper than the
+                surface around it, and a lit marquee saying which machine you are at. */}
+            <div className="s5-cab">
+                <span className="s5-marquee" aria-hidden="true"><i />THE HUNT<i /></span>
             <div className="s5-window">
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
@@ -153,7 +161,13 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
                             style={{ "--settle": `${SETTLE_MS}ms`, "--delay": `${STOP_AT[reel]}ms` }}>
                             <div className="s5-strip">
                                 {(grid && landed > reel ? grid[reel] : stripFor(pool, grid?.[reel] || pool.slice(0, 3))).map((sym, i) => (
-                                    <span className="s5-cell" key={i}>
+                                    // EVERY CELL CARRIES ITS SYMBOL'S COLOUR. The wash behind the symbol is
+                                    // the same hue the symbol was drawn in — one map, see SYMBOL_LOOK — so a
+                                    // violet glow means a wild before you have focused on the picture. The
+                                    // wild and the scatter get a stronger one than the paying symbols,
+                                    // because those two are the ones you are actually hunting for.
+                                    <span className={`s5-cell is-${symbolRole(sym)}`} key={i}
+                                        style={{ "--tone": symbolTone(sym) }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={art(machineId, sym)} alt="" draggable="false"
                                             className={lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""} />
@@ -170,6 +184,7 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
                         <polyline points={lit.line.map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
                     </svg>
                 ) : null}
+            </div>
             </div>
 
             {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}

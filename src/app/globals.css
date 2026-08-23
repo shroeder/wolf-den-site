@@ -18576,3 +18576,56 @@ body.cas-seated .social-fab { display: none; }
 .cs-buy i { font-style: normal; font-size: 9.5px; color: #8f98a3; letter-spacing: .01em; }
 .cs-buy:disabled { cursor: default; border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.04);
     color: #8f98a3; }
+
+/* ── THE HUNT, AS AN OBJECT ───────────────────────────────────────────────────────────────────────────
+   Luke, on the first cut: "the sprites seem monotone... i think one of these is a wild, but because its
+   all monotone, its really hard to tell", and "setting the slot machine screen apart from the
+   background". Three separate failures, and only the first was the art:
+
+     1. every symbol was the same gold        -> fixed in SYMBOL_LOOK, one hue per symbol by rank and role
+     2. the reels did not read as reels       -> the columns below are lit panels with real dividers
+     3. the machine did not read as a machine -> this frame, which gives it weight and an edge
+
+   A cabinet is a BRASS BOX with a hole cut in it and glass over the hole. Everything here is that: a
+   two-tone metal border with a highlight on the top edge and a shadow under it, a marquee across the
+   top, and a window that is visibly DEEPER than the metal around it. */
+.s5-cab { border-radius: 16px; padding: 8px; position: relative;
+    background: linear-gradient(180deg, #6b5322 0%, #3a2c11 34%, #241a0a 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 226, 150, .45), inset 0 -2px 4px rgba(0, 0, 0, .6),
+        0 6px 18px rgba(0, 0, 0, .55); }
+.s5-marquee { display: flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 5px 0 8px; font-family: var(--font-display); font-size: 12.5px; font-weight: 900;
+    letter-spacing: .16em; color: #ffe6a4; text-shadow: 0 0 10px rgba(255, 200, 90, .5); }
+.s5-marquee i { flex: 1 1 auto; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 214, 120, .5), transparent); }
+
+/* The window, cut into the metal. `inset` shadows are what make it a hole rather than a panel. */
+.s5-window { position: relative; border-radius: 9px; overflow: hidden;
+    background: #0b0710;
+    box-shadow: inset 0 3px 10px rgba(0, 0, 0, .9), inset 0 0 0 1px rgba(0, 0, 0, .8),
+        0 1px 0 rgba(255, 226, 150, .22); }
+
+/* ── AND THE REELS ARE LIT, NOT PAINTED ON ────────────────────────────────────────────────────────────
+   A reel is a lit strip behind glass. It has to be LIGHTER than the frame around it or the whole screen
+   is one dark rectangle — which is exactly what the first cut was. The dividers are two hairlines (a dark
+   one and a light one) rather than a border, which is how a physical gap between two lit panels actually
+   looks. */
+.s5-reel { background: linear-gradient(180deg, #241a30 0%, #171021 46%, #241a30 100%);
+    border-right: 1px solid rgba(0, 0, 0, .75);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, .05); }
+.s5-reel:last-child { border-right: none; box-shadow: none; }
+
+/* ── COLOUR BEHIND THE SYMBOL ─────────────────────────────────────────────────────────────────────────
+   The same hue the symbol was drawn in, washed behind it, so the reel is readable as colour before it is
+   readable as pictures. The wild and the scatter get a stronger wash than the paying symbols: those two
+   are what a player is actually hunting for, and everything else is texture between them. */
+.s5-cell { position: relative; }
+.s5-cell::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, color-mix(in srgb, var(--tone) 26%, transparent), transparent 68%); }
+.s5-cell.is-wild::before, .s5-cell.is-scatter::before {
+    background: radial-gradient(circle, color-mix(in srgb, var(--tone) 46%, transparent), transparent 72%); }
+.s5-cell.is-bonus::before {
+    background: radial-gradient(circle, color-mix(in srgb, var(--tone) 36%, transparent), transparent 70%); }
+/* The wild gets a ring as well. It is the one symbol whose whole job is to be spotted. */
+.s5-cell.is-wild::after { content: ""; position: absolute; inset: 12%; border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent); pointer-events: none; }
+.s5-cell img { position: relative; z-index: 1; }

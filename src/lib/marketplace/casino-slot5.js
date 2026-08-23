@@ -32,6 +32,45 @@
 // The whole economy is then two numbers that live somewhere else — chips minted per gold staked, and what the
 // chip store charges — instead of five paytables each fighting a ceiling.
 
+// ── COLOUR IS THE PAYTABLE ───────────────────────────────────────────────────────────────────────────────────
+// Luke, looking at the finished screen: "the sprites seem monotone, and nondescript. for example, i think one
+// of these is a wild, but because its all monotone, its really hard to tell. the same is true for icons that
+// pay more, and ones that trigger the bonus."
+//
+// He found the bug in the art brief. Every symbol on a cabinet was drawn to one shared MOOD line — The Hunt's
+// was "warm polished BRASS and deep gold" — so all six came back the same colour. That line existed to make a
+// reel read as a SET, which it did, at the cost of the only job colour has on a slot machine: telling you what
+// you are looking at before you have read anything. Six gold objects on a black field is a machine you have to
+// study. A set can be held together by drawing style and framing instead, and those cost nothing.
+//
+// So colour is assigned by ROLE and by RANK, in one place, and both halves of the game read it: the art
+// generator builds its prompts from `look`, and the screen tints each cell from `tone`. One map, so a symbol
+// cannot be violet in the picture and gold in the glow.
+//
+// The ladder runs COOL AND PLAIN at the bottom to WARM AND RICH at the top, which is the order a person reads
+// without being taught it — and the two symbols that are not part of the ladder at all sit outside it on
+// purpose. The scatter is the only cold bright thing on the reel and the wild is the only violet one; neither
+// can be mistaken for a paying symbol, which is exactly what they are not.
+export const SYMBOL_LOOK = {
+    bone: { rank: 1, role: "low", tone: "#8fa3b8",
+        look: "COOL SLATE GREY-BLUE, plain and unglamorous — the cheapest thing on the reel" },
+    doubloon: { rank: 2, role: "low", tone: "#d99a3c",
+        look: "WARM COPPER and old bronze, dull rather than bright" },
+    laurel: { rank: 3, role: "mid", tone: "#4fc98a",
+        look: "RICH EMERALD GREEN with pale gold edging, the first symbol on the reel that looks valuable" },
+    chest: { rank: 4, role: "bonus", tone: "#ff8c2b",
+        look: "BLAZING AMBER-ORANGE, hot light spilling out of it, the brightest warm thing on the reel" },
+    moon: { rank: 5, role: "scatter", tone: "#7ad4ff",
+        look: "ICE-BLUE and silver-white, glowing cold — the ONLY cold bright colour on the whole reel, so it "
+            + "cannot be mistaken for anything that pays on a line" },
+    wolf: { rank: 6, role: "wild", tone: "#b47cff",
+        look: "DEEP VIOLET and amethyst with a bright GOLD rim light — the only violet on the reel, and the "
+            + "richest thing on it. It substitutes for every other symbol, so it must look like none of them" },
+};
+
+export const symbolTone = (id) => SYMBOL_LOOK[id]?.tone || "#cbd3dc";
+export const symbolRole = (id) => SYMBOL_LOOK[id]?.role || "low";
+
 // ── THE TWENTY LINES ─────────────────────────────────────────────────────────────────────────────────────────
 // Row index per reel, 0 top, 1 middle, 2 bottom. The order matters: the first three are the straight lines
 // everybody reads first, then the V and the caret, then the shapes. A player never counts these — they see a
