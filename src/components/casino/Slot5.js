@@ -101,6 +101,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [breaking, setBreaking] = useState([]);
     const [dropping, setDropping] = useState([]);
     const [chainAt, setChainAt] = useState(-1);
+    // The chain being played inside a FREE spin, if any — so the multiplier badge and the break counter
+    // work in the free round exactly as they do in the base game.
+    const [freeChain, setFreeChain] = useState(null);
+    // The retrigger being shouted about, or null. Its own state rather than a phase, because the round is
+    // still running underneath it — this is a beat inside the free spins, not a screen instead of them.
+    const [gotMore, setGotMore] = useState(null);
     const [chainWon, setChainWon] = useState(0);
     // The last response, for the skip. A ref because skipFree is called from a handler that must not be
     // rebuilt every time the result changes.
@@ -130,8 +136,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // which is the frame the payout starts counting. The ladder climbed to x20, the x20 disappeared, and
     // then a number arrived with nothing on screen explaining where it came from. A multiplier is the
     // REASON for the payout; it has to still be there when the payout lands.
-    const chaining = phase === "tumble" || (phase === "done" && Boolean(result?.chain));
-    const mult = (chaining && result?.chain?.steps[Math.max(0, chainAt)]?.mult) || 1;
+    // A chain can now be running in either place — the base spin, or a free spin — so both the badge and
+    // the counter read whichever one is live rather than only the base result's.
+    const liveChain = freeChain || ((phase === "tumble" || phase === "done") ? result?.chain : null);
+    const chaining = Boolean(liveChain) && (phase === "tumble" || phase === "free" || phase === "done");
+    const mult = (chaining && liveChain?.steps[Math.max(0, chainAt)]?.mult) || 1;
 
     // ── A MACHINE NOBODY IS PLAYING SITS STILL ───────────────────────────────────────────────────────
     // Luke: "dont have this screen iterate over random symbols when you arent playing it."
@@ -214,8 +223,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     //
     // Recursive rather than a queue of timers, so a new spin cuts it cleanly instead of leaving six queued
     // breaks to land on top of the next game.
-    const runChain = useCallback((r, i) => {
-        const chain = r.chain;
+    const runChain = useCallback((chain, i) => {
         if (!chain || i >= chain.steps.length) {
             setBreaking([]); setDropping([]);
             return Promise.resolve();
@@ -253,7 +261,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     Haptic.hit(0.3 + Math.min(0.5, i * 0.08));
                     // And let the next grid fall into the hole.
                     timers.current.push(setTimeout(() => {
-                        runChain(r, i + 1).then(done);
+                        runChain(chain, i + 1).then(done);
                     }, 230 * rush));
                 }, 330 * rush));
             }, (i === 0 ? 120 : 190) * rush));
@@ -298,7 +306,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (r.chain) {
             playGrid(r.grid, [], {
                 stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
-                onDone: () => { setPhase("tumble"); runChain(r, 0).then(after); },
+                onDone: () => { setPhase("tumble"); runChain(r.chain, 0).then(after); },
             });
             return;
         }
@@ -354,21 +362,52 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         const sp = round.spins[i];
         setPhase("free");
         setFreeIdx(i);
+
+        // What happens once this spin has finished playing: credit it, sound it, and — if it bought more
+        // spins — stop and SAY SO before moving on.
+        const settle = () => {
+            if (sp.chips > 0) {
+                setFreeWon((n) => n + sp.chips);
+                // A big one inside the round gets the horns, the same as it would in the base game. A
+                // round where every spin sounds identical is a round with no shape to it.
+                if (sp.multiple >= BIG_WIN_AT) { Cas.jackpot(); Haptic.crit(); }
+                else { Cas.coins(Math.min(1, sp.chips / 400)); Haptic.hit(0.35); }
+            }
+            // ── AND MORE SPINS, IF IT BOUGHT THEM ────────────────────────────────────────────────────
+            // Luke, on the free round arriving with no fanfare: "I didn't even know that I got the free
+            // Spin bonus because there was nothing... popped off." A retrigger has exactly that problem
+            // and worse — the counter quietly changes from 6/14 to 6/28 and the best thing that can
+            // happen inside a bonus passes without a sound. It gets its own beat.
+            if (sp.retrigger) {
+                setGotMore(sp.retrigger);
+                Cas.jackpot();
+                Haptic.crit();
+                timers.current.push(setTimeout(() => {
+                    setGotMore(null);
+                    runFree(r, i + 1);
+                }, 1750));
+                return;
+            }
+            timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
+        };
+
+        // A CASCADING MACHINE TUMBLES IN ITS FREE ROUND TOO. Same chain player as the base game — the
+        // reels land, then the grid argues with itself, and the round multiplier rides on the ladder.
+        if (sp.chain) {
+            setChainAt(-1); setChainWon(0);
+            playGrid(sp.grid, [], {
+                stopAt: FREE_STOP_AT, settle: FREE_SETTLE_MS, lineMs: FREE_LINE_MS,
+                onDone: () => { setFreeChain(sp.chain); runChain(sp.chain, 0).then(() => { setFreeChain(null); settle(); }); },
+            });
+            return;
+        }
+
         playGrid(sp.grid, sp.wins, {
             stopAt: FREE_STOP_AT, settle: FREE_SETTLE_MS, lineMs: FREE_LINE_MS,
-            onDone: () => {
-                if (sp.chips > 0) {
-                    setFreeWon((n) => n + sp.chips);
-                    // A big one inside the round gets the horns, the same as it would in the base game. A
-                    // round where every spin sounds identical is a round with no shape to it.
-                    if (sp.multiple >= BIG_WIN_AT) { Cas.jackpot(); Haptic.crit(); }
-                    else { Cas.coins(Math.min(1, sp.chips / 400)); Haptic.hit(0.35); }
-                }
-                timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
-            },
+            onDone: settle,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [playGrid]);
+    }, [playGrid, runChain]);
 
     // ── SKIPPING IT ──────────────────────────────────────────────────────────────────────────────────────
     // For the twentieth round rather than the first. It jumps to the end and credits the whole thing — the
@@ -552,9 +591,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 Breaks so far against the number that opens the free round, and what the spin has taken. The
                 multiplier used to live here too and has moved onto the glass; what is left is the pair of
                 numbers you check rather than watch, which is what this strip is for. */}
-            {chaining && result?.chain ? (
-                <div className={`s5-tumble${result.chain.trigger && chainAt + 1 >= result.chain.trigger - 2 ? " is-close" : ""}`}>
-                    <span><i>Breaks</i><b>{chainAt + 1}{result.chain.trigger ? ` / ${result.chain.trigger}` : ""}</b></span>
+            {chaining && liveChain ? (
+                <div className={`s5-tumble${liveChain.trigger && chainAt + 1 >= liveChain.trigger - 2 ? " is-close" : ""}`}>
+                    <span><i>Breaks</i><b>{chainAt + 1}{liveChain.trigger ? ` / ${liveChain.trigger}` : ""}</b></span>
                     <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
                 </div>
             ) : null}
@@ -582,9 +621,22 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 A counter of where you are and what the round has paid so far. It sits under the reels
                 rather than over them — during a free round the reels are the thing you are watching, and
                 this is the score. */}
+            {/* ── MORE SPINS ──────────────────────────────────────────────────────────────────────────
+                The best thing that can happen inside a bonus, and it used to be a counter quietly going
+                from 6/14 to 6/28. It stops the round, says what it bought and what bought it, and then
+                the round carries on — a beat inside the free spins rather than a screen instead of them. */}
+            {gotMore ? (
+                <div className="s5-more" role="status">
+                    <b>+{gotMore.spins}</b>
+                    <i>more free spins</i>
+                    <em>{gotMore.by === "chain" ? "the threshing would not stop" : "three more scatters"}</em>
+                </div>
+            ) : null}
+
             {phase === "free" ? (
                 <div className="s5-freebar">
-                    <span><i>Free spin</i><b>{freeIdx + 1} / {result?.free?.spins.length}</b></span>
+                    <span><i>Free spin</i><b>{freeIdx + 1} / {result?.free?.spins.length}
+                        {result?.free?.added ? <u>+{result.free.added}</u> : null}</b></span>
                     <span className="s5-freemult">&times;{result?.free?.mult}</span>
                     <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
                     {/* For the twentieth round rather than the first. The chips were decided on the server

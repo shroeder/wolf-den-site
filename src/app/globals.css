@@ -19141,3 +19141,28 @@ body.cas-seated .social-fab { display: none; }
 .s5-window.is-hot .s5-bigmult b { color: #fff2c2;
     text-shadow: 0 0 14px rgba(255, 120, 40, 1), 0 0 40px rgba(255, 60, 20, .9), 0 3px 0 rgba(0, 0, 0, .6); }
 .s5-window.is-hot { box-shadow: inset 0 0 60px rgba(255, 110, 40, .3); }
+
+/* ── MORE FREE SPINS ──────────────────────────────────────────────────────────────────────────────────
+   A retrigger is the best thing that can happen inside a bonus and it used to be a counter quietly going
+   from 6/14 to 6/28. It lands over the reels, mid-round, says what it bought and what bought it, and
+   leaves — the round is still running underneath, so this is a beat rather than a screen. */
+.s5-more { position: absolute; inset: 0; z-index: 9; display: grid; align-content: center; justify-items: center;
+    gap: 1px; text-align: center; pointer-events: none;
+    background: radial-gradient(circle at 50% 45%, rgba(122, 212, 255, .34), rgba(6, 10, 20, .82) 62%);
+    animation: s5MoreIn .3s ease-out both; }
+.s5-more b { font-family: var(--font-display); font-size: 4.2rem; line-height: .92; font-weight: 900;
+    color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 16px rgba(122, 212, 255, 1), 0 0 46px rgba(60, 160, 255, .9), 0 4px 0 rgba(0, 0, 0, .55);
+    animation: s5MoreSlam .5s cubic-bezier(.15, 1.7, .35, 1) both; }
+.s5-more i { font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .22em;
+    text-transform: uppercase; color: #bfe8ff; }
+.s5-more em { font-style: normal; margin-top: 6px; font-size: 11.5px; color: #8fa4b8; }
+@keyframes s5MoreIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes s5MoreSlam {
+    0% { transform: scale(2.6) rotate(-7deg); opacity: 0; }
+    52% { transform: scale(.9) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+/* And the count in the bar carries what the round grew by, so "6 / 28" is not a number nobody can explain. */
+.s5-freebar u { text-decoration: none; margin-left: 4px; font-size: 10px; font-weight: 800;
+    color: #7ad4ff; vertical-align: 2px; }

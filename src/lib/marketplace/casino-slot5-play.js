@@ -172,9 +172,17 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // Opened by the tumbling rather than by a scatter — the screen says which, because they feel
             // completely different and only one of them is something you watched happen.
             byCascade: Boolean(r.free.byCascade),
+            // ── ONE `mult`, NOT TWO ──────────────────────────────────────────────────────────────
+            // This object carried the key twice: the round's own multiplier, and then a lookup of the
+            // offer id in FREE_SPIN_OFFERS. The second one wins in an object literal, and it only
+            // resolves for The Hunt — every other cabinet's offer id ("growing", "built", "fixed") is
+            // not in that list, so it fell to 1. The Vault reported x1 for a round the member had just
+            // spent six taps building to x2, and The Harvest's doubled tumbles reported x1 as well.
             mult: r.free.mult || 1,
+            // Spins bought by retriggering, and the round's opening length, so the screen can say "14 + 14"
+            // rather than silently showing 28.
             added: r.free.added || 0,
-            mult: FREE_SPIN_OFFERS.find((o) => o.id === offer.id)?.mult || 1,
+            base: r.free.base || offer.spins,
             // Each free spin carries its winning LINES in chips, exactly like the base spin does, because the
             // screen draws them exactly like the base spin does. Sending the raw engine wins meant the round
             // had nothing to light up and no number to call, which is most of why it played like a
@@ -189,6 +197,28 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 // What this one spin paid as a multiple of the bet, so the screen knows when a single free
                 // spin deserves the horns rather than a coin rattle.
                 multiple: sp.total / stake,
+                // ── A FREE SPIN ON A CASCADING MACHINE IS A CHAIN ────────────────────────────────
+                // Same shape as the base game's, so the screen plays it with the same code. Without
+                // this The Harvest's free round animated fourteen flat grids — the tumble switched off
+                // for the round you play the tumbling machine to reach.
+                chain: sp.chain ? {
+                    cascades: sp.chain.cascades,
+                    trigger: m.cascade?.trigger || null,
+                    steps: (() => {
+                        let run = 0;
+                        return sp.chain.steps.map((st) => {
+                            run += st.paid;
+                            return {
+                                grid: st.grid, broken: st.broken, mult: st.mult,
+                                chips: chipsFor(stake, run / stake),
+                                wins: st.wins.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                            };
+                        });
+                    })(),
+                } : null,
+                // And whether THIS spin bought more spins, and how — a chain that ran away with itself
+                // and a third scatter landing are not the same moment and must not read as one.
+                retrigger: sp.retrigger || null,
             })),
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),

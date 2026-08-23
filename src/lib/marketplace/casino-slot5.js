@@ -239,13 +239,13 @@ const HARVEST = {
         { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 5, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 1.96, 4: 12, 5: 102 },
-        chest: { 3: 1.02, 4: 5.5, 5: 37 },
-        laurel: { 3: 0.51, 4: 2.54, 5: 14.5 },
-        doubloon: { 3: 0.23, 4: 1.21, 5: 6 },
-        bone: { 3: 0.16, 4: 0.63, 5: 2.93 },
+        wolf: { 3: 1.39, 4: 8.53, 5: 72.5 },
+        chest: { 3: 0.73, 4: 3.91, 5: 26.3 },
+        laurel: { 3: 0.36, 4: 1.81, 5: 10.3 },
+        doubloon: { 3: 0.16, 4: 0.86, 5: 4.27 },
+        bone: { 3: 0.11, 4: 0.45, 5: 2.08 },
     },
-    scatterPays: { 3: 0.31, 4: 1.21, 5: 6 },
+    scatterPays: { 3: 0.22, 4: 0.86, 5: 4.27 },
     // ── THE CASCADE MACHINE ──────────────────────────────────────────────────────────────────────────
     // Every win is threshed away and what is above falls into the hole, so a win MAKES the next win
     // possible and the multiplier climbs with each break. Five breaks in one spin opens the free round —
@@ -254,9 +254,16 @@ const HARVEST = {
     // which is real bonus-round rarity — and unlike a scatter you can WATCH it approaching. Five would have
     // been one spin in seventeen, which is not a bonus, it is the base game with a fanfare.
     cascade: { trigger: 8, label: "The Threshing" },
-    free: { kind: "growing", spins: 14, label: "Fourteen spins, and the multiplier climbs" },
+    // ── ITS FREE ROUND IS FOURTEEN CASCADES ──────────────────────────────────────────────────────────
+    // This was `growing` — the multiplier climbing 1x to 14x across the round — from before the cabinet
+    // tumbled. Now that the free round cascades too, that ladder rides on TOP of the chain's own 1-to-20,
+    // and the two compound to x280: the machine returned 707% and the free round was worth more than the
+    // rest of the game put together.
+    //
+    // The chain IS the multiplier here. The round just doubles it, every spin, and the depth does the rest.
+    free: { kind: "fixed", spins: 14, mult: 2, label: "Fourteen spins, every one of them tumbling, at double" },
     second: { kind: "hold", trigger: "doubloon", need: 9, spins: 3, label: "The Wagon",
-        values: [0.39, 0.39, 0.39, 0.63, 0.63, 1.02, 1.56, 3.13], full: 41 },
+        values: [0.28, 0.28, 0.28, 0.45, 0.45, 0.73, 1.11, 2.23], full: 29.2 },
 };
 
 const DEEP = {
@@ -275,16 +282,16 @@ const DEEP = {
         { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 22, 4: 167, 5: 2224 },
-        chest: { 3: 6.5, 4: 50, 5: 500 },
-        laurel: { 3: 2.2, 4: 14.5, 5: 122 },
-        doubloon: { 4: 5, 5: 39 },
-        bone: { 5: 11 },
+        wolf: { 3: 18.9, 4: 143, 5: 1909 },
+        chest: { 3: 5.58, 4: 42.9, 5: 429 },
+        laurel: { 3: 1.89, 4: 12.4, 5: 105 },
+        doubloon: { 4: 4.29, 5: 33.5 },
+        bone: { 5: 9.44 },
     },
-    scatterPays: { 3: 1.1, 4: 5, 5: 33 },
+    scatterPays: { 3: 0.94, 4: 4.29, 5: 28.3 },
     free: { kind: "expanding", spins: 14, label: "Fourteen spins, and every wild takes its whole reel" },
     second: { kind: "pick", board: "trawl", label: "The Trawl",
-        chips: [8, 8, 8, 16.5, 16.5, 16.5, 50], mults: [2, 3, 5] },
+        chips: [6.87, 6.87, 6.87, 14.2, 14.2, 14.2, 42.9], mults: [2, 3, 5] },
 };
 
 const MENAGERIE = {
@@ -331,13 +338,13 @@ const VAULT = {
         { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 5, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 21, 4: 159, 5: 2092 },
-        chest: { 3: 6, 4: 46, 5: 460 },
-        laurel: { 3: 2.09, 4: 13.5, 5: 109 },
-        doubloon: { 4: 4.5, 5: 33 },
-        bone: { 5: 9.5 },
+        wolf: { 3: 19.2, 4: 146, 5: 1918 },
+        chest: { 3: 5.5, 4: 42.2, 5: 422 },
+        laurel: { 3: 1.92, 4: 12.4, 5: 99.9 },
+        doubloon: { 4: 4.12, 5: 30.2 },
+        bone: { 5: 8.71 },
     },
-    scatterPays: { 3: 0.86, 4: 4.5, 5: 30 },
+    scatterPays: { 3: 0.79, 4: 4.12, 5: 27.5 },
     // ── YOU BUILD YOUR OWN ROUND ─────────────────────────────────────────────────────────────────────
     // Every lock you turn adds spins or multiplier. One of them opens the door and the round begins with
     // whatever you managed to stack. Nothing on the board is a loss.
@@ -470,6 +477,27 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
     // that never returns — this is the same class of bug as a fight that cannot finish.
     const CEILING = 120;
 
+    // ── EVERY ROUND RETRIGGERS, ON THE CONDITION THAT OPENED IT ──────────────────────────────────────────
+    // Luke: "any free spins bonus should be retriggerable by getting the same condition during the free spin."
+    //
+    // This used to be one cabinet's gimmick — The Menagerie's whole identity was "and three more moons buys
+    // fourteen more", as if extending a round were an exotic feature rather than the thing every real machine
+    // does. It is the single best moment a free round has: you are already inside the thing you waited
+    // ninety-three spins for, you have stopped hoping for anything, and then it gets LONGER.
+    //
+    // The condition is the cabinet's own, not a new one, because that is what makes it legible — whatever put
+    // you in here does it again. Three scatters everywhere; on a cascading machine, a deep enough chain too,
+    // since that is the other door in.
+    //
+    // The award is the CABINET's round length rather than the offer's, which matters on The Vault: a round
+    // the member built to twenty spins should not hand back another twenty for one scatter landing. It hands
+    // back the eight the machine is worth.
+    // Capped by the round you are actually IN, so a short offer cannot be extended by more than its own
+    // length. Without the cap The Hunt's seven-spin sticky deal collected the cabinet's full ten every
+    // retrigger — it went from being level with the other two offers to being worth 26% more than them,
+    // which turns a choice into a right answer.
+    const RETRIGGER = Math.min(m.free?.spins || offer.spins || 5, offer.spins || 5);
+
     while (i < left && i < CEILING) {
         const grid = spinGrid(m, rng);
         for (const [reel, row] of stuck) grid[reel][row] = m.wild;
@@ -486,13 +514,20 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
             : offer.kind === "ladder" ? (LADDER[i % LADDER.length])
             : (offer.mult || 1);
 
-        const r = evaluate(m, grid, { lineBet, mult });
+        // ── A CASCADING MACHINE CASCADES IN ITS OWN FREE ROUND ───────────────────────────────────────────
+        // It did not. The Harvest's bonus ran flat single-evaluation spins — so the one cabinet on the floor
+        // whose whole identity is the tumble switched the tumble OFF for the round you play it to reach.
+        // The round multiplier rides on top of the chain's own ladder, which is what makes a free cascade
+        // worth waiting for rather than just a cascade you did not pay for.
+        const chain = m.cascade ? runCascade(m, grid, { lineBet, rng, mult }) : null;
+        const r = chain
+            ? { ...evaluate(m, chain.steps[0].grid, { lineBet, mult }), total: chain.total }
+            : evaluate(m, grid, { lineBet, mult });
 
-        // RETRIGGER: three scatters inside the round buys the whole round again.
-        if (offer.kind === "retrigger" && r.scatters >= 3 && left + offer.spins <= CEILING) {
-            left += offer.spins;
-            added += offer.spins;
-        }
+        // RETRIGGER — the same condition that opened the round, whatever this cabinet's is.
+        const deep = Boolean(chain && m.cascade && chain.cascades >= m.cascade.trigger);
+        const again = (r.scatters >= 3 || deep) && left + RETRIGGER <= CEILING;
+        if (again) { left += RETRIGGER; added += RETRIGGER; }
 
         if (offer.sticky) {
             for (let reel = 0; reel < REELS; reel += 1) {
@@ -502,10 +537,12 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
             }
         }
         total += r.total;
-        spins.push({ grid, ...r, mult });
+        // `retrigger` carries what this spin bought and HOW, so the screen can shout the right thing: a
+        // chain that ran away with itself and a third scatter landing are not the same moment.
+        spins.push({ grid, ...r, mult, chain, retrigger: again ? { spins: RETRIGGER, by: deep ? "chain" : "scatter" } : null });
         i += 1;
     }
-    return { total, spins, stuck, added };
+    return { total, spins, stuck, added, base: offer.spins };
 }
 
 // ── BUILDING YOUR OWN FREE ROUND ─────────────────────────────────────────────────────────────────────────────
@@ -566,7 +603,7 @@ export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } =
 // nothing, the same as everywhere else.
 const CASCADE_MULT = [1, 2, 3, 5, 8, 12, 20];
 
-export function runCascade(m, grid, { lineBet = 1, rng = Math.random } = {}) {
+export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: round = 1 } = {}) {
     const steps = [];
     let total = 0;
     let n = 0;
@@ -575,7 +612,10 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random } = {}) {
     // A hard ceiling. A cascade can in principle refill into another win forever, and a spin that never
     // resolves is a request that never returns.
     while (n < 20) {
-        const mult = CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)];
+        // The chain's own ladder, times whatever the round is running at. In the base game `round` is 1 and
+        // this is just the ladder; inside a free round the two stack, which is the entire reason a free
+        // cascade is worth waiting for rather than being a cascade you happened not to pay for.
+        const mult = CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round;
         const r = evaluate(m, working, { lineBet, mult });
         const lineWins = r.wins.filter((w) => w.kind === "line");
         // The scatter pays once, on the first pass only — otherwise a tumbling machine pays its scatter
@@ -613,7 +653,7 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random } = {}) {
         n += 1;
     }
 
-    return { total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] };
+    return { total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round };
 }
 
 // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────────────
@@ -753,7 +793,10 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         } else if (m.free?.kind === "deals") {
             offer = FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1];
         } else {
-            offer = { id: m.free.kind, kind: m.free.kind, label: m.free.label, spins: m.free.spins, mult: 1, sticky: false };
+            // `mult` off the cabinet rather than hardcoded to 1: a round can now carry a flat multiplier of
+            // its own (The Harvest doubles every tumbling spin), and a hardcoded 1 silently discarded it.
+            offer = { id: m.free.kind, kind: m.free.kind, label: m.free.label, spins: m.free.spins,
+                mult: m.free.mult || 1, sticky: false };
         }
         free = runFreeSpins(m, offer, { lineBet, rng });
         free.kind = offer.kind || "deals";
