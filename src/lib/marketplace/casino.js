@@ -123,51 +123,65 @@ export const SLOT_THEMES = {
         // those drawings live. The other cabinets keep their themes: they have no dedicated set yet, and a
         // theme is much better than a broken image. See SYMBOL_LOOK.
     },
+    // ── CHOSEN FOR COLOUR, FROM SPRITES THE DEN ALREADY OWNS ─────────────────────────────────────────
+    // See the note on LOOK in casino-slot5.js. Every one of these was drawn for another part of the game and
+    // is reused here, because the alternative — twenty-four more images — buys nothing the pools do not
+    // already contain. What each set needed was never new art. It was a SPREAD.
     slot2: {
         label: "The Harvest",
-        blurb: "The kindest machine on the floor, and the shortest ceiling.",
+        blurb: "The kindest reels on the floor. The wagon fills slowly and empties all at once.",
+        // The kitchen. Dishes run warm, so the two that are not do the work: Moon Broth is the only cold
+        // thing on the reel and the Jam Roll the only pink one.
         art: {
-            // The Wolf's Table is the Den's grandest dish, so it is the jackpot. The gold pie is the symbol
-            // that drops a coin in a piggy bank, which is the right shape for it.
-            wolf: "cooking:r_wolfs_table",
-            chest: "cooking:r_gold_pie",
-            laurel: "cooking:r_harvest_pie",
-            moon: "cooking:r_porridge",
+            wolf: "cooking:r_jam_roll",
+            moon: "cooking:r_moon_broth",
+            chest: "cooking:r_pumpkin_soup",
+            laurel: "cooking:r_harvest_hash",
+            doubloon: "cooking:r_syrup_cake",
+            bone: "cooking:r_mash",
         },
     },
     slot4: {
         label: "The Menagerie",
-        blurb: "The same patience as The Hunt, for twice the top prize.",
+        blurb: "Something is always moving. Three moons and it starts again.",
+        // Picked by matching each pet's own catalogue colour to the rung. The Chameleon fell out of that as
+        // the wild, which is the joke writing itself: an animal that turns into whatever is beside it.
         art: {
-            wolf: "pet:eternal_wolf",
-            chest: "pet:elder_dragon",
-            laurel: "pet:griffin",
-            bone: "pet:bear_cub",
-            moon: "pet:wolf_pup",
+            wolf: "pet:chameleon",
+            moon: "pet:spirit_fox",
+            chest: "pet:radiant_phoenix",
+            laurel: "pet:golem_heart",
+            doubloon: "pet:copper_kettle",
+            bone: "pet:wolf_pup",
         },
     },
     slot5: {
         label: "The Vault",
-        blurb: "Rarely opens. Opens enormously.",
+        blurb: "It rarely opens. When it does, it opens all the way.",
+        // Cut gems — a colour ladder somebody already built. Five stones in five hues, and the Wolf's Eye,
+        // the secret sixth, as the scatter.
         art: {
-            wolf: "item:primordial_primordial_blade",
-            chest: "item:celestial_celestial_blade",
-            laurel: "item:eternal_infinity",
-            doubloon: "item:ascendant_crown",
-            bone: "item:golden_crown",
-            moon: "item:rusty_sword",
+            wolf: "/images/gems/amethyst_t5.png",
+            moon: "/images/gems/wolfeye_t5.png",
+            chest: "/images/gems/ruby_t4.png",
+            laurel: "/images/gems/emerald_t3.png",
+            doubloon: "/images/gems/topaz_t2.png",
+            bone: "/images/gems/sapphire_t1.png",
         },
     },
     slot3: {
         label: "The Deep",
-        blurb: "Only triples and starfish pay. One triple pays a fortune.",
+        blurb: "Little comes up. What does is enormous.",
+        // Cold water, so the rule inverts: everything down here is cold and the two features are the only
+        // warm things in the machine. A starfish is also the one silhouette on the floor that nothing else
+        // can be confused with.
         art: {
-            wolf: "/images/fish/fish_leviathan.png",
-            moon: "/images/fish/fish_kraken.png",
-            chest: "/images/fish/fish_whale.png",
-            laurel: "/images/fish/fish_swordfish.png",
+            wolf: "/images/fish/fish_kraken.png",
             star: "/images/fish/fish_starfish.png",
-            bone: "/images/fish/fish_sardine.png",
+            chest: "/images/fish/fish_crab.png",
+            laurel: "/images/fish/fish_tidewyrm.png",
+            doubloon: "/images/fish/fish_mackerel.png",
+            bone: "/images/fish/fish_herring.png",
         },
     },
 };

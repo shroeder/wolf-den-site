@@ -22,6 +22,31 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 // faces here across a year of bonus rounds, and somebody who owns none still gets a full paddock — see
 // petsForPick, which falls back rather than showing an empty field.
 
+// ── ONE PICK GAME, THREE SUBJECTS ────────────────────────────────────────────────────────────────────────────
+// The Hunt pets its animals in a field, The Deep hauls them up in a net, The Vault opens what it finds. Same
+// interaction — tap, something gives you a number, one of them ends it — with a different place, a different
+// verb and a different pool.
+//
+// ONE COMPONENT, not three. Three copies of a pick game means two of them stop getting the fixes: the pop
+// that lands on the wrong thing, the orphaned row, the unreadable caption — all three were found once here
+// and would have had to be found again twice more.
+const SKIN = {
+    pen: { title: "The petting pen", say: "Pet them one at a time. One of them will have had enough.",
+        done: "That is the lot. Well done.", verbs: ["nuzzles you", "rolls over", "headbutts your hand",
+            "purrs", "thumps its tail", "leans in", "chirps at you", "flops down happily"],
+        endWord: "has had enough" },
+    trawl: { title: "The trawl", say: "Haul the net up, one at a time. Something down there will cut it.",
+        done: "The net is empty. Back up you go.",
+        verbs: ["comes up thrashing", "is heavier than it looks", "glitters", "surfaces slowly",
+            "brings the net taut", "is worth the trip", "shines in the dark", "was hiding down there"],
+        endWord: "cuts the net" },
+    locks: { title: "The locks", say: "One lock at a time. One of them is holding the door shut.",
+        done: "The door is closed again.",
+        verbs: ["gives", "clicks open", "turns easily", "yields", "falls away", "opens clean",
+            "was barely holding", "comes apart"],
+        endWord: "will not turn" },
+};
+
 const FARM_BG = {
     day: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838066440-671862.png",
     dusk: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838089019-734565.png",
@@ -30,7 +55,11 @@ const FARM_BG = {
 };
 // The same sky the farm would be showing right now. A pen that is always noon while the farm next door is at
 // dusk is two different farms.
-function skyNow() {
+function skyNow(board) {
+    // The Deep is under water and The Vault has no windows, so neither takes the farm's hour — only the pen
+    // does, because only the pen is outdoors on the farm.
+    if (board === "trawl") return FARM_BG.night;
+    if (board === "locks") return FARM_BG.dusk;
     const h = new Date().getHours();
     if (h < 6) return FARM_BG.night;
     if (h < 9) return FARM_BG.dawn;
@@ -41,17 +70,15 @@ function skyNow() {
 
 // What each pet says when you reach it. Nothing here is mechanical — it is the difference between a number
 // appearing and an animal giving you something.
-const HAPPY = ["nuzzles you", "rolls over", "headbutts your hand", "purrs", "thumps its tail", "leans in",
-    "chirps at you", "flops down happily"];
-const DONE = "has had enough";
-
 export default function PettingPen({ pick, onDone }) {
     const [turned, setTurned] = useState([]);     // indexes already petted, in order
     const [pop, setPop] = useState(null);         // { i, text, kind }
     const [shown, setShown] = useState(0);        // the running total, counting up
     const [bump, setBump] = useState(-1);         // which pet is mid-animation
     const timers = useRef([]);
-    const sky = useMemo(() => skyNow(), []);
+    const board = pick?.board || "pen";
+    const skin = SKIN[board] || SKIN.pen;
+    const sky = useMemo(() => skyNow(board), [board]);
 
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -92,7 +119,7 @@ export default function PettingPen({ pick, onDone }) {
         timers.current.push(setTimeout(() => setBump(-1), 520));
 
         if (card.kind === "end") {
-            setPop({ i, kind: "end", text: DONE });
+            setPop({ i, kind: "end", text: skin.endWord });
             Cas.lose();
             Haptic.hit(0.7);
             timers.current.push(setTimeout(() => onDone(), 1500));
@@ -107,19 +134,19 @@ export default function PettingPen({ pick, onDone }) {
         setPop({ i, kind: "chips", text: `+${(each[i] || 0).toLocaleString()}` });
         Cas.coins(Math.min(1, (each[i] || 0) / 300));
         Haptic.hit(0.45);
-    }, [over, turned, cards, each, onDone]);
+    }, [over, turned, cards, each, onDone, skin]);
 
     return (
         <div className="pen" style={{ backgroundImage: `url(${sky})` }}>
             <div className="pen-sky" aria-hidden="true" />
 
             <div className="pen-head">
-                <i>The petting pen</i>
+                <i>{skin.title}</i>
                 <b>{shown.toLocaleString()}</b>
                 <em>chips</em>
             </div>
             <p className="pen-say">
-                {over ? "That is the lot. Well done." : "Pet them one at a time. One of them will have had enough."}
+                {over ? skin.done : skin.say}
             </p>
 
             {/* THREE ACROSS FOR A SMALL FLOCK, FOUR FOR A BIG ONE. Nine pets in four columns leaves a single
@@ -133,7 +160,7 @@ export default function PettingPen({ pick, onDone }) {
                             className={`pen-pet${done ? " is-done" : ""}${bump === i ? " is-bump" : ""}${over && !done ? " is-out" : ""}`}
                             disabled={over || done}
                             onClick={() => pet(i)}
-                            aria-label={done ? `${p.name} — already petted` : `Pet the ${p.name}`}>
+                            aria-label={done ? `${p.name} — already taken` : `${board === "pen" ? "Pet" : "Take"} the ${p.name}`}>
                             {/* The pop sits on the animal that gave it, not in a corner of the screen. A number
                                 that appears somewhere else is a number you have to go and find. */}
                             {pop?.i === i ? <span className={`pen-pop is-${pop.kind}`}>{pop.text}</span> : null}
@@ -141,7 +168,7 @@ export default function PettingPen({ pick, onDone }) {
                                 // eslint-disable-next-line @next/next/no-img-element
                                 ? <img src={p.url} alt="" draggable="false" />
                                 : <span className="pen-noart" aria-hidden="true">?</span>}
-                            <span className="pen-name">{done ? (c.kind === "end" ? DONE : HAPPY[i % HAPPY.length]) : p.name}</span>
+                            <span className="pen-name">{done ? (c.kind === "end" ? skin.endWord : skin.verbs[i % skin.verbs.length]) : p.name}</span>
                         </button>
                     );
                 })}

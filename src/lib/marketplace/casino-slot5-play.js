@@ -122,6 +122,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         free: r.free ? {
             offer: offer.id,
             label: offer.label,
+            // Which of the five shapes this cabinet's round is — the screen names it, because "ten spins"
+            // means something different on a machine whose multiplier climbs than on one whose wilds stick.
+            kind: r.free.kind || m.free?.kind || "deals",
+            added: r.free.added || 0,
             mult: FREE_SPIN_OFFERS.find((o) => o.id === offer.id)?.mult || 1,
             // Each free spin carries its winning LINES in chips, exactly like the base spin does, because the
             // screen draws them exactly like the base spin does. Sending the raw engine wins meant the round
@@ -152,7 +156,24 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             chips: chipsFor(stake, r.pick.total / stake),
             // Per card, in the same order, so the screen never has to pair them up itself.
             each: r.pick.picked.map((c) => (c.kind === "chips" ? chipsFor(stake, (c.value * (stake / LINES.length)) / stake) : 0)),
-            pets: await petsForPick(buyerId, r.pick.picked.length),
+            pets: await petsForPick(buyerId, r.pick.picked.length, m.second?.board),
+            // Which skin the pick wears. One game, three subjects — see PickGame.
+            board: m.second?.board || "pen",
+            label: m.second?.label || "The Pick",
+        } : null,
+        // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────
+        // The Wagon and the Stampede. Every respin is sent, so the screen can play the round out coin by
+        // coin instead of announcing a total — the same reason the free spins carry their grids.
+        hold: r.hold ? {
+            label: m.second?.label || "Hold and Spin",
+            trigger: m.second?.trigger,
+            steps: r.hold.steps.map((st) => ({ held: st.held, got: st.got, left: st.left })),
+            filled: r.hold.filled,
+            full: r.hold.full,
+            chips: chipsFor(stake, r.hold.total / stake),
+            // Per cell, in chips, so the screen never converts anything itself.
+            cellChips: r.hold.steps[r.hold.steps.length - 1].held.map(
+                (v) => (v ? chipsFor(stake, (v * (stake / LINES.length)) / stake) : 0)),
         } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,
@@ -163,6 +184,12 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     };
 }
 
+// The animals The Deep can haul up. Named rather than derived: a pet's catalogue entry has no "lives in
+// water" flag, and inventing one to serve a single bonus round is a schema change to avoid a list.
+const SEA_PETS = new Set(["crab", "turtle", "marlin", "dolphin", "penguin", "seahorse", "octopus", "squid",
+    "reef_fish", "shark", "narwhal", "jellyfish", "starfish", "lobster", "eel", "pufferfish", "manta",
+    "deep_angler", "coelacanth", "whale", "seal", "otter", "walrus", "swordfish", "tuna"]);
+
 // ── WHOSE PETS ───────────────────────────────────────────────────────────────────────────────────────────────
 // The member's own, because a bonus round where you pet YOUR animals is a different thing from one where you
 // tap anonymous boxes — the pets are the thing they have been collecting all along, and this is the only place
@@ -171,11 +198,19 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 // Falls back to the whole catalogue for anybody who owns none yet, rather than showing an empty paddock: a
 // bonus round that looks broken because you have not played another feature is worse than a generic one.
 // Sprites come from mkt_pet_sprite, the same table the farm and the boss screen read.
-async function petsForPick(buyerId, count) {
+async function petsForPick(buyerId, count, board) {
     const owned = await db.query(
         `SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
     let ids = owned.map((r) => r.ref).filter(Boolean);
     if (ids.length < 3) ids = COLLECTIBLES.slice(0, 24).map((p) => p.id);
+    // ── THE TRAWL HAULS UP WHAT LIVES DOWN THERE ─────────────────────────────────────────────────────
+    // The Deep's pick is a net coming up, so it is filtered to the sea animals the member owns. Falls back
+    // to the whole collection rather than an empty net if they own none — the same rule as everywhere else
+    // here: a feature must never look broken because you have not played another one.
+    if (board === "trawl") {
+        const sea = ids.filter((id) => SEA_PETS.has(id));
+        if (sea.length >= 3) ids = sea;
+    }
     const art = await db.query(
         `SELECT pet_id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [ids]).catch(() => []);
     const urls = new Map(art.map((r) => [r.pet_id, r.url]));

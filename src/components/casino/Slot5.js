@@ -6,6 +6,7 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, slot5 } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import PettingPen from "@/components/casino/PettingPen.js";
+import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -209,7 +210,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             onDone: () => {
                 const m = slot5(machineId);
                 if (r.free) { flashTrigger(m.scatter, () => announceFree(r)); return; }
-                if (r.pick) { flashTrigger(m.bonus, () => setPhase("pick")); return; }
+                if (r.pick || r.hold) {
+                    // The symbol that opened it — a hold's coin or a pick's bonus symbol, whichever this
+                    // cabinet uses. Flashing the wrong one is worse than flashing none.
+                    flashTrigger(r.hold ? r.hold.trigger : m.bonus, () => setPhase("pick"));
+                    return;
+                }
                 setPhase("done");
             },
         });
@@ -317,10 +323,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // ── THE BONUS TAKES THE WHOLE BOARD ──────────────────────────────────────────────────────────────────
     // Before the cabinet, the readout, the panel and the owner row — all of it. A bonus round that plays in a
     // strip under the reels is a bonus round competing with the machine it came from.
-    if (phase === "pick" && result?.pick) {
+    if (phase === "pick" && (result?.pick || result?.hold)) {
         return (
             <div className="s5 is-bonus">
-                <PettingPen pick={result.pick} onDone={() => setPhase("done")} />
+                {result.hold
+                    ? <HoldAndSpin hold={result.hold} onDone={() => setPhase("done")} />
+                    : <PettingPen pick={result.pick} onDone={() => setPhase("done")} />}
             </div>
         );
     }
@@ -368,8 +376,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}`}
-                                        key={i} style={{ "--tone": symbolTone(sym) }}>
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}`}
+                                        key={i} style={{ "--tone": symbolTone(sym, machineId) }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
                                             className={`${lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""}${flashSym && sym === flashSym && landed > reel ? " is-flash-img" : ""}`.trim()} />
@@ -425,7 +433,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-shout" role="status">
                     <i>The moon is up</i>
                     <b>FREE SPINS</b>
-                    <em>{result.free.spins.length} spins, everything &times;{result.free.mult}</em>
+                    <em>{result.free.label}</em>
                 </div>
             ) : null}
 

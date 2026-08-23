@@ -51,25 +51,85 @@
 // without being taught it — and the two symbols that are not part of the ladder at all sit outside it on
 // purpose. The scatter is the only cold bright thing on the reel and the wild is the only violet one; neither
 // can be mistaken for a paying symbol, which is exactly what they are not.
-export const SYMBOL_LOOK = {
-    bone: { rank: 1, role: "low", tone: "#8fa3b8",
-        look: "COOL SLATE GREY-BLUE, plain and unglamorous — the cheapest thing on the reel" },
-    doubloon: { rank: 2, role: "low", tone: "#d99a3c",
-        look: "WARM COPPER and old bronze, dull rather than bright" },
-    laurel: { rank: 3, role: "mid", tone: "#4fc98a",
-        look: "RICH EMERALD GREEN with pale gold edging, the first symbol on the reel that looks valuable" },
-    chest: { rank: 4, role: "bonus", tone: "#ff8c2b",
-        look: "BLAZING AMBER-ORANGE, hot light spilling out of it, the brightest warm thing on the reel" },
-    moon: { rank: 5, role: "scatter", tone: "#7ad4ff",
-        look: "ICE-BLUE and silver-white, glowing cold — the ONLY cold bright colour on the whole reel, so it "
-            + "cannot be mistaken for anything that pays on a line" },
-    wolf: { rank: 6, role: "wild", tone: "#b47cff",
-        look: "DEEP VIOLET and amethyst with a bright GOLD rim light — the only violet on the reel, and the "
-            + "richest thing on it. It substitutes for every other symbol, so it must look like none of them" },
+// PER CABINET, because the ladder has to work against THAT machine's frame and THAT machine's neighbours.
+// Five cabinets sharing one palette is the monotone problem again at floor level rather than reel level: you
+// would not be able to tell which machine a screenshot came from. Each keeps the same GRAMMAR — cool and
+// plain at the bottom, warm and rich at the top, the scatter the only cold bright thing, the wild the only
+// one of its colour — and changes the hues.
+// ── CHOSEN, NOT DRAWN ────────────────────────────────────────────────────────────────────────────────────────
+// Luke, stopping a run that was about to generate twenty-four more images: "I thought we were reusing sprites
+// from different themes." He was right, and it would have been a waste of money as well as of art — the Den
+// already owns 113 pets, 137 dishes, 469 items, 34 fish and 30 cut gems, all drawn to the same house style.
+//
+// So the ladder is a SELECTION problem rather than a generation one. What went wrong on The Hunt's first pass
+// was never that the sprites were reused; it was that the six reused sprites were all brown. Pick for colour
+// and the same pool that produced a monotone reel produces a readable one.
+//
+// Each cabinet keeps its theme and gains a spread. `name` matters as much as `tone`: the symbol IDS are shared
+// across all five machines, so without it a paytable calls a jam roll "Wolf" and a starfish "Star".
+const LOOK = {
+    // ── THE HUNT ── the one cabinet with purpose-drawn symbols, because it was rebuilt before this was.
+    slot: {
+        bone: { rank: 1, role: "low", tone: "#8fa3b8", name: "Bone" },
+        doubloon: { rank: 2, role: "low", tone: "#d99a3c", name: "Doubloon" },
+        laurel: { rank: 3, role: "mid", tone: "#4fc98a", name: "Laurel" },
+        chest: { rank: 4, role: "bonus", tone: "#ff8c2b", name: "Chest" },
+        moon: { rank: 5, role: "scatter", tone: "#7ad4ff", name: "Moon" },
+        wolf: { rank: 6, role: "wild", tone: "#b47cff", name: "Wolf" },
+    },
+    // ── THE HARVEST ── the kitchen. Dishes run warm, so the two that are not warm do the heavy lifting:
+    // Moon Broth is the only cold thing on the reel and the Jam Roll the only pink one.
+    slot2: {
+        bone: { rank: 1, role: "low", tone: "#d9c9a8", name: "Mash" },
+        doubloon: { rank: 2, role: "low", tone: "#e0a83f", name: "Syrup Cake" },
+        laurel: { rank: 3, role: "mid", tone: "#7bbf4a", name: "Harvest Hash" },
+        chest: { rank: 4, role: "bonus", tone: "#ff7a45", name: "Pumpkin Soup" },
+        moon: { rank: 5, role: "scatter", tone: "#8fd8ff", name: "Moon Broth" },
+        wolf: { rank: 6, role: "wild", tone: "#e0559b", name: "Jam Roll" },
+    },
+    // ── THE DEEP ── cold water, so the rule inverts: everything is cold and the two features are the only
+    // warm things down there. A starfish is also the one silhouette on the floor nothing can be confused with.
+    slot3: {
+        bone: { rank: 1, role: "low", tone: "#8fa8bd", name: "Herring" },
+        doubloon: { rank: 2, role: "low", tone: "#4fa8a0", name: "Mackerel" },
+        laurel: { rank: 3, role: "mid", tone: "#45d8e8", name: "Tidewyrm" },
+        chest: { rank: 4, role: "bonus", tone: "#e34b3a", name: "Crab" },
+        star: { rank: 5, role: "scatter", tone: "#ffcc44", name: "Starfish" },
+        wolf: { rank: 6, role: "wild", tone: "#8b5aa8", name: "Kraken" },
+    },
+    // ── THE MENAGERIE ── the member's own menagerie, picked by matching each pet's catalogue colour to the
+    // rung. The Chameleon fell out of that as the wild, which is the joke writing itself: an animal that
+    // turns into whatever is next to it.
+    slot4: {
+        bone: { rank: 1, role: "low", tone: "#9aa7b5", name: "Wolf Pup" },
+        doubloon: { rank: 2, role: "low", tone: "#e8a33d", name: "Copper Kettle" },
+        laurel: { rank: 3, role: "mid", tone: "#37f5c0", name: "Golem Heart" },
+        chest: { rank: 4, role: "bonus", tone: "#ffd75e", name: "Radiant Phoenix" },
+        moon: { rank: 5, role: "scatter", tone: "#8fd3ff", name: "Spirit Fox" },
+        wolf: { rank: 6, role: "wild", tone: "#b45aff", name: "Chameleon" },
+    },
+    // ── THE VAULT ── cut gems, which are a colour ladder somebody already built: five stones in five hues,
+    // and the Wolf's Eye — the secret sixth — as the scatter.
+    slot5: {
+        bone: { rank: 1, role: "low", tone: "#4a7fb5", name: "Sapphire" },
+        doubloon: { rank: 2, role: "low", tone: "#e0b03a", name: "Topaz" },
+        laurel: { rank: 3, role: "mid", tone: "#3fc98a", name: "Emerald" },
+        chest: { rank: 4, role: "bonus", tone: "#e8434f", name: "Ruby" },
+        moon: { rank: 5, role: "scatter", tone: "#e8dcc6", name: "Wolf's Eye" },
+        wolf: { rank: 6, role: "wild", tone: "#a855f7", name: "Amethyst" },
+    },
 };
 
-export const symbolTone = (id) => SYMBOL_LOOK[id]?.tone || "#cbd3dc";
-export const symbolRole = (id) => SYMBOL_LOOK[id]?.role || "low";
+// The Hunt's ladder is the default for anything that asks without naming a cabinet.
+export const SYMBOL_LOOK = LOOK.slot;
+export const lookFor = (machineId, sym) => (LOOK[machineId] || LOOK.slot)[sym] || LOOK.slot[sym] || null;
+export const MACHINE_LOOKS = LOOK;
+
+export const symbolTone = (id, machineId = "slot") => lookFor(machineId, id)?.tone || "#cbd3dc";
+// What this cabinet calls it. The symbol IDS are shared across all five machines and the ART is not, so
+// without this a paytable calls a jam roll "Wolf" and a cut amethyst "Wolf" as well.
+export const symbolName = (id, machineId = "slot") => lookFor(machineId, id)?.name || id;
+export const symbolRole = (id, machineId = "slot") => lookFor(machineId, id)?.role || "low";
 
 // ── THE TWENTY LINES ─────────────────────────────────────────────────────────────────────────────────────────
 // Row index per reel, 0 top, 1 middle, 2 bottom. The order matters: the first three are the straight lines

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { SLOTS5, SYMBOL_LOOK, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { SLOTS5, lookFor, LINES } from "@/lib/marketplace/casino-slot5.js";
 
 // ── WHAT IT PAYS ─────────────────────────────────────────────────────────────────────────────────────────────
 // Every real cabinet has this behind a button and it is not decoration: a slot machine is the only game in the
@@ -43,8 +43,8 @@ function rowsForFive(machineId, bet, rate) {
     const rows = Object.entries(m.pays)
         .map(([id, by]) => ({
             id,
-            role: SYMBOL_LOOK[id]?.role || "low",
-            tone: SYMBOL_LOOK[id]?.tone || "#cbd3dc",
+            role: lookFor(machineId, id)?.role || "low",
+            tone: lookFor(machineId, id)?.tone || "#cbd3dc",
             cells: [3, 4, 5].map((n) => (by[n] ? chips(by[n]) : null)),
         }))
         .sort((a, b) => (b.cells[2] || 0) - (a.cells[2] || 0));
@@ -53,7 +53,7 @@ function rowsForFive(machineId, bet, rate) {
     const sc = {
         id: m.scatter,
         role: "scatter",
-        tone: SYMBOL_LOOK[m.scatter]?.tone || "#cbd3dc",
+        tone: lookFor(machineId, m.scatter)?.tone || "#cbd3dc",
         cells: [3, 4, 5].map((n) => (m.scatterPays[n] ? Math.max(1, Math.round(bet * m.scatterPays[n] * rate)) : null)),
     };
     return { rows: [...rows, sc], heads: ["3", "4", "5"], m };
@@ -136,14 +136,19 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                     <ul className="pt-notes">
                         <li>Lines pay <b>left to right</b> from the first reel. A run that starts on reel two pays nothing.</li>
                         <li>
-                            <b style={{ color: SYMBOL_LOOK[m.wild]?.tone }}>{pretty(m.wild)}</b> is <b>wild</b> —
+                            <b style={{ color: lookFor(machineId, m.wild)?.tone }}>{pretty(m.wild)}</b> is <b>wild</b> —
                             it stands in for any symbol except the {m.scatter}, and it only appears on the middle three reels.
                         </li>
                         <li>
-                            <b style={{ color: SYMBOL_LOOK[m.scatter]?.tone }}>{pretty(m.scatter)}</b> pays from
+                            <b style={{ color: lookFor(machineId, m.scatter)?.tone }}>{pretty(m.scatter)}</b> pays from
                             <b> anywhere</b>, on your whole bet rather than on a line. Three of them open the free spins.
                         </li>
-                        <li>Five <b style={{ color: SYMBOL_LOOK[m.bonus]?.tone }}>{m.bonus}s</b> anywhere open the pick.</li>
+                        <li>
+                            {m.second?.kind === "hold"
+                                ? <>{m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{m.second.trigger}s</b> anywhere open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.</>
+                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{m.bonus}s</b> anywhere open <b>{m.second?.label || "the pick"}</b>.</>}
+                        </li>
+                        <li>The free round here: <b>{m.free?.label}</b>.</li>
                     </ul>
                 ) : null}
             </div>
