@@ -19202,7 +19202,7 @@ body.cas-seated .social-fab { display: none; }
    The animation here is the feature rather than decoration: a burrow rocks, then critters hop out one at
    a time and the total ticks with each one. Four separate timings, deliberately not collapsed into one —
    see the note in TheWarren.js. */
-.wr { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; gap: 12px;
+.wr { position: relative; display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 10px;
     padding: 14px 12px 16px; border-radius: 16px; isolation: isolate;
     border: 1px solid rgba(255, 226, 150, .3); box-shadow: 0 8px 26px rgba(0, 0, 0, .55);
     animation: penIn .4s cubic-bezier(.2, 1.3, .4, 1) both; }
@@ -19251,63 +19251,75 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); transition: background .3s ease, box-shadow .3s ease; }
 .wr-depth span.is-on { background: #ffd75e; box-shadow: 0 0 12px rgba(255, 215, 94, .9); }
 
-.wr-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-self: center;
-    justify-self: center; width: 100%; max-width: 336px; }
+/* ── THE WALL, AND THE FLOOR UNDER IT ────────────────────────────────────────────────────────────
+   Fifteen eggs hanging five across, with the bottom third of the screen left empty for whatever comes
+   out of them. That empty third is not wasted — it is the stage, and it is the difference between a
+   grid of buttons and a place where something is happening. */
+.wr-wall { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; align-content: start;
+    justify-self: center; width: 100%; max-width: 348px; padding-top: 2px; }
 
-/* Luke: "the eggs look better" every stage. They are drawn from the room's own palette, so the board
-   itself climbs — earth, then drowned stone, then firelit, then starlit, then gold. */
-.wr-nest { position: relative; aspect-ratio: 1; border-radius: 14px; cursor: pointer; border: none;
-    overflow: visible;
-    background: radial-gradient(circle at 50% 38%, var(--nest-a, #4a3a22), var(--nest-b, #241a10) 70%);
-    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 var(--nest-rim, rgba(255, 226, 150, .25)),
-        0 0 16px var(--nest-glow, transparent), 0 4px 12px rgba(0, 0, 0, .55);
-    transition: transform .16s ease, opacity .35s ease; }
-.wr-nest:active:not(:disabled) { transform: scale(.94); }
-/* The mouth of the burrow — a dark hole with a lip, so a tile reads as something you open rather than as
-   a button with a gradient on it. */
-.wr-lid { position: absolute; inset: 22%; border-radius: 50%;
-    background: radial-gradient(circle at 50% 35%, rgba(0, 0, 0, .55), #06040a 78%);
-    box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95), 0 0 0 2px var(--nest-rim, rgba(255, 226, 150, .22)); }
-/* The Hoard is the same palette turned all the way up — it is the only room that glows on its own. */
-.wr.is-hoard { --nest-a: #9a7c22; --nest-b: #3a2c08; --nest-rim: rgba(255, 236, 170, .8);
-    --nest-glow: rgba(255, 215, 94, .75);
-    --room-wash: linear-gradient(180deg, rgba(255, 190, 40, .3), rgba(80, 55, 6, .32)); }
+.wr-egg { position: relative; aspect-ratio: .86; border: none; background: none; padding: 0;
+    cursor: pointer; display: grid; place-items: center;
+    transition: transform .16s ease, opacity .4s ease, filter .4s ease; }
+.wr-egg img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .7)) drop-shadow(0 0 10px var(--nest-glow, transparent)); }
+.wr-egg:active:not(:disabled) { transform: scale(.92); }
 
-/* THE SHAKE IS WHERE THE HOPE LIVES. Seven hundred milliseconds of a burrow rocking before anything is
+/* THE SHAKE IS WHERE THE HOPE LIVES. Seven hundred milliseconds of an egg rocking before anything is
    known. Collapsing this into the reveal is exactly what turns the feature back into tap-and-read. */
-.wr-nest.is-shaking { animation: wrShake .7s cubic-bezier(.36, .07, .19, .97); z-index: 3; }
+.wr-egg.is-shaking { animation: wrShake .7s cubic-bezier(.36, .07, .19, .97); z-index: 3; }
 @keyframes wrShake {
     0%, 100% { transform: rotate(0) scale(1); }
-    12% { transform: rotate(-7deg) scale(1.05); }
-    28% { transform: rotate(6deg) scale(1.07); }
-    44% { transform: rotate(-8deg) scale(1.09); }
-    60% { transform: rotate(7deg) scale(1.11); }
-    78% { transform: rotate(-4deg) scale(1.13); }
+    12% { transform: rotate(-9deg) scale(1.06); }
+    28% { transform: rotate(8deg) scale(1.09); }
+    44% { transform: rotate(-10deg) scale(1.12); }
+    60% { transform: rotate(9deg) scale(1.14); }
+    78% { transform: rotate(-5deg) scale(1.16); }
 }
-.wr-nest.is-open { opacity: .28; cursor: default; }
-.wr-nest.is-open .wr-lid { box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95); }
+/* An opened egg is gone rather than dimmed — the wall visibly empties as the room is worked through. */
+.wr-egg.is-open { opacity: .16; transform: scale(.8); cursor: default; filter: grayscale(.7); }
 
-/* ── AND THEY HOP OUT ─────────────────────────────────────────────────────────────────────────────────
-   One at a time, arcing up out of the burrow they came from — anchored to that tile rather than to the
-   middle of the screen, because an animal appearing somewhere other than the hole you opened is just a
-   number with a picture on it. */
-.wr-hop { position: absolute; left: 50%; top: 50%; z-index: 5; pointer-events: none;
-    display: grid; justify-items: center; gap: 2px;
-    animation: wrHop 1.5s cubic-bezier(.25, .9, .35, 1) both; }
-/* At 54px in a 92px tile these read as specks, and the animal IS the reward — a critter you cannot
-   identify is a number with a smudge next to it. Big enough to see what came out, and the arc lifts
-   clear of the board so it is never behind the next burrow. */
-.wr-hop img { width: 78px; height: 78px; object-fit: contain;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .8)); }
-.wr-hop u { text-decoration: none; padding: 2px 9px; border-radius: 999px; font-size: 13px; font-weight: 900;
-    background: #ffd75e; color: #2a1c05; box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
-    font-variant-numeric: tabular-nums; }
-@keyframes wrHop {
-    0% { transform: translate(-50%, -20%) scale(.4); opacity: 0; }
-    22% { transform: translate(calc(-50% + var(--dx) * .55), calc(-50% - var(--lift))) scale(1.06); opacity: 1; }
-    38% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * .72)) scale(1); opacity: 1; }
-    72% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * .82)) scale(1); opacity: 1; }
-    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% - var(--lift) * 1.5)) scale(.9); opacity: 0; }
+.wr-floor { position: relative; min-height: 128px; align-self: end; }
+
+/* ── AND THEY LAND ON IT ─────────────────────────────────────────────────────────────────────────
+   One at a time, dropping in from the wall above, bouncing twice, and then staying — because the crowd
+   on the floor IS the count. Eight animals still standing there when the eighth arrives says "eight"
+   faster than any number can. */
+.wr-critter { position: absolute; bottom: 4px; z-index: 4; pointer-events: none;
+    display: grid; justify-items: center; gap: 2px; transform: translateX(-50%);
+    animation: wrDrop .62s cubic-bezier(.3, 1.5, .45, 1) var(--delay, 0ms) both; }
+.wr-critter img { width: 74px; height: 74px; object-fit: contain;
+    filter: drop-shadow(0 4px 7px rgba(0, 0, 0, .8));
+    animation: wrIdle 1.1s ease-in-out var(--delay, 0ms) infinite; }
+.wr-critter.is-flip img { transform: scaleX(-1); }
+.wr-critter u { text-decoration: none; padding: 2px 9px; border-radius: 999px; font-size: 13px;
+    font-weight: 900; background: #ffd75e; color: #2a1c05; box-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+    font-variant-numeric: tabular-nums;
+    animation: wrPill 1.4s cubic-bezier(.2, 1.3, .3, 1) var(--delay, 0ms) both; }
+@keyframes wrDrop {
+    0% { transform: translate(-50%, -190px) scale(.5); opacity: 0; }
+    45% { transform: translate(-50%, 0) scale(1.12); opacity: 1; }
+    62% { transform: translate(-50%, -26px) scale(.96); opacity: 1; }
+    80% { transform: translate(-50%, 0) scale(1.04); opacity: 1; }
+    90% { transform: translate(-50%, -8px) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+/* A small idle so a floor of eight animals is alive rather than a row of stickers. */
+@keyframes wrIdle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+.wr-critter.is-flip img { animation-name: wrIdleFlip; }
+@keyframes wrIdleFlip {
+    0%, 100% { transform: scaleX(-1) translateY(0); }
+    50% { transform: scaleX(-1) translateY(-5px); }
+}
+/* The value rises off the animal and stays up — it is what was just added, and it should be readable
+   while the next one is still dropping. */
+@keyframes wrPill {
+    0% { transform: translateY(14px) scale(.6); opacity: 0; }
+    40% { transform: translateY(-4px) scale(1.15); opacity: 1; }
+    100% { transform: translateY(-10px) scale(1); opacity: 1; }
 }
 
 .wr-say { margin: 0; min-height: 16px; text-align: center; font-size: 12px; color: #c2bab0;

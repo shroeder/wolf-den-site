@@ -711,11 +711,11 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
 // and the ceiling near 750x, which the old pick could not approach because a board you can clear has a hard
 // top. Half of all rounds still end in the first room; the difference is that they no longer pay nothing.
 const WARREN_STAGES = [
-    { key: "hollow", name: "The Hollow", pups: [1, 3], value: 15 },
-    { key: "sunken", name: "The Sunken Run", pups: [2, 4], value: 28 },
-    { key: "ember", name: "The Ember Seam", pups: [2, 5], value: 50 },
-    { key: "astral", name: "The Star Warren", pups: [3, 6], value: 90 },
-    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 155 },
+    { key: "hollow", name: "The Hollow", pups: [1, 3], value: 8 },
+    { key: "sunken", name: "The Sunken Run", pups: [2, 4], value: 15 },
+    { key: "ember", name: "The Ember Seam", pups: [2, 5], value: 27 },
+    { key: "astral", name: "The Star Warren", pups: [3, 6], value: 48 },
+    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 84 },
 ];
 // The room past the last stage. Six mounds, one of which is the Mother — so it pays two or three times on
 // average and can, very rarely, pay five.
@@ -723,7 +723,13 @@ export const HOARD_MOUNDS = 6;
 const HOARD_VALUE = 645;
 
 export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
-    const NESTS = 9;
+    // ── FIFTEEN, NOT NINE ────────────────────────────────────────────────────────────────────────────────
+    // A wall of eggs rather than a tic-tac-toe board, which is what the machine Luke is pointing at actually
+    // looks like — and it is not only cosmetic. With thirteen critter eggs against one Elder and one Mother
+    // the expected number of eggs opened per room goes from 2.3 to 4.3, so a room is a visit rather than two
+    // taps. Advancing is still a coin flip, so the ladder keeps its shape: the fifth room is one round in
+    // sixteen and the Hoard one in thirty-two.
+    const NESTS = 15;
     const stages = [];
     let total = 0;
     let stage = 0;

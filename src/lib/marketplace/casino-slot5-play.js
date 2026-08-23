@@ -270,7 +270,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // money rather than the client's arithmetic.
         warren: r.warren ? {
             label: m.second?.label || "The Warren",
-            board: 9,
+            board: 15,
             reached: r.warren.reached,
             full: r.warren.full,
             stages: r.warren.stages.map((st) => ({

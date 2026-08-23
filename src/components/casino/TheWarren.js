@@ -95,14 +95,22 @@ export default function TheWarren({ warren, onDone }) {
             const list = next.kind === "mound" ? [next.chips] : next.pups;
             for (let i = 0; i < list.length; i += 1) {
                 const chips = list[i];
+                // ── AND THEY LAND ON THE FLOOR ───────────────────────────────────────────────────────────
+                // Not beside the egg they came out of — down in the open ground under the wall, which is
+                // where the reference machine puts them and which is the better idea for a reason worth
+                // saying: eight animals out of one egg would pile on top of that egg and cover the board.
+                // Spread across the floor they stay separate, they stay visible while the next one arrives,
+                // and the growing crowd IS the count.
                 setHops((p) => [...p, {
                     id: `${stage}-${at}-${i}-${slot}`,
-                    slot,
                     chips,
                     art: pool.length ? pool[(i + at + stage) % pool.length] : null,
-                    // Fanned out so five animals out of one burrow do not stack into one shape.
-                    dx: (i - (list.length - 1) / 2) * 34 + (i % 2 ? 6 : -6),
-                    lift: 54 + (i % 3) * 16,
+                    // Walked across the floor rather than randomised: a random x collides with itself and a
+                    // pile of two overlapping animals reads as one animal.
+                    x: 10 + ((i * 23 + at * 11) % 80),
+                    // Small differences so a row of eight does not read as a printed pattern.
+                    flip: i % 2 === 0,
+                    delay: (i % 3) * 40,
                 }]);
                 setWon((n) => n + chips);
                 // Rising pitch down the line, so a long train sounds like a build rather than a loop.
@@ -171,27 +179,37 @@ export default function TheWarren({ warren, onDone }) {
                 </div>
             </div>
 
-            <div className={`wr-board${inHoard ? " is-mounds" : ""}`}>
+            {/* ── THE WALL ────────────────────────────────────────────────────────────────────────────
+                Fifteen eggs, five across, hanging above an open floor — which is what the machine Luke
+                pointed at actually looks like, and it beats a three-by-three grid of holes for a reason
+                that is not only cosmetic: a wall reads as a PLACE with things in it, and it leaves the
+                bottom of the screen empty for the animals to land in. */}
+            <div className="wr-wall">
                 {Array.from({ length: slots }, (_, i) => (
                     <button key={`${stage}-${inHoard}-${i}`} type="button"
-                        className={`wr-nest${shaking === i ? " is-shaking" : ""}${spent.includes(i) ? " is-open" : ""}`}
+                        className={`wr-egg${shaking === i ? " is-shaking" : ""}${spent.includes(i) ? " is-open" : ""}`}
                         disabled={busy || done || spent.includes(i)}
                         onClick={() => open(i)}
-                        aria-label={inHoard ? "Open a mound" : "Open a burrow"}>
-                        <span className="wr-lid" aria-hidden="true" />
-                        {/* The animals that came out of THIS burrow, hopping. Rendered inside it so they
-                            arc from the thing that was opened rather than from the middle of the screen. */}
-                        {hops.filter((h) => h.slot === i).map((h) => (
-                            <span key={h.id} className="wr-hop"
-                                style={{ "--dx": `${h.dx}px`, "--lift": `${h.lift}px` }}>
-                                {h.art
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    ? <img src={h.art} alt="" draggable="false" />
-                                    : null}
-                                <u>+{h.chips.toLocaleString()}</u>
-                            </span>
-                        ))}
+                        aria-label={inHoard ? "Open a mound" : "Open an egg"}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/images/casino/warren/${inHoard ? "dome" : room}.png`} alt="" draggable="false" />
                     </button>
+                ))}
+            </div>
+
+            {/* ── AND THE FLOOR THEY LAND ON ──────────────────────────────────────────────────────────
+                Deliberately empty. It is where everything that comes out of an egg ends up, and an empty
+                third of the screen is not wasted space here — it is the stage. */}
+            <div className="wr-floor">
+                {hops.map((h) => (
+                    <span key={h.id} className={`wr-critter${h.flip ? " is-flip" : ""}`}
+                        style={{ left: `${h.x}%`, "--delay": `${h.delay}ms` }}>
+                        <u>+{h.chips.toLocaleString()}</u>
+                        {h.art
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={h.art} alt="" draggable="false" />
+                            : null}
+                    </span>
                 ))}
             </div>
 
