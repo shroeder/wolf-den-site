@@ -223,6 +223,9 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
     const points = pts.available || 0;
     const colour = p.cls?.color || "#b061ff";
     const treeSpent = p.points?.spent || 0;
+    // Tree points EARNED but not yet put into a node. This is the whole reason the panel can read as
+    // broken — see the note on the sub-line below.
+    const treeUnspent = p.points?.available || 0;
     const chosen = skills.find((s) => s.id === sel) || null;
     const toNext = TREE_POINTS_PER_SKILL_POINT - (treeSpent % TREE_POINTS_PER_SKILL_POINT);
     const onTake = (id) => onAct("take_skill", { skillId: id });
@@ -239,17 +242,32 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                 <div className="skp-head-body">
                     <span className="skp-kick">Skills</span>
                     <b className="skp-title">What you can press in a fight</b>
-                    {/* At a rate of one the countdown sentence is nonsense — "1 more tree point for the next"
-                        is true on every single beat of the game and tells nobody anything. The rate decides
-                        which sentence gets written, rather than the sentence being written for a rate that has
-                        since changed underneath it. */}
+                    {/* ── SPENT, NOT EARNED ───────────────────────────────────────────────────────────
+                        This read "Every point the tree earns, you earn one here too", and that is simply
+                        not true: a skill point comes from a tree point you have SPENT, not one you have
+                        been given. Levelling up hands you a tree point and changes nothing on this screen
+                        until you go and put it into a node.
+
+                        JT and Kaishiern both messaged about it within a day of each other, in almost the
+                        same words — "it gave me a point towards the passive tree but nothing for the
+                        skills". They were not confused. They read the sentence, did what it said would
+                        happen, and the screen did not do it. Two people reporting the same thing is the
+                        signal; the sentence being wrong is the cause.
+
+                        And when the purse is empty because there is an unspent tree point sitting there,
+                        it says so, with the number — a dead end that explains itself is an instruction.
+
+                        At a rate of one the old countdown sentence was also nonsense: "1 more tree point
+                        for the next" is true on every beat of the game and tells nobody anything. */}
                     <p className="skp-sub">
-                        {TREE_POINTS_PER_SKILL_POINT === 1
-                            ? "Every point the tree earns, you earn one here too."
-                            : `Every ${TREE_POINTS_PER_SKILL_POINT} points in the tree earns 1 here. ${
-                                toNext === TREE_POINTS_PER_SKILL_POINT
-                                    ? "The next tree point starts the next one."
-                                    : `${toNext} more tree point${toNext === 1 ? "" : "s"} for the next.`}`}
+                        {points === 0 && treeUnspent > 0
+                            ? `Spend your ${num(treeUnspent)} tree point${treeUnspent === 1 ? "" : "s"} and you earn ${treeUnspent === 1 ? "one" : "that many"} here.`
+                            : TREE_POINTS_PER_SKILL_POINT === 1
+                                ? "Every point you SPEND in the tree earns you one here."
+                                : `Every ${TREE_POINTS_PER_SKILL_POINT} points spent in the tree earns 1 here. ${
+                                    toNext === TREE_POINTS_PER_SKILL_POINT
+                                        ? "The next tree point spent starts the next one."
+                                        : `${toNext} more tree point${toNext === 1 ? "" : "s"} for the next.`}`}
                     </p>
                 </div>
                 <div className={`skp-points${points > 0 ? " is-live" : ""}`}>
