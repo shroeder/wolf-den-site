@@ -693,6 +693,17 @@ export function runPick(m, { lineBet = 1, rng = Math.random } = {}) {
         const j = Math.floor(rng() * (i + 1));
         [board[i], board[j]] = [board[j], board[i]];
     }
+    // ── IT OPENS WITH A WIN, ALWAYS ──────────────────────────────────────────────────────────────────
+    // The payout is sum x mult, so a board that deals its multipliers first multiplies NOTHING and the whole
+    // bonus pays zero. Watched one do exactly that on The Deep: x5, then x2, then the net was cut. Three
+    // taps, a fanfare, a takeover screen, and "Take 0 chips".
+    //
+    // A bonus that can pay nothing is worse than no bonus, because the player spent the anticipation. So the
+    // first card is guaranteed to be a chips card — swapped forward rather than re-rolled, which keeps every
+    // other position uniformly shuffled — and a multiplier always has something to multiply.
+    const firstChips = board.findIndex((c) => c.kind === "chips");
+    if (firstChips > 0) { [board[0], board[firstChips]] = [board[firstChips], board[0]]; }
+
     let sum = 0; let mult = 1;
     const picked = [];
     for (const card of board) {

@@ -18983,9 +18983,11 @@ body.cas-seated .social-fab { display: none; }
 .hs-left u { text-decoration: none; margin-left: 5px; font-size: 9.5px; font-weight: 700;
     letter-spacing: .1em; text-transform: uppercase; color: #8f98a3; }
 
-.hs-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 6px;
-    align-content: center; }
-.hs-cell { position: relative; min-height: 54px; border-radius: 10px; display: grid; place-items: center;
+/* SQUARE CELLS, CENTRED — not stretched. Letting the rows take 1fr of a tall stage pulled every cell into
+   a 65x110 slot and the coins with them, so a board of coins came out as a board of lozenges. The grid
+   keeps its own shape and the stage's spare height goes around it. */
+.hs-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; align-self: center; }
+.hs-cell { position: relative; aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center;
     background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .08); }
 .hs-cell i { width: 6px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .1); }
 .hs-cell.is-held { background: linear-gradient(180deg, #6b5322, #3a2c11);
@@ -19084,11 +19086,11 @@ body.cas-seated .social-fab { display: none; }
 .lk-built > span.is-up { animation: lkUp .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes lkUp { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
-.lk-board { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 9px;
-    align-content: center; overflow: visible; }
+.lk-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px;
+    align-self: center; overflow: visible; }
 /* No aspect-ratio: the board owns the height now and the tiles divide it, so ten locks fill the stage
    as two proper rows rather than sitting as a strip at the top of it. */
-.lk-tile { position: relative; min-height: 62px; border-radius: 14px; cursor: pointer;
+.lk-tile { position: relative; aspect-ratio: 1; border-radius: 14px; cursor: pointer;
     display: grid; place-items: center; font-size: 24px; font-weight: 900;
     border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .05); color: #8f98a3;
     transition: transform .15s ease, opacity .3s ease; }

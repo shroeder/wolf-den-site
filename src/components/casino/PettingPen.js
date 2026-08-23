@@ -53,12 +53,20 @@ const FARM_BG = {
     night: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838349373-318702.png",
     dawn: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm-bg/1784838132569-798406.png",
 };
+// ── A DEEP-SEA NET HAUL OVER A RED BARN ──────────────────────────────────────────────────────────────────────
+// This function's own comment said "The Deep is under water, so it does not take the farm's hour" and the very
+// next line handed The Deep the farm's NIGHT SKY. So The Trawl — a net coming up out of the ocean, full of
+// squid and marlin — played against a barn, a fence, a tree and a field of grass.
+//
+// It only shows up if you look at it. The comment is right, the gate is green, the code compiles, and the
+// screen is a fishing bonus in a barnyard.
+const SEA_BG = "/images/sailing/battle-bg-night.webp";
+
 // The same sky the farm would be showing right now. A pen that is always noon while the farm next door is at
 // dusk is two different farms.
 function skyNow(board) {
-    // The Deep is under water and The Vault has no windows, so neither takes the farm's hour — only the pen
-    // does, because only the pen is outdoors on the farm.
-    if (board === "trawl") return FARM_BG.night;
+    // Only the pen is outdoors on the farm, so only the pen takes the farm's hour.
+    if (board === "trawl") return SEA_BG;
     if (board === "locks") return FARM_BG.dusk;
     const h = new Date().getHours();
     if (h < 6) return FARM_BG.night;

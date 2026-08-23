@@ -73,8 +73,13 @@ export default function HoldAndSpin({ hold, onDone }) {
     // the answer first does not weaken that; it removes it. Exactly what showing the free round's payout
     // before the free round did, and it is the same mistake: the screen was handed the ending and put it on
     // top of the beginning.
-    const onBoard = cur.held.reduce((a, v, i) => a + (v ? (hold?.cellChips?.[i] || 0) : 0), 0)
-        + (done && hold?.full ? (hold.fullBonus || 0) : 0);
+    // The final figure comes from the server, not from this sum: each cell is rounded to whole chips on its
+    // own, so fifteen of them added up disagree with the round's own total by a chip or two — and the header
+    // said 57 above a button offering 58. While it runs, the sum is the honest running answer; the moment it
+    // stops, the number is the one being paid.
+    const onBoard = done
+        ? Number(hold?.chips || 0)
+        : cur.held.reduce((a, v, i) => a + (v ? (hold?.cellChips?.[i] || 0) : 0), 0);
 
     return (
         <div className={`hs${hold?.full ? " is-full" : ""}`}>
