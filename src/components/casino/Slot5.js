@@ -462,16 +462,29 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const skipFree = useCallback(() => {
         clearTimers();
         const r = resultRef.current;
-        if (!r?.free) return;
+        // ── SKIP THE ROUND YOU ARE IN ────────────────────────────────────────────────────────────────────
+        // This was hardcoded to `r.free`, from when that was the only round a spin could open. With the
+        // locking round it broke three ways at once: on a spin that opened ONLY the locking round the
+        // button did nothing at all (`if (!r.free) return`), on a spin that opened both it jumped to the
+        // end of the SCATTER round while you were watching the locking one — wrong grid, wrong total — and
+        // it handed off on `r.pick`, which no longer exists, so a pending hold was swallowed.
+        const cur = r?.[round];
+        if (!cur) return;
+        const last = cur.spins[cur.spins.length - 1];
         setShowLine(-1);
         setActiveWins([]);
         // Skipping IS asking for the end, so the full length is the right thing to land on.
-        setFreeIdx(r.free.spins.length - 1);
-        setFreeWon(r.free.spins.reduce((a, sp) => a + sp.chips, 0));
-        setGrid(r.free.spins[r.free.spins.length - 1].grid);
+        setFreeIdx(cur.spins.length - 1);
+        setFreeWon(cur.spins.reduce((a, sp) => a + sp.chips, 0));
+        setGrid(last.grid);
+        // The board as it finished — every wild that welded over the round, since that is what the last
+        // grid was actually played on.
+        setLockedAt([...(last.held || []), ...(last.justHeld || [])]);
         setLanded(REELS);
-        setPhase(r.pick ? "pick" : "freeDone");
-    }, [clearTimers]);
+        // And then whatever was still queued behind it, in the same order the round would have reached it.
+        if (round === "free" && r.locked) { announceFree(r, "locked"); return; }
+        setPhase(r.hold ? "pick" : "freeDone");
+    }, [clearTimers, round, announceFree]);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
     // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
@@ -703,7 +716,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-feature">
                     <h4>The hunt is over</h4>
                     <p><b>{freeWon.toLocaleString()}</b> chips from {result[round].spins.length} {round === "locked" ? "locking" : "free"} spins.</p>
-                    <button type="button" className="s5-go" onClick={() => setPhase(result.pick ? "pick" : "done")}>Go on</button>
+                    {/* `freeDone` is only ever reached after the LAST round a spin opened — runFree hands
+                        off to the locking round before it sets this phase — so the only thing that can
+                        still be queued behind it is a hold. This read `result.pick`, which no longer
+                        exists, and so always fell through to "done". */}
+                    <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : "done")}>Go on</button>
                 </div>
             ) : null}
 
