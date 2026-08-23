@@ -238,7 +238,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     : lit ? <span><b>{lit.count}</b> {lit.symbol} — <b>{lit.chips.toLocaleString()}</b> chips</span>
                     : result?.wonChips ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
                     : result ? <span className="s5-dim">No line this time.</span>
-                    : <span className="s5-dim">Twenty lines. Pick your deal and pull.</span>}
+                    : <span className="s5-dim">Twenty lines.</span>}
             </div>
 
             {/* ── THE DEAL CHOOSER IS GONE ────────────────────────────────────────────────────────────
@@ -294,7 +294,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                   panel, which is exactly the hierarchy — there is one thing you press over and over. */}
             <div className="s5-readout">
                 <span><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
-                <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                {/* BET IS NOT HERE. The stepper below prints it, larger, next to the controls that change
+                    it — the same number twice on one screen is one of them being ignored. */}
                 {/* CHIPS, not "win". What the last spin paid is already announced above the panel and then
                     gone; the number worth a permanent slot is the pile you are building, because that is the
                     one you are playing FOR and the one the counter charges against. */}

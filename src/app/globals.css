@@ -18638,7 +18638,7 @@ body.cas-seated .social-fab { display: none; }
    two parts instead: a readout you glance at, and one big button you press over and over. */
 
 /* A READOUT. Small caps, tabular figures, hairline dividers. These are numbers you check, not read. */
-.s5-readout { display: grid; grid-template-columns: repeat(3, 1fr); border-radius: 11px; overflow: hidden;
+.s5-readout { display: grid; grid-template-columns: repeat(2, 1fr); border-radius: 11px; overflow: hidden;
     background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .08); }
 .s5-readout > span { display: grid; gap: 1px; justify-items: center; padding: 7px 4px;
     border-right: 1px solid rgba(255, 255, 255, .07); }
@@ -18693,3 +18693,10 @@ body.cas-seated .social-fab { display: none; }
 .cas-stage .cas-leave { width: auto; min-width: 62px; padding: 0 13px; height: 36px; border-radius: 999px;
     font-size: 12px; font-weight: 800; letter-spacing: .04em; }
 .cas-stage .cas-panel-head { grid-template-columns: auto 1fr auto; }
+
+/* ── THE MACHINE SITS IN THE MIDDLE ───────────────────────────────────────────────────────────────────
+   Taking the Pot and the blurb off the top left a screen's worth of nothing between the header and the
+   cabinet, with the whole machine shoved to the bottom. Auto margins in a flex column centre it, so the
+   space that used to hold two things you could not act on now sits evenly above and below the one you
+   can. */
+.cas-stage .s5 { margin-top: auto; margin-bottom: auto; }
