@@ -18646,13 +18646,23 @@ body.cas-seated .social-fab { display: none; }
    A cabinet is a BRASS BOX with a hole cut in it and glass over the hole. Everything here is that: a
    two-tone metal border with a highlight on the top edge and a shadow under it, a marquee across the
    top, and a window that is visibly DEEPER than the metal around it. */
-.s5-cab { border-radius: 16px; padding: 8px; position: relative;
+.s5-cab { border-radius: 16px; padding: 8px; position: relative; overflow: hidden;
     background: linear-gradient(180deg, #6b5322 0%, #3a2c11 34%, #241a0a 100%);
     box-shadow: inset 0 1px 0 rgba(255, 226, 150, .45), inset 0 -2px 4px rgba(0, 0, 0, .6),
         0 6px 18px rgba(0, 0, 0, .55); }
+/* THE PAINTED SCENE, BEHIND THE NAME. Only as tall as the marquee — it is a masthead, not a wallpaper, and
+   letting it run down behind the reels would put a wolf's face under the symbols. Faded out at the bottom
+   into the cabinet's own gold so the join is a gradient rather than a hard edge. */
+.s5-cab::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 74px; z-index: 0;
+    background-image: var(--mast); background-size: cover; background-position: center;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); }
+/* And the name lifts off it — over a painted scene a flat gold letter disappears into the highlights. */
+.s5-cab > * { position: relative; z-index: 1; }
 .s5-marquee { display: flex; align-items: center; justify-content: center; gap: 9px;
-    padding: 5px 0 8px; font-family: var(--font-display); font-size: 12.5px; font-weight: 900;
-    letter-spacing: .16em; color: #ffe6a4; text-shadow: 0 0 10px rgba(255, 200, 90, .5); }
+    padding: 22px 0 12px; font-family: var(--font-display); font-size: 13.5px; font-weight: 900;
+    letter-spacing: .16em; color: #fff3d0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .95), 0 0 14px rgba(255, 180, 60, .7), 0 0 30px rgba(0, 0, 0, .8); }
 .s5-marquee i { flex: 1 1 auto; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 214, 120, .5), transparent); }
 
 /* The window, cut into the metal. `inset` shadows are what make it a hole rather than a panel. */

@@ -565,7 +565,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 dark page with a hairline border, which reads as a table. A real cabinet is an OBJECT: a
                 brass frame with weight to it, a recessed glass panel that is visibly deeper than the
                 surface around it, and a lit marquee saying which machine you are at. */}
-            <div className="s5-cab">
+            {/* ── THE MASTHEAD ────────────────────────────────────────────────────────────────────────
+                Every cabinet on a real floor has a painted scene above the glass; ours had a gold gradient
+                with the name set in it, which is the difference between a machine and a screen with reels
+                on it. Painted per cabinet — the wolf and the moon here, a kraken's eye on The Deep, the
+                vault door on The Vault — so five machines feel like five machines rather than one
+                component rendered five times. Dark at both ends by design, so the name sits over it. */}
+            <div className="s5-cab" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
                 {/* ── AND A WAY TO READ THE MACHINE ───────────────────────────────────────────────
                     On the marquee, right-hand end, which is where a real cabinet puts it. A slot is the
                     only game in the building whose rules are invisible while you play it: you can watch a
