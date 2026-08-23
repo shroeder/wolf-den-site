@@ -17,6 +17,8 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 // that is correct — a button here would be a lie about who is deciding.
 
 const CELLS = 15;
+// Copper, silver, gold — see `cellTier` on the server.
+const COIN = ["copper", "silver", "gold"];
 
 export default function HoldAndSpin({ hold, onDone }) {
     const [step, setStep] = useState(0);
@@ -62,12 +64,24 @@ export default function HoldAndSpin({ hold, onDone }) {
     const finish = useCallback(() => onDone(), [onDone]);
     const filled = cur.held.filter(Boolean).length;
 
+    // ── WHAT IS ON THE BOARD RIGHT NOW ───────────────────────────────────────────────────────────────────
+    // This read `hold.chips` — the FINAL total — from the first frame, so a round in which fourteen coins
+    // landed over four seconds showed the same number the whole way through and the header said "chips if it
+    // stops here" above a figure that had nothing to do with stopping here.
+    //
+    // The entire mechanic of a hold and spin is watching a number grow while the respins run out. Printing
+    // the answer first does not weaken that; it removes it. Exactly what showing the free round's payout
+    // before the free round did, and it is the same mistake: the screen was handed the ending and put it on
+    // top of the beginning.
+    const onBoard = cur.held.reduce((a, v, i) => a + (v ? (hold?.cellChips?.[i] || 0) : 0), 0)
+        + (done && hold?.full ? (hold.fullBonus || 0) : 0);
+
     return (
         <div className={`hs${hold?.full ? " is-full" : ""}`}>
             <div className="hs-head">
                 <i>{hold?.label || "Hold and Spin"}</i>
-                <b>{Number(hold?.chips || 0).toLocaleString()}</b>
-                <em>chips if it stops here</em>
+                <b key={onBoard}>{onBoard.toLocaleString()}</b>
+                <em>{done ? "chips" : "chips if it stops here"}</em>
             </div>
 
             {/* THE RESPINS LEFT ARE THE WHOLE GAME. Three lamps, and every coin that lands puts them all
@@ -81,9 +95,20 @@ export default function HoldAndSpin({ hold, onDone }) {
                 {Array.from({ length: CELLS }, (_, i) => {
                     const v = cur.held[i];
                     const chips = hold?.cellChips?.[i] || 0;
+                    const tier = hold?.cellTier?.[i] ?? 1;
                     return (
-                        <span key={i} className={`hs-cell${v ? " is-held" : ""}${flash.includes(i) ? " is-new" : ""}`}>
-                            {v ? <b>{chips.toLocaleString()}</b> : <i aria-hidden="true" />}
+                        <span key={i} className={`hs-cell${v ? ` is-held is-t${tier}` : ""}${flash.includes(i) ? " is-new" : ""}`}>
+                            {/* A COIN, NOT A RECTANGLE WITH A NUMBER IN IT. Three banks the Den already
+                                owns, ranked by what the coin is worth, so the board has a shape you can
+                                read across the room instead of fifteen identical tiles you have to add up.
+                                The value still prints — over the coin, where it belongs. */}
+                            {v ? (
+                                <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={`/images/casino/bank_${COIN[tier]}.webp`} alt="" draggable="false" />
+                                    <b>{chips.toLocaleString()}</b>
+                                </>
+                            ) : <i aria-hidden="true" />}
                         </span>
                     );
                 })}

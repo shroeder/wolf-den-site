@@ -222,6 +222,22 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // Per cell, in chips, so the screen never converts anything itself.
             cellChips: r.hold.steps[r.hold.steps.length - 1].held.map(
                 (v) => (v ? chipsFor(stake, (v * (stake / LINES.length)) / stake) : 0)),
+            // ── AND HOW BIG A COIN IT IS ─────────────────────────────────────────────────────────
+            // 0, 1, 2 — copper, silver, gold — ranked against THIS cabinet's own coin values, not
+            // against the board that happened to land. A cell was a rounded rectangle with a number
+            // in it, so an 11 and a 2 were the same object at a glance and the board had no shape.
+            // Ranking here rather than on the screen because the values live on the cabinet, and a
+            // client that ranks against what it can see re-ranks every round.
+            cellTier: r.hold.steps[r.hold.steps.length - 1].held.map((v) => {
+                if (!v) return -1;
+                const vals = [...new Set(m.second?.values || [])].sort((a, b) => a - b);
+                const at = vals.indexOf(v);
+                if (at < 0) return 1;
+                return at >= vals.length - 2 ? 2 : (at <= 1 ? 0 : 1);
+            }),
+            // The full-board bonus, so the screen can say what it is worth rather than folding it
+            // silently into the total.
+            fullBonus: r.hold.full ? chipsFor(stake, (m.second?.full || 200) * (stake / LINES.length) / stake) : 0,
         } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,
