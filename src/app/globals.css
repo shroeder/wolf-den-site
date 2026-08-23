@@ -19210,8 +19210,31 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 16px; }
 /* The room sits BEHIND the burrows rather than competing with them, and all five paintings have their
    own brightness — so one veil, and the numbers stay readable in every room. */
+/* THE VEIL WAS DOING THE OPPOSITE OF ITS JOB. At .78 over .88 the five painted rooms all came out as
+   the same near-black rectangle, and going a level deeper — which is the entire point of the ladder and
+   the thing Luke asked for by name ("a new background, the eggs look better") — was invisible. It is
+   light enough to read the room through now, and the darkness is concentrated top and bottom where the
+   numbers actually sit rather than spread flat over the painting. */
 .wr-veil { position: absolute; inset: 0; z-index: -1; border-radius: 16px;
-    background: linear-gradient(180deg, rgba(8, 6, 14, .78), rgba(8, 6, 14, .55) 45%, rgba(8, 6, 14, .88)); }
+    background:
+        linear-gradient(180deg, rgba(6, 4, 10, .86), rgba(6, 4, 10, .12) 30%,
+            rgba(6, 4, 10, .12) 62%, rgba(6, 4, 10, .9)),
+        var(--room-wash, transparent); }
+
+/* ── EACH ROOM IS ITS OWN PLACE ──────────────────────────────────────────────────────────────────
+   A colour wash and a burrow palette per stage, so the change of room registers in under a second even
+   on a phone in a bright shop. The wash is deliberately weak — it tints the painting rather than
+   replacing it — and the burrows carry the rest, because they are the thing being looked at. */
+.wr.is-hollow { --room-wash: linear-gradient(180deg, rgba(120, 78, 30, .3), rgba(40, 26, 10, .25));
+    --nest-a: #5c4526; --nest-b: #2a1d0f; --nest-rim: rgba(255, 226, 150, .3); --nest-glow: rgba(255, 200, 110, .3); }
+.wr.is-sunken { --room-wash: linear-gradient(180deg, rgba(30, 120, 140, .32), rgba(8, 40, 56, .3));
+    --nest-a: #1f5f6e; --nest-b: #0b2733; --nest-rim: rgba(140, 240, 255, .42); --nest-glow: rgba(90, 220, 255, .42); }
+.wr.is-ember { --room-wash: linear-gradient(180deg, rgba(180, 60, 20, .34), rgba(60, 14, 6, .3));
+    --nest-a: #8a3216; --nest-b: #35100a; --nest-rim: rgba(255, 160, 90, .5); --nest-glow: rgba(255, 120, 50, .55); }
+.wr.is-astral { --room-wash: linear-gradient(180deg, rgba(110, 70, 200, .34), rgba(24, 14, 60, .3));
+    --nest-a: #4a3392; --nest-b: #170f38; --nest-rim: rgba(200, 170, 255, .5); --nest-glow: rgba(170, 120, 255, .55); }
+.wr.is-kinghoard { --room-wash: linear-gradient(180deg, rgba(200, 160, 40, .3), rgba(70, 50, 8, .3));
+    --nest-a: #7d6420; --nest-b: #33270a; --nest-rim: rgba(255, 226, 150, .6); --nest-glow: rgba(255, 215, 94, .6); }
 
 .wr-head { display: grid; justify-items: center; gap: 1px; }
 .wr-head i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2em;
@@ -19224,27 +19247,31 @@ body.cas-seated .social-fab { display: none; }
     color: #b8b0a0; }
 /* THE LADDER, MADE VISIBLE. Six pips. Somebody who has never reached the bottom can see there is one. */
 .wr-depth { display: flex; gap: 5px; margin-top: 6px; }
-.wr-depth span { width: 20px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, .16); }
-.wr-depth span.is-on { background: #ffd75e; box-shadow: 0 0 8px rgba(255, 215, 94, .8); }
+.wr-depth span { width: 26px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .18);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .6); transition: background .3s ease, box-shadow .3s ease; }
+.wr-depth span.is-on { background: #ffd75e; box-shadow: 0 0 12px rgba(255, 215, 94, .9); }
 
-.wr-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-self: center;
-    justify-self: center; width: 100%; max-width: 300px; }
+.wr-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-self: center;
+    justify-self: center; width: 100%; max-width: 336px; }
 
+/* Luke: "the eggs look better" every stage. They are drawn from the room's own palette, so the board
+   itself climbs — earth, then drowned stone, then firelit, then starlit, then gold. */
 .wr-nest { position: relative; aspect-ratio: 1; border-radius: 14px; cursor: pointer; border: none;
     overflow: visible;
-    background: radial-gradient(circle at 50% 38%, #4a3a22, #241a10 70%);
-    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 226, 150, .25),
-        0 4px 12px rgba(0, 0, 0, .5);
+    background: radial-gradient(circle at 50% 38%, var(--nest-a, #4a3a22), var(--nest-b, #241a10) 70%);
+    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 var(--nest-rim, rgba(255, 226, 150, .25)),
+        0 0 16px var(--nest-glow, transparent), 0 4px 12px rgba(0, 0, 0, .55);
     transition: transform .16s ease, opacity .35s ease; }
 .wr-nest:active:not(:disabled) { transform: scale(.94); }
 /* The mouth of the burrow — a dark hole with a lip, so a tile reads as something you open rather than as
    a button with a gradient on it. */
 .wr-lid { position: absolute; inset: 22%; border-radius: 50%;
-    background: radial-gradient(circle at 50% 35%, #1a1208, #06040a 78%);
-    box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95), 0 0 0 2px rgba(255, 226, 150, .22); }
-.is-hoard .wr-nest { background: radial-gradient(circle at 50% 38%, #6b5a22, #2e2510 70%);
-    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 226, 150, .45),
-        0 0 18px rgba(255, 215, 94, .35), 0 4px 12px rgba(0, 0, 0, .5); }
+    background: radial-gradient(circle at 50% 35%, rgba(0, 0, 0, .55), #06040a 78%);
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, .95), 0 0 0 2px var(--nest-rim, rgba(255, 226, 150, .22)); }
+/* The Hoard is the same palette turned all the way up — it is the only room that glows on its own. */
+.wr.is-hoard { --nest-a: #9a7c22; --nest-b: #3a2c08; --nest-rim: rgba(255, 236, 170, .8);
+    --nest-glow: rgba(255, 215, 94, .75);
+    --room-wash: linear-gradient(180deg, rgba(255, 190, 40, .3), rgba(80, 55, 6, .32)); }
 
 /* THE SHAKE IS WHERE THE HOPE LIVES. Seven hundred milliseconds of a burrow rocking before anything is
    known. Collapsing this into the reveal is exactly what turns the feature back into tap-and-read. */
@@ -19267,9 +19294,12 @@ body.cas-seated .social-fab { display: none; }
 .wr-hop { position: absolute; left: 50%; top: 50%; z-index: 5; pointer-events: none;
     display: grid; justify-items: center; gap: 2px;
     animation: wrHop 1.5s cubic-bezier(.25, .9, .35, 1) both; }
-.wr-hop img { width: 54px; height: 54px; object-fit: contain;
-    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .75)); }
-.wr-hop u { text-decoration: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 900;
+/* At 54px in a 92px tile these read as specks, and the animal IS the reward — a critter you cannot
+   identify is a number with a smudge next to it. Big enough to see what came out, and the arc lifts
+   clear of the board so it is never behind the next burrow. */
+.wr-hop img { width: 78px; height: 78px; object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .8)); }
+.wr-hop u { text-decoration: none; padding: 2px 9px; border-radius: 999px; font-size: 13px; font-weight: 900;
     background: #ffd75e; color: #2a1c05; box-shadow: 0 2px 6px rgba(0, 0, 0, .6);
     font-variant-numeric: tabular-nums; }
 @keyframes wrHop {

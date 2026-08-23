@@ -39,7 +39,7 @@ const HOARD_ART = "/images/delves/rare-kinghoard.webp";
 const MOTHER_ART = "/images/delves/foe-warren-mother.webp";
 
 const SHAKE_MS = 700;
-const HOP_MS = 340;
+const HOP_MS = 380;
 const SETTLE_MS = 600;
 
 export default function TheWarren({ warren, onDone }) {
