@@ -122,10 +122,20 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             offer: offer.id,
             label: offer.label,
             mult: FREE_SPIN_OFFERS.find((o) => o.id === offer.id)?.mult || 1,
+            // Each free spin carries its winning LINES in chips, exactly like the base spin does, because the
+            // screen draws them exactly like the base spin does. Sending the raw engine wins meant the round
+            // had nothing to light up and no number to call, which is most of why it played like a
+            // fast-forward instead of ten spins.
             spins: r.free.spins.map((sp) => ({
                 grid: sp.grid,
-                wins: sp.wins,
+                wins: sp.wins
+                    .filter((w) => w.kind === "line")
+                    .map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                scatterWin: sp.wins.find((w) => w.kind === "scatter") || null,
                 chips: chipsFor(stake, sp.total / stake),
+                // What this one spin paid as a multiple of the bet, so the screen knows when a single free
+                // spin deserves the horns rather than a coin rattle.
+                multiple: sp.total / stake,
             })),
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),

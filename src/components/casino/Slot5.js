@@ -26,14 +26,23 @@ const SETTLE_MS = 340;
 const LANDS_AT = STOP_AT.map((t) => t + SETTLE_MS);
 // How long each winning line is drawn before the next one, when several paid.
 const LINE_MS = 620;
-// ── THE FREE ROUND RUNS ON ITS OWN CLOCK ─────────────────────────────────────────────────────────────────────
-// Ten spins at the base-game pace would be fifteen seconds of watching. Free spins on a real cabinet are FAST —
-// the reels barely settle before the next one goes — and the speed is most of what makes a round feel like a
-// run of luck rather than ten separate spins. Under a second each, so ten of them is about eight.
-const FREE_STOP_AT = [0, 55, 110, 165, 220];
-const FREE_SETTLE_MS = 230;
-const FREE_LANDS_AT = FREE_STOP_AT.map((t) => t + FREE_SETTLE_MS);
-const FREE_HOLD_MS = 330;   // how long a landed free spin sits before the next one goes
+// ── A FREE SPIN IS A SPIN ────────────────────────────────────────────────────────────────────────────────────
+// Luke: "free spins basically tries to speedrun instead of truly let the user experience them, it doesnt do
+// anything of the juice we usually have on spins."
+//
+// The first cut ran them at a quarter of the base pace with no lines drawn, no win called and no anticipation
+// — ten grids flickering past under a running total. That was an argument about real cabinets ("free spins are
+// fast") applied to the wrong thing: what is fast on a real machine is the DEAD time between spins, not the
+// spin. Every landing still gets its reel stops, every win still lights its line, and a big one still stops
+// the room. The round is the payoff for a one-in-ninety-three event; rushing it is throwing the payoff away.
+//
+// So a free spin is the base spin at about three quarters speed, which is quicker without being a different
+// thing, and the round can be skipped by anybody who has seen it (see the Skip button) rather than by
+// everybody automatically.
+const FREE_STOP_AT = [0, 110, 220, 330, 440];
+const FREE_SETTLE_MS = 300;
+const FREE_LINE_MS = 470;
+const FREE_HOLD_MS = 420;   // how long a finished free spin sits before the next one goes
 // Below this a win is not celebrated — see CELEBRATE_AT in casino-slot5-play.js. Seven wins in ten on a
 // twenty-line machine pay back less than the stake; that is what twenty lines buys, and a machine that
 // throws a fanfare at every one of them is doing the exact thing this rework existed to stop.
@@ -74,6 +83,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [pays, setPays] = useState(false);       // is the paytable open
     const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
     const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
+    // Whichever win list is currently being drawn — the base spin's, or the free spin on screen. `lit` reads
+    // this rather than the base result, which is what lets a free spin light its own lines.
+    const [activeWins, setActiveWins] = useState([]);
+    // The last response, for the skip. A ref because skipFree is called from a handler that must not be
+    // rebuilt every time the result changes.
+    const resultRef = useRef(null);
     const timers = useRef([]);
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
@@ -106,6 +121,37 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [idle] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, []).slice(0, ROWS)));
     const [filler, setFiller] = useState(() => slot5(machineId).strips.map((bag) => stripFor(bag, [])));
 
+    // ── PLAYING ONE GRID ─────────────────────────────────────────────────────────────────────────────────
+    // Reels in from the left, then every winning line drawn in turn. The base spin and every free spin go
+    // through this, on different clocks, which is the only reason they feel like the same machine — the
+    // alternative is two playback routines that drift apart, and the free one had already drifted into
+    // having no lines at all.
+    const playGrid = useCallback((g, wins, opts) => {
+        const { stopAt, settle, lineMs, scatters = 0, onDone } = opts;
+        setGrid(g);
+        setLanded(0);
+        setShowLine(-1);
+        setActiveWins(wins);
+        const landsAt = stopAt.map((t) => t + settle);
+        stopAt.forEach((_, k) => {
+            timers.current.push(setTimeout(() => {
+                setLanded(k + 1);
+                Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
+                Haptic.hit(k === REELS - 1 ? 0.5 : 0.3);
+                // Two scatters showing and the last reels still running. Handed the exact gap left, so it
+                // stops climbing at the instant the reel stops rather than answering early.
+                if (k === 2 && scatters >= 2) Cas.anticipate(landsAt[REELS - 1] - landsAt[2]);
+            }, landsAt[k]));
+        });
+        timers.current.push(setTimeout(() => {
+            if (!wins.length) { onDone(); return; }
+            wins.forEach((_, i) => {
+                timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * lineMs));
+            });
+            timers.current.push(setTimeout(() => { setShowLine(-1); onDone(); }, wins.length * lineMs));
+        }, landsAt[REELS - 1] + 230));
+    }, []);
+
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
     const pull = useCallback(async (force) => {
         if (busy || spinning) return;
@@ -122,40 +168,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (!r?.ok) { setSpinning(false); setPhase("idle"); return; }
 
         setResult(r);
+        resultRef.current = r;
         setGrid(r.grid);
         setSpinning(false);
 
-        // Each reel comes to rest on its own clock, and says so.
-        STOP_AT.forEach((_, i) => {
-            timers.current.push(setTimeout(() => {
-                setLanded(i + 1);
-                Cas.reelStop(i, i === REELS - 1 ? 0.85 : 0.4);
-                Haptic.hit(i === REELS - 1 ? 0.5 : 0.3);
-                // TWO SCATTERS SHOWING AND THREE REELS TO GO. The riser is handed the exact gap left, so it
-                // stops climbing at the instant the reel stops rather than telling you the answer early.
-                if (i === 2 && r.scatters >= 2) Cas.anticipate(LANDS_AT[4] - LANDS_AT[2]);
-            }, LANDS_AT[i]));
-        });
-
         // ── WHAT HAPPENS AFTER THE REELS STOP ────────────────────────────────────────────────────────
-        // Lines first, then the free round if there is one, then the pick. `nextAfterLines` is where the
-        // three are sequenced, so a spin that pays lines AND triggers both features still plays them in an
-        // order somebody can follow.
-        const nextAfterLines = () => {
-            if (r.free) { announceFree(r); return; }
-            setPhase(r.pick ? "pick" : "done");
-        };
-
-        const after = LANDS_AT[REELS - 1] + 260;
-        timers.current.push(setTimeout(() => {
-            if (!r.lines.length && !r.scatterWin) { nextAfterLines(); return; }
-            setPhase("lines");
-            r.lines.forEach((_, i) => {
-                timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * LINE_MS));
-            });
-            timers.current.push(setTimeout(() => { setShowLine(-1); nextAfterLines(); }, r.lines.length * LINE_MS));
-        }, after));
-    }, [busy, spinning, onSpin, clearTimers]);
+        // Lines first, then the free round if there is one, then the pick. Sequenced here so a spin that
+        // pays lines AND triggers both features still plays them in an order somebody can follow.
+        playGrid(r.grid, r.lines, {
+            stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
+            onDone: () => {
+                if (r.free) { announceFree(r); return; }
+                setPhase(r.pick ? "pick" : "done");
+            },
+        });
+    }, [busy, spinning, onSpin, clearTimers, playGrid]);
 
     // ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
     // Luke: "i didn't even know that I got the free Spin bonus because there was nothing, nothing popped off
@@ -184,30 +211,46 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const runFree = useCallback((r, i) => {
         const round = r.free;
         if (!round || i >= round.spins.length) {
+            setActiveWins([]);
             setPhase(r.pick ? "pick" : "freeDone");
             return;
         }
         const sp = round.spins[i];
         setPhase("free");
         setFreeIdx(i);
-        setGrid(sp.grid);
-        setLanded(0);
-        FREE_STOP_AT.forEach((_, k) => {
-            timers.current.push(setTimeout(() => {
-                setLanded(k + 1);
-                Cas.reelStop(k, 0.3);
-            }, FREE_LANDS_AT[k]));
+        playGrid(sp.grid, sp.wins, {
+            stopAt: FREE_STOP_AT, settle: FREE_SETTLE_MS, lineMs: FREE_LINE_MS,
+            onDone: () => {
+                if (sp.chips > 0) {
+                    setFreeWon((n) => n + sp.chips);
+                    // A big one inside the round gets the horns, the same as it would in the base game. A
+                    // round where every spin sounds identical is a round with no shape to it.
+                    if (sp.multiple >= BIG_WIN_AT) { Cas.jackpot(); Haptic.crit(); }
+                    else { Cas.coins(Math.min(1, sp.chips / 400)); Haptic.hit(0.35); }
+                }
+                timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
+            },
         });
-        timers.current.push(setTimeout(() => {
-            if (sp.chips > 0) {
-                setFreeWon((n) => n + sp.chips);
-                Cas.coins(Math.min(1, sp.chips / 400));
-                Haptic.hit(0.35);
-            }
-            timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
-        }, FREE_LANDS_AT[REELS - 1] + 60));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [playGrid]);
+
+    // ── SKIPPING IT ──────────────────────────────────────────────────────────────────────────────────────
+    // For the twentieth round rather than the first. It jumps to the end and credits the whole thing — the
+    // chips were decided on the server before the first reel moved, so nothing is being given up but the
+    // watching. Offered rather than imposed, which is the difference between this and the version Luke
+    // objected to.
+    const skipFree = useCallback(() => {
+        clearTimers();
+        const r = resultRef.current;
+        if (!r?.free) return;
+        setShowLine(-1);
+        setActiveWins([]);
+        setFreeIdx(r.free.spins.length - 1);
+        setFreeWon(r.free.spins.reduce((a, sp) => a + sp.chips, 0));
+        setGrid(r.free.spins[r.free.spins.length - 1].grid);
+        setLanded(REELS);
+        setPhase(r.pick ? "pick" : "freeDone");
+    }, [clearTimers]);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
     // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
@@ -247,11 +290,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     }, [result, picked]);
 
     const lit = useMemo(() => {
-        if (phase !== "lines" || showLine < 0 || !result) return null;
-        const w = result.lines[showLine];
+        if (showLine < 0 || !activeWins.length) return null;
+        const w = activeWins[showLine];
         if (!w) return null;
         return { line: lines[w.line], count: w.count, symbol: w.symbol, chips: w.chips };
-    }, [phase, showLine, result, lines]);
+    }, [showLine, activeWins, lines]);
 
     return (
         <div className="s5">
@@ -361,6 +404,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <span><i>Free spin</i><b>{freeIdx + 1} / {result?.free?.spins.length}</b></span>
                     <span className="s5-freemult">&times;{result?.free?.mult}</span>
                     <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
+                    {/* For the twentieth round rather than the first. The chips were decided on the server
+                        before the first reel moved, so nothing is given up but the watching — and it is
+                        OFFERED rather than imposed, which is the whole difference from the version that
+                        rushed the round for everybody. */}
+                    <button type="button" className="s5-skip" onClick={skipFree}>Skip</button>
                 </div>
             ) : null}
 

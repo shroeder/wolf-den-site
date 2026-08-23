@@ -18792,3 +18792,7 @@ body.cas-seated .social-fab { display: none; }
     font-weight: 700; border: 1px solid rgba(255, 111, 125, .4); background: rgba(255, 111, 125, .12);
     color: #ffc2c8; }
 .s5-owner button:disabled { opacity: .4; cursor: default; }
+.s5-freebar { grid-template-columns: 1fr auto 1fr auto; }
+.s5-skip { padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 10px; font-weight: 800;
+    letter-spacing: .06em; border: 1px solid rgba(122, 212, 255, .38); background: rgba(122, 212, 255, .12);
+    color: #cbe9fb; }
