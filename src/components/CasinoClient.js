@@ -1424,7 +1424,6 @@ export default function CasinoClient({ initial }) {
                     ) : at.live && SLOTS5[at.id] ? (
                         <Slot5
                             machineId={at.id}
-                            symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
                             lines={SLOT5_LINES}
                             onSpin={spin5}
                             gold={st?.gold}

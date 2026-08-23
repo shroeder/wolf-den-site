@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
-import { symbolTone, symbolRole } from "@/lib/marketplace/casino-slot5.js";
+import { symbolTone, symbolRole, slot5 } from "@/lib/marketplace/casino-slot5.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -33,15 +33,27 @@ const BIG_WIN_AT = 10;
 
 const art = (machineId, sym) => `/images/casino/reels/${machineId}-${sym}.webp`;
 
-// The strip a reel runs before it stops: filler, then the three symbols it is actually going to show. The
-// filler is drawn from the machine's own symbols so a spinning reel looks like this cabinet rather than a
-// generic blur.
-function stripFor(pool, land) {
-    const run = Array.from({ length: 9 }, () => pool[Math.floor(Math.random() * pool.length)]);
-    return [...run, ...land];
+// The strip a reel runs before it stops: filler, then the three symbols it is actually going to show.
+//
+// THE FILLER COMES FROM THAT REEL'S OWN STRIP, not from the machine's symbol list. On The Hunt the wild is
+// weighted 0 on reels one and five — that is what makes five-of-a-kind affordable — so a generic filler
+// showed wolves spinning past in columns they can never land in, and stood one at the top of reel one while
+// the machine sat idle. The cabinet next door already has this written on it: a machine teasing a symbol
+// that is not on its reels is the one thing a paytable must never do.
+//
+// Weighted, too, so the blur is made of the symbols this reel is actually full of.
+function stripFor(bag, land) {
+    const keys = Object.keys(bag).filter((k) => bag[k] > 0);
+    const total = keys.reduce((a, k) => a + bag[k], 0);
+    const draw = () => {
+        let r = Math.random() * total;
+        for (const k of keys) { r -= bag[k]; if (r <= 0) return k; }
+        return keys[keys.length - 1];
+    };
+    return [...Array.from({ length: 9 }, draw), ...land];
 }
 
-export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold, chips, bet, onBet, stakes = [25, 100, 500, 2500], busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, stakes = [25, 100, 500, 2500], busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -56,7 +68,8 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
     const clearTimers = useCallback(() => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
     useEffect(() => () => clearTimers(), [clearTimers]);
 
-    const pool = useMemo(() => symbols || ["wolf", "chest", "laurel", "doubloon", "bone", "moon"], [symbols]);
+    // One bag per reel, off the machine's real strips — see stripFor.
+    const strips = useMemo(() => slot5(machineId).strips, [machineId]);
 
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
     const pull = useCallback(async () => {
@@ -160,7 +173,10 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
                             style={{ "--settle": `${SETTLE_MS}ms`, "--delay": `${STOP_AT[reel]}ms` }}>
                             <div className="s5-strip">
-                                {(grid && landed > reel ? grid[reel] : stripFor(pool, grid?.[reel] || pool.slice(0, 3))).map((sym, i) => (
+                                {(grid && landed > reel
+                                    ? grid[reel]
+                                    : stripFor(strips[reel], grid?.[reel] || stripFor(strips[reel], []).slice(0, 3))
+                                ).map((sym, i) => (
                                     // EVERY CELL CARRIES ITS SYMBOL'S COLOUR. The wash behind the symbol is
                                     // the same hue the symbol was drawn in — one map, see SYMBOL_LOOK — so a
                                     // violet glow means a wild before you have focused on the picture. The
