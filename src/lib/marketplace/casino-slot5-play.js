@@ -6,6 +6,7 @@ import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { slot5, playSpin, FREE_SPIN_OFFERS, LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 
 // ── PLAYING THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
 // Gold in, chips out, and the gold never comes back. That asymmetry is the whole design (see chips.js), and it
@@ -140,7 +141,19 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),
         } : null,
-        pick: r.pick ? { picked: r.pick.picked, mult: r.pick.mult, total: r.pick.total } : null,
+        // ── THE PETTING PEN ──────────────────────────────────────────────────────────────────────────
+        // The board is decided here, as it always was — the taps only reveal it. What is new is that each
+        // card is attached to one of the member's OWN pets, so the bonus is a paddock of animals they
+        // collected rather than a row of numbered boxes. See petsForPick.
+        pick: r.pick ? {
+            picked: r.pick.picked,
+            mult: r.pick.mult,
+            total: r.pick.total,
+            chips: chipsFor(stake, r.pick.total / stake),
+            // Per card, in the same order, so the screen never has to pair them up itself.
+            each: r.pick.picked.map((c) => (c.kind === "chips" ? chipsFor(stake, (c.value * (stake / LINES.length)) / stake) : 0)),
+            pets: await petsForPick(buyerId, r.pick.picked.length),
+        } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,
         // And the multiple, for the "big win" threshold — see the note on celebration below.
@@ -148,6 +161,37 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         rate: CHIP_RATE,
         lineCount: LINES.length,
     };
+}
+
+// ── WHOSE PETS ───────────────────────────────────────────────────────────────────────────────────────────────
+// The member's own, because a bonus round where you pet YOUR animals is a different thing from one where you
+// tap anonymous boxes — the pets are the thing they have been collecting all along, and this is the only place
+// in the game that pays you for having them.
+//
+// Falls back to the whole catalogue for anybody who owns none yet, rather than showing an empty paddock: a
+// bonus round that looks broken because you have not played another feature is worse than a generic one.
+// Sprites come from mkt_pet_sprite, the same table the farm and the boss screen read.
+async function petsForPick(buyerId, count) {
+    const owned = await db.query(
+        `SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
+    let ids = owned.map((r) => r.ref).filter(Boolean);
+    if (ids.length < 3) ids = COLLECTIBLES.slice(0, 24).map((p) => p.id);
+    const art = await db.query(
+        `SELECT pet_id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [ids]).catch(() => []);
+    const urls = new Map(art.map((r) => [r.pet_id, r.url]));
+    // Only pets that actually have a picture — an animal drawn as a blank square is not an animal.
+    const drawn = ids.filter((id) => urls.get(id));
+    const pool = (drawn.length >= 3 ? drawn : ids).slice();
+    // Fisher-Yates. A sort() with a random comparator is not a shuffle and biases the ends of the array.
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const named = new Map(COLLECTIBLES.map((p) => [p.id, p.name]));
+    return Array.from({ length: count }, (_, i) => {
+        const id = pool[i % pool.length];
+        return { id, name: named.get(id) || id, url: urls.get(id) || null };
+    });
 }
 
 async function chipsOf(buyerId) {

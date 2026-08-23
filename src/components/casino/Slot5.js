@@ -5,6 +5,7 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, slot5 } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
+import PettingPen from "@/components/casino/PettingPen.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -82,7 +83,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | done
-    const [picked, setPicked] = useState([]);      // chests turned over so far
     const [pays, setPays] = useState(false);       // is the paytable open
     const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
     const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
@@ -186,7 +186,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (busy || spinning) return;
         unlock();
         clearTimers();
-        setResult(null); setShowLine(-1); setCounted(0); setPicked([]); setLanded(0);
+        setResult(null); setShowLine(-1); setCounted(0); setLanded(0);
         setFreeIdx(-1); setFreeWon(0);
         setPhase("spin"); setSpinning(true);
         setFiller(strips.map((bag) => stripFor(bag, [])));
@@ -307,25 +307,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     }, [result, phase]);
     useEffect(() => { if (phase === "spin") celebrated.current = false; }, [phase]);
 
-    // ── THE PICK ─────────────────────────────────────────────────────────────────────────────────────────
-    // The board was decided on the server before the first tap — the order is in the response — so turning a
-    // chest over reveals rather than decides. That is how every real pick bonus works and it is the only way
-    // it can be checked; what the taps buy is the ORDER you learn it in, which is the whole tension.
-    const turn = useCallback((i) => {
-        if (!result?.pick || i !== picked.length) return;
-        const card = result.pick.picked[i];
-        setPicked((p) => [...p, i]);
-        if (card.kind === "end") { Cas.lose(); setPhase("done"); }
-        else if (card.kind === "mult") { Cas.multUp(card.value); Haptic.crit(); }
-        else { Cas.coins(0.35); }
-    }, [result, picked]);
-
     const lit = useMemo(() => {
         if (showLine < 0 || !activeWins.length) return null;
         const w = activeWins[showLine];
         if (!w) return null;
         return { line: lines[w.line], count: w.count, symbol: w.symbol, chips: w.chips };
     }, [showLine, activeWins, lines]);
+
+    // ── THE BONUS TAKES THE WHOLE BOARD ──────────────────────────────────────────────────────────────────
+    // Before the cabinet, the readout, the panel and the owner row — all of it. A bonus round that plays in a
+    // strip under the reels is a bonus round competing with the machine it came from.
+    if (phase === "pick" && result?.pick) {
+        return (
+            <div className="s5 is-bonus">
+                <PettingPen pick={result.pick} onDone={() => setPhase("done")} />
+            </div>
+        );
+    }
 
     return (
         <div className="s5">
@@ -456,22 +454,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
-            {/* ── THE PICK ────────────────────────────────────────────────────────────────────────────── */}
-            {phase === "pick" && result?.pick ? (
-                <div className="s5-feature">
-                    <h4>Four chests. Keep going until one ends it.</h4>
-                    <div className="s5-board">
-                        {result.pick.picked.map((card, i) => (
-                            <button key={i} type="button" className={`s5-chest${picked.includes(i) ? " is-open" : ""}`}
-                                disabled={i !== picked.length} onClick={() => turn(i)}>
-                                {picked.includes(i)
-                                    ? (card.kind === "end" ? "✕" : card.kind === "mult" ? `×${card.value}` : card.value)
-                                    : "?"}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            ) : null}
+            {/* ── THE PICK IS ITS OWN GAME NOW ────────────────────────────────────────────────────────
+                Rendered above, as a full takeover — see the early return at the top of this component. It
+                used to be a row of grey boxes UNDER the reels, which is a form asking you to press it four
+                times. A bonus round is one spin in two hundred and thirty-three; it should be the moment
+                the slot machine stops being a slot machine. */}
 
             {/* ── ⚠ OWNER ONLY — REMOVE BEFORE THE FLOOR OPENS ────────────────────────────────────────
                 On the master "remove before launch" checklist with the server half. Free spins come once in
