@@ -1,6 +1,6 @@
 "use client";
 
-import { GiMusicalNotes, GiSpeakerOff } from "react-icons/gi";
+import { GiMusicalNotes, GiSoundOff } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Procedural ambient MUSIC for the walkable scenes (Town + Tavern). No audio files — a proper little looping
@@ -235,7 +235,11 @@ export default function SceneMusic({ vibe = "town", place = "top-right" }) {
             {/* A GLYPH, NOT AN EMOJI. 🎵 renders in the operating system's own colours — a purple note in a
                 warm gold-and-timber scene, immune to the `color` set right above it — which is precisely the
                 reason this app does not use emoji on its own surfaces. */}
-            {muted ? <GiSpeakerOff aria-hidden="true" /> : <GiMusicalNotes aria-hidden="true" />}
+            {/* Muted music is a crossed-out NOTE, not a crossed-out speaker. It was the speaker, which was
+                always slightly wrong for a music control and became actively confusing once the casino grew
+                a real sound-effects switch beside it — two buttons, one showing a speaker for "music off"
+                and the other a speaker for "sound on". Notes for music, speakers for sound, everywhere. */}
+            {muted ? <GiSoundOff aria-hidden="true" /> : <GiMusicalNotes aria-hidden="true" />}
         </button>
     );
 }

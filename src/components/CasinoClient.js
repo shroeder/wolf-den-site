@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FeatureDailies from "@/components/FeatureDailies";
 import SceneMusic from "@/components/SceneMusic";
-import { GiSoundOn, GiSoundOff } from "react-icons/gi";
+import { GiSpeaker, GiSpeakerOff } from "react-icons/gi";
 import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena-audio.js";
 import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
@@ -53,7 +53,12 @@ function SoundToggle() {
             {/* A glyph, not an emoji -- see the same note in SceneMusic. And the OFF state is coloured rather
                 than merely different, because "my sound is broken" is the report this button exists to answer
                 and it has to be legible at a glance from across a phone. */}
-            {off ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+            {/* A SPEAKER, NOT A SECOND NOTE. The first cut used GiSoundOn, which is a musical note with waves
+                coming off it — sat next to the music toggle's two eighth-notes it read as the same button
+                twice, at 38px, in the dark. Two adjacent controls that look alike and do different things is
+                worse than one control. Music is notes; sound is a speaker; each has its own crossed-out
+                twin, so both states of both buttons are legible without a caption. */}
+            {off ? <GiSpeakerOff aria-hidden="true" /> : <GiSpeaker aria-hidden="true" />}
         </button>
     );
 }
