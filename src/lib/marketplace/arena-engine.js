@@ -628,9 +628,25 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         const owed = att.lostLast === true;
         att.lostLast = false;
 
+        // ── NOBODY IS WORN DOWN BEFORE THEY HAVE ACTED ONCE ──────────────────────────────────────────
+        // The other half of "your first turn is sacred", and GrayKitsune found the hole in it: "My first turn
+        // is round 2 after burn already took half my health." He was right. The rule guaranteed the turn
+        // WOULD happen; it said nothing about what could be done to him before it did — so a foe that won the
+        // opening flip could hit him AND leave a burn, and the burn then ticked at the top of his first turn.
+        // Two hits before he had taken one, which is the exact unfairness the rule exists to stop.
+        //
+        // Measured at rung 40 with real kits: the lighter builds were losing 25-32% of their health on
+        // average before acting, and the burn tick is the part of that a member cannot answer, cannot see
+        // coming and did not get a turn to respond to.
+        //
+        // Symmetric, because it is a fairness rule rather than a player perk — the foe is not worn down
+        // before its first turn either. Only the FIRST turn: from the second onwards a wound burns exactly as
+        // it always has, which is what makes rend and burn worth carrying.
+        const firstTurn = att.swingsTaken === 0;
+
         // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
         // not stop you bleeding — and it can kill, which is the whole point of a wound.
-        if (att.bleedLeft > 0) {
+        if (!firstTurn && att.bleedLeft > 0) {
             const tick = Math.max(1, Math.round(att.bleedPer));
             att.hp -= tick;
             att.bleedLeft -= 1;
@@ -644,7 +660,7 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             if (att.hp <= 0) return false;
         }
-        if (att.burnLeft > 0) {
+        if (!firstTurn && att.burnLeft > 0) {
             const tick = Math.max(1, Math.round(att.burnPer));
             att.hp -= tick;
             att.burnLeft -= 1;
