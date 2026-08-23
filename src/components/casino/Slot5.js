@@ -123,6 +123,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const strips = useMemo(() => slot5(machineId).strips, [machineId]);
     // Does this cabinet tumble? Decides whether the owner row offers a forced chain.
     const cascades = useMemo(() => Boolean(slot5(machineId).cascade), [machineId]);
+    // The multiplier the chain has climbed to. Read straight off the step on screen rather than kept in its
+    // own state, so it can never disagree with the grid it is sitting on top of.
+    const mult = (phase === "tumble" && result?.chain?.steps[Math.max(0, chainAt)]?.mult) || 1;
 
     // ── A MACHINE NOBODY IS PLAYING SITS STILL ───────────────────────────────────────────────────────
     // Luke: "dont have this screen iterate over random symbols when you arent playing it."
@@ -219,6 +222,15 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setBreaking([]);
         if (st.chips > 0) setChainWon((n) => n + st.chips);
 
+        // ── AND IT ACCELERATES ───────────────────────────────────────────────────────────────────────
+        // The first version held every break for 920ms and the chain read as a slideshow: a line lit, sat
+        // there for two-thirds of a second saying "4 Syrup Cake — 2 chips", and only then broke. Nobody
+        // reads that line. They are watching the multiplier.
+        //
+        // Real cascade cabinets SPEED UP as the chain deepens, and it is the single cheapest piece of drama
+        // available — the machine sounding more urgent the longer it goes is the same information as the
+        // multiplier, delivered by tempo instead of by a number. Six breaks now costs what four used to.
+        const rush = Math.max(0.52, 1 - i * 0.13);
         return new Promise((done) => {
             // Light the wins on this grid.
             timers.current.push(setTimeout(() => {
@@ -234,9 +246,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     // And let the next grid fall into the hole.
                     timers.current.push(setTimeout(() => {
                         runChain(r, i + 1).then(done);
-                    }, 260));
-                }, 420));
-            }, i === 0 ? 120 : 240));
+                    }, 230 * rush));
+                }, 330 * rush));
+            }, (i === 0 ? 120 : 190) * rush));
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -448,7 +460,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 `.s5-lines ~ .s5-grid .s5-cell img:not(.is-lit)`, and the grid comes BEFORE the svg in this
                 markup — so `~` never matched and nothing has ever dimmed behind a winning line. A state
                 class on the container cannot be defeated by the order of two elements. */}
-            <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}`}>
+            <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}${mult >= 5 ? " is-hot" : ""}`}>
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
@@ -485,6 +497,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         <polyline points={lit.line.map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
                     </svg>
                 ) : null}
+
+                {/* ── THE MULTIPLIER, ON THE GLASS ────────────────────────────────────────────────
+                    It was a 14px number in the strip under the cabinet, beside the balance — which is to
+                    say the most exciting thing on a cascading machine was set in the same size as the
+                    thing it is least like. A climbing multiplier is the whole reason to watch a tumble,
+                    so it goes ON the reels at display size and SLAMS each time it moves.
+
+                    Keyed by its own value, which is what makes it re-mount and replay the slam on every
+                    step instead of animating once and then silently updating its text. */}
+                {phase === "tumble" && mult > 1 ? (
+                    <div className="s5-bigmult" key={mult} aria-hidden="true"><b>&times;{mult}</b></div>
+                ) : null}
             </div>
             </div>
 
@@ -516,14 +540,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 that was selected by default anyway. The choice is worth having back one day, but INSIDE the
                 round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
 
-            {/* ── THE TUMBLE COUNTER ──────────────────────────────────────────────────────────────────
-                The break count and the multiplier it has climbed to, while it is happening. This is the
-                whole tension of a cascading machine — you are watching a number go up that you cannot
-                influence — and it needs somewhere to live that is not the reels. */}
+            {/* ── HOW CLOSE THE CHAIN IS ──────────────────────────────────────────────────────────────
+                Breaks so far against the number that opens the free round, and what the spin has taken. The
+                multiplier used to live here too and has moved onto the glass; what is left is the pair of
+                numbers you check rather than watch, which is what this strip is for. */}
             {phase === "tumble" && result?.chain ? (
                 <div className={`s5-tumble${result.chain.trigger && chainAt + 1 >= result.chain.trigger - 2 ? " is-close" : ""}`}>
                     <span><i>Breaks</i><b>{chainAt + 1}{result.chain.trigger ? ` / ${result.chain.trigger}` : ""}</b></span>
-                    <span className="s5-tmult">&times;{result.chain.steps[Math.max(0, chainAt)]?.mult ?? 1}</span>
                     <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
                 </div>
             ) : null}

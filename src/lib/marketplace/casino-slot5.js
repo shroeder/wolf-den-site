@@ -77,15 +77,16 @@ const LOOK = {
         moon: { rank: 5, role: "scatter", tone: "#7ad4ff", name: "Moon" },
         wolf: { rank: 6, role: "wild", tone: "#b47cff", name: "Wolf" },
     },
-    // ── THE HARVEST ── the kitchen. Dishes run warm, so the two that are not warm do the heavy lifting:
-    // Moon Broth is the only cold thing on the reel and the Jam Roll the only pink one.
+    // ── THE HARVEST ── the larder, not the kitchen. Six shapes and six hues, because the cooked dishes it
+    // used to run are all served in the same brown bowl and a ladder of names is not a ladder of colours.
+    // Every tone here is measured off the sprite it sits under, so the glow a symbol throws is its own.
     slot2: {
-        bone: { rank: 1, role: "low", tone: "#d9c9a8", name: "Mash" },
-        doubloon: { rank: 2, role: "low", tone: "#e0a83f", name: "Syrup Cake" },
-        laurel: { rank: 3, role: "mid", tone: "#7bbf4a", name: "Harvest Hash" },
-        chest: { rank: 4, role: "bonus", tone: "#ff7a45", name: "Pumpkin Soup" },
-        moon: { rank: 5, role: "scatter", tone: "#8fd8ff", name: "Moon Broth" },
-        wolf: { rank: 6, role: "wild", tone: "#e0559b", name: "Jam Roll" },
+        bone: { rank: 1, role: "low", tone: "#e8dcc0", name: "Flour" },
+        doubloon: { rank: 2, role: "low", tone: "#e8b93a", name: "Corn" },
+        laurel: { rank: 3, role: "mid", tone: "#c8477e", name: "Jam" },
+        chest: { rank: 4, role: "bonus", tone: "#ff9c2b", name: "The Cauldron" },
+        moon: { rank: 5, role: "scatter", tone: "#3fc8e8", name: "Storm Bottle" },
+        wolf: { rank: 6, role: "wild", tone: "#9b5ac8", name: "The Press" },
     },
     // ── THE DEEP ── cold water, so the rule inverts: everything is cold and the two features are the only
     // warm things down there. A starfish is also the one silhouette on the floor nothing can be confused with.

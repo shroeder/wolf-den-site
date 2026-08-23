@@ -130,15 +130,30 @@ export const SLOT_THEMES = {
     slot2: {
         label: "The Harvest",
         blurb: "The kindest reels on the floor. The wagon fills slowly and empties all at once.",
-        // The kitchen. Dishes run warm, so the two that are not do the work: Moon Broth is the only cold
-        // thing on the reel and the Jam Roll the only pink one.
+        // ── SIX DISHES WAS SIX BROWN BOWLS ───────────────────────────────────────────────────────────
+        // This was the cooked-dish family — Jam Roll, Moon Broth, Pumpkin Soup, Harvest Hash, Syrup Cake,
+        // Mash — chosen by NAME, because a jam roll is pink and a moon broth is cold and on paper that is a
+        // spread. It is not. Every cooked dish in this game is served in the same brown bowl, so the spread
+        // was in the names and the reels were six identical bowls of stew. A contact sheet at reel size says
+        // so in one look; the names never will. Luke, on the first version of this exact mistake: "the
+        // sprites seem monotone, and nondescript... I think a big part of the fun is color."
+        //
+        // So: the LARDER instead of the kitchen, chosen off that sheet for hue AND silhouette, which have to
+        // be solved together — a second pass picked three preserve pots in cream, red and green and they
+        // were indistinguishable at reel size, because they were three pots.
+        //
+        //   sack · cluster · ball · cauldron · flask · press      six shapes
+        //   cream · yellow · magenta · gold · cyan · purple       six hues
+        //
+        // The two features carry the loudest of both: the bonus is the only lit fire on the reel and the
+        // wild the only thing with a leaf on it.
         art: {
-            wolf: "cooking:r_jam_roll",
-            moon: "cooking:r_moon_broth",
-            chest: "cooking:r_pumpkin_soup",
-            laurel: "cooking:r_harvest_hash",
-            doubloon: "cooking:r_syrup_cake",
-            bone: "cooking:r_mash",
+            wolf: "cooking:k_wine",              // wild — the grape press, purple and green
+            moon: "cooking:b_storm_chum",        // scatter — the only cold thing on the reel
+            chest: "cooking:kettle_5",           // bonus — the gold cauldron, the only one alight
+            laurel: "cooking:b_jam_paste",       // mid — deep magenta
+            doubloon: "cooking:b_corn_kernel",   // low — yellow
+            bone: "cooking:p_flour",             // low — pale cream
         },
     },
     slot4: {

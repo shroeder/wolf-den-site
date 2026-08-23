@@ -19077,3 +19077,22 @@ body.cas-seated .social-fab { display: none; }
     font-family: var(--font-display); font-size: 1rem; font-weight: 900; color: #fff;
     background: linear-gradient(180deg, #b47cff, #7c3aed); box-shadow: 0 4px 0 #4c1d95, 0 9px 20px rgba(0, 0, 0, .5);
     animation: penIn .3s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+/* ── THE MULTIPLIER, ON THE GLASS ─────────────────────────────────────────────────────────────────────
+   Over the reels, top-right, at display size. It slams in on every step — re-mounted by its React key, so
+   the animation replays rather than the text quietly changing under a finished animation — and the higher
+   it climbs the hotter it gets, because a x20 that looks like the x2 is a ladder nobody is climbing. */
+.s5-bigmult { position: absolute; top: 6px; right: 7px; z-index: 6; pointer-events: none;
+    animation: s5MultSlam .42s cubic-bezier(.15, 1.7, .35, 1) both; }
+.s5-bigmult b { display: block; font-family: var(--font-display); font-size: 2.5rem; line-height: .9;
+    font-weight: 900; color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(255, 215, 94, .95), 0 0 30px rgba(255, 140, 43, .8), 0 3px 0 rgba(0, 0, 0, .6); }
+@keyframes s5MultSlam {
+    0% { transform: scale(2.4) rotate(-9deg); opacity: 0; }
+    55% { transform: scale(.88) rotate(2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+/* Past the middle of the ladder it stops being gold and starts being on fire. */
+.s5-window.is-hot .s5-bigmult b { color: #fff2c2;
+    text-shadow: 0 0 14px rgba(255, 120, 40, 1), 0 0 40px rgba(255, 60, 20, .9), 0 3px 0 rgba(0, 0, 0, .6); }
+.s5-window.is-hot { box-shadow: inset 0 0 60px rgba(255, 110, 40, .3); }
