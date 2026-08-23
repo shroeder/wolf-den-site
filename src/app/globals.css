@@ -18457,7 +18457,9 @@ body.cas-seated .social-fab { display: none; }
    gold border, and the report that started this was "I don't see the music mute button at all" — it was
    measurably on screen and unobstructed, which is the point: being present is not the same as being
    findable on a phone. */
-.cas-audiobar { position: fixed; right: 10px; z-index: 62; display: flex; gap: 7px; align-items: center;
+/* ONE BUTTON NOW, so the pill is a pill rather than a row, and it has a fixed top again: it only ever
+   appears on the floor, where the stage header it used to dodge is not there. */
+.cas-audiobar { position: fixed; right: 10px; top: 10px; z-index: 62; display: flex; align-items: center;
     padding: 5px; border-radius: 999px;
     background: rgba(13, 9, 19, .72); backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 215, 94, .30); box-shadow: 0 3px 12px rgba(0, 0, 0, .5); }

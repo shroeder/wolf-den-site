@@ -127,15 +127,27 @@ const PLACE = {
     inline: null,
 };
 
-export default function SceneMusic({ vibe = "town", place = "top-right" }) {
-    const [muted, setMuted] = useState(true);
+// ── SOMEBODY ELSE CAN OWN THE SWITCH ─────────────────────────────────────────────────────────────────────────
+// Pass `muted` and this component stops having an opinion: it plays or does not play as told, and draws no
+// button of its own. That is what the casino needs — one control for the whole room rather than a music mute
+// beside a sound mute, which is two buttons for one question and invites the answer "half off".
+//
+// Left UNCONTROLLED everywhere else (town, the tavern, the raids, the sea), where the music genuinely is its
+// own thing and its own toggle is the only one there is.
+export default function SceneMusic({ vibe = "town", place = "top-right", muted: mutedProp }) {
+    const controlled = mutedProp !== undefined;
+    const [ownMuted, setOwnMuted] = useState(true);
+    const muted = controlled ? mutedProp : ownMuted;
+    const setMuted = setOwnMuted;
     const started = useRef(false);
     const audio = useRef(null);
 
-    // read saved preference (default: ON)
+    // read saved preference (default: ON). Skipped when somebody else owns the switch — their state is the
+    // only one, and a second remembered preference underneath it is how the two disagree.
     useEffect(() => {
-        try { setMuted(localStorage.getItem(KEY) === "1"); } catch { /* default on */ setMuted(false); }
-    }, []);
+        if (controlled) return;
+        try { setOwnMuted(localStorage.getItem(KEY) === "1"); } catch { /* default on */ setOwnMuted(false); }
+    }, [controlled]);
 
     const stop = useCallback(() => {
         const a = audio.current; if (!a) return;
@@ -228,6 +240,9 @@ export default function SceneMusic({ vibe = "town", place = "top-right" }) {
     const toggle = useCallback(() => {
         setMuted((m) => { const nm = !m; try { localStorage.setItem(KEY, nm ? "1" : "0"); } catch { /* ok */ } return nm; });
     }, []);
+
+    // Controlled: the host draws the control, so this draws nothing. After every hook, never before one.
+    if (controlled) return null;
 
     return (
         <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? `Play ${vibe} music` : "Mute music"}

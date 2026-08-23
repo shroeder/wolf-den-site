@@ -42,25 +42,25 @@ import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js"
 //
 // So the room gets its own switch. It is the arena's flag, not a second one -- two mutes that disagree is a
 // worse bug than no mute at all -- it is just finally reachable from the room it silences.
-function SoundToggle() {
-    // Read AFTER mount. The flag lives in localStorage and the server has no idea what it says, so touching it
-    // during render is a hydration mismatch: the server would emit "on" and the client might mean "off".
-    const [off, setOff] = useState(false);
-    useEffect(() => { setOff(isMuted()); }, []);
+// ── ONE SWITCH FOR THE WHOLE ROOM ────────────────────────────────────────────────────────────────────────────
+// Luke: "just make it one mute button instead of two, and only show it when you are on the casino floor, not
+// when you are inside a casino feature screen."
+//
+// It was two, and two was wrong for a reason worth writing down: they were two buttons for ONE question. The
+// music and the machines are not separate decisions a person wants to make — "is this room making noise" is
+// the whole of it — and offering both invites the state nobody wants, half muted, which then reads as the
+// sound being broken. Worse, they were two REMEMBERED states in two different localStorage keys, so they
+// could disagree across sessions and neither button would say so.
+//
+// So there is one flag now, the arena's, because the machines already ran on it and it is the one that could
+// be silently stuck (see the note that put a sound control in this room at all). SceneMusic is handed it and
+// draws nothing; this button is the only control, and it turns the room on and off.
+function SoundToggle({ off, onToggle }) {
     return (
-        <button type="button" data-sfx-toggle
-            onClick={() => { const next = !off; setOff(next); setMuted(next); if (!next) { unlock(); Cas.coin(2); } }}
-            aria-label={off ? "Turn sound effects on" : "Turn sound effects off"}
-            title={off ? "Sound effects are off" : "Sound effects are on"}
+        <button type="button" data-sfx-toggle onClick={onToggle}
+            aria-label={off ? "Turn sound on" : "Turn sound off"}
+            title={off ? "Sound is off" : "Sound is on"}
             className={`cas-sfxbtn${off ? " is-off" : ""}`}>
-            {/* A glyph, not an emoji -- see the same note in SceneMusic. And the OFF state is coloured rather
-                than merely different, because "my sound is broken" is the report this button exists to answer
-                and it has to be legible at a glance from across a phone. */}
-            {/* A SPEAKER, NOT A SECOND NOTE. The first cut used GiSoundOn, which is a musical note with waves
-                coming off it — sat next to the music toggle's two eighth-notes it read as the same button
-                twice, at 38px, in the dark. Two adjacent controls that look alike and do different things is
-                worse than one control. Music is notes; sound is a speaker; each has its own crossed-out
-                twin, so both states of both buttons are legible without a caption. */}
             {off ? <GiSpeakerOff aria-hidden="true" /> : <GiSpeaker aria-hidden="true" />}
         </button>
     );
@@ -432,6 +432,20 @@ export default function CasinoClient({ initial }) {
     // underneath it is two different things fighting for one screen — on a phone the reels and the button
     // could not both be visible, which is the one thing a slot machine has to manage.
     const [seated, setSeated] = useState(false);
+    // The room's one sound flag. Read after mount, never during render — it lives in localStorage and the
+    // server has no idea what it says, so touching it while rendering is a hydration mismatch.
+    const [soundOff, setSoundOff] = useState(false);
+    useEffect(() => { setSoundOff(isMuted()); }, []);
+    const toggleSound = useCallback(() => {
+        setSoundOff((was) => {
+            const next = !was;
+            setMuted(next);
+            // A confirming click, but only on the way ON — a sound to tell you the sound is off is a joke
+            // that lands once.
+            if (!next) { unlock(); Cas.coin(2); }
+            return next;
+        });
+    }, []);
     const [fx, setFx] = useState(null);      // what the features did on the last pull
     // The two shared games: what settled for you last, and a ticking clock for the round now open.
     const [settled, setSettled] = useState({});
@@ -1247,10 +1261,20 @@ export default function CasinoClient({ initial }) {
                 AudioContext and re-ask for the autoplay gesture every time you sat down or stood up.
                 Seated it drops below the header (64px of it: 40px button, 12px padding either side) so it
                 does not sit on the gold; on the floor it is exactly where it has always been. */}
-            <div className="cas-audiobar" style={{ top: seated ? 74 : 10 }}>
-                <SceneMusic vibe={seated && at ? at.id : "casino"} place="inline" />
-                <SoundToggle />
-            </div>
+            {/* ── MOUNTED ALWAYS, SHOWN ONLY ON THE FLOOR ─────────────────────────────────────────────
+                SceneMusic stays mounted at a machine so the cabinet's tune keeps playing — unmounting it
+                would tear down its AudioContext and re-ask for the autoplay gesture every time you sat
+                down. It is CONTROLLED here, so it draws no button; the switch below is the only one.
+
+                And the switch itself goes away once you are inside a machine. A cabinet is a full-screen
+                thing you are playing, and a floating control over it is clutter in the one place there is
+                least room for it — you are two taps from the floor if you want it. */}
+            <SceneMusic vibe={seated && at ? at.id : "casino"} place="inline" muted={soundOff} />
+            {!seated ? (
+                <div className="cas-audiobar">
+                    <SoundToggle off={soundOff} onToggle={toggleSound} />
+                </div>
+            ) : null}
             </div>
 
             {/* ── WHAT YOU ARE STANDING AT ────────────────────────────────────────────────────────────
