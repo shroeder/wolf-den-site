@@ -60,6 +60,9 @@ function forcedSpin(m, stake, offerId, want) {
         // two by design, which makes the single most elaborate animation on the floor the one nobody can
         // look at — including me, which is how it shipped unwatched the first time.
         if (want === "chain" && p.chain && p.chain.cascades >= 4) return p;
+        // A round that extends itself. Roughly a quarter of free rounds do it, which is often enough to
+        // matter and far too rare to sit and wait for while judging how the moment lands.
+        if (want === "again" && p.free && p.free.added > 0) return p;
     }
     // Never hang and never lie: if it could not find one, the member gets an ordinary spin.
     return null;
@@ -84,7 +87,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
     // can write, and "the button is hidden" is not a permission check.
-    const want = isOwner(buyerId) && ["free", "pick", "chain"].includes(force) ? force : null;
+    const want = isOwner(buyerId) && ["free", "pick", "chain", "again"].includes(force) ? force : null;
     const r = (want && forcedSpin(m, stake, offer.id, want)) || playSpin(m, { bet: stake, offerId: offer.id });
 
     // ── CONVERTED ONCE, AT THE END ───────────────────────────────────────────────────────────────────────
