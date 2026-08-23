@@ -1336,7 +1336,13 @@ export default function CasinoClient({ initial }) {
                         spec sheet, and the machine is right there to be played. The numbers have not gone
                         anywhere: check:casino prints every one of them and refuses the build if any cabinet
                         drifts. */}
-                    {SLOTS.has(at.id) && st?.slots?.[at.id] ? (
+                    {/* FROM WHICHEVER TABLE THIS CABINET ACTUALLY PLAYS ON. The five-reel machines have
+                        their own blurb and their own game; reading the old three-reel one described a
+                        machine that is no longer there — "nothing here pays small" over a twenty-line
+                        screen where most wins are a fraction of the stake by design. */}
+                    {SLOTS5[at.id] ? (
+                        <p className="cas-vol"><span>{SLOTS5[at.id].blurb}</span></p>
+                    ) : SLOTS.has(at.id) && st?.slots?.[at.id] ? (
                         <p className="cas-vol">
                             <span>{st.slots[at.id].blurb}</span>
                         </p>
@@ -1394,6 +1400,7 @@ export default function CasinoClient({ initial }) {
                             gold={st?.gold}
                             chips={st?.chips}
                             bet={bet}
+                            onBet={setBet}
                             busy={busy} />
                     ) : at.live && SLOTS.has(at.id) ? (
                         <>
@@ -1704,7 +1711,13 @@ export default function CasinoClient({ initial }) {
                     {/* ONE STAKE ROW AND ONE BUTTON for every machine, because the stake is the same decision
                         wherever you are standing and a floor where each cabinet invents its own controls is a
                         floor you have to learn three times. */}
-                    {at.live ? (
+                    {/* ── EXCEPT THE ONE THAT BRINGS ITS OWN ──────────────────────────────────────
+                        A five-reel cabinet has its own stake and its own Spin inside its own frame, so the
+                        shared row underneath it is a SECOND spin button — and the wrong one: it plays the
+                        three-reel game, on the three-reel table, for gold. Shot on the deployed page and
+                        there they both were, "Spin · 100" above and "Pull · 100" below, forty pixels apart.
+                        One machine, one button. */}
+                    {at.live && !SLOTS5[at.id] ? (
                         <div className="cas-controls">
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks

@@ -18528,3 +18528,10 @@ body.cas-seated .social-fab { display: none; }
 .s5-purse { display: flex; justify-content: space-between; margin: 0; font-size: 12px; color: #8f98a3;
     font-variant-numeric: tabular-nums; }
 .s5-chipcount { color: var(--acc, #ffd75e); font-weight: 800; }
+.s5-bets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.s5-bet { padding: 10px 4px; border-radius: 11px; cursor: pointer; font-weight: 900; font-size: 13px;
+    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: #cbd3dc;
+    font-variant-numeric: tabular-nums; }
+.s5-bet.is-on { border-color: var(--acc, #ffd75e); color: #1a1206; font-weight: 900;
+    background: linear-gradient(180deg, #ffe08a, #e8b63e); }
+.s5-bet:disabled { opacity: .45; cursor: default; }

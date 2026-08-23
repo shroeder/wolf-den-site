@@ -40,7 +40,7 @@ function stripFor(pool, land) {
     return [...run, ...land];
 }
 
-export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold, chips, bet, busy }) {
+export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold, chips, bet, onBet, stakes = [25, 100, 500, 2500], busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -221,6 +221,18 @@ export default function Slot5({ machineId = "slot", symbols, lines, onSpin, gold
                 </div>
             ) : null}
 
+            {/* ── ITS OWN STAKE ROW ───────────────────────────────────────────────────────────────────
+                The floor's shared stake row and Pull button are hidden under this machine, because a
+                cabinet with its own Spin inside its own frame plus the floor's Pull underneath it is two
+                buttons forty pixels apart that play two DIFFERENT games — the shared one plays the
+                three-reel table for gold. Hiding it means the stake has to live here instead. */}
+            <div className="s5-bets">
+                {stakes.map((v) => (
+                    <button key={v} type="button" className={`s5-bet${bet === v ? " is-on" : ""}`}
+                        disabled={spinning || phase === "pick"}
+                        onClick={() => { onBet?.(v); Cas.chips(); }}>{v.toLocaleString()}</button>
+                ))}
+            </div>
             <button type="button" className="s5-pull" onClick={pull} disabled={busy || spinning || phase === "pick"}>
                 {spinning ? "…" : `Spin · ${bet.toLocaleString()}`}
             </button>
