@@ -34,7 +34,10 @@ const winRate = (foe, samples) => {
 const reach = (p, n) => 1 - Math.pow(1 - p, n);
 
 console.log(`\n  ${me.display_name} — ${kit.classId || "no class"}, ${Object.values(kit.taken || {}).reduce((a, n) => a + n, 0)} points`);
-console.log(`  damage ${Math.round(kit.damage)}  health ${kit.health}  armour ${kit.armor}  speed ${kit.speed.toFixed(2)}  crit ${(kit.critChance * 100).toFixed(0)}%\n`);
+// `speed` was on this line and there is no speed — it went with the clock when turn order became a coin flip
+// at the bell, and this gate has crashed on `kit.speed.toFixed` ever since. A check that throws before its
+// first assertion is a check nobody is running. The stat that replaced it is printed instead.
+console.log(`  damage ${Math.round(kit.damage)}  health ${kit.health}  armour ${kit.armor}  extra turn ${((kit.extra || 0) * 100).toFixed(0)}%  crit ${(kit.critChance * 100).toFixed(0)}%\n`);
 console.log("  rung  class       shape       pts   win     100 tries   what it carries");
 
 const rows = [];

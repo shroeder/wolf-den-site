@@ -110,7 +110,24 @@ function fever(ring) {
  */
 function closeTurn(ring, rng = Math.random) {
     const f = ring.acting === "me" ? ring.A : ring.B;
-    const again = ring.over ? null : goesAgain(f, rng, ring.wasExtra);
+    // ── YOUR FIRST TURN IS SACRED ────────────────────────────────────────────────────────────────────
+    // Whoever wins the flip at the bell gets ONE beat before the other fighter has been in the fight at
+    // all. They do not get to chain that into two, three or six, which is what `goesAgain` was happily
+    // handing out — a granted turn bypasses the one-per-exchange rule by design, and stacked on the
+    // opening coin flip that design meant the fight could be decided before the member touched anything.
+    //
+    // Measured against the real rung-40 champion with four members' real kits: ValkyrieSylve lost 27.7%
+    // of her fights before ever acting, Kaishiern 24.1%, GrayKitsune 15.8% — up to six foe beats in a row.
+    // Kaishiern: "I start a fight on the Road and the enemy has already damaged me. In one case I was
+    // defeated before I could click anything." Four people reported it as the Road being broken and all
+    // four were describing this.
+    //
+    // This costs a foe its haste proc on the opening beat only, and nothing else anywhere: the moment you
+    // have taken one turn the rule expires and extra turns work exactly as they always have. It is the
+    // same principle openTurn already states for a lock that renews itself — you have to be IN the fight.
+    // Difficulty is a foe you cannot beat. A foe you never got to play against is not difficulty.
+    const beforeYourFirst = !ring.youActed && ring.acting === "foe";
+    const again = ring.over || beforeYourFirst ? null : goesAgain(f, rng, ring.wasExtra);
     ring.wasExtra = Boolean(again);
     if (!again) ring.up = ring.acting === "me" ? "foe" : "me";
     // The screen has to be able to SAY it, and it has to know which of the two it was: a Haste proc you can
@@ -156,6 +173,11 @@ function advance(ring, rng) {
         // earned it steps up. This is the only reason a fight is ever anything other than you-them-you-them,
         // and every one of them gets a sentence — which is the entire point of replacing the clock.
         const isExtra = ring.wasExtra;
+        // And the other half of the same guarantee: your first turn cannot be the one a stun or a chill
+        // eats. `lostLast` is the flag openTurn already honours for "you cannot lose two in a row" (it
+        // reads it as `owed`), so the rule is expressed in the vocabulary that is already there rather
+        // than as a second mechanism that has to be kept in step with the first.
+        if (mine && !ring.youActed) att.lostLast = true;
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });
@@ -193,6 +215,8 @@ function advance(ring, rng) {
 
         ring.awaiting = "act";
         ring.turn = "you";
+        // You are in the fight. Both halves of the guarantee above expire here, for the rest of the bout.
+        ring.youActed = true;
         return ring;
     }
     return ring;
@@ -223,6 +247,7 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName =
         t: 0, beat: 0,
         up: flip ? "me" : "foe",      // whose turn it is; the only thing turn order consists of now
         wasExtra: false,              // was the turn about to be taken an extra one — see closeTurn
+        youActed: false,              // has the member had a turn yet — see "your first turn is sacred"
         wentAgain: null,              // and how it was earned, for the screen: "granted" | "extra" | null
         cd: {},                       // skillId -> beats of YOURS before it comes back
         foeCd: {},                    // and theirs, kept apart so one deck cannot cool the other

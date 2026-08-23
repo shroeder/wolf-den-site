@@ -77,6 +77,31 @@ for (const pair of PAIRINGS) {
         + `   (${capped} of ${RUNS} hit the beat cap)`);
 }
 
+// ── YOUR FIRST TURN IS SACRED ────────────────────────────────────────────────────────────────────────────
+// Whoever wins the flip at the bell gets ONE beat before you have been in the fight. Not two, not six.
+// `goesAgain` used to chain the opening because a GRANTED turn deliberately bypasses the one-per-exchange
+// rule, and stacked on the coin flip that meant a quarter of rung-40 fights ended before the member touched
+// anything. Kaishiern: "I was defeated before I could click anything."
+//
+// Asserted against a foe built to abuse exactly that — permanent haste, max extra-turn chance, and enough
+// chill to eat the member's turn as well — because the bug needed all three and a gate that only tests a
+// plain fighter would have read green through the whole of it.
+{
+    const bully = { damage: 40, health: 90000, extra: 0.95, chill: 0.6, freeze: 0.9, critChance: 0, accuracy: 1 };
+    const hasted = { haste: { id: "haste", name: "Haste", power: 1, haste: 1, cooldown: 0 } };
+    let worstOpen = 0;
+    for (let i = 0; i < 4000; i += 1) {
+        const ring = openRing({ damage: 40, health: 90000, accuracy: 1, critChance: 0 }, bully,
+            { foeSkills: hasted, foeName: "The Bully" });
+        if (ring.beat > worstOpen) worstOpen = ring.beat;
+    }
+    // Two: at most one foe beat, then yours. Yours counts, which is why the bound is 2 and not 1.
+    if (worstOpen > 2) {
+        fail += 1;
+        console.log(`  FIRST TURN — ${worstOpen} beats ran before the member's first turn; at most 2 may.`);
+    } else console.log(`  first turn                 ok   (worst opening ${worstOpen} beats)`);
+}
+
 // ── AND THE ONE THAT BRICKED A MEMBER: NO UNPLAYABLE, UNFINISHED, UNRETIRED BOUT ─────────────────────────
 // A bout is in exactly one of three states, and the three must cover everything: FINISHED (over), PLAYABLE
 // (has a ring and can take a beat), or STALE (retired, so the screen drops it and a new fight can start).
