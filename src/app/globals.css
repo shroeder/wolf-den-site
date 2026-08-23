@@ -17634,7 +17634,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    symbol moving fast reads as a stutter, because it is one. */
 .cas-reel.is-spin .cas-strip { animation: casRun .26s linear infinite; }
 .cas-reel.is-spin .cas-cell img { filter: blur(2px); opacity: .9; }
-@keyframes casRun { to { transform: translateY(calc(var(--cell, 84px) * -4)); } }
+/* Same reversal as the five-reel cabinet, same fix — a reel falls, it does not rise. See s5Run. */
+@keyframes casRun {
+    from { transform: translateY(calc(var(--cell, 84px) * -4)); }
+    to { transform: translateY(0); }
+}
 
 /* ── AND COMING TO REST ───────────────────────────────────────────────────────────────────────────────
    The strip used to carry `transition: transform 520ms` in its inline style for the landing, and that
@@ -18514,7 +18518,17 @@ body.cas-seated .social-fab { display: none; }
    never "changes" the computed value and no transition ever starts. */
 .s5-reel.is-spin .s5-strip { animation: s5Run .22s linear infinite; }
 .s5-reel.is-spin .s5-cell img { filter: blur(2px); opacity: .9; }
-@keyframes s5Run { to { transform: translateY(calc(var(--s5cell) * -3)); } }
+/* ── A REEL FALLS. IT DOES NOT RISE. ─────────────────────────────────────────────────────────────
+   This ran `to { translateY(-3 cells) }` from an implicit start of zero, which walks the strip UPWARDS —
+   symbols travelling up and out of the top of the window. Then the landing keyframe came from -2.2 down
+   to rest, which is the correct direction, so the reel spun one way and stopped the other. Luke: "the
+   spin animation is reverse and then it reverses again when it stops."
+   Both halves now move the same way, which is down: the strip starts three cells high and falls to rest,
+   over and over, and the landing continues that fall rather than reversing it. */
+@keyframes s5Run {
+    from { transform: translateY(calc(var(--s5cell) * -3)); }
+    to { transform: translateY(0); }
+}
 .s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 340ms) cubic-bezier(.17,.84,.32,1) both; }
 @keyframes s5Settle { from { transform: translateY(calc(var(--s5cell) * -2.2)); } }
 
