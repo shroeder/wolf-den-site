@@ -37,7 +37,10 @@ for (const m of Object.values(SLOTS5)) {
         paid += r.total;
         basePaid += r.base.total;
         if (r.free) { freePaid += r.free.total; freeRounds += 1; }
+        // A cabinet has EITHER a pick or a hold-and-spin, never both — counted together, because what
+        // matters is how much of the machine lives in its second feature rather than which shape it is.
         if (r.pick) { pickPaid += r.pick.total; pickRounds += 1; }
+        if (r.hold) { pickPaid += r.hold.total; pickRounds += 1; }
         if (r.total > 0) {
             hits += 1;
             dry = 0;
@@ -56,13 +59,21 @@ for (const m of Object.values(SLOTS5)) {
     console.log(`  best single play   ${best.toFixed(0)}x your bet`);
     console.log(`\n  where the money is`);
     console.log(`    base game        ${pct(basePaid / paid)}`);
-    console.log(`    free spins       ${pct(freePaid / paid)}   (1 in ${Math.round(N / freeRounds).toLocaleString()} spins)`);
-    console.log(`    the chest pick   ${pct(pickPaid / paid)}   (1 in ${Math.round(N / pickRounds).toLocaleString()} spins)`);
+    console.log(`    free spins       ${pct(freePaid / paid)}   (1 in ${Math.round(N / freeRounds).toLocaleString()} spins)  ${m.free?.kind}`);
+    console.log(`    ${String(m.second?.label || "second").padEnd(16)} ${pct(pickPaid / paid)}   (1 in ${Math.round(N / pickRounds).toLocaleString()} spins)`);
     console.log(`\n  of the wins you SEE`);
     for (const [k, v] of Object.entries(buckets)) {
         if (!v) continue;
         console.log(`    ${k.padEnd(10)} ${pct(v / hits).padStart(7)}   (1 in ${Math.round(N / v).toLocaleString()} spins)`);
     }
+
+    // ── ONLY ONE CABINET OFFERS A CHOICE ─────────────────────────────────────────────────────────────────
+    // The other four have a single shape of free round, and that shape IS the machine's identity rather than
+    // a setting. There is nothing to keep level, so there is nothing to check.
+    // GUARDS THE OFFERS BLOCK ONLY. It was a `continue`, which skipped the hard rules below it as well — so
+    // four of the five cabinets were never checked at all and the gate reported green with The Harvest
+    // returning 170%. A gate that skips its own assertions is worse than no gate.
+    if (m.free?.kind === "deals") {
 
     // ── THE THREE OFFERS MUST BE A REAL CHOICE ───────────────────────────────────────────────────────────
     // Not "roughly equal" by assertion — measured. If one of them is worth 30% more than the others then it is
@@ -83,6 +94,8 @@ for (const m of Object.values(SLOTS5)) {
     if (spread > 0.12) {
         failures += 1;
         console.log(`    ✗ the best offer is worth ${pct(spread)} more than the worst — that is a right answer, not a choice`);
+    }
+
     }
 
     // ── AND THE ONE HARD RULE ────────────────────────────────────────────────────────────────────────────
