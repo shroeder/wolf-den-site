@@ -1277,7 +1277,10 @@ export default function CasinoClient({ initial }) {
                 And the switch itself goes away once you are inside a machine. A cabinet is a full-screen
                 thing you are playing, and a floating control over it is clutter in the one place there is
                 least room for it — you are two taps from the floor if you want it. */}
-            <SceneMusic vibe={seated && at ? at.id : "casino"} place="inline" muted={soundOff} />
+            {/* THE COUNTER IS NOT A CABINET, so it keeps the floor's tune rather than asking for one of
+                its own — and asking for one it does not have is how it ended up playing the TOWN folk loop,
+                which check:casino caught before anybody heard it. */}
+            <SceneMusic vibe={seated && at && at.id !== "store" ? at.id : "casino"} place="inline" muted={soundOff} />
             {!seated ? (
                 <div className="cas-audiobar">
                     <SoundToggle off={soundOff} onToggle={toggleSound} />

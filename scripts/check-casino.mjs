@@ -246,13 +246,18 @@ for (const m of perked) {
         .split("const VIBES = {")[1].split("\n};")[0]
         .matchAll(/^\s{4}([a-z0-9]+):\s*\{/gm)].map((m) => m[1]));
 
+    // THE COUNTER IS NOT A GAME. It is on the floor and in MACHINES because you walk to it, but it has no
+    // reels, no sounds of its own and no tune — it keeps the floor's. Everything else in that list is a
+    // cabinet and must have both.
+    const NOT_A_GAME = new Set(["store"]);
     if (!ids.length) problems.push("could not read MACHINES out of CasinoClient.js — this check has gone blind");
-    for (const id of ids) {
+    const games = ids.filter((id) => !NOT_A_GAME.has(id));
+    for (const id of games) {
         if (!voices.has(id)) problems.push(`${id} has no entry in VOICES — it would play The Hunt's sounds`);
         if (!vibes.has(id)) problems.push(`${id} has no entry in VIBES — it would play the TOWN music`);
     }
-    if (ids.length && ids.every((i) => voices.has(i) && vibes.has(i))) {
-        console.log(`\n  all ${ids.length} cabinets have their own voice and their own tune`);
+    if (games.length && games.every((i) => voices.has(i) && vibes.has(i))) {
+        console.log(`\n  all ${games.length} cabinets have their own voice and their own tune`);
     }
 }
 
