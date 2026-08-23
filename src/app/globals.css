@@ -18454,3 +18454,77 @@ body.cas-seated .social-fab { display: none; }
     display: grid; place-items: center; }
 /* Off is a STATE, not an absence — a red-ish cast so "why is there no sound" answers itself. */
 .cas-sfxbtn.is-off { color: #ff8f9b; border-color: rgba(255, 143, 155, .45); background: rgba(255, 143, 155, .12); }
+
+/* ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
+   Five columns, three rows, on a phone. The whole thing is sized off --s5cell so the grid scales as one
+   piece — the three-reel cabinet next door learned that the hard way, with objects sized in independent
+   vh units that all changed size when the room did. */
+.s5 { --s5cell: clamp(46px, 17vw, 74px); display: grid; gap: 10px; }
+.s5-window { position: relative; border-radius: 14px; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 26%, transparent);
+    background: radial-gradient(120% 90% at 50% 20%, rgba(255,255,255,.05), rgba(0,0,0,.55)); }
+.s5-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
+.s5-reel { position: relative; height: calc(var(--s5cell) * 3); overflow: hidden;
+    border-right: 2px solid rgba(0,0,0,.5); }
+.s5-reel:last-child { border-right: none; }
+.s5-strip { display: block; will-change: transform; }
+.s5-cell { display: flex; align-items: center; justify-content: center; height: var(--s5cell); }
+.s5-cell img { width: 70%; height: 70%; object-fit: contain; display: block; transition: filter .16s ease; }
+/* A symbol on the line that is currently being drawn. Everything else dims, so the line reads at a glance
+   instead of the player having to trace it. */
+.s5-cell img.is-lit { filter: drop-shadow(0 0 9px var(--acc, #ffd75e)) brightness(1.15); }
+.s5-lines ~ .s5-grid .s5-cell img:not(.is-lit) { opacity: .45; }
+
+/* Spinning, and coming to rest. Same construction as the three-reel cabinet: a looping keyframe for the
+   run, and a FROM-ONLY keyframe for the landing so it interpolates to the strip's own inline transform
+   without the keyframe needing to know where that is. A transition cannot do this job — while the reel
+   spins its transform belongs to an animation, which sits above the cascade, so removing the animation
+   never "changes" the computed value and no transition ever starts. */
+.s5-reel.is-spin .s5-strip { animation: s5Run .22s linear infinite; }
+.s5-reel.is-spin .s5-cell img { filter: blur(2px); opacity: .9; }
+@keyframes s5Run { to { transform: translateY(calc(var(--s5cell) * -3)); } }
+.s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 340ms) cubic-bezier(.17,.84,.32,1) both; }
+@keyframes s5Settle { from { transform: translateY(calc(var(--s5cell) * -2.2)); } }
+
+.s5-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.s5-lines polyline { fill: none; stroke: var(--acc, #ffd75e); stroke-width: 1.6; stroke-linejoin: round;
+    stroke-linecap: round; filter: drop-shadow(0 0 3px var(--acc, #ffd75e)); vector-effect: non-scaling-stroke; }
+
+.s5-say { min-height: 22px; text-align: center; font-size: 13px; color: #e8dcc6; }
+.s5-say b { color: var(--acc, #ffd75e); font-variant-numeric: tabular-nums; }
+.s5-dim { color: #8f98a3; }
+.s5-won b { font-size: 19px; font-family: var(--font-display); }
+
+/* The deal, chosen before the spin. Three equal options — none of them is the right one. */
+.s5-offers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.s5-offer { display: grid; gap: 1px; padding: 7px 4px; border-radius: 11px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: #cbd3dc; }
+.s5-offer b { font-size: 12px; font-weight: 900; }
+.s5-offer i { font-style: normal; font-size: 10px; color: #8f98a3; }
+.s5-offer.is-on { border-color: var(--acc, #ffd75e); background: color-mix(in srgb, var(--acc, #ffd75e) 14%, transparent); color: #fff; }
+.s5-offer.is-on i { color: #e8dcc6; }
+
+.s5-feature { padding: 11px 12px; border-radius: 13px; text-align: center;
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 32%, transparent);
+    background: color-mix(in srgb, var(--acc, #ffd75e) 9%, rgba(0,0,0,.4)); }
+.s5-feature h4 { margin: 0 0 5px; font-family: var(--font-display); font-size: 14px; color: var(--acc, #ffd75e); }
+.s5-feature p { margin: 0 0 8px; font-size: 12.5px; color: #e8dcc6; }
+.s5-feature p b { font-variant-numeric: tabular-nums; }
+.s5-go { padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.07); color: #e8dcc6; font-weight: 800; font-size: 12px; cursor: pointer; }
+
+.s5-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.s5-chest { aspect-ratio: 1; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 14px;
+    border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #8f98a3;
+    font-variant-numeric: tabular-nums; }
+.s5-chest:disabled { cursor: default; }
+.s5-chest.is-open { color: var(--acc, #ffd75e); border-color: color-mix(in srgb, var(--acc, #ffd75e) 45%, transparent);
+    background: color-mix(in srgb, var(--acc, #ffd75e) 15%, transparent); }
+
+.s5-pull { width: 100%; padding: 15px; border-radius: 14px; border: none; cursor: pointer;
+    font-family: var(--font-display); font-size: 1.05rem; font-weight: 900; color: #1a1206;
+    background: linear-gradient(180deg, #ffe08a, #e8b63e); box-shadow: 0 3px 0 #9c7418, 0 8px 20px rgba(0,0,0,.45); }
+.s5-pull:disabled { filter: grayscale(.5) brightness(.72); cursor: default; box-shadow: none; }
+.s5-purse { display: flex; justify-content: space-between; margin: 0; font-size: 12px; color: #8f98a3;
+    font-variant-numeric: tabular-nums; }
+.s5-chipcount { color: var(--acc, #ffd75e); font-weight: 800; }

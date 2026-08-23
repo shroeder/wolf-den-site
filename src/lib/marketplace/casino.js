@@ -1095,11 +1095,15 @@ export async function getCasinoState(buyerId) {
         // The avatar comes down with the gold. Everybody ELSE on this floor has been drawn with their own
         // sprite since it opened (see casinoOccupants), which left the one person the player is actually
         // looking at as the only blank on the screen.
-        db.queryOne(`SELECT gold, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT gold, COALESCE(chips, 0)::bigint AS chips, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         casinoOccupants(buyerId),
     ]);
     return {
         gold: Number(me?.gold) || 0,
+        // The casino's own currency. The five-reel machines pay in chips and the counter spends them, so the
+        // purse on that screen shows both — see chips.js. Sent from the first load rather than only in a spin
+        // response, or a member who walks in and does not pull is told they have none.
+        chips: Number(me?.chips) || 0,
         me: { sprite: me?.avatar_sprite_url || null },
         others,
         // Every cabinet's table, so a machine can show what it pays without another round trip. Functions

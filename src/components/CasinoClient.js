@@ -8,6 +8,8 @@ import { GiSpeaker, GiSpeakerOff } from "react-icons/gi";
 import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena-audio.js";
 import Burst from "@/components/casino/Burst";
 import { Cas } from "@/components/casino/casino-audio.js";
+import Slot5 from "@/components/casino/Slot5.js";
+import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
 // A room laid out like the tavern: you walk left and right along it, the other people in it are really there,
@@ -664,6 +666,26 @@ export default function CasinoClient({ initial }) {
             }));
         }
     }, []);
+
+    // ── THE FIVE-REEL MACHINE'S OWN SPIN ────────────────────────────────────────────────────────────────
+    // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
+    // response shape. Two games behind one verb is how a payout path gets confused about which table it is
+    // paying from. Returns the raw response to the component, which does all the revealing.
+    const spin5 = useCallback(async (offerId) => {
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "spin5", bet, machine: at?.id, offer: offerId }),
+        }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) {
+            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+                : r?.error === "closed" ? "This machine is not open yet."
+                : "That didn't go through.");
+            return r || { ok: false };
+        }
+        // Gold AND chips both moved, and the purse at the top of the screen shows both.
+        setSt((p) => (p ? { ...p, gold: r.gold, chips: r.chips } : p));
+        return r;
+    }, [bet, at]);
 
     const pull = useCallback(async () => {
         if (busy) return;
@@ -1357,7 +1379,23 @@ export default function CasinoClient({ initial }) {
                         </>
                     ) : null}
 
-                    {at.live && SLOTS.has(at.id) ? (
+                    {/* ── THE CABINET THAT HAS BEEN REBUILT ───────────────────────────────────────────
+                        A machine with an entry in SLOTS5 is a five-reel, twenty-line machine and renders
+                        the new screen; everything else is still the three-reel cabinet below. Keyed off the
+                        TABLE rather than a flag, so a cabinet becomes new the moment its maths does and
+                        there is no state in which the screen and the paytable disagree about which game
+                        this is. */}
+                    {at.live && SLOTS5[at.id] ? (
+                        <Slot5
+                            machineId={at.id}
+                            symbols={(st?.slots?.[at.id]?.symbols || []).map((x) => x.id)}
+                            lines={SLOT5_LINES}
+                            onSpin={spin5}
+                            gold={st?.gold}
+                            chips={st?.chips}
+                            bet={bet}
+                            busy={busy} />
+                    ) : at.live && SLOTS.has(at.id) ? (
                         <>
                             {/* ── THE MACHINE, NOT THREE BOXES ────────────────────────────────────
                                 Luke: "make it really look like a slot machine screen not just 3 boxes."
