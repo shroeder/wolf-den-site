@@ -186,19 +186,21 @@ const HUNT = {
     // solve it with nine or ten symbols; with four, the commonest one has to be a symbol you are pleased to
     // see FOUR of and indifferent to three of, which is exactly the job blanks do on a physical reel strip.
     pays: {
-        wolf: { 3: 16, 4: 145, 5: 2000 },
-        chest: { 3: 5.5, 4: 48, 5: 480 },
-        laurel: { 3: 2, 4: 14.5, 5: 120 },
-        doubloon: { 3: 1, 4: 5.5, 5: 40 },
-        bone: { 4: 2, 5: 16 },
+        wolf: { 3: 14.8, 4: 134, 5: 1851 },
+        chest: { 3: 5.09, 4: 44.4, 5: 444 },
+        laurel: { 3: 1.85, 4: 13.4, 5: 111 },
+        doubloon: { 3: 0.93, 4: 5.09, 5: 37 },
+        bone: { 4: 1.85, 5: 14.8 },
     },
     // Scatters pay a multiple of the TOTAL bet, not the line bet, because they do not sit on a line. This is
     // the one payout a player can always find without understanding paylines.
-    scatterPays: { 3: 1.2, 4: 5.5, 5: 36 },
+    scatterPays: { 3: 1.11, 4: 5.09, 5: 33.3 },
     // Its free round is the only one on the floor you CHOOSE the shape of — see FREE_SPIN_OFFERS.
     free: { kind: "deals", spins: 10, label: "Ten spins, four times" },
-    second: { kind: "pick", board: "pen", label: "The Petting Pen",
-        chips: [10, 10, 10, 10, 10, 24, 24, 24, 72], mults: [2, 3] },
+    // ── TEN SPINS, AND EVERY WOLF STAYS ──────────────────────────────────────────────────────────────
+    // The board you are playing on gets better as the round runs down, which is the opposite of how a
+    // losing streak feels and is exactly why people chase it. See STICKY.
+    second: { kind: "sticky", spins: 10, label: "Ten spins, and every wolf stays where it lands" },
 };
 
 // ── AND THE OTHER FOUR ───────────────────────────────────────────────────────────────────────────────────────
@@ -282,16 +284,18 @@ const DEEP = {
         { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 20.3, 4: 154, 5: 2051 },
-        chest: { 3: 6, 4: 46.1, 5: 461 },
-        laurel: { 3: 2.03, 4: 13.3, 5: 113 },
-        doubloon: { 4: 4.61, 5: 36 },
-        bone: { 5: 10.1 },
+        wolf: { 3: 20.9, 4: 159, 5: 2114 },
+        chest: { 3: 6.19, 4: 47.5, 5: 475 },
+        laurel: { 3: 2.09, 4: 13.7, 5: 116 },
+        doubloon: { 4: 4.75, 5: 37.1 },
+        bone: { 5: 10.4 },
     },
-    scatterPays: { 3: 1.01, 4: 4.61, 5: 30.4 },
+    scatterPays: { 3: 1.04, 4: 4.75, 5: 31.3 },
     free: { kind: "expanding", spins: 14, label: "Fourteen spins, and every wild takes its whole reel" },
-    second: { kind: "pick", board: "trawl", label: "The Trawl",
-        chips: [7.38, 7.38, 7.38, 15.3, 15.3, 15.3, 46.1], mults: [2, 3, 5] },
+    // Same shape as The Hunt's, and it plays completely differently: down here the wild is the rarest
+    // symbol on the floor and the pays above it are the steepest, so a board that fills up is worth
+    // several times what the same board is worth up top.
+    second: { kind: "sticky", spins: 10, label: "Ten hauls, and every kraken stays in the net" },
 };
 
 const MENAGERIE = {
@@ -537,17 +541,30 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
         const again = (r.scatters >= 3 || deep) && left + RETRIGGER <= CEILING;
         if (again) { left += RETRIGGER; added += RETRIGGER; }
 
+        // ── AND THE ONES THAT JUST LOCKED ────────────────────────────────────────────────────────────────
+        // Two lists per spin, because the screen has to tell three states apart: a cell that was ALREADY
+        // held (drawn locked from the moment the reels start), one that locks on THIS spin (drawn landing,
+        // then clamping shut, which is the moment worth watching), and an ordinary symbol. Without the
+        // distinction a sticky round animates as a grid that quietly has more wolves in it each time, and
+        // the whole mechanic goes by unremarked — the same failure as the retrigger changing a counter in
+        // silence.
+        const heldBefore = stuck.map(([reel, row]) => reel * ROWS + row);
+        const justHeld = [];
         if (offer.sticky) {
             for (let reel = 0; reel < REELS; reel += 1) {
                 for (let row = 0; row < ROWS; row += 1) {
-                    if (grid[reel][row] === m.wild && !stuck.some((p) => p[0] === reel && p[1] === row)) stuck.push([reel, row]);
+                    if (grid[reel][row] === m.wild && !stuck.some((p) => p[0] === reel && p[1] === row)) {
+                        stuck.push([reel, row]);
+                        justHeld.push(reel * ROWS + row);
+                    }
                 }
             }
         }
         total += r.total;
         // `retrigger` carries what this spin bought and HOW, so the screen can shout the right thing: a
         // chain that ran away with itself and a third scatter landing are not the same moment.
-        spins.push({ grid, ...r, mult, chain, retrigger: again ? { spins: RETRIGGER, by: deep ? "chain" : "scatter" } : null });
+        spins.push({ grid, ...r, mult, chain, held: heldBefore, justHeld,
+            retrigger: again ? { spins: RETRIGGER, by: deep ? "chain" : "scatter" } : null });
         i += 1;
     }
     return { total, spins, stuck, added, base: offer.spins };
@@ -705,63 +722,18 @@ export function runHold(m, cfg, { lineBet = 1, rng = Math.random } = {}) {
     return { total, steps, filled, full: filled === CELLS };
 }
 
-// ── THE PICK ─// ── THE PICK ─────────────────────────────────────────────────────────────────────────────────────────────────
-// Four chests open a board of twelve. You keep picking until you turn over the one that ends it, and every
-// pick is either chips or a multiplier on everything you have collected so far. The multiplier is what makes
-// this worth playing rather than watching: a board that has already paid four times is a board you do NOT want
-// to stop, and that tension is the entire feature.
-// The Hunt's board, kept as the default for anything that does not bring its own. Each cabinet's real board
-// is on the cabinet — see `second.chips` and `second.mults` — for the same reason the hold's coins are: a
-// payout that lives in a shared constant is a payout a per-cabinet rescale cannot reach.
-export const PICK_BOARD = [
-    ...Array.from({ length: 5 }, () => ({ kind: "chips", value: 10 })),
-    ...Array.from({ length: 3 }, () => ({ kind: "chips", value: 24 })),
-    { kind: "chips", value: 72 },
-    { kind: "mult", value: 2 },
-    { kind: "mult", value: 3 },
-    { kind: "end" },
-];
-
-/** A cabinet's own board, built from its numbers. One "end" card, always — that is what makes it a pick. */
-export function boardFor(m) {
-    const cfg = m?.second;
-    if (!cfg || cfg.kind !== "pick" || !cfg.chips) return PICK_BOARD.map((c) => ({ ...c }));
-    return [
-        ...cfg.chips.map((v) => ({ kind: "chips", value: v })),
-        ...(cfg.mults || []).map((v) => ({ kind: "mult", value: v })),
-        { kind: "end" },
-    ];
-}
-
-export function runPick(m, { lineBet = 1, rng = Math.random } = {}) {
-    const board = boardFor(m);
-    // Fisher-Yates, so every arrangement is equally likely. A sort() with a random comparator is NOT a
-    // shuffle and biases the ends of the array, which on a paying board is a real edge to whoever spots it.
-    for (let i = board.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(rng() * (i + 1));
-        [board[i], board[j]] = [board[j], board[i]];
-    }
-    // ── IT OPENS WITH A WIN, ALWAYS ──────────────────────────────────────────────────────────────────
-    // The payout is sum x mult, so a board that deals its multipliers first multiplies NOTHING and the whole
-    // bonus pays zero. Watched one do exactly that on The Deep: x5, then x2, then the net was cut. Three
-    // taps, a fanfare, a takeover screen, and "Take 0 chips".
-    //
-    // A bonus that can pay nothing is worse than no bonus, because the player spent the anticipation. So the
-    // first card is guaranteed to be a chips card — swapped forward rather than re-rolled, which keeps every
-    // other position uniformly shuffled — and a multiplier always has something to multiply.
-    const firstChips = board.findIndex((c) => c.kind === "chips");
-    if (firstChips > 0) { [board[0], board[firstChips]] = [board[firstChips], board[0]]; }
-
-    let sum = 0; let mult = 1;
-    const picked = [];
-    for (const card of board) {
-        picked.push(card);
-        if (card.kind === "end") break;
-        if (card.kind === "mult") mult *= card.value;
-        else sum += card.value;
-    }
-    return { total: sum * mult * lineBet, picked, mult };
-}
+// ── THE PICK IS GONE ────────────────────────────────────────────────────────────────────────────────────────
+// The Petting Pen and The Trawl were the same bonus in two skins: twelve cards, one of them ends it, tap
+// until it does. Luke: "I really just don't enjoy it when you select things and get a flat reward with slot
+// machine bonuses. I really like layered depth. And I don't like the simple cause and effect of click this
+// thing on screen, see a number."
+//
+// He is right and the numbers agreed: it ended on your SECOND tap 15% of the time, a quarter of rounds paid
+// under 3x, and the ceiling was 58x — which you reached one round in twelve, because a board you can clear
+// has no top end. Worse, nothing about it compounded. You collected 10, then 10, then 24. It was addition
+// with a fanfare on it.
+//
+// What replaced it is below: ten free spins where every wild LOCKS. See STICKY.
 
 // ── ONE WHOLE PLAY, START TO FINISH ──────────────────────────────────────────────────────────────────────────
 // Everything a single press of the button can turn into, resolved in one place so the simulator and the live
@@ -785,7 +757,7 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         : first;
 
     let total = base.total;
-    let free = null; let pick = null; let hold = null; let built = null;
+    let free = null; let locked = null; let hold = null; let built = null;
 
     // ── EARNED BY WATCHING ───────────────────────────────────────────────────────────────────────────
     // Enough consecutive breaks opens the free round whether or not a scatter ever landed. It is the only
@@ -817,10 +789,26 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         if (m.second?.kind === "hold") {
             hold = runHold(m, m.second, { lineBet, rng });
             total += hold.total;
-        } else {
-            pick = runPick(m, { lineBet, rng });
-            total += pick.total;
+        } else if (m.second?.kind === "sticky") {
+            // ── STICKY ───────────────────────────────────────────────────────────────────────────────
+            // Ten free spins in which every wild that lands STAYS THERE for the rest of the round. It is
+            // the same runFreeSpins the scatter round uses — `sticky` was already a flag on it — so this
+            // round retriggers like any other, and the spins a retrigger buys are played on the board the
+            // first ten filled up.
+            //
+            // That last part is the whole point, and it is the thing a pick could never do: three separate
+            // systems compounding into one another. Spins accumulate wilds, wilds make lines more likely,
+            // more lines mean more scatters seen, and a retrigger hands the accumulated board another ten.
+            // Nothing here is "tap a thing, read a number".
+            locked = runFreeSpins(m, {
+                id: "sticky", kind: "sticky", spins: m.second.spins || 10,
+                mult: m.second.mult || 1, sticky: true, label: m.second.label,
+            }, { lineBet, rng });
+            locked.kind = "sticky";
+            locked.label = m.second.label;
+            locked.mult = m.second.mult || 1;
+            total += locked.total;
         }
     }
-    return { grid, base, chain, free, pick, hold, built, total, bet };
+    return { grid, base, chain, free, locked, hold, built, total, bet };
 }

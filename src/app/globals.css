@@ -19166,3 +19166,30 @@ body.cas-seated .social-fab { display: none; }
 /* And the count in the bar carries what the round grew by, so "6 / 28" is not a number nobody can explain. */
 .s5-freebar u { text-decoration: none; margin-left: 4px; font-size: 10px; font-weight: 800;
     color: #7ad4ff; vertical-align: 2px; }
+
+/* ── A WILD THAT HAS WELDED ITSELF TO THE BOARD ───────────────────────────────────────────────────────
+   Ten spins in which every wild LOCKS. The mechanic is invisible unless a held wild looks different from
+   one that merely landed — so a locked cell gets a frame, a permanent glow in the wild's own colour, and
+   it does not dim when the round is drawing a line it is not part of. It is furniture now, not a symbol.
+
+   The clamp on the frame it locks is the beat the whole feature is made of: the board is permanently
+   better than it was a second ago, and you watched it happen. */
+.s5-cell.is-locked::after { content: ""; position: absolute; inset: 3%; border-radius: 9px; pointer-events: none;
+    border: 2px solid var(--tone, #b47cff);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tone, #b47cff) 70%, transparent),
+        inset 0 0 18px color-mix(in srgb, var(--tone, #b47cff) 34%, transparent);
+    animation: s5Weld .5s cubic-bezier(.2, 1.6, .35, 1) both; }
+@keyframes s5Weld {
+    0% { transform: scale(1.5); opacity: 0; }
+    55% { transform: scale(.93); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+/* A held wild is part of the furniture, so it never dims for a line it is not on. */
+.s5-window.is-lining .s5-cell.is-locked img { opacity: 1 !important; }
+.s5-cell.is-locked img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #b47cff) 65%, transparent)); }
+
+/* How many are welded, in the place the round multiplier sits on the other rounds — because on a locking
+   round THIS is the number that makes the last spins worth more than the first. */
+.s5-freemult.s5-held { display: inline-flex; align-items: baseline; gap: 4px; }
+.s5-freemult.s5-held u { text-decoration: none; font-family: var(--font-body, inherit); font-size: 9px;
+    font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a8b2bd; }

@@ -149,7 +149,7 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                         <li>
                             {m.second?.kind === "hold"
                                 ? <>{m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{pretty(m.second.trigger, machineId)}s</b> anywhere open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.</>
-                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{pretty(m.bonus, machineId)}s</b> anywhere open <b>{m.second?.label || "the pick"}</b>.</>}
+                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{pretty(m.bonus, machineId)}s</b> anywhere open <b>{m.second?.label || "the second round"}</b>.</>}
                         </li>
                         <li>The free round here: <b>{m.free?.label}</b>.</li>
                     </ul>

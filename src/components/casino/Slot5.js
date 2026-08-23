@@ -5,7 +5,6 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, symbolName, slot5 } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
-import PettingPen from "@/components/casino/PettingPen.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
 import TheLocks from "@/components/casino/TheLocks.js";
 
@@ -107,6 +106,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // The retrigger being shouted about, or null. Its own state rather than a phase, because the round is
     // still running underneath it — this is a beat inside the free spins, not a screen instead of them.
     const [gotMore, setGotMore] = useState(null);
+    // Which round is on screen — "free" (the scatter round) or "locked" (the ten spins where wilds weld).
+    const [round, setRound] = useState("free");
+    // The cells holding a locked wild, so the grid can draw them as welded rather than as landed.
+    const [lockedAt, setLockedAt] = useState([]);
     const [chainWon, setChainWon] = useState(0);
     // The last response, for the skip. A ref because skipFree is called from a handler that must not be
     // rebuilt every time the result changes.
@@ -146,10 +149,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // beginning.
     //
     // Counted from the spins ALREADY PLAYED instead, so the number grows when the shout says it does.
-    const roundGrew = (result?.free?.spins || [])
+    const roundGrew = (result?.[round]?.spins || [])
         .slice(0, Math.max(0, freeIdx + 1))
         .reduce((a, sp) => a + (sp.retrigger?.spins || 0), 0);
-    const roundLen = (result?.free?.base || result?.free?.spins?.length || 0) + roundGrew;
+    const roundLen = (result?.[round]?.base || result?.[round]?.spins?.length || 0) + roundGrew;
 
     const liveChain = freeChain || ((phase === "tumble" || phase === "done") ? result?.chain : null);
     const chaining = Boolean(liveChain) && (phase === "tumble" || phase === "free" || phase === "done");
@@ -199,7 +202,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // alternative is two playback routines that drift apart, and the free one had already drifted into
     // having no lines at all.
     const playGrid = useCallback((g, wins, opts) => {
-        const { stopAt, settle, lineMs, scatters = 0, onDone } = opts;
+        const { stopAt, settle, lineMs, scatters = 0, onDone, onLanded } = opts;
         setGrid(g);
         setLanded(0);
         setShowLine(-1);
@@ -216,6 +219,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             }, landsAt[k]));
         });
         timers.current.push(setTimeout(() => {
+            // The instant every reel is down and before any line is drawn — where a wild welds itself to
+            // the board, so the clamp reads as part of the landing rather than as part of the payout.
+            if (onLanded) onLanded();
             if (!wins.length) { onDone(); return; }
             wins.forEach((_, i) => {
                 timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * lineMs));
@@ -310,7 +316,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             const m = slot5(machineId);
             if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
             if (r.free) { flashTrigger(r.free.byCascade ? null : m.scatter, () => announceFree(r)); return; }
-            if (r.pick || r.hold) { flashTrigger(r.hold ? r.hold.trigger : m.bonus, () => setPhase("pick")); return; }
+            if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
+            if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
             setPhase("done");
         };
 
@@ -330,15 +337,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 const m = slot5(machineId);
                 if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
                 if (r.free) { flashTrigger(m.scatter, () => announceFree(r)); return; }
-                if (r.pick || r.hold) {
-                    // The symbol that opened it — a hold's coin or a pick's bonus symbol, whichever this
-                    // cabinet uses. Flashing the wrong one is worse than flashing none.
-                    flashTrigger(r.hold ? r.hold.trigger : m.bonus, () => setPhase("pick"));
-                    return;
-                }
+                // The symbol that opened it — a hold's coin, or the bonus symbol for the locking round.
+                // Flashing the wrong one is worse than flashing none.
+                if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
+                if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
                 setPhase("done");
             },
         });
+    // `announceFree` is deliberately NOT in this list. It is declared BELOW this hook, and a dependency
+    // array is evaluated during render rather than when the callback runs — so naming it here throws a TDZ
+    // error on the first paint, while calling it from inside the body (a closure, evaluated later) is fine.
+    // This file has made that exact mistake before; `npm run lint:undef` is what catches it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [busy, spinning, onSpin, clearTimers, playGrid, flashTrigger, machineId, runChain]);
 
     // ── THE MOON IS UP ───────────────────────────────────────────────────────────────────────────────────
@@ -351,13 +361,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     //
     // So the room stops. A full-cabinet card, the fanfare, a hard haptic, and a beat of nothing else — and
     // then the round runs, rather than the round having already run somewhere off screen.
-    const announceFree = useCallback((r) => {
+    // `which` is "free" or "locked" — the scatter round or the ten locking spins. Both are the same shape
+    // and both play through the same runner, because they ARE the same thing: a round of spins watched one
+    // at a time. A spin that triggers both plays them back to back.
+    const announceFree = useCallback((r, which = "free") => {
+        setRound(which);
         setPhase("freeIntro");
         setFreeWon(0);
         setFreeIdx(-1);
+        setLockedAt([]);
         Cas.jackpot();
         Haptic.crit();
-        timers.current.push(setTimeout(() => runFree(r, 0), 2100));
+        timers.current.push(setTimeout(() => runFree(r, 0, which), 2100));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -365,16 +380,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // One spin at a time, on the fast clock, with the total climbing. Recursive rather than a loop of timers
     // so a round can be cut short cleanly — clearTimers on a new pull stops it wherever it is instead of
     // leaving eight queued spins to land on top of the next game.
-    const runFree = useCallback((r, i) => {
-        const round = r.free;
+    const runFree = useCallback((r, i, which = "free") => {
+        const round = r[which];
         if (!round || i >= round.spins.length) {
             setActiveWins([]);
+            // A spin that opened BOTH rounds plays the scatter one and then the locking one, rather than
+            // the second silently vanishing into the total.
+            if (which === "free" && r.locked) { announceFree(r, "locked"); return; }
             setPhase("freeDone");
             return;
         }
         const sp = round.spins[i];
         setPhase("free");
         setFreeIdx(i);
+        // The wilds already welded to the board when this spin starts. Set BEFORE the reels move so they
+        // are drawn locked from the first frame — a held wild that only reveals itself after the reels
+        // stop is not held, it just landed again.
+        setLockedAt(sp.held || []);
 
         // What happens once this spin has finished playing: credit it, sound it, and — if it bought more
         // spins — stop and SAY SO before moving on.
@@ -397,11 +419,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 Haptic.crit();
                 timers.current.push(setTimeout(() => {
                     setGotMore(null);
-                    runFree(r, i + 1);
+                    runFree(r, i + 1, which);
                 }, 1750));
                 return;
             }
-            timers.current.push(setTimeout(() => runFree(r, i + 1), FREE_HOLD_MS));
+            timers.current.push(setTimeout(() => runFree(r, i + 1, which), FREE_HOLD_MS));
         };
 
         // A CASCADING MACHINE TUMBLES IN ITS FREE ROUND TOO. Same chain player as the base game — the
@@ -417,10 +439,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
         playGrid(sp.grid, sp.wins, {
             stopAt: FREE_STOP_AT, settle: FREE_SETTLE_MS, lineMs: FREE_LINE_MS,
+            // ── AND THE NEW ONES CLAMP SHUT ──────────────────────────────────────────────────────────
+            // On the frame the reels finish, any wild that landed this spin welds itself to the board with
+            // its own sound. This is the beat the whole feature is made of: the board is permanently
+            // better than it was a second ago, and you watched it happen.
+            onLanded: () => {
+                if (!sp.justHeld?.length) return;
+                setLockedAt((p) => [...p, ...sp.justHeld]);
+                Cas.reelStop(4, 0.8);
+                Haptic.crit();
+            },
             onDone: settle,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [playGrid, runChain]);
+    }, [playGrid, runChain, announceFree]);
 
     // ── SKIPPING IT ──────────────────────────────────────────────────────────────────────────────────────
     // For the twentieth round rather than the first. It jumps to the end and credits the whole thing — the
@@ -487,12 +519,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         );
     }
 
-    if (phase === "pick" && (result?.pick || result?.hold)) {
+    if (phase === "pick" && result?.hold) {
         return (
             <div className="s5 is-bonus">
                 {result.hold
                     ? <HoldAndSpin hold={result.hold} onDone={() => setPhase("done")} />
-                    : <PettingPen pick={result.pick} onDone={() => setPhase("done")} />}
+                    : null}
             </div>
         );
     }
@@ -540,7 +572,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}`}
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}`}
                                         key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
@@ -616,18 +648,19 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 Over the cabinet, because the cabinet is what it happened on. It holds for two seconds with
                 nothing else moving, which is the whole point: the rarest event on the machine gets the one
                 thing the base game never does, which is the screen's undivided attention. */}
-            {phase === "freeIntro" && result?.free ? (
+            {phase === "freeIntro" && result?.[round] ? (
                 <div className="s5-shout" role="status">
                     {/* ── SAY WHAT WAS BUILT, NOT WHAT THE CABINET USUALLY GIVES ──────────────────
                         On The Vault the round is not the machine's — the member just spent six taps
                         stacking it, and the fanfare announced "Ten spins" and dropped the multiplier
                         they had been watching climb. The one line that must name the round is the one
                         that named it wrong. */}
-                    <i>{result.built ? "You built it" : "The moon is up"}</i>
-                    <b>FREE SPINS</b>
-                    <em>{result.built
+                    <i>{round === "locked" ? "They will not leave"
+                        : result.built ? "You built it" : "The moon is up"}</i>
+                    <b>{round === "locked" ? "LOCKING WILDS" : "FREE SPINS"}</b>
+                    <em>{result.built && round === "free"
                         ? `${result.free.spins.length} spins at ×${result.free.mult}`
-                        : result.free.label}</em>
+                        : result[round].label}</em>
                 </div>
             ) : null}
 
@@ -651,7 +684,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-freebar">
                     <span><i>Free spin</i><b>{freeIdx + 1} / {roundLen}
                         {roundGrew ? <u>+{roundGrew}</u> : null}</b></span>
-                    <span className="s5-freemult">&times;{result?.free?.mult}</span>
+                    {/* On a locking round the multiplier is always 1 and the number that matters is how many
+                        wilds are welded to the board — which is the whole mechanic, and is the thing that
+                        makes the last spins worth more than the first. */}
+                    {round === "locked"
+                        ? <span className="s5-freemult s5-held">{lockedAt.length}<u>held</u></span>
+                        : <span className="s5-freemult">&times;{result?.free?.mult}</span>}
                     <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
                     {/* For the twentieth round rather than the first. The chips were decided on the server
                         before the first reel moved, so nothing is given up but the watching — and it is
@@ -661,10 +699,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
-            {phase === "freeDone" && result?.free ? (
+            {phase === "freeDone" && result?.[round] ? (
                 <div className="s5-feature">
                     <h4>The hunt is over</h4>
-                    <p><b>{freeWon.toLocaleString()}</b> chips from {result.free.spins.length} free spins.</p>
+                    <p><b>{freeWon.toLocaleString()}</b> chips from {result[round].spins.length} {round === "locked" ? "locking" : "free"} spins.</p>
                     <button type="button" className="s5-go" onClick={() => setPhase(result.pick ? "pick" : "done")}>Go on</button>
                 </div>
             ) : null}

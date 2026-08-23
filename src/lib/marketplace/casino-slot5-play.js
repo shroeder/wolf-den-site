@@ -55,7 +55,7 @@ function forcedSpin(m, stake, offerId, want) {
     for (let i = 0; i < FORCE_TRIES; i += 1) {
         const p = playSpin(m, { bet: stake, offerId });
         if (want === "free" && p.free) return p;
-        if (want === "pick" && (p.pick || p.hold)) return p;
+        if (want === "pick" && (p.locked || p.hold)) return p;
         // A DEEP TUMBLE, ON DEMAND. The chain that opens the free round is one spin in a hundred and thirty
         // two by design, which makes the single most elaborate animation on the floor the one nobody can
         // look at — including me, which is how it shipped unwatched the first time.
@@ -100,7 +100,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     if (won > 0) {
         chips = await moveChips(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
-            meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, pick: r.pick ? r.pick.total / stake : 0 },
+            meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, locked: r.locked ? r.locked.total / stake : 0 },
         });
     }
 
@@ -232,51 +232,31 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),
         } : null,
-        // ── THE PETTING PEN ──────────────────────────────────────────────────────────────────────────
-        // The board is decided here, as it always was — the taps only reveal it. What is new is that each
-        // card is attached to one of the member's OWN pets, so the bonus is a paddock of animals they
-        // collected rather than a row of numbered boxes. See petsForPick.
-        pick: r.pick ? {
-            picked: r.pick.picked,
-            mult: r.pick.mult,
-            total: r.pick.total,
-            chips: chipsFor(stake, r.pick.total / stake),
-            // Per card, in the same order, so the screen never has to pair them up itself.
-            each: r.pick.picked.map((c) => (c.kind === "chips" ? chipsFor(stake, (c.value * (stake / LINES.length)) / stake) : 0)),
-            pets: await petsForPick(buyerId, r.pick.picked.length, m.second?.board),
-            // Which skin the pick wears. One game, three subjects — see PickGame.
-            board: m.second?.board || "pen",
-            label: m.second?.label || "The Pick",
-        } : null,
-        // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────
-        // The Wagon and the Stampede. Every respin is sent, so the screen can play the round out coin by
-        // coin instead of announcing a total — the same reason the free spins carry their grids.
-        hold: r.hold ? {
-            label: m.second?.label || "Hold and Spin",
-            trigger: m.second?.trigger,
-            steps: r.hold.steps.map((st) => ({ held: st.held, got: st.got, left: st.left })),
-            filled: r.hold.filled,
-            full: r.hold.full,
-            chips: chipsFor(stake, r.hold.total / stake),
-            // Per cell, in chips, so the screen never converts anything itself.
-            cellChips: r.hold.steps[r.hold.steps.length - 1].held.map(
-                (v) => (v ? chipsFor(stake, (v * (stake / LINES.length)) / stake) : 0)),
-            // ── AND HOW BIG A COIN IT IS ─────────────────────────────────────────────────────────
-            // 0, 1, 2 — copper, silver, gold — ranked against THIS cabinet's own coin values, not
-            // against the board that happened to land. A cell was a rounded rectangle with a number
-            // in it, so an 11 and a 2 were the same object at a glance and the board had no shape.
-            // Ranking here rather than on the screen because the values live on the cabinet, and a
-            // client that ranks against what it can see re-ranks every round.
-            cellTier: r.hold.steps[r.hold.steps.length - 1].held.map((v) => {
-                if (!v) return -1;
-                const vals = [...new Set(m.second?.values || [])].sort((a, b) => a - b);
-                const at = vals.indexOf(v);
-                if (at < 0) return 1;
-                return at >= vals.length - 2 ? 2 : (at <= 1 ? 0 : 1);
-            }),
-            // The full-board bonus, so the screen can say what it is worth rather than folding it
-            // silently into the total.
-            fullBonus: r.hold.full ? chipsFor(stake, (m.second?.full || 200) * (stake / LINES.length) / stake) : 0,
+        // ── TEN SPINS, AND EVERY WILD LOCKS ──────────────────────────────────────────────────────────
+        // Deliberately the SAME SHAPE as `free`, because it is the same thing — a round of spins the screen
+        // plays one at a time — and the client should not need a second player for it. What is different is
+        // `held` and `justHeld` per spin, which is the mechanic made visible.
+        locked: r.locked ? {
+            label: r.locked.label,
+            kind: "sticky",
+            mult: r.locked.mult || 1,
+            added: r.locked.added || 0,
+            base: r.locked.base || (m.second?.spins || 10),
+            spins: r.locked.spins.map((sp) => ({
+                grid: sp.grid,
+                wins: sp.wins
+                    .filter((w) => w.kind === "line")
+                    .map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) })),
+                scatterWin: sp.wins.find((w) => w.kind === "scatter") || null,
+                chips: chipsFor(stake, sp.total / stake),
+                multiple: sp.total / stake,
+                // Cells already locked when this spin started, and the ones that clamp shut on it.
+                held: sp.held || [],
+                justHeld: sp.justHeld || [],
+                retrigger: sp.retrigger || null,
+            })),
+            total: r.locked.total,
+            chips: chipsFor(stake, r.locked.total / stake),
         } : null,
         // In chips, which is the only number on this screen a member should have to hold in their head.
         wonChips: won,
@@ -301,36 +281,6 @@ const SEA_PETS = new Set(["crab", "turtle", "marlin", "dolphin", "penguin", "sea
 // Falls back to the whole catalogue for anybody who owns none yet, rather than showing an empty paddock: a
 // bonus round that looks broken because you have not played another feature is worse than a generic one.
 // Sprites come from mkt_pet_sprite, the same table the farm and the boss screen read.
-async function petsForPick(buyerId, count, board) {
-    const owned = await db.query(
-        `SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
-    let ids = owned.map((r) => r.ref).filter(Boolean);
-    if (ids.length < 3) ids = COLLECTIBLES.slice(0, 24).map((p) => p.id);
-    // ── THE TRAWL HAULS UP WHAT LIVES DOWN THERE ─────────────────────────────────────────────────────
-    // The Deep's pick is a net coming up, so it is filtered to the sea animals the member owns. Falls back
-    // to the whole collection rather than an empty net if they own none — the same rule as everywhere else
-    // here: a feature must never look broken because you have not played another one.
-    if (board === "trawl") {
-        const sea = ids.filter((id) => SEA_PETS.has(id));
-        if (sea.length >= 3) ids = sea;
-    }
-    const art = await db.query(
-        `SELECT pet_id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [ids]).catch(() => []);
-    const urls = new Map(art.map((r) => [r.pet_id, r.url]));
-    // Only pets that actually have a picture — an animal drawn as a blank square is not an animal.
-    const drawn = ids.filter((id) => urls.get(id));
-    const pool = (drawn.length >= 3 ? drawn : ids).slice();
-    // Fisher-Yates. A sort() with a random comparator is not a shuffle and biases the ends of the array.
-    for (let i = pool.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    const named = new Map(COLLECTIBLES.map((p) => [p.id, p.name]));
-    return Array.from({ length: count }, (_, i) => {
-        const id = pool[i % pool.length];
-        return { id, name: named.get(id) || id, url: urls.get(id) || null };
-    });
-}
 
 async function chipsOf(buyerId) {
     const row = await db.queryOne(`SELECT COALESCE(chips, 0)::bigint AS chips FROM mkt_buyer WHERE id = $1`, [buyerId]);
