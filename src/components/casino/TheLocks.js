@@ -89,7 +89,12 @@ export default function TheLocks({ built, onDone }) {
                 </span>
             </div>
 
-            <div className="lk-board">
+            {/* ── THE BOARD SHAPES ITSELF TO THE ROUND ────────────────────────────────────────────────
+                A round is as long as it took to find the door — anything from one lock to ten — and a
+                fixed five columns made a six-lock round render as five and then a lonely one, with the
+                whole board floating in the middle of an empty stage. Columns come off the count so it
+                is always a block: 3x2 for six, 4x2 for eight, 5x2 for ten. */}
+            <div className="lk-board" style={{ "--cols": tiles.length <= 3 ? tiles.length : Math.ceil(tiles.length / 2) }}>
                 {tiles.map((t, i) => {
                     const done = turned.includes(i);
                     return (
@@ -104,8 +109,11 @@ export default function TheLocks({ built, onDone }) {
                                 set right above it. Same reason nothing else in this app uses emoji. */}
                             <span className="lk-face">
                                 {done
+                                    // A MULTIPLIER TILE ADDS TO THE MULTIPLIER, it does not set it. This
+                                    // read "x1", which says "times one" — no change at all — on a tile
+                                    // that had just taken the round from x1 to x2.
                                     ? (t.kind === "launch" ? <GiOpenGate aria-hidden="true" />
-                                        : t.kind === "spins" ? `+${t.value}` : `×${t.value}`)
+                                        : t.kind === "spins" ? `+${t.value}` : `+${t.value}×`)
                                     : <GiCombinationLock aria-hidden="true" />}
                             </span>
                         </button>

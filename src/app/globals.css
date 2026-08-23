@@ -19086,8 +19086,10 @@ body.cas-seated .social-fab { display: none; }
 .lk-built > span.is-up { animation: lkUp .45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes lkUp { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
 
-.lk-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px;
-    align-self: center; overflow: visible; }
+/* Columns come from the round's own length — see the note in TheLocks. Capped in width so ten locks do
+   not stretch to the full phone and three do not sit as three postage stamps in the middle of it. */
+.lk-board { display: grid; grid-template-columns: repeat(var(--cols, 5), 1fr); gap: 10px;
+    align-self: center; justify-self: center; width: 100%; max-width: 320px; overflow: visible; }
 /* No aspect-ratio: the board owns the height now and the tiles divide it, so ten locks fill the stage
    as two proper rows rather than sitting as a strip at the top of it. */
 .lk-tile { position: relative; aspect-ratio: 1; border-radius: 14px; cursor: pointer;
