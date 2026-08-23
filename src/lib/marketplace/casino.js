@@ -175,13 +175,19 @@ export const SLOT_THEMES = {
         blurb: "It rarely opens. When it does, it opens all the way.",
         // Cut gems — a colour ladder somebody already built. Five stones in five hues, and the Wolf's Eye,
         // the secret sixth, as the scatter.
+        // ── ALL AT THE TOP TIER, WHICH IS BACKWARDS FROM HOW IT READS ────────────────────────────────
+        // These used to climb the gem tiers with the pay ladder — sapphire t1 for the lowest, amethyst t5
+        // for the wild — which is a lovely idea and the wrong one, because the LOW symbols are what a slot
+        // machine looks like. They fill most of the grid on most spins, so tiering them meant the cabinet
+        // was mostly its own dullest art: a flat, dark t1 stone at 50px on a near-black window.
+        // A cut and polished stone at every rung; the ladder is carried by hue, where it always was.
         art: {
             wolf: "/images/gems/amethyst_t5.png",
             moon: "/images/gems/wolfeye_t5.png",
-            chest: "/images/gems/ruby_t4.png",
-            laurel: "/images/gems/emerald_t3.png",
-            doubloon: "/images/gems/topaz_t2.png",
-            bone: "/images/gems/sapphire_t1.png",
+            chest: "/images/gems/ruby_t5.png",
+            laurel: "/images/gems/emerald_t5.png",
+            doubloon: "/images/gems/topaz_t5.png",
+            bone: "/images/gems/sapphire_t5.png",
         },
     },
     slot3: {

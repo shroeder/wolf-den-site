@@ -18940,7 +18940,15 @@ body.cas-seated .social-fab { display: none; }
    grass underneath — the one part of the picture they belong in. The header stays at the top and the
    flock is pushed to the bottom of the pen, so the backdrop reads as a place they are standing in
    rather than a wallpaper behind them. */
-.cas-stage .s5.is-bonus .pen { flex: 1 1 auto; align-content: start; }
+.cas-stage .s5.is-bonus .pen,
+/* ── AND THE LOCKS, WHICH DID NOT SAY SO AND BLEW OUT OF THE PHONE ───────────────────────────────
+   `.s5.is-bonus` is a flex ROW on the stage, so a bonus screen that does not claim its share sizes
+   to its own content instead of to the viewport. The Locks did not, and the board -- five columns of
+   ten tiles -- came out two columns wide with the header, the multiplier counter and six of the tiles
+   past the right edge of the phone. `min-width: 0` because a grid child of a flex item refuses to
+   shrink below its content otherwise, which is the same overflow arriving by a different road. */
+.cas-stage .s5.is-bonus .lk,
+.cas-stage .s5.is-bonus .hs { flex: 1 1 auto; min-width: 0; align-content: start; }
 .cas-stage .s5.is-bonus .pen-field { margin-top: auto; }
 
 /* ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────
