@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import PetArt from "@/components/PetArt";
-import { collectibleById, petActive, petActiveLevelMult, petPassive, petPassiveLevelMult, PET_STAT_META } from "@/lib/marketplace/collectibles.js";
+import { collectibleById, petPassive, petPassiveLevelMult, PET_STAT_META } from "@/lib/marketplace/collectibles.js";
+import { petPerkAt } from "@/lib/marketplace/pet-perks.js";
 
 // ── GLOBAL pet watcher: A PET ARRIVED, A PET LEVELLED ────────────────────────────────────────────────────
 // Mounted once in the marketplace layout so both moments are celebrated ANYWHERE in the app — not just on
@@ -236,7 +237,6 @@ export default function PetAlerts() {
     const meta = (k) => PET_STAT_META[k] || {};
     const gains = (() => {
         const p = current.pet ? petPassive(current.pet) : null;
-        const a = current.pet ? petActive(current.pet) : null;
         const line = (kind, stat, base, mult) => {
             const from = Math.round(base * mult(current.from));
             const to = Math.round(base * mult(current.to));
@@ -244,9 +244,24 @@ export default function PetAlerts() {
         };
         const out = [];
         if (p) out.push(line("Passive", p.stat, p.value, petPassiveLevelMult));
-        // Listed even when both stats share a key: they scale at different rates (passive ×0.25/level, active
-        // ×0.5), so "the same stat" still moves by different amounts on the two lines.
-        if (a) out.push(line("Active", a.stat, a.value, petActiveLevelMult));
+        // ── THE SIGNATURE, NOT THE `activeStat` ──────────────────────────────────────────────────────
+        // This line used to read petActive(), which returns the pet's raw `activeStat` — a field the ENGINE
+        // only falls back to when a pet has no authored perk. Kangaroo's activeStat is `might`, so the card
+        // announced "+24 Might" for a pet that actually grants Plaza Kick, +8% damage on town raids, and
+        // grants no Might at all. Hearth Cat announced "+24 Hot Hands" and grants Banked Embers.
+        //
+        // GrayKitsune, who found it: "is this a hidden active (not shown on pet panel), or a visual bug?" A
+        // visual bug — and the pet panel was the half that was telling the truth. Both now read the same
+        // thing, through petPerkAt, which caps exactly the way the engine caps.
+        const before = current.pet ? petPerkAt(current.pet, current.from) : null;
+        const after = current.pet ? petPerkAt(current.pet, current.to) : null;
+        if (after) {
+            out.push({
+                kind: "Signature", stat: after.key,
+                from: before?.scaled ?? 0, to: after.scaled, up: Math.round(((after.scaled - (before?.scaled ?? 0)) * 10)) / 10,
+                label: after.name, icon: after.icon || "", desc: after.desc || "",
+            });
+        }
         return out;
     })();
     // SIX, NOT FIVE. This said `>= 5` and stamped "MAX LEVEL" on the celebration for reaching level five —
@@ -335,7 +350,7 @@ export default function PetAlerts() {
                         ))}
                         <p className="plu-gains-note">
                             {gains.length > 1
-                                ? "Passive counts while you simply own it. Active only counts while it's your companion."
+                                ? "Passive counts while you simply own it. The signature only counts while it's your companion."
                                 : "Counts while it's your companion."}
                             {maxed ? " · MAX LEVEL" : ""}
                         </p>

@@ -20,6 +20,7 @@ import { getMemberRecipeBook } from "@/lib/marketplace/cooking.js";
 import { memberFishLog } from "@/lib/marketplace/fishing.js";
 import { fishingUnlocked } from "@/lib/marketplace/sailing.js";
 import { collectibleById, petActive, petPassive, petSpecialPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { petPerkAt } from "@/lib/marketplace/pet-perks.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
 import { petActiveLevelMult } from "@/lib/marketplace/pet-level.js";
@@ -116,10 +117,13 @@ export default async function UserProfilePage({ params }) {
             const lvl = pets.petLevels?.[id]?.level || 1;
             const stone = petStones[id] || null;
             const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl, stone);
-            const active = petActive(def);
+            // THE SIGNATURE, NOT `activeStat` — see petPerkAt. This printed the pet's fallback stat, so a
+            // Kangaroo's public profile advertised "+24% Might" for a pet that grants Plaza Kick and no
+            // Might whatsoever. Same bug as the level-up card, on the page other members read.
+            const active = petPerkAt(def, lvl);
             const passive = petPassive(def);
             const pl = pets.petLevels?.[id] || {};
-            const activeVal = Math.round((active?.value || 0) * petActiveLevelMult(lvl));
+            const activeVal = active?.scaled ?? 0;
             const sp = petSpecialPassive(def);
             const specialDesc = [];
             if (sp) {
@@ -145,8 +149,8 @@ export default async function UserProfilePage({ params }) {
                 // and describing it the old way on a public card would be the card contradicting the fight.
                 activeDesc: active
                     ? (stone
-                        ? `+${activeVal}% ${fmtStat(active.stat)} ALWAYS — enshrined, works unequipped (Lv ${lvl})`
-                        : `+${activeVal}% ${fmtStat(active.stat)} when equipped (Lv ${lvl})`)
+                        ? `${active.name} — ${activeVal}% ALWAYS, enshrined, works unequipped (Lv ${lvl})`
+                        : `${active.name} — ${activeVal}% when equipped (Lv ${lvl})`)
                     : null,
                 passiveDesc: passive ? `+${pets.petLevels?.[id]?.value ?? passive.value} ${fmtStat(passive.stat)} owned (all pets stack)` : null,
                 specialDesc,

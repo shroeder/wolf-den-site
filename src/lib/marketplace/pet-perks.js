@@ -364,6 +364,29 @@ export function petPerk(pet) {
     return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
 }
 
+// ── WHAT THE SIGNATURE IS WORTH AT A GIVEN LEVEL ─────────────────────────────────────────────────────────────
+// The one function anything OUTSIDE the engine should use to say what an equipped pet is doing. It exists
+// because the level-up card was not using it: that card showed the pet's `activeStat` scaled by level — a
+// number the game never applies, because combinePetBonuses uses the pet's authored PERK key and only falls
+// back to activeStat when there is no perk. Kangaroo's activeStat is `might`, so the card cheerfully
+// advertised "+24 Might" while the pet actually grants Plaza Kick, +8% damage on town raids.
+//
+// GrayKitsune spotted it: "is this a hidden active (not shown on pet panel), or a visual bug?" A visual bug —
+// and the panel was the half that was right.
+//
+// Capped exactly the way the engine caps, because a card advertising 90% while the game pays 30% is worse
+// than an uncapped number: it looks deliberate.
+export function petPerkAt(pet, level) {
+    if (!pet) return null;
+    const perk = petPerk(pet);
+    const mult = petActiveLevelMult(level);
+    const raw = (Number(perk.value) || 0) * mult;
+    const capped = PROC_CAP[perk.key] != null
+        ? Math.min(PROC_CAP[perk.key], raw)
+        : capSystemPerk(perk.key, raw);
+    return { ...perk, level: Math.max(1, Number(level) || 1), scaled: Math.round(capped * 10) / 10 };
+}
+
 // ── WHAT A STONE WOULD DO TO THIS PET, IN WORDS ──────────────────────────────────────────────────────────────
 // Generated, never typed. The enshrining panel has to show BOTH stones at their real numbers before an
 // irreversible choice is made, and a hand-written line is a line that goes stale the first time a multiplier
