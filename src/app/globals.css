@@ -18898,4 +18898,9 @@ body.cas-seated .social-fab { display: none; }
    takeover: the pen was a card floating in the middle of a mostly empty screen. A bonus round that has
    replaced the game should occupy the space the game was in. */
 .cas-stage .s5.is-bonus { margin: 0; flex: 1 1 auto; display: flex; }
-.cas-stage .s5.is-bonus .pen { flex: 1 1 auto; align-content: center; }
+/* ANIMALS STAND ON THE GROUND. Centred, they floated in front of the barn roof with a field of empty
+   grass underneath — the one part of the picture they belong in. The header stays at the top and the
+   flock is pushed to the bottom of the pen, so the backdrop reads as a place they are standing in
+   rather than a wallpaper behind them. */
+.cas-stage .s5.is-bonus .pen { flex: 1 1 auto; align-content: start; }
+.cas-stage .s5.is-bonus .pen-field { margin-top: auto; }
