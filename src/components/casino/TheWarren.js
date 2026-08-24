@@ -53,6 +53,10 @@ export default function TheWarren({ warren, onDone }) {
     const [busy, setBusy] = useState(false);
     const [shaking, setShaking] = useState(-1);     // which egg is rocking
     const [cracking, setCracking] = useState(-1);  // which egg is breaking open, right now
+    // What the geode just cracked open for, or null. Its OWN state rather than the last entry in `hops`,
+    // which now persists for a whole room — so reading the haul off it left the previous geode's number on
+    // screen while you chose the next one.
+    const [haul, setHaul] = useState(null);
     const [hops, setHops] = useState([]);           // critters currently out, with their chips
     const [won, setWon] = useState(0);
     const [banner, setBanner] = useState(null);     // "elder" | "mother" | "hoard"
@@ -142,6 +146,11 @@ export default function TheWarren({ warren, onDone }) {
                 Cas.coin(Math.min(4, i));
                 Haptic.hit(0.28 + Math.min(0.4, i * 0.06));
                 await wait(HOP_MS);
+            }
+            if (inHoard) {
+                setHaul(list[0]);
+                await wait(1500);
+                setHaul(null);
             }
             await wait(SETTLE_MS);
             // ── AND THEY STAY ────────────────────────────────────────────────────────────────────────────
@@ -243,10 +252,8 @@ export default function TheWarren({ warren, onDone }) {
                             </button>
                         ))}
                     </div>
-                    {hops.length ? (
-                        <div className="wr-haul">
-                            <b>+{hops[hops.length - 1].chips.toLocaleString()}</b>
-                        </div>
+                    {haul != null ? (
+                        <div className="wr-haul"><b>+{haul.toLocaleString()}</b></div>
                     ) : null}
                 </div>
             ) : null}

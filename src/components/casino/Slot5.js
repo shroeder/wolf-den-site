@@ -870,6 +870,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
                     <button type="button" className="s5-f-again" disabled={locked} onClick={() => pull("again")}>Force retrigger</button>
                     <button type="button" className="s5-f-tease" disabled={locked} onClick={() => pull("tease")}>Force hold</button>
+                    <button type="button" className="s5-f-hoard" disabled={locked} onClick={() => pull("hoard")}>Force hoard</button>
                     {cascades ? (
                         <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>
                     ) : null}

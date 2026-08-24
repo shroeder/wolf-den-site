@@ -70,6 +70,9 @@ function forcedSpin(m, stake, offerId, want) {
         //
         // Same rule the screen uses: walk the reels, count what landed before each one, and keep the spin
         // if any reel arrives exactly one short of opening something.
+        // The room past the bottom of the Warren — one bonus in thirty-two, which is one spin in about
+        // seven thousand. There is no watching that happen on its own clock.
+        if (want === "hoard" && p.warren?.full) return p;
         if (want === "tease") {
             const targets = [{ sym: m.scatter, need: 3 },
                 m.second?.kind === "hold" ? { sym: m.second.trigger, need: m.second.need || 6 }
@@ -137,7 +140,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
     // can write, and "the button is hidden" is not a permission check.
-    const want = isOwner(buyerId) && ["free", "pick", "chain", "again", "tease"].includes(force) ? force : null;
+    const want = isOwner(buyerId) && ["free", "pick", "chain", "again", "tease", "hoard"].includes(force) ? force : null;
     const r = (want && forcedSpin(m, stake, offer.id, want)) || playSpin(m, { bet: stake, offerId: offer.id });
 
     // ── CONVERTED ONCE, AT THE END ───────────────────────────────────────────────────────────────────────
