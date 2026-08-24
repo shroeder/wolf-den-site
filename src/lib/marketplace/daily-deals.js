@@ -8,6 +8,7 @@ import { PUBLIC_COLLECTIBLES as COLLECTIBLES, collectibleById, petPrice, petActi
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // A short "what it does" line for a deal, so the shop is inspectable (gear stats / pet buff / consumable effect).
 function dealDescription(d) {
@@ -188,6 +189,17 @@ export async function buyDailyDeal(buyerId, dealId) {
     else if (deal.kind === "consumable") await grantConsumable(buyerId, deal.id, 1).catch(() => {});
     else if (deal.kind === "pet") await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, deal.id]).catch(() => {});
     await trackActivity(buyerId, "buy_daily_deal", { id: deal.id, kind: deal.kind, price: deal.price }).catch(() => {});
+    // ── AND IT COUNTS AS BUYING SOMETHING ────────────────────────────────────────────────────────────────
+    // Kaishiern: "One of my daily quests was to buy anything from the gold shop and I clicked on the link to
+    // take me to it. I bought one of the deal items but that didn't finish the quest for me."
+    //
+    // The quest is `gold_shop`, metric "buy", and the only place that ever bumped it was the ordinary shop
+    // route. A deal IS the gold shop -- it is the shelf at the top of it, bought with gold, and the quest
+    // card's own link sends you there -- so the one purchase the quest most obviously points at was the one
+    // that did not count. Bumped here rather than in the route so a second door onto deals cannot lose it
+    // again, and awaited rather than fired off, because a handler that has returned takes its stray promises
+    // with it.
+    await bumpQuestProgress(buyerId, "buy", 1).catch(() => {});
 
 
     const label = deal.kind === "gear" ? itemById(deal.id)?.name : deal.kind === "pet" ? collectibleById(deal.id)?.name : CONSUMABLES[deal.id]?.name;

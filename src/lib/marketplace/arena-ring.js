@@ -207,7 +207,7 @@ function advance(ring, rng) {
             } else ring.log.push({ t: ring.t, who: "foe", cast: true, meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });   // see the same push in act()
             if (cast) uncast(foeSkill, ring.B, cast);
             narrate(ring, swungFrom, { name: ring.foeName, skill: foeSkill, by: "foe", again: isExtra });
-            if (foeSkill?.id) ring.foeCd[foeSkill.id] = (foeSkill.cooldown || 0) + 1;
+            if (foeSkill?.id) ring.foeCd[foeSkill.id] = foeSkill.cooldown || 0;   // see the note in act()
             for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
             closeTurn(ring, rng);
             continue;
@@ -446,7 +446,24 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
     }
     if (cast) uncast(skill, ring.A, cast);
     narrate(ring, from, { name: ring.foeName, skill, by: "me" });
-    if (skill?.id) ring.cd[skill.id] = (skill.cooldown || 0) + 1;
+    // ── THE NUMBER ON THE CARD IS THE NUMBER OF TURNS ────────────────────────────────────────────────────
+    // GrayKitsune: "Bastion - my cool down says 3, but in battle it's 4."
+    //
+    // Traced against the ring rather than reasoned about, because the arithmetic here is easy to talk
+    // yourself into. Bastion, cooldown 3, cast on your turn #1:
+    //
+    //     turn #2  counter 3  locked      turn #4  counter 1  locked
+    //     turn #3  counter 2  locked      turn #5  ---------  available
+    //
+    // Four of your turns between one cast and the next, on a card that says three. The `+ 1` that used to be
+    // here was paying for the decrement at the bottom of this same function, which runs on the turn the skill
+    // was cast on — so the skill was charged for the beat it was spent on AND for its whole cooldown. Set it
+    // to the number the card promises and let that decrement be the first tick: the counter then reads 2 and
+    // 1 on the two turns it is locked, and it is back on the third, which is what "cooldown 3" says.
+    //
+    // Both decks, in the same breath. The foe books its cooldowns the same way five lines into advance() and
+    // leaving that alone would have handed the defence a free extra beat of every skill it owns.
+    if (skill?.id) ring.cd[skill.id] = skill.cooldown || 0;
     // ── A FREE SKILL DOES NOT COST YOU THE BEAT ──────────────────────────────────────────────────────────────
     // Cast it and you are still up: same beat, same clock, and now pick what you actually swing.
     //

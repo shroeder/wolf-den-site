@@ -1126,9 +1126,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const lastKey = useRef(null);
     // True only between pressing Challenge and the bout it produces arriving — see the effect below.
     const startedHere = useRef(false);
+    // ── HAS THIS BOUT EVER ASKED YOU FOR A MOVE ──────────────────────────────────────────────────────────
+    // Latched below, reset with the fight, and read by the deck. It is the difference between a fight you
+    // are PLAYING — which keeps its buttons on screen for as long as the transcript is still running — and
+    // an away bout or a pre-interactive transcript, which never had buttons and must not grow any.
+    const askedThisBout = useRef(false);
     useEffect(() => {
         if (lastKey.current === boutKey) return;
         lastKey.current = boutKey;
+        askedThisBout.current = false;
         // ── A NEW FIGHT INHERITS NOTHING ─────────────────────────────────────────────────────────────────
         // Luke: "when I enter fresh into a fight a bunch of damage numbers from the previous one are popping
         // up." They were. `prev` holds the LAST bout's health so the next render can diff against it, and it
@@ -1165,6 +1171,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // Two members reported the Road as broken in the same week and this is the half of it that was
         // working as designed — which is the worst kind, because there is nothing to find in the logs.
         setResumed(openAtEnd);
+        // ── AND A FIGHT YOU WALKED BACK INTO HAS NO OPENING LEFT TO ANNOUNCE ──────────────────────────
+        // Caught on the rig rather than reasoned about: resuming a bout at round 3 raised "THEY MOVE FIRST
+        // — SQUIRE ALDOUS OPENS" over a line that read "You strike — 170. Frozen solid." The banner's own
+        // guard is `shown > 0`, and on the render this decision is made `shown` is still 0 — the effect
+        // below closes over the value from BEFORE the setShown two lines up. So every resumed fight
+        // announced an opening that happened however long ago, on top of somebody else's swing.
+        //
+        // Decided here, where "did this fight start while you were watching" is already known, rather than
+        // by a second effect trying to infer it from a cursor that has not moved yet. Spent, not reset: a
+        // resumed bout is marked as already announced.
+        announcedOpen.current = openAtEnd;
     }, [boutKey, logAll.length, clearRing]);
     // A shorter transcript than the cursor is standing on cannot be the same fight — rematch, forfeit, or a
     // bout cleared out from under the screen. Anything else only ever GROWS, and growth is the normal case:
@@ -1252,6 +1269,29 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Is the ring still working through what it was handed? True from the moment a response arrives until
     // its last line has played. The deck reads this; see FightInput below.
     const playing = shown < logAll.length;
+
+    // ── THE DECK DOES NOT DISAPPEAR OUT FROM UNDER A FIGHT STILL PLAYING ─────────────────────────────────
+    // GrayKitsune, twice in one session: "suddenly all my skills vanish"; "the button just vanish and then
+    // turns play out till the overflow hits and I die."
+    //
+    // He is describing the last exchange of a bout. The server answers your tap with everything that follows
+    // it -- your swing, their answer, the Overflow that finishes you -- and that response carries
+    // `awaiting: null` because there is nothing left to ask. The deck read that field directly and unmounted
+    // on the spot, while the transcript it belongs to went on playing for several more seconds. So the fight
+    // that killed him played out under an empty command bar, which is indistinguishable from the controls
+    // breaking.
+    //
+    // AND I MADE IT WORSE LAST NIGHT. Before "one clock" a line that raises a banner took 170ms and
+    // compressed under load; it now takes its banner's full dwell and never compresses, precisely so those
+    // moments land. A dead window of about a second became one of many. The fix is not to shorten it back --
+    // the pacing is right -- it is that the deck has no business reading the server's question when what the
+    // player is watching is the answer. It stays, disabled, until the last line has played.
+    //
+    // `askedThisBout` is what keeps this off screens that never had a deck: an away bout resolved overnight
+    // and a transcript written before interactive combat both play through here too, and neither should grow
+    // a set of buttons on the way past.
+    useEffect(() => { if (raw?.awaiting === "act") askedThisBout.current = true; }, [raw?.awaiting]);
+    const holdDeck = playing && askedThisBout.current;
 
     // The position after the blows played so far. Recomputed rather than accumulated, so a scrub or a replay
     // can land anywhere without the health bars drifting out of step with the transcript.
@@ -2414,7 +2454,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         left it. Nothing has been reset.
                     </p>
                 ) : null}
-                <FightInput bout={bout} busy={busy || playing} onAct={(skillId) => act("act", { skillId })} />
+                <FightInput bout={bout} busy={busy || playing} hold={holdDeck} onAct={(skillId) => act("act", { skillId })} />
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px

@@ -193,8 +193,9 @@ async function moveItem(fromId, toId, itemId) {
     if (!row) return false;
     // A jewel does not travel with the piece. It is the sender's — they paid for the socket and found the
     // stone — so it goes back to their bag rather than being handed over unmentioned in a trade neither side
-    // agreed to. Also stops a socket row pointing at an item its owner no longer holds.
-    try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(fromId, itemId, "traded"); } catch { /* no bench, no gems */ }
+    // agreed to. THE SOCKET DOES travel, and used to not: see transferSockets, and ValkyrieSylve's Dragon
+    // Shield, which arrived with its enhancement intact and its cut gone.
+    try { const { transferSockets } = await import("@/lib/marketplace/jeweller.js"); await transferSockets(fromId, toId, itemId, "traded"); } catch { /* no bench, no sockets */ }
     await db.query(
         `INSERT INTO mkt_user_item (buyer_id, item_id, acquired_via, charges_left) VALUES ($1, $2, 'trade', $3) ON CONFLICT (buyer_id, item_id) DO NOTHING`,
         [toId, itemId, row.charges_left]

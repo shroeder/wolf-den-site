@@ -301,7 +301,10 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
     // Remove the item from inventory (guarded so a race can't double-list) and create the listing.
     const removed = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
     // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
-    try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(buyerId, itemId, "listed"); } catch { /* no bench, no gems */ }
+    // The stones come home the moment it goes on the shelf; the CUTS stay on the seller's row, empty, so the
+    // hole they paid for can travel to whoever claims it (see the transfer at settle-up). Deleting them here
+    // is what used to make an auctioned piece arrive uncut — same defect as the trade, same fix.
+    try { const { emptySockets } = await import("@/lib/marketplace/jeweller.js"); await emptySockets(buyerId, itemId, "listed"); } catch { /* no bench, no gems */ }
     if (!removed) { // lost the race — refund the fee
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, fee]).catch(() => {});
         return { ok: false, error: "not_owned" };
@@ -337,6 +340,8 @@ export async function buyAuctionListing(buyerId, listingId) {
     await grantItem(buyerId, claim.item_id, "auction").catch(() => {});
     await transferItemEnhancement(claim.seller_id, buyerId, claim.item_id); // any Forge enhancement rides with it
     await transferItemElement(claim.seller_id, buyerId, claim.item_id); // ...and any elemental reforge
+    // ...and the empty cuts, which the listing left on the seller's row for exactly this moment.
+    try { const { transferSockets } = await import("@/lib/marketplace/jeweller.js"); await transferSockets(claim.seller_id, buyerId, claim.item_id, "auction"); } catch { /* no bench, no sockets */ }
     const it = itemById(claim.item_id);
     // A LEVEL item the seller sold must not be auto-re-granted back to them (syncLevelItems) — mark it sold for
     // the seller, mirroring salvage. (Harmless for other sources; they're never auto-granted anyway.)

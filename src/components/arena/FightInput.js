@@ -18,19 +18,31 @@
 // What is left is the deck. Their beat resolves itself and arrives as transcript (see advance() in
 // arena-ring.js), which also halves what a bout costs — it was 42-60 taps and half of them were braces nobody
 // was choosing.
-export default function FightInput({ bout, busy, onAct }) {
+export default function FightInput({ bout, busy, onAct, hold = false }) {
     const awaiting = bout?.awaiting || null;
     // A finished bout, or a transcript from before interactive combat shipped, has nothing to ask for.
-    if (awaiting !== "act") return null;
+    //
+    // `hold` is the one exception and it is the whole of the fix for a deck that vanished mid-fight: the ring
+    // is still playing lines from a bout you were playing, so the buttons stay where your thumb left them --
+    // disabled, because there is genuinely nothing to press -- rather than unmounting the instant the server
+    // stops asking. See the note beside holdDeck in ArenaClient.
+    if (awaiting !== "act" && !hold) return null;
+    // Is the ring actually asking, or are we just holding the deck's place through playback?
+    const mine = awaiting === "act";
 
     const deck = bout?.deck || [];
     const cd = bout?.cd || {};
 
     return (
         <div className="fin">
+            {/* AND IT SAYS WHICH OF THE TWO IT IS. A greyed deck under the words "Your beat" is the same lie
+                as no deck at all -- it is not your beat, the ring is still working through the answer to the
+                last one. The buttons hold their place; the label tells the truth about why they are dark. */}
             <div className="fin-lab">
-                <span>Your beat</span>
-                <em>{deck.length ? "attack, or spend a skill" : "no skills yet — see the Skills tab"}</em>
+                <span>{mine ? "Your beat" : "The ring"}</span>
+                <em>{mine
+                    ? (deck.length ? "attack, or spend a skill" : "no skills yet — see the Skills tab")
+                    : "playing out the last one"}</em>
             </div>
             <div className="fin-deck">
                 <button type="button" className="fin-cmd is-attack" disabled={busy} onClick={() => onAct(null)}>

@@ -138,6 +138,61 @@ export async function reclaimGems(buyerId, itemId, reason = "item_gone") {
     return back.filter(Boolean);
 }
 
+// ── AND THE CUT IS NOT THE GEM ───────────────────────────────────────────────────────────────────────────────
+// ValkyrieSylve, on a Dragon Shield she took in a trade: "it was previously enhanced and had a socket cut in
+// it. Looking at it now, the enhancements are there but the socket is not."
+//
+// She is describing two different things and only one of them was meant to happen. The GEM coming home is the
+// rule above and it is right. The SOCKET is not the gem: it is a hole the Jewelcutter charged to cut, and it
+// belongs to the piece the same way a Forge enhancement and an elemental reforge do -- both of which have
+// always ridden across a trade and an auction (transferItemEnhancement, transferItemElement). The socket was
+// the one paid-for property of a piece that did not survive changing hands, and it did not survive because
+// reclaimGems is a DELETE and every hand-off called it.
+//
+// So a disposal now splits in two. Something DESTROYED -- salvaged, sold to the shop -- still deletes; there
+// is no piece left to hold a hole. Something HANDED OVER empties the socket and moves it.
+
+/** Pull the stones out and leave the holes. For a piece that is going somewhere rather than being destroyed. */
+export async function emptySockets(buyerId, itemId, reason = "item_moved") {
+    if (!buyerId || !itemId) return [];
+    const rows = await db.query(
+        `UPDATE mkt_item_socket SET gem_id = NULL, set_at = NULL
+          WHERE buyer_id = $1 AND item_id = $2 AND gem_id IS NOT NULL
+      RETURNING gem_id`,
+        [buyerId, itemId]
+    ).catch(() => []);
+    const back = [];
+    for (const r of rows) {
+        if (!r.gem_id) continue;
+        await grantGem(buyerId, r.gem_id, 1, "reclaimed");
+        await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id, meta) VALUES ($1,'reclaimed',$2,$3,$4::jsonb)`,
+            [buyerId, r.gem_id, itemId, JSON.stringify({ reason })]).catch(() => {});
+        back.push(gemById(r.gem_id));
+    }
+    return back.filter(Boolean);
+}
+
+/**
+ * Move the empty cuts to the new owner, returning any stones still in them to the old one.
+ *
+ * Safe on a piece with no sockets, which is what lets it sit on every hand-off path unconditionally. The
+ * ON CONFLICT is not decorative: the receiver may already own the same item def with its own cut, and the
+ * key is (buyer_id, item_id, idx) -- see mig354. Their own socket wins, because it is the one their gem may
+ * be sitting in; the arriving hole is dropped rather than overwriting a stone.
+ */
+export async function transferSockets(fromId, toId, itemId, reason = "traded") {
+    if (!fromId || !toId || !itemId) return [];
+    const back = await emptySockets(fromId, itemId, reason);
+    await db.query(
+        `INSERT INTO mkt_item_socket (buyer_id, item_id, idx, cut_at)
+         SELECT $2, item_id, idx, cut_at FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = $3
+         ON CONFLICT (buyer_id, item_id, idx) DO NOTHING`,
+        [fromId, toId, itemId]
+    ).catch(() => {});
+    await db.query(`DELETE FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = $2`, [fromId, itemId]).catch(() => {});
+    return back;
+}
+
 // ── FUSING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Three of a kind become one of the tier above. This is what stops the bottom tiers being litter: a Chipped
 // Ruby is not worth setting into anything by the time you have real gear, but nine of them are a Polished one,
