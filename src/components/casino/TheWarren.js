@@ -39,8 +39,11 @@ const HOARD_ART = "/images/delves/rare-kinghoard.webp";
 const MOTHER_ART = "/images/delves/foe-warren-mother.webp";
 
 const SHAKE_MS = 700;
+// The egg breaking is its own beat. Without it the egg shook and then simply stopped existing while
+// animals appeared somewhere else on screen — which is a shake and a spawn, not a hatch.
+const CRACK_MS = 420;
 const HOP_MS = 380;
-const SETTLE_MS = 600;
+const SETTLE_MS = 520;
 
 export default function TheWarren({ warren, onDone }) {
     // Where we are: which stage, and which room. `at` counts burrows OPENED on this stage, which is also the
@@ -48,7 +51,8 @@ export default function TheWarren({ warren, onDone }) {
     const [stage, setStage] = useState(0);
     const [at, setAt] = useState(0);
     const [busy, setBusy] = useState(false);
-    const [shaking, setShaking] = useState(-1);     // which burrow is rocking
+    const [shaking, setShaking] = useState(-1);     // which egg is rocking
+    const [cracking, setCracking] = useState(-1);  // which egg is breaking open, right now
     const [hops, setHops] = useState([]);           // critters currently out, with their chips
     const [won, setWon] = useState(0);
     const [banner, setBanner] = useState(null);     // "elder" | "mother" | "hoard"
@@ -87,10 +91,20 @@ export default function TheWarren({ warren, onDone }) {
         Cas.reelStop(1, 0.45);
         Haptic.hit(0.3);
         await wait(SHAKE_MS);
-        setShaking(-1);
 
         const next = inHoard ? hoard?.opened?.[at] : cur?.opened?.[at];
-        if (!next) { setBusy(false); return; }
+        if (!next) { setShaking(-1); setBusy(false); return; }
+
+        // ── AND THEN IT BREAKS ───────────────────────────────────────────────────────────────────────────
+        // Luke: "They need to actually come out of the egg. The egg needs to crack open." It used to shake
+        // and then quietly vanish while animals appeared elsewhere — a shake and a spawn, not a hatch. The
+        // shell splits, flashes, and throws a ring, and only then does anything climb out of it.
+        setShaking(-1);
+        setCracking(slot);
+        Cas.reelStop(4, 0.9);
+        Haptic.crit();
+        await wait(CRACK_MS);
+        setCracking(-1);
 
         if (next.kind === "pups" || next.kind === "mound") {
             // ── THEY COME OUT ONE AT A TIME ──────────────────────────────────────────────────────────────
@@ -105,14 +119,21 @@ export default function TheWarren({ warren, onDone }) {
                 // saying: eight animals out of one egg would pile on top of that egg and cover the board.
                 // Spread across the floor they stay separate, they stay visible while the next one arrives,
                 // and the growing crowd IS the count.
+                // ── OUT OF THE EGG THEY WERE IN ──────────────────────────────────────────────────────────
+                // They used to drop from an abstract "above" at an x picked off their index, so an animal
+                // could climb out of the top-left egg and land under the far right of the wall. They fall
+                // from the column their own egg is in now — which is what makes it a hatch rather than a
+                // spawn — and they fan out around that column as more of them arrive.
+                const col = slot % 5;
+                const eggX = (col + 0.5) * 20;
+                const fan = ((i % 2 ? 1 : -1) * Math.ceil(i / 2)) * 7.5;
                 setHops((p) => [...p, {
                     id: `${stage}-${at}-${i}-${slot}`,
                     chips,
                     art: pool.length ? pool[(i + at + stage) % pool.length] : null,
-                    // Walked across the floor rather than randomised: a random x collides with itself and a
-                    // pile of two overlapping animals reads as one animal.
-                    x: 10 + ((i * 23 + at * 11) % 80),
-                    // Small differences so a row of eight does not read as a printed pattern.
+                    x: Math.min(93, Math.max(7, eggX + fan)),
+                    // A shallow depth ladder so a crowd of twenty is a crowd rather than a queue.
+                    y: (i % 3) * 9,
                     flip: i % 2 === 0,
                     delay: (i % 3) * 40,
                 }]);
@@ -123,7 +144,11 @@ export default function TheWarren({ warren, onDone }) {
                 await wait(HOP_MS);
             }
             await wait(SETTLE_MS);
-            setHops([]);
+            // ── AND THEY STAY ────────────────────────────────────────────────────────────────────────────
+            // Luke: "They need to stay on the bottom until you reach the next phase or end." They used to be
+            // swept off after every egg, which threw away the best thing the floor does: by the fourth egg
+            // of a room there is a CROWD down there, and the crowd is the score in a form you do not have to
+            // read. It is cleared when the room changes and not before — see the Elder and the Mother.
             setAt((n) => n + 1);
             // In the Hoard the board is never spent — three more rise. Clearing `spent` is what brings
             // them back, and bumping `at` rotates which three stones they are.
@@ -144,6 +169,7 @@ export default function TheWarren({ warren, onDone }) {
             await wait(2400);
             setBanner(null);
             setSpent([]);
+            setHops([]);   // a new room is a new floor; the last room's crowd stays behind in it
             setAt(0);
             if (last) {
                 if (warren?.full) { setInHoard(true); } else { setDone(true); }
@@ -224,12 +250,15 @@ export default function TheWarren({ warren, onDone }) {
             {!inHoard ? <div className="wr-wall">
                 {Array.from({ length: slots }, (_, i) => (
                     <button key={`${stage}-${inHoard}-${i}`} type="button"
-                        className={`wr-egg${shaking === i ? " is-shaking" : ""}${spent.includes(i) ? " is-open" : ""}`}
+                        className={`wr-egg${shaking === i ? " is-shaking" : ""}${cracking === i ? " is-cracking" : ""}${spent.includes(i) && cracking !== i ? " is-open" : ""}`}
                         disabled={busy || done || spent.includes(i)}
                         onClick={() => open(i)}
                         aria-label={inHoard ? "Open a mound" : "Open an egg"}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/images/casino/warren/${inHoard ? "dome" : room}.png`} alt="" draggable="false" />
+                        <img src={`/images/casino/warren/${room}.png`} alt="" draggable="false" />
+                        {/* The shell coming apart: a flash inside it and a ring thrown outwards. Its own
+                            element because the egg is an <img> and an image cannot carry pseudo-elements. */}
+                        {cracking === i ? <i className="wr-break" aria-hidden="true" /> : null}
                     </button>
                 ))}
             </div> : null}
@@ -240,7 +269,7 @@ export default function TheWarren({ warren, onDone }) {
             {!inHoard ? <div className="wr-floor">
                 {hops.map((h) => (
                     <span key={h.id} className={`wr-critter${h.flip ? " is-flip" : ""}`}
-                        style={{ left: `${h.x}%`, "--delay": `${h.delay}ms` }}>
+                        style={{ left: `${h.x}%`, bottom: `${4 + h.y}px`, "--delay": `${h.delay}ms` }}>
                         <u>+{h.chips.toLocaleString()}</u>
                         {h.art
                             // eslint-disable-next-line @next/next/no-img-element
