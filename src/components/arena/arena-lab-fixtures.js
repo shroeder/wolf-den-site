@@ -314,6 +314,32 @@ export function baseState(extra = {}) {
 
 // ── THE SCENES ───────────────────────────────────────────────────────────────────────────────────────────────
 export const SCENES = {
+    // ── THE THREE THINGS NOBODY PRESSED ──────────────────────────────────────────────────────────────────
+    // An extra turn, a lost beat and a wound ticking. All three are asynchronous — they happen between your
+    // commands rather than because of one — and all three used to arrive as small grey text at whatever speed
+    // the rest of the beat left over. They have their own held banners now, and this is the only way to look
+    // at them: on a real account you would have to sit in a fight and wait for the dice.
+    //
+    // The log is deliberately ONE of each, in a row, so the sheet shows all three in sequence.
+    interrupt: {
+        label: "Extra turn, frozen, burning",
+        note: "The three events a player did not cause. Each holds the ring, names itself and sounds.",
+        state: () => baseState({
+            bout: makeBout({
+                beat: 6, turn: "you", awaiting: "act", hp: 793, maxHp: 2080, foeHp: 2450, foeMaxHp: 2830,
+                log: [
+                    { beat: 5, who: "them", grade: "hit", damage: 464, text: "Snare-Setter Wyn casts Overflow — 464. It catches fire.",
+                        ability: "Overflow", events: [{ kind: "hit", n: 464, side: "you" }] },
+                    { beat: 6, who: "them", grade: "hit", damage: 182, again: true,
+                        text: "Snare-Setter Wyn casts Rimebind again — 182.", ability: "Rimebind",
+                        events: [{ kind: "hit", n: 182, side: "you" }] },
+                    { beat: 6, who: "you", chilledSkip: true, meStun: 2, damage: 0, text: "You cannot act." },
+                    { beat: 7, who: "you", burnTick: true, grade: "burn", damage: 93, text: "You burn — 93.",
+                        events: [{ kind: "burn", n: 93, side: "you" }] },
+                ],
+            }),
+        }),
+    },
     // ── THE TWO NEW STATUSES, ON THE BAR ─────────────────────────────────────────────────────────────────
     // A freeze and a burn are the only effects that can cost you a whole turn or kill you without anybody
     // swinging, so they have to be legible while they are ON — not just at the instant they land. This is
