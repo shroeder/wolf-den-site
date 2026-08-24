@@ -19567,9 +19567,15 @@ body.cas-seated .social-fab { display: none; }
     to { box-shadow: inset 0 0 0 2.5px #fff3d0, inset 0 0 34px rgba(255, 215, 94, .65),
         0 0 34px rgba(255, 215, 94, .75); }
 }
-/* Everything AHEAD of the held reel steps back — a hold that lights one reel while the other four stay at
-   full strength is four things competing with the one thing that matters. */
-.s5-reel.is-dim { filter: brightness(.5) saturate(.65); transition: filter .3s ease; }
+/* ── AND EVERYTHING ELSE STEPS BACK ───────────────────────────────────────────────────────────────────
+   This dimmed whole REELS, by index, behind the held one — which is exactly where the teased symbols sit.
+   A `filter` on a reel cannot be undone by a child, so the two symbols the hold exists to point at were
+   being dimmed by the very rule meant to isolate them; only their own brightness boost was digging them
+   back out. Per CELL now, and only the landed ones that are not the ones being pointed at, so the held
+   reel keeps running at full strength and the teased symbols keep theirs. */
+.s5-cell.is-hushed img { opacity: .42; filter: saturate(.5) brightness(.8); transition: opacity .25s ease; }
+.s5-cell.is-hushed::before { opacity: .5; }
+.s5-cell.is-hushed::after { opacity: .35; }
 
 /* ── AND THE ONES THAT GOT YOU HERE ───────────────────────────────────────────────────────────────────
    Luke: "we should highlight the icons that give you the bonus that are already set and then have an

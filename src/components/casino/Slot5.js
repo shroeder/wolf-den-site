@@ -667,7 +667,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}${mult >= 5 ? " is-hot" : ""}`}>
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}${tease && tease.reel > reel ? " is-dim" : ""}`}
+                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}`}
                             style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
                             <div className="s5-strip">
                                 {/* Chooses between two things already drawn. Nothing here is random, so a
@@ -683,7 +683,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}${tease && sym === tease.sym && landed > reel ? " is-teased" : ""}`}
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}${tease && landed > reel ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
                                         key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
                                         {/* The wild's travelling shine. Its own element because the cell
                                             has already spent ::before on the plate and ::after on the
