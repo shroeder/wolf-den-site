@@ -19768,121 +19768,182 @@ body.cas-seated .social-fab { display: none; }
    is the entire question this panel exists to answer. It wraps instead; the row grows. */
 
 /* ══ THE GEM VAULT ════════════════════════════════════════════════════════════════════════════════════════
-   The Vault's scatter bonus — four collections filling at once, first one home pays. See GemVault.js.
-   Styled here rather than in the component because the cabinet mounts it over the reels and a styled-jsx
-   block would only ever reach the one component that owns it (same reason as the Warren). */
-/* min-width:0 all the way down, for the same reason the owner strip needed it: these are grid items inside
-   a grid, and min-width:auto means min-CONTENT, which four gem trays and a 24-tile board comfortably exceed
-   on a 375px phone. Left out, the board came out three columns wide with the fourth tray off the screen. */
-/* width:100% alongside the min-width:0. The two are not redundant: min-width:0 lets it SHRINK below its
-   content, and without a width it then shrink-wrapped to its content and sat in a 270px column with a dark
-   gutter down the right of the phone. */
-.gv { position: relative; display: grid; gap: 12px; padding: 14px 12px 16px; border-radius: 16px;
-    min-width: 0; width: 100%;
-    background: radial-gradient(120% 80% at 50% 0%, rgba(90,60,140,.42), rgba(10,8,16,.96) 70%);
-    border: 1px solid rgba(255,226,150,.3); box-shadow: 0 8px 26px rgba(0,0,0,.55); isolation: isolate;
+   Rebuilt on art after Luke called the first pass what it was — a settings panel in a casino's clothes. The
+   covers are drawn brass safe-deposit doors with a wolf medallion on them, they open onto a drawn velvet-lined
+   frame, and the whole thing stands in a drawn vault. Every one of those was a `border-radius` an hour ago.
+
+   The single biggest change is the ROOM. The reference bonus is on red velvet in a gold frame and that one
+   choice is most of why it feels expensive; the tiles matter less than the thing they stand on. */
+.gv { position: relative; display: grid; gap: 12px; padding: 16px 12px 18px; border-radius: 16px;
+    min-width: 0; width: 100%; isolation: isolate; overflow: hidden;
+    background: #0a0710 url("/images/casino/vault/gv-room.png") center top/cover no-repeat;
+    border: 1px solid rgba(255,200,110,.4);
+    box-shadow: inset 0 0 60px rgba(0,0,0,.75), 0 8px 26px rgba(0,0,0,.6);
     animation: penIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+/* The room is beautiful and it is a BACKDROP: pushed down so the covers read against it rather than
+   competing with it. */
+.gv::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(90% 55% at 50% 42%, rgba(0,0,0,.32), rgba(0,0,0,.76) 78%); }
+.gv > * { position: relative; z-index: 1; }
+
 .gv-head { display: grid; justify-items: center; gap: 2px; }
-.gv-kick { font-size: .62rem; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: #c9a24a; }
-.gv-title { font-size: 1.05rem; font-weight: 900; color: #f3e7c8; }
+.gv-kick { font-size: .6rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; color: #ffce7a;
+    text-shadow: 0 0 12px rgba(255,180,70,.8), 0 1px 0 rgba(0,0,0,.8); }
+.gv-title { font-size: 1.1rem; font-weight: 900; color: #fff3d8; text-shadow: 0 2px 0 rgba(0,0,0,.6); }
 
-/* FOUR ACROSS, SIX DOWN. Twenty-four covers on a 375px phone is 78px a tile with the gaps — big enough to
-   hit with a thumb without the board needing to scroll, which it must never do mid-pick. */
-.gv-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-width: 0; }
-.gv-tile { position: relative; aspect-ratio: 1; border-radius: 11px; cursor: pointer; display: grid; min-width: 0;
-    place-items: center; padding: 5px; transition: transform .12s ease, border-color .2s ease, background .2s ease;
-    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
-    border: 1px solid rgba(255,255,255,.14); }
-.gv-tile:not(:disabled):active { transform: scale(.94); }
+/* SIX ACROSS, FOUR DOWN — not four across and six down. Same twenty-four covers, but the tall arrangement
+   ran 470px of board on a 667px phone and pushed the four prize trays off the bottom of the screen. The trays
+   ARE the game: the whole tension is watching four sets race and knowing you are two rubies short. A board you
+   cannot see the prizes under is a board with no stakes on it. */
+.gv-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+/* THE COVER IS THE SPRITE. No border, no background colour, no radius — the drawing has all of that in it,
+   which is the whole point. */
+.gv-tile { position: relative; aspect-ratio: 1; min-width: 0; cursor: pointer; display: grid; place-items: center;
+    border: 0; padding: 0; background: url("/images/casino/vault/gv-cover.png") center/100% 100% no-repeat;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.7));
+    transition: transform .13s cubic-bezier(.2,1.5,.4,1), filter .2s ease; }
+.gv-tile:not(:disabled):active { transform: scale(.92); }
+@media (hover: hover) { .gv-tile:not(:disabled):hover { transform: translateY(-2px) scale(1.04);
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,.7)) brightness(1.15); } }
+/* A SHEEN CRAWLS ACROSS THE UNOPENED ONES. Twenty-four still brass doors is a wall; a highlight travelling
+   over them, staggered so it reads as a wave rather than a flash, is a board asking to be touched. Off once
+   it is opened — an opened box has nothing left to advertise. */
+.gv-tile::after { content: ""; position: absolute; inset: 8%; border-radius: 4px; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,246,214,.45) 47%, transparent 56%);
+    background-size: 260% 100%; animation: gvSheen 3.4s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 90ms); }
+@keyframes gvSheen { 0%, 62% { background-position: 190% 0; } 88%, 100% { background-position: -90% 0; } }
 .gv-tile:disabled { cursor: default; }
-.gv-lid { width: 44%; height: 44%; border-radius: 4px; background: rgba(255,226,150,.22);
-    box-shadow: inset 0 0 0 1px rgba(255,226,150,.3); transform: rotate(45deg); }
-.gv-tile.is-turned { background: color-mix(in srgb, var(--gem, #fff) 16%, rgba(0,0,0,.5));
-    border-color: color-mix(in srgb, var(--gem, #fff) 60%, transparent);
-    box-shadow: 0 0 14px -4px var(--gem, #fff); }
-.gv-tile img { width: 84%; height: 84%; object-fit: contain; animation: gvPop .33s cubic-bezier(.2,1.5,.4,1) both; }
-/* The stone leaves the tile it came out of, so the flight has somewhere to start from. */
+.gv-tile.is-turned { background-image: url("/images/casino/vault/gv-open.png"); animation: gvOpen .34s ease both; }
+.gv-tile.is-turned::after { display: none; }
+.gv-tile img { width: 54%; height: 54%; object-fit: contain; margin-top: -4%;
+    filter: drop-shadow(0 0 10px var(--gem, #fff)) drop-shadow(0 2px 2px rgba(0,0,0,.8));
+    animation: gvPop .34s cubic-bezier(.2,1.6,.4,1) both; }
 .gv-tile.is-flying img { opacity: 0; }
-@keyframes gvPop { from { transform: scale(.3) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes gvPop { from { transform: scale(.25) rotate(-30deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The lid coming off throws a ring of light the colour of what was under it. */
+@keyframes gvOpen { 0% { box-shadow: 0 0 0 0 var(--gem, #fff); } 100% { box-shadow: 0 0 26px -8px var(--gem, #fff); } }
 
-/* The stone travelling from the board down to its tray. Deliberately one element and a straight fall: an
-   arc between two measured DOM positions is a lot of machinery for a beat that lasts 600ms. */
-.gv-fly { position: absolute; left: 50%; top: 38%; width: 54px; height: 54px; object-fit: contain; z-index: 5;
-    pointer-events: none; animation: gvFly .62s cubic-bezier(.4,0,.6,1) both; }
+.gv-fly { position: absolute; left: 50%; top: 38%; width: 60px; height: 60px; object-fit: contain; z-index: 6;
+    pointer-events: none; filter: drop-shadow(0 0 16px rgba(255,255,255,.8));
+    animation: gvFly .62s cubic-bezier(.4,0,.6,1) both; }
 @keyframes gvFly {
-    0% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    0% { transform: translate(-50%, -50%) scale(1.3) rotate(0deg); opacity: 1; }
     70% { opacity: 1; }
-    100% { transform: translate(-50%, 240px) scale(.4); opacity: 0; }
+    100% { transform: translate(-50%, 250px) scale(.42) rotate(220deg); opacity: 0; }
 }
 
-/* ── THE FOUR SETS ── what each stone is worth and how many slots are still empty. */
-.gv-sets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-width: 0; }
-.gv-set { display: grid; justify-items: center; gap: 3px; padding: 8px 4px 7px; border-radius: 12px; min-width: 0;
-    background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.1);
-    transition: border-color .25s ease, background .25s ease, transform .25s ease; }
-.gv-set.is-live { border-color: color-mix(in srgb, var(--gem) 45%, transparent); }
-.gv-set-art { width: 30px; height: 30px; object-fit: contain; }
-.gv-set-pay { font-size: .72rem; font-weight: 900; color: var(--gem); font-variant-numeric: tabular-nums; }
-/* SLOTS, not a bar. "Two more" is a thing you read off four pips instantly and have to work out off a bar. */
-.gv-set-slots { display: flex; gap: 2.5px; }
-.gv-set-slots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.14);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); transition: background .2s ease, box-shadow .2s ease; }
-.gv-set-slots i.is-in { background: var(--gem); box-shadow: 0 0 7px var(--gem); }
-.gv-set.is-won { background: color-mix(in srgb, var(--gem) 22%, rgba(0,0,0,.5));
-    border-color: var(--gem); transform: translateY(-3px) scale(1.06);
-    box-shadow: 0 0 22px -4px var(--gem); animation: gvWon .7s ease both; }
-@keyframes gvWon { 0%, 100% { filter: none; } 40% { filter: brightness(1.7); } }
+/* ── THE FOUR TRAYS ── each a drawn brass plaque with a velvet cushion, the stone sitting on it. */
+.gv-sets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; min-width: 0; }
+.gv-set { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; min-width: 0;
+    padding: 13% 5% 9%; aspect-ratio: .76;
+    background: url("/images/casino/vault/gv-tray.png") center/100% 100% no-repeat;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
+    transition: transform .25s cubic-bezier(.2,1.4,.4,1), filter .25s ease; }
+.gv-set-art { width: 44%; height: auto; object-fit: contain; filter: saturate(.6) brightness(.55);
+    transition: filter .3s ease, transform .3s ease; }
+/* A tray with something in it wakes up. Before that the stone is a dull possibility, which is what makes the
+   first one landing feel like something. */
+.gv-set.is-live .gv-set-art { filter: none; transform: scale(1.08); }
+.gv-set-pay { font-size: .66rem; font-weight: 900; color: var(--gem); font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 8px color-mix(in srgb, var(--gem) 60%, transparent), 0 1px 0 rgba(0,0,0,.9); }
+.gv-set-slots { display: flex; gap: 2px; }
+.gv-set-slots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(0,0,0,.55);
+    box-shadow: inset 0 0 0 1px rgba(255,225,170,.35); transition: background .2s ease, box-shadow .2s ease; }
+.gv-set-slots i.is-in { background: var(--gem); box-shadow: 0 0 8px var(--gem);
+    animation: gvPip .3s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes gvPip { from { transform: scale(0); } to { transform: scale(1); } }
+.gv-set.is-won { transform: translateY(-6px) scale(1.1); z-index: 3; animation: gvWon .7s ease both; }
+@keyframes gvWon { 0%, 100% { filter: drop-shadow(0 0 24px var(--gem)) brightness(1.25); }
+    35% { filter: drop-shadow(0 0 40px var(--gem)) brightness(2); } }
 
+/* ── THE PAYOUT ── rays, the stone itself, and the number. */
 .gv-won { position: absolute; inset: 0; z-index: 8; display: grid; align-content: center; justify-items: center;
-    gap: 1px; border-radius: 16px; background: radial-gradient(80% 60% at 50% 50%, rgba(0,0,0,.82), rgba(0,0,0,.95));
-    animation: gvWonIn .35s ease both; }
+    gap: 2px; overflow: hidden;
+    background: radial-gradient(70% 50% at 50% 50%, color-mix(in srgb, var(--gem) 20%, rgba(0,0,0,.86)), rgba(0,0,0,.95));
+    animation: gvWonIn .3s ease both; }
 @keyframes gvWonIn { from { opacity: 0; } to { opacity: 1; } }
-.gv-won-kick { font-size: .68rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: var(--gem); }
-.gv-won-n { font-size: 3rem; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 26px var(--gem); animation: gvPop .5s cubic-bezier(.2,1.5,.4,1) both; }
-.gv-won-sub { font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #9aa2ad; }
-@media (max-width: 360px) { .gv-set-art { width: 26px; height: 26px; } .gv-set-pay { font-size: .66rem; } }
+/* Rays behind it. Cheap, and it is the difference between "a number appeared" and "you won". */
+.gv-won::before { content: ""; position: absolute; width: 190%; aspect-ratio: 1; pointer-events: none;
+    background: conic-gradient(from 0deg, color-mix(in srgb, var(--gem) 30%, transparent) 0 6deg, transparent 6deg 30deg);
+    animation: gvRays 16s linear infinite; opacity: .5; }
+@keyframes gvRays { to { transform: rotate(360deg); } }
+.gv-won > * { position: relative; z-index: 1; }
+.gv-won-art { width: 92px; height: 92px; object-fit: contain; margin-bottom: 4px;
+    filter: drop-shadow(0 0 30px var(--gem)); animation: gvWonArt 1.4s ease-in-out infinite alternate; }
+@keyframes gvWonArt { from { transform: scale(1) rotate(-4deg); } to { transform: scale(1.09) rotate(4deg); } }
+.gv-won-kick { font-size: .66rem; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: var(--gem);
+    text-shadow: 0 0 14px var(--gem); }
+.gv-won-n { font-size: 3.1rem; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 30px var(--gem), 0 3px 0 rgba(0,0,0,.55); animation: gvPop .55s cubic-bezier(.2,1.5,.4,1) both; }
+.gv-won-sub { font-size: .64rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #b9a98a; }
+@media (max-width: 360px) { .gv-set-pay { font-size: .6rem; } .gv-won-n { font-size: 2.6rem; } }
+
 
 /* ══ WIN IT AGAIN ═════════════════════════════════════════════════════════════════════════════════════════
-   The Vault's row across the top — your last five wins, paid back in one go when a spin tumbles three times.
-   See WinAgainBar.js. It sits ABOVE the cabinet because that is where it is on the machine Luke is pointing
-   at, and because a meter under the reels is a meter nobody looks at while the reels are moving. */
-/* min-width:0 on the bar AND on its row AND on every cell. All three are needed: each is a grid item of the
-   thing above it, and a grid item defaults to min-width:auto — so any one of them left out lets min-CONTENT
-   win and the whole cabinet goes wide with it. Measured, not guessed: the bar was 493px inside a 375px
-   phone and took the reels' fifth column and half the owner strip off the screen with it. */
-.wa { display: grid; gap: 5px; margin: 0 0 8px; padding: 7px 8px 8px; border-radius: 12px; min-width: 0;
-    background: linear-gradient(180deg, rgba(24,44,86,.95), rgba(10,18,38,.95));
-    border: 1px solid rgba(120,180,255,.35); }
-.wa-title { text-align: center; font-size: .62rem; font-weight: 900; letter-spacing: .22em;
-    text-transform: uppercase; color: #9fd0ff; text-shadow: 0 0 10px rgba(90,170,255,.6); }
-/* Five slots and the total. The total is wider because it is the number the whole row exists to produce. */
-.wa-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.3fr); gap: 3px; min-width: 0; }
-/* `min-width: 0` IS LOAD-BEARING. A grid item defaults to min-width:auto, which is min-CONTENT — so six
-   cells each refusing to go narrower than their own number pushed the row past 375px, and the row pushed the
-   whole cabinet with it: the reels lost their fifth column and the owner strip read "Forc gem". The row has
-   to be allowed to be as narrow as it is given. */
-.wa-slot, .wa-total { display: grid; justify-items: center; align-content: center; gap: 0; min-height: 30px;
-    min-width: 0; overflow: hidden; padding: 3px 2px; border-radius: 6px; background: rgba(0,0,0,.45);
-    border: 1px solid rgba(120,180,255,.22); transition: background .18s ease, border-color .18s ease,
-    box-shadow .18s ease, transform .18s ease; }
-.wa-slot b, .wa-total b { font-size: .72rem; font-weight: 900; color: #dbe9ff; font-variant-numeric: tabular-nums;
-    line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.wa-slot em, .wa-total em { font-style: normal; font-size: .46rem; font-weight: 800; letter-spacing: .06em;
-    text-transform: uppercase; color: #6f89ad; }
-.wa-slot.is-full { border-color: rgba(120,180,255,.45); background: rgba(30,60,110,.6); }
-/* THE BOOM. Each slot in turn, and it stays lit — the row filling up left to right IS the animation, so a
-   light that came back off would undo the thing it is drawing. */
-.wa-slot.is-lit { background: linear-gradient(180deg, #ffe27a, #f3b23a); border-color: #fff3c4;
-    box-shadow: 0 0 16px rgba(255,210,90,.85); transform: translateY(-2px) scale(1.06); }
-.wa-slot.is-lit b { color: #2a1c06; }
-.wa-slot.is-lit em { color: #7a5a12; }
-.wa-total { background: rgba(0,0,0,.55); border-color: rgba(255,210,90,.3); }
+   Luke, on the first cut of this: "right now what I'm looking at looks very web UI, and what I'm hoping for is
+   gamified, dopamine-inducing slot machine type of stuff... you're taking the bare minimum effort here."
+
+   He was right. Every cell was a rounded rectangle with an rgba() fill — the same information the reference
+   cabinet carries, built out of the vocabulary of a settings panel. The reference has OBJECTS: a bolted
+   marquee, chrome stars, recessed instrument windows with real bezels that throw light when they light.
+   So the windows are drawn now (wa-cell / wa-cell-lit, gen-vault-art.mjs) and the row is a rack they sit in.
+
+   The bar itself stays CSS on purpose: brushed steel behind a row of sprites is the one part of this a
+   gradient does honestly, and asking a model for "a plate with an empty middle" got a goblin standing in it. */
+.wa { display: grid; gap: 6px; margin: 0 0 8px; padding: 8px 9px 9px; border-radius: 12px; min-width: 0;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,0) 22%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 2px, rgba(0,0,0,.05) 2px 4px),
+        linear-gradient(180deg, #24406f, #0f1d38 60%, #16294a);
+    border: 1px solid rgba(150,200,255,.4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 6px rgba(0,0,0,.6), 0 4px 14px rgba(0,0,0,.5); }
+
+/* The title, with a cluster of chrome stars bolted to each end — mirrored, one sprite. */
+.wa-title { display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: .68rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; color: #cfe8ff;
+    text-shadow: 0 0 12px rgba(90,170,255,.9), 0 1px 0 rgba(0,0,0,.6); }
+/* The sprite is square, so a 34x15 box letterboxed it down to a sparkle. Give it its own aspect ratio and
+   enough size to read as the chunky bolted-on chrome it is on the reference cabinet. */
+.wa-title i { width: 42px; height: 26px; flex: none; margin: -6px 0;
+    background: url("/images/casino/vault/wa-stars.png") center/contain no-repeat;
+    filter: drop-shadow(0 0 6px rgba(120,190,255,.8)); }
+.wa-title i:last-child { transform: scaleX(-1); }
+
+.wa-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.35fr); gap: 3px; min-width: 0; }
+/* EVERY CELL IS THE DRAWN WINDOW. background-size 100% 100% rather than contain: these are stretched into a
+   rack and the bezel is meant to meet its neighbours, the way a row of instruments does. */
+.wa-slot, .wa-total { position: relative; display: grid; justify-items: center; align-content: center;
+    min-height: 38px; min-width: 0; overflow: hidden; padding: 4px 3px;
+    background: url("/images/casino/vault/wa-cell.png") center/100% 100% no-repeat;
+    transition: transform .18s cubic-bezier(.2,1.4,.4,1), filter .18s ease; }
+.wa-slot b, .wa-total b { font-size: .74rem; font-weight: 900; color: #7f93ad; font-variant-numeric: tabular-nums;
+    line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 0 rgba(0,0,0,.8); }
+.wa-slot em, .wa-total em { font-style: normal; font-size: .44rem; font-weight: 800; letter-spacing: .08em;
+    text-transform: uppercase; color: #4d5f78; }
+/* A window with a number in it is POWERED — the digits go amber and pick up a glow off the glass. */
+.wa-slot.is-full b { color: #ffcf6b; text-shadow: 0 0 9px rgba(255,190,80,.85), 0 1px 0 rgba(0,0,0,.8); }
+
+/* ── THE BOOM ── the lit window is a different drawing, not a filter: the reference's lit cell throws light
+   onto the metal around it, which no brightness filter on the dark one produces. */
+.wa-slot.is-lit { background-image: url("/images/casino/vault/wa-cell-lit.png");
+    transform: translateY(-3px) scale(1.1); z-index: 2;
+    filter: drop-shadow(0 0 14px rgba(255,200,90,.95)); animation: waBoom .26s cubic-bezier(.2,1.6,.4,1) both; }
+.wa-slot.is-lit b { color: #2a1a04; text-shadow: 0 1px 0 rgba(255,240,190,.7); font-size: .8rem; }
+.wa-slot.is-lit em { color: #6d4a08; }
+@keyframes waBoom { 0% { transform: translateY(0) scale(1); } 55% { transform: translateY(-5px) scale(1.24); } 100% { transform: translateY(-3px) scale(1.1); } }
+
 .wa-total b { color: #ffd75e; }
-.wa-total.is-paid { background: linear-gradient(180deg, #fff1b8, #ffc94d); border-color: #fff;
-    box-shadow: 0 0 26px rgba(255,210,90,.95); transform: scale(1.1); animation: waPaid .5s ease both; }
-.wa-total.is-paid b { color: #2a1c06; font-size: .92rem; }
-.wa-total.is-paid em { color: #7a5a12; }
-@keyframes waPaid { 0% { transform: scale(.85); } 60% { transform: scale(1.2); } 100% { transform: scale(1.1); } }
-.wa.is-firing { border-color: rgba(255,210,90,.7); box-shadow: 0 0 24px -6px rgba(255,210,90,.8); }
+.wa-total.is-paid { background-image: url("/images/casino/vault/wa-cell-lit.png");
+    transform: scale(1.14); z-index: 3; filter: drop-shadow(0 0 22px rgba(255,200,90,1));
+    animation: waPaid .55s cubic-bezier(.2,1.5,.4,1) both; }
+.wa-total.is-paid b { color: #2a1a04; font-size: 1rem; text-shadow: 0 1px 0 rgba(255,240,190,.8); }
+.wa-total.is-paid em { color: #6d4a08; }
+@keyframes waPaid { 0% { transform: scale(.8); } 55% { transform: scale(1.3); } 100% { transform: scale(1.14); } }
+/* The whole rack catches fire while it counts out. */
+.wa.is-firing { border-color: rgba(255,210,90,.85);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 0 34px -4px rgba(255,200,90,.9); }
+.wa.is-firing .wa-title { color: #ffe9ae; text-shadow: 0 0 16px rgba(255,200,90,1); }
+.wa.is-firing .wa-title i { filter: drop-shadow(0 0 8px rgba(255,210,120,.95)); }
 @media (max-width: 360px) { .wa-slot b, .wa-total b { font-size: .66rem; } .wa-slot em, .wa-total em { display: none; } }

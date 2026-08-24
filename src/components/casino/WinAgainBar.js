@@ -61,7 +61,8 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
     // because a meter that appears only once it has something in it never teaches anybody it exists.
     return (
         <div className={`wa${firing ? " is-firing" : ""}`}>
-            <div className="wa-title">{meter?.label || "WIN IT AGAIN"}</div>
+            {/* Chrome stars bolted to each end, one sprite mirrored — see gen-vault-art.mjs. */}
+            <div className="wa-title"><i aria-hidden="true" />{meter?.label || "WIN IT AGAIN"}<i aria-hidden="true" /></div>
             <div className="wa-row">
                 {Array.from({ length: slots }).map((_, i) => {
                     const v = recent[i];

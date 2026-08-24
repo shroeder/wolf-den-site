@@ -112,7 +112,9 @@ export default function GemVault({ gems, bet, onDone }) {
                         <button key={i} type="button"
                             className={`gv-tile${key ? " is-turned" : ""}${flying?.from === i ? " is-flying" : ""}`}
                             disabled={busy || done || Boolean(key)}
-                            style={set ? { "--gem": set.color } : undefined}
+                            /* `--i` staggers the sheen so it crosses the board as a WAVE rather than
+                               twenty-four doors flashing in unison, which reads as a glitch. */
+                            style={{ "--i": i % 6, ...(set ? { "--gem": set.color } : {}) }}
                             onClick={() => pick(i)}
                             aria-label={key ? set?.name : "Turn this stone"}>
                             {key ? (
@@ -152,11 +154,15 @@ export default function GemVault({ gems, bet, onDone }) {
                 twenty-four of them sitting in the DOM doing nothing. */}
             {flying ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="gv-fly" src={sets.find((s) => s.key === flying.key)?.art} alt="" draggable="false" />
+                <img className="gv-fly" src={sets.find((s) => s.key === flying.key)?.art} alt="" draggable="false"
+                    style={{ filter: `drop-shadow(0 0 16px ${sets.find((s) => s.key === flying.key)?.color || "#fff"})` }} />
             ) : null}
 
             {done && winner ? (
                 <div className="gv-won" style={{ "--gem": winner.color }}>
+                    {/* The stone you actually filled, big. A number on its own is a receipt. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="gv-won-art" src={winner.art} alt="" draggable="false" />
                     <span className="gv-won-kick">{winner.name} set complete</span>
                     <b className="gv-won-n">{(winner.pay * (bet || 0)).toLocaleString()}</b>
                     <span className="gv-won-sub">chips</span>
