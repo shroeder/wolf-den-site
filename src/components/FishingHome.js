@@ -85,18 +85,30 @@ export default function FishingHome({ fishing, gold = 0, status = null }) {
                 a link. So the page was a dead end at precisely the moment you most wanted somewhere to go —
                 with no sign that upgrades and a gold recharge both existed one tap away, on a tab of another
                 screen. Both are offered here now. */}
+            {/* The rod is the RAIL's sprite and the coin is the game's own, for the same reason as the nav
+                below: an OS emoji renders differently on every device and is the one thing on the screen we
+                did not draw. */}
+            {/* eslint-disable @next/next/no-img-element */}
             {casts.left > 0 ? (
                 <a className="fishhome-go" href="/marketplace/sailing?station=rail">
-                    🎣 Head to the rail <em>· {casts.left} {casts.left === 1 ? "cast" : "casts"} ready</em>
+                    <img className="fishhome-go-ico" src="/images/sailing/tracks/st_rail.png" alt="" draggable="false" />
+                    Head to the rail <em>· {casts.left} {casts.left === 1 ? "cast" : "casts"} ready</em>
                 </a>
             ) : recharge?.available ? (
                 <button type="button" className={`fishhome-go${canAfford ? "" : " is-quiet"}`}
                     disabled={busy || !canAfford} onClick={buyCast}>
-                    {busy ? <>Buying…</> : <>🎣 Buy another cast <em>· 🪙 {(recharge.cost || 0).toLocaleString()}</em></>}
+                    {busy ? <>Buying…</> : <>
+                        <img className="fishhome-go-ico" src="/images/sailing/tracks/st_rail.png" alt="" draggable="false" />
+                        Buy another cast <em>· <img className="fishhome-go-coin" src="/images/ui/coin.png" alt="gold" draggable="false" /> {(recharge.cost || 0).toLocaleString()}</em>
+                    </>}
                 </button>
             ) : (
-                <span className="fishhome-go is-quiet">🎣 Out of casts <em>· more tomorrow</em></span>
+                <span className="fishhome-go is-quiet">
+                    <img className="fishhome-go-ico" src="/images/sailing/tracks/st_rail.png" alt="" draggable="false" />
+                    Out of casts <em>· more tomorrow</em>
+                </span>
             )}
+            {/* eslint-enable @next/next/no-img-element */}
 
             {err ? <p className="fishhome-err">{err}</p> : null}
             {recharge?.available && !canAfford ? (
@@ -106,16 +118,30 @@ export default function FishingHome({ fishing, gold = 0, status = null }) {
                 <p className="fishhome-note">You&rsquo;ve bought all {recharge.maxPerDay} extra casts today.</p>
             ) : null}
 
-            {/* Where everything else actually lives. */}
+            {/* Where everything else actually lives.
+
+                THE QUARTERMASTER IS LISTED HERE because this is where people came looking for it. Kaishiern,
+                asked whether he knew about it: "I don't see one for fishing specifically." He was right — the
+                only door was a tab inside the ship-battle modal, on the sailing page, behind the button that
+                spends a battle. It is a station now and this is the sign pointing at it.
+
+                Painted, not typed: the three glyphs here were OS emoji, which is somebody else's art in the
+                middle of a screen made of ours. Each one is now the same sprite as the thing it leads to. */}
             <div className="fishhome-nav">
+                {/* eslint-disable @next/next/no-img-element */}
                 <a href="/marketplace/sailing?station=rail">
-                    <b>🎣 The Rail</b>
+                    <b><img src="/images/sailing/tracks/st_rail.png" alt="" draggable="false" /> The Rail</b>
                     <em>Line, lure &amp; luck upgrades</em>
                 </a>
+                <a href="/marketplace/sailing?station=shop">
+                    <b><img src="/images/sailing/tracks/st_shop.png" alt="" draggable="false" /> Quartermaster</b>
+                    <em>Spend your doubloons</em>
+                </a>
                 <a href="/marketplace/sailing">
-                    <b>⛵ Sailing</b>
+                    <b><img src="/images/sailing/tracks/st_helm.png" alt="" draggable="false" /> Sailing</b>
                     <em>{atSea ? "Your boat is out" : "Set sail, dig & raid"}</em>
                 </a>
+                {/* eslint-enable @next/next/no-img-element */}
             </div>
 
             <FishingLog log={fishing?.log} known={known} total={total} records={records} onClose={null} />

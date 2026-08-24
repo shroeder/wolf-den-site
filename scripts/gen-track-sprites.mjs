@@ -66,6 +66,11 @@ const TRACKS = {
     st_guns: P("A single brass naval CANNON on a wooden carriage, muzzle toward the viewer's right, a curl of smoke at the mouth. Warm brass, oiled oak, grey smoke."),
     st_dig: P("A short-handled IRON SHOVEL biting into a mound of dark earth, one gold coin edge showing in the dirt. Dark iron, warm oak handle, brown soil, a glint of gold."),
     st_rail: P("A bent wooden FISHING ROD with a taut line running off it and a small brass reel, caught mid-bite. Warm oak, brass, pale taut line."),
+    // The fifth station. The Quartermaster was reachable only from inside the battle modal, so members who had
+    // never opened it did not know a shop existed at all -- Eric D, Kaishiern and GrayKitsune all said so in
+    // the same minute. A CHEST, because the four siblings are a wheel, a cannon, a shovel and a rod and the
+    // silhouette has to be told apart from all of them at 44px.
+    st_shop: P("A banded oak SEA CHEST with its lid thrown open, gold doubloons spilling over the rim and a heavy brass padlock hanging from the hasp. Deep oak brown, dark iron bands, warm brass, bright gold coins."),
 };
 
 const args = process.argv.slice(2);

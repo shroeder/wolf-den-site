@@ -14,6 +14,7 @@ import ArenaClient from "@/components/ArenaClient";
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard, { Track as ShipTrack, Dbl } from "@/components/ShipYard";
 import GunDeck from "@/components/GunDeck";
+import Quartermaster from "@/components/Quartermaster";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
@@ -239,7 +240,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const stationsRef = useRef(null);
     useEffect(() => {
         const want = new URLSearchParams(window.location.search).get("station");
-        if (want && ["helm", "dig", "rail"].includes(want)) setStation(want);
+        if (want && ["helm", "guns", "shop", "dig", "rail"].includes(want)) setStation(want);
     }, []);
     const [toolFx, setToolFx] = useState(null); // { emoji, name, k } — flashes when a dig tool procs
     const [procFx, setProcFx] = useState(null); // { emoji, left, top, k } — the burst on the triggering tile
@@ -1168,8 +1169,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     wrap, and stacking gives every tab the same footprint no matter how long the word is. */}
                 {/* PAINTED TABS. These were four flat line glyphs — the only navigation in the whole feature,
                     rendered in the one visual language the rest of the game does not use. */}
+                {/* ── AND A FIFTH, WHICH NOBODY COULD FIND ────────────────────────────────────────────
+                    The Quartermaster was a TAB INSIDE the ship-battle modal, which meant the only route to the
+                    shop ran through the button that spends your one remaining battle. Eric D: "There's a
+                    fishing quartermaster??" Kaishiern: "I don't see one for fishing specifically." GrayKitsune:
+                    "Idk what a quartermaster is." Three members in one minute, none of whom had ever opened it,
+                    all of them holding doubloons. A shop you reach by opening a fight is a shop nobody visits.
+                    It is a station now, beside the four it always belonged with. */}
                 {[["helm", "st_helm", "Helm", "Boat upgrades"],
                   ...(state.combat ? [["guns", "st_guns", "Guns", "Raiding upgrades"]] : []),
+                  ...(state.combat ? [["shop", "st_shop", "Shop", "The Quartermaster — spend doubloons"]] : []),
                   ["dig", "st_dig", "Dig", "Tools & excavation"], ["rail", "st_rail", "Rail", "Fishing"]].map(([k, art, label, sub]) => (
                     <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub} aria-label={sub}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1277,11 +1286,42 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         encounters had a purse and nowhere to spend it. The purse IS the button: the number you
                         are looking at is the reason to press it, and nothing else needs saying. */}
                     <button type="button" className="sby-purse-cta" disabled={busy}
-                        onClick={() => { setBattleTab("shop"); setYardOpen(true); }}>
+                        onClick={() => {
+                            setStation("shop");
+                            requestAnimationFrame(() => stationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                        }}>
                         <Dbl className="sby-purse-cta-coin" />
                         <b>{(state.combat.doubloons || 0).toLocaleString()}</b>
                         <em>Quartermaster</em>
                     </button>
+                </section>
+            </> : null}
+
+            {station === "shop" && state.combat ? <>
+                {/* ── THE QUARTERMASTER, AS A ROOM YOU CAN WALK INTO ──────────────────────────────────────
+                    Same component the battle modal used to host, mounted straight on the page. Nothing about
+                    the shop changed — what changed is that reaching it no longer costs you a tap on the button
+                    that starts a fight. See the station strip above for who asked. */}
+                <section className="card" style={{ borderColor: "rgba(255,190,90,0.45)", background: "linear-gradient(180deg, rgba(255,180,70,0.10), transparent 40%)" }}>
+                    <Kicker art="st_shop" label="Stores" tint="rgba(255,190,90,0.55)" bg="rgba(255,190,90,0.16)" />
+                    <h2 style={{ margin: "0 0 2px" }}>The Quartermaster</h2>
+                    <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem", lineHeight: 1.5 }}>
+                        Everything doubloons buy — the locker, the manifest, and a roll of the dice. Doubloons come
+                        from ship battles and from what you haul up at sea; they buy nothing anywhere else.
+                    </p>
+                    <Quartermaster
+                        stoneShop={state.stoneShop}
+                        onBuyStone={(id) => act("buy_stone", { stone: id })}
+                        shop={state.combat.shop}
+                        locker={state.combat.locker}
+                        purse={state.combat.doubloons || 0}
+                        busy={busy}
+                        onBuyLocker={(id) => act("buy_locker", { id })}
+                        recipe={state.combat.recipe}
+                        onBuyRecipe={() => act("buy_recipe")}
+                        onBuyPiece={(piece) => act("buy_piece", { piece })}
+                        onGamble={() => act("gamble_chest")}
+                    />
                 </section>
             </> : null}
 
@@ -1740,6 +1780,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             // change and looks like nothing at all: the stations sit below the fold, so the
                             // modal vanished and the page stayed exactly where it was. "Clicking upgrade
                             // doesn't take me anywhere" — it did, silently, off screen.
+                            // Same walk as onUpgradeShip, to the shop rather than the gun deck.
+                            onQuartermaster={() => {
+                                setYardOpen(false);
+                                setStation("shop");
+                                requestAnimationFrame(() => {
+                                    stationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                });
+                            }}
                             onUpgradeShip={() => {
                                 setYardOpen(false);
                                 setStation("guns");

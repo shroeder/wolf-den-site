@@ -93,7 +93,7 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 // (matchOpponent in sailing.js), so there is nothing to compare and nothing to pick: this tab is one button
 // and your record.
 
-export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, stoneShop = null, owner = false, onUpgradeShip}) {
+export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, stoneShop = null, owner = false, onUpgradeShip, onQuartermaster = null }) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
     const active = tab || ownTab;
@@ -135,7 +135,12 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, 
 
             <div className="sbd-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
-                <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
+                {/* ── A DOOR, NOT A TAB, WHEREVER THE SHOP HAS ITS OWN ROOM ──────────────────────────
+                    The Quartermaster is a station on the sailing page now, so this stays as the signpost it
+                    always was and simply walks you there instead of opening a second copy of the same shelves
+                    inside a modal. `onQuartermaster` is absent in the lab, which still renders it inline. */}
+                <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""}
+                    onClick={() => (onQuartermaster ? onQuartermaster() : setTab("shop"))}>Quartermaster</button>
             </div>
 
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
