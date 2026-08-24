@@ -1803,13 +1803,18 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             clock += hold;
         };
 
-        // A line whose whole content IS the interruption — "you cannot act" carries no damage and therefore
-        // no events at all. Without this the one thing the player most needs told would be the one thing
-        // that never got a moment.
-        for (const a of alerts) if (!evs.some((e) => e.li === a.li)) raise(a.li);
-
-        evs.forEach((e, i) => {
-            raise(e.li);
+        // ── IN THE ORDER THEY HAPPENED ───────────────────────────────────────────────────────────────
+        // Walked by LINE rather than by event, for two reasons that only showed up on film. A line whose
+        // whole content IS the interruption — "you cannot act" — carries no damage and therefore no events
+        // at all, so a loop over events alone skips the one thing most worth saying. And raising those
+        // event-less alerts up front instead put them at the FRONT of the beat: filmed, FROZEN played a
+        // second and a half before the extra turn that caused it, which tells the story backwards.
+        const order = [...new Set([...evs.map((e) => e.li), ...alerts.map((a) => a.li)])].sort((x, y) => x - y);
+        let i = -1;
+        for (const li of order) {
+            raise(li);
+            for (const e of evs.filter((x) => x.li === li)) {
+            i += 1;
             const base = EVENT_MS[e.kind] ?? EVENT_MS.default;
             const dur = i < 2 ? base : Math.max(90, Math.round(base * SQUEEZE));
             // BEAT_BUDGET_MS caps how long a beat may take, which is right for a flurry of numbers and wrong
@@ -1866,7 +1871,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 else if (e.kind === "miss") { Sfx.block(0.3); }
             }, at + wind));
             timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
-        });
+            }
+        }
         timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS + held) + 1400));
         return () => { for (const t of timers) clearTimeout(t); setAlert(null); };
     }, [beatQueue]);

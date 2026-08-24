@@ -327,14 +327,19 @@ export const SCENES = {
         state: () => baseState({
             bout: makeBout({
                 beat: 6, turn: "you", awaiting: "act", hp: 793, maxHp: 2080, foeHp: 2450, foeMaxHp: 2830,
+                // ── `me` AND `foe`, NOT `you` AND `them` ─────────────────────────────────────────────
+                // The engine's transcript speaks me/foe and ArenaClient translates it ONCE on the way in
+                // (see logAll). A fixture written in the screen's vocabulary is therefore translated a
+                // second time and comes out inverted: every line reads as the opponent's. Filmed exactly
+                // that — "IT IS BURNING ROAN VASQUEZ" over a line that says "You burn".
                 log: [
-                    { beat: 5, who: "them", grade: "hit", damage: 464, text: "Snare-Setter Wyn casts Overflow — 464. It catches fire.",
+                    { beat: 5, who: "foe", damage: 464, text: "Roan Vasquez casts Overflow — 464. It catches fire.",
                         ability: "Overflow", events: [{ kind: "hit", n: 464, side: "you" }] },
-                    { beat: 6, who: "them", grade: "hit", damage: 182, again: true,
-                        text: "Snare-Setter Wyn casts Rimebind again — 182.", ability: "Rimebind",
+                    { beat: 6, who: "foe", damage: 182, again: true,
+                        text: "Roan Vasquez casts Rimebind again — 182.", ability: "Rimebind",
                         events: [{ kind: "hit", n: 182, side: "you" }] },
-                    { beat: 6, who: "you", chilledSkip: true, meStun: 2, damage: 0, text: "You cannot act." },
-                    { beat: 7, who: "you", burnTick: true, grade: "burn", damage: 93, text: "You burn — 93.",
+                    { beat: 6, who: "me", chilledSkip: true, meStun: 2, damage: 0, text: "You cannot act." },
+                    { beat: 7, who: "me", burnTick: true, damage: 93, text: "You burn — 93.",
                         events: [{ kind: "burn", n: 93, side: "you" }] },
                 ],
             }),
