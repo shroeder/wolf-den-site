@@ -343,7 +343,7 @@ const VAULT = {
         { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 5, wolf: 0 },
     ],
     // ── A CASCADING PAYTABLE, NOT THE OLD ONE ────────────────────────────────────────────────────────
-    // Scaled to 0.545 of what it was, and this is NOT a nerf to hold a number — it is a different machine.
+    // Scaled to 0.630 of what it was, and this is NOT a nerf to hold a number — it is a different machine.
     // The old table was built for a cabinet that resolved a spin in ONE step and whose whole identity was a
     // long wait for a 1,918x wolf. This one tumbles, so a single press can pay four times over, and then the
     // meter pays those wins back AGAIN. Left alone the Vault returned 155.89% against a floor at 100 — not
@@ -354,13 +354,13 @@ const VAULT = {
     // specced it; the gem ladder is untouched. What moved is the base, which is the part that was written
     // for a machine that no longer exists.
     pays: {
-        wolf: { 3: 10.5, 4: 79.6, 5: 1045 },
-        chest: { 3: 3.0, 4: 23.0, 5: 230 },
-        laurel: { 3: 1.05, 4: 6.76, 5: 54.4 },
-        doubloon: { 4: 2.25, 5: 16.5 },
-        bone: { 5: 4.75 },
+        wolf: { 3: 12.1, 4: 92, 5: 1208 },
+        chest: { 3: 3.47, 4: 26.6, 5: 266 },
+        laurel: { 3: 1.21, 4: 7.81, 5: 62.9 },
+        doubloon: { 4: 2.6, 5: 19 },
+        bone: { 5: 5.49 },
     },
-    scatterPays: { 3: 0.43, 4: 2.25, 5: 15.0 },
+    scatterPays: { 3: 0.5, 4: 2.6, 5: 17.3 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -694,7 +694,12 @@ export function runGems(m, { lineBet = 1, rng = Math.random } = {}) {
     // `tiles` is the whole board, not the number of stones that were drawn. The screen builds its covers from
     // this: sizing the board off `order` gave a seven-tile board on a run that filled a set in seven picks,
     // which reads as "the bonus is nearly over before it starts" and hides the whole shape of the thing.
-    return { order, have, won, total, tiles: bag.length, sets: GEM_SETS.map((g) => ({ ...g })) };
+    // `board` is the WHOLE bag in its shuffled order, `order` only the prefix that was actually drawn. The
+    // screen needs both: the prefix to play, and the rest to turn over at the end — Luke: "whenever you
+    // reveal and get the prize, we also want to show for a little while everything else that you didn't pick,
+    // so that you know what you missed." Which is the best part of a pick bonus and the part that makes you
+    // want another one: seeing the ruby that was one cover away.
+    return { order, board: bag, have, won, total, tiles: bag.length, sets: GEM_SETS.map((g) => ({ ...g })) };
 }
 
 // ── CASCADES ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1048,7 +1053,24 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
     let nextMeter = m.winAgain ? meter.slice(0, m.winAgain.slots) : [];
     let winAgain = null;
     if (m.winAgain) {
-        if (total > 0) nextMeter = [total / bet, ...nextMeter].slice(0, m.winAgain.slots);
+        // ── EVERY MANUAL SPIN ADVANCES THE ROW, INCLUDING A LOSING ONE ───────────────────────────────
+        // Luke: "if you don't win anything on a spin it adds a blank to the top area, that way it can push
+        // everything off... it's all working except for ignoring when you don't win."
+        //
+        // I had it only pushing on a win, which quietly made the meter a bank you could never lose from —
+        // sit there long enough and your five best spins stay in the row for ever. The blank is the whole
+        // tension: a dead spin ages your good ones one place closer to falling off the end, so the question
+        // is not "will it fire" but "will it fire before I lose the 20,000 in slot 4".
+        //
+        // AND THE BONUS IS NOT PART OF THE ENTRY. `total` at this point already includes the gem collection,
+        // and the row is drawn the instant the response lands — BEFORE the player has touched a single cover.
+        // Luke: "when I got the gem bonus it already won in the top left as a win-it-again before I even
+        // played the pick'em game — we definitely don't want to show people that, because then they'll
+        // understand that it's rigged." He is exactly right, and it is the worst kind of leak: the screen
+        // telling you the outcome of a game it is about to pretend to ask you to play. The row records the
+        // REELS — what the spin visibly paid — and the bonus pays itself on its own screen.
+        const reelWin = total - (gems?.total || 0);
+        nextMeter = [Math.max(0, reelWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
         if (chain && chain.cascades >= m.winAgain.need) {
             const paid = nextMeter.reduce((a, n) => a + n, 0);
             total += paid * bet;

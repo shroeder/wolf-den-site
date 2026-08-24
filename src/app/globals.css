@@ -19824,6 +19824,15 @@ body.cas-seated .social-fab { display: none; }
 @keyframes gvSheen { 0%, 62% { background-position: 190% 0; } 88%, 100% { background-position: -90% 0; } }
 .gv-tile:disabled { cursor: default; }
 .gv-tile.is-turned { background-image: url("/images/casino/vault/gv-open.png"); animation: gvOpen .34s ease both; }
+/* ── WHAT YOU LEFT BEHIND ────────────────────────────────────────────────────────────────────────────────
+   The covers nobody opened, turned over at the end. Deliberately HELD BACK — no ring of light, the stone
+   desaturated and small — because it has to read as "this is what was there" and never for a second as a
+   stone you collected. The whole point of showing it is the ruby that was one cover away, and that only
+   lands if it is visibly not yours. */
+.gv-tile.is-missed { animation: none; opacity: .72; filter: drop-shadow(0 2px 3px rgba(0,0,0,.7)) grayscale(.35); }
+.gv-tile.is-missed img { width: 44%; height: 44%; filter: saturate(.7) brightness(.85);
+    animation: gvMissed .3s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes gvMissed { from { transform: scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
 .gv-tile.is-turned::after { display: none; }
 .gv-tile img { width: 54%; height: 54%; object-fit: contain; margin-top: -4%;
     filter: drop-shadow(0 0 10px var(--gem, #fff)) drop-shadow(0 2px 2px rgba(0,0,0,.8));

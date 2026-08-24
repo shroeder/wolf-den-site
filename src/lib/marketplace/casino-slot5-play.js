@@ -212,7 +212,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // The whole board and the order it comes out in. The screen maps the tile a finger landed on to the
         // next stone in that order — see runGems for why that is the honest way round.
         gems: r.gems ? {
-            order: r.gems.order, won: r.gems.won, sets: r.gems.sets, tiles: r.gems.tiles,
+            order: r.gems.order, board: r.gems.board, won: r.gems.won, sets: r.gems.sets, tiles: r.gems.tiles,
             total: chipsFor(stake, r.gems.total / stake),
         } : null,
         // ── THE TUMBLE ───────────────────────────────────────────────────────────────────────────────

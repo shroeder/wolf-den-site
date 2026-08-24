@@ -23,6 +23,7 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 const REVEAL_MS = 330;      // the lid coming off
 const FLY_MS = 620;         // the stone travelling down to its set
 const FILL_MS = 700;        // the set lighting up when its last slot lands
+const MISSED_MS = 2400;     // the rest of the board turned over, so you see what you walked past
 const WIN_MS = 2600;        // the prize on screen before it hands back
 
 export default function GemVault({ gems, bet, onDone }) {
@@ -43,6 +44,14 @@ export default function GemVault({ gems, bet, onDone }) {
     const [have, setHave] = useState(() => Object.fromEntries(sets.map((s) => [s.key, 0])));
     const [flying, setFlying] = useState(null);   // { key, from } — a stone on its way to its set
     const [filled, setFilled] = useState(null);   // the set that just completed
+    // ── AND WHAT WAS UNDER EVERYTHING ELSE ───────────────────────────────────────────────────────────────
+    // Luke: "whenever you reveal and get the prize, we also want to show for a little while everything else
+    // that you didn't pick — we're going to reveal that so that you know what you missed."
+    //
+    // Which is the best part of a pick bonus and the reason you want another one immediately: the ruby that
+    // was one cover away. `board` is the whole shuffled bag and `order` is only the prefix that was drawn, so
+    // the leftovers are everything past the cursor, laid onto the covers nobody touched.
+    const [missed, setMissed] = useState(null);   // tile index -> the stone that was under it
     const [busy, setBusy] = useState(false);
     const [done, setDone] = useState(false);
     const cursor = useRef(0);
@@ -83,13 +92,27 @@ export default function GemVault({ gems, bet, onDone }) {
             Cas.jackpot();
             Haptic.crit();
             await wait(FILL_MS);
+
+            // Everything past the cursor, dealt onto the covers still face down — in tile order, which is as
+            // arbitrary as the shuffle that produced it and reads as "this is what was there".
+            const rest = (gems?.board || []).slice(cursor.current);
+            const left = {};
+            let r = 0;
+            for (let t = 0; t < (gems?.tiles || 0); t += 1) {
+                if (turned[t] != null || t === tile) continue;
+                if (r < rest.length) { left[t] = rest[r]; r += 1; }
+            }
+            setMissed(left);
+            Cas.reelStop(0, 0.4);
+            await wait(MISSED_MS);
+
             setDone(true);
             await wait(WIN_MS);
             onDone?.();
             return;
         }
         setBusy(false);
-    }, [busy, done, turned, order, sets, have, onDone]);
+    }, [busy, done, turned, order, sets, have, onDone, gems]);
 
     const winner = filled;
 
@@ -97,7 +120,7 @@ export default function GemVault({ gems, bet, onDone }) {
         <div className="gv">
             <div className="gv-head">
                 <span className="gv-kick">The Gem Vault</span>
-                <b className="gv-title">{done ? "Set complete" : "Turn a stone"}</b>
+                <b className="gv-title">{missed ? "What you left behind" : done ? "Set complete" : "Turn a stone"}</b>
             </div>
 
             {/* ── THE BOARD ────────────────────────────────────────────────────────────────────────────
@@ -107,17 +130,21 @@ export default function GemVault({ gems, bet, onDone }) {
             <div className="gv-board" aria-label="Pick a stone">
                 {layout.map((_, i) => {
                     const key = turned[i];
-                    const set = key ? sets.find((s) => s.key === key) : null;
+                    // A cover you never opened, turned over at the end. Drawn the same way but held back —
+                    // see `.gv-tile.is-missed` — because it has to read as "what was there" and never as a
+                    // stone you collected.
+                    const miss = !key && missed ? missed[i] : null;
+                    const set = (key || miss) ? sets.find((s) => s.key === (key || miss)) : null;
                     return (
                         <button key={i} type="button"
-                            className={`gv-tile${key ? " is-turned" : ""}${flying?.from === i ? " is-flying" : ""}`}
+                            className={`gv-tile${key ? " is-turned" : ""}${miss ? " is-turned is-missed" : ""}${flying?.from === i ? " is-flying" : ""}`}
                             disabled={busy || done || Boolean(key)}
                             /* `--i` staggers the sheen so it crosses the board as a WAVE rather than
                                twenty-four doors flashing in unison, which reads as a glitch. */
                             style={{ "--i": i % 6, ...(set ? { "--gem": set.color } : {}) }}
                             onClick={() => pick(i)}
-                            aria-label={key ? set?.name : "Turn this stone"}>
-                            {key ? (
+                            aria-label={key || miss ? set?.name : "Turn this stone"}>
+                            {key || miss ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={set?.art} alt="" draggable="false" />
                             ) : <i className="gv-lid" aria-hidden="true" />}

@@ -74,10 +74,14 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
             <div className="wa-title"><i aria-hidden="true" />{meter?.label || "WIN IT AGAIN"}<i aria-hidden="true" /></div>
             <div className="wa-row">
                 {Array.from({ length: slots }).map((_, i) => {
+                    // A ZERO IS A BLANK, not the digit 0. Every manual spin advances the row now, including
+                    // a losing one — see the note in playSpin — and a column of "0"s would read as five wins
+                    // of nothing rather than as your good spins being pushed toward the edge.
                     const v = recent[i];
+                    const won = Number(v) > 0;
                     return (
-                        <div key={i} className={`wa-slot${v != null ? " is-full" : ""}${firing && lit >= i ? " is-lit" : ""}`}>
-                            <b>{v != null ? Math.round(v * (bet || 0)).toLocaleString() : ""}</b>
+                        <div key={i} className={`wa-slot${won ? " is-full" : ""}${firing && lit >= i ? " is-lit" : ""}`}>
+                            <b>{won ? Math.round(v * (bet || 0)).toLocaleString() : ""}</b>
                             {/* Numbers, not "RECENT WIN 2". The reference has a cabinet's width to spend and
                                 this has 375px — the words were the widest thing in the row and the row is
                                 what has to fit. */}
