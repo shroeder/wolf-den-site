@@ -18704,68 +18704,119 @@ body.cas-seated .social-fab { display: none; }
     .s5-tally-n { font-size: 2.5rem; }
 }
 
-/* ══ THE STATUS RIBBONS, ON THE GLASS ═════════════════════════════════════════════════════════════════════
-   Luke: "I hate the blue area, I hate how plain it is, I hate the text wrap" — and, on the recap: "things
-   like this should consume the animated spin area, not polluted underneath."
+/* ══ THE ROUND, WHILE IT RUNS ═════════════════════════════════════════════════════════════════════════════
+   Luke: "the info box under the free spins is ghetto and lacking all dopamine and polish."
 
-   Both were the same mistake. These were flat rounded rectangles STACKED BELOW the cabinet, so a free round
-   pushed the reels up the page, the numbers sat in a wide slab with room for nothing but labels, and the
-   labels wrapped because the slab was a three-column grid on a 375px phone. A cabinet does not grow a new
-   panel when it enters a bonus; it lights part of its own glass.
+   Right, and it was the same mistake as everything else on this cabinet: a rounded rectangle with three
+   label-over-number stacks in it, sitting on the glass for the best sixty seconds the machine has. The Win
+   It Again rack next door is DRAWN windows in a rack and reads as part of a machine — so the windows here
+   are drawn too (fs-window, fs-mult) and only the rack behind them is CSS. That split is deliberate and it
+   is the second time it has been earned: a model will not draw an empty panel, it finds something to put in
+   it, and asking for one returned a red horned demon standing in the middle of the rack.
 
-   So they are pinned over the bottom of the window now, they are dark and gold instead of that flat blue,
-   the labels are short enough that nothing can wrap, and the page below never moves. */
-/* The cabinet makes room rather than the ribbon sitting on the symbols. Both ribbons live at the BOTTOM —
-   the top of a cabinet is its masthead, and covering the machine's own name to show a counter is the same
-   mistake in the other direction. When a cascade runs inside a free round they stack, oldest at the bottom. */
-.s5-cab.has-foot { padding-bottom: 48px; }
-.s5-cab.has-head { padding-bottom: 46px; }
-.s5-cab.has-head.has-foot { padding-bottom: 90px; }
-.s5-freebar, .s5-tumble {
+   ── AND IT HAD NEVER ACTUALLY BEEN ON THE GLASS ────────────────────────────────────────────────────────
+   `position: absolute` was being beaten by `.s5-cab > * { position: relative }` — one specificity point,
+   silently, so the bar sat in flow and the 48px strip the cabinet was reserving for it showed up as an
+   empty gold band underneath. Measured (`position: "relative"` straight off the computed style) rather
+   than guessed at for a third time. Selector matches the child rule now. */
+/* ── THE CABINET GROWS A STRIP FOR IT ────────────────────────────────────────────────────────────────────
+   Pinned over the glass the bar covered the bottom row of symbols, which on a three-row machine is a third
+   of the board — the fix for "polluted underneath" cannot be "hidden behind". These numbers are the bar's
+   MEASURED height plus its inset, not estimates: the free-spin rack renders 64px tall because the gold
+   medallion in it is 54, and the first guess at 48 left it sitting over two rows of reels. */
+.s5-cab.has-foot { padding-bottom: 74px; }
+.s5-cab.has-head { padding-bottom: 56px; }
+.s5-cab.has-head.has-foot { padding-bottom: 130px; }
+.s5-cab > .s5-freebar, .s5-cab > .s5-tumble {
     position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 7;
-    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-    padding: 5px 8px; border-radius: 10px; min-width: 0;
-    background: linear-gradient(180deg, rgba(16,10,3,.86), rgba(6,4,1,.94));
-    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 42%, transparent);
-    box-shadow: 0 -6px 22px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,225,160,.22);
-    animation: s5BarIn .28s cubic-bezier(.2,1.4,.4,1) both; }
-@keyframes s5BarIn { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
-/* Stacked, not overlaid: the cascade counter sits above the free-spin ribbon when both are up. */
-.s5-cab.has-foot .s5-tumble { bottom: 50px; }
+    display: flex; align-items: stretch; justify-content: space-between; gap: 6px;
+    padding: 5px 7px; border-radius: 10px; min-width: 0; overflow: hidden;
+    /* Brushed metal: the one part of this a gradient does honestly. */
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,0) 26%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, rgba(0,0,0,.05) 2px 4px),
+        linear-gradient(180deg, #1c1408, #0a0703 62%, #140e05);
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 62%, transparent);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,230,170,.35),
+        inset 0 -2px 7px rgba(0,0,0,.7);
+    animation: s5BarIn .3s cubic-bezier(.2,1.4,.4,1) both; }
+.s5-cab.has-foot .s5-tumble { bottom: 74px; }
 
-/* NOTHING IN HERE MAY WRAP. Every readout is a fixed little stack — a two-or-three letter label over a
-   number — and the label is short by construction rather than by hoping the box is wide enough. */
-.s5-freebar span, .s5-tumble span { display: grid; gap: 0; justify-items: center; min-width: 0;
+/* ── HOW FAR THROUGH YOU ARE, AS A THING YOU SEE ────────────────────────────────────────────────────────
+   "2 / 10" is a division. A bar creeping along the rack behind the windows is the same fact arriving
+   without being read, and it is the single cheapest piece of tension on the screen: you can watch the round
+   running out. Behind the windows, not in front — it lights the rack, it does not cover it. */
+.s5-fb-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); z-index: 0;
+    pointer-events: none; transition: width .5s cubic-bezier(.3,.9,.3,1);
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--acc, #ffd75e) 10%, transparent),
+        color-mix(in srgb, var(--acc, #ffd75e) 34%, transparent));
+    box-shadow: inset -1px 0 0 color-mix(in srgb, var(--acc, #ffd75e) 85%, transparent),
+        0 0 22px color-mix(in srgb, var(--acc, #ffd75e) 45%, transparent); }
+
+/* ── THE WINDOWS ── drawn, stretched into the rack so their bezels meet it the way instruments do. */
+.s5-fb-cell { position: relative; z-index: 1; flex: 1 1 0; min-width: 0;
+    display: grid; justify-items: center; align-content: center; gap: 0; padding: 5px 8px 6px;
+    background: url("/images/casino/fs-window.webp") center/100% 100% no-repeat;
     white-space: nowrap; }
-.s5-freebar i, .s5-tumble i { font-style: normal; font-size: 7.5px; font-weight: 900; letter-spacing: .13em;
-    text-transform: uppercase; color: #a98c5c; white-space: nowrap; }
-.s5-freebar b, .s5-tumble b { font-size: 15px; font-weight: 900; line-height: 1.05; color: #ffe9bd;
-    font-variant-numeric: tabular-nums; white-space: nowrap;
-    text-shadow: 0 0 10px rgba(255,190,80,.5), 0 1px 0 rgba(0,0,0,.8); }
-.s5-freebar u, .s5-tumble u { text-decoration: none; margin-left: 3px; font-size: 9.5px; font-weight: 900;
-    color: #1a1206; background: linear-gradient(180deg, #ffe27a, #f3b23a); border-radius: 999px;
-    padding: 0 4px; vertical-align: 2px; box-shadow: 0 0 8px rgba(255,200,90,.8); }
+.s5-fb-cell i { font-style: normal; font-size: 7px; font-weight: 900; letter-spacing: .16em;
+    text-transform: uppercase; color: #a98c5c; text-shadow: 0 1px 0 rgba(0,0,0,.9); }
+.s5-fb-cell b { font-size: 16px; font-weight: 900; line-height: 1.05; color: #ffe9bd;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--acc, #ffd75e) 75%, transparent), 0 1px 0 rgba(0,0,0,.9); }
+.s5-fb-cell b s { text-decoration: none; color: #8a7346; margin: 0 1px; font-size: 12px; }
+/* What a retrigger bought, riding the corner of the window it changed rather than inside the number. */
+.s5-fb-cell u { position: absolute; top: -3px; right: -2px; text-decoration: none; font-size: 9px;
+    font-weight: 900; color: #1a1206; background: linear-gradient(180deg, #ffe27a, #f3b23a);
+    border-radius: 999px; padding: 0 5px; box-shadow: 0 0 10px rgba(255,200,90,.95);
+    animation: s5FbGot .4s cubic-bezier(.2,1.7,.4,1) both; }
+@keyframes s5FbGot { from { transform: scale(.4) translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The money glows harder than the counters, because it is the only one of the three anybody cares about. */
+.s5-fb-cell.is-won b { color: #fff3d0;
+    text-shadow: 0 0 18px rgba(255,200,90,.95), 0 0 6px #fff, 0 1px 0 rgba(0,0,0,.9); }
 
-/* The multiplier is the number people actually watch, so it is the biggest thing on the ribbon and it
-   glows on its own rather than sharing the readouts' styling. */
-.s5-freemult, .s5-tmult { font-family: var(--font-display); font-size: 1.3rem; line-height: 1;
-    color: #ffd75e; text-shadow: 0 0 16px rgba(255,215,94,.9), 0 2px 0 rgba(0,0,0,.7);
-    animation: s5MultPulse 1.9s ease-in-out infinite; }
-@keyframes s5MultPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
-.s5-held { color: #9ce8ff; text-shadow: 0 0 16px rgba(120,210,255,.9), 0 2px 0 rgba(0,0,0,.7); }
-.s5-held u { background: linear-gradient(180deg, #bdf0ff, #5ac8f0); }
+/* ── THE MULTIPLIER ── a gold medallion with the number struck into it, beating while the round runs. It is
+   the number people actually watch, so it is the only round thing on a rack of rectangles. */
+.s5-fb-mult { position: relative; z-index: 1; flex: 0 0 auto; width: 52px; aspect-ratio: 1;
+    display: grid; place-items: center;
+    background: url("/images/casino/fs-mult.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 14px rgba(255,200,90,.8));
+    animation: s5FbBeat 1.7s ease-in-out infinite; }
+@keyframes s5FbBeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.s5-fb-mult b { font-family: var(--font-display); font-size: 1.25rem; line-height: 1; color: #ffe9bd;
+    text-shadow: 0 0 14px rgba(255,200,90,1), 0 2px 0 rgba(0,0,0,.8); }
+.s5-fb-mult em { position: absolute; bottom: 4px; font-style: normal; font-size: .42rem; font-weight: 900;
+    letter-spacing: .1em; text-transform: uppercase; color: #c8a86a; }
+.s5-fb-mult.is-held b { color: #bdf0ff; text-shadow: 0 0 14px rgba(120,210,255,1), 0 2px 0 rgba(0,0,0,.8); }
+.s5-fb-mult.is-held { filter: drop-shadow(0 0 14px rgba(120,210,255,.85)); }
 
+@media (max-width: 340px) {
+    .s5-fb-cell b { font-size: 14px; }
+    .s5-fb-mult { width: 44px; }
+    .s5-fb-mult b { font-size: 1.05rem; }
+}
+
+/* ── THE CASCADE COUNTER ── the same rack, one machine along. It shows two plain readouts rather than the
+   free round's three windows, because a cascade is over in seconds and a drawn window per number would be
+   more furniture than the moment can carry. Shares the rack, the fill and the gold. */
+.s5-tumble span { position: relative; z-index: 1; display: grid; justify-items: center; gap: 0;
+    min-width: 0; white-space: nowrap; padding: 2px 10px; }
+.s5-tumble i { font-style: normal; font-size: 7px; font-weight: 900; letter-spacing: .16em;
+    text-transform: uppercase; color: #a98c5c; }
+.s5-tumble b { font-size: 15px; font-weight: 900; line-height: 1.05; color: #ffe9bd;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent), 0 1px 0 rgba(0,0,0,.9); }
+.s5-tmult { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; color: #ffd75e;
+    text-shadow: 0 0 16px rgba(255,215,94,.9), 0 2px 0 rgba(0,0,0,.7); }
 /* Two breaks from the bonus it starts shouting, and on the glass that reads as the machine heating up. */
-.s5-tumble.is-close { border-color: #7ad4ff;
-    animation: s5BarIn .28s cubic-bezier(.2,1.4,.4,1) both, s5Close .7s ease-in-out infinite alternate; }
-@keyframes s5Close { from { box-shadow: 0 -6px 22px rgba(0,0,0,.7); } to { box-shadow: 0 -6px 22px rgba(0,0,0,.7), 0 0 22px rgba(122,212,255,.7); } }
+.s5-cab > .s5-tumble.is-close { border-color: #7ad4ff;
+    animation: s5BarIn .3s cubic-bezier(.2,1.4,.4,1) both, s5Close .7s ease-in-out infinite alternate; }
+@keyframes s5Close {
+    from { box-shadow: 0 -8px 24px rgba(0,0,0,.8); }
+    to { box-shadow: 0 -8px 24px rgba(0,0,0,.8), 0 0 24px rgba(122,212,255,.75); }
+}
 .s5-tumble.is-close .s5-tmult { color: #7ad4ff; text-shadow: 0 0 16px rgba(122,212,255,.9); }
-
-/* Small, round and out of the way — it is an escape hatch, not a call to action. */
-.s5-skip { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 10px;
-    font-weight: 900; letter-spacing: .06em; color: #d8bd8e;
-    border: 1px solid rgba(255,215,94,.35); background: rgba(0,0,0,.5); }
-@media (max-width: 340px) { .s5-freebar b, .s5-tumble b { font-size: 13px; } }
+@keyframes s5BarIn { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .s5-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .s5-chest { aspect-ratio: 1; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 14px;
@@ -19394,12 +19445,6 @@ body.cas-seated .social-fab { display: none; }
 /* A held wild is part of the furniture, so it never dims for a line it is not on. */
 .s5-window.is-lining .s5-cell.is-locked img { opacity: 1 !important; }
 .s5-cell.is-locked img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #b47cff) 65%, transparent)); }
-
-/* How many are welded, in the place the round multiplier sits on the other rounds — because on a locking
-   round THIS is the number that makes the last spins worth more than the first. */
-.s5-freemult.s5-held { display: inline-flex; align-items: baseline; gap: 4px; }
-.s5-freemult.s5-held u { text-decoration: none; font-family: var(--font-body, inherit); font-size: 9px;
-    font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #a8b2bd; }
 
 /* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
    Five rooms deep, and the room is the point — each stage is a different painted place behind the

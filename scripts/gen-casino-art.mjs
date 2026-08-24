@@ -44,12 +44,32 @@ if (!OPENAI) throw new Error("no OPENAI_API_KEY");
 const OUT = process.env.CASINO_OUT || path.join(process.cwd(), ".casino-art");
 const PUBLIC = path.join(process.cwd(), "public", "images", "casino");
 
-// The shared body of every cabinet. Written once because the ROW is the design: seven machines that are
-// plainly the same kind of furniture, differing in what they do rather than in what shape they are.
+// ── THE SHARED BODY IS A SHAPE, NOT A PAINT JOB ──────────────────────────────────────────────────────────────
+// Luke: "can you make the slot machine sprites on the floor more indicative of the actual game screen that
+// pops up when you play them? And can you make them way more golden and colourful, with variety between the
+// different ones so they don't all look the same? Use bold colours so they really pop."
+//
+// Two faults, and the second one caused the first. This constant used to carry "dark stained wood and
+// tarnished brass, wolf-motif carvings" — the MATERIAL was shared, so five machines came out as one machine
+// in five faint tints, and the row read as a shop display of the same product. Now the shared part is only
+// the SILHOUETTE (upright, plinth, marquee, three reels, a plate below), which is what actually has to match
+// so the floor reads as a row of machines. Colour, material and glass belong to each cabinet.
+//
+// And what is ON the glass had drifted away from the games entirely: The Harvest's cabinet showed "a scatter
+// of small coins" when the machine is fruit — lime star fruit, oranges, strawberries — and The Vault's showed
+// "a crown" when every symbol on it is a cut gem. You walk up to a cabinet and then sit at it, so the glass
+// is a promise about what you are about to see. Each one now shows its own top symbols.
 const CABINET =
     "A single free-standing fantasy arcade gambling cabinet seen straight on from the front, upright, taller "
-    + "than it is wide, standing on a plinth. Dark stained wood and tarnished brass, wolf-motif carvings, a "
-    + "glowing display panel in the upper half and a lever or button plate below.";
+    + "than it is wide, standing on a plinth, with a big glowing glass display of three reels filling the "
+    + "upper half, a lit arched marquee across the top and a button plate with a lever below.";
+
+// Gold on every one of them, because he asked for gold on every one of them — and because a gilded frame is
+// what makes a saturated body colour read as rich rather than as plastic. Said once so no cabinet forgets it.
+const GILT =
+    " Heavily gilded: thick polished gold trim around the glass, gold filigree down the sides and a gold-lit "
+    + "marquee. Bold saturated colour, jewel-bright, glowing against a dark room — rich and expensive, never "
+    + "muted, never washed out, no dull brown anywhere.";
 
 const JOBS = {
     // ── THE COUNTER ── the one thing on this floor that is NOT a cabinet, so it deliberately breaks the
@@ -70,43 +90,88 @@ const JOBS = {
     slot: {
         size: "1024x1024",
         prompt: housePrompt(
-            `${CABINET} Its display shows three reels lit warm GOLD, a howling wolf's head glowing on the middle `
-            + "reel. Steady, generous, well-used — the machine everybody plays.",
+            `${CABINET} Deep OXBLOOD RED lacquer panels with hot amber light spilling out of the glass. Its `
+            + "three reels show a glowing violet wolf's head on the middle reel, a pale blue crescent moon "
+            + "beside it and a heaped orange treasure chest, with a green laurel wreath carved into the "
+            + "marquee. Steady, generous, well used — the machine everybody plays."
+            + GILT,
         ),
     },
     slot2: {
         size: "1024x1024",
         prompt: housePrompt(
-            `${CABINET} Squatter and broader than the others, in worn honey-coloured wood with copper fittings. `
-            + "Its display shows three reels lit soft AMBER, a scatter of small coins spilling from the tray at "
-            + "its base. Homely, busy, forever paying out a little.",
+            `${CABINET} Squatter and broader than the others, in warm HONEY and crimson lacquer. It is a `
+            + "FRUIT machine: its three reels show a vivid lime-green star fruit sliced to a five-pointed "
+            + "star, a brilliant orange and a deep crimson strawberry, all glossy and jewel-bright, with a "
+            + "blazing amber harvest moon on the marquee and real fruit heaped in the tray at its base. "
+            + "Homely, busy, forever paying out a little."
+            + GILT,
         ),
     },
     slot3: {
         size: "1024x1024",
         prompt: housePrompt(
-            `${CABINET} Taller and narrower than the others, in near-black wood with silver fittings. Its display `
-            + "shows three reels lit cold VIOLET and pale blue, a crescent moon and scattered stars glowing on "
-            + "them. Austere and expensive-looking — the machine you approach rather than sit at.",
+            `${CABINET} Taller and narrower than the others, in deep ABYSSAL TEAL and blue-black enamel with `
+            + "verdigris fittings and barnacles along the plinth. Its three reels glow cold cyan: a violet "
+            + "kraken with coiling tentacles on the middle reel, a bright cyan sea-serpent beside it and a "
+            + "scarlet crab, with kelp and a ship's lantern worked into the marquee. Austere and expensive — "
+            + "the machine you approach rather than sit at."
+            + GILT,
         ),
     },
     slot4: {
         size: "1024x1024",
         prompt: housePrompt(
-            `${CABINET} In warm russet wood with brass fittings, its cabinet sides carved as a menagerie of
-            beasts. Its display shows three reels lit deep GREEN, a wolf pup and a griffin glowing on them,
-            and a small brass cage of fireflies hanging from one corner. Alive and busy.`
+            `${CABINET} In warm russet and vivid EMERALD GREEN, its sides carved as a menagerie of beasts.
+            Its three reels glow bright green: a blazing golden phoenix with spread wings on the middle reel,
+            a glowing mint-green crystal heart beside it and a pale blue spirit fox, with a small brass cage
+            of fireflies hanging from one corner and a violet chameleon curled on the marquee. Alive and
+            busy — the loudest, most crowded machine on the floor.${GILT}`
                 .replace(/\s+/g, " "),
         ),
     },
     slot5: {
         size: "1024x1024",
         prompt: housePrompt(
-            `${CABINET} The heaviest machine on the floor: a squat armoured strongbox of a cabinet in blued
-            steel and gold, with a great riveted vault door built into its lower half and a spoked brass
-            handwheel on it. Its display shows three reels lit hard WHITE and gold, a crown glowing on the
-            middle one. Expensive, shut, and rarely open.`
+            `${CABINET} The heaviest machine on the floor: a squat armoured strongbox of a cabinet in pale
+            BLUED STEEL and gold, with a great riveted vault door built into its lower half and a spoked
+            brass handwheel on it. It is a GEM machine: its three reels show a brilliant blue sapphire, a
+            blazing red ruby and a vivid green emerald, faceted and throwing hard white glints, with loose
+            cut gems spilling from the tray at its base. Expensive, shut, and rarely open.${GILT}`
                 .replace(/\s+/g, " "),
+        ),
+    },
+
+    // ══ THE FREE-SPIN RACK ═══════════════════════════════════════════════════════════════════════
+    // Luke: "the info box under the free spins is ghetto and lacking all dopamine and polish."
+    //
+    // It was: a dark rounded rectangle with three label-over-number stacks in it. Correct information,
+    // built out of the vocabulary of a settings panel — and it sits on the glass during the best sixty
+    // seconds the machine has, which is the worst possible place to put a form. The Win It Again rack next
+    // door is drawn objects in a drawn rack and it reads as part of a cabinet; this is the same problem and
+    // gets the same answer. Three pieces, shared by all five machines, tinted by each one's accent.
+    // THE RACK ITSELF STAYS CSS, and this is the second time that has been the right answer. I asked for
+    // "a long panel with a plain empty recessed middle" and got a red horned demon standing in it — the
+    // identical failure the Win It Again note fifty lines up already records ("asking a model for a plate
+    // with an empty middle got a goblin standing in it"). A model will not draw an empty rectangle; it will
+    // find something to put in it. Brushed metal behind a row of drawn windows is the one part of this a
+    // gradient does honestly, so the WINDOWS are sprites and the rack they sit in is CSS.
+    "fs-window": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A single recessed instrument window seen straight on and flat: a heavy polished GOLD bezel with "
+            + "small rivets, set into dark blued metal, with a completely EMPTY black glass panel in the "
+            + "centre. Slightly wider than tall. Nothing behind the glass — no digits, no text, no symbols, "
+            + "no reflections of objects. Just a bare dark window in a gold frame.",
+        ),
+    },
+    "fs-mult": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A round polished GOLD medallion seen straight on and flat, its rim milled with fine teeth like "
+            + "a coin edge and studded with small gems, with a completely EMPTY recessed dark centre that "
+            + "glows faintly from within. Perfectly circular. Nothing struck into the middle — no digits, no "
+            + "text, no letters, no symbols at all.",
         ),
     },
 

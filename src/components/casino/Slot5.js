@@ -189,9 +189,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // The cells holding a locked wild, so the grid can draw them as welded rather than as landed.
     const [lockedAt, setLockedAt] = useState([]);
     const [chainWon, setChainWon] = useState(0);
-    // The last response, for the skip. A ref because skipFree is called from a handler that must not be
-    // rebuilt every time the result changes.
-    const resultRef = useRef(null);
     const timers = useRef([]);
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
@@ -475,7 +472,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (!r?.ok) { setSpinning(false); setPhase("idle"); return; }
 
         setResult(r);
-        resultRef.current = r;
         setGrid(r.grid);
         setSpinning(false);
 
@@ -642,38 +638,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [playGrid, runChain, announceFree]);
 
-    // ── SKIPPING IT ──────────────────────────────────────────────────────────────────────────────────────
-    // For the twentieth round rather than the first. It jumps to the end and credits the whole thing — the
-    // chips were decided on the server before the first reel moved, so nothing is being given up but the
-    // watching. Offered rather than imposed, which is the difference between this and the version Luke
-    // objected to.
-    const skipFree = useCallback(() => {
-        clearTimers();
-        const r = resultRef.current;
-        // ── SKIP THE ROUND YOU ARE IN ────────────────────────────────────────────────────────────────────
-        // This was hardcoded to `r.free`, from when that was the only round a spin could open. With the
-        // locking round it broke three ways at once: on a spin that opened ONLY the locking round the
-        // button did nothing at all (`if (!r.free) return`), on a spin that opened both it jumped to the
-        // end of the SCATTER round while you were watching the locking one — wrong grid, wrong total — and
-        // it handed off on `r.pick`, which no longer exists, so a pending hold was swallowed.
-        const cur = r?.[round];
-        if (!cur) return;
-        const last = cur.spins[cur.spins.length - 1];
-        setShowLine(-1);
-        setActiveWins([]);
-        // Skipping IS asking for the end, so the full length is the right thing to land on.
-        setFreeIdx(cur.spins.length - 1);
-        setFreeWon(cur.spins.reduce((a, sp) => a + sp.chips, 0));
-        setGrid(last.grid);
-        // The board as it finished — every wild that welded over the round, since that is what the last
-        // grid was actually played on.
-        setLockedAt([...(last.held || []), ...(last.justHeld || [])]);
-        setLanded(REELS);
-        // And then whatever was still queued behind it, in the same order the round would have reached it.
-        if (round === "free" && r.locked) { announceFree(r, "locked"); return; }
-        if (!r.hold && !r.warren) { Cas.signature(); Haptic.crit(); }
-        setPhase(r.hold ? "pick" : r.warren ? "warren" : "freeDone");
-    }, [clearTimers, round, announceFree]);
 
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
     // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
@@ -876,22 +840,41 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
                 </div>
             ) : null}
+            {/* ── THE ROUND, WHILE IT RUNS ────────────────────────────────────────────────────────────
+                Luke: "the info box under the free spins is ghetto and lacking all dopamine and polish."
+
+                It was a dark rounded rectangle with three label-over-number stacks in it — the right
+                information built out of the vocabulary of a settings panel, sitting on the glass during the
+                best sixty seconds the machine has. The Win It Again rack next door is drawn windows in a
+                rack and reads as part of a cabinet; this is the same problem, so it gets the same answer.
+
+                Three drawn instrument windows, the multiplier in a gold medallion that beats while the
+                round runs, and a fill creeping along the rack behind them so how far through you are is
+                something you SEE rather than divide. The total counts up instead of being restated.
+
+                AND NO SKIP. Luke: "don't allow skipping, remove that button as well." The argument for it
+                was the twentieth round rather than the first — but a bonus is one spin in forty here, the
+                round IS the product, and a button offering to not watch it is the machine agreeing that
+                watching is a chore. `skipFree` went with it rather than being left dangling. */}
             {phase === "free" ? (
                 <div className="s5-freebar">
-                    <span><i>Free spin</i><b>{freeIdx + 1} / {roundLen}
-                        {roundGrew ? <u>+{roundGrew}</u> : null}</b></span>
+                    <i className="s5-fb-fill" aria-hidden="true"
+                        style={{ "--p": `${roundLen ? Math.min(100, ((freeIdx + 1) / roundLen) * 100) : 0}%` }} />
+                    <span className="s5-fb-cell">
+                        <i>Spin</i>
+                        <b>{freeIdx + 1}<s>/</s>{roundLen}</b>
+                        {roundGrew ? <u>+{roundGrew}</u> : null}
+                    </span>
                     {/* On a locking round the multiplier is always 1 and the number that matters is how many
                         wilds are welded to the board — which is the whole mechanic, and is the thing that
                         makes the last spins worth more than the first. */}
                     {round === "locked"
-                        ? <span className="s5-freemult s5-held">{lockedAt.length}<u>held</u></span>
-                        : <span className="s5-freemult">&times;{result?.free?.mult}</span>}
-                    <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
-                    {/* For the twentieth round rather than the first. The chips were decided on the server
-                        before the first reel moved, so nothing is given up but the watching — and it is
-                        OFFERED rather than imposed, which is the whole difference from the version that
-                        rushed the round for everybody. */}
-                    <button type="button" className="s5-skip" onClick={skipFree}>Skip</button>
+                        ? <span className="s5-fb-mult is-held"><b>{lockedAt.length}</b><em>held</em></span>
+                        : <span className="s5-fb-mult"><b>&times;{result?.free?.mult}</b></span>}
+                    <span className="s5-fb-cell is-won">
+                        <i>This round</i>
+                        <b><Tally n={freeWon} ms={520} /></b>
+                    </span>
                 </div>
             ) : null}
             {/* ── THE ANNOUNCEMENT ────────────────────────────────────────────────────────────────────
