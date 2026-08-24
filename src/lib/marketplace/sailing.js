@@ -880,7 +880,10 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     //
     // Now they bury a SECOND chest. Decided here rather than at the payout so the board can announce it while
     // there is still dirt to move: knowing two are down there is the reason to spend the stamina.
-    const twinChest = row?.dig_lure === true && Math.random() < LURE_TWIN_CHANCE;
+    // `> 0` and not `=== true`: a lure is a COUNT now, so a second one banks instead of overwriting the
+    // first — see mig400 and the note in consumables.js. Reading it as a boolean here would have quietly
+    // stopped charming anything the moment the column changed type.
+    const twinChest = (Number(row?.dig_lure) || 0) > 0 && Math.random() < LURE_TWIN_CHANCE;
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
     // Beachhead: a third of sites arrive half dug, so the shallow layers over the chest are already gone.
@@ -3794,7 +3797,7 @@ async function finishDig(buyerId, board) {
     const uncovered = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
     const chestTier = board.chestTier || (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
     const digSea = seaEffects(await equippedSeaAffinity(buyerId));
-    const lureMult = row?.dig_lure === true ? 1.5 : 1;
+    const lureMult = (Number(row?.dig_lure) || 0) > 0 ? 1.5 : 1;
     // ── THE CHEST, OR COIN FOR HOW CLOSE YOU GOT ─────────────────────────────────────────────────────────
     // Expose every cell of it and the chest is yours, at the tier that was buried. Fall short and the dig
     // still pays — doubloons scaled by how much dirt you moved — because a dig that pays nothing after a
@@ -3836,7 +3839,10 @@ async function finishDig(buyerId, board) {
     // NOTE: digging does NOT level the boat — but voyages_completed drives the EXCAVATION level (tool unlocks).
     await db.query(
         `UPDATE mkt_sailing
-            SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL, dig_lure = FALSE,
+            SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL,
+                -- ONE charge, not all of them. This cleared the flag outright, which was correct while it
+                -- was a boolean and is the whole bug now that a member can hold five.
+                dig_lure = GREATEST(0, dig_lure - 1),
                 voyages_completed = voyages_completed + 1, updated_at = NOW()
           WHERE buyer_id = $1`,
         [buyerId]

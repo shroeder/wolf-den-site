@@ -647,7 +647,30 @@ async function grantMiningGear(buyerId, depth) {
     return null;
 }
 
-const MINE_CONSUMABLES = ["treat_bone", "farm_growth_tonic", "pot_adrenaline", "farm_fertilizer_crate", "sail_lucky_lure"];
+// ── WHAT THE ROCK AND THE FURNACE HAND OUT ───────────────────────────────────────────────────────────────────
+// Luke: "we have way too many lucky lures... I noticed that when you smelt, you get a lot of lucky lures. And
+// that seems like the smelting reward pool is maybe a little bit limited."
+//
+// Both true, and the same line caused both. This was FIVE ids picked uniformly, so one in five of every
+// consumable out of a mine node or a furnace curio was a Lucky Lure — and the furnace is the biggest tap in
+// the game right now. Measured over the three days to 24 Aug: 126, 134 and 214 curios a day and climbing
+// (5 -> 69 -> 114 -> 188 pours), 72% of them consumables, so roughly THIRTY lures a day out of the furnace
+// alone against a Den that spends about thirty-four. It mints its own supply.
+//
+// WIDENED RATHER THAN TRIMMED. Nothing is removed and no drop rate goes down; the list goes from five to
+// twelve, and the lure falls out of the arithmetic — 20% to 5.8% — because there is more to find, not because
+// it was taken away. Weighted rather than uniform, so a Pet Treat is common and an Ember Stone is a small
+// event; a flat list of twelve makes every one of them equally unremarkable, which is the other half of
+// "limited". Everything here already existed and already drops elsewhere.
+const MINE_CONSUMABLES = {
+    treat_bone: 12, pot_adrenaline: 12,
+    farm_growth_tonic: 10, farm_fertilizer_crate: 10, scroll_wisdom: 10,
+    // Stones out of a furnace. Nothing in the game fits the setting better and neither had a mining source.
+    stone_ember: 10, stone_storm: 10,
+    treat_snack: 6, pot_secondwind: 6, farm_harvest_charm: 6, spin_lucky_coin: 6,
+    // Still here, still worth finding — just no longer one pull in five.
+    sail_lucky_lure: 6,
+};
 // Painted chest icon for a tier (the same art the equipment screen shows), or null if none was generated.
 async function chestArtFor(tier) {
     const { getChestArt } = await import("@/lib/marketplace/chest-art.js");
@@ -656,9 +679,18 @@ async function chestArtFor(tier) {
     return (typeof v === "string" ? v : v?.url) || null;
 }
 
+/** One weighted pick off a { id: weight } table. */
+function pickWeighted(table) {
+    const entries = Object.entries(table);
+    const total = entries.reduce((a, [, w]) => a + w, 0);
+    let r = Math.random() * total;
+    for (const [id, w] of entries) { r -= w; if (r <= 0) return id; }
+    return entries[entries.length - 1][0];
+}
+
 async function grantMiningConsumable(buyerId) {
     const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
-    const id = MINE_CONSUMABLES[Math.floor(Math.random() * MINE_CONSUMABLES.length)];
+    const id = pickWeighted(MINE_CONSUMABLES);
     await grantConsumable(buyerId, id, 1).catch(() => {});
     // Every consumable has its OWN painted sprite in mkt_consumable_sprite. Returning just {id,name} meant the
     // client had nothing to draw and fell back to the generic potion — so a Pet Treat and a Lucky Lure came out

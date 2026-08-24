@@ -250,7 +250,8 @@ export async function featureConsumables(buyerId, feature) {
     if (f === "boss") active.push(...(await activeBoosts(buyerId)));
     if (f === "sail") {
         const r = await db.queryOne(`SELECT dig_lure, force_encounter, force_merchant FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
-        if (r?.dig_lure) active.push({ kind: "sail_lure", label: "Next dig is charmed" });
+        const lures = Number(r?.dig_lure) || 0;
+        if (lures > 0) active.push({ kind: "sail_lure", label: lures === 1 ? "Next dig is charmed" : `${lures} charmed digs banked` });
         if (r?.force_encounter) active.push({ kind: "sail_encounter", label: "Next voyage draws an encounter" });
         if (r?.force_merchant) active.push({ kind: "sail_merchant", label: "Next landing meets the Gold Merchant" });
     }
@@ -435,7 +436,14 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             const { applyTreasureMap } = await import("@/lib/marketplace/sailing.js");
             applied = await applyTreasureMap(buyerId).catch(() => "Your next landing will meet the Gold Merchant.");
         }
-        else if (e.type === "sail_lure") { await db.query(`UPDATE mkt_sailing SET dig_lure = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next dig will turn up +50% fragments."; }
+        else if (e.type === "sail_lure") {
+            // BANKS, rather than overwrites. As a boolean this threw away every charge after the first, which
+            // is why nobody spent them — see mig400. The sentence says the stack so a second use is visibly
+            // worth something.
+            const r = await db.queryOne(`UPDATE mkt_sailing SET dig_lure = COALESCE(dig_lure, 0) + 1 WHERE buyer_id = $1 RETURNING dig_lure`, [buyerId]).catch(() => null);
+            const n = Number(r?.dig_lure) || 1;
+            applied = n > 1 ? `Charmed — ${n} digs banked, each worth +50% fragments.` : "Your next dig will turn up +50% fragments.";
+        }
         else if (e.type === "sail_storm") { await db.query(`UPDATE mkt_sailing SET returns_at = NOW() + (returns_at - NOW()) / 2 WHERE buyer_id = $1 AND returns_at > NOW()`, [buyerId]).catch(() => {}); applied = "The storm hurls you homeward — sail time halved!"; }
         else if (e.type === "sail_tailwind") { const h = Math.max(1, Number(e.hours) || 2); await db.query(`UPDATE mkt_sailing SET returns_at = GREATEST(NOW(), returns_at - ($2 || ' hours')::interval) WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at > NOW()`, [buyerId, String(h)]).catch(() => {}); applied = `A strong gust fills your sails — ${h} hours shaved off the voyage!`; }
         else if (e.type === "sail_encounter") { await db.query(`UPDATE mkt_sailing SET force_encounter = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Something stirs the deep — your next voyage brings an encounter."; }
