@@ -20,8 +20,18 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 // THE SERVER DECIDED THE ORDER, not the tile. Same as the Warren: the tile a finger lands on is mapped to the
 // next stone in the server's list. Pretending the chosen tile decides the outcome would be a lie; pretending
 // it does not matter which one you touched would look broken.
-const REVEAL_MS = 330;      // the lid coming off
-const FLY_MS = 620;         // the stone travelling down to its set
+// ── THE BEAT OF ONE PICK ─────────────────────────────────────────────────────────────────────────────────────
+// Luke: "instead of the gold lock boxes I wanted the diamonds that you touch, and then in the top right it
+// does this animation where it cracks apart and reveals what it is."
+//
+// So a pick is no longer one event, it is four, and they happen in a STAGE rather than on the tile. The tile
+// is small — a stone cracking open at 55px is a flicker — and the whole point of the moment is that you get
+// to watch it. The crystal you touched flies up to the stage at full size, shakes, breaks in half, and what
+// was inside is standing there when the halves clear.
+const SHAKE_MS = 380;       // the crystal rocking, deciding whether to go
+const CRACK_MS = 460;       // the two halves parting
+const SHOW_MS = 520;        // the stone standing in the wreckage
+const FLY_MS = 620;         // ...and travelling down to its set
 const FILL_MS = 700;        // the set lighting up when its last slot lands
 const MISSED_MS = 2400;     // the rest of the board turned over, so you see what you walked past
 const WIN_MS = 2600;        // the prize on screen before it hands back
@@ -43,6 +53,8 @@ export default function GemVault({ gems, bet, onDone }) {
     const [turned, setTurned] = useState({});     // tile index -> stone key
     const [have, setHave] = useState(() => Object.fromEntries(sets.map((s) => [s.key, 0])));
     const [flying, setFlying] = useState(null);   // { key, from } — a stone on its way to its set
+    // What the reveal stage is doing: "shake" | "crack" | "show", and which stone is inside.
+    const [stage, setStage] = useState(null);
     const [filled, setFilled] = useState(null);   // the set that just completed
     // ── AND WHAT WAS UNDER EVERYTHING ELSE ───────────────────────────────────────────────────────────────
     // Luke: "whenever you reveal and get the prize, we also want to show for a little while everything else
@@ -68,16 +80,32 @@ export default function GemVault({ gems, bet, onDone }) {
         cursor.current += 1;
         const set = sets.find((s) => s.key === key);
 
+        // The tile empties immediately — the crystal has left the board and is up on the stage.
         setTurned((p) => ({ ...p, [tile]: key }));
+
+        setStage({ phase: "shake", key });
         Cas.reelStop(2, 0.5);
         Haptic.hit(0.3);
-        await wait(REVEAL_MS);
+        await wait(SHAKE_MS);
+
+        // ── IT BREAKS ────────────────────────────────────────────────────────────────────────────────────
+        // Two halves of the same sprite, clipped down the middle and thrown apart — see .gvs-half. One
+        // drawing rather than two, because a left half and a right half generated separately would never
+        // line up along the break, and the seam is the one thing this animation is about.
+        setStage({ phase: "crack", key });
+        Cas.jackpot();
+        Haptic.crit();
+        await wait(CRACK_MS);
+
+        setStage({ phase: "show", key });
+        await wait(SHOW_MS);
 
         // ── AND IT GOES SOMEWHERE ────────────────────────────────────────────────────────────────────────
         // The stone flies out of the tile and down into its set's tray. Without the flight it is a grid that
         // changes colour and a counter that changes number, and nothing on screen says those two facts are
         // the same fact.
         setFlying({ key, from: tile });
+        setStage(null);
         Cas.coin(1);
         await wait(FLY_MS);
         setFlying(null);
@@ -118,9 +146,38 @@ export default function GemVault({ gems, bet, onDone }) {
 
     return (
         <div className="gv">
+            {/* ── THE HEAD, AND THE STAGE IN THE TOP RIGHT ────────────────────────────────────────────
+                Title on the left, the reveal on the right, exactly where Luke put it. The stage holds its
+                size whether or not anything is in it: a panel that appears on the first pick would shove the
+                board down mid-tap, and a board that moves under a finger is the one thing a pick screen
+                cannot do. */}
             <div className="gv-head">
-                <span className="gv-kick">The Gem Vault</span>
-                <b className="gv-title">{missed ? "What you left behind" : done ? "Set complete" : "Turn a stone"}</b>
+                <span className="gv-headtext">
+                    <span className="gv-kick">The Gem Vault</span>
+                    <b className="gv-title">{missed ? "What you left behind" : done ? "Set complete" : "Turn a stone"}</b>
+                </span>
+                <span className={`gvs${stage ? ` is-${stage.phase}` : ""}`} aria-hidden="true">
+                    {stage ? (
+                        <>
+                            {/* TWO HALVES OF ONE DRAWING. Clipped down the middle and thrown apart, so the
+                                break line is exactly where the two pieces meet — which two separately drawn
+                                halves could never promise. */}
+                            {/* eslint-disable @next/next/no-img-element */}
+                            <img className="gvs-half is-l" src="/images/casino/vault/gv-gem.png" alt="" draggable="false" />
+                            <img className="gvs-half is-r" src="/images/casino/vault/gv-gem.png" alt="" draggable="false" />
+                            {stage.phase === "crack" || stage.phase === "show" ? (
+                                <i className="gvs-burst">
+                                    {Array.from({ length: 10 }, (_, k) => <b key={k} style={{ "--k": k }} />)}
+                                </i>
+                            ) : null}
+                            {stage.phase === "show" ? (
+                                <img className="gvs-prize" src={sets.find((x) => x.key === stage.key)?.art} alt=""
+                                    draggable="false" style={{ "--gem": sets.find((x) => x.key === stage.key)?.color }} />
+                            ) : null}
+                            {/* eslint-enable @next/next/no-img-element */}
+                        </>
+                    ) : null}
+                </span>
             </div>
 
             {/* ── THE BOARD ────────────────────────────────────────────────────────────────────────────
@@ -143,7 +200,7 @@ export default function GemVault({ gems, bet, onDone }) {
                                twenty-four doors flashing in unison, which reads as a glitch. */
                             style={{ "--i": i % 6, ...(set ? { "--gem": set.color } : {}) }}
                             onClick={() => pick(i)}
-                            aria-label={key || miss ? set?.name : "Turn this stone"}>
+                            aria-label={key || miss ? set?.name : "Break this crystal"}>
                             {key || miss ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={set?.art} alt="" draggable="false" />

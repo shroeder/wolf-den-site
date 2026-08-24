@@ -19897,6 +19897,89 @@ body.cas-seated .social-fab { display: none; }
 .gv-won-sub { font-size: .64rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #b9a98a; }
 @media (max-width: 360px) { .gv-set-pay { font-size: .6rem; } .gv-won-n { font-size: 2.6rem; } }
 
+/* ── THE COVER IS A CRYSTAL ───────────────────────────────────────────────────────────────────────────────
+   Luke: "instead of the gold lock boxes I wanted the diamonds that you touch."
+
+   A lock box is a CONTAINER — it says "there is something behind this", which makes the board a filing
+   cabinet you work through. A raw crystal says "there is something INSIDE this", which is the difference
+   between opening a drawer and breaking a geode. It is also what makes the crack read at all: a brass door
+   does not shatter. The revealed tile keeps the velvet-lined setting underneath. */
+.gv-tile { background-image: url("/images/casino/vault/gv-gem.png"); background-size: 82% 82%;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,.75)); }
+.gv-tile.is-turned { background-image: url("/images/casino/vault/gv-open.png"); background-size: 100% 100%; }
+/* The sheen crawls over the crystals rather than over a metal plate, so it is a glint travelling through
+   glass — tighter and brighter than it was on brass. */
+.gv-tile::after { inset: 14%; background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.75) 48%, transparent 56%); }
+
+/* ── THE HEAD: TITLE LEFT, STAGE RIGHT ────────────────────────────────────────────────────────────────── */
+.gv-head { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center;
+    justify-items: start; gap: 8px; }
+.gv-headtext { display: grid; justify-items: start; gap: 1px; min-width: 0; }
+
+/* THE STAGE. Fixed size whether or not anything is in it — a panel that appeared on the first pick would
+   shove the board down mid-tap, and a board that moves under a finger is the one thing a pick screen must
+   never do. */
+.gvs { position: relative; width: 96px; height: 96px; display: block; justify-self: end; }
+.gvs-half { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 0 10px rgba(150,210,255,.55)); }
+/* Clipped down the middle: one drawing, two pieces, and the break is exactly where they meet. */
+.gvs-half.is-l { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+.gvs-half.is-r { clip-path: polygon(50% 0, 100% 0, 100% 100%, 50% 100%); }
+
+/* It arrives and rocks — the beat before it goes, which is what makes the break feel decided rather than
+   instant. */
+.gvs.is-shake .gvs-half { animation: gvsIn .18s cubic-bezier(.2,1.6,.4,1) both, gvsShake .3s .18s ease-in-out both; }
+@keyframes gvsIn { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes gvsShake {
+    0%, 100% { transform: rotate(0) translateX(0); }
+    20% { transform: rotate(-5deg) translateX(-2px); }
+    45% { transform: rotate(5deg) translateX(2px); }
+    70% { transform: rotate(-3deg) translateX(-1px); }
+}
+/* AND IT BREAKS. The halves part, tumble and fade; the flash is one frame of white behind them. */
+.gvs.is-crack .gvs-half.is-l { animation: gvsL .46s cubic-bezier(.2,.8,.3,1) both; }
+.gvs.is-crack .gvs-half.is-r { animation: gvsR .46s cubic-bezier(.2,.8,.3,1) both; }
+.gvs.is-show .gvs-half { opacity: 0; }
+@keyframes gvsL {
+    0% { transform: none; opacity: 1; }
+    100% { transform: translate(-34px, 12px) rotate(-38deg) scale(.85); opacity: 0; }
+}
+@keyframes gvsR {
+    0% { transform: none; opacity: 1; }
+    100% { transform: translate(34px, 12px) rotate(38deg) scale(.85); opacity: 0; }
+}
+.gvs.is-crack::before, .gvs.is-show::before { content: ""; position: absolute; inset: -18px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.95), rgba(180,225,255,0) 62%);
+    animation: gvsFlash .42s ease-out both; pointer-events: none; }
+@keyframes gvsFlash { 0% { opacity: 1; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.5); } }
+
+/* Ten splinters of the crystal itself, thrown outward. */
+.gvs-burst { position: absolute; inset: 0; display: block; pointer-events: none; }
+.gvs-burst b { position: absolute; left: 50%; top: 50%; width: 5px; height: 9px; border-radius: 1px;
+    background: linear-gradient(180deg, #ffffff, #a8d6f5); box-shadow: 0 0 7px rgba(190,230,255,.95);
+    transform-origin: 50% 50%; animation: gvsShard .55s cubic-bezier(.15,.75,.35,1) both;
+    animation-delay: calc(var(--k) * 12ms); --a: calc(var(--k) * 36deg); }
+@keyframes gvsShard {
+    0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: rotate(var(--a)) translateY(-52px) rotate(220deg) scale(.8); opacity: 0; }
+}
+
+/* WHAT WAS INSIDE, standing in the wreckage. */
+.gvs-prize { position: absolute; inset: 12%; width: 76%; height: 76%; object-fit: contain;
+    filter: drop-shadow(0 0 18px var(--gem, #fff));
+    animation: gvsPrize .42s cubic-bezier(.2,1.7,.35,1) both; }
+@keyframes gvsPrize {
+    0% { transform: scale(.2) rotate(-40deg); opacity: 0; }
+    60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
+    100% { transform: none; opacity: 1; }
+}
+@media (max-width: 360px) {
+    .gv-head { grid-template-columns: minmax(0, 1fr) 82px; }
+    .gvs { width: 82px; height: 82px; }
+}
+
+
 
 /* ══ WIN IT AGAIN ═════════════════════════════════════════════════════════════════════════════════════════
    Luke, on the first cut of this: "right now what I'm looking at looks very web UI, and what I'm hoping for is

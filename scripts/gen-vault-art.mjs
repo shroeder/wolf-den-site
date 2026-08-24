@@ -100,8 +100,30 @@ const ART = {
                     + "shadow. The middle of the image must stay simple and uncluttered — panels are laid over "
                     + "it — so keep all detail and ornament to the outer edges." }),
     },
-    // THE STAR OF THE SHOW. Twenty-four of these on screen at once, and it is the thing a finger lands on, so
-    // it carries the most weight of anything here: an unopened cover has to look like it is worth opening.
+    // ── THE THING A FINGER LANDS ON ──────────────────────────────────────────────────────────────────
+    // Luke: "instead of like the gold lock boxes I wanted the diamonds that you touch, and then in the top
+    // right it does this animation where it cracks apart and reveals what it is."
+    //
+    // The brass doors were a good object and the wrong one. A lock box is a container — it says "there is
+    // something behind this", which makes the board a filing cabinet you are working through. A raw crystal
+    // says "there is something INSIDE this", and that is the difference between opening a drawer and
+    // breaking a geode open. It is also what makes the crack read: a door does not shatter.
+    //
+    // Deliberately PALE and uncut, so it is obviously not one of the four prize stones. If the cover looked
+    // like a sapphire the board would be lying about what you had found before you had found it.
+    "gv-gem": {
+        px: 320,
+        prompt: housePrompt(
+            "A large rough uncut CRYSTAL — a chunky many-faceted shard of pale ice-white quartz with a "
+            + "faint blue heart, catching a hard white specular glint along its top facets and a cool "
+            + "reflection down one side, standing point-upward",
+            { framing: "sprite",
+                extra: "Seen straight on and flat to the viewer with no perspective. Pale ice-white and cold "
+                    + "blue ONLY — no gold, no warm colour, no metal, no setting, no frame around it. Must "
+                    + "read clearly at 55 pixels wide." }),
+    },
+    // THE OLD COVER, kept because the Warren-style brass frame is still what a REVEALED tile sits in — the
+    // crystal cracks and what is behind it is a velvet-lined setting. See gv-open.
     "gv-cover": {
         prompt: housePrompt(
             "An ornate square safe-deposit box door of polished brass, its face framed by an engraved scrolled "
