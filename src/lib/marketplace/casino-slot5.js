@@ -1036,10 +1036,19 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
     // This spin's own win goes on FIRST and then the whole row is paid, which is what the reference does and
     // what the screenshot shows — 50 + 75 + 200 = 325, the last of those being the spin that triggered it.
     // Paying the row but leaving out the spin that opened it would be the machine keeping the best one.
-    let nextMeter = m.winAgain ? meter.slice(-m.winAgain.slots) : [];
+    // ── THE ROW SHIFTS RIGHT ─────────────────────────────────────────────────────────────────────────
+    // Luke: "it's supposed to move all the numbers to the right after each manual spin, meaning all cascades
+    // all add up into one win amount."
+    //
+    // Both halves matter and I had one of them backwards. ONE ENTRY PER MANUAL SPIN was already right —
+    // `total` here is everything the press paid, the whole tumble chain summed, not a slot per cascade. The
+    // ORDER was wrong: I appended, so the newest sat at the far right and the row aged leftward. It enters at
+    // slot 1 and pushes the rest along, the way the reference labels it (RECENT WIN 2, 3, 4, 5 — counting
+    // AWAY from the newest), and the oldest falls off the end.
+    let nextMeter = m.winAgain ? meter.slice(0, m.winAgain.slots) : [];
     let winAgain = null;
     if (m.winAgain) {
-        if (total > 0) nextMeter = [...nextMeter, total / bet].slice(-m.winAgain.slots);
+        if (total > 0) nextMeter = [total / bet, ...nextMeter].slice(0, m.winAgain.slots);
         if (chain && chain.cascades >= m.winAgain.need) {
             const paid = nextMeter.reduce((a, n) => a + n, 0);
             total += paid * bet;

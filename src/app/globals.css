@@ -19947,3 +19947,71 @@ body.cas-seated .social-fab { display: none; }
 .wa.is-firing .wa-title { color: #ffe9ae; text-shadow: 0 0 16px rgba(255,200,90,1); }
 .wa.is-firing .wa-title i { filter: drop-shadow(0 0 8px rgba(255,210,120,.95)); }
 @media (max-width: 360px) { .wa-slot b, .wa-total b { font-size: .66rem; } .wa-slot em, .wa-total em { display: none; } }
+
+/* ── THE EXPLOSION ────────────────────────────────────────────────────────────────────────────────────────
+   Luke: "if you win it again it needs to pop off and explode to let you know."
+
+   It was a cell that scaled up and glowed, which is a state CHANGE and not an EVENT. The row counting itself
+   off left to right is the build; this is what the build was for. It sits over the whole bar rather than
+   inside one window, because what just happened is the row emptying — not a cell lighting. */
+.wa { position: relative; }
+.wa.is-blown { animation: waShake .5s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes waShake {
+    0%, 100% { transform: translateX(0); }
+    12% { transform: translateX(-7px) rotate(-.5deg); }
+    28% { transform: translateX(6px) rotate(.5deg); }
+    46% { transform: translateX(-4px); }
+    64% { transform: translateX(3px); }
+    82% { transform: translateX(-1px); }
+}
+.wa-blow { position: absolute; inset: -6px; z-index: 9; display: grid; align-content: center; justify-items: center;
+    gap: 0; pointer-events: none; overflow: visible;
+    background: radial-gradient(60% 120% at 50% 50%, rgba(255,214,110,.34), rgba(0,0,0,0) 72%); }
+/* THE FLASH — one frame of white, the way a real cabinet's strobe reads on a phone camera. */
+.wa-blow::before { content: ""; position: absolute; inset: -40px; background: #fff8e2;
+    animation: waFlash .42s ease-out both; }
+@keyframes waFlash { 0% { opacity: .92; } 100% { opacity: 0; } }
+
+/* The shock ring, thrown from the middle of the row. */
+.wa-blow-ring { position: absolute; width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid rgba(255,226,150,.95); animation: waRing .7s cubic-bezier(.1,.7,.3,1) both; }
+@keyframes waRing {
+    0% { transform: scale(.2); opacity: 1; border-width: 5px; }
+    100% { transform: scale(11); opacity: 0; border-width: 1px; }
+}
+
+/* Sixteen shards, fanned evenly and thrown outward. Gold, chrome and hot white — the bar's own palette, so
+   the debris looks like the marquee came apart rather than like confetti landed on it. */
+.wa-blow-shards { position: absolute; inset: 0; display: grid; place-items: center; }
+.wa-blow-shards i { position: absolute; width: 7px; height: 12px; border-radius: 2px;
+    background: hsl(calc(38deg + var(--k) * 7deg) 95% 62%);
+    box-shadow: 0 0 8px hsl(calc(38deg + var(--k) * 7deg) 95% 62%);
+    transform-origin: 50% 50%;
+    animation: waShard .85s cubic-bezier(.15,.75,.35,1) both;
+    animation-delay: calc(var(--k) * 8ms);
+    --a: calc(var(--k) * 22.5deg);
+}
+@keyframes waShard {
+    0% { transform: rotate(var(--a)) translateY(0) scale(.5); opacity: 0; }
+    18% { opacity: 1; }
+    100% { transform: rotate(var(--a)) translateY(-96px) rotate(300deg) scale(.85); opacity: 0; }
+}
+
+.wa-blow-kick { font-size: .58rem; font-weight: 900; letter-spacing: .26em; text-transform: uppercase;
+    color: #3a2405; text-shadow: 0 1px 0 rgba(255,246,214,.9);
+    animation: waKick .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes waKick { 0% { transform: translateY(6px) scale(.7); opacity: 0; } 100% { transform: none; opacity: 1; } }
+/* The number SLAMS in — overshoots and settles, which is the difference between a number arriving and a
+   number being delivered. */
+.wa-blow-n { font-size: 2.5rem; font-weight: 900; line-height: 1; color: #fff;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(255,196,70,1), 0 0 60px rgba(255,150,40,.8), 0 3px 0 rgba(90,50,0,.85);
+    animation: waSlam .55s cubic-bezier(.2,1.7,.35,1) both; }
+@keyframes waSlam {
+    0% { transform: scale(2.6); opacity: 0; filter: blur(6px); }
+    45% { opacity: 1; filter: blur(0); }
+    70% { transform: scale(.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+@media (max-width: 360px) { .wa-blow-n { font-size: 2rem; } }
+

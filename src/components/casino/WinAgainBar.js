@@ -18,13 +18,14 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 // It draws only. The row's contents and whether it fired are both decided server-side (mkt_casino_meter, and
 // the note on playSpin's `meter` parameter); this walks the lights left to right and hands back.
 const STEP_MS = 260;        // one slot lighting — the "boom"
-const HOLD_MS = 900;        // the total sitting there before the round carries on
+const BLOW_MS = 2200;       // the explosion, on top of everything, before the round carries on
 
 export default function WinAgainBar({ meter, bet, firing, onFired }) {
     const slots = meter?.slots || 5;
     const recent = meter?.recent || [];
     const [lit, setLit] = useState(-1);
     const [total, setTotal] = useState(null);
+    const [blown, setBlown] = useState(false);   // the explosion is up
     const timers = useRef([]);
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -32,17 +33,25 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
         // Not reset with setState here — the lights are DERIVED from `firing` further down, so an idle bar
         // needs no state change to look idle. Setting it synchronously in an effect is a cascading render
         // for a value the render can already work out.
-        if (!firing) return undefined;
+        if (!firing) { return undefined; }
         // ── LEFT TO RIGHT, ONE AT A TIME ─────────────────────────────────────────────────────────────
         // The whole feeling of the reference is that it counts them off rather than flashing the row. Each
         // one is its own beat with its own note, climbing, so five slots sound like a build and not a loop.
         let i = 0;
         const step = () => {
             if (i >= recent.length) {
+                // ── AND THEN IT GOES OFF ─────────────────────────────────────────────────────────────
+                // Luke: "if you win it again it needs to pop off and explode to let you know."
+                //
+                // It was a cell that scaled up and glowed, which is a state change, not an event. The row
+                // counting itself off is the BUILD; this is the thing the build was for, and it has to be
+                // loud enough that you could not possibly miss it while looking somewhere else on the
+                // cabinet — which, since the row lives above the reels, is exactly where you are looking.
                 setTotal(firing.total);
+                setBlown(true);
                 Cas.jackpot();
                 Haptic.crit();
-                timers.current.push(setTimeout(() => onFired?.(), HOLD_MS));
+                timers.current.push(setTimeout(() => onFired?.(), BLOW_MS));
                 return;
             }
             setLit(i);
@@ -60,7 +69,7 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
     // Nothing in the row and nothing firing is a bar with nothing to say — but it still draws, empty,
     // because a meter that appears only once it has something in it never teaches anybody it exists.
     return (
-        <div className={`wa${firing ? " is-firing" : ""}`}>
+        <div className={`wa${firing ? " is-firing" : ""}${firing && blown ? " is-blown" : ""}`}>
             {/* Chrome stars bolted to each end, one sprite mirrored — see gen-vault-art.mjs. */}
             <div className="wa-title"><i aria-hidden="true" />{meter?.label || "WIN IT AGAIN"}<i aria-hidden="true" /></div>
             <div className="wa-row">
@@ -81,6 +90,21 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
                     <em>total</em>
                 </div>
             </div>
+
+            {/* ── THE EXPLOSION ───────────────────────────────────────────────────────────────────────
+                Sits over the whole bar rather than inside a cell, because the thing that just happened is
+                the ROW emptying, not one window lighting. Sixteen shards thrown from the middle, a shock
+                ring, and the number slammed in over the top of both. */}
+            {firing && blown ? (
+                <div className="wa-blow" aria-live="polite">
+                    <i className="wa-blow-ring" aria-hidden="true" />
+                    <span className="wa-blow-shards" aria-hidden="true">
+                        {Array.from({ length: 16 }, (_, k) => <i key={k} style={{ "--k": k }} />)}
+                    </span>
+                    <b className="wa-blow-kick">{meter?.label || "WIN IT AGAIN"}</b>
+                    <b className="wa-blow-n">{(firing.total || 0).toLocaleString()}</b>
+                </div>
+            ) : null}
         </div>
     );
 }
