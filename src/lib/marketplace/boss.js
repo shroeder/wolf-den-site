@@ -48,11 +48,35 @@ export const BOSS_MULT_CAP = 20;
 const MAX_FORTUNE_DAYS = 8; // don't let an unusually long-lived boss balloon the accrual
 function bossDaysActive(boss) {
     if (!boss?.started_at) return 1;
-    const ms = Date.now() - new Date(boss.started_at).getTime();
+    // ── A DEAD BOSS STOPS BANKING ────────────────────────────────────────────────────────────────────────
+    // Measured against Date.now() this kept climbing after the draw, so the recap's ticket count drifted
+    // away from the hat that was actually drawn — a card read on Tuesday would quote a bigger number than
+    // the one the lottery ran on.
+    const end = boss.defeated_at ? new Date(boss.defeated_at).getTime() : Date.now();
+    const ms = end - new Date(boss.started_at).getTime();
     return Math.min(MAX_FORTUNE_DAYS, Math.max(1, Math.ceil(ms / 86400000)));
 }
 export function fortuneTickets(fortune, boss) {
     return Math.round((Number(fortune) || 0) * TICKETS_PER_FORTUNE_PER_DAY * bossDaysActive(boss));
+}
+
+// ── WHAT SOMEBODY ACTUALLY HOLDS IN THE HAT ──────────────────────────────────────────────────────────────────
+// GrayKitsune, on the card that goes up when a boss dies: "The total tickets here show less then 800, I was
+// over 1000 before the boss went down. Is it not including the ones from fortune or spirit fox in the final
+// tally or is this visual?"
+//
+// Visual, and he is exactly right about which half was missing. His damage bought 788; his 36 Fortune banked
+// another 288 over the eight days the accrual caps at, for 1,076 — which is the number the live boss screen
+// showed him all week AND the number finalizeBossKill actually drew with. Only the after-the-fact surfaces
+// were wrong, and they were wrong because each of them wrote `Math.floor(dmg / divisor)` out by hand: the
+// celebration card, the recap leaderboard, the recap's own "your tickets" line, and the POT the odds are
+// quoted against. Four copies of a rule that had grown a second half.
+//
+// One function now. It takes the fortune because the caller has the pack bonuses to hand — see
+// getPackPetBonuses, which every one of these surfaces already loads or can.
+export function ticketsFor(dmg, fortune, boss) {
+    const divisor = Math.max(1, boss?.ticket_divisor || 100);
+    return Math.floor((Number(dmg) || 0) / divisor) + fortuneTickets(fortune, boss);
 }
 
 // Single source of truth for a member's daily manual-strike cap: base + gear/pet extra_strike + signature +
@@ -704,6 +728,10 @@ export async function getBossRecap(bossId, buyerId = null) {
         )
         .catch(() => []);
     const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
+    // The fortune half of everybody's ticket count — see ticketsFor. Loaded once for the whole page, the way
+    // the live boss screen already does it, so the leaderboard, the pot and your own line cannot disagree.
+    const petBonuses = await getPackPetBonuses().catch(() => new Map());
+    const fortuneOf = (id) => petBonuses.get(id)?.stats?.fortune || 0;
     const leaderboard = rows.slice(0, 15).map((r, i) => ({
         rank: i + 1,
         name: r.display_name || r.alias || "Member",
@@ -711,7 +739,7 @@ export async function getBossRecap(bossId, buyerId = null) {
         avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
         level: lvl(r.xp),
         dmg: r.dmg,
-        tickets: Math.floor(r.dmg / divisor),
+        tickets: ticketsFor(r.dmg, fortuneOf(r.id), boss),
         you: Boolean(buyerId && r.id === buyerId),
     }));
     let winner = null;
@@ -723,13 +751,15 @@ export async function getBossRecap(bossId, buyerId = null) {
         // as "top damage takes the prize". It is not: weightedDraw picks one ticket out of the pot. On the
         // kill Luke asked about, Eric held 982 of roughly 7,000 and had an 86% chance of losing. Handing the
         // card the pot lets it say the odds out loud, which is the only thing that settles it.
-        const pot = rows.reduce((n, r) => n + Math.floor(r.dmg / divisor), 0);
+        // THE POT HAS TO BE THE WHOLE HAT, or the odds this card exists to state are wrong in the member's
+        // favour. Fortune tickets are in the draw (see finalizeBossKill) and were not in this sum.
+        const pot = rows.reduce((n, r) => n + ticketsFor(r.dmg, fortuneOf(r.id), boss), 0);
         if (w) winner = { name: w.display_name || w.alias || "Member", avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL, tickets: boss.winner_tickets || 0, pot, you: Boolean(buyerId && buyerId === boss.winner_buyer_id) };
     }
     let mine = null;
     if (buyerId) {
         const idx = rows.findIndex((r) => r.id === buyerId);
-        if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: Math.floor(r.dmg / divisor), hits: r.hits }; }
+        if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: ticketsFor(r.dmg, fortuneOf(r.id), boss), hits: r.hits }; }
     }
     // MVP = the top damage dealer, with their battle SPRITE, for the "final blow" cinematic.
     let mvp = null;
@@ -783,7 +813,6 @@ export async function getPendingBossCelebration(buyerId) {
         )
         .catch(() => null);
     if (!row) return { pending: false };
-    const divisor = Math.max(1, row.ticket_divisor || 100);
     const [mineRow, heroesRows, winnerRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [row.id, buyerId]).catch(() => null),
         db.query(
@@ -794,12 +823,14 @@ export async function getPendingBossCelebration(buyerId) {
         row.winner_buyer_id ? db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [row.winner_buyer_id]).catch(() => null) : null,
     ]);
     const dmg = mineRow?.dmg || 0;
+    // Same sum as the live screen and the draw — see ticketsFor. This line is the one he screenshotted.
+    const myFortune = (await getPackPetBonuses().catch(() => new Map())).get(buyerId)?.stats?.fortune || 0;
     const aheadRow = await db.queryOne(`SELECT COUNT(*)::int AS n FROM (SELECT buyer_id FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > $2) x`, [row.id, dmg]).catch(() => null);
     return {
         pending: true,
         boss: { id: row.id, name: row.name },
         winner: row.winner_buyer_id ? { name: winnerRow?.display_name || winnerRow?.alias || "A member", you: row.winner_buyer_id === buyerId, tickets: row.winner_tickets || 0, prize: row.prize_name || null } : null,
-        mine: { dmg, tickets: Math.floor(dmg / divisor), rank: (aheadRow?.n || 0) + 1 },
+        mine: { dmg, tickets: ticketsFor(dmg, myFortune, row), rank: (aheadRow?.n || 0) + 1 },
         heroes: heroesRows.map((h) => ({ url: h.avatar_sprite_url, flip: h.avatar_sprite_flip === true })),
         recapUrl: `/marketplace/boss/recap/${row.id}`,
     };
@@ -821,7 +852,7 @@ export async function getMyBossSummary(buyerId) {
     ]);
     const dmg = row?.dmg || 0;
     // Include fortune raffle tickets so this matches the boss screen's headline count (both feed the same raffle).
-    const tickets = Math.floor(dmg / divisor) + fortuneTickets(myPet?.stats?.fortune || 0, boss);
+    const tickets = ticketsFor(dmg, myPet?.stats?.fortune || 0, boss);
     return { bossName: boss.name, dmg, tickets, divisor };
 }
 
@@ -913,7 +944,6 @@ function weightedDraw(pool, weightFn) {
 async function finalizeBossKill(bossId) {
     const boss = await db.queryOne(`SELECT * FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
     if (!boss) return;
-    const divisor = Math.max(1, boss.ticket_divisor || 100);
 
     const parts = await db
         .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
@@ -924,7 +954,7 @@ async function finalizeBossKill(bossId) {
     const pool = parts.map((p) => ({
         id: p.buyer_id,
         dmg: p.dmg,
-        tickets: Math.floor(p.dmg / divisor) + fortuneTickets(petBonuses.get(p.buyer_id)?.stats?.fortune || 0, boss),
+        tickets: ticketsFor(p.dmg, petBonuses.get(p.buyer_id)?.stats?.fortune || 0, boss),
     }));
     const ranked = pool.slice().sort((a, b) => b.dmg - a.dmg);
     const top1 = ranked[0] || null;
