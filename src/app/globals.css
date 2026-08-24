@@ -19447,6 +19447,14 @@ body.cas-seated .social-fab { display: none; }
    the phone, and cracking one does not empty a board — three more rise. It is the only room in the game
    where the objects are bigger than the text, and that is the point: after five rooms of 74px eggs, the
    change of SCALE is what says you have arrived somewhere. */
+/* The owner's shortcut to the geode room — see skipToHoard in TheWarren. Deliberately drab and labelled
+   "owner": it is a test control living on a real cabinet, and it should never be mistaken for part of the
+   game. Goes with the rest of the force row when the floor stops being tuned. */
+.wr-skip { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 6;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 0.62rem; font-weight: 800;
+    letter-spacing: 0.04em; color: #cbb98a; background: rgba(10,8,5,0.85);
+    border: 1px dashed rgba(203,185,138,0.5); }
+.wr-skip:disabled { opacity: 0.4; cursor: default; }
 .wr-hoard { position: relative; display: grid; align-content: center; justify-items: center;
     grid-row: 2 / span 2; align-self: stretch; }
 .wr-geodes { display: grid; grid-template-columns: repeat(3, 1fr); align-items: end; gap: 2px;

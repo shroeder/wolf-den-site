@@ -641,7 +641,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     if (phase === "warren" && result?.warren) {
         return (
             <div className="s5 is-bonus">
-                <TheWarren warren={result.warren} onDone={() => setPhase("done")} />
+                <TheWarren warren={result.warren} owner={owner} onDone={() => setPhase("done")} />
             </div>
         );
     }

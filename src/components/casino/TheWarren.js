@@ -47,7 +47,7 @@ const CRACK_MS = 420;
 const HOP_MS = 380;
 const SETTLE_MS = 520;
 
-export default function TheWarren({ warren, onDone }) {
+export default function TheWarren({ warren, onDone, owner = false }) {
     // Where we are: which stage, and which room. `at` counts burrows OPENED on this stage, which is also the
     // index into that stage's `opened` list — the server decided the order, this only walks it.
     const [stage, setStage] = useState(0);
@@ -226,9 +226,46 @@ export default function TheWarren({ warren, onDone }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [cracking, cur]);
 
+    // ── OWNER: WALK ME STRAIGHT TO THE GEODES ────────────────────────────────────────────────────────────
+    // Luke: "I need a way to trigger the, like, dome picker... the very last stage where you pick the prize.
+    // I need to test that out."
+    //
+    // "Force hoard" upstairs already guarantees the RUN contains one — that part works, and it finds one in
+    // about five hundred re-rolls. What it cannot do is shorten the walk: the geodes are the last room, and
+    // getting to them means tapping through every burrow of every room above first. Judging how the biggest
+    // screen in the game feels is not something you should have to earn four rooms of egg-hatching for,
+    // every single time.
+    //
+    // PLAYBACK ONLY. It moves the cursor to the visit the server already decided carries a geode; it does
+    // not create one, does not touch a number, and cannot appear on a run that has none. The rooms it skips
+    // were paid when the server ran them — `total` is not assembled from this animation (see the note on
+    // `opened` below), so skipping the walk cannot skip a payout.
+    const skipToHoard = useCallback(() => {
+        if (busy || done) return;
+        const k = stages.findIndex((st, i) => i >= stage && st.geode != null);
+        if (k < 0) return;
+        setBusy(true);
+        setSpent([]); setHops([]); setAt(0); setBanner(null);
+        // ── AND THE TALLY DOES NOT LIE ABOUT THE ROOMS IT SKIPPED ────────────────────────────────────
+        // The counter is accumulated by the walk, so jumping the cursor left it reading 0 over a run that
+        // had already paid four rooms — and the number on screen while you judge the geode is the number
+        // the geode is about to be added to. Seeded with what the skipped visits came to, read off the
+        // server's own pup values (`chips` in the walk below is exactly this list).
+        setWon(stages.slice(0, k).reduce((a, st) => a
+            + st.opened.reduce((b, n) => b + (n.pups || []).reduce((c, v) => c + v, 0), 0)
+            + (st.geode || 0), 0));
+        setStage(k);
+        setInHoard(true);
+        // `open` normally awaits this promise and does the cleanup afterwards. Nothing is awaiting it here,
+        // so the resolver IS the cleanup — same steps, same order, in the one place they are written.
+        crackDone.current = () => { setInHoard(false); setSpent([]); setHops([]); setAt(0); setStage(k + 1); setBusy(false); };
+    }, [busy, done, stages, stage]);
+
     // Counted in ROOMS rather than visits — six trips through the Deep Warren is still the Deep Warren, and
     // the pips would otherwise run off the end of the bar.
     const depth = cur?.room || 1;
+    // Is there a geode still ahead of us on this run? Decides whether the owner control is worth drawing.
+    const hoardAhead = owner && stages.some((st, i) => i >= stage && st.geode != null);
     // ── WHAT THE WHOLE RUN CAME TO ───────────────────────────────────────────────────────────────────────
     // Counted off the server's own record of the round rather than off anything the screen tallied as it
     // went — a summary assembled from the animation is a summary that can disagree with the payout.
@@ -258,6 +295,14 @@ export default function TheWarren({ warren, onDone }) {
                     ))}
                 </div>
             </div>
+
+            {/* Owner only, and only while a geode is still ahead — see skipToHoard. On the
+                remove-before-launch list with the rest of the force controls. */}
+            {hoardAhead && !inHoard ? (
+                <button type="button" className="wr-skip" disabled={busy} onClick={skipToHoard}>
+                    owner · skip to the geodes
+                </button>
+            ) : null}
 
             {/* ── THE HOARD ───────────────────────────────────────────────────────────────────────────
                 Luke, on the reference: "the dome actually a big thing full screen and it needs to look
