@@ -75,6 +75,11 @@ const ICONS = {
     // which is also what the screen is actually about, members trading produce and catch between themselves.
     // Distinct at a glance from store (awning), trades (handshake) and auction (gavel).
     market: "A woven wicker basket brimming with fresh produce — orange carrots, leafy greens and a ripe red apple — with a single silver fish laid across the rim and two gold coins leaning against the base",
+    // The Casino. A CABINET rather than cards or dice: the floor is nine slot machines and one card table, so
+    // the machine is what the place actually is — and at 18px a fanned hand of cards is a smudge while a lit
+    // box with three symbols in a window is a silhouette. Deliberately not a die (the Daily Spin owns
+    // "gambling shape") and not a coin (the store and the credit screen both already lean on gold discs).
+    casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
 };
 
 const want = process.argv.slice(2);

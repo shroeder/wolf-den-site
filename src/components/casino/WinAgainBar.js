@@ -89,6 +89,8 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
                         </div>
                     );
                 })}
+                {/* The divider before it — a rule in the rack, so the sum cannot be counted as a sixth win. */}
+                <i className="wa-div" aria-hidden="true" />
                 <div className={`wa-total${firing && total != null ? " is-paid" : ""}`}>
                     <b>{(firing && total != null ? total : recent.reduce((a, n) => a + n, 0) * (bet || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</b>
                     <em>total</em>

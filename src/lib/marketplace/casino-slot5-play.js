@@ -138,7 +138,15 @@ async function readMeter(buyerId, machineId) {
     ).catch(() => null);
     const raw = row?.recent;
     const list = Array.isArray(raw) ? raw : [];
-    return list.map((n) => Number(n) || 0).filter((n) => n > 0);
+    // ── A ZERO IS A ROW ENTRY, NOT A MISSING ONE ─────────────────────────────────────────────────────────
+    // This ended in `.filter((n) => n > 0)`, from when only a WINNING spin was pushed and a zero could only
+    // mean corrupt data. Then dead spins started pushing blanks — which is the entire tension of the meter,
+    // because a blank ages your good wins one place closer to falling off the end — and this line quietly
+    // undid all of it: the row went to the database with its blanks and came back COMPACTED, wins shuffled
+    // left, always five-of-five full. Luke: "I've never seen a blank in the row, they're always populated."
+    // He never could. The engine pushes a blank on 59.6% of spins and the row is genuinely full 1.4% of the
+    // time; this filter was rebuilding a full row on every read.
+    return list.map((n) => Number(n) || 0);
 }
 
 async function saveMeter(buyerId, machineId, recent) {

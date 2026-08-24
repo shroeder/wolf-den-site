@@ -20228,7 +20228,24 @@ body.cas-seated .social-fab { display: none; }
 .wa-slot.is-lit em { color: #6d4a08; }
 @keyframes waBoom { 0% { transform: translateY(0) scale(1); } 55% { transform: translateY(-5px) scale(1.24); } 100% { transform: translateY(-3px) scale(1.1); } }
 
-.wa-total b { color: #ffd75e; }
+/* ── THE TOTAL IS NOT A SIXTH SLOT ───────────────────────────────────────────────────────────────────────
+   Luke, counting the row: "what the heck is Win It Again tracking?" Five slots and a total, drawn as six
+   identical instrument windows — so it reads as six tracked wins, and the sum reads as the oldest one. The
+   information was right and the shape lied about it.
+
+   It gets a gap, a rule to divide it off, a gold bezel instead of the steel one, and a label that says what
+   it is. Same rack, visibly a different KIND of thing. */
+.wa-row { grid-template-columns: repeat(5, minmax(0, 1fr)) 8px minmax(0, 1.5fr); }
+/* A real element rather than ::before: the divider is the sixth GRID CHILD, between the last slot and the
+   total, and a pseudo-element on the row would have taken cell one and pushed every window along by a slot. */
+.wa-div { align-self: center; width: 1px; height: 62%; margin: 0 auto; display: block;
+    background: linear-gradient(180deg, transparent, rgba(150,200,255,.65), transparent); }
+.wa-total { filter: drop-shadow(0 0 10px rgba(255,200,90,.35)); }
+.wa-total::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 5px;
+    box-shadow: inset 0 0 0 1px rgba(255,200,90,.6); }
+.wa-total b { color: #ffd75e; font-size: .82rem;
+    text-shadow: 0 0 10px rgba(255,190,80,.8), 0 1px 0 rgba(0,0,0,.8); }
+.wa-total em { color: #b08a3c; }
 .wa-total.is-paid { background-image: url("/images/casino/vault/wa-cell-lit.png");
     transform: scale(1.14); z-index: 3; filter: drop-shadow(0 0 22px rgba(255,200,90,1));
     animation: waPaid .55s cubic-bezier(.2,1.5,.4,1) both; }
