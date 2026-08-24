@@ -524,14 +524,19 @@ export default function SpinWheel() {
                                     <img src={bonus.won.sprite} alt="" className="cw-bonus-win-img" />
                                 </div>
                                 <div className="cw-bonus-win-rar">{(bonus.won.rarity || "rare").toUpperCase()}{bonus.won.slot ? ` · ${bonus.won.slot.replace("_", " ")}` : ""}</div>
-                                {/* A duplicate is only reachable on a COMPLETE set (see rollBonusGame) and it
-                                    writes no row, so the card must not say you won a thing you already had.
-                                    It says what actually happened instead. */}
+                                {/* A duplicate is only reachable on a COMPLETE set (see rollBonusGame). It
+                                    writes no trophy row, so the card must not say you won a thing you already
+                                    had — it names the chest the round paid instead. */}
                                 <div className="cw-bonus-win-txt">
                                     {bonus.won.duplicate
-                                        ? <>You already have <b>{bonus.won.name}</b> — the set is complete.</>
+                                        ? <>The set is complete — <b>{bonus.won.chest?.label || "a chest"}</b> instead.</>
                                         : <>You won <b>{bonus.won.name}</b>!</>}
                                 </div>
+                                {bonus.won.duplicate ? (
+                                    <div className="cw-bonus-win-stats">
+                                        Every Wheelwarden piece is already yours. {bonus.won.name} would have been a duplicate, so the round pays a chest — it is in your stash.
+                                    </div>
+                                ) : null}
                                 {bonus.won.stats ? <div className="cw-bonus-win-stats">{bonus.won.stats}</div> : null}
                                 <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect gear</button>
                             </div>

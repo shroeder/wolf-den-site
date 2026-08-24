@@ -237,6 +237,13 @@ if (MINI_WHEEL_PRIZES.length !== MINI_WHEEL_WEDGES) {
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
 // board draws BOARD_ITEMS of these at random, three tiles each.
 const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"];
+// ── WHAT A FINISHED SET IS PAID INSTEAD ──────────────────────────────────────────────────────────────────────
+// Once all ten are yours the bonus round has nothing new to hand over, and it used to hand over nothing at all
+// (see bonusFlip). Luke's call is a chest roll, and the tier is the wheel's OWN top chest rather than a number
+// invented for this: the Gold Chest wedge above sits at weight 4 and the BONUS GAME wedge at weight 5, so
+// finishing the collection turns the bonus wedge into a slightly-likelier version of the best chest the wheel
+// already gives — an upgrade for having completed it, rather than a wedge that goes dead.
+const BONUS_DUPE_CHEST = "gold";
 const BOARD_ITEMS = 6; // distinct gear on the board (× 3 tiles each = 18 tiles → big, readable match-3)
 
 function wheelForLevel(level) {
@@ -345,14 +352,19 @@ export async function bonusFlip(buyerId, index) {
     let winner = null; let fullBoard = null;
     if (count >= (g.need || 3)) {
         g.done = true;
-        // ── AND IF IT IS A DUPLICATE, THE CARD DOES NOT CLAIM OTHERWISE ──────────────────────────────
-        // Only reachable with a COMPLETE set now (see rollBonusGame), which nobody has yet -- Eric D is one
-        // piece away. grantPiece returns false when the row already existed, and that return was being
-        // thrown away, so the one case where the round pays nothing was also the case that looked identical
-        // to winning. What a finished set should be paid instead is Luke's number, not mine to invent.
+        // ── AND A FINISHED SET IS PAID A CHEST ───────────────────────────────────────────────────────
+        // Only reachable with a COMPLETE set now (see rollBonusGame). grantPiece returns false when the row
+        // already existed, and that return was being thrown away -- so the one case where the round paid
+        // nothing was also the case that looked identical to winning. It pays BONUS_DUPE_CHEST now, and the
+        // card says which of the two happened.
         const granted = await grantPiece(buyerId, revealedId, "wheel_bonus").catch(() => false);
-        await trackActivity(buyerId, granted ? "spin_bonus_win" : "spin_bonus_dupe", { item: revealedId }).catch(() => {});
-        winner = { ...gearCard(revealedId), duplicate: !granted };
+        let chest = null;
+        if (!granted) {
+            await addChests(buyerId, { [BONUS_DUPE_CHEST]: 1 }, { source: "spin_bonus_dupe", meta: { piece: revealedId } }).catch(() => {});
+            chest = { tier: BONUS_DUPE_CHEST, label: CHEST_TIERS[BONUS_DUPE_CHEST]?.label || "Chest" };
+        }
+        await trackActivity(buyerId, granted ? "spin_bonus_win" : "spin_bonus_dupe", { item: revealedId, chest: chest?.tier || null }).catch(() => {});
+        winner = { ...gearCard(revealedId), duplicate: !granted, chest };
         fullBoard = g.board.map(gearCard);
     }
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(g)]).catch(() => {});
