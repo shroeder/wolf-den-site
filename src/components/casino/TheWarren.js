@@ -37,6 +37,8 @@ const STAGE_ART = {
 };
 const HOARD_ART = "/images/delves/rare-kinghoard.webp";
 const MOTHER_ART = "/images/delves/foe-warren-mother.webp";
+// Three stones, rotated by which visit you are on so a second trip is not the same three again.
+const GEODES = ["amethyst", "emerald", "ruby"];
 
 const SHAKE_MS = 700;
 // The egg breaking is its own beat. Without it the egg shook and then simply stopped existing while
@@ -68,18 +70,18 @@ export default function TheWarren({ warren, onDone }) {
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
     const wait = (ms) => new Promise((r) => timers.current.push(setTimeout(r, ms)));
 
+    // ── VISITS, NOT ROOMS ────────────────────────────────────────────────────────────────────────────────
+    // The last room loops: an Elder down there opens one geode and puts you straight back on the same wall.
+    // So `stage` walks a list of VISITS, and the Deep Warren can appear in it several times over — which is
+    // why the depth pips read the visit's OWN room number rather than counting how many walls you have seen.
     const stages = useMemo(() => warren?.stages || [], [warren]);
     const cur = stages[stage];
-    const room = inHoard ? "kinghoard" : (cur?.key || "hollow");
+    const room = cur?.key || "hollow";
     const pool = warren?.art?.pets?.[room] || [];
-    const hoard = warren?.hoard;
 
-    // Fifteen eggs on the wall; the Hoard shows three geodes and then three MORE, so it is never a board
-    // being emptied — it is the same choice, again, until she is behind one.
     const slots = warren?.board || 15;
     // Which stone each of the three is, this time round. Rotated by how many have been cracked so the
     // trio changes between picks rather than the same three rising again.
-    const GEODES = ["amethyst", "emerald", "ruby"];
 
     // ── OPENING ONE ──────────────────────────────────────────────────────────────────────────────────────
     // The tapped burrow is not the one the server chose — the server chose an ORDER, and this maps the slot
@@ -96,7 +98,7 @@ export default function TheWarren({ warren, onDone }) {
         Haptic.hit(0.3);
         await wait(SHAKE_MS);
 
-        const next = inHoard ? hoard?.opened?.[at] : cur?.opened?.[at];
+        const next = cur?.opened?.[at];
         if (!next) { setShaking(-1); setBusy(false); return; }
 
         // ── AND THEN IT BREAKS ───────────────────────────────────────────────────────────────────────────
@@ -110,11 +112,11 @@ export default function TheWarren({ warren, onDone }) {
         await wait(CRACK_MS);
         setCracking(-1);
 
-        if (next.kind === "pups" || next.kind === "mound") {
+        if (next.kind === "pups") {
             // ── THEY COME OUT ONE AT A TIME ──────────────────────────────────────────────────────────────
             // The heart of it. Each one hops, lands, and adds — and because the count is not known in
             // advance, every extra animal is a small escalation on its own.
-            const list = next.kind === "mound" ? [next.chips] : next.pups;
+            const list = next.pups;
             for (let i = 0; i < list.length; i += 1) {
                 const chips = list[i];
                 // ── AND THEY LAND ON THE FLOOR ───────────────────────────────────────────────────────────
@@ -147,11 +149,6 @@ export default function TheWarren({ warren, onDone }) {
                 Haptic.hit(0.28 + Math.min(0.4, i * 0.06));
                 await wait(HOP_MS);
             }
-            if (inHoard) {
-                setHaul(list[0]);
-                await wait(1500);
-                setHaul(null);
-            }
             await wait(SETTLE_MS);
             // ── AND THEY STAY ────────────────────────────────────────────────────────────────────────────
             // Luke: "They need to stay on the bottom until you reach the next phase or end." They used to be
@@ -167,24 +164,31 @@ export default function TheWarren({ warren, onDone }) {
         }
 
         if (next.kind === "elder") {
-            // ── THE ELDER, AND DOWN A LEVEL ──────────────────────────────────────────────────────────────
-            // The big event. Everything stops, the room is named, and then the whole board is replaced by a
-            // deeper one. Luke: "he like congratulates you and it's this huge event and then it goes to the
-            // next screen that's a new background, the eggs look better."
-            const last = stage >= stages.length - 1;
-            setBanner(last && warren?.full ? "hoard" : "elder");
+            // ── THE ELDER ────────────────────────────────────────────────────────────────────────────────
+            // Everything stops, the room is named, and the whole board is replaced. Luke: "he like
+            // congratulates you and it's this huge event and then it goes to the next screen that's a new
+            // background, the eggs look better."
+            const toHoard = cur?.geode != null;
+            setBanner(toHoard ? "hoard" : "elder");
             Cas.jackpot();
             Haptic.crit();
             await wait(2400);
             setBanner(null);
-            setSpent([]);
-            setHops([]);   // a new room is a new floor; the last room's crowd stays behind in it
-            setAt(0);
-            if (last) {
-                if (warren?.full) { setInHoard(true); } else { setDone(true); }
-            } else {
-                setStage((n) => n + 1);
+
+            // ── AND IN THE LAST ROOM, A GEODE ────────────────────────────────────────────────────────────
+            // One crack, and then back onto the same wall to look for another Elder. The geode is not a
+            // room you work through — it is a prize the last room hands you, over and over, until she
+            // finds you.
+            if (toHoard) {
+                setInHoard(true);
+                await new Promise((r) => { crackDone.current = r; });
+                setInHoard(false);
             }
+
+            setSpent([]);
+            setHops([]);   // a new wall is a new floor; the last one's crowd stays behind in it
+            setAt(0);
+            setStage((n) => n + 1);
             setBusy(false);
             return;
         }
@@ -197,18 +201,43 @@ export default function TheWarren({ warren, onDone }) {
         setBanner(null);
         setDone(true);
         setBusy(false);
-    }, [busy, done, spent, inHoard, hoard, cur, at, stage, stages.length, pool, warren]);
+    }, [busy, done, spent, cur, at, stage, pool]);
 
-    const depth = inHoard ? stages.length + 1 : stage + 1;
+    // ── CRACKING ONE ─────────────────────────────────────────────────────────────────────────────────────
+    // Its own handler rather than a branch of `open`, because the Hoard is not a board being walked: it is
+    // one choice, once, and the round is paused on a promise until it is made.
+    const crackDone = useRef(null);
+    const crack = useCallback(async (i) => {
+        if (cracking >= 0 || !cur?.geode) return;
+        unlock();
+        setCracking(i);
+        Cas.reelStop(4, 0.95);
+        Haptic.crit();
+        await wait(CRACK_MS);
+        setHaul(cur.geode);
+        setWon((n) => n + cur.geode);
+        Cas.jackpot();
+        Haptic.crit();
+        await wait(1900);
+        setHaul(null);
+        setCracking(-1);
+        crackDone.current?.();
+        crackDone.current = null;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cracking, cur]);
+
+    // Counted in ROOMS rather than visits — six trips through the Deep Warren is still the Deep Warren, and
+    // the pips would otherwise run off the end of the bar.
+    const depth = cur?.room || 1;
     // ── WHAT THE WHOLE RUN CAME TO ───────────────────────────────────────────────────────────────────────
     // Counted off the server's own record of the round rather than off anything the screen tallied as it
     // went — a summary assembled from the animation is a summary that can disagree with the payout.
-    const opened = (warren?.stages || []).reduce((a, st) => a + st.opened.length, 0)
-        + (warren?.hoard?.opened?.length || 0);
+    const opened = (warren?.stages || []).reduce((a, st) => a + st.opened.length, 0);
     const hatched = (warren?.stages || []).reduce((a, st) =>
-        a + st.opened.reduce((b, n) => b + (n.pups?.length || 0), 0), 0)
-        + (warren?.hoard?.opened || []).filter((o) => o.kind === "mound").length;
-    const reachedHoard = Boolean(warren?.full);
+        a + st.opened.reduce((b, n) => b + (n.pups?.length || 0), 0), 0);
+    const geodes = Number(warren?.geodes || 0);
+    const deepest = Number(warren?.reached || 1);
+    const reachedHoard = geodes > 0;
 
     return (
         <div className={`wr is-${room}${inHoard ? " is-hoard" : ""}`}>
@@ -239,16 +268,16 @@ export default function TheWarren({ warren, onDone }) {
                 The only room in the game where the objects are bigger than the text. */}
             {inHoard ? (
                 <div className="wr-hoard">
-                    <div className="wr-geodes" key={at}>
+                    <div className="wr-geodes">
                         {GEODES.map((g, i) => (
                             <button key={g} type="button"
-                                className={`wr-geode${shaking === i ? " is-cracking" : ""}${spent.includes(i) ? " is-gone" : ""}${spent.length && !spent.includes(i) ? " is-passed" : ""}`}
-                                disabled={busy || done || spent.length > 0}
-                                onClick={() => open(i)}
+                                className={`wr-geode${cracking === i ? " is-cracking" : ""}${cracking >= 0 && cracking !== i ? " is-passed" : ""}`}
+                                disabled={cracking >= 0}
+                                onClick={() => crack(i)}
                                 aria-label="Crack this geode open"
                                 style={{ "--i": i }}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={`/images/casino/warren/geode-${GEODES[(i + at) % 3]}.png`} alt="" draggable="false" />
+                                <img src={`/images/casino/warren/geode-${GEODES[(i + stage) % 3]}.png`} alt="" draggable="false" />
                             </button>
                         ))}
                     </div>
@@ -304,7 +333,7 @@ export default function TheWarren({ warren, onDone }) {
             <p className="wr-say">
                 {done ? "That is the warren emptied."
                     : busy ? " "
-                    : inHoard ? "Crack one open. She is behind one of them."
+                    : inHoard ? "Crack one open. Then back to the wall."
                     : "Open an egg. One holds the Elder, one holds the Mother."}
             </p>
 
@@ -319,13 +348,14 @@ export default function TheWarren({ warren, onDone }) {
                 size it is worth. In the middle, because there is nothing else left to look at. */}
             {done ? (
                 <div className="wr-end" role="status">
-                    <i>{reachedHoard ? "You emptied the Deep Warren" : "The warren is closed"}</i>
+                    <i>{reachedHoard ? "You cracked the Deep Warren open" : "The warren is closed"}</i>
                     <b>{won.toLocaleString()}</b>
                     <em>chips</em>
                     <ul className="wr-tally">
-                        <li><span>{depth}</span> {depth === 1 ? "room" : "rooms"} deep</li>
+                        <li><span>{deepest}</span> {deepest === 1 ? "room" : "rooms"} deep</li>
                         <li><span>{opened}</span> {opened === 1 ? "egg" : "eggs"} opened</li>
                         <li><span>{hatched}</span> out of them</li>
+                        {geodes ? <li><span>{geodes}</span> {geodes === 1 ? "geode" : "geodes"}</li> : null}
                     </ul>
                     <button type="button" className="wr-go" onClick={onDone}>Done</button>
                 </div>

@@ -294,21 +294,26 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             label: m.second?.label || "The Warren",
             board: 15,
             reached: r.warren.reached,
+            geodes: r.warren.geodes,
             full: r.warren.full,
+            // ── VISITS, NOT ROOMS ────────────────────────────────────────────────────────────────
+            // The last room LOOPS — an Elder down there opens one geode and puts you straight back on
+            // the same wall — so this is an ordered list of VISITS and the Deep Warren can appear in it
+            // several times. A visit that ended on an Elder in the last room carries the geode it
+            // opened, because from the round's point of view the geode is part of that visit rather
+            // than a separate room.
             stages: r.warren.stages.map((st) => ({
                 key: st.key,
                 name: st.name,
+                room: st.stage + 1,
+                geode: st.geode != null
+                    ? chipsFor(stake, (st.geode * (stake / LINES.length)) / stake)
+                    : null,
                 opened: st.opened.map((n) => (n.kind === "pups"
                     ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
                     : { kind: n.kind })),
             })),
-            hoard: r.warren.hoard ? {
-                opened: r.warren.hoard.opened.map((o) => (o.kind === "mound"
-                    ? { kind: "mound", chips: chipsFor(stake, (o.value * (stake / LINES.length)) / stake) }
-                    : { kind: "mother" })),
-            } : null,
             chips: chipsFor(stake, r.warren.total / stake),
-            // The animals, by stage, so the screen shows the member's own world rather than numbered boxes.
             art: await warrenArt(),
         } : null,
 

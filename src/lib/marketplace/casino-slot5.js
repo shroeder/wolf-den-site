@@ -715,35 +715,47 @@ const WARREN_STAGES = [
     { key: "sunken", name: "The Sunken Run", pups: [2, 4], value: 15 },
     { key: "ember", name: "The Ember Seam", pups: [2, 5], value: 27 },
     { key: "astral", name: "The Star Warren", pups: [3, 6], value: 48 },
-    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 84 },
+    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 44 },
 ];
 // ── THE ROOM PAST THE LAST ROOM ──────────────────────────────────────────────────────────────────────────────
-// Three colossal geodes, one crack at a time, and it keeps going until the Mother is behind one. Written as a
-// RUNNING CHANCE rather than a shuffled board of six, because the screen shows three and then three MORE — a
-// fixed board would either run out of objects or lie about how many are left.
-const HOARD_END = 0.28;
-const HOARD_VALUE = 560;
+// Three colossal geodes, and you crack exactly ONE — then you are put back on the Deep Warren's wall to look
+// for another Elder. Luke chose that shape over the Hoard being a room you work through, and it is the better
+// one: it makes the last room a loop rather than a corridor, and every trip back is a fresh chance at either
+// another geode or the Mother.
+//
+// Which is why the Deep Warren seeds TWO Elders against its one Mother. At one apiece a return trip would be
+// a coin flip and the loop would almost never run; at two the odds of getting back are 2/3, so a run that
+// reaches the bottom usually takes a couple of geodes and can, rarely, take five.
+const DEEP_ELDERS = 2;
+const HOARD_VALUE = 430;
 
 export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     // ── FIFTEEN, NOT NINE ────────────────────────────────────────────────────────────────────────────────
     // A wall of eggs rather than a tic-tac-toe board, which is what the machine Luke is pointing at actually
-    // looks like — and it is not only cosmetic. With thirteen critter eggs against one Elder and one Mother
-    // the expected number of eggs opened per room goes from 2.3 to 4.3, so a room is a visit rather than two
-    // taps. Advancing is still a coin flip, so the ladder keeps its shape: the fifth room is one round in
-    // sixteen and the Hoard one in thirty-two.
+    // looks like — and it is not only cosmetic. Thirteen critter eggs against an Elder and a Mother means the
+    // expected number opened per room is 4.3 rather than 2.3, so a room is a visit rather than two taps.
     const NESTS = 15;
+    const LAST = WARREN_STAGES.length - 1;
+    // A hard stop on the loop. The Deep Warren can in principle hand back Elder after Elder, and a round that
+    // cannot end is a request that never returns — the same rule every other loop in this file follows.
+    const MAX_VISITS = 24;
+
     const stages = [];
     let total = 0;
     let stage = 0;
     let ended = false;
+    let geodes = 0;
 
-    while (stage < WARREN_STAGES.length && !ended) {
+    while (!ended && stages.length < MAX_VISITS) {
         const cfg = WARREN_STAGES[stage];
-        // Seven critter burrows, one Elder, one Mother — shuffled, then opened in order. Decided before the
-        // first tap, exactly like every other board on this floor: the taps reveal, they do not decide.
+        // Only the last room carries a second Elder. Everywhere above it, one Elder against one Mother is
+        // the coin flip that keeps the ladder honest — the fifth room is one run in sixteen and has to stay
+        // that way whatever happens once you are down there.
+        const elders = stage === LAST ? DEEP_ELDERS : 1;
         const board = [
-            ...Array.from({ length: NESTS - 2 }, () => ({ kind: "pups" })),
-            { kind: "elder" }, { kind: "mother" },
+            ...Array.from({ length: NESTS - elders - 1 }, () => ({ kind: "pups" })),
+            ...Array.from({ length: elders }, () => ({ kind: "elder" })),
+            { kind: "mother" },
         ];
         for (let i = board.length - 1; i > 0; i -= 1) {
             const j = Math.floor(rng() * (i + 1));
@@ -753,7 +765,6 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
         const opened = [];
         for (const nest of board) {
             if (nest.kind === "pups") {
-                // How many come out, and what each is worth. The count is the drama; the value is the money.
                 const [lo, hi] = cfg.pups;
                 const n = lo + Math.floor(rng() * (hi - lo + 1));
                 const pups = Array.from({ length: n }, () => cfg.value * (0.7 + rng() * 0.9));
@@ -762,33 +773,31 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
                 continue;
             }
             opened.push({ kind: nest.kind });
-            break;   // the Elder takes you down, the Mother sends you home. Either way this stage is done.
+            break;   // the Elder takes you on, the Mother sends you home. Either way this visit is done.
         }
 
         const last = opened[opened.length - 1];
-        stages.push({ stage, key: cfg.key, name: cfg.name, board: board.length, opened });
-        if (last.kind === "mother") { ended = true; break; }
-        stage += 1;
-    }
+        const visit = { stage, key: cfg.key, name: cfg.name, opened };
 
-    // ── THE HOARD ────────────────────────────────────────────────────────────────────────────────────────
-    // Only if the Elder was found on all five stages. A different room, a different mechanic, and the reason
-    // anybody tells anybody else about this machine.
-    let hoard = null;
-    if (!ended && stage >= WARREN_STAGES.length) {
-        const opened = [];
-        // Capped at a dozen for the reason every loop in this file is capped: a round that cannot end is a
-        // request that never returns. At a 28% end chance, twelve is far past anything that will happen.
-        for (let i = 0; i < 12; i += 1) {
-            if (rng() < HOARD_END) { opened.push({ kind: "mother" }); break; }
+        // AN ELDER IN THE LAST ROOM IS A GEODE. One crack, its own value, and then straight back onto the
+        // same wall — the visit carries the geode rather than there being a separate room in the data,
+        // because from the round's point of view it IS part of this visit.
+        if (last.kind === "elder" && stage === LAST) {
             const value = HOARD_VALUE * (0.55 + rng() * 1.1);
             total += value * lineBet;
-            opened.push({ kind: "mound", value });
+            geodes += 1;
+            visit.geode = value;
         }
-        hoard = { opened };
+
+        stages.push(visit);
+        if (last.kind === "mother") { ended = true; break; }
+        if (stage < LAST) stage += 1;
     }
 
-    return { total, stages, hoard, reached: stages.length, full: Boolean(hoard) };
+    // How deep it got, counted in ROOMS rather than visits — six trips through the Deep Warren is still the
+    // Deep Warren, and the depth pips would otherwise run off the end of the bar.
+    const reached = Math.min(WARREN_STAGES.length, (stages[stages.length - 1]?.stage ?? 0) + 1);
+    return { total, stages, geodes, reached, full: geodes > 0 };
 }
 
 // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────────────
