@@ -8,6 +8,8 @@ import Paytable from "@/components/casino/Paytable.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
 import TheLocks from "@/components/casino/TheLocks.js";
 import TheWarren from "@/components/casino/TheWarren.js";
+import GemVault from "@/components/casino/GemVault.js";
+import WinAgainBar from "@/components/casino/WinAgainBar.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -92,7 +94,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [result, setResult] = useState(null);    // the whole server response
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
-    const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | done
+    const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | gems | done
+    // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
+    // beside `rest` in the spin handler.
+    const [meterFire, setMeterFire] = useState(null);
+    const afterMeter = useRef(null);
     const [pays, setPays] = useState(false);       // is the paytable open
     const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
     const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
@@ -413,14 +419,25 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         // ── WHAT HAPPENS AFTER THE REELS STOP ────────────────────────────────────────────────────────
         // Lines first, then the free round if there is one, then the pick. Sequenced here so a spin that
         // pays lines AND triggers both features still plays them in an order somebody can follow.
-        const after = () => {
+        // ── THE METER GOES FIRST, THEN WHATEVER ELSE THE SPIN OPENED ─────────────────────────────────
+        // Three tumbles in one spin is what fires the row, so the row has to be paid before the screen moves
+        // on to a scatter bonus that happened on the same pull. `rest` is held on a ref and called by the
+        // bar when its lights have finished walking — a callback rather than a timer, because the animation
+        // owns how long it takes and this code should not be holding a second opinion about that.
+        const rest = () => {
             const m = slot5(machineId);
             if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
+            // The Vault's scatter opens a collection rather than a round — see runGems.
+            if (r.gems) { flashTrigger(m.scatter, () => setPhase("gems")); return; }
             if (r.free) { flashTrigger(r.free.byCascade ? null : m.scatter, () => announceFree(r)); return; }
             if (r.hold) { flashTrigger(r.hold.trigger, () => setPhase("pick")); return; }
             if (r.warren) { flashTrigger(m.bonus, () => setPhase("warren")); return; }
             if (r.locked) { flashTrigger(m.bonus, () => announceFree(r, "locked")); return; }
             setPhase("done");
+        };
+        const after = () => {
+            if (r.meter?.fired) { afterMeter.current = rest; setMeterFire(r.meter.fired); return; }
+            rest();
         };
 
         // A CASCADING MACHINE TUMBLES INSTEAD OF DRAWING LINES. The reels still land the same way; what
@@ -438,6 +455,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             onDone: () => {
                 const m = slot5(machineId);
                 if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
+                if (r.gems) { flashTrigger(m.scatter, () => setPhase("gems")); return; }
                 if (r.free) { flashTrigger(m.scatter, () => announceFree(r)); return; }
                 // The symbol that opened it — a hold's coin, or the bonus symbol for the locking round.
                 // Flashing the wrong one is worse than flashing none.
@@ -646,6 +664,17 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         );
     }
 
+    // ── THE GEM VAULT TAKES THE WHOLE SCREEN ─────────────────────────────────────────────────────────────
+    // Four collections, twenty-four covers and its own trays along the bottom — the same argument as the
+    // Warren. It cannot share a stage with a slot cabinet and it does not try to.
+    if (phase === "gems" && result?.gems) {
+        return (
+            <div className="s5 is-bonus">
+                <GemVault gems={result.gems} bet={bet} onDone={() => setPhase("done")} />
+            </div>
+        );
+    }
+
     if (phase === "pick" && result?.hold) {
         return (
             <div className="s5 is-bonus">
@@ -658,6 +687,15 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
     return (
         <div className="s5">
+            {/* ── THE ROW ACROSS THE TOP ───────────────────────────────────────────────────────────────
+                Only on a cabinet that has one. It draws even when empty, because a meter that appears once
+                it already has something in it never teaches anybody it is there — and its whole trick is
+                that it is filling while you are looking at something else. */}
+            {slot5(machineId).winAgain ? (
+                <WinAgainBar meter={result?.meter || { slots: slot5(machineId).winAgain.slots, recent: [], label: slot5(machineId).winAgain.label }}
+                    bet={bet} firing={meterFire}
+                    onFired={() => { setMeterFire(null); const go = afterMeter.current; afterMeter.current = null; go?.(); }} />
+            ) : null}
             {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
             {/* ── THE GRID ────────────────────────────────────────────────────────────────────────────── */}
             {/* ── A MACHINE, NOT A GRID ON A PAGE ─────────────────────────────────────────────────────
@@ -871,6 +909,14 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-f-again" disabled={locked} onClick={() => pull("again")}>Force retrigger</button>
                     <button type="button" className="s5-f-tease" disabled={locked} onClick={() => pull("tease")}>Force hold</button>
                     <button type="button" className="s5-f-hoard" disabled={locked} onClick={() => pull("hoard")}>Force hoard</button>
+                    {/* The Vault's two. Only on the Vault: a button that spins forty thousand times looking
+                        for a feature this cabinet does not have is a button that quietly does nothing. */}
+                    {slot5(machineId).second?.kind === "gems" ? (
+                        <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("gems")}>Force gems</button>
+                    ) : null}
+                    {slot5(machineId).winAgain ? (
+                        <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("winagain")}>Force win again</button>
+                    ) : null}
                     {cascades ? (
                         <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>
                     ) : null}

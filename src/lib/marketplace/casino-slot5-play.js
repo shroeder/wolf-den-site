@@ -51,9 +51,9 @@ export const slot5OpenFor = (buyerId) => OPEN || isOwner(buyerId);
 // The chips it mints are logged under their own reason so a forced spin can never be mistaken for play when
 // the floor's numbers are read.
 const FORCE_TRIES = 40000;
-function forcedSpin(m, stake, offerId, want) {
+function forcedSpin(m, stake, offerId, want, meter = []) {
     for (let i = 0; i < FORCE_TRIES; i += 1) {
-        const p = playSpin(m, { bet: stake, offerId });
+        const p = playSpin(m, { bet: stake, offerId, meter });
         if (want === "free" && p.free) return p;
         if (want === "pick" && (p.locked || p.hold || p.warren)) return p;
         // A DEEP TUMBLE, ON DEMAND. The chain that opens the free round is one spin in a hundred and thirty
@@ -73,6 +73,10 @@ function forcedSpin(m, stake, offerId, want) {
         // The room past the bottom of the Warren — one bonus in thirty-two, which is one spin in about
         // seven thousand. There is no watching that happen on its own clock.
         if (want === "hoard" && p.warren?.full) return p;
+        // The Vault's two. Three moons is the rarest trigger on that cabinet and three tumbles in one spin is
+        // not much commoner — neither is something to sit and wait for while judging how it lands.
+        if (want === "gems" && p.gems) return p;
+        if (want === "winagain" && p.winAgain) return p;
         if (want === "tease") {
             const targets = [{ sym: m.scatter, need: 3 },
                 m.second?.kind === "hold" ? { sym: m.second.trigger, need: m.second.need || 6 }
@@ -121,6 +125,30 @@ async function warrenArt() {
     return warrenArtCache;
 }
 
+// ── THE WIN IT AGAIN METER ───────────────────────────────────────────────────────────────────────────────────
+// The Vault remembers its last few wins and pays the lot back when a spin tumbles three times in a row. Held
+// in mkt_casino_meter.recent (mig401) as MULTIPLES OF THE BET, never chips: a meter filled at 25 a spin and
+// emptied at 2,500 would hand somebody a number nobody won.
+//
+// Read before the spin and written after, in one place, so there is no path where a spin pays out of the
+// meter and the meter does not move.
+async function readMeter(buyerId, machineId) {
+    const row = await db.queryOne(
+        `SELECT recent FROM mkt_casino_meter WHERE buyer_id = $1 AND machine = $2`, [buyerId, machineId],
+    ).catch(() => null);
+    const raw = row?.recent;
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map((n) => Number(n) || 0).filter((n) => n > 0);
+}
+
+async function saveMeter(buyerId, machineId, recent) {
+    await db.query(
+        `INSERT INTO mkt_casino_meter (buyer_id, machine, recent, updated_at) VALUES ($1, $2, $3::jsonb, NOW())
+         ON CONFLICT (buyer_id, machine) DO UPDATE SET recent = $3::jsonb, updated_at = NOW()`,
+        [buyerId, machineId, JSON.stringify(recent)],
+    ).catch(() => {});
+}
+
 export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     if (!slot5OpenFor(buyerId)) return { ok: false, error: "closed" };
@@ -140,8 +168,12 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
     // can write, and "the button is hidden" is not a permission check.
-    const want = isOwner(buyerId) && ["free", "pick", "chain", "again", "tease", "hoard"].includes(force) ? force : null;
-    const r = (want && forcedSpin(m, stake, offer.id, want)) || playSpin(m, { bet: stake, offerId: offer.id });
+    const want = isOwner(buyerId) && ["free", "pick", "chain", "again", "tease", "hoard", "gems", "winagain"].includes(force) ? force : null;
+    // The meter as it stood before this pull. Handed to the engine rather than settled here — see the note
+    // on playSpin's `meter` parameter for why that matters to the gate.
+    const before = m.winAgain ? await readMeter(buyerId, m.id) : [];
+    const r = (want && forcedSpin(m, stake, offer.id, want, before)) || playSpin(m, { bet: stake, offerId: offer.id, meter: before });
+    if (m.winAgain) await saveMeter(buyerId, m.id, r.meter || []);
 
     // ── CONVERTED ONCE, AT THE END ───────────────────────────────────────────────────────────────────────
     // The engine works in multiples of the bet and knows nothing about chips; the rate is applied here and
@@ -164,6 +196,25 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.
         grid: r.grid,
+        // ── THE METER BAR ACROSS THE TOP ─────────────────────────────────────────────────────────────
+        // `slots` is what the row holds, `recent` is what is in it AFTER this spin, and `fired` is the
+        // payout when three tumbles emptied it. The screen lights the row left to right off `fired`; it
+        // has no arithmetic of its own to do.
+        meter: m.winAgain ? {
+            slots: m.winAgain.slots, need: m.winAgain.need, label: m.winAgain.label,
+            // What to DRAW. On an ordinary spin that is the row as it now stands; on a firing spin it is the
+            // row the payout was made of, because the animation lights those slots before it empties them.
+            recent: r.winAgain ? r.winAgain.row : (r.meter || []),
+            cleared: Boolean(r.winAgain),
+            fired: r.winAgain ? { total: chipsFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
+        } : null,
+        // ── THE GEM VAULT ────────────────────────────────────────────────────────────────────────────
+        // The whole board and the order it comes out in. The screen maps the tile a finger landed on to the
+        // next stone in that order — see runGems for why that is the honest way round.
+        gems: r.gems ? {
+            order: r.gems.order, won: r.gems.won, sets: r.gems.sets,
+            total: chipsFor(stake, r.gems.total / stake),
+        } : null,
         // ── THE TUMBLE ───────────────────────────────────────────────────────────────────────────────
         // A cascading machine sends the WHOLE chain: every grid, which cells broke, the multiplier at that
         // break, and what it paid. The screen shatters and drops from this list — it decides nothing, the

@@ -342,22 +342,42 @@ const VAULT = {
         { bone: 34, doubloon: 23, laurel: 12, chest: 5, moon: 0, wolf: 4 },
         { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 5, wolf: 0 },
     ],
+    // ── A CASCADING PAYTABLE, NOT THE OLD ONE ────────────────────────────────────────────────────────
+    // Scaled to 0.545 of what it was, and this is NOT a nerf to hold a number — it is a different machine.
+    // The old table was built for a cabinet that resolved a spin in ONE step and whose whole identity was a
+    // long wait for a 1,918x wolf. This one tumbles, so a single press can pay four times over, and then the
+    // meter pays those wins back AGAIN. Left alone the Vault returned 155.89% against a floor at 100 — not
+    // rich, just strictly the best cabinet to sit at, which is the one thing the spread rule exists to stop.
+    //
+    // The features were NOT touched to get there, on purpose (see the long note at the top of
+    // check-slot5.mjs). The meter still holds five spins and still fires on three tumbles, the way Luke
+    // specced it; the gem ladder is untouched. What moved is the base, which is the part that was written
+    // for a machine that no longer exists.
     pays: {
-        wolf: { 3: 19.2, 4: 146, 5: 1918 },
-        chest: { 3: 5.5, 4: 42.2, 5: 422 },
-        laurel: { 3: 1.92, 4: 12.4, 5: 99.9 },
-        doubloon: { 4: 4.12, 5: 30.2 },
-        bone: { 5: 8.71 },
+        wolf: { 3: 10.5, 4: 79.6, 5: 1045 },
+        chest: { 3: 3.0, 4: 23.0, 5: 230 },
+        laurel: { 3: 1.05, 4: 6.76, 5: 54.4 },
+        doubloon: { 4: 2.25, 5: 16.5 },
+        bone: { 5: 4.75 },
     },
-    scatterPays: { 3: 0.79, 4: 4.12, 5: 27.5 },
-    // ── YOU BUILD YOUR OWN ROUND ─────────────────────────────────────────────────────────────────────
-    // Every lock you turn adds spins or multiplier. One of them opens the door and the round begins with
-    // whatever you managed to stack. Nothing on the board is a loss.
-    // EIGHT BEFORE YOU TOUCH A LOCK, so the round is worth something even if the first tile is the door —
-    // the mechanic only works if there is no bad outcome, and opening on the first pick must still be a
-    // real free round rather than a shrug.
-    free: { kind: "built", spins: 8, label: "Turn the locks, then the door opens" },
-    second: { kind: "build", label: "The Locks" },
+    scatterPays: { 3: 0.43, 4: 2.25, 5: 15.0 },
+    // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
+    // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
+    // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
+    // then if you get three cascades in a row it does this animation where it goes boom boom boom and it
+    // highlights each of the things across the top from left to right and does a win-it-again sound
+    // effect, and you win all the amount in the top right."
+    //
+    // THE LOCKS ARE GONE, on his call. They were the best pick on the floor and this is a better cabinet:
+    // the Locks were one screen you visited, and these two features run THROUGH the base game. The meter
+    // is filling on every spin whether you are looking at it or not, which is the thing the reference does
+    // that nothing here did — it makes an ordinary spin matter to a later one.
+    cascade: { label: "The Vault Falls" },
+    // Three breaks in one spin pays out everything the meter has been holding. `need` is the number of
+    // CASCADES, not of wins; `slots` is how many spins the meter remembers. Both live here rather than in
+    // the engine so the cabinet owns its own feature, the way every other one does.
+    winAgain: { slots: 5, need: 3, label: "WIN IT AGAIN" },
+    second: { kind: "gems", label: "The Gem Vault" },
 };
 
 export const SLOTS5 = { slot: HUNT, slot2: HARVEST, slot3: DEEP, slot4: MENAGERIE, slot5: VAULT };
@@ -609,6 +629,71 @@ export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } =
     return { picked, spins, mult };
 }
 
+// ── THE VAULT'S GEM PICK ─────────────────────────────────────────────────────────────────────────────────────
+// Luke, describing the machine he wants the Vault to be: "there's a bonus game where there's these three spy
+// glasses — if you get three scattered you initiate the bonus where you pick a bunch of different gems and
+// then it reveals what's behind them, and it shows you on the bottom the different prizes associated with the
+// gems... and then when you finally get the slots all filled that gives you that prize."
+//
+// So it is a COLLECTION, not a ladder you climb. Four gems, four prizes, and every pick is a stone going into
+// one of four sets. The first set to fill pays and the bonus ends — which means every tile you turn is good
+// for somebody and the tension is which of the four is going to get there.
+//
+// WHY THE RARE ONE NEEDS MORE OF ITSELF, not just fewer on the board: if the diamond were simply scarce you
+// would know inside two picks that it was gone. Needing SIX of them keeps it alive and losable deep into the
+// board, which is the whole drama — you can be one diamond short when the ambers fill and it is over.
+//
+// The server lays out the whole board and the ORDER it will come out in; the screen maps the tile a finger
+// landed on to the next thing in that order. Same honesty as the Warren: pretending the chosen tile decides
+// the outcome would be a lie, and pretending it does not matter which one you touched would look broken.
+// `pay` is a multiple of the TOTAL BET, and `need` is how many of that stone fill its set.
+// NOTHING NEW WAS DRAWN. The Jeweller already has six stones at five cuts each (public/images/gems), so the
+// four sets are four of those — and the CUT climbs with the set, so the stone you are chasing is visibly the
+// better rock as well as the bigger number. The reference machine's top prize is a diamond and we do not have
+// one; a tier-five ruby is the same idea in this game's own palette.
+export const GEM_SETS = [
+    { key: "topaz", name: "Topaz", need: 4, pay: 8, art: "/images/gems/topaz_t2.png", color: "#ffc74d" },
+    { key: "sapphire", name: "Sapphire", need: 4, pay: 18, art: "/images/gems/sapphire_t3.png", color: "#5aa9ff" },
+    { key: "emerald", name: "Emerald", need: 5, pay: 45, art: "/images/gems/emerald_t4.png", color: "#4bd88a" },
+    { key: "ruby", name: "Ruby", need: 5, pay: 200, art: "/images/gems/ruby_t5.png", color: "#ff5470" },
+];
+// TWENTY-FOUR TILES, four across and six down, and the composition is the whole balance of the bonus — the
+// prizes do not have odds of their own, they fall out of which set gets there first.
+//
+// Tuned by simulation, not by feel. The first pass gave amber 79% and the two good stones LITERALLY ZERO:
+// amber needed three and had seven on the board, so it was always home before anything else had started.
+// Sapphire and emerald carrying the same need as the set below them is what keeps all four in the race —
+// the difference between them is how many are down there, not how many you must find.
+//
+//   topaz 53.8%   sapphire 33.3%   emerald 10.0%   ruby 2.9%
+const GEM_BAG = { topaz: 7, sapphire: 6, emerald: 6, ruby: 5 };
+
+export function runGems(m, { lineBet = 1, rng = Math.random } = {}) {
+    const bag = [];
+    for (const [key, n] of Object.entries(GEM_BAG)) for (let i = 0; i < n; i += 1) bag.push(key);
+    for (let i = bag.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rng() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    const need = Object.fromEntries(GEM_SETS.map((g) => [g.key, g.need]));
+    const have = Object.fromEntries(GEM_SETS.map((g) => [g.key, 0]));
+    const order = [];
+    let won = null;
+    for (const key of bag) {
+        order.push(key);
+        have[key] += 1;
+        if (have[key] >= need[key]) { won = key; break; }
+    }
+    // ── THE BOARD ALWAYS PAYS ────────────────────────────────────────────────────────────────────────────
+    // A bag that runs out with nothing filled would be a bonus you can lose, which this is not — three
+    // scatters is the rarest thing on the cabinet and it must never resolve to a shrug. The composition
+    // makes it unreachable in practice; this is the guard that means I do not have to prove that by hand.
+    if (!won) won = GEM_SETS[0].key;
+    const set = GEM_SETS.find((g) => g.key === won) || GEM_SETS[0];
+    const total = set.pay * lineBet * LINES.length;
+    return { order, have, won, total, sets: GEM_SETS.map((g) => ({ ...g })) };
+}
+
 // ── CASCADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "we should have one that cascades... the winning paylines get fractured, and then they break, and then
 // the new symbols fall down, and then there can be increased multipliers based on how many times that happens
@@ -858,7 +943,12 @@ export function runHold(m, cfg, { lineBet = 1, rng = Math.random } = {}) {
 // Everything a single press of the button can turn into, resolved in one place so the simulator and the live
 // machine cannot disagree about what a spin is worth. `offerId` is the member's choice when the free spins
 // trigger; the simulator passes a fixed one, the real machine passes what they tapped.
-export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = {}) {
+// `meter` is the Win It Again row as it stood BEFORE this spin, in multiples of the bet. It is a parameter
+// rather than something the caller settles afterwards for one reason: check-slot5.mjs has to be able to see
+// what the feature actually pays. The first cut settled it in spinSlot5, and the gate — which simulates
+// through playSpin — reported the Vault putting 0.00% of its money in features while quietly under-counting
+// its whole return. A gate that cannot see a feature is a gate that lies about the machine.
+export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", meter = [] } = {}) {
     const lineBet = bet / LINES.length;
     const grid = spinGrid(m, rng);
 
@@ -876,14 +966,21 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
         : first;
 
     let total = base.total;
-    let free = null; let locked = null; let hold = null; let built = null; let warren = null;
+    let free = null; let locked = null; let hold = null; let built = null; let warren = null; let gems = null;
 
     // ── EARNED BY WATCHING ───────────────────────────────────────────────────────────────────────────
     // Enough consecutive breaks opens the free round whether or not a scatter ever landed. It is the only
     // way into a bonus on this floor that has nothing to do with what the reels stopped on.
     const byCascade = Boolean(chain && m.cascade && chain.cascades >= m.cascade.trigger);
 
-    if (first.freeSpins || byCascade) {
+    // ── THE VAULT'S SCATTER OPENS A COLLECTION, NOT A ROUND ──────────────────────────────────────────
+    // Three moons on this cabinet are the gem pick — see runGems. It is checked before the free-round
+    // branch rather than inside it because this machine HAS no free round: the scatter is its whole bonus,
+    // which is what the reference does and what makes the meter the thing you play for in between.
+    if (first.freeSpins && m.second?.kind === "gems") {
+        gems = runGems(m, { lineBet, rng });
+        total += gems.total;
+    } else if (first.freeSpins || byCascade) {
         let offer;
         if (m.free?.kind === "built") {
             // THE VAULT BUILDS ITS OWN. The picking happens first and decides the round that follows.
@@ -932,5 +1029,21 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid" } = 
             total += locked.total;
         }
     }
-    return { grid, base, chain, free, locked, hold, built, warren, total, bet };
+    // ── THE METER FILLS, AND THREE TUMBLES EMPTY IT ──────────────────────────────────────────────────
+    // This spin's own win goes on FIRST and then the whole row is paid, which is what the reference does and
+    // what the screenshot shows — 50 + 75 + 200 = 325, the last of those being the spin that triggered it.
+    // Paying the row but leaving out the spin that opened it would be the machine keeping the best one.
+    let nextMeter = m.winAgain ? meter.slice(-m.winAgain.slots) : [];
+    let winAgain = null;
+    if (m.winAgain) {
+        if (total > 0) nextMeter = [...nextMeter, total / bet].slice(-m.winAgain.slots);
+        if (chain && chain.cascades >= m.winAgain.need) {
+            const paid = nextMeter.reduce((a, n) => a + n, 0);
+            total += paid * bet;
+            winAgain = { paid, cascades: chain.cascades, need: m.winAgain.need,
+                slots: m.winAgain.slots, label: m.winAgain.label, row: nextMeter };
+            nextMeter = [];
+        }
+    }
+    return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter, total, bet };
 }

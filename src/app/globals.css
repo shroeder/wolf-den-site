@@ -19761,3 +19761,108 @@ body.cas-seated .social-fab { display: none; }
 /* THE DESCRIPTION STAYS ON A PHONE. It was hidden under 380px to keep the row to one line, and the result
    was a column of bare names — "Lucky Lure" tells you nothing about what tapping Use is going to do, which
    is the entire question this panel exists to answer. It wraps instead; the row grows. */
+
+/* ══ THE GEM VAULT ════════════════════════════════════════════════════════════════════════════════════════
+   The Vault's scatter bonus — four collections filling at once, first one home pays. See GemVault.js.
+   Styled here rather than in the component because the cabinet mounts it over the reels and a styled-jsx
+   block would only ever reach the one component that owns it (same reason as the Warren). */
+.gv { position: relative; display: grid; gap: 12px; padding: 14px 12px 16px; border-radius: 16px;
+    background: radial-gradient(120% 80% at 50% 0%, rgba(90,60,140,.42), rgba(10,8,16,.96) 70%);
+    border: 1px solid rgba(255,226,150,.3); box-shadow: 0 8px 26px rgba(0,0,0,.55); isolation: isolate;
+    animation: penIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+.gv-head { display: grid; justify-items: center; gap: 2px; }
+.gv-kick { font-size: .62rem; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: #c9a24a; }
+.gv-title { font-size: 1.05rem; font-weight: 900; color: #f3e7c8; }
+
+/* FOUR ACROSS, SIX DOWN. Twenty-four covers on a 375px phone is 78px a tile with the gaps — big enough to
+   hit with a thumb without the board needing to scroll, which it must never do mid-pick. */
+.gv-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.gv-tile { position: relative; aspect-ratio: 1; border-radius: 11px; cursor: pointer; display: grid;
+    place-items: center; padding: 5px; transition: transform .12s ease, border-color .2s ease, background .2s ease;
+    background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
+    border: 1px solid rgba(255,255,255,.14); }
+.gv-tile:not(:disabled):active { transform: scale(.94); }
+.gv-tile:disabled { cursor: default; }
+.gv-lid { width: 44%; height: 44%; border-radius: 4px; background: rgba(255,226,150,.22);
+    box-shadow: inset 0 0 0 1px rgba(255,226,150,.3); transform: rotate(45deg); }
+.gv-tile.is-turned { background: color-mix(in srgb, var(--gem, #fff) 16%, rgba(0,0,0,.5));
+    border-color: color-mix(in srgb, var(--gem, #fff) 60%, transparent);
+    box-shadow: 0 0 14px -4px var(--gem, #fff); }
+.gv-tile img { width: 84%; height: 84%; object-fit: contain; animation: gvPop .33s cubic-bezier(.2,1.5,.4,1) both; }
+/* The stone leaves the tile it came out of, so the flight has somewhere to start from. */
+.gv-tile.is-flying img { opacity: 0; }
+@keyframes gvPop { from { transform: scale(.3) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* The stone travelling from the board down to its tray. Deliberately one element and a straight fall: an
+   arc between two measured DOM positions is a lot of machinery for a beat that lasts 600ms. */
+.gv-fly { position: absolute; left: 50%; top: 38%; width: 54px; height: 54px; object-fit: contain; z-index: 5;
+    pointer-events: none; animation: gvFly .62s cubic-bezier(.4,0,.6,1) both; }
+@keyframes gvFly {
+    0% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: translate(-50%, 240px) scale(.4); opacity: 0; }
+}
+
+/* ── THE FOUR SETS ── what each stone is worth and how many slots are still empty. */
+.gv-sets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.gv-set { display: grid; justify-items: center; gap: 3px; padding: 8px 4px 7px; border-radius: 12px;
+    background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.1);
+    transition: border-color .25s ease, background .25s ease, transform .25s ease; }
+.gv-set.is-live { border-color: color-mix(in srgb, var(--gem) 45%, transparent); }
+.gv-set-art { width: 30px; height: 30px; object-fit: contain; }
+.gv-set-pay { font-size: .72rem; font-weight: 900; color: var(--gem); font-variant-numeric: tabular-nums; }
+/* SLOTS, not a bar. "Two more" is a thing you read off four pips instantly and have to work out off a bar. */
+.gv-set-slots { display: flex; gap: 2.5px; }
+.gv-set-slots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.14);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); transition: background .2s ease, box-shadow .2s ease; }
+.gv-set-slots i.is-in { background: var(--gem); box-shadow: 0 0 7px var(--gem); }
+.gv-set.is-won { background: color-mix(in srgb, var(--gem) 22%, rgba(0,0,0,.5));
+    border-color: var(--gem); transform: translateY(-3px) scale(1.06);
+    box-shadow: 0 0 22px -4px var(--gem); animation: gvWon .7s ease both; }
+@keyframes gvWon { 0%, 100% { filter: none; } 40% { filter: brightness(1.7); } }
+
+.gv-won { position: absolute; inset: 0; z-index: 8; display: grid; align-content: center; justify-items: center;
+    gap: 1px; border-radius: 16px; background: radial-gradient(80% 60% at 50% 50%, rgba(0,0,0,.82), rgba(0,0,0,.95));
+    animation: gvWonIn .35s ease both; }
+@keyframes gvWonIn { from { opacity: 0; } to { opacity: 1; } }
+.gv-won-kick { font-size: .68rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: var(--gem); }
+.gv-won-n { font-size: 3rem; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px var(--gem); animation: gvPop .5s cubic-bezier(.2,1.5,.4,1) both; }
+.gv-won-sub { font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #9aa2ad; }
+@media (max-width: 360px) { .gv-set-art { width: 26px; height: 26px; } .gv-set-pay { font-size: .66rem; } }
+
+/* ══ WIN IT AGAIN ═════════════════════════════════════════════════════════════════════════════════════════
+   The Vault's row across the top — your last five wins, paid back in one go when a spin tumbles three times.
+   See WinAgainBar.js. It sits ABOVE the cabinet because that is where it is on the machine Luke is pointing
+   at, and because a meter under the reels is a meter nobody looks at while the reels are moving. */
+.wa { display: grid; gap: 5px; margin: 0 0 8px; padding: 7px 8px 8px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(24,44,86,.95), rgba(10,18,38,.95));
+    border: 1px solid rgba(120,180,255,.35); }
+.wa-title { text-align: center; font-size: .62rem; font-weight: 900; letter-spacing: .22em;
+    text-transform: uppercase; color: #9fd0ff; text-shadow: 0 0 10px rgba(90,170,255,.6); }
+/* Five slots and the total. The total is wider because it is the number the whole row exists to produce. */
+.wa-row { display: grid; grid-template-columns: repeat(5, 1fr) 1.35fr; gap: 3px; }
+.wa-slot, .wa-total { display: grid; justify-items: center; align-content: center; gap: 0; min-height: 30px;
+    padding: 3px 2px; border-radius: 6px; background: rgba(0,0,0,.45);
+    border: 1px solid rgba(120,180,255,.22); transition: background .18s ease, border-color .18s ease,
+    box-shadow .18s ease, transform .18s ease; }
+.wa-slot b, .wa-total b { font-size: .74rem; font-weight: 900; color: #dbe9ff; font-variant-numeric: tabular-nums;
+    line-height: 1.1; }
+.wa-slot em, .wa-total em { font-style: normal; font-size: .46rem; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: #6f89ad; }
+.wa-slot.is-full { border-color: rgba(120,180,255,.45); background: rgba(30,60,110,.6); }
+/* THE BOOM. Each slot in turn, and it stays lit — the row filling up left to right IS the animation, so a
+   light that came back off would undo the thing it is drawing. */
+.wa-slot.is-lit { background: linear-gradient(180deg, #ffe27a, #f3b23a); border-color: #fff3c4;
+    box-shadow: 0 0 16px rgba(255,210,90,.85); transform: translateY(-2px) scale(1.06); }
+.wa-slot.is-lit b { color: #2a1c06; }
+.wa-slot.is-lit em { color: #7a5a12; }
+.wa-total { background: rgba(0,0,0,.55); border-color: rgba(255,210,90,.3); }
+.wa-total b { color: #ffd75e; }
+.wa-total.is-paid { background: linear-gradient(180deg, #fff1b8, #ffc94d); border-color: #fff;
+    box-shadow: 0 0 26px rgba(255,210,90,.95); transform: scale(1.1); animation: waPaid .5s ease both; }
+.wa-total.is-paid b { color: #2a1c06; font-size: .92rem; }
+.wa-total.is-paid em { color: #7a5a12; }
+@keyframes waPaid { 0% { transform: scale(.85); } 60% { transform: scale(1.2); } 100% { transform: scale(1.1); } }
+.wa.is-firing { border-color: rgba(255,210,90,.7); box-shadow: 0 0 24px -6px rgba(255,210,90,.8); }
+@media (max-width: 360px) { .wa-slot b, .wa-total b { font-size: .66rem; } .wa-slot em, .wa-total em { display: none; } }

@@ -1,0 +1,12 @@
+-- ── WHAT THE VAULT REMEMBERS BETWEEN PULLS ───────────────────────────────────────────────────────────────────
+-- The Win It Again meter: the last few wins, held across spins, paid out in one go when a spin tumbles three
+-- times in a row. Luke, with the reference machine in hand: "every time you win an amount, that goes up top,
+-- and then if you get three cascades in a row... you win all the amount in the top right."
+--
+-- It belongs on mkt_casino_meter because that table is already "what a machine remembers about you", keyed by
+-- (buyer, machine) — the three-reel cabinets have been using it for their trays and streaks. A five-reel
+-- cabinet having state between pulls is new; the place to keep it is not.
+--
+-- IN STAKE UNITS, never gold and never chips, which is the rule the rest of that table already follows: a
+-- meter filled at one bet and emptied at another would pay out something nobody won.
+ALTER TABLE mkt_casino_meter ADD COLUMN IF NOT EXISTS recent JSONB NOT NULL DEFAULT '[]'::jsonb;

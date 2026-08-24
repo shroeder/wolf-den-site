@@ -49,8 +49,14 @@ for (const m of Object.values(SLOTS5)) {
     const buckets = { "under 1x": 0, "1-2x": 0, "2-5x": 0, "5-20x": 0, "20-100x": 0, "over 100x": 0 };
     let best = 0; let dry = 0; let worstDry = 0;
 
+    // ── THE METER RIDES ACROSS SPINS, SO THE SIMULATION HAS TO CARRY IT ──────────────────────────────
+    // The Vault's Win It Again row is state BETWEEN pulls (mkt_casino_meter). Simulating each spin from an
+    // empty meter would have reported a feature that pays nothing, which is exactly what the first run of
+    // this gate said. Carried here the same way the real play path carries it.
+    let meter = [];
     for (let i = 0; i < N; i += 1) {
-        const r = playSpin(m, { bet: BET, rng, offerId: "mid" });
+        const r = playSpin(m, { bet: BET, rng, offerId: "mid", meter });
+        meter = r.meter || [];
         paid += r.total;
         basePaid += r.base.total;
         if (r.free) { freePaid += r.free.total; freeRounds += 1; }
@@ -58,6 +64,10 @@ for (const m of Object.values(SLOTS5)) {
         // matters is how much of the machine lives in its second feature rather than which shape it is.
         if (r.pick) { pickPaid += r.pick.total; pickRounds += 1; }
         if (r.hold) { pickPaid += r.hold.total; pickRounds += 1; }
+        // The Vault's two, which are neither a free round nor a hold: the gem collection off its scatter,
+        // and the meter emptying. Both are "the money in the features" by any reading a player would use.
+        if (r.gems) { pickPaid += r.gems.total; pickRounds += 1; }
+        if (r.winAgain) { freePaid += r.winAgain.paid * BET; freeRounds += 1; }
         if (r.total > 0) {
             hits += 1;
             dry = 0;
