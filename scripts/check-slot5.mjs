@@ -5,11 +5,26 @@
 //   how often anything happens at all, how big the wins actually are, how long the dry spells run, how often
 //   the features come, and how much of the money is in them.
 //
-// The gate itself is one rule, and it is stricter than the RTP ceiling it replaces: every machine returns
-// 1.00x in CHIPS on average. There is no gold coming back from these machines — you stake gold and are paid
-// chips — so a "house edge" here would be meaningless and a "money printer" impossible. What matters instead
-// is that no cabinet is ever the smart pick, and that the wins are shaped like a machine somebody wants to
-// play. See the header of casino-slot5.js.
+// ── WHAT THIS GATE IS ACTUALLY FOR, AND WHAT IT IS NOT ───────────────────────────────────────────────────────
+// It used to demand that every machine return 1.00x in chips, and I spent a day serving that: every time a
+// new feature was added — cascades, the universal retrigger, the Warren, the Hoard loop — the machine came out
+// over 100% and I scaled the payouts back DOWN to hold the number. Luke, watching it happen: "are you trying
+// to balance the slots or what, don't do that please... when you do that you really kind of make everything
+// boring."
+//
+// He is right, and the old comment right here said why without noticing: CHIPS ARE TICKETS, NOT MONEY. You
+// stake gold, you are paid chips, and chips never convert back — chips.js has no path from chips to gold. So
+// 100% was an arbitrary constant. Holding it bought nothing, and it cost real features: the Deep Warren's
+// critters went from 84 to 44 and the geode from 560 to 430 purely to keep a number that protects nothing.
+//
+// WHAT THE RULE WAS ALWAYS FOR is the second half of its own error message — "so none is the smart pick".
+// That is about the five cabinets being level WITH EACH OTHER, not about where the floor sits. So that is
+// what it checks now: the SPREAD between the best and worst machine. The level itself is printed and left
+// alone, and raising the whole floor is a decision for Luke with one number, not something a gate can force
+// out of me a nerf at a time.
+//
+// The real sink was never the return anyway. It is what chips COST in the store, which is priced by hand.
+const SPREAD_TOLERANCE = 0.08;
 import { SLOTS5, LINES, playSpin, FREE_SPIN_OFFERS, runFreeSpins } from "../src/lib/marketplace/casino-slot5.js";
 
 const N = Number(process.env.SPINS || 400000);
@@ -23,6 +38,8 @@ function mulberry(seed) {
 }
 
 let failures = 0;
+// Every cabinet's return, collected as it is measured, so the spread can be judged at the end.
+const returns = [];
 
 for (const m of Object.values(SLOTS5)) {
     const rng = mulberry(20260823);
@@ -98,11 +115,8 @@ for (const m of Object.values(SLOTS5)) {
 
     }
 
-    // ── AND THE ONE HARD RULE ────────────────────────────────────────────────────────────────────────────
-    if (Math.abs(rtp - 1) > 0.03) {
-        failures += 1;
-        console.log(`\n  ✗ ${m.label} returns ${pct(rtp)} in chips; every machine must return 1.00x ±3% so none is the smart pick`);
-    }
+    // The level is REPORTED, not policed — see the note at the top. What is policed is the spread, below.
+    returns.push({ label: m.label, rtp });
     if (hits / N < 0.25) {
         failures += 1;
         console.log(`  ✗ only ${pct(hits / N)} of spins do anything — the whole point of twenty lines is that the screen stays alive`);
@@ -113,7 +127,28 @@ for (const m of Object.values(SLOTS5)) {
     }
 }
 
+// ── THE ONE HARD RULE: LEVEL WITH EACH OTHER ─────────────────────────────────────────
+// Not "at 100%". See the note at the top of this file. The floor can sit wherever Luke wants it; what it may
+// not do is make one cabinet the obviously correct place to stand.
+const lo = Math.min(...returns.map((r) => r.rtp));
+const hi = Math.max(...returns.map((r) => r.rtp));
+const mid = returns.reduce((a, r) => a + r.rtp, 0) / returns.length;
+const spread = hi / lo - 1;
+console.log(`
+══ THE FLOOR ═══════════════════════════════════════`);
+for (const r of returns) console.log(`  ${r.label.padEnd(16)} ${pct(r.rtp)}`);
+console.log(`  ${"the floor".padEnd(16)} ${pct(mid)} on average`);
+if (spread > SPREAD_TOLERANCE) {
+    failures += 1;
+    console.log(`
+  ✗ the best cabinet pays ${pct(spread)} more than the worst — that makes one of them the smart pick.`);
+    console.log(`    Level them WITH EACH OTHER. Do NOT level them down to a target: the height of the floor is`);
+    console.log(`    a design decision, and chips are tickets rather than money.`);
+} else {
+    console.log(`  spread ${pct(spread)} — no cabinet is the smart pick (tolerance ${pct(SPREAD_TOLERANCE)}).`);
+}
+
 console.log(failures
     ? `\ncheck:slot5 — ${failures} problem(s).`
-    : `\ncheck:slot5 — every machine returns 1.00x in chips, the screen stays alive, and the money is in the features.`);
+    : `\ncheck:slot5 — the five cabinets are level with each other, the screen stays alive, and the money is in the features.`);
 process.exit(failures ? 1 : 0);

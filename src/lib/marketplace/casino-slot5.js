@@ -715,7 +715,7 @@ const WARREN_STAGES = [
     { key: "sunken", name: "The Sunken Run", pups: [2, 4], value: 15 },
     { key: "ember", name: "The Ember Seam", pups: [2, 5], value: 27 },
     { key: "astral", name: "The Star Warren", pups: [3, 6], value: 48 },
-    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 44 },
+    { key: "kinghoard", name: "The Deep Warren", pups: [4, 8], value: 84 },
 ];
 // ── THE ROOM PAST THE LAST ROOM ──────────────────────────────────────────────────────────────────────────────
 // Three colossal geodes, and you crack exactly ONE — then you are put back on the Deep Warren's wall to look
@@ -727,7 +727,7 @@ const WARREN_STAGES = [
 // a coin flip and the loop would almost never run; at two the odds of getting back are 2/3, so a run that
 // reaches the bottom usually takes a couple of geodes and can, rarely, take five.
 const DEEP_ELDERS = 2;
-const HOARD_VALUE = 430;
+const HOARD_VALUE = 560;
 
 export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     // ── FIFTEEN, NOT NINE ────────────────────────────────────────────────────────────────────────────────
