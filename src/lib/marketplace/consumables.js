@@ -192,6 +192,76 @@ export async function activeBoosts(buyerId) {
     return out;
 }
 
+// ── WHICH SCREEN A CONSUMABLE BELONGS TO ─────────────────────────────────────────────────────────────────────
+// Kaishiern: "And a button to use consumables on tier respective screens. With an icon to say if they have
+// been used already/ are active."
+//
+// He is describing the shape of the problem exactly. Everything you own lives on ONE stash screen inside the
+// store, and every one of these things is spent somewhere else — a Tailwind Charm is only ever interesting
+// while you are looking at a voyage, a Harvest Charm while you are looking at crops. So the answer to "do I
+// have anything that helps here" was: leave, go to the store, read a list of forty, come back.
+//
+// DERIVED FROM THE EFFECT, not a hand-kept list of ids. A list would need a line added every time a consumable
+// is, and the one that got missed would be the one nobody could find — which is the bug this is fixing. The
+// effect a thing HAS is already the honest answer to which screen it belongs on.
+const FEATURE_BY_EFFECT = {
+    strikes: "boss", damage: "boss",
+    recharge: "gear", reset_cooldown: "gear",
+    forge_enhance: "forge", forge_enchant: "forge",
+    pet_xp: "pets", pet_level: "pets",
+    spin_token: "spin", spin_reset: "spin",
+};
+
+/** Which feature screen this consumable belongs on, or null for one that belongs to no screen in particular. */
+export function featureOf(id) {
+    const t = CONSUMABLES[id]?.effect?.type || "";
+    if (FEATURE_BY_EFFECT[t]) return FEATURE_BY_EFFECT[t];
+    // The sail_* and farm_* families name their own home, and a new one added to either will land here without
+    // anybody remembering this function exists.
+    if (t.startsWith("sail_")) return "sail";
+    if (t.startsWith("farm_")) return "farm";
+    return null;   // the XP scrolls: instant, and no screen is more theirs than any other
+}
+
+/**
+ * What this member is holding FOR ONE SCREEN, and what is already running there.
+ *
+ * `active` is the other half of Kaishiern's ask — "an icon to say if they have been used already / are
+ * active". It is read from wherever each effect actually lives rather than from a second bookkeeping table:
+ * timed boosts on mkt_user_boost, the sailing one-shots as flags on mkt_sailing, the farm's charges as counts
+ * on mkt_buyer. A shelf that kept its own copy of "is this on" would be a copy that could be wrong.
+ */
+export async function featureConsumables(buyerId, feature) {
+    const f = String(feature || "").trim();
+    if (!buyerId || !f) return { feature: f, stash: [], active: [] };
+    const own = await db.query(`SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []);
+    const stash = own
+        .filter((r) => CONSUMABLES[r.consumable_id] && featureOf(r.consumable_id) === f)
+        .map((r) => {
+            const c = CONSUMABLES[r.consumable_id];
+            return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc,
+                count: Number(r.count) || 0, target: c.target || null };
+        })
+        // Cheapest-feeling first is wrong here; what you want at a glance is the thing you have most of, then
+        // by name so the shelf does not reshuffle itself between visits.
+        .sort((a, z) => z.count - a.count || a.name.localeCompare(z.name));
+
+    const active = [];
+    if (f === "boss") active.push(...(await activeBoosts(buyerId)));
+    if (f === "sail") {
+        const r = await db.queryOne(`SELECT dig_lure, force_encounter, force_merchant FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        if (r?.dig_lure) active.push({ kind: "sail_lure", label: "Next dig is charmed" });
+        if (r?.force_encounter) active.push({ kind: "sail_encounter", label: "Next voyage draws an encounter" });
+        if (r?.force_merchant) active.push({ kind: "sail_merchant", label: "Next landing meets the Gold Merchant" });
+    }
+    if (f === "farm") {
+        const r = await db.queryOne(`SELECT COALESCE(farm_harvest_luck,0)::int AS luck, COALESCE(farm_fertilizer,0)::int AS fert FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        if (r?.luck > 0) active.push({ kind: "farm_harvest_luck", label: `${r.luck} charmed harvest${r.luck === 1 ? "" : "es"} left` });
+        if (r?.fert > 0) active.push({ kind: "farm_fertilizer", label: `${r.fert} fertilizer in stock` });
+    }
+    return { feature: f, stash, active };
+}
+
 // --- Stash + shop -----------------------------------------------------------------------------------
 
 export async function listConsumables(buyerId) {

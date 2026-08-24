@@ -1,5 +1,6 @@
 import PetsClient from "@/components/PetsClient";
 import ViewPing from "@/components/ViewPing";
+import ConsumableShelf from "@/components/ConsumableShelf";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export default function PetsPage() {
         <>
             <ViewPing event="view_inventory" meta={{ section: "pets" }} />
             <PetsClient />
+            {/* Every treat in the game feeds the pet on the screen above it. */}
+            <ConsumableShelf feature="pets" title="Treats in your pack" />
         </>
     );
 }

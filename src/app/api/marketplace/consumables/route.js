@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { buyConsumable, listConsumables, useConsumable } from "@/lib/marketplace/consumables.js";
+import { buyConsumable, featureConsumables, listConsumables, useConsumable } from "@/lib/marketplace/consumables.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
 
@@ -13,11 +13,17 @@ function noStore(body, init = {}) {
 }
 
 // GET — the member's consumable stash + shop + active boosts.
-export async function GET() {
+//
+// `?feature=farm` narrows it to one screen's worth: what you hold that helps HERE, and what is already
+// running here. That is the whole payload the per-feature shelf needs, and sending the other thirty-odd rows
+// to a farm page so it can throw them away is a page that got slower to answer a smaller question.
+export async function GET(request) {
     return withRequestLogging(null, "GET /api/marketplace/consumables", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
+            const feature = new URL(request.url).searchParams.get("feature");
+            if (feature) return noStore(await featureConsumables(buyer.id, feature));
             return noStore(await listConsumables(buyer.id));
         } catch (error) {
             return internalError(error, { event: "marketplace.consumables.get.failure" });

@@ -5,6 +5,7 @@ import { featuredPackage } from "@/lib/marketplace/packages-server.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, resolveFarmOwner } from "@/lib/marketplace/farm.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import ConsumableShelf from "@/components/ConsumableShelf";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Farm | The Wolf Den", robots: { index: false } };
@@ -44,5 +45,20 @@ export default async function FarmPage({ searchParams }) {
     // The neighbour chips never showed it because they are plain <a> tags — a full page load remounts
     // everything. Keying on the OWNER makes the client remount on any route that changes who you are looking
     // at, whichever kind of navigation got you there.
-    return <FarmClient key={farm.owner?.id || ownerId} initial={farm} viewingAlias={farm.mine ? null : u} />;
+    return (
+        <>
+            <FarmClient key={farm.owner?.id || ownerId} initial={farm} viewingAlias={farm.mine ? null : u} />
+            {/* ── WHAT IS IN THE SHED ──────────────────────────────────────────────────────────────────
+                Growth Tonics, Harvest Charms, fertilizer, seed packs, whistles — all of them are spent on
+                the farm above and all of them lived on a stash screen inside the store. Kaishiern asked for
+                this. Only on YOUR farm: on somebody else's it would be offering to spend your things on
+                their crops.
+
+                A HARD RELOAD after a use, and deliberately. FarmClient seeds every one of its useState calls
+                from `initial` (see the note above about why this page is keyed), so new server data does not
+                reach it — and a Growth Tonic that takes 60% off your slowest crop has to move the timer you
+                are looking at or it reads as having done nothing. */}
+            {farm.mine ? <ConsumableShelf feature="farm" title="In your shed" reloadOnUse /> : null}
+        </>
+    );
 }

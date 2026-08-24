@@ -18,6 +18,7 @@ import Quartermaster from "@/components/Quartermaster";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
+import ConsumableShelf from "@/components/ConsumableShelf";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -1187,6 +1188,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </button>
                 ))}
             </div>
+
+            {/* ── WHAT YOU ARE CARRYING FOR THE SEA ────────────────────────────────────────────────────────
+                Tailwind Charms, Raiding Horns, Prospector's Charms, Storm in a Bottle — every one of them is
+                spent on a voyage, a raid or a dig, and every one of them lived on a stash screen inside the
+                store. Kaishiern asked for exactly this. `onUsed` reloads the page's own state, because a
+                tailwind that shaves two hours off a voyage has to move the clock you are looking at. On the
+                Helm because that is where the voyage is and where the page opens. */}
+            {station === "helm" ? <ConsumableShelf feature="sail" title="In your hold" onUsed={() => load()} /> : null}
 
             {station === "helm" ? <>
             {/* NO SECOND DOOR. There was a full "Ship battles" card here with its own Open button, duplicating

@@ -19705,3 +19705,51 @@ body.cas-seated .social-fab { display: none; }
 .wr-tally span { display: block; font-family: var(--font-display); font-size: 1.5rem; color: #ffe6a4;
     font-variant-numeric: tabular-nums; }
 .wr-end .wr-go { width: auto; min-width: 168px; }
+
+/* ══ THE PER-FEATURE CONSUMABLE SHELF ═════════════════════════════════════════════════════════════════════
+   What you are carrying that helps on THIS screen — see ConsumableShelf.js and Kaishiern's ask. Styled here
+   rather than in the component because it is mounted on six different pages and a styled-jsx block would
+   only ever reach one of them. */
+.cshelf { padding: 12px; }
+.cshelf-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 9px; }
+.cshelf-head b { font-size: 0.86rem; font-weight: 900; letter-spacing: 0.02em; color: #e7dcc4; }
+.cshelf-more { font-size: 0.7rem; font-weight: 800; color: #8b93a0; text-decoration: none; }
+@media (hover: hover) { .cshelf-more:hover { color: #e7dcc4; } }
+
+/* Already running. Green, because every one of these is a good thing currently true about your next action. */
+.cshelf-active { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 9px; }
+.cshelf-on { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px;
+    font-size: 0.68rem; font-weight: 800; color: #9ce8a0; background: rgba(126,213,126,0.12);
+    border: 1px solid rgba(126,213,126,0.32); }
+.cshelf-on i { width: 6px; height: 6px; border-radius: 50%; background: #8fe0a4; flex: none;
+    box-shadow: 0 0 6px rgba(143,224,164,0.9); }
+
+.cshelf-grid { display: grid; gap: 6px; }
+.cshelf-item { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 9px;
+    padding: 7px 8px; border-radius: 11px; background: rgba(255,255,255,0.035); border: 1px solid #2a2f37; }
+.cshelf-art { position: relative; width: 34px; height: 34px; display: grid; place-items: center; }
+.cshelf-img { width: 30px; height: 30px; object-fit: contain; font-size: 1.3rem; line-height: 1; }
+/* The count sits ON the art. Bottom-right, clear of the sprite's own silhouette. */
+.cshelf-n { position: absolute; right: -3px; bottom: -3px; min-width: 15px; padding: 0 3px; border-radius: 999px;
+    font-size: 0.6rem; font-weight: 900; text-align: center; color: #14100a; background: #ffd75e;
+    border: 1px solid rgba(0,0,0,0.45); }
+.cshelf-body { display: grid; gap: 1px; min-width: 0; }
+.cshelf-body b { font-size: 0.78rem; font-weight: 800; color: #e7dcc4; }
+.cshelf-body em { font-style: normal; font-size: 0.68rem; line-height: 1.35; color: #8b93a0; }
+.cshelf-use { flex: none; padding: 6px 13px; border-radius: 9px; cursor: pointer; font-size: 0.75rem;
+    font-weight: 900; color: #14100a; background: linear-gradient(180deg, #ffe27a, #f3b23a);
+    border: 1px solid #fff3c4; box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+.cshelf-use:not(:disabled):active { transform: translateY(2px); box-shadow: none; }
+.cshelf-use:disabled { opacity: 0.55; cursor: default; }
+/* A consumable that needs a target picker it cannot open from here says where it IS spent, rather than
+   offering a button that would dead-end. */
+/* The two consumables that need a target picker send you to the screen that has one, rather than offering a
+   Use button that would dead-end. Quiet, because it is a detour and not the thing this panel is for. */
+.cshelf-go { flex: none; padding: 6px 11px; border-radius: 9px; font-size: 0.72rem; font-weight: 800;
+    color: #cbb98a; background: rgba(255,255,255,0.05); border: 1px solid rgba(203,185,138,0.3);
+    text-decoration: none; white-space: nowrap; }
+.cshelf-ok { margin: 9px 0 0; font-size: 0.74rem; font-weight: 700; color: #9ce8a0; }
+.cshelf-err { margin: 9px 0 0; font-size: 0.74rem; font-weight: 700; color: #ff9a8a; }
+/* THE DESCRIPTION STAYS ON A PHONE. It was hidden under 380px to keep the row to one line, and the result
+   was a column of bare names — "Lucky Lure" tells you nothing about what tapping Use is going to do, which
+   is the entire question this panel exists to answer. It wraps instead; the row grows. */

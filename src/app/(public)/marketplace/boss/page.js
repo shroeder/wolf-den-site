@@ -4,6 +4,7 @@ import BossFightClient from "@/components/BossFightClient";
 import HappyHour from "@/components/HappyHour";
 import QuestsClient from "@/components/QuestsClient";
 import ViewPing from "@/components/ViewPing";
+import ConsumableShelf from "@/components/ConsumableShelf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,10 @@ export default function BossPage() {
             <section className="card">
                 <BossFightClient />
             </section>
+            {/* Adrenaline, Second Wind, Berserker's Brew — every one of them buys strikes or damage on the
+                fight directly above, and until now they could only be drunk from the store two screens away.
+                See ConsumableShelf. */}
+            <ConsumableShelf feature="boss" title="Potions for this fight" />
             <QuestsClient />
             <section className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <span>🎯 <strong>Need a hand from the pack?</strong> Post a bounty — attach gold, get help in the real world.</span>
