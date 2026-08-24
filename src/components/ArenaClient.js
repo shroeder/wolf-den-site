@@ -68,7 +68,7 @@ const REFUSALS = {
     brace_cooling: "You braced last beat. Not twice in a row — swing, drink, or cast.",
     // Kept for any bout still in flight that was opened under the old six-a-bout rule.
     no_braces: "You are out of braces for this bout.",
-    recently_fought: "You just fought them. Five more bouts before a rematch.",
+    recently_fought: "You just fought them. Three more bouts before a rematch.",
     // ── THE TAP THAT DID NOTHING AND SAID NOTHING ────────────────────────────────────────────────────────
     // `no_bout` means the server has no fight it can take a beat for, while the screen is still showing one.
     // That combination used to be completely silent: the refusal comes back carrying a full state, so it took
@@ -134,6 +134,15 @@ const PLAY_CHORE_MS = 170;
 // And what a deep queue multiplies all of it by.
 const PLAY_RUSH = 0.6;
 const PLAY_OPEN_MS = 700;
+// ── AND LONGER STILL WHEN THEY MOVE FIRST ────────────────────────────────────────────────────────────────────
+// Luke: "when it's their turn first, by the time you click fight on the enemy it's like they've already taken
+// their turn and you didn't even see what happened and you're at half health. There needs to be a wait until
+// the actual player's ready to see things."
+//
+// 700ms is measured from the moment the component mounts, and the player is still watching a list slide away
+// for most of it. So the one exchange nobody chose — the opponent's opening blow — was also the one nobody
+// watched. It is announced and held instead, which is what a round start is for.
+const PLAY_OPEN_FOE_MS = 1500;
 
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
 // own result and their incoming telegraph from being on screen at the same time — which they were, in the same
@@ -189,13 +198,19 @@ const COUNTER_WIND_MS = 150;
 // screen that worked out its own payout would be a second copy of the rule and the copies drift.
 const BAND_WORD = { brutal: "brutal", hard: "harder", even: "even", easy: "easier" };
 
+// ── HOW MANY OPPONENTS A PAGE SHOWS ──────────────────────────────────────────────────────────────────────────
+// Luke: "the list you should be able to load more to see more, otherwise you're stuck fighting the top 10
+// people." It was a hard .slice(0, 8) with nothing behind it, and because the list is sorted hardest-first
+// that meant the eight strongest members on a board of ninety-one were the only fights that existed. Anybody
+// who wanted an easier bout had no way to reach one.
+const FIGHT_PAGE = 8;
+
 function FIGHT_OPTIONS(st) {
     return (st?.targets || [])
         .map((t) => ({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
             damage: t.damage, health: t.health, reward: t.reward }))
         // Hardest first — the fight worth having should be the one under your thumb, not the safest one.
-        .sort((x, y) => (y.power || 0) - (x.power || 0))
-        .slice(0, 8);
+        .sort((x, y) => (y.power || 0) - (x.power || 0));
 }
 
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
@@ -871,6 +886,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // resolved at render off the live data; the empty string means "I folded them all up".
     const [openHouse, setOpenHouse] = useState(null);
     const [boardAll, setBoardAll] = useState(false);
+    // How many pages of opponents are on screen. Reset whenever the roster changes underneath, so beating
+    // somebody does not leave you looking at a page that no longer exists.
+    const [fightPage, setFightPage] = useState(1);
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     // How much of the log has already been turned into floating numbers. Without this the screen only ever
@@ -1152,8 +1170,25 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // bout cleared out from under the screen. Anything else only ever GROWS, and growth is the normal case:
     // the cursor stays where it is and the new lines animate from there.
     useEffect(() => {
-        if (logAll.length < shown) { setShown(0); clearRing(); }
+        if (logAll.length < shown) { setShown(0); clearRing(); announcedOpen.current = false; }
     }, [logAll.length, shown, clearRing]);
+
+    // ── WHO MOVES FIRST, SAID OUT LOUD ───────────────────────────────────────────────────────────────────
+    // Only when it is THEM: you pressing the button is its own announcement, and a banner over your own
+    // opening swing would be the machine explaining a thing you just did. Held for the same beat the stepper
+    // waits, so the first blow lands as the banner clears rather than under it.
+    // Not `opened` — that name is already a state further up this file, and shadowing it would compile.
+    const announcedOpen = useRef(false);
+    useEffect(() => {
+        if (announcedOpen.current || !logAll.length || shown > 0) return undefined;
+        announcedOpen.current = true;
+        if (logAll[0]?.who === "you") return undefined;
+        setAlert({ kind: "first", mine: false });
+        Sfx.warn();
+        Haptic.hit(0.4);
+        const t = setTimeout(() => setAlert(null), PLAY_OPEN_FOE_MS - 220);
+        return () => clearTimeout(t);
+    }, [logAll, shown]);
 
     // ── NOT EVERY LINE DESERVES THE SAME HALF SECOND ─────────────────────────────────────────────────────────
     // Luke: "every user interaction results in slow feedback, nothing feels good, it all feels laggy."
@@ -1169,11 +1204,30 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // gets a beat you can read and no more. And when the queue is deep the whole run compresses, because the
     // eighth line of a nine-line exchange is not being savoured by anybody.
     const beatMs = useCallback((line, queued) => {
-        const chore = line.bleedTick || line.burnTick || line.stunnedSkip || line.chilledSkip
-            || line.cast || line.guard || line.fever;
+        // ── A LINE THAT INTERRUPTS OWNS THE SCREEN FOR AS LONG AS ITS BANNER IS UP ────────────────────
+        // Luke: "I like the pop-ups but it's not halting the fight, so it's like the pop-ups are trying to
+        // catch up with something that already happened a while ago. It needs to halt the fight while that
+        // pop up happens."
+        //
+        // He is describing two clocks. This stepper decides how long a log line owns the screen; the banner
+        // schedules itself on its own timers in the beat player. They agreed about nothing, so the fight
+        // walked on underneath a banner still describing the line before last.
+        //
+        // Worse, the three lines that RAISE a banner were classed as chores here and given the SHORTEST
+        // beat in the file — 170ms, compressing to 102 under load — while the banner they raise holds for
+        // between 460 and 1000. The stepper was actively racing them.
+        //
+        // One clock now: a line that interrupts is worth its banner's dwell PLUS the beat its numbers would
+        // have had, and it does not compress, because the whole point of it is being read.
+        const hold = line.again ? ALERT_MS.again
+            : (line.stunnedSkip || line.chilledSkip) ? ALERT_MS.locked
+                : (line.burnTick || line.bleedTick) ? ALERT_MS.dot
+                    : 0;
+        const chore = line.cast || line.guard || line.fever;
         const base = chore ? PLAY_CHORE_MS : PLAY_BLOW_MS;
-        // Four or more still to come and the exchange is a run, not a beat: play it like one.
-        return queued > 3 ? Math.round(base * PLAY_RUSH) : base;
+        // Four or more still to come and the exchange is a run, not a beat: play it like one. A banner is
+        // never rushed — only the beat that follows it is.
+        return hold + (queued > 3 ? Math.round(base * PLAY_RUSH) : base);
     }, []);
 
     useEffect(() => {
@@ -1189,7 +1243,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             setShown((n) => n + 1);
             return undefined;
         }
-        const ms = shown === 0 ? PLAY_OPEN_MS : beatMs(logAll[shown], queued);
+        const theyOpen = shown === 0 && logAll[0]?.who !== "you";
+        const ms = shown === 0 ? (theyOpen ? PLAY_OPEN_FOE_MS : PLAY_OPEN_MS) : beatMs(logAll[shown], queued);
         const id = setTimeout(() => setShown((n) => n + 1), ms);
         return () => clearTimeout(id);
     }, [logAll, shown, beatMs]);
@@ -2279,10 +2334,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         because "frozen" without a number is not information you can act on. */}
                     {alert ? (
                         <div className={`ar-alert is-${alert.kind}${alert.mine ? " is-mine" : ""}`} role="status">
-                            <b>{alert.kind === "again" ? "EXTRA TURN"
-                                : alert.kind === "locked" ? (alert.frozen ? "FROZEN" : "STUNNED")
-                                    : (alert.bleed ? "BLEEDING" : "BURNING")}</b>
-                            <i>{alert.kind === "again"
+                            <b>{alert.kind === "first" ? "THEY MOVE FIRST"
+                                : alert.kind === "again" ? "EXTRA TURN"
+                                    : alert.kind === "locked" ? (alert.frozen ? "FROZEN" : "STUNNED")
+                                        : (alert.bleed ? "BLEEDING" : "BURNING")}</b>
+                            <i>{alert.kind === "first" ? `${bout.foe.name} opens`
+                                : alert.kind === "again"
                                 ? (alert.mine ? "you go again" : `${bout.foe.name} goes again`)
                                 : alert.kind === "locked"
                                     ? (alert.mine
@@ -2881,7 +2938,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     Gauntlet tiers in ONE list: they resolve to the same thing server-side, and splitting
                     them on screen would be asking somebody to compare two ladders to answer one question. */}
                 {(() => {
-                    const opts = FIGHT_OPTIONS(st);
+                    const all = FIGHT_OPTIONS(st);
+                    const opts = all.slice(0, fightPage * FIGHT_PAGE);
                     // The biggest purse on the board, so one row can be flagged as the one worth taking.
                     // Computed over what is SHOWN, not over the whole roster — a badge pointing at a fight
                     // that is not on screen is a badge that lies.
@@ -2921,6 +2979,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             </button>
                         );
                     });
+                })()}
+                {/* ── AND THE REST OF THE BOARD ───────────────────────────────────────────────────────
+                    Luke: "the list you should be able to load more to see more, otherwise you're stuck
+                    fighting the top 10 people." Sorted hardest-first, a fixed page meant the strongest
+                    handful were the only fights that existed and anybody wanting an easier one had no
+                    route to it. */}
+                {(() => {
+                    const total = FIGHT_OPTIONS(st).length;
+                    const seen = Math.min(total, fightPage * FIGHT_PAGE);
+                    if (seen >= total) return null;
+                    return (
+                        <button type="button" className="ar-more" onClick={() => { Sfx.ui(); setFightPage((n) => n + 1); }}>
+                            Load more — {total - seen} further down the board
+                        </button>
+                    );
                 })()}
                 {/* The old behaviour, kept as one row rather than as the only option: somebody who does not
                     want to choose should not have to. */}
@@ -3793,6 +3866,9 @@ function Styles() {
             .ar-alert.is-locked b { color: #9fe0ff; }
             .ar-alert.is-dot { background: radial-gradient(circle at 50% 45%, rgba(255,120,50,.2), rgba(10,4,4,.62) 68%); }
             .ar-alert.is-dot b { font-size: 1.5rem; color: #ff9a5c; }
+            /* The round start, when the opening blow is not yours. Red, because it is a warning. */
+            .ar-alert.is-first { background: radial-gradient(circle at 50% 45%, rgba(255,90,70,.3), rgba(10,4,4,.88) 66%); }
+            .ar-alert.is-first b { font-size: 1.7rem; color: #ff9f9f; }
             /* YOUR extra turn is the good one — it is the only version of this banner that is a reward. */
             .ar-alert.is-again.is-mine { background: radial-gradient(circle at 50% 45%, rgba(140,255,190,.3), rgba(4,10,8,.86) 66%); }
             .ar-alert.is-again.is-mine b { color: #8bf0b4; }

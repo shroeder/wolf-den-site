@@ -735,8 +735,18 @@ async function purserBits(buyerId) {
 // Counted over bouts YOU CHALLENGED, not ones you defended. Being attacked is not a choice, and blocking a
 // rematch because somebody keeps picking you would punish the person who did nothing.
 //
-// The board carries 91 members, so removing five can never leave you with nobody to fight.
+// The board carries 91 members, so removing a few can never leave you with nobody to fight.
+//
+// ── TWO NUMBERS, BECAUSE THERE ARE TWO SITUATIONS ────────────────────────────────────────────────────────────
+// Luke: "instead of the last five fights that rule should be the last three fights. Five was only for the auto
+// match, but when you're actually SELECTING a fight, three is probably more appropriate."
+//
+// He is drawing a real distinction. When the machine picks for you, a wide block is free — you never see what
+// it skipped, and a rematch you did not ask for is the thing the rule exists to stop. When YOU are looking at
+// a list and choosing, every blocked name is one fewer option on a board you can see, and the cost of the rule
+// is visible in a way it never is for auto-match.
 export const REMATCH_BLOCK = 5;
+export const REMATCH_BLOCK_PICK = 3;
 export async function recentPvpFoes(buyerId, limit = REMATCH_BLOCK) {
 if (!buyerId) return new Set();
 // npc_tier IS NULL is what a member-vs-member bout looks like; the NPC ladder writes a tier.
@@ -835,8 +845,18 @@ export async function getArenaState(buyerId, pre = {}) {
     // is CSS with no JSX left, and nothing renders this list any more — every fight goes through Find a fight.
     // A flag nobody draws is the Den's favourite bug, so the rule lives where the choice is actually made:
     // matchArenaOpponent skips them, and startBout refuses them.
+    // ── AND IT DOES NOT OFFER WHAT IT WILL REFUSE ────────────────────────────────────────────────────
+    // Luke: "if you fought them in the last five turns it baits you into clicking them and then it says you
+    // can't fight them. Just hide them from the list — there's no point having them in the list."
+    //
+    // The comment that used to sit here argued the opposite: that a `recentlyFought` flag was a flag nobody
+    // drew, so the rule should live only where the choice is MADE — matchArenaOpponent skips them and
+    // startBout refuses them. That was right about the flag and wrong about the list. A name you can tap and
+    // are then told off for tapping is worse than either drawing a flag or hiding the row, and hiding it is
+    // the cheaper of those two.
+    const blocked = await recentPvpFoes(buyerId, REMATCH_BLOCK_PICK).catch(() => new Set());
     const targets = board
-        .filter((o) => o.id !== buyerId)
+        .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)))
         .map((o) => ({ ...o, reward: {
             vp: vpPreview(myPower, o.power),
             // A member, so the PvP premium applies — the card must promise what finishBout will pay.
@@ -1706,9 +1726,13 @@ export async function startBout(buyerId, targetId = null) {
 
     // In parallel: they share no inputs, and serialising them added a whole round trip to the press that was
     // timing out. ~390ms and ~a loadout assembly, previously one after the other for no reason.
-    const [board, me, blockedFoes, blockedBands] = await Promise.all([
+    // TWO BLOCK WIDTHS, and which one applies depends on who did the choosing. `blockedFoes` is the wide one
+    // and belongs to auto-match, where you never see what was skipped. `pickBlocked` is the narrow one and
+    // belongs to a name you tapped off a list — see the note on REMATCH_BLOCK_PICK.
+    const [board, me, blockedFoes, pickBlocked, blockedBands] = await Promise.all([
         standings(), kitFor(buyerId),
         recentPvpFoes(buyerId).catch(() => new Set()),
+        recentPvpFoes(buyerId, REMATCH_BLOCK_PICK).catch(() => new Set()),
         recentNpcBands(buyerId).catch(() => new Set()),
     ]);
     const myPower = arenaRating(me);
@@ -1795,7 +1819,7 @@ export async function startBout(buyerId, targetId = null) {
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         // The board draws these as unavailable; this is what makes them unavailable. A crafted POST is the
         // only way to reach this line, and it gets the same answer the screen gave.
-        if (blockedFoes.has(String(foe.id))) {
+        if (pickBlocked.has(String(foe.id))) {
             return { ok: false, error: "recently_fought", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
         foeKit = await kitFor(foe.id);
