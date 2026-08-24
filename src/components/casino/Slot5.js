@@ -131,7 +131,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
     // bet is owned by the room (every cabinet shares it) and a second copy here would drift from it.
     const betIndex = Math.max(0, stakes.indexOf(bet));
-    const locked = busy || spinning || phase === "pick";
+    // ── AND YOU CANNOT PULL WHAT YOU CANNOT PAY FOR ──────────────────────────────────────────────────────
+    // The server has always refused an unaffordable spin, but the button did not, so pressing it did
+    // NOTHING: the reels sat still, no sound, no message, and the only way to work out why was to look at
+    // the balance and do the arithmetic yourself. A control that is live and does nothing is worse than one
+    // that is plainly off — the second tells you something, the first reads as a broken machine.
+    const broke = Number(gold ?? 0) < Number(bet ?? 0);
+    const locked = busy || spinning || phase === "pick" || broke;
     const step = (d) => {
         const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
         if (next !== bet) { onBet?.(next); Cas.chips(); }
@@ -854,6 +860,15 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
+            {/* Says how far short, because "not enough" without a number is a dead end — the member has to
+                either lower the bet or go and earn, and both need the size of the gap. */}
+            {broke ? (
+                <p className="s5-short">
+                    {(Number(bet) - Number(gold ?? 0)).toLocaleString()} more gold for a {Number(bet).toLocaleString()} spin
+                    {bet > (stakes[0] ?? 0) ? <> — or step the bet down</> : null}
+                </p>
+            ) : null}
+
             {/* ── THE CONTROL PANEL ───────────────────────────────────────────────────────────────────
                 Luke: "proffesionalize the wager buttons and spin button."
 
@@ -886,8 +901,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
                         onClick={() => step(1)}>+</button>
                 </div>
-                <button type="button" className="s5-spin" onClick={() => pull(null)} disabled={locked}>
-                    {spinning ? <span className="s5-spin-wait" aria-hidden="true" /> : "SPIN"}
+                <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}
+                    onClick={() => pull(null)} disabled={locked}>
+                    {spinning ? <span className="s5-spin-wait" aria-hidden="true" />
+                        : broke ? <span className="s5-spin-broke">NOT<br />ENOUGH</span>
+                        : "SPIN"}
                 </button>
             </div>
         </div>
