@@ -49,6 +49,23 @@ const EGGS = {
         + "gemstones — one ruby, one emerald, one sapphire — polished gleaming precious metal, jewelled and regal",
 };
 
+// ── AND WHAT IS LEFT OF THEM ─────────────────────────────────────────────────────────────────────────────────
+// Luke: "The egg needs to crack open." A burst and a vanish is not a crack — it reads as the egg being
+// deleted. What makes it a HATCH is that the shell is still there afterwards, broken, with nothing in it.
+//
+// One empty bottom-half per room, in the same material as the egg above it, so an opened space on the wall
+// says what happened to it rather than just going dim. Same jagged break line across all five so the wall
+// stays one set.
+const SHELLS = Object.fromEntries(Object.entries({
+    hollow: "a plain speckled brown egg shell",
+    sunken: "a pale blue-green barnacled egg shell with a band of dark seaweed",
+    ember: "a charcoal-black stone egg shell with cooling orange magma cracks",
+    astral: "a deep indigo crystal egg shell with faint violet constellation lines",
+    kinghoard: "an ornate golden egg shell wrapped in engraved gold filigree, one gemstone still set in it",
+}).map(([k, v]) => [`${k}-shell`, `the EMPTY BROKEN BOTTOM HALF of ${v}, cracked open and hollow, jagged `
+    + `zig-zag break line across the top, dark empty interior visible inside, a few small shell fragments `
+    + `fallen at its base, nothing inside it`]));
+
 // ── THE HOARD'S THREE ────────────────────────────────────────────────────────────────────────────────────────
 // The reference machine ends on three colossal onion domes filling the whole screen — "pick a dome". Luke:
 // "the dome actually a big thing full screen and it needs to look amazing. we wouldnt use a dome but
@@ -78,14 +95,16 @@ const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? 
 const FORCE = process.argv.includes("--force");
 
 let made = 0, skipped = 0;
-for (const [id, subject] of Object.entries({ ...EGGS, ...GEODES })) {
+for (const [id, subject] of Object.entries({ ...EGGS, ...SHELLS, ...GEODES })) {
     if (only && !only.has(id)) continue;
     const dest = `${OUT}/${id}.png`;
     if (fs.existsSync(dest) && !FORCE) { skipped += 1; continue; }
     const big = id.startsWith("geode-");
     // The eggs are 74px and must survive it — few shapes, no detail. The geodes fill most of a phone, so
     // the opposite note applies: they get to be intricate, and they should be.
-    const shape = big ? "" : "Upright egg shape, wider at the bottom, seen straight on. ";
+    const shape = big ? ""
+        : id.endsWith("-shell") ? "Seen straight on, sitting upright. "
+        : "Upright egg shape, wider at the bottom, seen straight on. ";
     const scale = big
         ? "Renders LARGE, roughly 300 pixels tall — rich detail, many facets, dramatic interior light."
         : "Must read clearly at 74 pixels tall — strong outline, few large shapes, no fine detail.";

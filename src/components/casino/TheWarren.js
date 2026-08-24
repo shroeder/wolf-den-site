@@ -254,8 +254,14 @@ export default function TheWarren({ warren, onDone }) {
                         disabled={busy || done || spent.includes(i)}
                         onClick={() => open(i)}
                         aria-label={inHoard ? "Open a mound" : "Open an egg"}>
+                        {/* ── AND THE SHELL STAYS ────────────────────────────────────────────────
+                            An opened space used to be the same egg at 16% opacity, which reads as an egg
+                            that faded rather than one that hatched. It is the empty broken bottom half
+                            now, in that room's own material — so the wall tells you what happened to
+                            every space on it, and a room half worked through looks it. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/images/casino/warren/${room}.png`} alt="" draggable="false" />
+                        <img src={`/images/casino/warren/${room}${spent.includes(i) && cracking !== i ? "-shell" : ""}.png`}
+                            alt="" draggable="false" />
                         {/* The shell coming apart: a flash inside it and a ring thrown outwards. Its own
                             element because the egg is an <img> and an image cannot carry pseudo-elements. */}
                         {cracking === i ? <i className="wr-break" aria-hidden="true" /> : null}

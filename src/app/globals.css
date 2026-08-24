@@ -19324,8 +19324,11 @@ body.cas-seated .social-fab { display: none; }
     100% { transform: scale(2.1); opacity: 0; box-shadow: 0 0 50px rgba(255, 246, 216, 0); }
 }
 
-/* An opened egg is gone rather than dimmed — the wall visibly empties as the room is worked through. */
-.wr-egg.is-open { opacity: .16; transform: scale(.8); cursor: default; filter: grayscale(.7); }
+/* An opened space is a BROKEN SHELL, not a ghost of an egg — see the note in TheWarren. Held back a
+   little so the unopened eggs stay the loudest thing on the wall, but not so far that the shell reads as
+   an absence: a room half worked through should look worked through. */
+.wr-egg.is-open { opacity: .62; transform: scale(.9); cursor: default; }
+.wr-egg.is-open img { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .7)) brightness(.75) saturate(.8); }
 
 /* Taller, because the crowd lives in it for a whole room rather than a second and a half. */
 .wr-floor { position: relative; min-height: 152px; align-self: end; }
