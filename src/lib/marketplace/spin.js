@@ -308,7 +308,22 @@ async function rollBonusGame(buyerId) {
     // runs rather than erroring on an empty board.
     const ownedSet = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
     const fresh = WHEEL_GEAR.filter((id) => !ownedSet.has(id));
-    const chosen = shuffle([...(fresh.length >= BOARD_ITEMS ? fresh : WHEEL_GEAR)]).slice(0, BOARD_ITEMS);
+    // ── THE FALLBACK WAS FIRING AT HALF A SET, NOT AT A FULL ONE ─────────────────────────────────────────
+    // Kaishiern: "What happens if you get a duplicate collectible? I got a second wolf fang blade from the
+    // wheel."
+    //
+    // The line above filters out what you hold, and then the old version of this one threw that away the
+    // moment `fresh` dropped below BOARD_ITEMS -- six. Ten pieces on the wheel, so from FIVE owned onwards
+    // the board went back to the full list and could hand you a piece you already had. Not an edge case at
+    // the end of a set: five of the thirty-four people with Wheelwarden pieces are at five or more right now,
+    // Kaishiern among them at exactly five, and Eric D is at nine.
+    //
+    // And a duplicate pays NOTHING. grantPiece is ON CONFLICT DO NOTHING; ownership is binary and permanent,
+    // so the bonus round declared a trophy, played the confetti and wrote no row.
+    //
+    // The board SHRINKS instead. Fewer kinds, still three tiles each, still an honest reveal -- a member two
+    // pieces from a set gets a six-tile board and both of them are things they do not own.
+    const chosen = shuffle([...(fresh.length ? fresh : WHEEL_GEAR)]).slice(0, BOARD_ITEMS);
     const tiles = shuffle(chosen.flatMap((id) => [id, id, id]));
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ board: tiles, flipped: [], done: false, need: 3 })]).catch(() => {});
     return { size: tiles.length, need: 3, roster: chosen.map(gearCard) };
@@ -330,9 +345,14 @@ export async function bonusFlip(buyerId, index) {
     let winner = null; let fullBoard = null;
     if (count >= (g.need || 3)) {
         g.done = true;
-        await grantPiece(buyerId, revealedId, "wheel_bonus").catch(() => {});
-        await trackActivity(buyerId, "spin_bonus_win", { item: revealedId }).catch(() => {});
-        winner = gearCard(revealedId);
+        // ── AND IF IT IS A DUPLICATE, THE CARD DOES NOT CLAIM OTHERWISE ──────────────────────────────
+        // Only reachable with a COMPLETE set now (see rollBonusGame), which nobody has yet -- Eric D is one
+        // piece away. grantPiece returns false when the row already existed, and that return was being
+        // thrown away, so the one case where the round pays nothing was also the case that looked identical
+        // to winning. What a finished set should be paid instead is Luke's number, not mine to invent.
+        const granted = await grantPiece(buyerId, revealedId, "wheel_bonus").catch(() => false);
+        await trackActivity(buyerId, granted ? "spin_bonus_win" : "spin_bonus_dupe", { item: revealedId }).catch(() => {});
+        winner = { ...gearCard(revealedId), duplicate: !granted };
         fullBoard = g.board.map(gearCard);
     }
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify(g)]).catch(() => {});

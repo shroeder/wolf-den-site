@@ -524,7 +524,14 @@ export default function SpinWheel() {
                                     <img src={bonus.won.sprite} alt="" className="cw-bonus-win-img" />
                                 </div>
                                 <div className="cw-bonus-win-rar">{(bonus.won.rarity || "rare").toUpperCase()}{bonus.won.slot ? ` · ${bonus.won.slot.replace("_", " ")}` : ""}</div>
-                                <div className="cw-bonus-win-txt">You won <b>{bonus.won.name}</b>!</div>
+                                {/* A duplicate is only reachable on a COMPLETE set (see rollBonusGame) and it
+                                    writes no row, so the card must not say you won a thing you already had.
+                                    It says what actually happened instead. */}
+                                <div className="cw-bonus-win-txt">
+                                    {bonus.won.duplicate
+                                        ? <>You already have <b>{bonus.won.name}</b> — the set is complete.</>
+                                        : <>You won <b>{bonus.won.name}</b>!</>}
+                                </div>
                                 {bonus.won.stats ? <div className="cw-bonus-win-stats">{bonus.won.stats}</div> : null}
                                 <button type="button" className="cw-collect" onClick={() => setBonus(null)}>Collect gear</button>
                             </div>
