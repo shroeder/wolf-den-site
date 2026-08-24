@@ -406,8 +406,35 @@ export default function BlacksmithClient({ initial }) {
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} elements={it.elements} />
                                 <span className="forge-card-name">{it.name}</span>
                                 {it.level > 0 ? <span className="forge-card-rankline"><ForgeRank level={it.level} size={22} /></span> : null}
-                                <span className="forge-card-stats">{it.stats || "—"}</span>
-                                {it.bonus ? <span className="forge-card-bonus">⚒ {it.bonus}</span> : null}
+                                {/* ── ONE LIST, AND IT IS THE FINAL NUMBERS ───────────────────────
+                                    Luke: "I don't understand why we don't just combine the stats instead
+                                    of having two complete sections one in green. Why don't we just show
+                                    the final stats on the items instead of having that delineation which
+                                    sucks up so much space."
+
+                                    It was the base stats as one run-on wrapped string, then the forge
+                                    bonus as a SECOND run-on wrapped string in a green box under it. Two
+                                    problems in one: it doubled the height of every card, and it made the
+                                    reader do the addition — the number that actually matters, what this
+                                    piece is worth right now, appeared nowhere on the card.
+
+                                    `statMap` is base + forge already merged and has been on this payload
+                                    the whole time; the card just never used it. One row per stat, label
+                                    left and value right, with the forged share noted on its own line
+                                    rather than in a block of its own. */}
+                                <span className="forge-card-stats">
+                                    {Object.entries(it.statMap || {}).length
+                                        ? Object.entries(it.statMap).map(([k, v]) => (
+                                            <span key={k} className={`forge-stat${it.forgedMap?.[k] ? " is-forged" : ""}`}>
+                                                <i>{statName(k)}</i>
+                                                <b>{v}{statSuffix(k)}
+                                                    {it.forgedMap?.[k]
+                                                        ? <u>+{it.forgedMap[k]}</u>
+                                                        : null}</b>
+                                            </span>
+                                        ))
+                                        : <span className="forge-stat"><i>—</i></span>}
+                                </span>
                                 {it.util ? <span className="forge-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</span> : null}
                                 {!it.affordable && powerScrolls > 0 ? <span className="forge-card-scroll">📜 Use Power Scroll</span> : null}
                                 {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
@@ -854,6 +881,15 @@ const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need
 // How a stat reads on screen. Kept in step with STAT_META server-side; anything unknown falls back to its key
 // rather than being dropped, so a new stat shows up as ugly instead of invisible.
 const STAT_UI = {
+    // ── THE PIECE'S OWN NUMBERS WERE MISSING FROM THIS MAP ───────────────────────────────────────────
+    // Every stat below `pet_bond` is an affix, and the seven above are what the piece IS — a weapon's
+    // damage and swing speed, a shield's block, armour. They were absent, so anything reading this map fell
+    // through to `k.replace(/_/g, " ")` and printed "base damage" in lower case, or dropped them where the
+    // lookup was used as a filter. That is the same list the salvage comparison reads.
+    base_damage: { label: "Damage", suffix: "" }, speed: { label: "Attack speed", suffix: "/s" },
+    armor: { label: "Armour", suffix: "" }, block_chance: { label: "Block", suffix: "%" },
+    vitality: { label: "Vitality", suffix: "" }, tenacity: { label: "Tenacity", suffix: "" },
+    pierce: { label: "Pierce", suffix: "" },
     might: { label: "Might", suffix: "" }, fortune: { label: "Fortune", suffix: "" },
     ferocity: { label: "Ferocity", suffix: "" }, crit_chance: { label: "Crit chance", suffix: "%" },
     crit_power: { label: "Crit power", suffix: "%" }, extra_strike: { label: "Extra strike", suffix: "%" },
@@ -1390,12 +1426,26 @@ export const FORGE_CSS = `
    thing. The price used to be the biggest, brightest text on the row — so five rows of "167/28 Iron Filings"
    read as a price list and the only thing that looked pressable in the whole card was the Enhance button
    underneath, which does something else entirely. */
-.forge-swap { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; width: 100%;
+/* ── THREE COLUMNS DO NOT FIT A PHONE ────────────────────────────────────────────────────────────────
+   This was 1fr / auto / auto: stat, cost, button. A grid's 1fr still has min-width:auto, so it will not
+   shrink below its own text, and both of the auto columns carry white-space:nowrap — so on a narrow
+   screen the three minimums add up to more than the row and the whole thing overflows to the RIGHT. Luke,
+   with a photo: "the reforge buttons are bleeding outside of the containing box." The longer the stat name,
+   the further out the pill sat, which is why it looked worse row by row.
+
+   Two columns instead. The stat and its price stack on the left and the pill sits beside them spanning
+   both, so nothing has to be narrower than its own words. */
+.forge-swap { display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "stat go" "cost go"; column-gap: 10px; row-gap: 2px; align-items: center;
+    width: 100%;
     padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
     color: #e6d9c2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.3); }
+.forge-swap-stat { grid-area: stat; }
+.forge-swap em { grid-area: cost; }
+.forge-swap-go { grid-area: go; }
 .forge-swap-stat { font-size: 14px; font-weight: 900; color: #ffd08a; }
 .forge-swap b { color: #ffd08a; }
-.forge-swap em { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+.forge-swap em { display: inline-flex; align-items: center; gap: 4px; min-width: 0;
     font-style: normal; font-size: 10.5px; font-weight: 700; color: #a4917a; }
 .forge-swap em.is-short { color: #ff9f9f; }
 /* A SOLID PILL, because "where do I click to change the stat" was the next question after the row stopped
@@ -1431,9 +1481,23 @@ export const FORGE_CSS = `
 .forge-art .item-art-img, .forge-er-art .item-art-img { width: 100% !important; height: 100% !important; }
 .forge-card-name { font-size: 14px; font-weight: 900; line-height: 1.15; color: #fff4e2; text-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 /* Inherent stats the item was BORN with — quiet, so the forged bonus can pop against them. */
-.forge-card-stats { font-size: 11px; color: #bda88c; line-height: 1.25; }
-/* What the FORGE added — a green pill that clearly stacks ON TOP of the base stats above. */
-.forge-card-bonus { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #a6f0b4; font-weight: 900; line-height: 1.2; background: rgba(80,210,120,0.14); border: 1px solid rgba(143,227,154,0.45); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+/* ── ONE ROW PER STAT ────────────────────────────────────────────────────────────────────────────────
+   Luke: "it's confusing when all the text overflows, I feel like all the different texts should have its
+   own area and it should be like a line properly."
+
+   It was a single run-on string that wrapped wherever it ran out of room, so "29 Damage · 0.96/s Attack
+   Speed · +8 Might" broke across three ragged lines and no two cards lined up with each other. A row each,
+   name on the left and number hard right, tabular figures so the column of numbers is actually a column.
+   The green pill that used to sit under it is gone — see the note in the JSX. */
+.forge-card-stats { display: grid; gap: 1px; width: 100%; font-size: 11px; line-height: 1.35; }
+.forge-stat { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.forge-stat i { font-style: normal; color: #bda88c; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.forge-stat b { flex: 0 0 auto; font-weight: 900; color: #e6d9c2; font-variant-numeric: tabular-nums; }
+/* The forge's share, on the line it belongs to rather than in a block of its own — so a piece that has
+   been worked on still says so, and says WHERE, without a second copy of the whole stat list. */
+.forge-stat.is-forged b { color: #ffd08a; }
+.forge-stat u { text-decoration: none; margin-left: 4px; font-size: 9.5px; font-weight: 900; color: #8fe39a; }
 .forge-card-attune { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #e0c8ff; font-weight: 900; line-height: 1.2; background: rgba(150,90,255,0.16); border: 1px solid rgba(184,120,255,0.5); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .forge-setchip { display: block; margin: 2px 0 0; font-size: 10px; font-weight: 800; line-height: 1.3; color: #ffd75e; }
 /* A collection piece pays for being OWNED, so melting one costs a bonus you already hold — called out
@@ -1606,7 +1670,15 @@ export const FORGE_CSS = `
 @keyframes forgeReveal { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes forgeRewardBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 /* ── enhance reveal (big, juicy, self-contained) ── */
-.forge-er { overflow: hidden; } /* clip the light rays so the glow never bleeds past the card */
+/* ── THE CLIP THAT ATE THE SCROLL ────────────────────────────────────────────────────────────────────
+   overflow:hidden here was for the light rays behind the item, and it silently defeated the scroll fix
+   three hundred lines above it: .forge-mg-scrim > * sets max-height and overflow-y:auto, this rule
+   has the same specificity and comes LATER, so it won. The result is the bug that fix was written for,
+   back again on exactly one card — Luke: "when I finish enhancing I can't scroll down to click the done
+   button." The Forged! button is the last thing in this card.
+
+   The rays are clipped by the stage they live in instead, which is where the clip belonged anyway. */
+.forge-er-stage { overflow: hidden; border-radius: 14px; }
 .forge-er-grade { font-size: 1.55rem; font-weight: 900; letter-spacing: 0.02em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); margin-bottom: 2px; animation: forgeGradeIn .4s cubic-bezier(.2,1.4,.3,1) both; }
 .forge-er-stage { position: relative; display: grid; place-items: center; width: 100%; height: 184px; margin: 2px 0 4px; }
 /* Rays are a smaller, dimmer frame so the ITEM is the star (not a giant starburst around a tiny sprite). */

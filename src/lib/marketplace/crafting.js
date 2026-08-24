@@ -769,6 +769,10 @@ export async function getForgeState(buyerId) {
             // subtracted from anything — deciding whether to melt a piece down means seeing the actual delta.
             statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
+            // WHICH lines the forge is responsible for, raw. `bonus` above is a rendered string and the card
+            // used to print it as a whole second block of stats underneath the first — see the note on the
+            // card. Keyed, the same figure can be shown ON the line it belongs to instead.
+            forgedMap: enh?.bonus || null,
             // No sockets left: this piece can still grow every line it has, forever, but it cannot gain a
             // NEW one — so a pixel-perfect run spent hoping for a brand-new stat cannot land. Said on the
             // card, before the parts go in. See forgeCeiling.
