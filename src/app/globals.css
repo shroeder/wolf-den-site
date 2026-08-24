@@ -18602,6 +18602,108 @@ body.cas-seated .social-fab { display: none; }
 .s5-go { padding: 7px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2);
     background: rgba(255,255,255,.07); color: #e8dcc6; font-weight: 800; font-size: 12px; cursor: pointer; }
 
+
+/* ══ THE TALLY ════════════════════════════════════════════════════════════════════════════════════════════
+   Luke: "at the very end, once you're completely done with your free spins, it tallies it all up for you."
+
+   The bonus round is one spin in a few hundred, and it used to end on one line of grey text and a button
+   marked "Go on" — the flattest possible finish to the best thing the machine does. This is the curtain
+   call instead: rays turn behind it, the cabinet's own wild comes out and dances the way the Warren's
+   Elder does, the number CLIMBS rather than appearing, and what made it is listed underneath.
+
+   Reusing the wild is deliberate — every cabinet already has a purpose-drawn one, so every cabinet gets
+   its own dancer for free, and the animal you were chasing all round is the animal that shows up. */
+.s5-tally { position: relative; overflow: hidden; isolation: isolate; padding: 14px 12px 13px;
+    border-radius: 15px; text-align: center; display: grid; justify-items: center; gap: 1px;
+    border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 55%, transparent);
+    background: radial-gradient(80% 70% at 50% 34%, color-mix(in srgb, var(--acc, #ffd75e) 20%, rgba(0,0,0,.55)), rgba(0,0,0,.88));
+    box-shadow: inset 0 0 44px rgba(0,0,0,.7), 0 0 34px -6px color-mix(in srgb, var(--acc, #ffd75e) 55%, transparent);
+    animation: s5TallyIn .42s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes s5TallyIn { from { transform: scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* RAYS, TURNING. The single cheapest way to say "this is the good screen" — a repeating-conic wedge fan
+   behind everything, spinning slowly enough that you feel it rather than watch it. */
+.s5-tally-rays { position: absolute; left: 50%; top: 34%; z-index: 0; width: 480px; height: 480px;
+    transform: translate(-50%, -50%); pointer-events: none; opacity: .42; filter: saturate(1.4);
+    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--acc, #ffd75e) 90%, transparent) 0 7deg, transparent 7deg 20deg);
+    -webkit-mask-image: radial-gradient(closest-side, #000 18%, transparent 76%);
+    mask-image: radial-gradient(closest-side, #000 18%, transparent 76%);
+    animation: s5TallyRays 22s linear infinite; }
+@keyframes s5TallyRays { to { rotate: 360deg; } }
+
+/* Thrown out from under the dancer's feet on arrival, so the energy comes FROM the animal. */
+.s5-tally-burst { position: absolute; left: 50%; top: 46%; z-index: 3; width: 0; height: 0; pointer-events: none; }
+.s5-tally-burst b { position: absolute; width: 7px; height: 7px; border-radius: 50%;
+    background: hsl(calc(34deg + var(--k) * 2.4deg) 98% 66%);
+    box-shadow: 0 0 12px hsl(calc(34deg + var(--k) * 2.4deg) 98% 66%);
+    animation: s5TallySpark 1s cubic-bezier(.15,.75,.35,1) both;
+    animation-delay: calc(var(--k) * 26ms); --a: calc(var(--k) * 25.7deg); }
+@keyframes s5TallySpark {
+    0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 0; }
+    22% { opacity: 1; }
+    100% { transform: rotate(var(--a)) translateY(-120px) scale(.9); opacity: 0; }
+}
+
+/* THE DANCER. Hatch with an overshoot, then a hop with a lean in it — a bounce on its own reads as a ball;
+   the rotation either side and the squash on landing are what make it an animal enjoying itself. */
+.s5-tally-star { position: relative; z-index: 2; width: 92px; height: 92px; object-fit: contain;
+    transform-origin: 50% 100%;
+    filter: drop-shadow(0 0 26px color-mix(in srgb, var(--acc, #ffd75e) 85%, transparent)) drop-shadow(0 6px 7px rgba(0,0,0,.7));
+    animation: s5TallyPop .44s cubic-bezier(.2,1.7,.35,1) both,
+               s5TallyDance .6s .44s ease-in-out infinite; }
+@keyframes s5TallyPop {
+    0% { transform: scale(.2) rotate(-32deg); opacity: 0; }
+    55% { transform: scale(1.2) rotate(7deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes s5TallyDance {
+    0% { transform: translateY(0) rotate(-5deg) scale(1, 1); }
+    25% { transform: translateY(-12px) rotate(0deg) scale(.96, 1.06); }
+    50% { transform: translateY(0) rotate(5deg) scale(1.05, .95); }
+    75% { transform: translateY(-12px) rotate(0deg) scale(.96, 1.06); }
+    100% { transform: translateY(0) rotate(-5deg) scale(1, 1); }
+}
+
+.s5-tally-kick { position: relative; z-index: 2; font-size: .6rem; font-weight: 900; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--acc, #ffd75e);
+    text-shadow: 0 0 14px color-mix(in srgb, var(--acc, #ffd75e) 80%, transparent);
+    animation: s5TallyRise .4s .3s cubic-bezier(.2,1.6,.4,1) both; }
+/* The number is the point of the screen, so it is the biggest thing on it and it never stops breathing. */
+.s5-tally-n { position: relative; z-index: 2; font-size: 3.1rem; font-weight: 900; line-height: 1.05;
+    color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 95%, transparent), 0 3px 0 rgba(0,0,0,.6);
+    animation: s5TallyRise .4s .38s cubic-bezier(.2,1.6,.4,1) both, s5TallyGlow 1.8s 1.6s ease-in-out infinite; }
+@keyframes s5TallyGlow {
+    0%, 100% { text-shadow: 0 0 30px color-mix(in srgb, var(--acc, #ffd75e) 90%, transparent), 0 3px 0 rgba(0,0,0,.6); }
+    50% { text-shadow: 0 0 52px color-mix(in srgb, var(--acc, #ffd75e) 100%, transparent), 0 0 14px #fff, 0 3px 0 rgba(0,0,0,.6); }
+}
+.s5-tally-sub { position: relative; z-index: 2; font-size: .6rem; font-weight: 900; letter-spacing: .22em;
+    text-transform: uppercase; color: #c9ab7c; animation: s5TallyRise .4s .46s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes s5TallyRise { from { transform: translateY(10px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* WHAT MADE IT. The total on its own is a number; the parts under it are the round you just played, and
+   they arrive one at a time so the reading has a rhythm. */
+.s5-tally-rows { position: relative; z-index: 2; display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 5px; margin: 9px 0 10px; }
+.s5-tally-rows span { display: grid; justify-items: center; gap: 1px; padding: 5px 11px; border-radius: 10px;
+    background: rgba(0,0,0,.5); border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 30%, transparent);
+    animation: s5TallyRise .34s cubic-bezier(.2,1.6,.4,1) both; }
+.s5-tally-rows span:nth-child(1) { animation-delay: .6s; }
+.s5-tally-rows span:nth-child(2) { animation-delay: .7s; }
+.s5-tally-rows span:nth-child(3) { animation-delay: .8s; }
+.s5-tally-rows span:nth-child(4) { animation-delay: .9s; }
+.s5-tally-rows i { font-style: normal; font-size: .48rem; font-weight: 900; letter-spacing: .14em;
+    text-transform: uppercase; color: #8f98a3; }
+.s5-tally-rows b { font-size: .95rem; font-weight: 900; color: #e8dcc6; font-variant-numeric: tabular-nums; }
+.s5-tally .s5-go { position: relative; z-index: 2; padding: 9px 26px; font-size: 13px; color: #1a1206;
+    border: 1px solid #fff3c4; background: linear-gradient(180deg, #ffe08a, #e8b63e);
+    box-shadow: 0 3px 0 #9c7418, 0 0 22px -4px rgba(255,200,90,.9);
+    animation: s5TallyRise .34s 1s cubic-bezier(.2,1.6,.4,1) both; }
+@media (max-width: 360px) {
+    .s5-tally-star { width: 76px; height: 76px; }
+    .s5-tally-n { font-size: 2.5rem; }
+}
+
 .s5-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .s5-chest { aspect-ratio: 1; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 14px;
     border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #8f98a3;

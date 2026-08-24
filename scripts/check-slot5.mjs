@@ -86,7 +86,7 @@ for (const m of Object.values(SLOTS5)) {
     console.log(`  best single play   ${best.toFixed(0)}x your bet`);
     console.log(`\n  where the money is`);
     console.log(`    base game        ${pct(basePaid / paid)}`);
-    console.log(`    free spins       ${pct(freePaid / paid)}   (1 in ${Math.round(N / freeRounds).toLocaleString()} spins)  ${m.free?.kind}`);
+    console.log(`    free spins       ${pct(freePaid / paid)}   (1 in ${Math.round(N / freeRounds).toLocaleString()} spins)  ${m.free?.kind || ""}`);
     console.log(`    ${String(m.second?.label || "second").padEnd(16)} ${pct(pickPaid / paid)}   (1 in ${Math.round(N / pickRounds).toLocaleString()} spins)`);
     console.log(`\n  of the wins you SEE`);
     for (const [k, v] of Object.entries(buckets)) {

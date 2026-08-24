@@ -86,6 +86,58 @@ const pent = (o = 0) => voice.scale[Math.floor(Math.random() * voice.scale.lengt
 // The nth note of the current cabinet's scale, for the sounds that CLIMB rather than scatter.
 const step = (i, o = 0) => voice.scale[((i % voice.scale.length) + voice.scale.length) % voice.scale.length] * (2 ** o);
 
+// ── THE TWO BONUS BEDS ───────────────────────────────────────────────────────────────────────────────────────
+// A bar at a time, so it can be stopped mid-round; see `Cas.music` for why one bar ahead rather than the whole
+// round. Both are built entirely out of `voice.scale`, which is what makes The Harvest's bonus pastoral and
+// The Deep's faintly wrong without either of them being written twice.
+//
+// Bar boundaries ride a setTimeout and so jitter by a handful of milliseconds; notes WITHIN a bar are
+// scheduled on the audio clock and are exact. At this tempo nobody can hear the seam, and the alternative is
+// a lookahead scheduler for something that only ever plays under a pick screen.
+const bed = { name: null, bar: 0, timer: null };
+
+// THE PICKER: sparse, slow, suspended. A held root underneath, a four-note figure climbing over it, one high
+// shimmer late in the bar and a breath of air at the end. Nothing resolves — the whole point of the screen is
+// that it has not happened yet, and the music is a question mark held for as long as you want to take.
+const bedPick = (bar) => {
+    const S = 0.3;
+    const r = (bar % 4) * 2;
+    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 2.3, gain: 0.05 });
+    tone({ at: 0.03, freq: voice.bodyHz * 0.75, type: "triangle", dur: 1.5, gain: 0.022 });
+    [0, 2, 4, 6].forEach((k, i) => {
+        tone({ at: k * S, freq: step(r + i, i > 2 ? 1 : 0), type: "triangle", dur: 0.55, gain: 0.034 });
+        tone({ at: k * S, freq: step(r + i, i > 2 ? 2 : 1), type: "sine", dur: 0.34, gain: 0.011 });
+    });
+    tone({ at: 5 * S, freq: step(r + 3, 2), type: "sine", dur: 1, gain: 0.017 });
+    noise({ at: 7 * S, dur: 0.22, gain: 0.013, type: "highpass", freq: 7000 });
+};
+bedPick.bar = 8 * 300;
+
+// THE FREE SPINS: the same key at nearly twice the tempo, with a floor under it. Bass on every other step, a
+// kick you feel rather than hear, hats between, and a melody that actually goes somewhere and comes back —
+// because this half is not a question, it is the thing being handed to you, and it should push.
+const FREE_MEL = [0, 2, 4, 2, 3, 4, 6, 4];
+const bedFree = (bar) => {
+    const S = 0.19;
+    const up = bar % 2;
+    for (let k = 0; k < 8; k += 1) {
+        if (k % 2 === 0) {
+            tone({ at: k * S, freq: voice.bodyHz * 0.5, type: "sawtooth", dur: 0.16, gain: 0.055 });
+            noise({ at: k * S, dur: 0.09, gain: 0.05, type: "lowpass", freq: 190, sweepTo: 60 });
+        } else {
+            noise({ at: k * S, dur: 0.035, gain: 0.014, type: "highpass", freq: 8000 });
+        }
+        const n = FREE_MEL[k] + up;
+        tone({ at: k * S, freq: step(n, 1), type: "triangle", dur: 0.24, gain: 0.036 });
+        tone({ at: k * S + 0.015, freq: step(n, 2), type: "sine", dur: 0.14, gain: 0.012 });
+    }
+    // The turnaround: the last bar of every four leans up, so four bars is a phrase rather than a loop.
+    if (bar % 4 === 3) tone({ at: 7 * S, freq: step(0, 1), to: step(4, 2), type: "triangle", dur: 0.3, gain: 0.03 });
+};
+bedFree.bar = 8 * 190;
+
+const MUSIC = { pick: bedPick, free: bedFree };
+
 export const Cas = {
     // -- SITTING DOWN -------------------------------------------------------------------------------------
     // Point every following sound at this cabinet's voice. An unknown id falls back to The Hunt rather than
@@ -376,6 +428,58 @@ export const Cas = {
             tone({ at: (i * d) / 9, freq: 1200, type: "sine", dur: 0.06, gain: 0.035, detune: (i % 2 ? 1 : -1) * (10 + i * 9) });
         }
         tone({ at: d, freq: 880, to: 440, type: "triangle", dur: 0.14, gain: 0.07 });
+    },
+
+    // ── AND THE BONUS HAS MUSIC ──────────────────────────────────────────────────────────────────────────
+    // Luke: "there's different music that plays during the bonus picker and the actual bonus spins."
+    //
+    // Up to here the casino has been sound EFFECTS — things that fire when something happens — and between
+    // them, silence. That is fine for a base spin, which is over in two seconds. A bonus round is thirty
+    // seconds to two minutes of a member sitting inside one screen, and thirty seconds of silence between
+    // taps is what makes a bonus feel like a form. Music is the floor under it.
+    //
+    // TWO BEDS, AND THEY ARE DELIBERATELY OPPOSITE:
+    //   pick   sparse, slow, suspended — a question. Nothing has been decided yet and you are choosing.
+    //   free   driving, twice the tempo, a bass note on every beat — an answer. It is happening to you now.
+    // Walking from one into the other is the shape of the whole feature, and you can hear it with your eyes
+    // shut. `bonus()` is the sting that sits over the seam.
+    //
+    // SYNTHESISED, AND IN THE CABINET'S OWN KEY. Everything in this file is drawn from `voice.scale`, so the
+    // beds inherit that for free: The Harvest's bonus is pastoral and a fifth down, The Deep's is in a minor
+    // key, and none of that needed a second decision or a single audio file. Nine cabinets × two beds as
+    // assets would be eighteen loops to write, host and cache on a page that opens in a card shop.
+    //
+    // SCHEDULING. One bar is scheduled ahead at a time, through the same `tone`/`noise` the effects use, so
+    // it rides the arena's compressor and the arena's mute with no extra plumbing. A timer re-arms the next
+    // bar; the alternative — scheduling a whole round up front — cannot be stopped once a member walks out.
+    music(name = null) {
+        if (bed.name === name) return this;
+        if (bed.timer) { clearTimeout(bed.timer); bed.timer = null; }
+        bed.name = name;
+        bed.bar = 0;
+        if (!name) return this;
+
+        const kit = MUSIC[name];
+        if (!kit) { bed.name = null; return this; }
+
+        const play = () => {
+            if (bed.name !== name) return;
+            kit(bed.bar);
+            bed.bar += 1;
+            bed.timer = setTimeout(play, kit.bar);
+        };
+        play();
+        return this;
+    },
+
+    // The sting over the seam — picker into free spins. Deliberately the only thing in the file that plays
+    // while a bed is being swapped, so the change of music lands ON something.
+    bonus() {
+        for (let i = 0; i < 5; i += 1) {
+            tone({ at: i * 0.09, freq: step(i, i > 2 ? 1 : 0), type: "triangle", dur: 0.5, gain: 0.06 });
+        }
+        tone({ freq: voice.bodyHz * 0.5, to: voice.bodyHz * 1.5, type: "sawtooth", dur: 0.6, gain: 0.07 });
+        noise({ dur: 0.5, gain: 0.04, type: "bandpass", freq: 600, sweepTo: 5000, q: 1.2 });
     },
 };
 

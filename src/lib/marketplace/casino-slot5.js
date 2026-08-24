@@ -246,21 +246,25 @@ const HARVEST = {
     scatter: "moon",
     // GENTLE. The widest spread of low symbols and the shortest ceiling — this is the cabinet somebody plays
     // for an hour without ever feeling mugged, and it is the only one whose wild appears on four reels.
+    // ── THE MOON MOVED TO REELS ONE, TWO AND THREE ───────────────────────────────────────────────────
+    // Because the bonus is a LINE now (see lineTrigger below) and it sat on reels 1, 3 and 5, which makes
+    // three of it in a row not rare but impossible. Left to right across the first three is also what makes
+    // it watchable: two moons up and reel three still turning is the best second this cabinet has.
     strips: [
-        { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 6, wolf: 0 },
+        { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 11, wolf: 0 },
+        { bone: 24, doubloon: 21, laurel: 17, chest: 8, moon: 10, wolf: 7 },
+        { bone: 24, doubloon: 20, laurel: 16, chest: 8, moon: 10, wolf: 8 },
         { bone: 24, doubloon: 21, laurel: 17, chest: 8, moon: 0, wolf: 7 },
-        { bone: 24, doubloon: 20, laurel: 16, chest: 8, moon: 5, wolf: 8 },
-        { bone: 24, doubloon: 21, laurel: 17, chest: 8, moon: 0, wolf: 7 },
-        { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 5, wolf: 0 },
+        { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 0, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 1.54, 4: 9.45, 5: 80.3 },
-        chest: { 3: 0.81, 4: 4.33, 5: 29.1 },
-        laurel: { 3: 0.4, 4: 2.01, 5: 11.4 },
-        doubloon: { 3: 0.18, 4: 0.95, 5: 4.73 },
-        bone: { 3: 0.12, 4: 0.5, 5: 2.3 },
+        wolf: { 3: 2.08, 4: 12.8, 5: 108.4 },
+        chest: { 3: 1.09, 4: 5.85, 5: 39.3 },
+        laurel: { 3: 0.54, 4: 2.71, 5: 15.4 },
+        doubloon: { 3: 0.24, 4: 1.28, 5: 6.39 },
+        bone: { 3: 0.16, 4: 0.68, 5: 3.11 },
     },
-    scatterPays: { 3: 0.24, 4: 0.95, 5: 4.73 },
+    scatterPays: { 3: 0.32, 4: 1.28, 5: 6.39 },
     // ── THE CASCADE MACHINE ──────────────────────────────────────────────────────────────────────────
     // Every win is threshed away and what is above falls into the hole, so a win MAKES the next win
     // possible and the multiplier climbs with each break. Five breaks in one spin opens the free round —
@@ -284,7 +288,9 @@ const HARVEST = {
     //
     // SEVEN AND ONE TO START, so a begin tile on the first tap is still a real round rather than a shrug.
     // The pool above it does the rest: about five more spins and one more multiplier on an average walk.
-    free: { kind: "built", spins: 7, label: "Turn the sheaves, then the round begins" },
+    // Three moons on a payline, left to right from reel one — see lineTrigger in evaluate().
+    lineTrigger: true,
+    free: { kind: "built", spins: 11, label: "Turn the sheaves, then the round begins" },
     second: { kind: "build", label: "The Threshing Floor" },
     pick: { spins: 26, mult: 6, begin: 4 },
     // THE WAGON IS GONE. It was this cabinet's hold-and-spin and it was a good one, but the machine Luke is
@@ -465,12 +471,31 @@ export function evaluate(m, grid, { lineBet = 1, mult = 1 } = {}) {
     const secondSym = m.second?.kind === "hold" ? m.second.trigger : (m.bonus || "chest");
     const need = m.second?.kind === "hold" ? (m.second.need || 6) : 5;
     const bonuses = grid.flat().filter((x) => x === secondSym).length;
+    // ── THREE ON A LINE, NOT THREE ANYWHERE ──────────────────────────────────────────────────────────────
+    // Luke, describing Pharaoh's Fortune: "if you get three on a payline you trigger the bonus."
+    //
+    // A scatter is found; a LINE is watched. Three moons anywhere is a fact you are told after the reels
+    // stop, and three moons marching left to right across reels one, two and three is something you can see
+    // coming with a reel still spinning — which is the entire drama of a slot machine and the reason the
+    // reels stop in order at all.
+    //
+    // It only works if the symbol is ON those reels. The Harvest's moon used to sit on reels 1, 3 and 5,
+    // which makes three-in-a-row not rare but IMPOSSIBLE — the strips had to move with the rule.
+    let lineTrig = 0;
+    if (m.lineTrigger) {
+        for (const line of LINES) {
+            let n = 0;
+            while (n < REELS && grid[n][line[n]] === m.scatter) n += 1;
+            if (n > lineTrig) lineTrig = n;
+        }
+    }
     return {
         wins,
         total,
         scatters,
         bonuses,
-        freeSpins: scatters >= 3,
+        lineTrig,
+        freeSpins: m.lineTrigger ? lineTrig >= 3 : scatters >= 3,
         // FIVE chests, not four. At four the pick opened every fifteenth spin and carried 38% of the whole
         // machine — a bonus round you cannot go two minutes without seeing is a chore with a board on it.
         pick: bonuses >= need,

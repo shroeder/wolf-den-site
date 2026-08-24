@@ -67,6 +67,32 @@ const BIG_WIN_AT = 10;
 // names, so a path built from the machine id only works for the cabinets that happen to have a generic set.
 const artFor = (art, machineId, sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
 
+// ── THE NUMBER IS COUNTED, NOT PRINTED ───────────────────────────────────────────────────────────────────────
+// A total that appears is a receipt. A total that RUNS is the machine paying you, and the two are the same
+// number — the only difference is the ~1.4s of climbing, which is the part worth sitting through. Eased out,
+// so it sprints and then savours the last few hundred, and it ticks a coin every fourth frame on the way.
+function Tally({ n, ms = 1500 }) {
+    const [at, setAt] = useState(0);
+    useEffect(() => {
+        // No reset on the zero path: `at` is already 0 and a synchronous setState in an effect is a
+        // cascading render for a value that was right at first paint.
+        if (!n) return undefined;
+        let raf = 0, t0 = 0, tick = 0;
+        const step = (t) => {
+            if (!t0) t0 = t;
+            const k = Math.min(1, (t - t0) / ms);
+            const e = 1 - Math.pow(1 - k, 3);
+            setAt(Math.round(n * e));
+            tick += 1;
+            if (tick % 4 === 0 && k < 1) Cas.coin(Math.round(k * 8) - 2);
+            if (k < 1) raf = requestAnimationFrame(step); else Cas.coins(0.6);
+            };
+        raf = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(raf);
+    }, [n, ms]);
+    return <>{at.toLocaleString()}</>;
+}
+
 // The strip a reel runs before it stops: filler, then the three symbols it is actually going to show.
 //
 // THE FILLER COMES FROM THAT REEL'S OWN STRIP, not from the machine's symbol list. On The Hunt the wild is
@@ -95,6 +121,24 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | gems | done
+
+    // ── MUSIC UNDER THE BONUS ────────────────────────────────────────────────────────────────────────────
+    // Luke: "there's different music that plays during the bonus picker and the actual bonus spins."
+    //
+    // The two beds are opposite on purpose — the picker is slow and suspended because nothing has been
+    // decided yet, the round is driving because it is happening to you — so walking from one screen into
+    // the next is audible with your eyes shut. Every other phase is silent: a base spin is over in two
+    // seconds and does not want a soundtrack, and music that never stops stops being an event.
+    //
+    // Derived from `phase` rather than started and stopped by hand at each site. Every path out of a bonus
+    // — finishing it, a retrigger, closing the modal mid-round — already sets a phase, so a phase-derived
+    // bed cannot be left playing behind a screen that has gone. `music()` no-ops when the bed is unchanged,
+    // so this effect re-running is free.
+    const musicBed = phase === "pick" || phase === "build" || phase === "warren" || phase === "gems" ? "pick"
+        : phase === "free" || phase === "freeIntro" ? "free"
+        : null;
+    useEffect(() => { Cas.music(musicBed); }, [musicBed]);
+    useEffect(() => () => Cas.music(null), []);
     // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
     // beside `rest` in the spin handler.
     const [meterFire, setMeterFire] = useState(null);
@@ -193,6 +237,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         .slice(0, Math.max(0, freeIdx + 1))
         .reduce((a, sp) => a + (sp.retrigger?.spins || 0), 0);
     const roundLen = (result?.[round]?.base || result?.[round]?.spins?.length || 0) + roundGrew;
+    // The same sum over the WHOLE round rather than the walked prefix — the bar counts up as you go, the
+    // tally at the end reports what the round finally was.
+    const tallyGrew = (result?.[round]?.spins || []).reduce((a, sp) => a + (sp.retrigger?.spins || 0), 0);
 
     const liveChain = freeChain || ((phase === "tumble" || phase === "done") ? result?.chain : null);
     const chaining = Boolean(liveChain) && (phase === "tumble" || phase === "free" || phase === "done");
@@ -508,6 +555,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             // A spin that opened BOTH rounds plays the scatter one and then the locking one, rather than
             // the second silently vanishing into the total.
             if (which === "free" && r.locked) { announceFree(r, "locked"); return; }
+            // The tally is the curtain call, so it gets the fanfare rather than arriving in silence.
+            Cas.signature(); Haptic.crit();
             setPhase("freeDone");
             return;
         }
@@ -604,6 +653,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setLanded(REELS);
         // And then whatever was still queued behind it, in the same order the round would have reached it.
         if (round === "free" && r.locked) { announceFree(r, "locked"); return; }
+        if (!r.hold && !r.warren) { Cas.signature(); Haptic.crit(); }
         setPhase(r.hold ? "pick" : r.warren ? "warren" : "freeDone");
     }, [clearTimers, round, announceFree]);
 
@@ -648,7 +698,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     if (phase === "build" && result?.built) {
         return (
             <div className="s5 is-bonus">
-                <TheLocks built={result.built} onDone={() => announceFree(result)} />
+                <TheLocks built={result.built} onDone={() => { Cas.bonus(); announceFree(result); }} />
             </div>
         );
     }
@@ -874,15 +924,34 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 </div>
             ) : null}
 
+            {/* ── AND AT THE END, IT TALLIES UP ───────────────────────────────────────────────────────
+                Luke: "at the very end, once you're completely done with your free spins, it tallies it all
+                up for you and shows like a dancing [character]."
+
+                This was one line of text and a Go on button — the flattest possible end to the best thing
+                the machine does. A round is a story with a total at the end of it, so the total is counted
+                UP rather than printed, the parts that made it are listed under it, and the cabinet's own
+                wild comes out and dances the way the Warren's Elder does. `freeDone` is only ever reached
+                after the LAST round a spin opened, so this is genuinely the end. */}
             {phase === "freeDone" && result?.[round] ? (
-                <div className="s5-feature">
-                    <h4>The hunt is over</h4>
-                    <p><b>{freeWon.toLocaleString()}</b> chips from {result[round].spins.length} {round === "locked" ? "locking" : "free"} spins.</p>
-                    {/* `freeDone` is only ever reached after the LAST round a spin opened — runFree hands
-                        off to the locking round before it sets this phase — so the only thing that can
-                        still be queued behind it is a hold. This read `result.pick`, which no longer
-                        exists, and so always fell through to "done". */}
-                    <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Go on</button>
+                <div className="s5-tally">
+                    <i className="s5-tally-rays" aria-hidden="true" />
+                    <span className="s5-tally-burst" aria-hidden="true">
+                        {Array.from({ length: 14 }, (_, k) => <b key={k} style={{ "--k": k }} />)}
+                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="s5-tally-star" src={artFor(art, machineId, slot5(machineId).wild)} alt=""
+                        draggable="false" />
+                    <span className="s5-tally-kick">{round === "locked" ? "The locking round is done" : "The round is done"}</span>
+                    <b className="s5-tally-n"><Tally n={freeWon} /></b>
+                    <span className="s5-tally-sub">chips</span>
+                    <div className="s5-tally-rows">
+                        <span><i>Spins</i><b>{result[round].spins.length}</b></span>
+                        {result[round].mult > 1 ? <span><i>Multiplier</i><b>&times;{result[round].mult}</b></span> : null}
+                        {tallyGrew > 0 ? <span><i>Retriggered</i><b>+{tallyGrew}</b></span> : null}
+                        <span><i>Best spin</i><b>{Math.max(0, ...result[round].spins.map((x) => x.chips || 0)).toLocaleString()}</b></span>
+                    </div>
+                    <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Collect</button>
                 </div>
             ) : null}
 
