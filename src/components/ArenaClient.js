@@ -165,6 +165,11 @@ const EVENT_MS = { hit: 300, crit: 380, counter: 380, riposte: 300, thorn: 260, 
 // eight events at full length would be 2.2s a beat and 16s a fight.
 const SQUEEZE = 0.62;
 const BEAT_BUDGET_MS = 1200;
+// ── HOW LONG AN INTERRUPTION IS HELD ─────────────────────────────────────────────────────────────────────────
+// Long enough to read two words and understand it cost you something. The two that break the turn order get
+// the full hold; a tick gets a shorter one, because a burn fires EVERY beat and a second's stop on each would
+// make a burning fight unwatchable.
+const ALERT_MS = { again: 900, locked: 1000, dot: 460, default: 700 };
 // ── A COUNTER DRAWS BACK BEFORE IT LANDS ─────────────────────────────────────────────────────────────────────
 // The recoil reads instantly because it is a red flash AND a shove; the lunge was only a shove, so a counter
 // looked soft next to the blow it answers. A blow needs an anticipation to hit against — the same reason every
@@ -843,6 +848,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [beatQueue, setBeatQueue] = useState(null);  // the beat's events, played one at a time
+    // The thing nobody pressed — an extra turn, a lost beat, a wound ticking — held on screen with a sound
+    // and a real dwell. See the note where the queue is built.
+    const [alert, setAlert] = useState(null);
     const [counterWind, setCounterWind] = useState(null); // "left" | "right" — who is drawing back to strike
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
@@ -1711,18 +1719,41 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // Everything above is the OLD path and it stays for one reason only: bouts are persisted mid-fight,
         // so a bout opened before this shipped has log lines with no `events` on them. Those still animate
         // the way they always did. Anything resolved since plays as a sequence instead.
+        // ── THE THINGS NOBODY PRESSED ────────────────────────────────────────────────────────────────
+        // Luke, after one command produced twelve log lines: "there's just an issue in general with getting
+        // locked out visibility wise. I don't mind getting locked out at all in rung three. I DO mind not
+        // being able to see what is going on... it goes way too fast for the human eye to detect extra turns
+        // and also to detect being frozen and burn damage... all of these asynchronous effects that aren't
+        // related to me clicking a button, they need to be called out, and there needs to be enough time for
+        // the user to know what's happening."
+        //
+        // Three things break the rhythm of alternating turns and none of them had a moment of its own:
+        // somebody GOING AGAIN, somebody LOSING a beat, and a wound or a fire ticking on its own. All three
+        // arrived as another line of small grey text inside a budget shared with everything else.
+        //
+        // Each one now stops the ring, says what it is, and holds. Sequenced WITH the beat rather than
+        // painted over it: the alert plays, then that line's numbers do.
         const queue = [];
-        for (const l of fresh) {
+        const alerts = [];
+        fresh.forEach((l, li) => {
+            const a = l.again ? { kind: "again", mine: l.who === "you" }
+                : (l.stunnedSkip || l.chilledSkip)
+                    ? { kind: "locked", mine: l.who === "you", frozen: Boolean(l.chilledSkip),
+                        beats: Math.max(0, Number(l.who === "you" ? l.meStun : l.foeStun) || 0) }
+                    : (l.burnTick || l.bleedTick)
+                        ? { kind: "dot", mine: l.who === "you", bleed: Boolean(l.bleedTick) }
+                        : null;
+            if (a) alerts.push({ ...a, li });
             for (const e of l.events || []) {
                 // The engine says WHICH FIGHTER it landed on; the ring only knows left and right.
-                queue.push({ ...e, side: e.side === "you" ? "left" : "right" });
+                queue.push({ ...e, li, side: e.side === "you" ? "left" : "right" });
             }
-        }
-        if (queue.length) {
+        });
+        if (queue.length || alerts.length) {
             // Held only while a counter is actually coming — otherwise the beat's sentence would wait for a
             // moment that never arrives.
             setCounterHeld(queue.some((e) => e.kind === "counter"));
-            setBeatQueue({ id: bout.log.length, events: queue });
+            setBeatQueue({ id: bout.log.length, events: queue, alerts });
             return undefined;
         }
         if (!pops.length) return undefined;
@@ -1743,14 +1774,47 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // following one is scaled by SQUEEZE, and the whole beat is capped at BEAT_BUDGET_MS. Change those two
     // numbers to make the ring slower and more cinematic or faster and tighter; nothing else needs touching.
     useEffect(() => {
-        if (!beatQueue?.events?.length) return undefined;
-        const evs = beatQueue.events;
+        if (!beatQueue?.events?.length && !beatQueue?.alerts?.length) return undefined;
+        const evs = beatQueue.events || [];
+        const alerts = beatQueue.alerts || [];
         const timers = [];
         let clock = 0;
+        // What the alerts hold for in total, so the beat budget can be widened by exactly that much.
+        const held = alerts.reduce((a, x) => a + (ALERT_MS[x.kind] ?? ALERT_MS.default), 0);
+
+        // ── AN ALERT OWNS THE SCREEN BEFORE ITS OWN LINE PLAYS ───────────────────────────────────────
+        // Scheduled by LINE, so the banner for "you cannot act" is up before that line's numbers rather
+        // than over the top of the next exchange. `shown` stops one line raising it twice when the line
+        // also carries several events.
+        const shown = new Set();
+        const raise = (li) => {
+            const a = alerts.find((x) => x.li === li);
+            if (!a || shown.has(li)) return;
+            shown.add(li);
+            const hold = ALERT_MS[a.kind] ?? ALERT_MS.default;
+            const at = clock;
+            timers.push(setTimeout(() => {
+                setAlert(a);
+                if (a.kind === "again") { Sfx.surge(); Haptic.crit(); duck(0.4, 0.25); }
+                else if (a.kind === "locked") { Sfx.freeze(); Haptic.crit(); duck(0.5, 0.3); }
+                else { Sfx.burn(); Haptic.hit(0.3); }
+            }, at));
+            timers.push(setTimeout(() => setAlert(null), at + hold - 90));
+            clock += hold;
+        };
+
+        // A line whose whole content IS the interruption — "you cannot act" carries no damage and therefore
+        // no events at all. Without this the one thing the player most needs told would be the one thing
+        // that never got a moment.
+        for (const a of alerts) if (!evs.some((e) => e.li === a.li)) raise(a.li);
+
         evs.forEach((e, i) => {
+            raise(e.li);
             const base = EVENT_MS[e.kind] ?? EVENT_MS.default;
             const dur = i < 2 ? base : Math.max(90, Math.round(base * SQUEEZE));
-            const at = Math.min(clock, BEAT_BUDGET_MS);
+            // BEAT_BUDGET_MS caps how long a beat may take, which is right for a flurry of numbers and wrong
+            // for a beat that also has to EXPLAIN itself — so the cap is lifted by whatever the alerts hold.
+            const at = Math.min(clock, BEAT_BUDGET_MS + held);
             clock += dur;
             // The draw-back happens BEFORE the blow it belongs to, and the swing is heard at the start of it —
             // the same rule the command wind-up follows. The counter's own moment shifts back by that much so
@@ -1803,8 +1867,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             }, at + wind));
             timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
         });
-        timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS) + 1400));
-        return () => { for (const t of timers) clearTimeout(t); };
+        timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS + held) + 1400));
+        return () => { for (const t of timers) clearTimeout(t); setAlert(null); };
     }, [beatQueue]);
 
     // The shake runs for a beat and then bursts on its own; a tap skips it. Keyed on the crate so a second
@@ -2201,6 +2265,27 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     {/* The MOVE that just landed, named across the ring. The damage is deliberately NOT
                         repeated here — it floats over the fighter that took it, and printing it in both places
                         put two copies of the same number a few pixels apart, which read as a rendering fault. */}
+                    {/* ── THE INTERRUPTION ────────────────────────────────────────────────────────────
+                        The three things that happen to you rather than because of you. Deliberately LOUDER
+                        than the move callout beside it and deliberately in the way: a move you chose does
+                        not need explaining, and these do. It says whose it is, because "extra turn" is a
+                        reward or a warning depending entirely on that, and how many beats a lockout costs,
+                        because "frozen" without a number is not information you can act on. */}
+                    {alert ? (
+                        <div className={`ar-alert is-${alert.kind}${alert.mine ? " is-mine" : ""}`} role="status">
+                            <b>{alert.kind === "again" ? "EXTRA TURN"
+                                : alert.kind === "locked" ? (alert.frozen ? "FROZEN" : "STUNNED")
+                                    : (alert.bleed ? "BLEEDING" : "BURNING")}</b>
+                            <i>{alert.kind === "again"
+                                ? (alert.mine ? "you go again" : `${bout.foe.name} goes again`)
+                                : alert.kind === "locked"
+                                    ? (alert.mine
+                                        ? `you lose this beat${alert.beats > 0 ? ` — ${alert.beats} more to come` : ""}`
+                                        : `${bout.foe.name} loses this beat`)
+                                    : (alert.mine ? "it is burning you" : `it is burning ${bout.foe.name}`)}</i>
+                        </div>
+                    ) : null}
+
                     {clash ? (
                         <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}${clash.crit ? " is-crit" : ""}`}
                             aria-hidden="true">
@@ -3683,6 +3768,34 @@ function Styles() {
             .ar-turnmark.is-them { color: #6fd0ff; border-color: rgba(111,208,255,.5); }
 
             /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
+            /* ── THE INTERRUPTION ────────────────────────────────────────────────────────────────────
+               Above everything, across the whole ring, and unmissable. These are the only three events in
+               the fight that a player did not cause, so they are the only three allowed to stop it. */
+            .ar-alert { position: absolute; inset: 0; z-index: 9; display: grid; place-content: center;
+                justify-items: center; gap: 3px; pointer-events: none; text-align: center;
+                animation: arAlertIn .22s ease-out both; }
+            .ar-alert b { font-size: 2.1rem; font-weight: 900; letter-spacing: .1em; color: #fff;
+                text-shadow: 0 3px 14px #000, 0 0 30px currentColor;
+                animation: arAlertSlam .5s cubic-bezier(.15,1.7,.35,1) both; }
+            .ar-alert i { font-style: normal; font-size: 11.5px; font-weight: 800; letter-spacing: .1em;
+                text-transform: uppercase; color: #dfe6ee; text-shadow: 0 2px 8px #000; }
+            /* Each reads as what it is before the words are read: the extra turn is gold and hot, the
+               lockout is ice, the tick is the colour of the thing doing it. */
+            .ar-alert.is-again { background: radial-gradient(circle at 50% 45%, rgba(255,190,60,.32), rgba(6,4,10,.86) 66%); }
+            .ar-alert.is-again b { color: #ffd75e; }
+            .ar-alert.is-locked { background: radial-gradient(circle at 50% 45%, rgba(120,200,255,.34), rgba(4,10,20,.9) 66%); }
+            .ar-alert.is-locked b { color: #9fe0ff; }
+            .ar-alert.is-dot { background: radial-gradient(circle at 50% 45%, rgba(255,120,50,.2), rgba(10,4,4,.62) 68%); }
+            .ar-alert.is-dot b { font-size: 1.5rem; color: #ff9a5c; }
+            /* YOUR extra turn is the good one — it is the only version of this banner that is a reward. */
+            .ar-alert.is-again.is-mine { background: radial-gradient(circle at 50% 45%, rgba(140,255,190,.3), rgba(4,10,8,.86) 66%); }
+            .ar-alert.is-again.is-mine b { color: #8bf0b4; }
+            @keyframes arAlertIn { from { opacity: 0 } to { opacity: 1 } }
+            @keyframes arAlertSlam {
+                0% { transform: scale(2.1); opacity: 0 }
+                55% { transform: scale(.92); opacity: 1 }
+                100% { transform: scale(1); opacity: 1 }
+            }
             .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
             .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; align-content: center;
                 gap: 2px; pointer-events: none; }
