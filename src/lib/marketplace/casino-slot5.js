@@ -691,7 +691,10 @@ export function runGems(m, { lineBet = 1, rng = Math.random } = {}) {
     if (!won) won = GEM_SETS[0].key;
     const set = GEM_SETS.find((g) => g.key === won) || GEM_SETS[0];
     const total = set.pay * lineBet * LINES.length;
-    return { order, have, won, total, sets: GEM_SETS.map((g) => ({ ...g })) };
+    // `tiles` is the whole board, not the number of stones that were drawn. The screen builds its covers from
+    // this: sizing the board off `order` gave a seven-tile board on a run that filled a set in seven picks,
+    // which reads as "the bonus is nearly over before it starts" and hides the whole shape of the thing.
+    return { order, have, won, total, tiles: bag.length, sets: GEM_SETS.map((g) => ({ ...g })) };
 }
 
 // ── CASCADES ─────────────────────────────────────────────────────────────────────────────────────────────────

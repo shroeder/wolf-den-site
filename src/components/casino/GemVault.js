@@ -33,14 +33,11 @@ export default function GemVault({ gems, bet, onDone }) {
     // render: shuffling in the render body both touches a ref and calls Math.random() while React is drawing,
     // and the rule against that is not pedantry — under a re-render the board would reshuffle underneath a
     // half-finished pick, which is the one bug this screen cannot have. Run once, by construction.
-    const [layout] = useState(() => {
-        const slots = order.map((key, i) => ({ key, i }));
-        for (let i = slots.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [slots[i], slots[j]] = [slots[j], slots[i]];
-        }
-        return slots;
-    });
+    // THE WHOLE BOARD, not the number of stones that happened to be drawn. `order` is only as long as the run
+    // took, so building covers from it gave a seven-tile board on a seven-pick run — the bonus looked nearly
+    // finished before a finger touched it, and the shape of the thing (24 covers, four sets in a race) was
+    // invisible. `tiles` is the bag.
+    const [layout] = useState(() => Array.from({ length: gems?.tiles || order.length || 24 }, (_, i) => i));
 
     const [turned, setTurned] = useState({});     // tile index -> stone key
     const [have, setHave] = useState(() => Object.fromEntries(sets.map((s) => [s.key, 0])));
@@ -108,7 +105,7 @@ export default function GemVault({ gems, bet, onDone }) {
                 so the board itself is a record of how the run went — which is what makes being one short
                 legible at a glance instead of only in the trays. */}
             <div className="gv-board" aria-label="Pick a stone">
-                {layout.map((slot, i) => {
+                {layout.map((_, i) => {
                     const key = turned[i];
                     const set = key ? sets.find((s) => s.key === key) : null;
                     return (

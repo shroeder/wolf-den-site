@@ -68,7 +68,10 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
                     return (
                         <div key={i} className={`wa-slot${v != null ? " is-full" : ""}${firing && lit >= i ? " is-lit" : ""}`}>
                             <b>{v != null ? Math.round(v * (bet || 0)).toLocaleString() : ""}</b>
-                            <em>{i === 0 ? "recent win" : i + 1}</em>
+                            {/* Numbers, not "RECENT WIN 2". The reference has a cabinet's width to spend and
+                                this has 375px — the words were the widest thing in the row and the row is
+                                what has to fit. */}
+                            <em>{i + 1}</em>
                         </div>
                     );
                 })}

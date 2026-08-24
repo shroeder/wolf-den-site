@@ -912,10 +912,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     {/* The Vault's two. Only on the Vault: a button that spins forty thousand times looking
                         for a feature this cabinet does not have is a button that quietly does nothing. */}
                     {slot5(machineId).second?.kind === "gems" ? (
-                        <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("gems")}>Force gems</button>
+                        <button type="button" className="s5-f-gems" disabled={locked} onClick={() => pull("gems")}>Force gems</button>
                     ) : null}
                     {slot5(machineId).winAgain ? (
-                        <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("winagain")}>Force win again</button>
+                        <button type="button" className="s5-f-again2" disabled={locked} onClick={() => pull("winagain")}>Force win again</button>
                     ) : null}
                     {cascades ? (
                         <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>

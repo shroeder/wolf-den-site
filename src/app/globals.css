@@ -18897,11 +18897,16 @@ body.cas-seated .social-fab { display: none; }
 
 /* ⚠ OWNER ONLY — remove with the force-a-bonus buttons. Deliberately ugly and unstyled-looking so it can
    never be mistaken for part of the machine, and so it is obvious in a screenshot that it is still there. */
-.s5-owner { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 8px;
-    background: rgba(255, 111, 125, .09); border: 1px dashed rgba(255, 111, 125, .45); }
+/* IT WRAPS, and it has to. This is a flex row of force buttons that has grown every time a cabinet gained a
+   feature, and it does not shrink — so the moment the Vault reached eight of them the row's min-content was
+   495px, and because .s5 is a grid the ROW took the whole cabinet with it: the reels lost their fifth column
+   and the balance panel ran off the screen. Measured at 509px inside a 375px phone, and it was the owner
+   strip rather than the new meter bar, which was the obvious suspect and innocent. */
+.s5-owner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 8px;
+    min-width: 0; background: rgba(255, 111, 125, .09); border: 1px dashed rgba(255, 111, 125, .45); }
 .s5-owner i { font-style: normal; font-size: 8.5px; font-weight: 900; letter-spacing: .14em;
     text-transform: uppercase; color: #ff8f9b; }
-.s5-owner button { flex: 1 1 auto; padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 10.5px;
+.s5-owner button { flex: 0 1 auto; min-width: 0; padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 10.5px;
     font-weight: 700; border: 1px solid rgba(255, 111, 125, .4); background: rgba(255, 111, 125, .12);
     color: #ffc2c8; }
 .s5-owner button:disabled { opacity: .4; cursor: default; }
@@ -19766,7 +19771,14 @@ body.cas-seated .social-fab { display: none; }
    The Vault's scatter bonus — four collections filling at once, first one home pays. See GemVault.js.
    Styled here rather than in the component because the cabinet mounts it over the reels and a styled-jsx
    block would only ever reach the one component that owns it (same reason as the Warren). */
+/* min-width:0 all the way down, for the same reason the owner strip needed it: these are grid items inside
+   a grid, and min-width:auto means min-CONTENT, which four gem trays and a 24-tile board comfortably exceed
+   on a 375px phone. Left out, the board came out three columns wide with the fourth tray off the screen. */
+/* width:100% alongside the min-width:0. The two are not redundant: min-width:0 lets it SHRINK below its
+   content, and without a width it then shrink-wrapped to its content and sat in a 270px column with a dark
+   gutter down the right of the phone. */
 .gv { position: relative; display: grid; gap: 12px; padding: 14px 12px 16px; border-radius: 16px;
+    min-width: 0; width: 100%;
     background: radial-gradient(120% 80% at 50% 0%, rgba(90,60,140,.42), rgba(10,8,16,.96) 70%);
     border: 1px solid rgba(255,226,150,.3); box-shadow: 0 8px 26px rgba(0,0,0,.55); isolation: isolate;
     animation: penIn .4s cubic-bezier(.2,1.3,.4,1) both; }
@@ -19776,8 +19788,8 @@ body.cas-seated .social-fab { display: none; }
 
 /* FOUR ACROSS, SIX DOWN. Twenty-four covers on a 375px phone is 78px a tile with the gaps — big enough to
    hit with a thumb without the board needing to scroll, which it must never do mid-pick. */
-.gv-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.gv-tile { position: relative; aspect-ratio: 1; border-radius: 11px; cursor: pointer; display: grid;
+.gv-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.gv-tile { position: relative; aspect-ratio: 1; border-radius: 11px; cursor: pointer; display: grid; min-width: 0;
     place-items: center; padding: 5px; transition: transform .12s ease, border-color .2s ease, background .2s ease;
     background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.03));
     border: 1px solid rgba(255,255,255,.14); }
@@ -19804,8 +19816,8 @@ body.cas-seated .social-fab { display: none; }
 }
 
 /* ── THE FOUR SETS ── what each stone is worth and how many slots are still empty. */
-.gv-sets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.gv-set { display: grid; justify-items: center; gap: 3px; padding: 8px 4px 7px; border-radius: 12px;
+.gv-sets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.gv-set { display: grid; justify-items: center; gap: 3px; padding: 8px 4px 7px; border-radius: 12px; min-width: 0;
     background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.1);
     transition: border-color .25s ease, background .25s ease, transform .25s ease; }
 .gv-set.is-live { border-color: color-mix(in srgb, var(--gem) 45%, transparent); }
@@ -19835,19 +19847,27 @@ body.cas-seated .social-fab { display: none; }
    The Vault's row across the top — your last five wins, paid back in one go when a spin tumbles three times.
    See WinAgainBar.js. It sits ABOVE the cabinet because that is where it is on the machine Luke is pointing
    at, and because a meter under the reels is a meter nobody looks at while the reels are moving. */
-.wa { display: grid; gap: 5px; margin: 0 0 8px; padding: 7px 8px 8px; border-radius: 12px;
+/* min-width:0 on the bar AND on its row AND on every cell. All three are needed: each is a grid item of the
+   thing above it, and a grid item defaults to min-width:auto — so any one of them left out lets min-CONTENT
+   win and the whole cabinet goes wide with it. Measured, not guessed: the bar was 493px inside a 375px
+   phone and took the reels' fifth column and half the owner strip off the screen with it. */
+.wa { display: grid; gap: 5px; margin: 0 0 8px; padding: 7px 8px 8px; border-radius: 12px; min-width: 0;
     background: linear-gradient(180deg, rgba(24,44,86,.95), rgba(10,18,38,.95));
     border: 1px solid rgba(120,180,255,.35); }
 .wa-title { text-align: center; font-size: .62rem; font-weight: 900; letter-spacing: .22em;
     text-transform: uppercase; color: #9fd0ff; text-shadow: 0 0 10px rgba(90,170,255,.6); }
 /* Five slots and the total. The total is wider because it is the number the whole row exists to produce. */
-.wa-row { display: grid; grid-template-columns: repeat(5, 1fr) 1.35fr; gap: 3px; }
+.wa-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.3fr); gap: 3px; min-width: 0; }
+/* `min-width: 0` IS LOAD-BEARING. A grid item defaults to min-width:auto, which is min-CONTENT — so six
+   cells each refusing to go narrower than their own number pushed the row past 375px, and the row pushed the
+   whole cabinet with it: the reels lost their fifth column and the owner strip read "Forc gem". The row has
+   to be allowed to be as narrow as it is given. */
 .wa-slot, .wa-total { display: grid; justify-items: center; align-content: center; gap: 0; min-height: 30px;
-    padding: 3px 2px; border-radius: 6px; background: rgba(0,0,0,.45);
+    min-width: 0; overflow: hidden; padding: 3px 2px; border-radius: 6px; background: rgba(0,0,0,.45);
     border: 1px solid rgba(120,180,255,.22); transition: background .18s ease, border-color .18s ease,
     box-shadow .18s ease, transform .18s ease; }
-.wa-slot b, .wa-total b { font-size: .74rem; font-weight: 900; color: #dbe9ff; font-variant-numeric: tabular-nums;
-    line-height: 1.1; }
+.wa-slot b, .wa-total b { font-size: .72rem; font-weight: 900; color: #dbe9ff; font-variant-numeric: tabular-nums;
+    line-height: 1.1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .wa-slot em, .wa-total em { font-style: normal; font-size: .46rem; font-weight: 800; letter-spacing: .06em;
     text-transform: uppercase; color: #6f89ad; }
 .wa-slot.is-full { border-color: rgba(120,180,255,.45); background: rgba(30,60,110,.6); }
