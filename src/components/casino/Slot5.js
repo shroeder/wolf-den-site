@@ -24,7 +24,15 @@ const ROWS = 3;
 // Per-reel release, then the settle. Same shape as the three-reel cabinet next door, and the same rule: the
 // sound is timed off THESE numbers rather than a second copy of them, because that drift cost us 620ms once
 // already. See the reel clock in CasinoClient.
-const STOP_AT = [0, 150, 300, 460, 660];
+// ── THE GAPS BETWEEN REELS ARE THE GAME ─────────────────────────────────────────────────────────────────────
+// These were 150ms apart, which is not five reels stopping one at a time — it is five reels stopping at once
+// with a stutter on it. Every cabinet on a real floor leaves a real beat between reels, and the reason is not
+// decoration: the gap is the ONLY place anticipation can live. You cannot be told you are one scatter away if
+// the reel that would deliver it has already stopped.
+//
+// 320ms apart, so a plain spin lands over about a second and a quarter — long enough to watch, short enough
+// that the ninety-two losing spins between bonuses are not a chore.
+const STOP_AT = [0, 320, 640, 960, 1280];
 const SETTLE_MS = 340;
 const LANDS_AT = STOP_AT.map((t) => t + SETTLE_MS);
 // How long each winning line is drawn before the next one, when several paid.
@@ -42,7 +50,7 @@ const LINE_MS = 620;
 // So a free spin is the base spin at about three quarters speed, which is quicker without being a different
 // thing, and the round can be skipped by anybody who has seen it (see the Skip button) rather than by
 // everybody automatically.
-const FREE_STOP_AT = [0, 110, 220, 330, 440];
+const FREE_STOP_AT = [0, 230, 460, 690, 920];
 const FREE_SETTLE_MS = 300;
 const FREE_LINE_MS = 470;
 const FREE_HOLD_MS = 420;   // how long a finished free spin sits before the next one goes
@@ -107,6 +115,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // The retrigger being shouted about, or null. Its own state rather than a phase, because the round is
     // still running underneath it — this is a beat inside the free spins, not a screen instead of them.
     const [gotMore, setGotMore] = useState(null);
+    // The reel being held and the symbol it is held for, or null. Drives the glow on the reel that is still
+    // running and the pulse on the symbols that got you this far.
+    const [tease, setTease] = useState(null);
     // Which round is on screen — "free" (the scatter round) or "locked" (the ten spins where wilds weld).
     const [round, setRound] = useState("free");
     // The cells holding a locked wild, so the grid can draw them as welded rather than as landed.
@@ -202,23 +213,90 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // through this, on different clocks, which is the only reason they feel like the same machine — the
     // alternative is two playback routines that drift apart, and the free one had already drifted into
     // having no lines at all.
+    // ── WHICH REELS ARE ONE SYMBOL SHORT ─────────────────────────────────────────────────────────────────
+    // Luke: "if you almost hit a bonus or a scatter... we should highlight the icons that give you the bonus
+    // that are already set and then have an effect... it's definitely also like a sound that plays to let you
+    // know you're getting close. And it does that for each reel until it's out of reels."
+    //
+    // This is the most important thing a slot machine does and we had a stub of it: one riser, fired only if
+    // reel three happened to have landed two scatters, with nothing on screen at all.
+    //
+    // Walked reel by reel BEFORE anything moves, off the grid the server already sent. For each reel, count
+    // what landed in the reels before it; if that count is exactly one short of opening something, this reel
+    // is live and the machine holds its breath. It stays live on every following reel until the symbol lands
+    // or the reels run out — which is exactly "for each reel until it's out of reels", and it is why a
+    // two-scatter spin can hold you three separate times.
+    const teaseFor = useCallback((g) => {
+        const m = slot5(machineId);
+        const targets = [
+            { sym: m.scatter, need: 3 },
+            m.second?.kind === "hold"
+                ? { sym: m.second.trigger, need: m.second.need || 6 }
+                : { sym: m.bonus, need: 5 },
+        ].filter((t) => t.sym);
+        const out = [];
+        for (let k = 0; k < REELS; k += 1) {
+            let live = null;
+            for (const t of targets) {
+                let soFar = 0;
+                for (let r = 0; r < k; r += 1) soFar += g[r].filter((x) => x === t.sym).length;
+                if (soFar === t.need - 1) { live = t.sym; break; }
+            }
+            out.push(live);
+        }
+        return out;
+    }, [machineId]);
+
     const playGrid = useCallback((g, wins, opts) => {
-        const { stopAt, settle, lineMs, scatters = 0, onDone, onLanded } = opts;
+        const { stopAt, settle, lineMs, onDone, onLanded } = opts;
         setGrid(g);
         setLanded(0);
         setShowLine(-1);
         setActiveWins(wins);
-        const landsAt = stopAt.map((t) => t + settle);
-        stopAt.forEach((_, k) => {
+        setTease(null);
+
+        // ── AND A HELD REEL RUNS LONGER ──────────────────────────────────────────────────────────────────
+        // A reel that could open something does not stop on time, and everything after it is pushed back by
+        // the same amount — so the hold is added to the clock rather than stolen from the next reel. Each
+        // successive hold is longer than the last, because a second hold the same length as the first reads
+        // as the machine repeating itself instead of as the tension climbing.
+        const tease = teaseFor(g);
+        const landsAt = [];
+        let extra = 0;
+        let held = 0;
+        for (let k = 0; k < REELS; k += 1) {
+            if (tease[k]) { held += 1; extra += 950 + (held - 1) * 420; }
+            landsAt.push(stopAt[k] + settle + extra);
+        }
+
+        for (let k = 0; k < REELS; k += 1) {
+            const at = landsAt[k];
+            // The hold begins when the PREVIOUS reel lands — the first moment the player can see they are one
+            // short — and the riser is handed the exact gap remaining, so it resolves on the beat the reel
+            // stops rather than finishing early and leaving a hole.
+            if (tease[k]) {
+                const from = k === 0 ? 0 : landsAt[k - 1];
+                timers.current.push(setTimeout(() => {
+                    setTease({ reel: k, sym: tease[k] });
+                    Cas.anticipate(at - from);
+                    Haptic.hit(0.25);
+                }, from));
+            }
             timers.current.push(setTimeout(() => {
                 setLanded(k + 1);
-                Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
-                Haptic.hit(k === REELS - 1 ? 0.5 : 0.3);
-                // Two scatters showing and the last reels still running. Handed the exact gap left, so it
-                // stops climbing at the instant the reel stops rather than answering early.
-                if (k === 2 && scatters >= 2) Cas.anticipate(landsAt[REELS - 1] - landsAt[2]);
-            }, landsAt[k]));
-        });
+                if (!tease[k]) {
+                    Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
+                    Haptic.hit(k === REELS - 1 ? 0.5 : 0.3);
+                    return;
+                }
+                // Did it come? Both answers are loud — a hold that resolves quietly either way was not a
+                // hold, it was a pause. The miss is deliberately short and soft though: most of them miss,
+                // and a machine that mourns every one of them is exhausting by the tenth.
+                setTease(null);
+                if (g[k].includes(tease[k])) { Cas.reelStop(k, 1); Haptic.crit(); }
+                else { Cas.nearMiss(); Haptic.hit(0.5); }
+            }, at));
+        }
         timers.current.push(setTimeout(() => {
             // The instant every reel is down and before any line is drawn — where a wild welds itself to
             // the board, so the clamp reads as part of the landing rather than as part of the payout.
@@ -229,7 +307,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             });
             timers.current.push(setTimeout(() => { setShowLine(-1); onDone(); }, wins.length * lineMs));
         }, landsAt[REELS - 1] + 230));
-    }, []);
+    }, [teaseFor]);
 
     // ── PLAYING A CASCADE ────────────────────────────────────────────────────────────────────────────────
     // Press once and the machine argues with itself. Each break is four beats, and they are separately
@@ -327,14 +405,14 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         // follows is a chain rather than a list of lines to light one at a time.
         if (r.chain) {
             playGrid(r.grid, [], {
-                stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
+                stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS,
                 onDone: () => { setPhase("tumble"); runChain(r.chain, 0).then(after); },
             });
             return;
         }
 
         playGrid(r.grid, r.lines, {
-            stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS, scatters: r.scatters,
+            stopAt: STOP_AT, settle: SETTLE_MS, lineMs: LINE_MS,
             onDone: () => {
                 const m = slot5(machineId);
                 if (r.built) { flashTrigger(m.scatter, () => setPhase("build")); return; }
@@ -589,7 +667,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}${mult >= 5 ? " is-hot" : ""}`}>
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}`}
+                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}${tease && tease.reel > reel ? " is-dim" : ""}`}
                             style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
                             <div className="s5-strip">
                                 {/* Chooses between two things already drawn. Nothing here is random, so a
@@ -605,7 +683,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}`}
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}${tease && sym === tease.sym && landed > reel ? " is-teased" : ""}`}
                                         key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
                                         {/* The wild's travelling shine. Its own element because the cell
                                             has already spent ::before on the plate and ::after on the

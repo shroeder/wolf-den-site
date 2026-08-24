@@ -19550,3 +19550,42 @@ body.cas-seated .social-fab { display: none; }
 .s5-reel { background: linear-gradient(180deg, #1c1409, #0d0905 55%, #1c1409);
     box-shadow: inset 2px 0 6px rgba(0, 0, 0, .75), inset -2px 0 6px rgba(0, 0, 0, .75),
         inset 0 3px 9px rgba(0, 0, 0, .6), inset 0 -3px 9px rgba(0, 0, 0, .6); }
+
+/* ── THE HOLD ─────────────────────────────────────────────────────────────────────────────────────────
+   Two scatters down and the third reel still running. This is the moment a slot machine exists for, and
+   it needs three things at once, none of which we had: the reel that could deliver it has to look ALIVE,
+   the symbols that got you here have to be pointed at, and everything else has to get out of the way. */
+
+/* The reel still running. Lit from within, its edges hot, and visibly not finished. */
+.s5-reel.is-teasing { z-index: 3;
+    box-shadow: inset 0 0 0 2px #ffd75e, inset 0 0 26px rgba(255, 215, 94, .5),
+        0 0 26px rgba(255, 215, 94, .55);
+    animation: s5Hold .5s ease-in-out infinite alternate; }
+@keyframes s5Hold {
+    from { box-shadow: inset 0 0 0 2px rgba(255, 215, 94, .7), inset 0 0 20px rgba(255, 215, 94, .35),
+        0 0 18px rgba(255, 215, 94, .4); }
+    to { box-shadow: inset 0 0 0 2.5px #fff3d0, inset 0 0 34px rgba(255, 215, 94, .65),
+        0 0 34px rgba(255, 215, 94, .75); }
+}
+/* Everything AHEAD of the held reel steps back — a hold that lights one reel while the other four stay at
+   full strength is four things competing with the one thing that matters. */
+.s5-reel.is-dim { filter: brightness(.5) saturate(.65); transition: filter .3s ease; }
+
+/* ── AND THE ONES THAT GOT YOU HERE ───────────────────────────────────────────────────────────────────
+   Luke: "we should highlight the icons that give you the bonus that are already set and then have an
+   effect where it kinda zooms in slightly or shakes." Both — a slow swell, and a rocking tilt on top of
+   it, so it reads as a thing straining rather than a thing pulsing. */
+.s5-cell.is-teased { z-index: 4; }
+.s5-cell.is-teased img { animation: s5Teased .52s ease-in-out infinite alternate; transform-origin: 50% 60%; }
+@keyframes s5Teased {
+    from { transform: scale(1) rotate(-2.5deg); filter: drop-shadow(0 0 6px var(--tone)) brightness(1.05); }
+    to { transform: scale(1.16) rotate(2.5deg); filter: drop-shadow(0 0 18px var(--tone)) brightness(1.35); }
+}
+/* Its setting goes with it, for the same reason a winning line lights its whole frame: a symbol glowing
+   inside a dark bezel is a picture with a filter on it, not a lamp coming on. */
+.s5-cell.is-teased::after {
+    border-color: #fff !important;
+    box-shadow: inset 0 0 0 2px rgba(40, 22, 6, .8), 0 0 26px var(--tone) !important;
+    animation: s5TeasedRing .52s ease-in-out infinite alternate;
+}
+@keyframes s5TeasedRing { from { opacity: .8; } to { opacity: 1; } }
