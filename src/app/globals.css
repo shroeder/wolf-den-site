@@ -19381,6 +19381,65 @@ body.cas-seated .social-fab { display: none; }
 /* Taller, because the crowd lives in it for a whole room rather than a second and a half. */
 .wr-floor { position: relative; min-height: 152px; align-self: end; }
 
+/* ══ THE ELDER, HAVING A PARTY ════════════════════════════════════════════════════════════════════════════
+   Luke: "the elder wolf — I'd rather he pop out like everything else but have him dance around and have a
+   good time, instead of just a modal in the middle, because that's the core dopamine part right there and I
+   feel like we're missing out on a lot of dopamine."
+
+   He was a full-screen shout, and a full-screen shout is the same SHAPE as an error: it stops the room,
+   greys what you were looking at, and lays a slab of text over it. That is what a game does when something
+   has gone wrong — not when the best thing on the machine has just happened. Everything else in this bonus
+   hatches out of an egg onto the floor; the one moment worth celebrating was the only one that did not.
+
+   So he uses the critters' own stage, at twice their size, and then he DANCES. The old shout held 2,400ms
+   and most of that was spent reading a caption. Same budget, spent on the animal. */
+.wr-elder { position: absolute; bottom: 4px; z-index: 6; pointer-events: none;
+    display: grid; justify-items: center; gap: 1px; transform: translateX(-50%); }
+.wr-elder img { width: 116px; height: 116px; object-fit: contain; transform-origin: 50% 100%;
+    filter: drop-shadow(0 0 26px rgba(255,214,110,.9)) drop-shadow(0 6px 7px rgba(0,0,0,.65));
+    /* Hatch, then dance. The `in` holds its end state and the dance overrides it from .42s — later
+       animation in the list wins the same property, which is what lets these two share `transform`. */
+    animation: wrElderIn .42s cubic-bezier(.2,1.7,.35,1) both,
+               wrElderDance .58s .42s ease-in-out infinite; }
+@keyframes wrElderIn {
+    0% { transform: scale(.2) rotate(-35deg); opacity: 0; }
+    55% { transform: scale(1.22) rotate(6deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+/* A HOP WITH A LEAN IN IT. A bounce on its own is a ball; the rotation either side of the hop and the
+   squash on the landing are what make it read as an animal enjoying itself. */
+@keyframes wrElderDance {
+    0% { transform: translateY(0) rotate(-5deg) scale(1, 1); }
+    25% { transform: translateY(-13px) rotate(0deg) scale(.96, 1.06); }
+    50% { transform: translateY(0) rotate(5deg) scale(1.05, .95); }
+    75% { transform: translateY(-13px) rotate(0deg) scale(.96, 1.06); }
+    100% { transform: translateY(0) rotate(-5deg) scale(1, 1); }
+}
+/* His own name, under him, instead of across the room. */
+.wr-elder u { text-decoration: none; font-size: .58rem; font-weight: 900; letter-spacing: .2em;
+    text-transform: uppercase; color: #14100a; background: linear-gradient(180deg, #ffe27a, #f3b23a);
+    border-radius: 999px; padding: 2px 9px; box-shadow: 0 0 16px rgba(255,200,90,.8);
+    animation: wrElderTag .4s .5s cubic-bezier(.2,1.6,.4,1) both; }
+.wr-elder em { font-style: normal; font-size: .58rem; font-weight: 800; color: #ffd9a0;
+    text-shadow: 0 1px 0 rgba(0,0,0,.8); animation: wrElderTag .4s .62s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes wrElderTag { from { transform: translateY(8px) scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* THROWN FROM UNDER HIS FEET, not raining down on him. The energy has to come from the animal — sparks
+   falling from above decorate him, sparks kicked up by him are him doing it. */
+.wr-elder-pop { position: absolute; left: 50%; bottom: 10px; width: 0; height: 0; display: block; }
+.wr-elder-pop b { position: absolute; width: 6px; height: 6px; border-radius: 50%;
+    background: hsl(calc(38deg + var(--k) * 9deg) 96% 64%);
+    box-shadow: 0 0 9px hsl(calc(38deg + var(--k) * 9deg) 96% 64%);
+    transform-origin: 50% 50%; animation: wrElderSpark .8s cubic-bezier(.15,.75,.35,1) both;
+    animation-delay: calc(var(--k) * 22ms); --a: calc(var(--k) * 30deg - 90deg); }
+@keyframes wrElderSpark {
+    0% { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 0; }
+    22% { opacity: 1; }
+    100% { transform: rotate(var(--a)) translateY(-84px) scale(.9); opacity: 0; }
+}
+@media (max-width: 360px) { .wr-elder img { width: 98px; height: 98px; } }
+
+
 /* ── AND THEY LAND ON IT ─────────────────────────────────────────────────────────────────────────
    One at a time, dropping in from the wall above, bouncing twice, and then staying — because the crowd
    on the floor IS the count. Eight animals still standing there when the eighth arrives says "eight"

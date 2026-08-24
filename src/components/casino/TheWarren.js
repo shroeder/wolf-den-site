@@ -46,6 +46,9 @@ const SHAKE_MS = 700;
 const CRACK_MS = 420;
 const HOP_MS = 380;
 const SETTLE_MS = 520;
+// Long enough to actually enjoy him. The old shout held 2,400ms and most of that was reading; this is the
+// same budget spent on the animal instead of on a caption.
+const ELDER_MS = 2600;
 
 export default function TheWarren({ warren, onDone, owner = false }) {
     // Where we are: which stage, and which room. `at` counts burrows OPENED on this stage, which is also the
@@ -61,7 +64,18 @@ export default function TheWarren({ warren, onDone, owner = false }) {
     const [haul, setHaul] = useState(null);
     const [hops, setHops] = useState([]);           // critters currently out, with their chips
     const [won, setWon] = useState(0);
-    const [banner, setBanner] = useState(null);     // "elder" | "mother" | "hoard"
+    const [banner, setBanner] = useState(null);     // "mother" | "hoard"
+    // ── THE ELDER, OUT ON THE FLOOR ──────────────────────────────────────────────────────────────────────
+    // Luke: "the elder wolf — I'd rather he pop out like everything else but have him dance around and have
+    // a good time, instead of just a modal in the middle, because that's the core dopamine part right there
+    // and I feel like we're missing out on a lot of dopamine."
+    //
+    // He is right, and the reason is that a full-screen shout is the same shape as an ERROR. It stops the
+    // room, greys what you were looking at and puts a slab of text over it — which is what a game does when
+    // something has gone wrong, not when the best thing on the machine has just happened. Everything else in
+    // this bonus hatches out of an egg and lands on the floor; the one moment worth celebrating was the one
+    // that did not. So he hatches too, from the egg you actually touched, and then he has a party.
+    const [elder, setElder] = useState(null);      // { x, art }
     const [inHoard, setInHoard] = useState(false);
     const [done, setDone] = useState(false);
     // Which board slots have been opened, so a burrow cannot be picked twice and the room visibly empties.
@@ -165,15 +179,19 @@ export default function TheWarren({ warren, onDone, owner = false }) {
 
         if (next.kind === "elder") {
             // ── THE ELDER ────────────────────────────────────────────────────────────────────────────────
-            // Everything stops, the room is named, and the whole board is replaced. Luke: "he like
-            // congratulates you and it's this huge event and then it goes to the next screen that's a new
-            // background, the eggs look better."
+            // He comes out of the egg your finger landed on, at the column it was in, and dances. Luke: "he
+            // like congratulates you and it's this huge event and then it goes to the next screen that's a
+            // new background, the eggs look better."
             const toHoard = cur?.geode != null;
-            setBanner(toHoard ? "hoard" : "elder");
+            const col = slot % 5;
+            setElder({ x: Math.min(78, Math.max(22, (col + 0.5) * 20)), art: warren?.art?.elder || null });
             Cas.jackpot();
             Haptic.crit();
-            await wait(2400);
-            setBanner(null);
+            await wait(ELDER_MS);
+            setElder(null);
+            // The Hoard still gets its shout: it is a ROOM you are being shown, not a creature, and there is
+            // nothing to hatch. The Elder's was the one that should never have been a slab of text.
+            if (toHoard) { setBanner("hoard"); await wait(1500); setBanner(null); }
 
             // ── AND IN THE LAST ROOM, A GEODE ────────────────────────────────────────────────────────────
             // One crack, and then back onto the same wall to look for another Elder. The geode is not a
@@ -373,6 +391,24 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                             : null}
                     </span>
                 ))}
+
+                {/* ── AND THE ELDER, HAVING A PARTY ───────────────────────────────────────────────────
+                    Same floor, same hatch, four times the size — and then he dances instead of standing
+                    there. The sparks are thrown from under his feet rather than raining down, so the
+                    energy comes from HIM: the room is reacting to the animal, not decorating him. */}
+                {elder ? (
+                    <span className="wr-elder" style={{ left: `${elder.x}%` }}>
+                        <i className="wr-elder-pop" aria-hidden="true">
+                            {Array.from({ length: 12 }, (_, k) => <b key={k} style={{ "--k": k }} />)}
+                        </i>
+                        {elder.art
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={elder.art} alt="" draggable="false" />
+                            : null}
+                        <u>THE ELDER</u>
+                        <em>{stages[stage + 1]?.name || "Deeper"}</em>
+                    </span>
+                ) : null}
             </div> : null}
 
             <p className="wr-say">
@@ -406,9 +442,10 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 </div>
             ) : null}
 
-            {/* ── THE THREE MOMENTS ───────────────────────────────────────────────────────────────────
-                The Elder takes you down, the Hoard is the room past the bottom, and the Mother ends it.
-                Each takes the whole screen, because each is the only thing happening. */}
+            {/* ── THE TWO THAT ARE STILL A SHOUT ──────────────────────────────────────────────────────
+                The Hoard is a ROOM you are being shown and the Mother is the run ending — neither is a
+                creature coming out of an egg, and neither has anything to hatch. The Elder used to be here
+                with them and should never have been: see the note beside `elder` at the top. */}
             {banner ? (
                 <div className={`wr-shout is-${banner}`} role="status">
                     {banner === "mother" ? (
@@ -418,19 +455,10 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                             <b>THE MOTHER</b>
                             <em>She has had enough of you.</em>
                         </>
-                    ) : banner === "hoard" ? (
+                    ) : (
                         <>
                             <b>THE HOARD</b>
                             <em>Nobody gets this far. Take what you can carry.</em>
-                        </>
-                    ) : (
-                        <>
-                            {warren?.art?.elder
-                                // eslint-disable-next-line @next/next/no-img-element
-                                ? <img src={warren.art.elder} alt="" />
-                                : null}
-                            <b>THE ELDER</b>
-                            <em>{stages[stage + 1]?.name || "Deeper"} — and everything down there is bigger.</em>
                         </>
                     )}
                 </div>
