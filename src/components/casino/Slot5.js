@@ -137,7 +137,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // the balance and do the arithmetic yourself. A control that is live and does nothing is worse than one
     // that is plainly off — the second tells you something, the first reads as a broken machine.
     const broke = Number(gold ?? 0) < Number(bet ?? 0);
-    const locked = busy || spinning || phase === "pick" || broke;
+    // ── AND NOT WHILE ANYTHING IS STILL PLAYING ──────────────────────────────────────────────────────────
+    // Luke: "You shouldn't be able to spin while it's spinning or counting up after the spin."
+    //
+    // This listed the phases it wanted to block, and so it blocked the ones somebody had remembered:
+    // "pick" was in the list, and "lines", "tumble", "free", "freeIntro", "freeDone", "build", "warren" and
+    // "trigger" were not. Pressing SPIN mid-round cut a bonus off at the knees and started a new spin over
+    // the top of it. And the count-up was not covered at all — the reels had stopped, the number was still
+    // climbing, and a second pull threw away the end of the win the member was watching arrive.
+    //
+    // Stated the other way round now: the machine is only free when nothing is happening. A new phase added
+    // tomorrow is locked by default instead of being unlocked by omission, which is the difference between
+    // a rule and a list.
+    // `atRest`, not `idle` — `idle` is already the reels' resting faces further down this file, and a
+    // second one would shadow it.
+    const counting = phase === "done" && Number(result?.wonChips || 0) > counted;
+    const atRest = phase === "idle" || (phase === "done" && !counting);
+    const locked = busy || spinning || !atRest || broke;
     const step = (d) => {
         const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
         if (next !== bet) { onBet?.(next); Cas.chips(); }

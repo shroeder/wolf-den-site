@@ -202,6 +202,24 @@ export const Cas = {
 
     // The pot. Bigger than a jackpot and it has to sound it, so it gets the fanfare, a bell, and a cascade
     // that runs on well past the point where the fanfare has finished.
+    // ── THE MOTHER ───────────────────────────────────────────────────────────────────────────────────
+    // The sound of a run being taken off you. The Warren was ending on `pot()` — the JACKPOT fanfare with
+    // five rounds of coins on it — because that was the nearest big sound to hand, so the moment a member
+    // lost everything they were climbing for, the machine congratulated them.
+    //
+    // Built downwards, which is the whole trick: every other sound on this floor climbs. A growl falling
+    // out from under the room, a snarl over the top of it, and then the door shutting.
+    dread() {
+        const r = voice.winRoot;
+        tone({ freq: r * 0.75, to: r * 0.26, type: "sawtooth", dur: 1.15, gain: 0.08 });
+        tone({ at: 0.02, freq: r * 0.5, to: r * 0.18, type: "square", dur: 1.3, gain: 0.05 });
+        // The snarl — a band sweeping DOWN, so it reads as something closing in rather than arriving.
+        noise({ dur: 0.6, gain: 0.07, type: "bandpass", freq: 1500, sweepTo: 210, q: 1.1 });
+        // And the door.
+        tone({ at: 0.44, freq: r * 0.34, to: r * 0.11, type: "sine", dur: 0.95, gain: 0.1 });
+        noise({ at: 0.44, dur: 0.26, gain: 0.06, type: "lowpass", freq: 340, sweepTo: 80, q: 0.7 });
+    },
+
     pot() {
         this.jackpot();
         [0, 0.16, 0.32].forEach((at, i) => {

@@ -182,7 +182,7 @@ export default function TheWarren({ warren, onDone }) {
 
         // The Warren Mother. It is over, and it says so with its own face rather than with a sentence.
         setBanner("mother");
-        Cas.pot();
+        Cas.dread();
         Haptic.crit();
         await wait(2100);
         setBanner(null);
@@ -191,6 +191,15 @@ export default function TheWarren({ warren, onDone }) {
     }, [busy, done, spent, inHoard, hoard, cur, at, stage, stages.length, pool, warren]);
 
     const depth = inHoard ? stages.length + 1 : stage + 1;
+    // ── WHAT THE WHOLE RUN CAME TO ───────────────────────────────────────────────────────────────────────
+    // Counted off the server's own record of the round rather than off anything the screen tallied as it
+    // went — a summary assembled from the animation is a summary that can disagree with the payout.
+    const opened = (warren?.stages || []).reduce((a, st) => a + st.opened.length, 0)
+        + (warren?.hoard?.opened?.length || 0);
+    const hatched = (warren?.stages || []).reduce((a, st) =>
+        a + st.opened.reduce((b, n) => b + (n.pups?.length || 0), 0), 0)
+        + (warren?.hoard?.opened || []).filter((o) => o.kind === "mound").length;
+    const reachedHoard = Boolean(warren?.full);
 
     return (
         <div className={`wr is-${room}${inHoard ? " is-hoard" : ""}`}>
@@ -292,10 +301,27 @@ export default function TheWarren({ warren, onDone }) {
                     : "Open an egg. One holds the Elder, one holds the Mother."}
             </p>
 
+            {/* ── AND THE RECKONING ───────────────────────────────────────────────────────────────────
+                Luke: "it should total up everything for you at the end of the bonus. And then have a
+                button in the middle that says you're done."
+
+                It ended on a small button along the bottom edge reading "Take 46 chips", under a screen
+                still full of eggs — which is a receipt, not an ending. A run through the Warren is the
+                longest thing on this floor and it deserves to be added up: how deep you got, how many
+                eggs you opened, how many animals are standing on the floor, and the number, once, at the
+                size it is worth. In the middle, because there is nothing else left to look at. */}
             {done ? (
-                <button type="button" className="wr-go" onClick={onDone}>
-                    Take {won.toLocaleString()} chips
-                </button>
+                <div className="wr-end" role="status">
+                    <i>{reachedHoard ? "You emptied the Deep Warren" : "The warren is closed"}</i>
+                    <b>{won.toLocaleString()}</b>
+                    <em>chips</em>
+                    <ul className="wr-tally">
+                        <li><span>{depth}</span> {depth === 1 ? "room" : "rooms"} deep</li>
+                        <li><span>{opened}</span> {opened === 1 ? "egg" : "eggs"} opened</li>
+                        <li><span>{hatched}</span> out of them</li>
+                    </ul>
+                    <button type="button" className="wr-go" onClick={onDone}>Done</button>
+                </div>
             ) : null}
 
             {/* ── THE THREE MOMENTS ───────────────────────────────────────────────────────────────────

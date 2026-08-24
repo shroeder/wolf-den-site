@@ -19639,3 +19639,28 @@ body.cas-seated .social-fab { display: none; }
 .s5-spin-broke { display: block; font-family: var(--font-body, inherit); font-size: 11px; font-weight: 800;
     line-height: 1.15; letter-spacing: .06em; }
 .s5-short { margin: 0 0 2px; text-align: center; font-size: 12px; color: #ffb4a4; }
+
+/* ── THE RECKONING ────────────────────────────────────────────────────────────────────────────────────
+   A run through the Warren is the longest thing on the floor and it used to end on a small button along
+   the bottom edge reading "Take 46 chips", under a screen still full of eggs. That is a receipt, not an
+   ending. It takes the whole screen, adds the run up, and puts the number in the middle at the size it
+   is worth — because at that point there is nothing else left to look at. */
+.wr-end { position: absolute; inset: 0; z-index: 10; display: grid; align-content: center;
+    justify-items: center; gap: 2px; padding: 24px; text-align: center;
+    background: radial-gradient(circle at 50% 42%, rgba(20, 14, 8, .82), rgba(6, 4, 10, .96) 70%);
+    animation: s5MoreIn .35s ease-out both; }
+.wr-end > i { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .18em;
+    text-transform: uppercase; color: #c9b48a; }
+.wr-end > b { font-family: var(--font-display); font-size: 4.4rem; line-height: 1; font-weight: 900;
+    color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 24px rgba(255, 215, 94, .9), 0 0 62px rgba(255, 150, 30, .6), 0 4px 0 rgba(0, 0, 0, .6);
+    animation: s5MoreSlam .55s cubic-bezier(.15, 1.7, .35, 1) .1s both; }
+.wr-end > em { font-style: normal; font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: #a89c86; }
+
+/* The three facts that make a number a story: how deep, how many opened, how many came out. */
+.wr-tally { list-style: none; margin: 16px 0 20px; padding: 0; display: flex; gap: 18px; }
+.wr-tally li { font-size: 11px; color: #9a9081; display: grid; justify-items: center; gap: 1px; }
+.wr-tally span { display: block; font-family: var(--font-display); font-size: 1.5rem; color: #ffe6a4;
+    font-variant-numeric: tabular-nums; }
+.wr-end .wr-go { width: auto; min-width: 168px; }
