@@ -892,36 +892,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 times. A bonus round is one spin in two hundred and thirty-three; it should be the moment
                 the slot machine stops being a slot machine. */}
 
-            {/* ── ⚠ OWNER ONLY — REMOVE BEFORE THE FLOOR OPENS ────────────────────────────────────────
-                On the master "remove before launch" checklist with the server half. Free spins come once in
-                ninety-three spins and the pick once in two hundred and thirty-three, which makes both of them
-                nearly impossible to LOOK at — the first time the free round was seen on screen it had to be
-                faked, and a fake only proves the half that was already fine.
-
-                The server re-rolls whole spins until one triggers naturally and plays that, so what appears
-                here is a real spin with a real payout and no special-case code near the money. The gate is
-                server-side; this row being hidden is not the permission check. */}
-            {owner ? (
-                <div className="s5-owner">
-                    <i>owner</i>
-                    <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
-                    <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
-                    <button type="button" className="s5-f-again" disabled={locked} onClick={() => pull("again")}>Force retrigger</button>
-                    <button type="button" className="s5-f-tease" disabled={locked} onClick={() => pull("tease")}>Force hold</button>
-                    <button type="button" className="s5-f-hoard" disabled={locked} onClick={() => pull("hoard")}>Force hoard</button>
-                    {/* The Vault's two. Only on the Vault: a button that spins forty thousand times looking
-                        for a feature this cabinet does not have is a button that quietly does nothing. */}
-                    {slot5(machineId).second?.kind === "gems" ? (
-                        <button type="button" className="s5-f-gems" disabled={locked} onClick={() => pull("gems")}>Force gems</button>
-                    ) : null}
-                    {slot5(machineId).winAgain ? (
-                        <button type="button" className="s5-f-again2" disabled={locked} onClick={() => pull("winagain")}>Force win again</button>
-                    ) : null}
-                    {cascades ? (
-                        <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>
-                    ) : null}
-                </div>
-            ) : null}
 
             {/* Says how far short, because "not enough" without a number is a dead end — the member has to
                 either lower the bet or go and earn, and both need the size of the gap. */}
@@ -971,6 +941,42 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         : "SPIN"}
                 </button>
             </div>
+
+            {/* ── ⚠ OWNER ONLY — REMOVE BEFORE THE FLOOR OPENS ────────────────────────────────────────
+                LAST IN THE CABINET, under the spin panel. Luke: "can you move these red controls down
+                beneath the spin button please." It was sitting between the readout and the balance, which
+                pushed BET and SPIN — the two things anybody came here to touch — most of a screen further
+                down, on a cabinet that already carries a meter bar above it. A test control has to be
+                reachable and must never be in the way of the game.
+                On the master "remove before launch" checklist with the server half. Free spins come once in
+                ninety-three spins and the pick once in two hundred and thirty-three, which makes both of them
+                nearly impossible to LOOK at — the first time the free round was seen on screen it had to be
+                faked, and a fake only proves the half that was already fine.
+
+                The server re-rolls whole spins until one triggers naturally and plays that, so what appears
+                here is a real spin with a real payout and no special-case code near the money. The gate is
+                server-side; this row being hidden is not the permission check. */}
+            {owner ? (
+                <div className="s5-owner">
+                    <i>owner</i>
+                    <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
+                    <button type="button" className="s5-f-pick" disabled={locked} onClick={() => pull("pick")}>Force pick</button>
+                    <button type="button" className="s5-f-again" disabled={locked} onClick={() => pull("again")}>Force retrigger</button>
+                    <button type="button" className="s5-f-tease" disabled={locked} onClick={() => pull("tease")}>Force hold</button>
+                    <button type="button" className="s5-f-hoard" disabled={locked} onClick={() => pull("hoard")}>Force hoard</button>
+                    {/* The Vault's two. Only on the Vault: a button that spins forty thousand times looking
+                        for a feature this cabinet does not have is a button that quietly does nothing. */}
+                    {slot5(machineId).second?.kind === "gems" ? (
+                        <button type="button" className="s5-f-gems" disabled={locked} onClick={() => pull("gems")}>Force gems</button>
+                    ) : null}
+                    {slot5(machineId).winAgain ? (
+                        <button type="button" className="s5-f-again2" disabled={locked} onClick={() => pull("winagain")}>Force win again</button>
+                    ) : null}
+                    {cascades ? (
+                        <button type="button" className="s5-f-chain" disabled={locked} onClick={() => pull("chain")}>Force tumble</button>
+                    ) : null}
+                </div>
+            ) : null}
         </div>
     );
 }

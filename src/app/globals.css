@@ -18497,7 +18497,16 @@ body.cas-seated .social-fab { display: none; }
    findable on a phone. */
 /* ONE BUTTON NOW, so the pill is a pill rather than a row, and it has a fixed top again: it only ever
    appears on the floor, where the stage header it used to dodge is not there. */
-.cas-audiobar { position: fixed; right: 10px; top: 10px; z-index: 62; display: flex; align-items: center;
+/* ── IN THE ROOM, NOT ON THE SCREEN ───────────────────────────────────────────────────────────────────
+   Luke: "move the mute button down into the top right of the animation frame, not the entire screen."
+
+   It was `position: fixed`, so it hung in the corner of the VIEWPORT — over the site header, next to the
+   cart, reading as a piece of the website rather than a control belonging to the room. It is already
+   rendered inside `.cas-roomwrap` (which is `position: relative`), so absolute lands it exactly where it
+   belongs with no markup change at all. `top: 20px` rather than 10 because `.cas-room` carries 10px of
+   margin above it — the frame starts lower than the wrapper does, and the button wants the art's corner,
+   not the wrapper's. */
+.cas-audiobar { position: absolute; right: 10px; top: 20px; z-index: 6; display: flex; align-items: center;
     padding: 5px; border-radius: 999px;
     background: rgba(13, 9, 19, .72); backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 215, 94, .30); box-shadow: 0 3px 12px rgba(0, 0, 0, .5); }
