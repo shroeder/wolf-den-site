@@ -2974,6 +2974,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 {bout && !bout.over ? (
                     <p className="ar-pick-note">{bout.foe?.name || "Your opponent"} is still standing — one fight at a time.</p>
                 ) : null}
+                {/* ── WHY SOMEBODY YOU WERE LOOKING FOR IS NOT HERE ───────────────────────────────────
+                    GrayKitsune: "Eric vanished out of the pick your match on arena screen for me lol." He
+                    is not wrong and the hiding is right — a name you can only be refused for tapping should
+                    not be on the board. But in a Den this size you notice WHICH person is gone, and the only
+                    reason he found out why is that Luke was in chat when he said it. The list accounts for
+                    itself now. Counted, not named: naming them would rebuild the bait. */}
+                {st.hiddenRecent?.n > 0 ? (
+                    <p className="ar-pick-note is-quiet">
+                        {st.hiddenRecent.n === 1
+                            ? "One member is hidden here — you have fought them"
+                            : `${st.hiddenRecent.n} members are hidden here — you have fought each of them`}
+                        {" "}inside your last {st.hiddenRecent.within} bouts. They come back once you have fought somebody else.
+                    </p>
+                ) : null}
                 {/* Hardest first, because the interesting fight should be the one you see. Members and
                     Gauntlet tiers in ONE list: they resolve to the same thing server-side, and splitting
                     them on screen would be asking somebody to compare two ladders to answer one question. */}
@@ -4729,6 +4743,9 @@ function Styles() {
             .ar-pick-head b { font-family: var(--font-display); font-size: 1.02rem; color: #ffe9b8; }
             .ar-pick-head em { font-style: normal; font-size: 11px; color: #98a0aa; }
             .ar-pick-note { margin: 0 0 2px; font-size: 11px; color: #ffb35c; }
+            /* The amber above is a WARNING — "your opponent is still standing". A list explaining its own
+               shape is not one, so it takes the page's quiet grey and a line height it can wrap on. */
+            .ar-pick-note.is-quiet { color: #8b93a0; line-height: 1.45; margin: 0 0 6px; }
 
             /* Dealt out rather than simply present — six rows 45ms apart reads as cards being turned over. */
             .ar-pick-row { position: relative; display: grid;

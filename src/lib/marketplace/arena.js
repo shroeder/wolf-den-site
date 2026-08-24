@@ -855,6 +855,12 @@ export async function getArenaState(buyerId, pre = {}) {
     // are then told off for tapping is worse than either drawing a flag or hiding the row, and hiding it is
     // the cheaper of those two.
     const blocked = await recentPvpFoes(buyerId, REMATCH_BLOCK_PICK).catch(() => new Set());
+    // ── AND SAY THAT SOMETHING WAS HIDDEN ────────────────────────────────────────────────────────────
+    // GrayKitsune: "Eric vanished out of the pick your match on arena screen for me lol." Hiding a name you
+    // would only be refused for tapping is right, and it turned a bait into a disappearance — a member of a
+    // small Den notices when a specific person is missing, and the only reason he got an answer is that Luke
+    // happened to be in chat at the time. The board carries the count so the list can account for itself.
+    const hiddenRecent = board.filter((o) => o.id !== buyerId && blocked.has(String(o.id))).length;
     const targets = board
         .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)))
         .map((o) => ({ ...o, reward: {
@@ -1015,6 +1021,10 @@ export async function getArenaState(buyerId, pre = {}) {
             npcBest,
         },
         targets,
+        // How many members the rematch rule is holding back right now, AND the rule's own number. The count
+        // without the window is half a sentence, and the client cannot import it — arena.js is server-only,
+        // and a second copy of a balance constant living in a component is how two games get played at once.
+        hiddenRecent: { n: hiddenRecent, within: REMATCH_BLOCK_PICK },
         gauntlet,
         // The crates, with the table each one can actually roll FOR THIS MEMBER — a gated row is swapped for
         // its stand-in rather than dropped, so the odds on screen are the odds they will get.

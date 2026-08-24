@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
 import CoinCta from "@/components/CoinCta";
+import { GiOpenBook } from "react-icons/gi";
 
 const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const SLOTS = [["", "All slots"], ["main_hand", "Weapon"], ["off_hand", "Off-hand"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["feet", "Feet"], ["hands", "Hands"], ["ring", "Ring"], ["amulet", "Amulet"], ["cloak", "Cloak"]];
@@ -169,7 +170,15 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-grid">
                             {listings.map((l) => (
                                 <div key={l.id} className="ah-card ah-card-tap" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }} onClick={() => setDetail(l)} role="button" tabIndex={0}>
-                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} elements={l.elements} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
+                                    {/* WILL IT FILL A SLOT IN THE DEX. On the art, where the enhancement badge
+                                        already sits, and only when the answer is no — on a board where most
+                                        pieces are new, a badge for "new" would be on everything. Suppressed
+                                        for a piece you are HOLDING and for your own listing: both already say
+                                        so on the button underneath, and two labels for one fact is noise. */}
+                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} elements={l.elements} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}
+                                        {l.collected && !l.owned && !l.mine ? (
+                                            <span className="ah-dex" title="Already in your compendium — buying it again won't add to it"><GiOpenBook aria-hidden="true" />logged</span>
+                                        ) : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
@@ -290,6 +299,12 @@ export default function AuctionClient({ initial }) {
                         {detail.depth ? <div className="ah-card-depth" style={{ textAlign: "left" }}>⛏️ Depths affinity: {detail.depth} <span className="ah-attune-blurb">— helps underground</span></div> : null}
                         {detail.signature ? <div className="ah-card-sig" style={{ textAlign: "left" }}>★ {detail.signature.label} — {detail.signature.desc}</div> : null}
                         {detail.compare ? <CompareBlock c={detail.compare} /> : null}
+                        {/* The card carries the badge; this is where the buy happens, so it gets the sentence.
+                            Same suppression as the card — a piece you hold, or your own listing, already says
+                            so on the button below. */}
+                        {detail.collected && !detail.owned && !detail.mine ? (
+                            <div className="ah-detail-dex"><GiOpenBook aria-hidden="true" /> Already in your compendium — you have owned this before, so buying it back adds nothing to the dex or its milestones.</div>
+                        ) : null}
                         <div className="ah-detail-meta muted">
                             {detail.mine
                                 ? (detail.status === "sold" && detail.buyerName ? <>🤝 Sold to {detail.buyerName}{detail.soldAt ? ` · ${ago(detail.soldAt)}` : ""}</> : detail.status === "active" ? <>Your listing · ⏳ {timeLeft(detail.expiresAt)} left</> : `Your listing · ${detail.status}`)
@@ -359,6 +374,20 @@ const AH_CSS = `
 .ah-sellcard.is-picked { border-color: #ffd75e; box-shadow: 0 0 0 1px #ffd75e, 0 8px 20px rgba(255,215,94,0.2); }
 .ah-card-art { position: relative; width: 64px; height: 64px; display: grid; place-items: center; }
 .ah-card-art svg, .ah-card-art img { width: 58px; height: 58px; }
+/* The compendium badge. Top-left, because the enhancement badge owns bottom-right and these two are on the
+   same art often enough that stacking them would overlap. Muted stone against the enhancement's gold: one is
+   a boast about the item, this is a note about YOUR copy of the ledger. */
+/* The same fact, said in a sentence, where the purchase is actually made. */
+.ah-detail-dex { display: flex; align-items: flex-start; gap: 6px; margin: 8px 0 0; padding: 7px 9px;
+    border-radius: 10px; text-align: left; font-size: 0.72rem; line-height: 1.45; color: #cbb98a;
+    background: rgba(203,185,138,0.07); border: 1px solid rgba(203,185,138,0.22); }
+.ah-detail-dex svg { flex: none; width: 13px; height: 13px; margin-top: 2px; }
+.ah-dex { position: absolute; top: -4px; left: -6px; display: inline-flex; align-items: center; gap: 2px;
+    font-size: 7px; line-height: 1.5; font-weight: 900; letter-spacing: 0.03em; text-transform: uppercase;
+    color: rgba(203,185,138,0.85); background: rgba(10,8,5,0.6);
+    border: 1px solid rgba(203,185,138,0.24); border-radius: 999px;
+    padding: 1px 4px 1px 3px; white-space: nowrap; }
+.ah-dex svg { width: 7px; height: 7px; flex: none; }
 .ah-enh { position: absolute; bottom: -4px; right: -6px; font-size: 0.6rem; font-weight: 900; color: #2a1a06; background: linear-gradient(180deg,#ffe27a,#f3b23a); border: 1px solid #fff3c4; border-radius: 999px; padding: 1px 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); white-space: nowrap; }
 .ah-card-name { font-weight: 800; font-size: 0.86rem; line-height: 1.2; }
 .ah-card-stats { font-size: 0.72rem; line-height: 1.25; }

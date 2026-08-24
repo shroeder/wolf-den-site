@@ -206,6 +206,25 @@ export const hullGrade = (hits = 0) => HULL_GRADES.find((g) => hits <= g.max) ||
 export const RECKONING_AT = 4;
 export const RECKONING_NAME = "Reckoning";
 
+// ── AND NOT TWICE RUNNING ────────────────────────────────────────────────────────────────────────────────────
+// Three members reported the same fight in two days. GrayKitsune worked out the mechanism himself: "enemy ship
+// with 6 cannons using reckoning and then missing 4 shots on their regular cannon fire means they get to
+// reckoning and regular shot again the next turn." Kaishiern lost a win streak to it; Sunflower Jinxx took
+// three in a row.
+//
+// He is right, and the reason is that RECKONING_AT was measured against a PLAYER's miss rate — 4.2 to 5.0 balls
+// wide across a whole 2.5-3.6 round fight, which is what makes it land "roughly once a fight". A foe with a
+// six-gun battery throws that many in a single round, so the threshold that is a whole fight for you is one
+// round for her. Her Reckoning does not cost her the round either, so the answer arrives on top of a full
+// broadside.
+//
+// Luke's call is the lockout rather than a threshold scaled to the battery: "you probably shouldn't be able to
+// do reckoning back to back." One full round has to pass between one Reckoning and the next, and it applies to
+// both decks — the mechanic has always read the same from either side and that is the point of it.
+export const RECKONING_GAP = 2;   // rounds between one Reckoning and the next, on either deck
+export const reckoningReady = (side, round) =>
+    (side?.reck || 0) >= RECKONING_AT && (round - (side?.reckLast ?? -99)) >= RECKONING_GAP;
+
 /** Somewhere on her ship worth a ball: canvas while she has any, a live gun, or timber. */
 function reckoningTarget(defSide, rng) {
     // Nothing to take off a living thing — the whole volley goes into it.
@@ -558,8 +577,12 @@ export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
         me: { ...state.me, guns: [...state.me.guns], gunMax: [...(state.me.gunMax || state.me.guns)] },
         foe: { ...state.foe, guns: [...state.foe.guns], gunMax: [...(state.foe.gunMax || state.foe.guns)] },
     };
+    // `cooling` is its own error rather than not_ready, because the two are different sentences on screen: one
+    // says keep missing, the other says wait a round.
     if ((st.me.reck || 0) < RECKONING_AT) return { ok: false, error: "not_ready", state: st, events: [] };
+    if (!reckoningReady(st.me, st.round)) return { ok: false, error: "cooling", state: st, events: [] };
     st.me.reck = 0;
+    st.me.reckLast = st.round;
 
     const events = [];
     for (const ev of reckoningBroadside(me, st, "me", rng)) events.push(ev);
@@ -807,8 +830,11 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         // round, you did not skip it"), so the mechanic reads the same from either deck — which is the point.
         // She has no button to choose the moment with, and inventing hesitation for her would just be a
         // hidden delay nobody could see.
-        if ((st.foe.reck || 0) >= RECKONING_AT && st.foe.hp > 0 && st.me.hp > 0) {
+        // The lockout is hers too — see RECKONING_GAP. Without it a big battery refills the meter inside the
+        // very round it spent it, which is the fight three people reported.
+        if (reckoningReady(st.foe, st.round) && st.foe.hp > 0 && st.me.hp > 0) {
             st.foe.reck = 0;
+            st.foe.reckLast = st.round;
             for (const ev of reckoningBroadside(foe, st, "foe", rng)) events.push(ev);
         }
         if (st.me.hp > 0 && st.foe.hp > 0) fire("foe", theirs);

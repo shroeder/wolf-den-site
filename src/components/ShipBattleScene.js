@@ -1047,7 +1047,15 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
     const reck = battle?.reck || null;
     const reckN = Math.max(0, Math.min(reck?.at || 8, reck?.n || 0));
     const reckAt = reck?.at || 8;
-    const reckReady = reckN >= reckAt;
+    // ── FULL IS NOT THE SAME AS READY ────────────────────────────────────────────────────────────────────
+    // A Reckoning cannot follow a Reckoning — one round has to pass (RECKONING_GAP, and see the note beside
+    // it for the three people who reported the fight it came from). The server decides both halves and
+    // publishes them, because a rule the button re-derives is a rule that drifts from the one the engine
+    // enforces. `?? ` for a battle saved before these fields existed: full meant ready then and still does.
+    const reckReady = reck?.ready ?? (reckN >= reckAt);
+    // Full, but inside the round after the last one. The meter has nothing left to say, so the button says
+    // what it is actually waiting for instead of sitting there dark with four lit notches.
+    const reckCooling = Boolean(reck?.cooling);
     const reckFire = useCallback(() => {
         if (!reckReady || busy || phase !== "aim") return;
         setBalls([]);
@@ -1298,7 +1306,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                             onClick={reckFire}
                             title={reckReady
                                 ? `${reck.name} — one free volley, every ball lands, targets chosen at random`
-                                : `${reckAt - reckN} more ${reckAt - reckN === 1 ? "miss" : "misses"}`}>
+                                : reckCooling
+                                    ? `${reck.name} is loaded — it cannot follow another, so it comes back next round`
+                                    : `${reckAt - reckN} more ${reckAt - reckN === 1 ? "miss" : "misses"}`}>
                             <i className="sbt-reck-shine" aria-hidden="true" />
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="sbt-reck-art" src="/images/sailing/gun/reckoning.png" alt="" draggable="false" />
@@ -1313,6 +1323,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                 replaced by the thing to do. */}
                             {reckReady ? (
                                 <em className="sbt-reck-cta">Unleash</em>
+                            ) : reckCooling ? (
+                                <em className="sbt-reck-cta is-wait">Next round</em>
                             ) : (
                                 <span className="sbt-reck-pips" aria-hidden="true">
                                     {Array.from({ length: reckAt }).map((_, i) => (

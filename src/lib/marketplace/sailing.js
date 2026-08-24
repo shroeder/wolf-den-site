@@ -21,7 +21,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
          GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
-         RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
+         RECKONING_AT, RECKONING_NAME, reckoningReady } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { hasPower, equippedPowers, claimPowerUse, powerUsesLeft, powerRoll, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -2598,11 +2598,18 @@ const buildBattleView = (st, meta, { row = null, hulls = null } = {}) => ({
     },
     caps: { sails: SAILS_MAX, gun: GUN_HP },
     // THE RECKONING. How many of your balls have gone wide, and what it takes to spend it. See ship-battle.
-    reck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.me.reck || 0)), name: RECKONING_NAME },
+    // `ready` is the whole rule, decided once here rather than by each surface re-deriving it: the meter has to
+    // be full AND a round has to have passed since the last one (RECKONING_GAP). `cooling` separates "keep
+    // missing" from "wait a round", which are different sentences on the button.
+    reck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.me.reck || 0)), name: RECKONING_NAME,
+        ready: reckoningReady(st.me, st.round),
+        cooling: (st.me.reck || 0) >= RECKONING_AT && !reckoningReady(st.me, st.round) },
     // HERS, because she fires one now. A free unanswered broadside that arrives with no warning is not
     // difficulty, it is a surprise — and the whole design of this fight is that every number deciding it is on
     // screen before you commit. Same shape as yours so the card can read it without a special case.
-    foeReck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.foe.reck || 0)), name: RECKONING_NAME },
+    foeReck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.foe.reck || 0)), name: RECKONING_NAME,
+        ready: reckoningReady(st.foe, st.round),
+        cooling: (st.foe.reck || 0) >= RECKONING_AT && !reckoningReady(st.foe, st.round) },
     // Each gun's own ceiling — a barrel with Iron on it holds more hits than the one beside it, and the
     // scene has to read "1 of 3" against the right number.
     gunMax: { me: st.me.gunMax || null, foe: st.foe.gunMax || null },

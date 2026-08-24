@@ -11,6 +11,8 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
+import { GiOpenBook } from "react-icons/gi";
+
 import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, sortStatKeys, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
@@ -799,6 +801,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <div className="equip-bag-grid">
                                         {cat.items.map((i) => (
                                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")} · ${i.statsText}`}>
+                                                {/* WILL THIS FILL A SLOT IN THE DEX. The shelf already hides
+                                                    what you are HOLDING, so anything wearing this badge is a
+                                                    piece you owned once and let go — buying it back adds
+                                                    nothing to the compendium. See `collected` in
+                                                    inventory.js for who asked. */}
+                                                {i.collected ? (
+                                                    <span className="equip-dex" title="Already in your compendium — buying this again won't add to it">
+                                                        <GiOpenBook aria-hidden="true" />logged
+                                                    </span>
+                                                ) : null}
                                                 <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements}
                                                     gem={i.gem} socket={i.socket} />
                                                 <span className="equip-card-name">{i.name}</span>
@@ -1002,6 +1014,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 {it.charge ? <div className="eqtrait t-charge"><span aria-hidden="true">🎁</span><span><b>{it.charge.rewardLabel}</b><em>an in-store perk — can&apos;t be sold</em></span></div> : null}
                                 {it.collectionPiece ? (
                                     <div className="eqtrait t-set"><span aria-hidden="true">🏆</span><span><b>Collection piece</b><em>Owning it is enough — the bonus is permanent and it never needs to be worn, sold or salvaged.</em></span></div>
+                                ) : null}
+                                {/* The tile carries a badge; the sheet is where the decision is made, so it
+                                    gets the sentence. Only on the shelf — in your own bag it would be telling
+                                    you that a thing you are holding is a thing you have held. */}
+                                {it.shop && it.collected ? (
+                                    <div className="eqtrait t-set"><span aria-hidden="true"><GiOpenBook /></span><span><b>Already in your compendium</b><em>You have owned this before, so buying it back adds nothing to the dex or its milestones.</em></span></div>
                                 ) : null}
                                 {it.setName ? (
                                     (data.setsOverview || []).some((s) => s.id === it.setId) ? (

@@ -9985,12 +9985,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .equip-picker-head { display: flex; align-items: center; justify-content: space-between; }
 .equip-bag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin-top: 8px; }
 .equip-card {
+    /* The compendium badge below anchors here. Without this it would escape to the nearest positioned
+       ancestor, which for a grid child means landing on the GRID rather than on the tile. */
+    position: relative;
     display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer;
     padding: 10px 6px; border-radius: 12px; font: inherit; color: #e7dcc4;
     background: linear-gradient(180deg, color-mix(in srgb, var(--rar, #888) 18%, transparent), rgba(0, 0, 0, 0.32));
     border: 1.5px solid color-mix(in srgb, var(--rar, #fff) 60%, transparent);
     box-shadow: 0 0 12px -5px var(--rar), inset 0 0 16px -12px var(--rar); transition: transform 0.1s ease;
 }
+
+/* ── ALREADY IN YOUR COMPENDIUM ──────────────────────────────────────────────────────────────────────────
+   GrayKitsune, SoullessShiitake and Kaishiern all asked for this inside two days. It marks the EXCEPTION --
+   gear you have owned before, which will not fill a slot in the dex -- rather than tagging every new piece,
+   because on a shelf where most things are new the badge for "new" is on everything and says nothing.
+   Deliberately quiet: it is a footnote on a purchase, not a warning against it. */
+.equip-dex {
+    position: absolute; top: 4px; right: 4px; z-index: 1; display: inline-flex; align-items: center; gap: 2px;
+    padding: 1px 4px 1px 3px; border-radius: 999px; font-size: 7px; font-weight: 900; letter-spacing: 0.03em;
+    line-height: 1.5; text-transform: uppercase; color: rgba(203, 185, 138, 0.85);
+    background: rgba(10, 8, 5, 0.6); border: 1px solid rgba(203, 185, 138, 0.24); pointer-events: none;
+}
+.equip-dex svg { width: 7px; height: 7px; flex: none; }
 .equip-card:hover { transform: translateY(-2px); }
 .equip-card.is-equipped { box-shadow: 0 0 0 1px #ffd75e inset, 0 0 12px -4px #ffd75e; }
 /* Rarity backplate behind the glyph — makes each item read like a loot card. */
@@ -15731,6 +15747,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-reck-pips i { width: 12px; height: 10px; }
 .sbt-reck-cta { margin-left: auto; min-width: 0; font-size: 0.7rem; font-weight: 900;
     letter-spacing: 0.1em; text-transform: uppercase; }
+/* LOADED, BUT NOT YET. "Next round" is twice the length of "Unleash" and it is not a call to action, so it
+   loses the size and the shout — it is a status sitting where the verb usually is. Amber rather than the
+   ready-gold, so a glance can tell the two apart without reading either. */
+.sbt-reck-cta.is-wait { font-size: 0.56rem; letter-spacing: 0.06em; color: #c9a24a; font-weight: 800; }
 /* 168px of content in a 165px button — three over, which clips the last charge. */
 .sbt-reck-pips i { width: 11px; }
 .sbt-reck { padding-right: 8px; }

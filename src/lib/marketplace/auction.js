@@ -12,6 +12,7 @@ import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { transferItemElement, describeItemElements, getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { collectedIds } from "@/lib/marketplace/compendium.js";
 import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
@@ -84,7 +85,7 @@ export const listingFee = (price, waived = false) =>
     waived ? 0 : Math.max(1, Math.ceil((Number(price) || 0) * LIST_FEE_PCT));
 
 // A public shape for one listing (item meta merged in). `me`/`owned` are viewer-relative.
-function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
+function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap, collectedSet = null) {
     const it = itemById(row.item_id);
     if (!it) return null;
     const det = enhMap && enhMap.get(`${row.seller_id}|${row.item_id}`);
@@ -118,6 +119,12 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
         status: "active",
         mine: viewerId && row.seller_id === viewerId,
         owned: ownedSet.has(row.item_id), // viewer already owns this item (can't buy a duplicate)
+        // ── AND WHETHER IT WOULD FILL A SLOT IN THE DEX ──────────────────────────────────────────────
+        // Asked for by GrayKitsune, SoullessShiitake and Kaishiern inside two days, for the shop and the
+        // auction house together. `owned` is what you are HOLDING; this is what you have ever held, which
+        // is the question a buyer is actually asking — a piece already logged pays no compendium milestone
+        // however good it is.
+        collected: Boolean(collectedSet?.has(row.item_id)),
     };
 }
 
@@ -198,13 +205,15 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     ).catch(() => []);
     const sprites = await itemSpriteMap().catch(() => ({}));
     const ownedSet = new Set(buyerId ? (await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id) : []);
+    // Everything this viewer has EVER held — see `collected` in shapeListing.
+    const collectedSet = await collectedIds(buyerId).catch(() => new Set());
     // Enhancement per (seller, item) so a listed enhanced piece shows "⚒️ +N" + its exact forge stats.
     const sellerIds = [...new Set(rows.map((r) => r.seller_id))];
     const itemIds = [...new Set(rows.map((r) => r.item_id))];
     const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
     const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})), util: describeUtil(e.util) }]));
     const elemMap = sellerIds.length ? await getElementOverridesForMembers(sellerIds).catch(() => new Map()) : new Map();
-    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap, elemMap)).filter(Boolean);
+    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap, elemMap, collectedSet)).filter(Boolean);
     const needle = String(q || "").trim().toLowerCase();
     if (needle) out = out.filter((l) => l.name.toLowerCase().includes(needle) || l.sellerName.toLowerCase().includes(needle));
     if (slot) out = out.filter((l) => l.slot === slot);

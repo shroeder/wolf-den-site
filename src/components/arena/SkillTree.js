@@ -288,6 +288,23 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                 </span>
             </div>
 
+            {/* ── AND SAY WHAT SPENDING ONE ALSO BUYS ─────────────────────────────────────────────────────
+                Kaishiern: "I just leveled up my Runecaller but it only gave me one point for tree but
+                nothing for the skills. Is that a glitch or was it changed? I thought it was one point in
+                each when you level up."
+
+                Not a glitch: a skill point is derived from a tree point you have SPENT, so levelling hands
+                you one point and the second arrives the moment you put it into a node. The Skills tab has
+                said so since the 22nd — and he asked on the 23rd, because that is not where anybody is
+                standing when the question occurs to them. They are here, looking at the point they just
+                got. So the sentence lives here too, on the unspent points, and nowhere else: with an empty
+                purse there is nothing to explain and it would just be a rule to read every visit. */}
+            {pts.available > 0 ? (
+                <p className="skt-earn">
+                    Spending {pts.available === 1 ? "it" : "them"} also earns you {pts.available === 1 ? "a skill point" : `${pts.available} skill points`} — see the Skills tab.
+                </p>
+            ) : null}
+
             {/* ── WHAT YOU ARE CARRYING ───────────────────────────────────────────────────────────────────
                 The tree draws a node's dots and never totals them, so four ranks of Conditioning was a row of
                 pips and nothing else — there was no screen anywhere that said what your passives came to.
@@ -440,6 +457,9 @@ function Styles() {
             .skt-xpbar u { display: block; height: 100%; background: var(--c); text-decoration: none;
                 transition: width .6s cubic-bezier(.2,.8,.3,1); }
             .skt-lv em { font-style: normal; font-size: 10px; color: #7f8790; }
+            /* The one-line explanation of what an unspent point is worth. Quiet: it is an answer to a
+               question, not a call to action, and it is gone the moment the purse is empty. */
+            .skt-earn { margin: 8px 0 0; font-size: 0.72rem; line-height: 1.4; color: #9aa2ad; }
             .skt-points { flex: 0 0 auto; display: grid; place-items: center; min-width: 56px; padding: 8px 6px;
                 border-radius: 13px; background: rgba(0,0,0,.36); border: 1px solid rgba(255,255,255,.12); }
             .skt-points b { font-size: 1.5rem; font-weight: 900; color: #6f7883; line-height: 1; }

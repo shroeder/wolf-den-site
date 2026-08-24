@@ -257,6 +257,10 @@ export function baseState(extra = {}) {
         me: { ...ME, rank: 12, vp: 1040, power: MY_POWER, abilities: treeAbilities(TREE_CLASS, TREE_TAKEN, "fire") },
         rank: 12, size: 84,
         vp: 1040, laurels: 640,
+        // Three names the rematch rule is holding back, so the note that explains their absence can be looked
+        // at. Real state carries the same shape — see hiddenRecent in arena.js and GrayKitsune's "Eric
+        // vanished out of the pick your match on arena screen for me lol."
+        hiddenRecent: { n: 3, within: 3 },
         // The real crates, through the real tables, so the shelf can be looked at without a login.
         armoury: CRATES.map((c) => ({
             id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,

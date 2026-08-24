@@ -401,6 +401,20 @@ export async function getInventory(buyerId) {
     // so they have to be concatenated in explicitly — leaving them to ITEMS would have quietly emptied nine
     // shelves. A trophy shows no slot and no combat stats, because it has neither.
     const ownedPieceIds = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    // ── HAVE I ALREADY LOGGED THIS ONE ───────────────────────────────────────────────────────────────────
+    // GrayKitsune: "In gold shop - icon to show whether you already have it in compendium?" SoullessShiitake,
+    // the next day: "It would be cool if there was a symbol to indicate whether or not you already have a
+    // piece of gear in your compendium when looking at the general store and auction house." Kaishiern: "I'll
+    // second that! Good to know if it'll fill a spot in the dex!"
+    //
+    // The shelf already hides what you are HOLDING, and the compendium is what you have ever held — so the
+    // gap is exactly the gear you owned once and sold, salvaged or traded away. Those come back onto the
+    // shelf looking like a new entry, and buying one fills nothing. Lazily imported for the same reason the
+    // socket read below is: compendium.js is server-only and this module is imported from both sides.
+    const collected = await (async () => {
+        try { const { collectedIds } = await import("@/lib/marketplace/compendium.js"); return await collectedIds(buyerId); }
+        catch { return new Set(); }
+    })();
     const shopPieces = COLLECTION_PIECES.filter((p) => p.source === "xp_shop" && !ownedPieceIds.has(p.id))
         .map((p) => {
             const cost = Math.max(0, p.xpCost || 0);
@@ -411,6 +425,7 @@ export async function getInventory(buyerId) {
                 stats: null, statsText: "", sea: p.sea || null, depth: p.depth || null, signature: null,
                 farmText: p.farm ? describeFarm(p.farm) : null,
                 setName: set?.name || null, setId: set?.id || null, collectionPiece: true,
+                collected: collected.has(p.id),
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
         });
@@ -427,6 +442,8 @@ export async function getInventory(buyerId) {
                 elements: describeItemElements(i.id, null),
                 farmText: i.farm ? describeFarm(i.farm) : null,
                 setName: set?.name || null, setId: set?.id || null,
+                // Ever held, so ever logged — see the note beside `collected` above.
+                collected: collected.has(i.id),
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
         })
