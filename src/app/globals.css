@@ -20175,3 +20175,249 @@ body.cas-seated .social-fab { display: none; }
 }
 @media (max-width: 360px) { .wa-blow-n { font-size: 2rem; } }
 
+
+/* ══ THE THRESHING FLOOR ══════════════════════════════════════════════════════════════════════════════════
+   The Harvest's pick, before its free spins. Luke: "it's a dopamine-inducing reveal when you click the tiles
+   — that's the key to this one. They slowly rotate to reveal what you got, and then whatever you revealed
+   flies up into the top category."
+
+   Three beats per tap, and the middle one is what was missing: the tile TURNS, what was under it FLIES to
+   its counter, and the counter takes the hit. Without the flight a grid changes and a number changes and
+   nothing says those are the same fact. */
+.thf { position: relative; display: grid; gap: 10px; padding: 14px 12px 18px; border-radius: 16px;
+    min-width: 0; width: 100%; isolation: isolate; overflow: hidden;
+    background: #120c08 url("/images/casino/harvest-barn.webp") center top/cover no-repeat;
+    border: 1px solid rgba(255,180,58,.4);
+    box-shadow: inset 0 0 70px rgba(0,0,0,.8), 0 8px 26px rgba(0,0,0,.6);
+    animation: penIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+/* The barn is a BACKDROP and it is busy, so it gets pushed down — the tiles have to win. */
+.thf::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(95% 55% at 50% 46%, rgba(0,0,0,.38), rgba(0,0,0,.82) 76%); }
+.thf > * { position: relative; z-index: 1; }
+
+/* ── THE TWO COUNTERS ── everything below exists to move these, so they are the biggest thing on screen. */
+.thf-top { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.thf-count { display: grid; justify-items: center; gap: 0; padding: 6px 6px 5px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(40,24,10,.94), rgba(18,11,5,.94));
+    border: 1px solid rgba(255,180,58,.42); box-shadow: inset 0 1px 0 rgba(255,220,150,.25);
+    transition: transform .18s cubic-bezier(.2,1.5,.4,1), box-shadow .18s ease; }
+.thf-count b { font-size: 1.6rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;
+    color: #ffd66e; text-shadow: 0 0 18px rgba(255,180,58,.75), 0 2px 0 rgba(0,0,0,.6); }
+.thf-count em { font-style: normal; font-size: .54rem; font-weight: 900; letter-spacing: .18em;
+    text-transform: uppercase; color: #b99a6a; margin-top: 2px; }
+.thf-count.is-mult b { color: #9ce8ff; text-shadow: 0 0 18px rgba(90,200,255,.75), 0 2px 0 rgba(0,0,0,.6); }
+/* THE HIT LANDING. The counter is what the chip was thrown at, so it has to react like something was
+   thrown at it — overshoot and settle, not a fade. */
+.thf-count.is-bump { transform: scale(1.16); box-shadow: 0 0 30px -4px rgba(255,200,90,.95); animation: thfBump .42s cubic-bezier(.2,1.7,.35,1) both; }
+@keyframes thfBump { 0% { transform: scale(1); } 55% { transform: scale(1.24); } 100% { transform: scale(1.16); } }
+
+.thf-say { margin: 0; text-align: center; min-height: 1.1em; font-size: .74rem; color: #d8bd8e;
+    text-shadow: 0 1px 0 rgba(0,0,0,.8); }
+
+/* ── THE BOARD ── thirty-six sheaves, six across. */
+.thf-board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px;
+    min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+/* min-width:0 on the TILE as well as the board and the wrap. Every one of the three is a grid item of the
+   thing above it, and a single missing one lets min-content win and takes the sixth column off the phone. */
+.thf-tile { position: relative; aspect-ratio: 1; min-width: 0; max-width: 100%; border: 0; padding: 0;
+    background: none; cursor: pointer; perspective: 420px; }
+.thf-tile:disabled { cursor: default; }
+/* THE TURN IS A REAL ROTATION. A fade is a state change; a card turning over is a promise being kept, and
+   the half-second it takes is the whole beat Luke is asking for. */
+.thf-face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 9px;
+    transform-style: preserve-3d; transition: transform .46s cubic-bezier(.3,.9,.3,1);
+    background: linear-gradient(180deg, #6b4a1e, #3a2710);
+    border: 1px solid rgba(255,200,110,.4); box-shadow: inset 0 1px 0 rgba(255,220,150,.3), 0 2px 3px rgba(0,0,0,.6); }
+@media (hover: hover) { .thf-tile:not(:disabled):hover .thf-face { filter: brightness(1.25); } }
+.thf-tile:not(:disabled):active .thf-face { transform: scale(.93); }
+.thf-tile.is-turned .thf-face { transform: rotateY(180deg); background: linear-gradient(180deg, #2a1a0a, #150d05);
+    border-color: rgba(255,214,110,.6); }
+.thf-tile.is-turned b { transform: rotateY(180deg); }
+.thf-face b { font-size: .5rem; font-weight: 900; letter-spacing: .02em; color: #ffd66e; text-align: center;
+    line-height: 1.1; text-shadow: 0 0 8px rgba(255,180,58,.8); }
+/* The one that ends it burns. */
+.thf-tile.is-launch .thf-face { background: linear-gradient(180deg, #b3401f, #6b1f0c);
+    border-color: #ffb066; box-shadow: 0 0 24px -3px rgba(255,140,60,.95); }
+.thf-tile.is-launch b { color: #fff3d8; font-size: .54rem; }
+/* THE SHEAF ON AN UNTURNED TILE. Drawn, not CSS. The first cut built it from a conic-gradient on the
+   reasoning that thirty-six copies of a sprite is a lot of requests for three strokes — and it came out
+   invisible against the tile, so the board was thirty-six blank brown rectangles with nothing to want and
+   nothing to aim at. One 23kb sprite, cached once, thirty-six times on screen. */
+.thf-sheaf { width: 62%; height: 62%; background: url("/images/casino/harvest-sheaf.webp") center/contain no-repeat;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
+/* Turned by the finish rather than by a finger: held back, so it reads as what WAS there and never as
+   something you collected. */
+.thf-tile.is-rest .thf-face { opacity: .5; filter: grayscale(.5); box-shadow: none;
+    animation: thfRest .3s ease both; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes thfRest { from { opacity: 0; } to { opacity: .5; } }
+.thf-tile.is-flying b { opacity: 0; }
+/* A GLINT TRAVELS THE BOARD. Thirty-six still tiles is a wall; a highlight crossing them, staggered by
+   column so it reads as a wave rather than a flash, is a board asking to be touched. */
+.thf-tile:not(.is-turned) .thf-face::after { content: ""; position: absolute; inset: 0; border-radius: 9px;
+    pointer-events: none; background: linear-gradient(105deg, transparent 40%, rgba(255,240,190,.42) 48%, transparent 56%);
+    background-size: 280% 100%; animation: thfSheen 3.2s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes thfSheen { 0%, 60% { background-position: 200% 0; } 86%, 100% { background-position: -100% 0; } }
+
+/* ── THE CHIP IN FLIGHT ── from the board up to the counter it belongs to. */
+.thf-fly { position: absolute; left: 50%; top: 52%; z-index: 6; pointer-events: none;
+    font-size: .68rem; font-weight: 900; letter-spacing: .04em; padding: 4px 10px; border-radius: 999px;
+    color: #1a1006; background: linear-gradient(180deg, #ffe27a, #f3b23a); border: 1px solid #fff3c4;
+    box-shadow: 0 0 18px rgba(255,200,90,.9); animation: thfFly .62s cubic-bezier(.35,0,.4,1) both; }
+.thf-fly.is-mult { background: linear-gradient(180deg, #bdf0ff, #5ac8f0); border-color: #e8faff;
+    box-shadow: 0 0 18px rgba(90,200,255,.9); }
+@keyframes thfFly {
+    0% { transform: translate(-50%, 0) scale(.7); opacity: 0; }
+    18% { transform: translate(-50%, -6px) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -300px) scale(.75); opacity: 0; }
+}
+/* Sent left or right depending on which counter it is owed to, so the two never look like the same throw. */
+.thf-fly.is-spins { --lean: -22%; }
+.thf-fly.is-mult { --lean: 22%; }
+@keyframes thfFlyLean { to { margin-left: var(--lean); } }
+.thf-fly { animation: thfFly .62s cubic-bezier(.35,0,.4,1) both, thfFlyLean .62s ease-out both; }
+
+/* ── AND BOTH NUMBERS READ BACK ── the last thing before the reels. */
+.thf-out { position: absolute; inset: 0; z-index: 8; display: grid; align-content: center; justify-items: center;
+    gap: 2px; background: radial-gradient(70% 50% at 50% 50%, rgba(60,30,8,.9), rgba(0,0,0,.95));
+    animation: gvWonIn .3s ease both; }
+.thf-out-kick { font-size: .62rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; color: #ffb43a;
+    text-shadow: 0 0 14px rgba(255,180,58,.9); }
+.thf-out-n { font-size: 3rem; font-weight: 900; line-height: 1; color: #fff; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 30px rgba(255,180,58,.95), 0 3px 0 rgba(0,0,0,.55);
+    animation: gvPop .5s cubic-bezier(.2,1.5,.4,1) both; }
+.thf-out-n s { text-decoration: none; color: #c9a24a; font-size: 1.7rem; vertical-align: .2em; }
+.thf-out-sub { font-size: .66rem; font-weight: 800; color: #c9ab7c; }
+@media (max-width: 360px) { .thf-count b { font-size: 1.6rem; } .thf-out-n { font-size: 2.5rem; } }
+
+/* ══ THE THRESHING FLOOR, FURNISHED ═══════════════════════════════════════════════════════════════════════
+   Luke, on the first cut: "that bonus game is absolute garbage, it looks terrible... you're not thinking
+   about all of the juice — all the sprites, all the border decorations, all the glints and animations and
+   effects. A lot of it boils down to the amount of sprites you're not using and the plainness of everything."
+
+   Right, and it was the same mistake as the Vault: I built the frame in CSS. Count the drawings on the
+   reference and there are a dozen — carved cartouches round the counters, stone tiles with painted faces,
+   figures flanking the board, gold trim on every edge. This pass replaces every `border-radius` that was
+   pretending to be furniture with a thing that was drawn:
+
+     thf-beam      the carved oak beam the title sits on
+     thf-plaque    the cartouche each counter lives in
+     thf-corner    the bracket, four times, mirrored
+     thf-lantern   hung either side of the board
+     harvest-sheaf the tile itself, carved, with its own brass border
+     thf-spin / thf-mult / thf-begin   what a tile turns over to show                                     */
+
+/* ── THE TRACK, BOUNDED ───────────────────────────────────────────────────────────────────────────────
+   `.thf` measured 347px and the board inside it 381, so the sixth column of sheaves was clipped off the
+   phone — and `width: 100%` on the child did nothing, because 100% of WHAT is the grid AREA, and the area
+   was the problem. With no `grid-template-columns` the implicit track is `auto`, which is allowed to grow
+   past its own container to fit a child's min-content; the track had gone to 388.5 inside a 347 box.
+   `minmax(0, 1fr)` is what stops an auto track doing that, and it is the one line that fixes it. */
+.thf { padding: 9px 7px 14px; gap: 7px; grid-template-columns: minmax(0, 1fr); }
+
+/* ── THE BEAM ── the title sits ON something. */
+.thf-beam { position: relative; height: 46px; display: grid; place-items: center;
+    background: url("/images/casino/thf-beam.webp") center/100% 100% no-repeat;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.65)); }
+.thf-beam b { font-size: .72rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
+    color: #ffdf9a; text-shadow: 0 0 12px rgba(255,180,58,.9), 0 2px 0 rgba(0,0,0,.8); }
+
+/* ── THE COUNTERS ── the number sits on the plaque's brass plate, not in a div. */
+.thf-top { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.thf-count { position: relative; aspect-ratio: 1.72; display: grid; place-items: center; padding: 0;
+    background: url("/images/casino/thf-plaque.webp") center/100% 100% no-repeat;
+    border: 0; box-shadow: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,.7));
+    transition: transform .18s cubic-bezier(.2,1.5,.4,1), filter .18s ease; }
+.thf-count b { position: absolute; top: 46%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 1.7rem; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;
+    color: #ffd66e; text-shadow: 0 0 16px rgba(255,180,58,.9), 0 2px 0 rgba(0,0,0,.85); }
+.thf-count em { position: absolute; bottom: 9%; left: 50%; transform: translateX(-50%);
+    font-style: normal; font-size: .46rem; font-weight: 900; letter-spacing: .16em; white-space: nowrap;
+    text-transform: uppercase; color: #d8b378; text-shadow: 0 1px 0 rgba(0,0,0,.9); }
+.thf-count.is-mult b { color: #9ce8ff; text-shadow: 0 0 16px rgba(90,200,255,.9), 0 2px 0 rgba(0,0,0,.85); }
+.thf-count.is-bump { transform: scale(1.14); filter: drop-shadow(0 0 24px rgba(255,200,90,.95)); }
+
+/* ── LANTERNS EITHER SIDE ── hung off the board, swinging very slightly. */
+.thf-lamp { position: absolute; top: 168px; width: 34px; height: 52px; z-index: 2; pointer-events: none;
+    background: url("/images/casino/thf-lantern.webp") center/contain no-repeat;
+    transform-origin: 50% 0; filter: drop-shadow(0 0 16px rgba(255,170,60,.7));
+    animation: thfSwing 4.6s ease-in-out infinite; }
+.thf-lamp.is-l { left: 2px; }
+.thf-lamp.is-r { right: 2px; animation-delay: -2.3s; transform: scaleX(-1); }
+@keyframes thfSwing { 0%, 100% { rotate: -3deg; } 50% { rotate: 3deg; } }
+
+/* ── THE BOARD, IN A CARVED FRAME ── four copies of one bracket. */
+/* min-width:0 for the same reason it was needed on the meter bar and the owner strip: this is a grid item
+   inside a grid, and min-width:auto means min-CONTENT — six carved tiles plus the wrap's padding exceeded
+   375px and the board ran off the right of the phone. */
+/* MEASURED, NOT REASONED ABOUT. `.thf` came out 347px and the board inside it 381 — the sixth column was
+   being clipped off the phone. min-width:0 lets a grid item shrink but does not make it FIT; the explicit
+   width and border-box are what actually bind it to the parent's content box. */
+.thf-boardwrap { position: relative; padding: 7px 4px; min-width: 0; width: 100%; max-width: 100%;
+    box-sizing: border-box; }
+.thf-cnr { position: absolute; width: 30px; height: 30px; z-index: 3; pointer-events: none;
+    background: url("/images/casino/thf-corner.webp") center/contain no-repeat;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.8)); }
+.thf-cnr.is-tl { top: -4px; left: -4px; }
+.thf-cnr.is-tr { top: -4px; right: -4px; transform: scaleX(-1); }
+.thf-cnr.is-bl { bottom: -4px; left: -4px; transform: scaleY(-1); }
+.thf-cnr.is-br { bottom: -4px; right: -4px; transform: scale(-1, -1); }
+
+/* ── THE TILE IS THE DRAWING ── no gradient, no border, no radius. The carved block has all of it. */
+.thf-face { background: url("/images/casino/harvest-sheaf.webp") center/100% 100% no-repeat;
+    border: 0; box-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.7)); }
+.thf-tile.is-turned .thf-face { background-image: none;
+    background-color: rgba(12,7,3,.86); border-radius: 9px;
+    box-shadow: inset 0 0 0 1px rgba(255,200,110,.55), inset 0 0 14px rgba(0,0,0,.9); }
+/* What it turned over to show — a drawn token, not the word for one. */
+.thf-tok { width: 74%; height: 74%; transform: rotateY(180deg); }
+.thf-tok.is-spins { background: url("/images/casino/thf-spin.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 9px rgba(255,190,70,.9)); }
+.thf-tok.is-mult { background: url("/images/casino/thf-mult.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 9px rgba(120,210,255,.95)); }
+.thf-tok.is-launch { width: 86%; height: 86%;
+    background: url("/images/casino/thf-begin.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 16px rgba(255,150,50,1)); animation: thfBurn 1.1s ease-in-out infinite alternate; }
+@keyframes thfBurn { from { transform: rotateY(180deg) scale(1); } to { transform: rotateY(180deg) scale(1.09); } }
+/* The little +1 rides in the corner of the token rather than replacing it. */
+.thf-face u { position: absolute; right: 5%; bottom: 3%; transform: rotateY(180deg);
+    text-decoration: none; font-size: .48rem; font-weight: 900; color: #1a1006;
+    background: linear-gradient(180deg, #ffe27a, #f3b23a); border-radius: 999px; padding: 0 4px;
+    box-shadow: 0 0 6px rgba(255,200,90,.9); }
+.thf-tile.is-launch .thf-face { box-shadow: inset 0 0 0 1px #ffb066, 0 0 22px -2px rgba(255,140,60,.95); }
+
+/* The glint travels the carved tiles the same way. */
+.thf-tile:not(.is-turned) .thf-face::after { border-radius: 8px;
+    background: linear-gradient(105deg, transparent 42%, rgba(255,246,214,.5) 49%, transparent 57%); }
+
+/* ── THE CHIP IN FLIGHT ── the token itself flying, not a text pill. */
+.thf-fly { position: absolute; left: 50%; top: 56%; z-index: 6; pointer-events: none;
+    width: 46px; height: 46px; display: block;
+    animation: thfFly .62s cubic-bezier(.35,0,.4,1) both, thfFlyLean .62s ease-out both; }
+.thf-fly.is-spins { background: url("/images/casino/thf-spin.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 14px rgba(255,190,70,1)); }
+.thf-fly.is-mult { background: url("/images/casino/thf-mult.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 14px rgba(120,210,255,1)); }
+.thf-fly u { position: absolute; right: -4px; bottom: -2px; text-decoration: none; font-size: .52rem;
+    font-weight: 900; color: #1a1006; background: linear-gradient(180deg, #ffe27a, #f3b23a);
+    border-radius: 999px; padding: 0 5px; box-shadow: 0 0 8px rgba(255,200,90,.95); }
+@keyframes thfFly {
+    0% { transform: translate(-50%, 0) scale(.5) rotate(0deg); opacity: 0; }
+    18% { transform: translate(-50%, -8px) scale(1.15) rotate(40deg); opacity: 1; }
+    100% { transform: translate(-50%, -320px) scale(.7) rotate(400deg); opacity: 0; }
+}
+
+/* ── AND A LITTLE MORE LIFE ── dust motes drifting through the lantern light, because a still room behind a
+   still board is two still things. Cheap: three radial gradients on one element. */
+.thf::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+    background:
+        radial-gradient(2px 2px at 22% 30%, rgba(255,220,150,.9), transparent 60%),
+        radial-gradient(2px 2px at 68% 55%, rgba(255,220,150,.7), transparent 60%),
+        radial-gradient(1.5px 1.5px at 44% 78%, rgba(255,220,150,.8), transparent 60%);
+    animation: thfMotes 9s ease-in-out infinite alternate; }
+@keyframes thfMotes { from { transform: translateY(0); } to { transform: translateY(-14px); } }
+
+@media (max-width: 360px) {
+    .thf-count b { font-size: 1.45rem; }
+    .thf-lamp { width: 28px; height: 44px; }
+}

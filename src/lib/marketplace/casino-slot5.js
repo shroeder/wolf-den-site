@@ -81,12 +81,24 @@ const LOOK = {
     // used to run are all served in the same brown bowl and a ladder of names is not a ladder of colours.
     // Every tone here is measured off the sprite it sits under, so the glow a symbol throws is its own.
     slot2: {
-        bone: { rank: 1, role: "low", tone: "#e8dcc0", name: "Flour" },
-        doubloon: { rank: 2, role: "low", tone: "#e8b93a", name: "Corn" },
-        laurel: { rank: 3, role: "mid", tone: "#c8477e", name: "Jam" },
-        chest: { rank: 4, role: "bonus", tone: "#ff9c2b", name: "The Cauldron" },
-        moon: { rank: 5, role: "scatter", tone: "#3fc8e8", name: "Storm Bottle" },
-        wolf: { rank: 6, role: "wild", tone: "#9b5ac8", name: "The Press" },
+        // ── JUICY, NOT RUSTIC ────────────────────────────────────────────────────────────────────────
+        // Luke: "they need to be sexy and really dopamine-inducing icons in the tiles — think about the
+        // star fruit and all those cool things."
+        //
+        // The first pass drew an honest farm: a flour sack, an ear of corn, a jar of preserves. Correct
+        // theme, wrong appetite. A slot machine wants CANDY — the fruit machines everybody already finds
+        // irresistible — and burlap is the least appetising surface there is. The tones below are the fruit,
+        // so the tile a symbol sits on is the colour of the thing on it.
+        bone: { rank: 1, role: "low", tone: "#b8e832", name: "Star Fruit" },
+        doubloon: { rank: 2, role: "low", tone: "#ff8a2b", name: "Orange" },
+        laurel: { rank: 3, role: "mid", tone: "#e8355e", name: "Strawberry" },
+        chest: { rank: 4, role: "bonus", tone: "#9b3ae8", name: "Grapes" },
+        // THE HARVEST MOON is the one thing on this reel that glows from inside, because three of it on a
+        // line is the whole reason the cabinet exists. It was a "Storm Bottle" in cold blue — a fishing
+        // object on a farm, in the one colour nothing else here uses, which is a symbol nobody could learn.
+        moon: { rank: 5, role: "scatter", tone: "#ffb43a", name: "Harvest Moon" },
+        // The only COOL thing on a reel of hot fruit, which is exactly what makes it pop out of a line.
+        wolf: { rank: 6, role: "wild", tone: "#5ac8f0", name: "The Wheat Wolf" },
     },
     // ── THE DEEP ── cold water, so the rule inverts: everything is cold and the two features are the only
     // warm things down there. A starfish is also the one silhouette on the floor nothing can be confused with.
@@ -264,9 +276,20 @@ const HARVEST = {
     // rest of the game put together.
     //
     // The chain IS the multiplier here. The round just doubles it, every spin, and the depth does the rest.
-    free: { kind: "fixed", spins: 14, mult: 2, label: "Fourteen spins, every one of them tumbling, at double" },
-    second: { kind: "hold", trigger: "doubloon", need: 9, spins: 3, label: "The Wagon",
-        values: [0.31, 0.31, 0.31, 0.5, 0.5, 0.81, 1.23, 2.47], full: 32.4 },
+    // ── YOU BUILD THE ROUND ON THE THRESHING FLOOR ───────────────────────────────────────────────────
+    // Luke, with Pharaoh's Fortune in hand: "if you get three on a payline you trigger the bonus... before
+    // you start the free spins there's this beautiful section where you pick all these tiles, and the tiles
+    // can either be plus one spin or plus one multiplier... and once you finally get the begin free spins it
+    // starts the free spins with the amount that you got and the multiplier that you got."
+    //
+    // SEVEN AND ONE TO START, so a begin tile on the first tap is still a real round rather than a shrug.
+    // The pool above it does the rest: about five more spins and one more multiplier on an average walk.
+    free: { kind: "built", spins: 7, label: "Turn the sheaves, then the round begins" },
+    second: { kind: "build", label: "The Threshing Floor" },
+    pick: { spins: 26, mult: 6, begin: 4 },
+    // THE WAGON IS GONE. It was this cabinet's hold-and-spin and it was a good one, but the machine Luke is
+    // pointing at has ONE bonus and this is it — a cabinet with a pick AND a hold has two second features and
+    // no identity. Its numbers are in the history if it is ever wanted back.
 };
 
 const DEEP = {
@@ -603,16 +626,35 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
 // That is the opposite of the pick it replaces, where one tile ended the round and took the board with it.
 // Same interaction, same number of taps, completely different feeling: one is nerve under threat, the other
 // is greed with no downside, and the second is the one people replay.
-export const VAULT_TILES = [
-    { kind: "spins", value: 2 }, { kind: "spins", value: 2 }, { kind: "spins", value: 3 },
-    { kind: "spins", value: 3 }, { kind: "spins", value: 5 },
-    { kind: "mult", value: 1 }, { kind: "mult", value: 1 }, { kind: "mult", value: 2 },
-    { kind: "mult", value: 3 },
-    { kind: "launch" },
-];
+// ── THE PICK BEFORE THE ROUND ────────────────────────────────────────────────────────────────────────────────
+// Luke, with Pharaoh's Fortune in hand: "before you start the free spins there's this beautiful section where
+// you have to pick all these tiles, and the tiles can either be plus one spin or plus one multiplier. There's
+// a total of six multiplier tiles hidden and a total of 26 free spin tiles hidden, and then there's a begin
+// free spins — I think four of those tiles — and once you get the begin free spins it starts the free spins
+// with the amount that you got and the multiplier that you got."
+//
+// THERE IS NO BAD TILE, and that is the whole mechanic. Every tile is a gift — another spin, another
+// multiplier — and the one that ends it does not take anything away, it starts the thing you were building.
+// The tension is entirely "how much more dare I stack", and the answer is never a punishment. That is the
+// opposite of a pick where one tile ends the round and takes the board with it: same interaction, same number
+// of taps, completely different feeling, and only one of them is replayed.
+//
+// THE POOL IS THE BALANCE. 36 tiles, 4 of which end it, so the expected walk is (36-4)/(4+1) = 6.4 tiles —
+// about five spins and one multiplier on top of the base. Landing a begin on the first tap still hands over a
+// real round, which is why there is a base at all.
+const PICK_POOL = { spins: 26, mult: 6, begin: 4 };
+
+export function pickTiles(m) {
+    const p = m?.pick || PICK_POOL;
+    return [
+        ...Array.from({ length: p.spins }, () => ({ kind: "spins", value: 1 })),
+        ...Array.from({ length: p.mult }, () => ({ kind: "mult", value: 1 })),
+        ...Array.from({ length: p.begin }, () => ({ kind: "launch" })),
+    ];
+}
 
 export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } = {}) {
-    const board = VAULT_TILES.map((t) => ({ ...t }));
+    const board = pickTiles(m);
     for (let i = board.length - 1; i > 0; i -= 1) {
         const j = Math.floor(rng() * (i + 1));
         [board[i], board[j]] = [board[j], board[i]];
@@ -626,7 +668,9 @@ export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } =
         if (tile.kind === "spins") spins += tile.value;
         else mult += tile.value;
     }
-    return { picked, spins, mult };
+    // `board` goes back whole as well as the prefix that was walked: the screen turns the rest of the tiles
+    // over at the end so you can see what was still out there, the same as the Gem Vault.
+    return { picked, board, spins, mult, tiles: board.length };
 }
 
 // ── THE VAULT'S GEM PICK ─────────────────────────────────────────────────────────────────────────────────────

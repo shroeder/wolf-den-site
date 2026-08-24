@@ -25,3 +25,4 @@ scripts/_tmp-*.mjs
 # throwaway session-minting helpers used by the shot rig; never committed
 scripts/_*.mjs
 .vault-art/
+.harvest-art/

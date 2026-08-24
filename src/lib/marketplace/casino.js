@@ -147,14 +147,21 @@ export const SLOT_THEMES = {
         //
         // The two features carry the loudest of both: the bonus is the only lit fire on the reel and the
         // wild the only thing with a leaf on it.
-        art: {
-            wolf: "cooking:k_wine",              // wild — the grape press, purple and green
-            moon: "cooking:b_storm_chum",        // scatter — the only cold thing on the reel
-            chest: "cooking:kettle_5",           // bonus — the gold cauldron, the only one alight
-            laurel: "cooking:b_jam_paste",       // mid — deep magenta
-            doubloon: "cooking:b_corn_kernel",   // low — yellow
-            bone: "cooking:p_flour",             // low — pale cream
-        },
+        // ── AND THEN IT GOT ITS OWN ─────────────────────────────────────────────────────────────────
+        // Luke: "it needs a full-on rework of all the sprites on all the tiles... right now you're showing
+        // like I don't know what the hell you're showing, but we want to show really juicy sprites related
+        // to farming."
+        //
+        // He is describing borrowed art, and the note above is the confession: this cabinet was dressed out
+        // of the KITCHEN's sprite folder because nobody had drawn it one. The reasoning about silhouette and
+        // hue was sound and the objects were still somebody else's — a fishing chum ball as the scatter, a
+        // jam paste as the mid. At reel speed that is not a farm, it is a shelf of unrelated jars.
+        //
+        // Six drawn for it now (gen-harvest-art.mjs): flour sack, corn cob, jam jar, pumpkin, harvest moon,
+        // wheat-crowned wolf. Six silhouettes, six hues, and the moon is the only one that glows from inside
+        // because three of it on a line is the whole reason the cabinet exists. NO `art` KEY AT ALL is what
+        // selects them: the resolver falls through to /images/casino/reels/slot2-<sym>.webp, which is where
+        // a cabinet's own set belongs.
     },
     slot4: {
         label: "The Menagerie",
