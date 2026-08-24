@@ -8,6 +8,7 @@ import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import { itemById } from "@/lib/marketplace/items";
+import { GiOpenBook } from "react-icons/gi";
 
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 
@@ -85,6 +86,14 @@ export default function DailyDeals() {
                 {state.deals.map((d) => (
                     <div key={d.id} className={`deal${d.featured ? " is-featured" : ""}`}>
                         {d.featured ? <span className="deal-badge deal-featured">★ FEATURED</span> : <span className="deal-badge">-{Math.round(d.discount * 100)}%</span>}
+                        {/* Same chip, same class, same corner as the gold shop's tiles and the auction's
+                            cards — three shelves asking one question should not answer it three ways.
+                            Top-right because .deal-badge already owns top-left. */}
+                        {d.collected && !d.owned ? (
+                            <span className="equip-dex" title="Already in your compendium — buying this again won't add to it">
+                                <GiOpenBook aria-hidden="true" />logged
+                            </span>
+                        ) : null}
                         <button type="button" className="deal-inspect" onClick={() => setInspect(d)} title="Tap to see what it does">
                             <DealArt deal={d} />
                             <div className="deal-name">{d.name}</div>

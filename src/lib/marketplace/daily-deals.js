@@ -9,6 +9,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { collectedIds } from "@/lib/marketplace/compendium.js";
 
 // A short "what it does" line for a deal, so the shop is inspectable (gear stats / pet buff / consumable effect).
 function dealDescription(d) {
@@ -128,11 +129,13 @@ const DEAL_RESET_COST = 1500;
 export async function getDailyDeals(buyerId) {
     const { dayKey, resetInSecs, resetAt } = dayContext();
     if (!buyerId) return { deals: todaysDeals(dayKey).map((d) => ({ ...d, desc: dealDescription(d), canBuy: false })), resetInSecs, resetAt, gold: 0, signedIn: false };
-    const [goldRow, claimedRows, owned, resetRow] = await Promise.all([
+    const [goldRow, claimedRows, owned, resetRow, collected] = await Promise.all([
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT item_id FROM mkt_daily_deal_purchase WHERE buyer_id = $1 AND day = $2`, [buyerId, dayKey]).catch(() => []),
         ownedSets(buyerId),
         db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // Everything ever held — the compendium's own read, so the badge here cannot disagree with the dex.
+        collectedIds(buyerId).catch(() => new Set()),
     ]);
     const gold = goldRow?.gold || 0;
     const resetUsed = resetRow?.d === dayKey;
@@ -148,8 +151,14 @@ export async function getDailyDeals(buyerId) {
         canReset: !resetUsed && gold >= DEAL_RESET_COST,
         deals: deals.map((d) => {
             const isOwned = (d.kind === "gear" && owned.gear.has(d.id)) || (d.kind === "pet" && owned.pets.has(d.id));
+            // ── AND WOULD IT FILL A SLOT IN THE DEX ──────────────────────────────────────────────────
+            // The same question the gold shop and the auction house now answer, asked in the one place
+            // GrayKitsune actually named: "In gold shop - icon to show whether you already have it in
+            // compendium?" The deals shelf IS the top of the gold shop, and it was the surface the marker
+            // missed. `owned` is what you HOLD; this is what you have ever held, which for a deal you
+            // sold on last month is the difference between a new entry and nothing.
             const isClaimed = claimed.has(d.id);
-            return { ...d, desc: dealDescription(d), owned: isOwned, claimed: isClaimed, canBuy: !isOwned && !isClaimed && gold >= d.price };
+            return { ...d, desc: dealDescription(d), owned: isOwned, claimed: isClaimed, collected: d.kind === "gear" && collected.has(d.id), canBuy: !isOwned && !isClaimed && gold >= d.price };
         }),
     };
 }

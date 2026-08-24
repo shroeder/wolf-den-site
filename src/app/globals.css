@@ -10188,6 +10188,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .trade-gold { font-weight: 800; color: #ffd75e; }
 .trade-item { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); border: 1px solid var(--rar, rgba(255,255,255,0.15)); color: #e7dcc4; }
 .trade-item svg { width: 0.95em; height: 0.95em; color: var(--rar); }
+/* NEW TO YOUR DEX, on an offer somebody built for you. Green rather than the compendium chip's stone, because
+   this one is a reason to say yes and the shop's is a reason to think twice — the same fact, read opposite
+   ways depending on which side of the counter you are on. */
+.trade-item-new { font-size: 0.56rem; font-weight: 900; letter-spacing: 0.06em; color: #0f2416;
+    background: #8fe0a4; border-radius: 999px; padding: 1px 4px; margin-left: 1px; }
 
 .hub-tile { position: relative; }
 .hub-tile-badge { position: absolute; top: 6px; right: 8px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0443a; color: #fff; font-size: 0.72rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }

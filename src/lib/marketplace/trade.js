@@ -454,10 +454,17 @@ export async function cancelTrade(userId, offerId) {
 }
 
 // Decorate an offer's item ids with names/rarity/icons for display.
-function decorate(ids) {
+//
+// `collected` is the same flag the gold shop, the deals shelf and the auction house now carry: has the VIEWER
+// ever held this piece. An offer is the one place the question has a deadline attached — you are deciding
+// whether to accept, and a piece that is new to your dex is worth more to you than the same piece is worth to
+// somebody who already logged it. Passed in rather than looked up per item, because listTrades decorates four
+// lists per offer and this is one read for the lot.
+function decorate(ids, collected = null) {
     return (Array.isArray(ids) ? ids : []).map((id) => {
         const d = itemById(id);
-        return d ? { id: d.id, name: d.name, rarity: d.rarity, icon: d.icon } : { id, name: id, rarity: "common", icon: null };
+        const dex = collected ? { collected: collected.has(id) } : {};
+        return d ? { id: d.id, name: d.name, rarity: d.rarity, icon: d.icon, ...dex } : { id, name: id, rarity: "common", icon: null, ...dex };
     });
 }
 function decoratePets(ids) {
@@ -482,12 +489,17 @@ export async function listTrades(userId) {
             [userId]
         )
         .catch(() => []);
+    // One read for every item on every offer — see decorate().
+    const { collectedIds } = await import("@/lib/marketplace/compendium.js");
+    const collected = await collectedIds(userId).catch(() => new Set());
     const map = (r) => ({
         id: r.id,
         from: { id: r.from_buyer_id, label: r.from_name || r.from_alias || "Member", alias: r.from_alias },
         to: { id: r.to_buyer_id, label: r.to_name || r.to_alias || "Member", alias: r.to_alias },
-        offeredItems: decorate(r.offered_items), offeredGold: r.offered_gold,
-        requestedItems: decorate(r.requested_items), requestedGold: r.requested_gold,
+        // Only what is coming TO you is marked. What they are asking FOR is already yours by definition, so a
+        // "you have this logged" chip on it would be noise on every row.
+        offeredItems: decorate(r.offered_items, r.to_buyer_id === userId ? collected : null), offeredGold: r.offered_gold,
+        requestedItems: decorate(r.requested_items, r.from_buyer_id === userId ? collected : null), requestedGold: r.requested_gold,
         offeredPets: decoratePets(r.offered_pets), requestedPets: decoratePets(r.requested_pets),
         note: r.note || null, expiresAt: r.expires_at,
     });

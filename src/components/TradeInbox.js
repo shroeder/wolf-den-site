@@ -11,7 +11,15 @@ function Side({ items = [], gold = 0, pets = [] }) {
         <span className="trade-side">
             {gold ? <span className="trade-gold">💰 {gold.toLocaleString()}</span> : null}
             {items.map((it) => (
-                <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.name}><ItemArt id={it.id} icon={it.icon} className="trade-item-art" /> {it.name}</span>
+                <span key={it.id} className={`trade-item rar-${it.rarity}`} title={it.collected === false ? `${it.name} — new to your compendium` : it.name}>
+                    <ItemArt id={it.id} icon={it.icon} className="trade-item-art" /> {it.name}
+                    {/* The INVERSE of the shelves, deliberately. On a shop the useful signal is "you already
+                        have this, it fills nothing"; on an offer somebody built for you it is "this one is
+                        new", because that is the reason to say yes. `=== false` and not `!it.collected`:
+                        the flag is absent on the side of the trade that is already yours, and absent must
+                        not read as new. */}
+                    {it.collected === false ? <b className="trade-item-new" title="New to your compendium">NEW</b> : null}
+                </span>
             ))}
             {pets.map((p) => (
                 <span key={`pet-${p.id}`} className={`trade-item rar-${p.rarity}`} title={p.name}><span className="trade-item-art" style={{ display: "inline-grid", placeItems: "center" }}><PetArt id={p.id} /></span> 🐾 {p.name}</span>
