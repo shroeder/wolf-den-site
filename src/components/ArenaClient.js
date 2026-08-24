@@ -2553,12 +2553,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 {[
                     ["fight", "Fight", null],
                     ["road", "Road", st.ladder ? `${st.ladder.beaten}` : null],
-                    ["tree", "Skills", (st.progress?.points?.available || 0) + (st.progress?.skillPoints?.available || 0) || null],
+                    // ── CLASS AND SKILLS ARE TWO TABS ────────────────────────────────────────────────
+                    // Luke: "we should have 2 tabs instead of 1 here, one for class, one for skills."
+                    //
+                    // They shared a tab on the argument that they are one decision seen twice — a point
+                    // spent in the tree earns a point to spend on a skill. True, and it still cost more
+                    // than it bought: the two of them stacked made the longest screen in the game, so the
+                    // tree was three thumb-flicks below the panel and neither had the screen to itself.
+                    // Two badges instead of one is also plainly better — an unspent CLASS point and an
+                    // unspent SKILL point are different errands, and one merged number said neither.
+                    ["tree", "Class", st.progress?.points?.available || null],
+                    ["skills", "Skills", st.progress?.skillPoints?.available || null],
                     ["train", "Training", null],
                     ["armoury", "Armoury", null],
                 ].map(([k, label, badge]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}
-                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && badge ? " has-dot" : ""}`}
+                        className={`ar-tab${tab === k ? " is-on" : ""}${(k === "tree" || k === "skills") && badge ? " has-dot" : ""}`}
                         onClick={() => { Sfx.ui(); setTab(k); }}>
                         {label}
                         {badge ? <i className="ar-tab-n">{badge}</i> : null}
@@ -2566,23 +2576,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 ))}
             </div>
 
+            {/* ── SKILLS: WHAT YOU PRESS IN A FIGHT ──────────────────────────────────────────────────
+                Its own tab now. It used to sit on top of the tree, which meant the half you actually use
+                mid-fight was a scroll away from the half you read once — and the shared screen was long
+                enough that neither got looked at properly. */}
+            {tab === "skills" ? (
+                <SkillPanel progress={st.progress} busy={busy}
+                    onAct={(action, extra) => act(action, extra)} />
+            ) : null}
+
+            {/* ── CLASS: THE TREE ────────────────────────────────────────────────────────────────────
+                The half you read once and forget, with the screen to itself. The relationship the shared
+                tab was protecting — a point spent here earns a skill point — is said in the tree's own
+                copy rather than implied by adjacency. */}
             {tab === "tree" ? (
-                // ── THE PANEL SITS ABOVE THE TREE ───────────────────────────────────────────────────────
-                // Same tab, deliberately. They are one decision seen twice — every point spent below earns a
-                // point to spend up here — and putting them on separate tabs would hide that relationship
-                // behind a tap. The panel goes FIRST because it is the half you press in a fight; the tree is
-                // the half you read once and forget.
-                //
-                // The gap is on a WRAPPER rather than a margin on either child. Both of them are self-contained
-                // cards with their own internal spacing, and hanging a margin off one of them would follow it
-                // into the lab and anywhere else it gets mounted — a spacing rule that belongs to this layout
-                // living inside a component that does not know about this layout.
-                <div style={{ display: "grid", gap: 18 }}>
-                    <SkillPanel progress={st.progress} busy={busy}
-                        onAct={(action, extra) => act(action, extra)} />
-                    <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
-                        onAct={(action, extra) => act(action, extra)} />
-                </div>
+                <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
+                    onAct={(action, extra) => act(action, extra)} />
             ) : null}
 
             {tab === "train" ? (
@@ -2894,8 +2903,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 {tab === "fight" ? (<>
             {/* ── ONE LINE FOR WHAT YOU FIGHT WITH ── the kit used to be four full cards at the top of this
                 tab. It is now the Skills tab's entire subject, so repeating it here was a screen of scrolling
-                spent restating the tab next door. A strip of the sprites, and a way through to them. */}
-            <button type="button" className="ar-kitline" onClick={() => { Sfx.ui(); setTab("tree"); }}>
+                spent restating the tab next door. A strip of the sprites, and a way through to them.
+                Points at "skills" rather than "tree" since the two were split — this strip shows the
+                abilities, so it has to land on the abilities. */}
+            <button type="button" className="ar-kitline" onClick={() => { Sfx.ui(); setTab("skills"); }}>
                 <span className="ar-kitline-arts">
                     {(st.me?.abilities || []).slice(0, 5).map((ab) => (
                         ab.sprite ? (
@@ -4202,7 +4213,11 @@ function Styles() {
             /* ── TABS ── */
             /* FOUR now that the Armoury is a tab. The count was hardcoded at three, so the fourth wrapped onto
                a line of its own and the strip stopped reading as one control. */
-            .ar-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 0 0 16px; }
+            /* SIX now that Class and Skills are separate. Six across a 375px phone is 58px a tab, which
+               truncates "Training" and "Armoury"; two rows of three keeps every label a whole word, which
+               is the thing this strip was rebuilt around in the first place. */
+            .ar-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 0 0 16px; }
+            @media (min-width: 560px) { .ar-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
             .ar-tab { position: relative; padding: 9px 2px; border-radius: 11px; cursor: pointer;
                 font-size: 10.5px; font-weight: 900; letter-spacing: -.01em; color: #9aa2ab;
                 white-space: nowrap;

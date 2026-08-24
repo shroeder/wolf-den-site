@@ -21,6 +21,8 @@ let ctx = null;
 let master = null;
 let sfxBus = null;
 let musicBus = null;
+// Held rather than local so other features can hang their OWN bus off the same limiter — see `subBus`.
+let comp = null;
 let noiseBuf = null;
 let muted = false;
 let started = false;
@@ -41,7 +43,7 @@ function ensure() {
 
         // A gentle limiter so a crit landing on top of the music cannot clip. Cheap, and the difference between
         // "loud" and "harsh" on a phone speaker.
-        const comp = ctx.createDynamicsCompressor();
+        comp = ctx.createDynamicsCompressor();
         comp.threshold.value = -14;
         comp.knee.value = 22;
         comp.ratio.value = 8;
@@ -65,6 +67,36 @@ function ensure() {
         ctx = null;
     }
     return ctx;
+}
+
+// ── A BUS OF YOUR OWN ────────────────────────────────────────────────────────────────────────────────────────
+// `tone`/`noise` schedule notes up to a second ahead on the audio clock, and once scheduled they WILL sound —
+// clearing the timer that would have scheduled the next batch does nothing about the batch already in flight.
+// That is fine for effects, which are meant to ring out, and it is exactly wrong for a music bed: stopping one
+// and starting another leaves the tail of the first playing under the second, which is two tracks at once.
+//
+// So a bed gets a gain node of its own to hang its notes on, and stopping it means ramping that node to
+// silence — which cuts the tail no matter how far ahead it was scheduled. Own bus rather than `musicBus`
+// because that one belongs to the arena's own track and has its own fades. Both land on the same limiter.
+export function subBus(gain = 1) {
+    const c = ensure();
+    if (!c || !comp) return null;
+    const g = c.createGain();
+    g.gain.value = gain;
+    g.connect(comp);
+    return g;
+}
+
+/** Silence a sub-bus and let it go. The disconnect is delayed past the fade or it cuts with a click. */
+export function killBus(g, fade = 0.14) {
+    if (!g || !ctx) return;
+    const t = ctx.currentTime;
+    try {
+        g.gain.cancelScheduledValues(t);
+        g.gain.setValueAtTime(g.gain.value, t);
+        g.gain.linearRampToValueAtTime(0.0001, t + fade);
+        setTimeout(() => { try { g.disconnect(); } catch { /* already gone */ } }, (fade + 0.1) * 1000);
+    } catch { /* context torn down */ }
 }
 
 /** Call from a user gesture. Safe to call repeatedly. */

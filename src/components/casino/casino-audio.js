@@ -20,7 +20,7 @@
 // WHY NOT JUST USE `Sfx`. The arena's kit is a fight: impacts, crits, blocks, hurt. A coin cascade and a
 // near-miss sigh are not fight sounds, and bolting them on grows one module into everything. Same plumbing,
 // separate voice.
-import { noise, tone } from "@/components/arena/arena-audio.js";
+import { killBus, noise, subBus, tone } from "@/components/arena/arena-audio.js";
 
 // ── THE SCALE EVERYTHING IS TUNED TO ─────────────────────────────────────────────────────────────────────────
 // A major pentatonic. Every random pitch in this file — every coin, every ball, every daub — is drawn from
@@ -91,48 +91,91 @@ const step = (i, o = 0) => voice.scale[((i % voice.scale.length) + voice.scale.l
 // round. Both are built entirely out of `voice.scale`, which is what makes The Harvest's bonus pastoral and
 // The Deep's faintly wrong without either of them being written twice.
 //
+// ── AND BOTH HAVE A FORM ─────────────────────────────────────────────────────────────────────────────────────
+// Luke, on the first cut: "the bonus spin music is way too repetitive." It was: one bar of eight notes, the
+// same eight every time, with the whole thing nudged up a step on alternate bars. That is not a tune, it is a
+// ringtone, and a bonus round is a minute long.
+//
+// What makes a loop stop announcing itself is two periods that do not divide each other. So: the HARMONY
+// moves on a four-bar cycle, the MELODY is four written phrases picked by the same four-bar clock, and the
+// TEXTURE changes on an eight-bar clock — which means the same bar of music does not come back around for
+// eight bars, and the bar it comes back to is voiced differently. Plus a fill on the fourth bar of every
+// four, which is the thing that tells an ear a phrase just ended.
+//
 // Bar boundaries ride a setTimeout and so jitter by a handful of milliseconds; notes WITHIN a bar are
 // scheduled on the audio clock and are exact. At this tempo nobody can hear the seam, and the alternative is
-// a lookahead scheduler for something that only ever plays under a pick screen.
-const bed = { name: null, bar: 0, timer: null };
+// a lookahead scheduler for something that only ever plays under a bonus screen.
+const bed = { name: null, bar: 0, timer: null, bus: null };
 
-// THE PICKER: sparse, slow, suspended. A held root underneath, a four-note figure climbing over it, one high
-// shimmer late in the bar and a breath of air at the end. Nothing resolves — the whole point of the screen is
+// Four bars of harmony, as degrees of the cabinet's own pentatonic. Pentatonic has no semitone in it, so
+// these cannot clash however they are voiced — which is what lets the melody be written once and transposed
+// onto each of them without a second thought.
+const PROG = [0, 3, 1, 4];
+
+// ── THE PICKER ── sparse, slow, suspended. A held root underneath, a figure climbing over it, one high
+// shimmer late in the bar and a breath of air at the end. Nothing resolves: the whole point of the screen is
 // that it has not happened yet, and the music is a question mark held for as long as you want to take.
+const PICK_FIGS = [
+    [0, 2, 4, 6],
+    [0, 3, 5, 7],
+    [0, 2, 5, 7],
+    [0, 4, 6, 7],
+];
 const bedPick = (bar) => {
     const S = 0.3;
-    const r = (bar % 4) * 2;
-    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 2.3, gain: 0.05 });
-    tone({ at: 0.03, freq: voice.bodyHz * 0.75, type: "triangle", dur: 1.5, gain: 0.022 });
-    [0, 2, 4, 6].forEach((k, i) => {
-        tone({ at: k * S, freq: step(r + i, i > 2 ? 1 : 0), type: "triangle", dur: 0.55, gain: 0.034 });
-        tone({ at: k * S, freq: step(r + i, i > 2 ? 2 : 1), type: "sine", dur: 0.34, gain: 0.011 });
+    const r = PROG[bar % 4];
+    const b = bed.bus;
+    const airy = Math.floor(bar / 4) % 2 === 1;     // the eight-bar clock: every other pass opens out
+    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 2.3, gain: 0.05, bus: b });
+    tone({ at: 0.03, freq: voice.bodyHz * 0.75 * (airy ? 1.5 : 1), type: "triangle", dur: 1.5, gain: 0.022, bus: b });
+    PICK_FIGS[bar % 4].forEach((k, i) => {
+        tone({ at: k * S, freq: step(r + i, i > 2 ? 1 : 0), type: "triangle", dur: 0.55, gain: 0.034, bus: b });
+        tone({ at: k * S, freq: step(r + i, i > 2 ? 2 : 1), type: "sine", dur: 0.34, gain: airy ? 0.016 : 0.011, bus: b });
     });
-    tone({ at: 5 * S, freq: step(r + 3, 2), type: "sine", dur: 1, gain: 0.017 });
-    noise({ at: 7 * S, dur: 0.22, gain: 0.013, type: "highpass", freq: 7000 });
+    tone({ at: 5 * S, freq: step(r + 3, 2), type: "sine", dur: 1, gain: 0.017, bus: b });
+    noise({ at: 7 * S, dur: 0.22, gain: 0.013, type: "highpass", freq: 7000, bus: b });
+    // The turnaround. Four bars is a phrase, and a phrase has to sound like it ended.
+    if (bar % 4 === 3) tone({ at: 6.5 * S, freq: step(r + 4, 1), to: step(r, 2), type: "sine", dur: 0.5, gain: 0.02, bus: b });
 };
 bedPick.bar = 8 * 300;
 
-// THE FREE SPINS: the same key at nearly twice the tempo, with a floor under it. Bass on every other step, a
-// kick you feel rather than hear, hats between, and a melody that actually goes somewhere and comes back —
-// because this half is not a question, it is the thing being handed to you, and it should push.
-const FREE_MEL = [0, 2, 4, 2, 3, 4, 6, 4];
+// ── THE FREE SPINS ── the same key at nearly twice the tempo, with a floor under it. Bass on every other
+// step, a kick you feel rather than hear, hats between, and four written phrases over a four-bar harmony,
+// because this half is not a question — it is the thing being handed to you, and it should push.
+const FREE_MELS = [
+    [0, 2, 4, 2, 3, 4, 6, 4],
+    [4, 3, 2, 3, 4, 6, 4, 2],
+    [2, 4, 6, 4, 5, 6, 8, 6],
+    [6, 4, 3, 4, 2, 1, 0, 2],
+];
 const bedFree = (bar) => {
     const S = 0.19;
-    const up = bar % 2;
+    const r = PROG[bar % 4];
+    const mel = FREE_MELS[bar % 4];
+    const b = bed.bus;
+    // The eight-bar clock. Second pass moves the lead up an octave and puts a shaker on the offbeats, so the
+    // form is eight bars long even though the harmony is four — the cheapest way to stop a loop repeating.
+    const lift = Math.floor(bar / 4) % 2;
     for (let k = 0; k < 8; k += 1) {
         if (k % 2 === 0) {
-            tone({ at: k * S, freq: voice.bodyHz * 0.5, type: "sawtooth", dur: 0.16, gain: 0.055 });
-            noise({ at: k * S, dur: 0.09, gain: 0.05, type: "lowpass", freq: 190, sweepTo: 60 });
+            tone({ at: k * S, freq: step(r, -1), type: "sawtooth", dur: 0.16, gain: 0.05, bus: b });
+            noise({ at: k * S, dur: 0.09, gain: 0.05, type: "lowpass", freq: 190, sweepTo: 60, bus: b });
         } else {
-            noise({ at: k * S, dur: 0.035, gain: 0.014, type: "highpass", freq: 8000 });
+            noise({ at: k * S, dur: 0.035, gain: 0.014, type: "highpass", freq: 8000, bus: b });
+            if (lift) noise({ at: k * S + S * 0.5, dur: 0.03, gain: 0.008, type: "highpass", freq: 9500, bus: b });
         }
-        const n = FREE_MEL[k] + up;
-        tone({ at: k * S, freq: step(n, 1), type: "triangle", dur: 0.24, gain: 0.036 });
-        tone({ at: k * S + 0.015, freq: step(n, 2), type: "sine", dur: 0.14, gain: 0.012 });
+        const n = mel[k];
+        tone({ at: k * S, freq: step(r + n, 1 + lift), type: "triangle", dur: 0.24, gain: 0.036, bus: b });
+        tone({ at: k * S + 0.015, freq: step(r + n, 2 + lift), type: "sine", dur: 0.14, gain: 0.012, bus: b });
     }
-    // The turnaround: the last bar of every four leans up, so four bars is a phrase rather than a loop.
-    if (bar % 4 === 3) tone({ at: 7 * S, freq: step(0, 1), to: step(4, 2), type: "triangle", dur: 0.3, gain: 0.03 });
+    // THE FILL. The back half of every fourth bar, sweeping into the downbeat — it is what makes the form come
+    // ROUND rather than start again, and it is the single thing that was missing from the first cut.
+    if (bar % 4 === 3) {
+        for (let k = 0; k < 4; k += 1) {
+            noise({ at: (6 + k * 0.5) * S, dur: 0.06, gain: 0.016 + k * 0.006, type: "bandpass", freq: 2600 + k * 900, q: 1.4, bus: b });
+        }
+        tone({ at: 7 * S, freq: step(r, 1), to: step(PROG[0], 2), type: "triangle", dur: 0.3, gain: 0.032, bus: b });
+    }
 };
 bedFree.bar = 8 * 190;
 
@@ -455,12 +498,20 @@ export const Cas = {
     music(name = null) {
         if (bed.name === name) return this;
         if (bed.timer) { clearTimeout(bed.timer); bed.timer = null; }
+        // ── AND THE OLD BED HAS TO BE CUT, NOT JUST UNSCHEDULED ──────────────────────────────────────
+        // Luke, hearing the first version: "it's now playing two tracks over each other." Clearing the
+        // timer stops the NEXT bar from being scheduled; it does nothing about the bar already in flight,
+        // whose notes were handed to the audio clock up to two and a half seconds ahead and will sound
+        // whatever happens after. Under a bed swap that tail plays underneath the new one — two tracks.
+        // Each bed hangs its notes on a gain node of its own, and stopping one silences that node.
+        if (bed.bus) { killBus(bed.bus); bed.bus = null; }
         bed.name = name;
         bed.bar = 0;
         if (!name) return this;
 
         const kit = MUSIC[name];
         if (!kit) { bed.name = null; return this; }
+        bed.bus = subBus(1);
 
         const play = () => {
             if (bed.name !== name) return;

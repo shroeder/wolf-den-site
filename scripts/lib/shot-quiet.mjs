@@ -35,6 +35,11 @@ export const QUIET_HIDE = [
     ".gm-overlay", ".arl-scrim", ".ck-scrim", ".ckmg-scrim", ".cmp-scrim", ".dgl-scrim",
     ".fga-scrim", ".jwr-scrim", ".mk-scrim", ".mkl-scrim", ".mmg-scrim", ".poll-scrim",
     ".svy-scrim", ".gearpick-scrim", ".fishlaunch-scrim", ".minelaunch-scrim",
+    // ── HIDE THE DIALOG, NOT ONLY ITS SCRIM ──────────────────────────────────────────────────────────
+    // The poll and the survey put the scrim and the panel side by side under a `-wrap`, so hiding the
+    // scrim removed the dimming and left the card sitting in the middle of the shot — which cost a whole
+    // capture of the casino's bonus screen. Hide the wrap and both halves go.
+    ".poll-wrap", ".svy-wrap",
     "div:has(> [aria-label='Happy Hour is live'])",
     // Not a modal, but it sits at the bottom of every page for five seconds after ANY mutating call — which
     // is exactly where a game's primary button lives. It ate the click on the casino's Pull button and the

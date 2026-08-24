@@ -122,6 +122,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [counted, setCounted] = useState(0);     // the chip counter, ticking up
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | gems | done
 
+    // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
+    // beside `rest` in the spin handler.
+    const [meterFire, setMeterFire] = useState(null);
+    // ── THE ROW ONLY MOVES WHEN THE SPIN IS OVER ─────────────────────────────────────────────────────
+    // Luke: "what the heck is Win It Again tracking — I'd expect 21 to have been pushed into the top left
+    // box." He was watching a cascade two breaks in with 21 chips on the counter, and the row already read
+    // 82 in slot one: the spin's FINAL reel total, printed before the reels had finished paying it.
+    //
+    // Same leak as the gem bonus had. The server settles the whole spin the instant you press the button,
+    // and anything on screen drawn straight off that response is the machine telling you the answer while
+    // it is still pretending to work it out. The row is held at what it said before the pull and advances
+    // in `after()`, when the last cascade has been paid and the number on the counter is the number that
+    // went into the slot.
+    const [shownMeter, setShownMeter] = useState(null);
+    const afterMeter = useRef(null);
+    const [pays, setPays] = useState(false);       // is the paytable open
+    const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
     // ── MUSIC UNDER THE BONUS ────────────────────────────────────────────────────────────────────────────
     // Luke: "there's different music that plays during the bonus picker and the actual bonus spins."
     //
@@ -134,17 +151,16 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // — finishing it, a retrigger, closing the modal mid-round — already sets a phase, so a phase-derived
     // bed cannot be left playing behind a screen that has gone. `music()` no-ops when the bed is unchanged,
     // so this effect re-running is free.
+    // ── AND IT MUST NOT FLICKER ──────────────────────────────────────────────────────────────────────
+    // A cascading free spin walks free -> tumble -> free several times a spin, and the first cut restarted
+    // the bed on every one of those — which is what put two tracks on top of each other before the bus fix,
+    // and would still restart the tune from bar one four times a round after it. `freeIdx >= 0` is only
+    // true while a round is actually being played, so a base-game tumble cannot start bonus music.
     const musicBed = phase === "pick" || phase === "build" || phase === "warren" || phase === "gems" ? "pick"
-        : phase === "free" || phase === "freeIntro" ? "free"
+        : phase === "free" || phase === "freeIntro" || (phase === "tumble" && freeIdx >= 0) ? "free"
         : null;
     useEffect(() => { Cas.music(musicBed); }, [musicBed]);
     useEffect(() => () => Cas.music(null), []);
-    // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
-    // beside `rest` in the spin handler.
-    const [meterFire, setMeterFire] = useState(null);
-    const afterMeter = useRef(null);
-    const [pays, setPays] = useState(false);       // is the paytable open
-    const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
     const [freeWon, setFreeWon] = useState(0);     // chips taken so far in the round
     // Whichever win list is currently being drawn — the base spin's, or the free spin on screen. `lit` reads
     // this rather than the base result, which is what lets a free spin light its own lines.
@@ -483,6 +499,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             setPhase("done");
         };
         const after = () => {
+            // The reels have finished paying, so the row may now say what they paid — see shownMeter.
+            if (r.meter) setShownMeter(r.meter);
             if (r.meter?.fired) { afterMeter.current = rest; setMeterFire(r.meter.fired); return; }
             rest();
         };
@@ -742,7 +760,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 it already has something in it never teaches anybody it is there — and its whole trick is
                 that it is filling while you are looking at something else. */}
             {slot5(machineId).winAgain ? (
-                <WinAgainBar meter={result?.meter || { slots: slot5(machineId).winAgain.slots, recent: [], label: slot5(machineId).winAgain.label }}
+                <WinAgainBar meter={shownMeter || { slots: slot5(machineId).winAgain.slots, recent: [], label: slot5(machineId).winAgain.label }}
                     bet={bet} firing={meterFire}
                     onFired={() => { setMeterFire(null); const go = afterMeter.current; afterMeter.current = null; go?.(); }} />
             ) : null}
@@ -759,7 +777,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 on it. Painted per cabinet — the wolf and the moon here, a kraken's eye on The Deep, the
                 vault door on The Vault — so five machines feel like five machines rather than one
                 component rendered five times. Dark at both ends by design, so the name sits over it. */}
-            <div className="s5-cab" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
+            {/* ── AND THE RIBBONS GET THEIR OWN STRIP ─────────────────────────────────────────────────
+                Pinned over the glass they covered the bottom row of symbols, which on a three-row machine
+                is a third of the board — the fix for "polluted underneath" cannot be "hidden behind". The
+                cabinet grows a strip for whichever ribbon is up, so the reels stay whole and the page below
+                still never moves. */}
+            <div className={`s5-cab${phase === "free" ? " has-foot" : ""}${chaining && liveChain ? " has-head" : ""}`}
+                style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
                 {/* ── AND A WAY TO READ THE MACHINE ───────────────────────────────────────────────
                     On the marquee, right-hand end, which is where a real cabinet puts it. A slot is the
                     only game in the building whose rules are invisible while you play it: you can watch a
@@ -828,36 +852,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <div className="s5-bigmult" key={mult} aria-hidden="true"><b>&times;{mult}</b></div>
                 ) : null}
             </div>
-            </div>
 
-            {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
-            {/* NOT UNTIL THE WHOLE SPIN HAS FINISHED PLAYING. `wonChips` is the total including the free
-                round and the pick, so showing it the moment the reels stopped printed the answer above a
-                bonus round that had not been watched yet — the ten spins would then run with their own
-                outcome already on screen. It waits for "done".
+            {/* ── EVERYTHING THAT HAPPENS, HAPPENS ON THE MACHINE ─────────────────────────────────
+                Luke: "things like this recap should consume the animated spin area, not polluted
+                underneath."
 
-                The comment lives HERE rather than inside the ternary below, because a JSX comment in an
-                expression position is a parse error, and it is one this file has already made once. */}
-            <div className="s5-say">
-                {phase === "spin" ? <span className="s5-dim">…</span>
-                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> chips</span>
-                    : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
-                    : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
-                    : result ? <span className="s5-dim" />
-                    : <span className="s5-dim">Twenty lines.</span>}
-            </div>
+                All five of these used to be siblings of the cabinet, stacked down the page under it —
+                so a free round pushed the reels up, the tally arrived as a fifth panel in a column of
+                panels, and the screen grew and shrank as the spin went through its phases. That is a
+                form reporting on a game rather than a game.
 
-            {/* ── THE DEAL CHOOSER IS GONE ────────────────────────────────────────────────────────────
-                Three buttons offering twenty spins at 2x, ten at 4x or seven with sticky wilds. Luke: "remove
-                the spins buttons, its too complicated." He is right about the placement even though the
-                mechanic is sound: it was a question about a bonus round that arrives once in ninety-three
-                spins, asked permanently, on the main screen, above the button you actually came to press.
-                Ninety-two times out of ninety-three it was three buttons that did nothing.
-
-                The round still runs — it takes the middle deal, ten spins at four times, which is the one
-                that was selected by default anyway. The choice is worth having back one day, but INSIDE the
-                round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
-
+                They live INSIDE the cabinet now and are positioned over the glass. `.s5-cab` is already
+                `position: relative; overflow: hidden`, so an overlay is clipped to the machine and the
+                page below it never moves at all.
+            */}
             {/* ── HOW CLOSE THE CHAIN IS ──────────────────────────────────────────────────────────────
                 Breaks so far against the number that opens the free round, and what the spin has taken. The
                 multiplier used to live here too and has moved onto the glass; what is left is the pair of
@@ -868,7 +876,24 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <span><i>This spin</i><b>{chainWon.toLocaleString()}</b></span>
                 </div>
             ) : null}
-
+            {phase === "free" ? (
+                <div className="s5-freebar">
+                    <span><i>Free spin</i><b>{freeIdx + 1} / {roundLen}
+                        {roundGrew ? <u>+{roundGrew}</u> : null}</b></span>
+                    {/* On a locking round the multiplier is always 1 and the number that matters is how many
+                        wilds are welded to the board — which is the whole mechanic, and is the thing that
+                        makes the last spins worth more than the first. */}
+                    {round === "locked"
+                        ? <span className="s5-freemult s5-held">{lockedAt.length}<u>held</u></span>
+                        : <span className="s5-freemult">&times;{result?.free?.mult}</span>}
+                    <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
+                    {/* For the twentieth round rather than the first. The chips were decided on the server
+                        before the first reel moved, so nothing is given up but the watching — and it is
+                        OFFERED rather than imposed, which is the whole difference from the version that
+                        rushed the round for everybody. */}
+                    <button type="button" className="s5-skip" onClick={skipFree}>Skip</button>
+                </div>
+            ) : null}
             {/* ── THE ANNOUNCEMENT ────────────────────────────────────────────────────────────────────
                 Over the cabinet, because the cabinet is what it happened on. It holds for two seconds with
                 nothing else moving, which is the whole point: the rarest event on the machine gets the one
@@ -888,7 +913,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         : result[round].label}</em>
                 </div>
             ) : null}
-
             {/* ── AND THE ROUND, WHILE IT RUNS ────────────────────────────────────────────────────────
                 A counter of where you are and what the round has paid so far. It sits under the reels
                 rather than over them — during a free round the reels are the thing you are watching, and
@@ -904,26 +928,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <em>{gotMore.by === "chain" ? "the threshing would not stop" : "three more scatters"}</em>
                 </div>
             ) : null}
-
-            {phase === "free" ? (
-                <div className="s5-freebar">
-                    <span><i>Free spin</i><b>{freeIdx + 1} / {roundLen}
-                        {roundGrew ? <u>+{roundGrew}</u> : null}</b></span>
-                    {/* On a locking round the multiplier is always 1 and the number that matters is how many
-                        wilds are welded to the board — which is the whole mechanic, and is the thing that
-                        makes the last spins worth more than the first. */}
-                    {round === "locked"
-                        ? <span className="s5-freemult s5-held">{lockedAt.length}<u>held</u></span>
-                        : <span className="s5-freemult">&times;{result?.free?.mult}</span>}
-                    <span><i>This round</i><b>{freeWon.toLocaleString()}</b></span>
-                    {/* For the twentieth round rather than the first. The chips were decided on the server
-                        before the first reel moved, so nothing is given up but the watching — and it is
-                        OFFERED rather than imposed, which is the whole difference from the version that
-                        rushed the round for everybody. */}
-                    <button type="button" className="s5-skip" onClick={skipFree}>Skip</button>
-                </div>
-            ) : null}
-
             {/* ── AND AT THE END, IT TALLIES UP ───────────────────────────────────────────────────────
                 Luke: "at the very end, once you're completely done with your free spins, it tallies it all
                 up for you and shows like a dancing [character]."
@@ -954,6 +958,45 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Collect</button>
                 </div>
             ) : null}
+            </div>
+
+            {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
+            {/* NOT UNTIL THE WHOLE SPIN HAS FINISHED PLAYING. `wonChips` is the total including the free
+                round and the pick, so showing it the moment the reels stopped printed the answer above a
+                bonus round that had not been watched yet — the ten spins would then run with their own
+                outcome already on screen. It waits for "done".
+
+                The comment lives HERE rather than inside the ternary below, because a JSX comment in an
+                expression position is a parse error, and it is one this file has already made once. */}
+            <div className="s5-say">
+                {phase === "spin" ? <span className="s5-dim">…</span>
+                    : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> chips</span>
+                    : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
+                    : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
+                    : result ? <span className="s5-dim" />
+                    : <span className="s5-dim">Twenty lines.</span>}
+            </div>
+
+            {/* ── THE DEAL CHOOSER IS GONE ────────────────────────────────────────────────────────────
+                Three buttons offering twenty spins at 2x, ten at 4x or seven with sticky wilds. Luke: "remove
+                the spins buttons, its too complicated." He is right about the placement even though the
+                mechanic is sound: it was a question about a bonus round that arrives once in ninety-three
+                spins, asked permanently, on the main screen, above the button you actually came to press.
+                Ninety-two times out of ninety-three it was three buttons that did nothing.
+
+                The round still runs — it takes the middle deal, ten spins at four times, which is the one
+                that was selected by default anyway. The choice is worth having back one day, but INSIDE the
+                round it belongs to, at the moment it triggers, where it is a moment rather than a setting. */}
+
+
+
+
+
+
+
+
+
+
 
             {/* ── THE PICK IS ITS OWN GAME NOW ────────────────────────────────────────────────────────
                 Rendered above, as a full takeover — see the early return at the top of this component. It

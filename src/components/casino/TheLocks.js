@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
@@ -32,7 +32,9 @@ const OUT_MS = 1700;        // both numbers read back before the round starts
 
 export default function TheLocks({ built, onDone }) {
     const tiles = built?.tiles || built?.board?.length || 36;
-    const picked = built?.picked || [];
+    // Memoised because two callbacks depend on it: `built?.picked || []` is a fresh array on every render,
+    // which would rebuild the reveal loop each time and give the drainer a moving target.
+    const picked = useMemo(() => built?.picked || [], [built]);
 
     // The round's starting point, before a single tile is turned. Derived from the server's own totals minus
     // what the walk added, so the screen cannot drift from what the round will actually be handed. Computed
@@ -47,23 +49,36 @@ export default function TheLocks({ built, onDone }) {
     const [flying, setFlying] = useState(null);   // { kind, from }
     const [bump, setBump] = useState(null);       // "spins" | "mult"
     const [rest, setRest] = useState(null);       // tile index -> what was left under it
-    const [busy, setBusy] = useState(false);
+    const [queued, setQueued] = useState([]);     // squares tapped and waiting their turn
     const [done, setDone] = useState(false);
     const cursor = useRef(0);
     const timers = useRef([]);
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
     const wait = (ms) => new Promise((r) => timers.current.push(setTimeout(r, ms)));
 
-    const turn = useCallback(async (i) => {
-        if (busy || done || turned[i] != null) return;
-        unlock();
-        setBusy(true);
+    // ── TAP AHEAD; THE BOARD REVEALS AT ITS OWN PACE ─────────────────────────────────────────────────────
+    // Luke: "the picking should let you pick ahead and reveal them at its own pace, but not halting the pick
+    // — reveal one by one at its own pace."
+    //
+    // Every tap used to lock the whole board for a second and a half while its reveal played, which turns a
+    // pick screen into a queue at a counter: you know what you want to press next and the game will not let
+    // you. Worse, it made the good part — the reveal — feel like the thing standing between you and the game.
+    //
+    // So a tap goes into a QUEUE and returns immediately. The square darkens as "taken" the instant it is
+    // pressed, so a finger always gets a response, and a drainer walks the queue one at a time at the pace
+    // the animation wants. You can lay down six taps in two seconds and then watch six reveals play out.
+    //
+    // The queue is state and the drainer is a ref-guarded loop rather than an effect per item: two reveals
+    // running at once would fight over `flying`, which is a single element by design.
+    const draining = useRef(false);
+    const qRef = useRef([]);
 
+    const reveal = useCallback(async (i) => {
         // The next tile in the server's order, not the one "under" this square — the server chose an ORDER
         // and this maps the square a finger landed on to the next thing in it. Same honesty as the Warren.
         const tile = picked[cursor.current];
         cursor.current += 1;
-        if (!tile) { setBusy(false); return; }
+        if (!tile) return false;
 
         setTurned((p) => ({ ...p, [i]: tile }));
         Cas.reelStop(2, 0.5);
@@ -90,7 +105,7 @@ export default function TheLocks({ built, onDone }) {
             setDone(true);
             await wait(OUT_MS);
             onDone?.();
-            return;
+            return true;
         }
 
         // ── IT FLIES TO ITS COUNTER ──────────────────────────────────────────────────────────────────────
@@ -105,8 +120,36 @@ export default function TheLocks({ built, onDone }) {
         Haptic.hit(0.4);
         await wait(BUMP_MS);
         setBump(null);
-        setBusy(false);
-    }, [busy, done, turned, picked, built, tiles, onDone]);
+        return false;
+    }, [turned, picked, built, tiles, onDone]);
+
+    // One reveal at a time, in the order the squares were pressed, until the queue runs dry — and it can be
+    // refilled while it is running, which is the whole point.
+    const drain = useCallback(async () => {
+        if (draining.current) return;
+        draining.current = true;
+        while (qRef.current.length) {
+            const i = qRef.current[0];
+            const ended = await reveal(i);
+            qRef.current = qRef.current.slice(1);
+            setQueued(qRef.current);
+            if (ended) break;
+        }
+        draining.current = false;
+    }, [reveal]);
+
+    const turn = useCallback((i) => {
+        // Only "already spoken for" is refused — never "something else is playing". `picked.length` is the
+        // hard stop: queueing more taps than there are tiles left would walk the cursor off the end.
+        if (done || turned[i] != null || qRef.current.includes(i)) return;
+        if (cursor.current + qRef.current.length >= picked.length) return;
+        unlock();
+        qRef.current = [...qRef.current, i];
+        setQueued(qRef.current);
+        Cas.coin(2);
+        Haptic.hit(0.18);
+        drain();
+    }, [done, turned, picked, drain]);
 
     const label = (t) => (t.kind === "launch" ? "BEGIN" : t.kind === "spins" ? "+1 SPIN" : "+1 MULT");
 
@@ -130,9 +173,10 @@ export default function TheLocks({ built, onDone }) {
             </div>
 
             <p className="thf-say">
-                {done ? "The floor is swept. Take it to the reels."
+                {done ? "The floor is swept — take it to the reels"
                     : rest ? "And what was still out there…"
-                    : busy ? " " : "Turn a sheaf. One of them starts the round."}
+                    : queued.length > 1 ? `${queued.length} sheaves waiting`
+                    : "Turn a sheaf — one of them starts the round"}
             </p>
 
             {/* Hung either side of the board — the reference's torches, in a barn. */}
@@ -155,9 +199,10 @@ export default function TheLocks({ built, onDone }) {
                         <button key={i} type="button"
                             className={`thf-tile${shown ? " is-turned" : ""}${miss ? " is-rest" : ""}`
                                 + `${shown?.kind === "launch" ? " is-launch" : ""}`
-                                + `${flying?.from === i ? " is-flying" : ""}`}
-                            style={{ "--i": i % 6 }}
-                            disabled={busy || done || Boolean(shown)}
+                                + `${flying?.from === i ? " is-flying" : ""}`
+                                + `${!shown && queued.includes(i) ? " is-queued" : ""}`}
+                            style={{ "--i": i % 6, "--q": queued.indexOf(i) }}
+                            disabled={done || Boolean(shown) || queued.includes(i)}
                             onClick={() => turn(i)}
                             aria-label={shown ? label(shown) : "Turn this sheaf"}>
                             <span className="thf-face">

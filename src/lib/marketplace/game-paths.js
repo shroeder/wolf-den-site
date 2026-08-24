@@ -30,6 +30,10 @@ export const GAME_EXTRA_PATHS = [
     // The Market — owner-gated, but it still has to be a KNOWN game path or the nav and the Pathfinder strip
     // both vanish the moment you walk in, which is the exact trap the Jewelcutter fell into above.
     "/marketplace/market",
+    // The Casino — owner-gated, and it fell into the same trap as the Jewelcutter above: walk onto the floor
+    // and the game nav and the Pathfinder strip both vanish, with no way back but the browser button. Being
+    // gated is a reason to be missing from the MENU for most people, never a reason to be an unknown path.
+    "/marketplace/casino",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

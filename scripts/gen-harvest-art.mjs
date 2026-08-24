@@ -117,33 +117,56 @@ const ART = {
     // rectangles and a brown grid.
     //
     // A `border-radius` is not furniture. Everything below is a thing that gets DRAWN.
+    // ══ AND THEN HE LOOKED AT IT ON A PHONE ══════════════════════════════════════════════════════════════
+    // Luke: "the colours are so lame and the icons too. This isn't dopamine, it's poo poo mud. You are way
+    // too committed to the theme."
+    //
+    // Dead right, and the evidence is in the prompts below as they first stood: EVERY one of them said "deep
+    // oak brown, warm brass, gold wheat". Beam, plaque, corner, tile, token — one hue at five brightnesses,
+    // on a warm brown barn photo, which is not a palette, it is a wash. Meanwhile the reels of this same
+    // cabinet are lime, orange, crimson, violet, amber and ice blue, and they look terrific. The bonus screen
+    // was throwing away the only thing about this machine that already worked.
+    //
+    // THE RULE FOR THIS PASS: the room is COLD and the prizes are HOT. Everything structural — beam, plaque,
+    // corner, the back of a tile — is deep indigo-stained wood with polished gold on it, so it recedes and
+    // the gold reads as light rather than as more wood. Everything that is a PRIZE keeps a saturated hue of
+    // its own, and the three of them are far apart on the wheel: amber for a spin, ice for a multiplier,
+    // crimson for the one that starts the round. Nobody should need to read a token to know which it is.
+    //
+    // Being "committed to the theme" was the actual bug. It is still a barn, still sheaves, still lanterns —
+    // but a barn at NIGHT, lit by what you are about to win.
     "thf-beam": {
         wide: true,
         prompt: housePrompt(
-            "A long horizontal carved OAK BEAM with polished brass end-caps, a bundle of golden wheat bolted "
-            + "to each end and a simple carved groove running the length of its plain middle",
+            "A long horizontal carved BEAM of deep midnight indigo-stained wood with polished bright gold "
+            + "end-caps, a bundle of blazing gold wheat bolted to each end and a simple carved groove running "
+            + "the length of its plain middle",
             { framing: "sprite", extra: "Wide banner proportions, roughly four times as wide as tall, seen "
-                + "straight on and flat with no perspective. Deep oak brown, warm brass, hot gold wheat. The "
-                + "middle of the beam is plain carved wood — no plate, no engraving, no ornament on it." }),
+                + "straight on and flat with no perspective. Deep indigo and blue-black wood, BRIGHT polished "
+                + "gold fittings that glow against it, hot gold wheat. Strong contrast between the dark wood "
+                + "and the gold — no brown anywhere. The middle of the beam is plain dark wood: no plate, no "
+                + "engraving, no ornament on it." }),
     },
     // The counter cartouche. "An EMPTY plate set into a frame" is a real object the model will happily draw
     // empty — asking for "a frame with a blank middle" is what produced a goblin on the Vault's marquee.
     "thf-plaque": {
         prompt: housePrompt(
-            "An ornate carved oak plaque with scrolled corners and a beaded brass rim, holding a completely "
-            + "EMPTY polished dark brass plate in its centre, with a small bundle of wheat carved at the top",
-            { framing: "sprite", extra: "Slightly wider than tall, seen straight on and flat to the viewer. "
-                + "Deep oak, warm brass, gold wheat. The plate in the centre is BARE dark metal — no digits, "
-                + "no engraving, no symbols, nothing on it at all." }),
+            "An ornate carved plaque of deep midnight indigo lacquered wood with scrolled corners and a "
+            + "beaded bright gold rim, holding a completely EMPTY polished near-black plate in its centre, "
+            + "with a small bundle of gold wheat carved at the top",
+            { framing: "sprite", extra: "Clearly wider than tall — roughly three parts wide to two tall — "
+                + "seen straight on and flat to the viewer. Deep indigo and blue-black lacquer, BRIGHT "
+                + "polished gold rim and scrollwork, hot gold wheat. No brown. The plate in the centre is "
+                + "BARE near-black metal — no digits, no engraving, no symbols, nothing on it at all." }),
     },
     // The corner bracket, used four times mirrored around the board.
     "thf-corner": {
         px: 256,
         prompt: housePrompt(
-            "An ornate carved corner bracket of oak and brass scrollwork with a curl of wheat and a single "
-            + "ripe berry worked into it, forming a right angle",
-            { framing: "sprite", extra: "Seen straight on and flat. Deep oak, warm brass, gold wheat, one "
-                + "red berry. Reads as the top-left corner of a frame." }),
+            "An ornate corner bracket of deep indigo lacquered wood and bright gold scrollwork with a curl "
+            + "of gold wheat and a single glowing ruby worked into it, forming a right angle",
+            { framing: "sprite", extra: "Seen straight on and flat. Deep indigo wood, BRIGHT polished gold "
+                + "scrollwork, one vivid glowing ruby. No brown. Reads as the top-left corner of a frame." }),
     },
     // A hanging lantern for the sides of the board — the reference's torches, in a barn.
     "thf-lantern": {
@@ -160,10 +183,12 @@ const ART = {
     "thf-spin": {
         px: 256,
         prompt: housePrompt(
-            "A round golden TOKEN embossed with a curling arrow chasing its own tail around the rim, a ripe "
-            + "ear of wheat struck into the centre of it, polished and catching a hard highlight",
-            { framing: "sprite", extra: "Hot polished gold and warm amber. Circular. Nothing else in frame. "
-                + "No text, no numbers, no letters of any kind." }),
+            "A round TOKEN of blazing polished gold embossed with a curling arrow chasing its own tail "
+            + "around the rim, a ripe ear of wheat struck into the centre of it, glowing from within and "
+            + "catching a hard white highlight",
+            { framing: "sprite", extra: "Hot polished gold and blazing amber, lit from inside so it reads as "
+                + "a light source rather than as metal. Circular. Nothing else in frame. No text, no "
+                + "numbers, no letters of any kind." }),
     },
     "thf-mult": {
         px: 256,
@@ -176,10 +201,12 @@ const ART = {
     "thf-begin": {
         px: 256,
         prompt: housePrompt(
-            "A blazing round token of molten gold, its face a harvest sun with flames licking off its rim, "
-            + "burning white-hot at the centre",
-            { framing: "sprite", extra: "Molten gold, orange flame and a white-hot core — the brightest "
-                + "thing in this set by a long way. Circular. Nothing else in frame. No text, no numbers." }),
+            "A blazing round token of molten CRIMSON and magenta fire, its face a burning harvest sun with "
+            + "flames licking off its rim, burning white-hot at the centre",
+            { framing: "sprite", extra: "Hot crimson, magenta and orange flame with a white-hot core — the "
+                + "brightest thing in this set by a long way, and deliberately RED rather than gold so it "
+                + "can never be mistaken for the gold spin token. Circular. Nothing else in frame. No text, "
+                + "no numbers." }),
     },
 
     // ── THE BACK OF A PICK TILE ──────────────────────────────────────────────────────────────────────────
@@ -191,25 +218,29 @@ const ART = {
     "harvest-sheaf": {
         px: 256,
         prompt: housePrompt(
-            "A square carved OAK TILE with a raised beaded brass border running around its edge, a tied "
-            + "bundle of golden wheat carved in relief across its face and a twist of red twine at the "
-            + "stems, lit from the upper left",
+            "A square TILE of deep indigo-violet enamel with a raised beaded BRIGHT GOLD border running "
+            + "around its edge, a tied bundle of glowing golden wheat in relief across its face and a twist "
+            + "of crimson twine at the stems, lit from the upper left",
             { framing: "sprite", extra: "Square, seen straight on and flat to the viewer with no "
-                + "perspective. Deep oak brown, warm brass border, hot gold wheat, one red twine. Must read "
-                + "clearly at 50 pixels wide — chunky, no fine detail." }),
+                + "perspective. The field of the tile is DEEP INDIGO-VIOLET enamel, almost blue-black, and "
+                + "the border and wheat are BRIGHT hot gold that glows against it — maximum contrast between "
+                + "the dark field and the gold. One crimson twine. No brown anywhere. Thirty-six of these sit "
+                + "side by side, so it must read clearly at 50 pixels wide — chunky, no fine detail." }),
     },
 
     // ── AND THE ROOM THE BONUS IS PICKED IN ──────────────────────────────────────────────────────────────
     "harvest-barn": {
         wide: true, scene: true,
         prompt: housePrompt(
-            "The inside of a great timber BARN at harvest night: stacked hay bales and crates of glossy "
-            + "fruit along both side walls, strings of drying corn and herbs hanging from the rafters, a "
-            + "warm lantern glowing high in the roof beams and a huge amber harvest moon in the open "
-            + "doorway at the back, with the middle of the floor left clear and uncluttered",
-            { framing: "scene", extra: "Portrait orientation, seen straight on. Warm amber lantern light, "
-                + "deep golden hay, cool blue night through the doorway. The middle of the image must stay "
-                + "simple — panels are laid over it — so keep all detail and ornament to the outer edges." }),
+            "The inside of a great timber BARN deep at NIGHT: stacked hay bales and crates of glossy fruit "
+            + "along both side walls, strings of drying corn hanging from the rafters, two small lanterns "
+            + "throwing warm pools of light high in the roof beams and an enormous amber harvest moon in the "
+            + "open doorway at the back, with the middle of the floor left clear and uncluttered",
+            { framing: "scene", extra: "Portrait orientation, seen straight on. NIGHT: the whole room is deep "
+                + "indigo and blue-black, lit only by two small warm lantern pools and the amber moon in the "
+                + "doorway. Cold blue shadows everywhere, warm light only where a lantern touches. Dark and "
+                + "moody rather than golden — panels are laid over the middle, so keep the centre very dark "
+                + "and simple and all detail and ornament to the outer edges." }),
     },
 };
 

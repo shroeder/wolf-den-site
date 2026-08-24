@@ -257,22 +257,28 @@ const HARVEST = {
         { bone: 24, doubloon: 21, laurel: 17, chest: 8, moon: 0, wolf: 7 },
         { bone: 26, doubloon: 22, laurel: 18, chest: 8, moon: 0, wolf: 0 },
     ],
+    // -- AND THE PAYTABLE CARRIES THE CABINET NOW ------------------------------------------------
+    // Taking the cascade out cost sixty points of return: it went from 100.80 per cent to 39.80,
+    // because a chain re-paid the same landing two or three times a spin and this paytable had been
+    // written knowing that. A machine that pays ONCE per spin needs bigger line pays for exactly the
+    // same money, so these are the old numbers x2.60 -- swept over 150,000 spins rather than guessed.
+    // Base game 40 per cent of the return, the built round 60, which is what a Pharaoh's-Fortune bonus
+    // is supposed to be: the base game keeps you in the chair and the bonus is the payday.
     pays: {
-        wolf: { 3: 2.08, 4: 12.8, 5: 108.4 },
-        chest: { 3: 1.09, 4: 5.85, 5: 39.3 },
-        laurel: { 3: 0.54, 4: 2.71, 5: 15.4 },
-        doubloon: { 3: 0.24, 4: 1.28, 5: 6.39 },
-        bone: { 3: 0.16, 4: 0.68, 5: 3.11 },
+        wolf: { 3: 5.41, 4: 33.28, 5: 281.84 },
+        chest: { 3: 2.83, 4: 15.21, 5: 102.18 },
+        laurel: { 3: 1.4, 4: 7.05, 5: 40.04 },
+        doubloon: { 3: 0.62, 4: 3.33, 5: 16.61 },
+        bone: { 3: 0.42, 4: 1.77, 5: 8.09 },
     },
-    scatterPays: { 3: 0.32, 4: 1.28, 5: 6.39 },
-    // ── THE CASCADE MACHINE ──────────────────────────────────────────────────────────────────────────
-    // Every win is threshed away and what is above falls into the hole, so a win MAKES the next win
-    // possible and the multiplier climbs with each break. Five breaks in one spin opens the free round —
-    // a bonus earned by watching rather than by landing three of anything.
-    // EIGHT BREAKS. Measured over 200,000 spins: the mean chain is 1.56 and eight-plus happens once in 132,
-    // which is real bonus-round rarity — and unlike a scatter you can WATCH it approaching. Five would have
-    // been one spin in seventeen, which is not a bonus, it is the base game with a fanfare.
-    cascade: { trigger: 8, label: "The Threshing" },
+    scatterPays: { 3: 0.83, 4: 3.33, 5: 16.61 },
+    // ── AND IT DOES NOT CASCADE ──────────────────────────────────────────────────────────────────────
+    // It used to: every win threshed away, what was above falling into the hole, the multiplier climbing
+    // with each break, and eight breaks opening the round. That is The Vault's mechanic and The Vault is
+    // where it belongs — with the Win It Again meter above it, which is what a cascading cabinet is FOR.
+    // Two cascading machines on a five-machine floor is two machines that play the same, and this one is
+    // supposed to be the plain one: reels land, lines pay, three moons on a payline open the bonus, and
+    // everything interesting happens on the Threshing Floor rather than in the base game.
     // ── ITS FREE ROUND IS FOURTEEN CASCADES ──────────────────────────────────────────────────────────
     // This was `growing` — the multiplier climbing 1x to 14x across the round — from before the cabinet
     // tumbled. Now that the free round cascades too, that ladder rides on TOP of the chain's own 1-to-20,
@@ -286,11 +292,11 @@ const HARVEST = {
     // can either be plus one spin or plus one multiplier... and once you finally get the begin free spins it
     // starts the free spins with the amount that you got and the multiplier that you got."
     //
-    // SEVEN AND ONE TO START, so a begin tile on the first tap is still a real round rather than a shrug.
+    // NINE AND ONE TO START, so a begin tile on the first tap is still a real round rather than a shrug.
     // The pool above it does the rest: about five more spins and one more multiplier on an average walk.
     // Three moons on a payline, left to right from reel one — see lineTrigger in evaluate().
     lineTrigger: true,
-    free: { kind: "built", spins: 11, label: "Turn the sheaves, then the round begins" },
+    free: { kind: "built", spins: 9, label: "Turn the sheaves, then the round begins" },
     second: { kind: "build", label: "The Threshing Floor" },
     pick: { spins: 26, mult: 6, begin: 4 },
     // THE WAGON IS GONE. It was this cabinet's hold-and-spin and it was a good one, but the machine Luke is

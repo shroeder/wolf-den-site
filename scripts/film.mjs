@@ -169,7 +169,10 @@ if (process.env.SHOT_HIDE) {
 await send("Page.navigate", { url });
 await sleep(SETTLE);
 
-const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true }))?.result?.value;
+// awaitPromise so --eval can be an async IIFE: a scripted player that has to WAIT for a screen before it can
+// drive it (open the machine, wait for the bonus, then act) is the common case, and without this the rig read
+// the value as a pending Promise and reported "{}".
+const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }))?.result?.value;
 
 // FIRE IT. The click has to land on an attached handler, so it is retried and its effect confirmed — the
 // same rule shot.mjs learned: a click into un-hydrated HTML dispatches into nothing and the film comes out
