@@ -607,6 +607,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // because those two are the ones you are actually hunting for.
                                     <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}`}
                                         key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
+                                        {/* The wild's travelling shine. Its own element because the cell
+                                            has already spent ::before on the plate and ::after on the
+                                            frame, and a shine needs to clip separately from both. */}
+                                        {symbolRole(sym, machineId) === "wild" ? <i className="s5-shine" aria-hidden="true" /> : null}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
                                             className={`${lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""}${flashSym && sym === flashSym && landed > reel ? " is-flash-img" : ""}`.trim()} />

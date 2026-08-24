@@ -19421,75 +19421,132 @@ body.cas-seated .social-fab { display: none; }
     text-shadow: 0 0 22px rgba(255, 215, 94, 1), 0 0 60px rgba(255, 150, 30, .9), 0 4px 0 rgba(0, 0, 0, .6);
     animation: s5MoreSlam .55s cubic-bezier(.15, 1.7, .35, 1) both; }
 
-/* ── EVERY SYMBOL IS A FRAMED MEDALLION ───────────────────────────────────────────────────────────────
-   Luke, with a photo of a cabinet's base game: "need this level of detail and art and dopamine."
+/* ── THE TILE IS THE RARITY ───────────────────────────────────────────────────────────────────────────
+   Luke: "I think we are missing some core dopamine inducing things. contrast, exciting colors, exciting
+   tiles with backgrounds reflecting rarity."
 
-   The thing that reference does — and every cabinet on a real floor does — is that no symbol ever floats.
-   Each one sits on a BRIGHT BACKING PLATE inside an ORNATE FRAME with rivets, so a reel reads as a column
-   of jewels in settings rather than as pictures on a dark sheet. Ours floated: a die-cut sprite over a
-   soft radial glow at 26%, which is why the window read as flat however good the individual drawings were.
-   That is a framing problem, not a drawing problem, and framing is free.
+   The reference cabinet does this and it is the thing I missed on the first pass. Look at what it puts
+   behind each symbol: the pastries and the cigar box sit on a plain white strip with nothing around them.
+   The BEAR sits in a gilded frame on hot orange. The decorated egg sits in a gilded frame on violet. The
+   tile treatment IS the paytable — you can see which symbols matter before you know what any of them are.
 
-   Everything here is built from the symbol's OWN tone (see LOOK), so a wolf sits in violet and a moon in
-   ice-blue and the reel is a colour ladder you can read at arm's length. */
+   My first pass gave every symbol the same gold bezel and studs and changed only the hue, which is the
+   opposite: it made a bone look as important as a wolf and flattened the ladder it was supposed to show.
 
-/* THE PLATE. Lit from above, in the symbol's hue, over a warm base — so it glows rather than tints. */
+   Four tiers, and they differ in how MUCH is going on rather than only in colour:
+
+     low       flat pale stone. No frame, no studs, no glow. It is filler and it should look like filler.
+     mid       a real colour and a bronze rim. Something is happening.
+     bonus     gilded, saturated, lit from inside, four studs. This one opens something.
+     wild      all of that plus a second bezel and a shimmer that never stops.
+
+   And the contrast comes from the same ladder: the top tiers are BRIGHT, so the tiles that matter punch
+   off the dark cabinet instead of every tile sitting at the same mid-tone. */
+
+/* ── LOW: FLAT STONE ─────────────────────────────────────────────────────────────────────────────── */
 .s5-cell::before {
-    inset: 6%;
-    border-radius: 22%;
-    background:
-        radial-gradient(120% 90% at 50% 12%,
-            color-mix(in srgb, var(--tone) 62%, #fff 38%),
-            color-mix(in srgb, var(--tone) 78%, #120c06 22%) 72%),
-        #1a1208;
-    box-shadow:
-        inset 0 2px 0 color-mix(in srgb, var(--tone) 30%, #fff 70%),
-        inset 0 -6px 12px rgba(0, 0, 0, .55);
+    inset: 5%;
+    border-radius: 20%;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--tone) 20%, #cfc6b4 80%),
+        color-mix(in srgb, var(--tone) 26%, #8d8474 74%));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -3px 7px rgba(0, 0, 0, .35);
 }
-
-/* THE FRAME, AND ITS RIVETS. Two rings — a bright gold bezel and a dark inner line so the bezel has an
-   edge to be bright against — plus four studs, which is the detail that makes a border read as hardware
-   rather than as a CSS outline. */
 .s5-cell::after {
-    content: ""; position: absolute; inset: 6%; border-radius: 22%; pointer-events: none; z-index: 2;
-    border: 2px solid rgba(255, 226, 150, .82);
-    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .75), 0 2px 6px rgba(0, 0, 0, .55);
-    background-image:
-        radial-gradient(circle at 14% 14%, #ffe6a4 0 1.6px, transparent 1.9px),
-        radial-gradient(circle at 86% 14%, #ffe6a4 0 1.6px, transparent 1.9px),
-        radial-gradient(circle at 14% 86%, #ffe6a4 0 1.6px, transparent 1.9px),
-        radial-gradient(circle at 86% 86%, #ffe6a4 0 1.6px, transparent 1.9px);
-}
-/* The two symbols that open something get a hotter setting, because on a real cabinet the feature symbols
-   are visibly better made than the ones that only pay. */
-.s5-cell.is-wild::after, .s5-cell.is-scatter::after, .s5-cell.is-bonus::after {
-    border-color: #ffe6a4;
-    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .8), 0 0 14px color-mix(in srgb, var(--tone) 75%, transparent),
-        0 2px 6px rgba(0, 0, 0, .55);
+    content: ""; position: absolute; inset: 5%; border-radius: 20%; pointer-events: none; z-index: 2;
+    border: 1.5px solid rgba(60, 46, 26, .55);
 }
 
-/* The drawing itself sits ON the plate and fills it — at 70% it was a small picture in a large empty
-   frame, which is the opposite of what a medallion is. */
-.s5-cell img { width: 84%; height: 84%; position: relative; z-index: 3;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55)); }
+/* ── MID: A REAL COLOUR, AND A BRONZE RIM ────────────────────────────────────────────────────────── */
+.s5-cell.is-mid::before {
+    background: radial-gradient(120% 90% at 50% 14%,
+        color-mix(in srgb, var(--tone) 46%, #fff 54%),
+        color-mix(in srgb, var(--tone) 88%, #2a1d0c 12%) 78%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), inset 0 -5px 10px rgba(0, 0, 0, .45);
+}
+.s5-cell.is-mid::after {
+    border: 2px solid rgba(206, 152, 74, .85);
+    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .6);
+}
+
+/* ── BONUS AND SCATTER: GILDED, AND LIT FROM INSIDE ──────────────────────────────────────────────── */
+.s5-cell.is-bonus::before, .s5-cell.is-scatter::before {
+    background: radial-gradient(120% 92% at 50% 10%,
+        #fff,
+        color-mix(in srgb, var(--tone) 68%, #fff 32%) 34%,
+        color-mix(in srgb, var(--tone) 96%, #1a0e04 4%) 84%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .8), inset 0 -6px 12px rgba(0, 0, 0, .45),
+        0 0 18px color-mix(in srgb, var(--tone) 55%, transparent);
+}
+.s5-cell.is-bonus::after, .s5-cell.is-scatter::after {
+    border: 2.5px solid #ffe6a4;
+    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .8), 0 0 16px color-mix(in srgb, var(--tone) 70%, transparent);
+    /* The studs. Four of them, and they are the detail that makes a border read as hardware rather than
+       as a CSS outline — which is exactly why the low tiles do not get any. */
+    background-image:
+        radial-gradient(circle at 13% 13%, #fff6d8 0 1.7px, transparent 2px),
+        radial-gradient(circle at 87% 13%, #fff6d8 0 1.7px, transparent 2px),
+        radial-gradient(circle at 13% 87%, #fff6d8 0 1.7px, transparent 2px),
+        radial-gradient(circle at 87% 87%, #fff6d8 0 1.7px, transparent 2px);
+}
+
+/* ── WILD: EVERYTHING, PLUS A SHINE THAT NEVER STOPS ─────────────────────────────────────────────── */
+.s5-cell.is-wild::before {
+    background: radial-gradient(120% 92% at 50% 8%,
+        #fff,
+        color-mix(in srgb, var(--tone) 62%, #fff 38%) 30%,
+        color-mix(in srgb, var(--tone) 100%, #000 0%) 88%);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .9), inset 0 -6px 14px rgba(0, 0, 0, .5),
+        0 0 26px color-mix(in srgb, var(--tone) 80%, transparent);
+}
+.s5-cell.is-wild::after {
+    border: 3px solid #fff3d0;
+    box-shadow: inset 0 0 0 2px rgba(40, 22, 6, .85), inset 0 0 0 3.5px rgba(255, 226, 150, .7),
+        0 0 24px color-mix(in srgb, var(--tone) 85%, transparent);
+    background-image:
+        radial-gradient(circle at 13% 13%, #fff 0 2px, transparent 2.4px),
+        radial-gradient(circle at 87% 13%, #fff 0 2px, transparent 2.4px),
+        radial-gradient(circle at 13% 87%, #fff 0 2px, transparent 2.4px),
+        radial-gradient(circle at 87% 87%, #fff 0 2px, transparent 2.4px);
+}
+/* A bar of light crossing the wild, forever. It is the one symbol worth watching for on an idle machine,
+   and a cabinet where nothing moves between spins is a cabinet nobody looks at. */
+.s5-cell.is-wild { overflow: hidden; }
+.s5-cell.is-wild > i.s5-shine { position: absolute; inset: 5%; border-radius: 20%; z-index: 4;
+    pointer-events: none; overflow: hidden; }
+.s5-cell.is-wild > i.s5-shine::before { content: ""; position: absolute; top: -60%; bottom: -60%;
+    width: 26%; left: -40%; transform: rotate(18deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+    animation: s5Shine 3.6s ease-in-out infinite; }
+@keyframes s5Shine {
+    0%, 62% { left: -40%; }
+    88%, 100% { left: 118%; }
+}
+
+/* The drawing sits ON the plate and fills it — at 70% it was a small picture in a large empty frame,
+   which is the opposite of what a medallion is. The rarer it is, the more of its tile it takes. */
+.s5-cell img { width: 80%; height: 80%; position: relative; z-index: 3;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .5)); }
+.s5-cell.is-bonus img, .s5-cell.is-scatter img { width: 86%; height: 86%; }
+.s5-cell.is-wild img { width: 90%; height: 90%;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .6)) drop-shadow(0 0 6px color-mix(in srgb, var(--tone) 60%, transparent)); }
 
 /* A LIT SYMBOL LIGHTS ITS WHOLE SETTING. Glowing the sprite alone left the frame around it dark, so a
    winning line read as five slightly brighter pictures instead of five lamps coming on. */
-.s5-cell img.is-lit { filter: drop-shadow(0 0 10px var(--acc, #ffd75e)) brightness(1.2); }
+.s5-cell img.is-lit { filter: drop-shadow(0 0 10px var(--acc, #ffd75e)) brightness(1.22); }
 .s5-cell:has(img.is-lit)::before {
-    background:
-        radial-gradient(120% 90% at 50% 12%,
-            color-mix(in srgb, var(--tone) 34%, #fff 66%),
-            color-mix(in srgb, var(--tone) 62%, #fff 38%) 72%),
-        #1a1208;
+    background: radial-gradient(120% 92% at 50% 10%, #fff,
+        color-mix(in srgb, var(--tone) 34%, #fff 66%) 40%,
+        color-mix(in srgb, var(--tone) 70%, #fff 30%) 86%);
 }
 .s5-cell:has(img.is-lit)::after {
-    border-color: #fff6d8;
-    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .8), 0 0 20px var(--acc, #ffd75e), 0 2px 6px rgba(0, 0, 0, .55);
+    border-color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .8), 0 0 24px var(--acc, #ffd75e);
 }
 
-/* And the reel behind them gets a seam and a lip, so five columns read as five physical strips rather
-   than as one sheet with gaps drawn on it. */
-.s5-reel { background: linear-gradient(180deg, #241a10, #16100a 55%, #241a10);
-    box-shadow: inset 2px 0 5px rgba(0, 0, 0, .6), inset -2px 0 5px rgba(0, 0, 0, .6),
-        inset 0 3px 8px rgba(0, 0, 0, .5), inset 0 -3px 8px rgba(0, 0, 0, .5); }
+/* And the reel behind them stays DARK on purpose. The reference gets its contrast from bright tiles on a
+   pale strip; this cabinet is a den at night, so it gets the same contrast the other way round — bright
+   tiles on black wood. What matters is the gap between the tile and its ground, not which one is lighter. */
+.s5-reel { background: linear-gradient(180deg, #1c1409, #0d0905 55%, #1c1409);
+    box-shadow: inset 2px 0 6px rgba(0, 0, 0, .75), inset -2px 0 6px rgba(0, 0, 0, .75),
+        inset 0 3px 9px rgba(0, 0, 0, .6), inset 0 -3px 9px rgba(0, 0, 0, .6); }
