@@ -19153,6 +19153,14 @@ body.cas-seated .social-fab { display: none; }
 .s5-stepper i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
 .s5-stepper b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+/* While the panel is a meter rather than a stake: the label goes gold-green and the number is the win. The
+   .wt-line inside it is the shared count-up, shrunk to the stepper's own scale — the same component every
+   other cabinet counts with, not a second copy of it. */
+.s5-stepper.is-reading i { color: #7fe0a0; }
+.s5-stepper.is-reading b { color: #fff3d0; }
+.s5-stepper.is-reading .wt-line { font-size: 0; gap: 0; }
+.s5-stepper.is-reading .wt-line b { font-family: inherit; font-size: 14px; font-weight: 800;
+    color: #fff3d0; text-shadow: 0 0 10px rgba(255,215,94,.75); }
 
 /* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
    bar, and because nothing else on the screen is round. */
@@ -20023,7 +20031,11 @@ body.cas-seated .social-fab { display: none; }
         linear-gradient(180deg, rgba(8,5,2,.3), rgba(8,5,2,.12) 24%, rgba(8,5,2,.12) 72%, rgba(8,5,2,.38)),
         var(--room) center / cover no-repeat, #0c0904; }
 .s5-cab.is-colossal::before { display: none; }
-.s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
+/* `transform: none` is the whole fix. The base .s5-pays is vertically centred on its rail with
+   translateY(-50%), and this rule re-homed it to the corner without clearing that — so it was dragged half
+   its own height above the cabinet and the top of the word was cut off by the machine's own edge. Luke:
+   "make it so pays isn't being cut off." Measured at top 56 against a cabinet starting at 61. */
+.s5-pays.is-float { position: absolute; top: 5px; right: 8px; transform: none; z-index: 3; }
 
 /* ── A HIT IS A TILE THAT LIGHTS ──────────────────────────────────────────────────────────────────────
    Luke: "never mind, don't show the lines — just brighten up all the tiles that hit."

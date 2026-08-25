@@ -134,6 +134,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // dropped by WinTally itself when the number has landed and its held beat is over. Whatever the tiers do
     // to the timing from now on, the button agrees with the screen.
     const [celebrating, setCelebrating] = useState(false);
+    // What the colossal cabinet wants shown on its panel — see ColossalReels' onReadout.
+    const [colReadout, setColReadout] = useState(null);
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | gems | done
 
     // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
@@ -789,7 +791,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
                         gold={gold} chips={chips}
                         playing={Boolean(result?.colossal)} pressed={phase === "spin"}
-                        onDone={() => setPhase("done")} />
+                        onReadout={setColReadout} onDone={() => setPhase("done")} />
                 </div>
 
                 {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
@@ -798,10 +800,31 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     a two-column panel of their own under the machine, which is 86px spent on two numbers
                     you glance at. What is left below the glass is the one control anybody presses. */}
                 <div className="s5-panel">
-                    <div className="s5-stepper">
+                    <div className={`s5-stepper${colReadout ? " is-reading" : ""}`}>
                         <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
                             onClick={() => step(-1)}>−</button>
-                        <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                        {/* ── THE PANEL IS THE METER ───────────────────────────────────────────────────
+                            Luke: "make the payment amount show up somewhere that isn't underneath the
+                            reels." It had been three places, all of them looking for room on a screen with
+                            none. This one already existed: while a spin is paying, the BET is the one thing
+                            nobody needs — the button is locked, the stake cannot be changed, and the number
+                            that matters is the other one. It costs no height and covers no reel. */}
+                        {colReadout ? (
+                            <span aria-live="polite">
+                                <i>{colReadout.kind === "free"
+                                    ? `Free spin ${colReadout.at + 1}/${colReadout.of}${colReadout.mult > 1 ? ` · ×${colReadout.mult}` : ""}`
+                                    : "Won"}</i>
+                                {/* WinTally renders its own <b> for the climbing number, so it is dropped in
+                                    rather than wrapped — a <b> inside a <b> is the sort of thing that works
+                                    until something styles the outer one. */}
+                                {colReadout.kind === "paid"
+                                    ? <WinTally key={colReadout.k} chips={colReadout.chips}
+                                        multiple={colReadout.multiple} tone={symbolTone(slot5(machineId).wild, machineId)} />
+                                    : <b>{(colReadout.chips || 0).toLocaleString()}</b>}
+                            </span>
+                        ) : (
+                            <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                        )}
                         <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
                             onClick={() => step(1)}>+</button>
                     </div>

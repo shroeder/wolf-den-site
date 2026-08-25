@@ -44,7 +44,7 @@ const SCATTER_NEED = 3;
 // The count plus its held beat — what a paying spin costs in time before the machine moves on.
 const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
-export default function ColossalReels({ machineId, art, bet, data, onDone, playing, pressed = false, gold, chips }) {
+export default function ColossalReels({ machineId, art, bet, data, onDone, onReadout, playing, pressed = false, gold, chips }) {
     const m = slot5(machineId);
     const rows = data?.rows || 12;
 
@@ -69,6 +69,18 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     // At rest the machine draws its own board (see `idle`), and that board has a giant standing in it — so
     // it needs a giants list of its own or the figure is tiled twelve times instead of drawn once.
     const giants = spin?.giants || (data ? [] : [{ reel: 3, row: 0, len: 12, sym: "dire" }]);
+
+    // What the panel should be showing instead of the bet. Pushed up on every change rather than polled,
+    // and cleared on unmount so a cabinet you walked out of cannot leave its last win on the controls.
+    const readout = useMemo(() => {
+        if (paid && !isBigWin(paid.multiple)) return { kind: "paid", ...paid };
+        if (free) return { kind: "free", at: free.at, of: free.of, mult: spin?.applied || 1 };
+        if (won > 0) return { kind: "won", chips: won };
+        return null;
+    }, [paid, free, won, spin]);
+    useEffect(() => { onReadout?.(readout); }, [readout, onReadout]);
+    useEffect(() => () => onReadout?.(null), [onReadout]);
+
 
     // ── ONE SPIN, PLAYED ─────────────────────────────────────────────────────────────────────────────────
     const playOne = useCallback(async (sp, isFree) => {
@@ -499,22 +511,17 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
 
                 The free-round counter joins it, because that is the other thing that is only true
                 sometimes. Between them they took a whole strip of a screen that had none to spare. */}
-            {/* ── AND IT SITS UNDER THE BOARDS, NOT OVER THEM ─────────────────────────────────────────
-                Luke: "move the win amount down and not cover the bottom slot." It was pinned to the bottom
-                of the reel stack, which put a pill straight across the middle row of the small board — the
-                one board you have to read to know whether a column is about to send. It hangs off the
-                cabinet's bottom edge now, in the strip the panel shrink paid for. */}
-            {(free || paid || won > 0) ? (
-                <div className="col5-flash" role="status">
-                    {free ? <span className="col5-flash-spin">Free spin {free.at + 1}/{free.of}</span> : null}
-                    {free && (spin?.applied || 1) > 1
-                        ? <span className="col5-flash-mult">&times;{spin.applied}</span> : null}
-                    {paid && !isBigWin(paid.multiple)
-                        ? <WinTally key={paid.k} chips={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
-                        : won > 0 ? <span className="col5-flash-won"><b>{won.toLocaleString()}</b> chips</span> : null}
-                </div>
-            ) : null}
+            {/* ── THE READOUT IS NOT HERE ANY MORE ────────────────────────────────────────────────────
+                Luke: "make the payment amount show up somewhere that isn't underneath the reels." It has
+                been three places now — across the small board's middle row, then in a reserved band below
+                the cabinet, then hanging off the cabinet's edge over the panel gap — and every one of them
+                was looking for somewhere to PUT it on a screen that has no spare room.
 
+                There is already a place. The panel says BET and a number, permanently, and while a spin is
+                paying out the bet is the one thing nobody needs: the button is locked, the stake cannot be
+                changed, and the number that matters is the other one. So the readout goes there, in the
+                space that already exists, and costs no height at all. It is reported upward rather than
+                drawn here — see `onReadout`, and Slot5 for what it becomes. */}
             {/* A big one takes the whole cabinet — title, coins, and a number climbing at the size it is
                 worth. See WinTally for what "big" means and why it is read off the multiple. */}
             {paid && isBigWin(paid.multiple) ? (
