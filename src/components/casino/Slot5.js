@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
-import WinTally, { isBigWin } from "@/components/casino/WinTally";
+import WinTally, { isBigWin, tierFor } from "@/components/casino/WinTally";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, symbolName, slot5, LINES } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
@@ -61,6 +61,9 @@ const FREE_HOLD_MS = 420;   // how long a finished free spin sits before the nex
 // Below this a win is not celebrated — see CELEBRATE_AT in casino-slot5-play.js. Seven wins in ten on a
 // twenty-line machine pay back less than the stake; that is what twenty lines buys, and a machine that
 // throws a fanfare at every one of them is doing the exact thing this rework existed to stop.
+// How long a celebration can possibly own the button, plus a second. A backstop, never the normal path —
+// WinTally's own onDone is what releases it in every ordinary case. See the note on the flag.
+const holdCeiling = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 1000; };
 const CELEBRATE_AT = 1;
 const BIG_WIN_AT = 10;
 
@@ -671,11 +674,35 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     }, [playGrid, runChain, announceFree]);
 
 
-    // The counting itself lives in WinTally now — this only raises the flag the moment a paying spin has
-    // finished playing, and WinTally drops it when the celebration is over.
+    // ── THE FLAG, AND WHY IT CANNOT BE ALLOWED TO STICK ──────────────────────────────────────────────────
+    // Luke: "after spin, can no longer spin again." I did that, on this cabinet only, and the shape of the
+    // mistake is worth keeping.
+    //
+    // The counting lives in WinTally, which drops this flag when the celebration is over. But the colossal
+    // cabinet RETURNS EARLY, several hundred lines above the two places WinTally is mounted — so on the
+    // Menagerie the flag went up on every winning spin and there was nothing on the page that could ever put
+    // it down. SPIN stayed disabled until a reload. It passed every test I ran because the tests that won
+    // were on a five-reel cabinet and the colossal spins I filmed did not pay.
+    //
+    // Two fixes, because one of them is the cause and the other is the class.
+    //
+    //   THE CAUSE: the colossal cabinet runs its own celebration inside ColossalReels and only reports
+    //   "done" once that has finished, so by the time this effect could fire the count is already over.
+    //   It must never raise the flag at all.
+    //
+    //   THE CLASS: a lock whose only release is a component somewhere else is a lock that bricks the machine
+    //   the day that component does not render — and there is a second way in, because the readout below
+    //   prefers a lit payline over the counter. So the flag now expires on its own. The ceiling is generous
+    //   (the longest celebration plus a second), it never fires in normal play, and it means the worst this
+    //   can ever do again is hold the button a moment too long instead of forever.
+    const isColossal = useMemo(() => Boolean(slot5(machineId).colossal), [machineId]);
     useEffect(() => {
-        if (phase === "done" && Number(result?.wonChips || 0) > 0) setCelebrating(true);
-    }, [result, phase]);
+        if (isColossal) return undefined;
+        if (phase !== "done" || !(Number(result?.wonChips || 0) > 0)) return undefined;
+        setCelebrating(true);
+        const t = setTimeout(() => setCelebrating(false), holdCeiling(result?.multiple || 0));
+        return () => clearTimeout(t);
+    }, [result, phase, isColossal]);
 
     // The horns, once, and only for a win that actually beat the stake.
     const celebrated = useRef(false);
@@ -739,7 +766,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // press is finished, the way the Warren and the Threshing Floor do.
     if (slot5(machineId).colossal) {
         return (
-            <div className="s5">
+            <div className="s5 is-colossal-stack">
                 {/* ── IT IS A CABINET, NOT A PAGE ──────────────────────────────────────────────────────
                     The first cut drew two bare grids stacked on a dark page, and Luke: "this doesn't even
                     remotely resemble the image I sent you. It's super jank." He is right — count what the

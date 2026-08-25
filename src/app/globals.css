@@ -18635,6 +18635,9 @@ body.cas-seated .social-fab { display: none; }
    piece — the three-reel cabinet next door learned that the hard way, with objects sized in independent
    vh units that all changed size when the room did. */
 .s5 { --s5cell: clamp(46px, 17vw, 74px); display: grid; gap: 10px; }
+/* The colossal cabinet is the one fighting for height, and ten pixels between it and its own panel is a
+   gap nobody reads. Six, and the four go to the reels. */
+.s5.is-colossal-stack { gap: 6px; }
 .s5-window { position: relative; border-radius: 14px; overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 26%, transparent);
     background: radial-gradient(120% 90% at 50% 20%, rgba(255,255,255,.05), rgba(0,0,0,.55)); }
@@ -20012,7 +20015,7 @@ body.cas-seated .social-fab { display: none; }
 
    The space came out of the controls (see .s5-panel), which is the trade he asked for: the frame is paid for
    in chrome rather than in glass. */
-.s5-cab.is-colossal { padding: 19px 11px 40px; overflow: hidden;
+.s5-cab.is-colossal { padding: 19px 11px 32px; overflow: hidden;
     background:
         linear-gradient(180deg, rgba(8,5,2,.3), rgba(8,5,2,.12) 24%, rgba(8,5,2,.12) 72%, rgba(8,5,2,.38)),
         var(--room) center / cover no-repeat, #0c0904; }
@@ -20055,7 +20058,7 @@ body.cas-seated .social-fab { display: none; }
    down and not cover the bottom slot." At `bottom: 6px` it lay straight across the middle row of the small
    board, which is the row you have to read to know whether a column is about to send. The cabinet carries
    the room for it below (see .s5-cab.is-colossal), paid for by the panel shrink above. */
-.col5-flash { position: absolute; left: 50%; bottom: -30px; z-index: 8; transform: translateX(-50%);
+.col5-flash { position: absolute; left: 50%; bottom: -31px; z-index: 8; transform: translateX(-50%);
     display: flex; align-items: center; gap: 8px; white-space: nowrap;
     padding: 4px 12px; border-radius: 999px; pointer-events: none;
     background: linear-gradient(180deg, rgba(14,9,2,.92), rgba(6,4,1,.96));
@@ -20216,9 +20219,15 @@ body.cas-seated .social-fab { display: none; }
        controls gave back 16px and the frame took 24, but centring the panel meant the bet block stopped
        inflating itself to the disc's height — measured, SPIN's lower edge landed at 757 of 800, so there
        were forty-three pixels sitting under the button doing nothing. A reserve is a promise about chrome,
-       and the chrome got smaller, so the promise had to. 274 to 248: rows go 33.7px to 35.4px, which is the
-       whole of that slack spent on glass rather than on air. */
-    --col5-avail: calc(100dvh - 248px);
+       and the chrome got smaller, so the promise had to.
+
+       AND ONCE MORE, MEASURED RATHER THAN GUESSED. Luke: "make the reels taller to fit, you aren't using
+       that space below, I want it to use all the space." He was right and there was more of it than I had
+       assumed — measured below the small board: 40px of cabinet padding, 10px to the panel, and 18px of
+       slack under the button. Sixty-eight pixels, doing nothing on every spin that does not pay. The win
+       readout needs about thirty-one of them and nothing needs the rest, so the padding drops to 32, the
+       gap to 6, and the reserve goes 274 -> 248 -> 224. Rows: 33.7px, then 35.4px, now 37.0px. */
+    --col5-avail: calc(100dvh - 224px);
     /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
     --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
 }
