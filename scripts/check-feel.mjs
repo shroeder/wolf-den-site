@@ -221,6 +221,63 @@ const PROBE = (sc) => `(() => {
   }, 3200));
 })()`;
 
+// ── DOES PRESSING IT DO ANYTHING ────────────────────────────────────────────────────────────────────────────
+// Luke, naming the thing I actually get wrong: "you tend to make features like a web UI ... often times you
+// miss interactability and cause and effect ... something flashy should happen when it doesn't, or something
+// should happen a little slower with animations, or something needs a modal that pops up, or certain kinds of
+// noises and sounds, vibrations on the phone."
+//
+// Every one of those is invisible to a screenshot and measurable from inside the page. So: hook the speaker,
+// hook the vibrator, watch the DOM, press the thing, and see what the machine does about it.
+//
+//   SILENT     the press made no sound
+//   NUMB       the press never buzzed the phone
+//   DEAD       the press changed nothing on screen — the definition of a button that is not a button
+//   LAGGY      nothing changed for a fifth of a second after the tap; a control has to answer instantly
+//   INSTANT    the whole thing was over in under half a second. "Something should happen a little slower
+//              with animations." A result that arrives with no time to watch is a receipt.
+const REACTION = (actSel) => `(() => {
+  const pick = sel => { for (const s of sel.split(',')) { const e = document.querySelector(s.trim()); if (e) return e; } return null; };
+  const act = pick(${JSON.stringify(actSel)});
+  if (!act || act.disabled) return JSON.stringify({ skip: 1 });
+
+  // The speaker. Every sound in the Den ends up starting one of these two nodes.
+  let sounds = 0;
+  for (const K of [window.AudioBufferSourceNode, window.OscillatorNode]) {
+    if (!K || !K.prototype || !K.prototype.start) continue;
+    const orig = K.prototype.start;
+    K.prototype.start = function (...a) { sounds += 1; return orig.apply(this, a); };
+  }
+  // The phone. navigator.vibrate is a no-op in headless but it is still CALLED, which is the question.
+  let buzzes = 0;
+  const ov = navigator.vibrate ? navigator.vibrate.bind(navigator) : null;
+  navigator.vibrate = (...a) => { buzzes += 1; return ov ? ov(...a) : true; };
+
+  // The screen. Class and style changes are how this app animates, so they are what "something happened"
+  // looks like from here — plus anything added or removed.
+  let changes = 0, firstAt = null, lastAt = null, modal = false, newImgs = 0;
+  const t0 = performance.now();
+  const mo = new MutationObserver(recs => {
+    for (const r of recs) {
+      changes += 1;
+      if (firstAt === null) firstAt = performance.now() - t0;
+      lastAt = performance.now() - t0;
+      for (const n of r.addedNodes || []) {
+        if (n.nodeType !== 1) continue;
+        if (n.matches && (n.matches('[role=dialog],[aria-modal=true]') || /modal|tally|reveal|splash|overlay/i.test(n.className || ''))) modal = true;
+        if (n.tagName === 'IMG' || (n.querySelector && n.querySelector('img'))) newImgs += 1;
+      }
+    }
+  });
+  mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+
+  act.click();
+  return new Promise(res => setTimeout(() => {
+    mo.disconnect();
+    res(JSON.stringify({ sounds, buzzes, changes, firstAt, lastAt, modal, newImgs }));
+  }, 5000));
+})()`;
+
 const MOTION = (sel) => `(() => {
   const strip = () => { for (const s of ${JSON.stringify(sel)}.split(',')) { const e = document.querySelector(s.trim()); if (e) return e; } return null; };
   const y = el => { if (!el) return null; const m = new DOMMatrixReadOnly(getComputedStyle(el).transform); return m.m42; };
@@ -287,6 +344,22 @@ for (const sc of SCREENS) {
         if (d.dim.length) advisories.push(`${at}  CONTRAST  ${d.dim.length} may be hard to read, worst: ${[...new Set(d.dim)].slice(0, 3).join(" · ")}`);
         if (d.emoji.length) fail(at, "SPRITES", `emoji where a sprite belongs: ${[...new Set(d.emoji)].slice(0, 3).join(" · ")}`);
         if (d.animated === 0) fail(at, "ALIVE", "nothing on this screen animates or transitions at all");
+
+        // ── AND THEN PRESS IT ────────────────────────────────────────────────────────────────────────
+        // Once per screen, at his phone size. This is the half of the gate that asks whether the feature
+        // is a GAME rather than a form.
+        if (W === 412) {
+            const rx = JSON.parse((await evaluate(REACTION(sc.act))) || "{}");
+            if (!rx.skip) {
+                if (!rx.sounds) fail(`${sc.id} press`, "SILENT", "pressing the main action made no sound at all");
+                if (!rx.buzzes) fail(`${sc.id} press`, "NUMB", "pressing the main action never buzzed the phone");
+                if (!rx.changes) fail(`${sc.id} press`, "DEAD", "pressing the main action changed nothing on screen");
+                else {
+                    if (rx.firstAt > 200) fail(`${sc.id} press`, "LAGGY", `nothing moved for ${Math.round(rx.firstAt)}ms after the tap — a control has to answer instantly`);
+                    if (rx.lastAt < 400) fail(`${sc.id} press`, "INSTANT", `the whole thing was over in ${Math.round(rx.lastAt)}ms — there is nothing to watch`);
+                }
+            }
+        }
 
         if (sc.motion && W === 412) {
             const mo = JSON.parse((await evaluate(MOTION(sc.motion))) || "{}");
