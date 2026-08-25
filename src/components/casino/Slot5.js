@@ -786,8 +786,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-cab is-colossal"
                     style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)`,
                         "--room": `url(/images/casino/room/${machineId}.webp)` }}>
-                    <button type="button" className="s5-pays is-float" onClick={() => setPays(true)}
-                        aria-label="What this machine pays">PAYS</button>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
                         gold={gold} chips={chips}
                         playing={Boolean(result?.colossal)} pressed={phase === "spin"}
@@ -799,32 +797,42 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 {/* NO SEPARATE READOUT. Balance and chips moved onto the cabinet's own ribbon — they were
                     a two-column panel of their own under the machine, which is 86px spent on two numbers
                     you glance at. What is left below the glass is the one control anybody presses. */}
-                <div className="s5-panel">
-                    <div className={`s5-stepper${colReadout ? " is-reading" : ""}`}>
+                {/* ── PAYS IS A BUTTON IN THE ROW, NOT A STICKER ON THE GLASS ──────────────────────────
+                    Luke: "the pays symbol should be a button that isn't overlaid or underlaid and has a
+                    background colour to it." It was floating in the cabinet's top frame band, which is
+                    nineteen pixels tall against a twenty-three pixel button — so it hung over the top of
+                    the colossal board no matter what I did to its offset. There is no version of that which
+                    is not overlaid; it needed to stop being an overlay.
+
+                    It sits in the control row now, beside the stepper and the disc, with its own ground and
+                    rim. Nothing under it, nothing over it, and no vertical cost — the row was already there
+                    and the stepper had width to spare. */}
+                <div className="s5-panel is-colossal">
+                    <button type="button" className="s5-pays is-tile" onClick={() => setPays(true)}
+                        aria-label="What this machine pays">PAYS</button>
+                    <div className="s5-stepper">
                         <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
                             onClick={() => step(-1)}>−</button>
-                        {/* ── THE PANEL IS THE METER ───────────────────────────────────────────────────
-                            Luke: "make the payment amount show up somewhere that isn't underneath the
-                            reels." It had been three places, all of them looking for room on a screen with
-                            none. This one already existed: while a spin is paying, the BET is the one thing
-                            nobody needs — the button is locked, the stake cannot be changed, and the number
-                            that matters is the other one. It costs no height and covers no reel. */}
-                        {colReadout ? (
-                            <span aria-live="polite">
-                                <i>{colReadout.kind === "free"
-                                    ? `Free spin ${colReadout.at + 1}/${colReadout.of}${colReadout.mult > 1 ? ` · ×${colReadout.mult}` : ""}`
-                                    : "Won"}</i>
-                                {/* WinTally renders its own <b> for the climbing number, so it is dropped in
-                                    rather than wrapped — a <b> inside a <b> is the sort of thing that works
-                                    until something styles the outer one. */}
-                                {colReadout.kind === "paid"
-                                    ? <WinTally key={colReadout.k} chips={colReadout.chips}
-                                        multiple={colReadout.multiple} tone={symbolTone(slot5(machineId).wild, machineId)} />
-                                    : <b>{(colReadout.chips || 0).toLocaleString()}</b>}
-                            </span>
-                        ) : (
-                            <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
-                        )}
+                        {/* ── BET DOES NOT MOVE OVER FOR THE WIN ───────────────────────────────────────
+                            "I can't even see the bet amount now that you shoved one in there." Fair — the
+                            first cut REPLACED the stake with the payout, which is fine reasoning about what
+                            matters in the moment and useless when you want to change your bet and cannot
+                            read what it is. They sit side by side; the row had the width the whole time. */}
+                        <span className="s5-meters">
+                            <span className="s5-meter"><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                            {colReadout ? (
+                                <span className="s5-meter is-win" aria-live="polite">
+                                    <i>{colReadout.kind === "free"
+                                        ? `Free ${colReadout.at + 1}/${colReadout.of}${colReadout.mult > 1 ? ` ×${colReadout.mult}` : ""}`
+                                        : "Won"}</i>
+                                    {/* WinTally renders its own <b>, so it is dropped in rather than wrapped. */}
+                                    {colReadout.kind === "paid"
+                                        ? <WinTally key={colReadout.k} chips={colReadout.chips}
+                                            multiple={colReadout.multiple} tone={symbolTone(slot5(machineId).wild, machineId)} />
+                                        : <b>{(colReadout.chips || 0).toLocaleString()}</b>}
+                                </span>
+                            ) : null}
+                        </span>
                         <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
                             onClick={() => step(1)}>+</button>
                     </div>

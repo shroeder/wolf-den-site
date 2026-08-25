@@ -19153,14 +19153,7 @@ body.cas-seated .social-fab { display: none; }
 .s5-stepper i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
 .s5-stepper b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
-/* While the panel is a meter rather than a stake: the label goes gold-green and the number is the win. The
-   .wt-line inside it is the shared count-up, shrunk to the stepper's own scale — the same component every
-   other cabinet counts with, not a second copy of it. */
-.s5-stepper.is-reading i { color: #7fe0a0; }
-.s5-stepper.is-reading b { color: #fff3d0; }
-.s5-stepper.is-reading .wt-line { font-size: 0; gap: 0; }
-.s5-stepper.is-reading .wt-line b { font-family: inherit; font-size: 14px; font-weight: 800;
-    color: #fff3d0; text-shadow: 0 0 10px rgba(255,215,94,.75); }
+
 
 /* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
    bar, and because nothing else on the screen is round. */
@@ -20031,11 +20024,43 @@ body.cas-seated .social-fab { display: none; }
         linear-gradient(180deg, rgba(8,5,2,.3), rgba(8,5,2,.12) 24%, rgba(8,5,2,.12) 72%, rgba(8,5,2,.38)),
         var(--room) center / cover no-repeat, #0c0904; }
 .s5-cab.is-colossal::before { display: none; }
-/* `transform: none` is the whole fix. The base .s5-pays is vertically centred on its rail with
-   translateY(-50%), and this rule re-homed it to the corner without clearing that — so it was dragged half
-   its own height above the cabinet and the top of the word was cut off by the machine's own edge. Luke:
-   "make it so pays isn't being cut off." Measured at top 56 against a cabinet starting at 61. */
-.s5-pays.is-float { position: absolute; top: 5px; right: 8px; transform: none; z-index: 3; }
+/* ── PAYS IS A CONTROL, SO IT LIVES WITH THE CONTROLS ─────────────────────────────────────────────────
+   Luke: "the pays symbol should be a button that isn't overlaid or underlaid and has a background colour."
+   Floating it in the cabinet's top band could never satisfy that — the band is 19px and the button is 23,
+   so it hung over the colossal board whatever offset it was given, and before that it was clipping its own
+   top on the machine's edge. It is in the control row now with a real ground under it. */
+.s5-pays.is-tile { position: static; transform: none; flex: 0 0 auto; align-self: stretch;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 11px; border-radius: 10px; cursor: pointer;
+    font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .1em;
+    color: #2a1c05; border: 1px solid rgba(255,226,150,.55);
+    background: linear-gradient(180deg, #f2d488, #d5a63f 62%, #b8862a);
+    box-shadow: 0 2px 0 #7d5c15, inset 0 1px 0 rgba(255,255,255,.45); }
+.s5-pays.is-tile:active { transform: translateY(2px); box-shadow: 0 0 0 #7d5c15, inset 0 1px 0 rgba(255,255,255,.45); }
+
+/* Three things in the row now: the paytable, the stake, the disc. */
+.s5-panel.is-colossal { grid-template-columns: auto 1fr auto; }
+
+/* ── BET AND WON, SIDE BY SIDE ────────────────────────────────────────────────────────────────────────
+   "I can't even see the bet amount now that you shoved one in there." The first cut swapped the stake out
+   for the payout, which is fine reasoning about what matters in the moment and useless the second you want
+   to change your bet and cannot read it. The row always had the width for both. */
+/* `.s5-stepper > span` sets display:grid at (0,1,1) and a bare `.s5-meters` is (0,1,0), so the two meters
+   stacked on top of each other instead of sitting side by side. Named through the same combinator to win. */
+.s5-stepper > .s5-meters { display: flex; align-items: center; justify-content: center; gap: 16px;
+    min-width: 0; padding: 4px 2px; }
+.s5-meter { display: grid; gap: 0; justify-items: center; min-width: 0; }
+.s5-meter i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #7d8792; white-space: nowrap; }
+.s5-meter b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+/* The win reads as the live one: green label, brighter number, and it arrives rather than appearing. */
+.s5-meter.is-win { animation: s5MeterIn .26s cubic-bezier(.2,1.4,.4,1) both; }
+.s5-meter.is-win i { color: #7fe0a0; }
+.s5-meter.is-win b { color: #fff3d0; text-shadow: 0 0 10px rgba(255,215,94,.75); }
+.s5-meter.is-win .wt-line { font-size: 0; gap: 0; }
+.s5-meter.is-win .wt-line b { font-family: inherit; font-size: 14px; font-weight: 800; color: #fff3d0;
+    text-shadow: 0 0 10px rgba(255,215,94,.75); }
+@keyframes s5MeterIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 /* ── A HIT IS A TILE THAT LIGHTS ──────────────────────────────────────────────────────────────────────
    Luke: "never mind, don't show the lines — just brighten up all the tiles that hit."
