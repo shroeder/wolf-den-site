@@ -31,6 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 
+import { housePrompt } from "../src/lib/marketplace/art-style.js";
 import { priceRun, quality } from "./lib/gen-guard.mjs";
 import "./lib/ai-trace.mjs";
 
@@ -47,139 +48,105 @@ if (!key && !PUBLISH) throw new Error("no OPENAI_API_KEY");
 const OUT = path.join(process.cwd(), ".vip-art");
 const PUBLIC = path.join(process.cwd(), "public", "images", "casino");
 
-// The same house voice the rest of the floor is painted in, so the lounge is the same building.
-const HOUSE = "Painterly cel-shaded 2D fantasy game art, bold dark ink contour outlines, rich saturated "
-    + "colour, storybook RPG style.";
-
-// ── NO TEXT, AND THE ONE EXCEPTION ───────────────────────────────────────────────────────────────────────────
-// Every generator in this repo bans lettering, because an image model cannot be trusted with it — the
-// multiplier plates and the pearl both went through this and both ended up having their numeral laid over the
-// sprite in CSS instead.
+// ── THE STYLE COMES FROM art-style.js, NOT FROM HERE ─────────────────────────────────
+// Luke: "what is with the style on these sprites and background, it doesn't match anything we use."
 //
-// The VIP sign is the exception, and it is a calculated one: "VIP" is three capital letters, it is the single
-// most-drawn piece of signage in the entire reference corpus, and a sign that says something ELSE is instantly
-// obvious on a contact sheet rather than subtly wrong. It is still checked by eye before it ships, and if it
-// comes out mangled the fallback is the same as everywhere else — draw the plate empty and set the letters in
-// CSS over it.
-const NO_TEXT = "No text, no words, no letters, no numbers, no signage, no logo, no watermark.";
-
-// ── AND `background: "transparent"` IS NOT ENOUGH ON ITS OWN ──────────────────────────────────
-// The first pass of the door and the bartender came back with the API flag set and 0.0% transparent pixels in
-// the result: a full tan wall behind the archway and a whole painted back-bar behind the wolf. The flag asks
-// for an alpha channel; it does not stop the model painting a scene into it.
+// He is right and the cause is embarrassing: this file wrote its OWN style prose. A local HOUSE constant
+// ("painterly cel-shaded, storybook RPG"), a local CUTOUT and a local NO_TEXT — three hand-rolled versions
+// of three things that already exist, while the other eighteen generators in this repo import
+// housePrompt(). art-style.js opens with a list of the four different looks the game ended up with the
+// LAST time somebody did this, and its first line says: import this from any generator instead of writing
+// style prose inline. I read that file to write the dragon and then did not use it here.
 //
-// What causes it is in the PROMPT. Both of those described where the subject was standing — "set into the wall
-// of a casino", "standing behind a bar" — and a model told where something is will draw there. The vendor, whose
-// prompt said "beside a bar" only in passing, came back 34.8% transparent.
+// THE MODEL WAS NEVER THE PROBLEM — gpt-image-1 at medium, the same as all 68 other image calls in the
+// repo. The prompt was.
 //
-// So a cut-out prompt must describe the OBJECT AND NOTHING ELSE, and then say so twice. Checked by counting
-// alpha rather than by looking, because a transparent PNG and an opaque one look identical in any viewer that
-// composites onto white.
-const CUTOUT = "The subject is CUT OUT and completely ISOLATED on a FULLY TRANSPARENT background. There is no "
-    + "room, no wall, no floor, no shelf, no furniture and no scenery of any kind behind or around it — only "
-    + "empty transparency. Nothing else whatsoever in frame.";
+// So: subject only, and the house does the rest. framing "sprite" brings DIE_CUT (isolated, transparent,
+// 8% margin, nothing touching an edge); framing "scene" brings SCENE; NEGATIVE_STYLE bans the sticker rim
+// and the lettering on both.
 
-// The player's hero is a stocky chibi — big head, short legs, heavy outline. Anybody who shares a floor with
-// them has to be built the same way; a realistic figure scaled down reads as a different game standing in it.
-const CHIBI = "Drawn in the same build as a stocky chibi RPG hero sprite: large head, short sturdy body, "
-    + "short legs, heavy dark outline, standing squarely on both feet with the whole body and both feet "
-    + "visible and nothing cropped. Full length, head to feet.";
+// The player's hero is a stocky chibi — big head, short legs. Anybody sharing a floor with them has to be
+// built the same way; a realistic figure scaled down reads as a different game standing in it.
+const CHIBI = "Built like a stocky chibi RPG hero sprite: large head, short sturdy body, short legs, "
+    + "standing squarely on both feet with the whole body and both feet visible and nothing cropped.";
 
 const JOBS = {
-    // ── THE DOOR THAT SHOULD NEVER HAVE BEEN DRAWN ─────────────────────────────────────
-    // A `door` job lived here and produced a fine painting of a gold archway with drapes, a rope and a VIP
-    // sign, which was then stood on the casino floor in front of one of the wall's own gold archways.
+    // ── THE SIGN OVER THE ARCH ─────────────────────────────
+    // Drawn as its own object after being CROPPED out of the deleted door painting for a day. Luke: "vip sign
+    // is clearly cut out of a sprite." A crop is only as clean as the silhouette it cuts along, and a sign
+    // painted INTO an archway has no silhouette of its own.
     //
-    // Luke: "the VIP room should not be janky — you made it look like double arches. We already have arches
-    // in the background, why can't you just put all the VIPs walking around in there?"
-    //
-    // He is right, and it is the most ordinary kind of mistake there is: I generated an asset for something
-    // the game already had. The wall has been a repeating frieze of arches with dark recesses since the floor
-    // was painted, and the VIP entrance is now simply one of them — positioned onto a real arch, with the
-    // people drawn inside its recess (see .cas-vipdoor in globals.css).
-    //
-    // The job is deleted rather than left behind a flag, because a generator that can still produce the wrong
-    // answer will produce it again. The only piece worth keeping was the sign, which was cropped out of the
-    // last preview into vip-sign.webp — it hangs over the arch, and the arch was already there.
-
-    // ── THE SIGN OVER THE ARCH ───────────────────────────────────────────────────
-    // Drawn properly, after being CROPPED out of the deleted door painting for a day. Luke: "vip sign is
-    // clearly cut out of a sprite." It was: a hard rectangle with the sign's bottom frame and bulbs sliced
-    // off and the arch's scrollwork cut through on both sides, opaque, sitting on a painted wall.
-    //
-    // Reusing art already paid for is usually right and it was wrong here, because the thing being reused
-    // was drawn ATTACHED to something. A crop can only be as clean as the silhouette it cuts along, and a
-    // sign painted into an archway has no silhouette of its own — there is no line where the sign stops and
-    // the arch starts. Cheaper to draw the object than to keep cutting around one that was never separate.
-    //
-    // WIDE, because it hangs across the mouth of an arch: a portrait crop would have to be scaled down to
-    // span it and the lettering would go with it.
+    // THE ONE PLACE LETTERING IS ALLOWED. NEGATIVE_STYLE bans text everywhere, for good reason — but "VIP"
+    // is three capitals and the most-drawn sign in the reference corpus, so a wrong one is obvious at a glance
+    // rather than subtly off. Checked by eye before it ships; if it ever comes back mangled the fallback is
+    // the plate empty and the letters set in CSS.
     sign: {
         size: "1536x1024",
         file: "vip-sign",
-        prompt: `${HOUSE} A single ornate hanging casino sign board, seen straight on from the front. A `
-            + "rectangular gold-framed plaque with a deep red panel inside it, reading the three capital "
-            + "letters V I P in large gold serif letters and nothing else. Round warm-lit bulbs set evenly "
-            + "all the way around the gold frame, including along the BOTTOM edge. A small decorative gold "
-            + "crest on the top edge and two short gold chains rising from the top corners as if it hangs "
-            + "from them. Rich gold and deep red, warm glowing bulbs, expensive. "
-            + `The whole sign complete and unclipped with space around it. ${CUTOUT}`,
+        prompt: housePrompt(
+            "An ornate hanging casino sign board: a rectangular gold frame with a deep red panel inside it, "
+            + "reading the three capital letters V I P in large gold serif letters and nothing else. Round "
+            + "warm-lit bulbs set evenly all the way around the frame including along the BOTTOM edge, a small "
+            + "gold crest on the top edge, and two short gold chains rising from the top corners.",
+            { framing: "sprite", extra: "Gold and deep red, the bulbs warm and glowing. It hangs over the "
+                + "mouth of an archway and must read at about 120 pixels wide. THE LETTERING IS THE ONE "
+                + "EXCEPTION to the no-text rule: the sign must say exactly VIP." }),
     },
 
-    // ── THE ROOM, FROM INSIDE ────────────────────────────────────────────────────────────────────────────
-    // A 3:1 panorama, painted flat with NO vanishing point. That is not a stylistic choice, it is the only
-    // thing that works: the camera pans across this room, and a scene with perspective is correct from
-    // exactly one camera position and wrong everywhere else. The casino floor's wall learned this the hard
-    // way and its note says so at length.
-    //
-    // The BAR IS AT THE RIGHT-HAND END, because that is where the two people you can talk to stand and the
-    // page lays its hit areas over them at fixed percentages. Everything Luke listed is in here: the couch,
-    // the fountain, the signs, the fixtures, the bartender.
+    // ── THE ROOM ──────────────────────────────────
+    // A FLAT ELEVATION with no vanishing point — not a stylistic choice, the only thing that works: the
+    // camera pans across this room, and a scene with perspective is correct from exactly one camera position
+    // and wrong everywhere else. The casino floor's wall learned that the hard way.
     lounge: {
         size: "1536x1024",
         file: "vip-room",
-        prompt: `${HOUSE} A wide panoramic interior of an opulent private VIP lounge in a fantasy casino, `
-            + "painted as a FLAT ELEVATION seen straight on with NO perspective and NO vanishing point, like "
-            + "a stage set or a side-scrolling game backdrop. "
-            + "Deep violet and midnight-blue walls with gold panelling and wolf motifs carved into them. "
-            + "On the LEFT: a long buttoned couch upholstered in gold silk with violet cushions, and beside "
-            + "it a tall silver water fountain with lit water falling into a basin, glowing pale blue. "
-            + "In the MIDDLE: a low marble table, a thick patterned carpet, and a second smaller couch. "
-            + "On the RIGHT: a long polished dark-wood BAR with a brass rail, ranks of glowing bottles on "
-            + "lit glass shelves behind it, and two tall bar stools in front. "
-            + "Hanging from the ceiling across the whole width: ornate golden chandeliers and lanterns, and "
-            + "glowing sign boards in warm amber and violet neon mounted on the walls between them. "
-            + "Warm pools of light on the floor beneath each fixture. Opulent, moody, expensive, "
-            + "unmistakably a room you had to be let into. "
-            + `NO PEOPLE and no characters anywhere in the room. ${NO_TEXT}`,
+        prompt: housePrompt(
+            "The interior of an opulent private VIP lounge in a fantasy casino, painted as a FLAT ELEVATION "
+            + "seen straight on with NO perspective and NO vanishing point, like a stage set. Deep violet and "
+            + "midnight-blue walls with gold panelling and carved wolf motifs. On the LEFT a long buttoned "
+            + "couch in gold silk with violet cushions and a tall silver water fountain lit from within. In "
+            + "the MIDDLE a low marble table, a thick patterned carpet and a second couch. On the RIGHT a long "
+            + "polished dark-wood BAR with a brass rail, lit glass shelves of glowing bottles behind it and "
+            + "two tall stools. Golden chandeliers and lanterns hang across the whole width, with warm pools "
+            + "of light on the floor beneath each one.",
+            { framing: "scene", extra: "Opulent, moody and expensive — unmistakably a room you had to be "
+                + "let into. NO PEOPLE and no characters anywhere in it." }),
     },
 
-    // ── THE TWO YOU CAN TALK TO ───────────────────────────────────────────────────
-    // FULL BODY, and the first cut was not. I asked for "head and torso only, nothing below the bar" while
-    // picturing them behind a bar — and then placed them in a room where the bar is off to one side, so what
-    // shipped was two enormous floating busts standing on a carpet. Luke: "what's up with the wolf torsos."
-    //
-    // A character that shares a floor with the player has to be a WHOLE PERSON standing on it, at a size that
-    // makes sense next to them. The hero is a stocky chibi — big head, short legs, heavy outline — so these
-    // match that build rather than being realistic figures scaled down, which would read as a different game.
-    // They are drawn a little taller than the hero because they are the adults behind the counter.
+    // ── THE TWO YOU CAN TALK TO ────────────────────────────
+    // FULL BODY. The first cut asked for "head and torso only, nothing below the bar" while picturing them
+    // behind a bar, then placed them in a room whose bar is off to one side — two enormous floating busts
+    // standing on a carpet. Luke: "what's up with the wolf torsos."
     bartender: {
         size: "1024x1536",
         file: "vip-bartender",
-        prompt: `${HOUSE} A single friendly grizzled wolf-man bartender standing and facing the viewer. `
-            + "Grey-and-silver fur, one ear notched, a neat dark waistcoat over a white shirt with the "
-            + "sleeves rolled up, dark trousers, a bar towel over one shoulder. He holds a glass in one hand "
-            + "and a polishing cloth in the other, with a knowing half-smile. "
-            + `${CHIBI} ${CUTOUT} ${NO_TEXT}`,
+        prompt: housePrompt(
+            "A friendly grizzled wolf-man bartender standing and facing the viewer, seen head to foot. "
+            + "Silver-grey fur and one notched ear, wearing a rich CRIMSON waistcoat with polished gold "
+            + "buttons over a cream shirt with the sleeves rolled up, a deep teal necktie, dark navy trousers "
+            + "and brown boots, with a gold-striped bar towel over one shoulder. He holds a glass in one hand "
+            + "and a polishing cloth in the other, with a knowing half-smile.",
+            // ── A GREY WOLF IN BROWN IS NOT A COLOUR SCHEME ─────────────────────────────────
+            // The first house-style pass came back nearly monochrome sepia, and the house style was not at
+            // fault — I had described a grey animal in a dark waistcoat and dark trousers, which is a
+            // colourless character however richly it is painted. HOUSE_STYLE asks for "rich saturated
+            // jewel-tone colours" and can only deliver them if the SUBJECT has some. Sable came back vivid
+            // from the same prompt template because a russet fox in a violet coat is vivid.
+            //
+            // So Rolf keeps his silver fur and is dressed in crimson and gold — warm, against a lounge that
+            // is violet and gold, so he reads as a person in the room rather than part of the panelling.
+            { framing: "sprite", extra: `${CHIBI} Warm crimson and gold against silver fur — he must read as `
+                + "the brightest thing at his end of a violet room." }),
     },
     vendor: {
         size: "1024x1536",
         file: "vip-vendor",
-        prompt: `${HOUSE} A single sly well-dressed fox merchant standing and facing the viewer. Russet fur, `
-            + "a deep violet velvet coat with gold frogging over dark trousers and buckled boots, a monocle, "
-            + "rings on his fingers. He holds a small ornate wooden case open in both hands with a soft "
-            + "violet glow spilling out of it, lighting his face from below. Conspiratorial expression. "
-            + `${CHIBI} ${CUTOUT} ${NO_TEXT}`,
+        prompt: housePrompt(
+            "A sly well-dressed fox merchant standing and facing the viewer, seen head to foot. Russet fur, a "
+            + "deep violet velvet coat with gold frogging over dark trousers and buckled boots, a monocle and "
+            + "rings on his fingers. He holds a small ornate wooden case open in both hands with a violet glow "
+            + "spilling out of it, lighting his face from below. Conspiratorial expression.",
+            { framing: "sprite", extra: CHIBI }),
     },
 };
 

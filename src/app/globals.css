@@ -17719,6 +17719,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     /* The walk moves in sixteen small hops a second; this smooths the gaps between them into a stride. */
     transition: left 62ms linear; }
 .cas-other { opacity: .8; }
+/* The room's stacking order, said once rather than left to DOM order: the wall's furniture is behind the
+   machines, the machines are behind the people, and you are in front of everybody. */
+.cas-mach { z-index: 2; }
+.cas-other { z-index: 3; }
+.cas-you { z-index: 4; }
 /* Sized against the cabinet, not against the old box — see the note on .cas-mach. Everybody else is a
    shade smaller than you as well as dimmer, which is the cheapest possible way of saying who the camera
    is following. */
@@ -19799,17 +19804,9 @@ body.cas-seated .social-fab { display: none; }
    pearl lands, so the number changes because something hit it. */
 .s5-fb-mult.is-collecting { animation: s5MultHit .5s cubic-bezier(.2,1.7,.4,1); }
 @keyframes s5MultHit { 0% { transform: scale(1); } 45% { transform: scale(1.3); } 100% { transform: scale(1); } }
-.s5-fb-plus { position: absolute; top: -6px; right: -6px; text-decoration: none;
-    font-size: 10px; font-weight: 900; color: #05231c; padding: 0 5px; border-radius: 999px;
-    background: linear-gradient(180deg, #b6ffe9, #5affd0);
-    box-shadow: 0 0 12px rgba(90,255,208,.95);
-    animation: s5PlusFly .9s cubic-bezier(.2,1.5,.4,1) both; }
-@keyframes s5PlusFly {
-    0% { transform: translate(-18px, 26px) scale(.5); opacity: 0; }
-    40% { transform: translate(0, 0) scale(1.25); opacity: 1; }
-    70% { transform: translate(0, 0) scale(1); opacity: 1; }
-    100% { transform: translate(0, -6px) scale(.9); opacity: 0; }
-}
+/* `.s5-fb-plus` and `@keyframes s5PlusFly` lived here — the "+1" badge that popped onto the
+   medallion. The pearl itself makes the trip now (see .s5-pearlfly), and a number appearing at the
+   same instant as the object that caused it is the same fact told twice. */
 
 /* ── WHAT THE WALL STILL HELD ─────────────────────────────────────────────────────────────────────────
    Luke: "when you lose by picking the other thing it should show what the value of the non-picked eggs
@@ -22218,7 +22215,41 @@ body.cas-seated .social-fab { display: none; }
    arches sit at roughly 0.056, 0.242, 0.425, 0.607 and 0.789 of it. The world is two tiles (see .cas-world),
    so arch N of the first tile is at `(0.056 + 0.183N) / 2` of the world — the second one, which the rope
    hangs on, at 11.8%. That is why VIP_X is 11.8 and not a round number: it is where an arch actually is. */
-.cas-vipdoor { position: absolute; left: 11.8%; bottom: 15%; transform: translateX(-50%); z-index: 3;
+/* ── IT IS A HOLE IN THE WALL, SO IT GOES BEHIND EVERYONE ─────────────────────────────────
+   Luke: "the thingy should render behind the character." It was `z-index: 3` while every other object on the
+   floor — the cabinets, the other members, the hero — sits at `auto`, so the rope and the sign painted over
+   all of them and the player stood BEHIND his own barrier.
+
+   `isolation: isolate` makes the door its own stacking context, so the mask/sign/rope layering inside it
+   stays put without those numbers leaking into the room and beating everything else. Then the room's own
+   order is stated once, here, instead of being an accident of DOM order: wall furniture, machines, other
+   people, you. */
+/* ══ A PEARL FLYING INTO THE MULTIPLIER ══════════════════════════════════════════
+   Luke: "pearls should animate a shiny pearl into the multiplier."
+
+   It was a "+1" text badge popping onto the medallion — which states the fact and shows nothing. The pearl
+   is a DRAWN OBJECT sitting on the reel a couple of inches away, so the honest version is that the object
+   travels: it lifts off the cell it landed on and lands in the number it is about to raise.
+
+   `--dx`/`--dy` are measured at launch from the two real elements (see Slot5), so one keyframe flies a pearl
+   from either outside reel, at any row, at any cabinet size. It arcs rather than sliding — a straight line
+   between two points reads as a UI transition; a lift and a fall reads as a thing being thrown. */
+.s5-pearlfly { position: absolute; z-index: 9; pointer-events: none; aspect-ratio: 1; height: auto;
+    margin: 0; transform-origin: 50% 50%;
+    filter: drop-shadow(0 0 10px rgba(90,255,208,.95));
+    animation: s5PearlFly .85s cubic-bezier(.4,0,.35,1) both;
+    animation-delay: calc(var(--i, 0) * 90ms); }
+@keyframes s5PearlFly {
+    0%   { transform: translate(-50%, -50%) scale(.7); opacity: 0; }
+    14%  { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+    /* The lift: most of the horizontal travel with the pearl still high, so it falls into the medallion. */
+    62%  { transform: translate(calc(-50% + var(--dx) * .68), calc(-50% + var(--dy) * .34)) scale(1.05);
+           opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.42); opacity: 0; }
+}
+
+.cas-vipdoor { position: absolute; left: 11.8%; bottom: 15%; transform: translateX(-50%);
+    z-index: 1; isolation: isolate;
     /* The recess between two pillars, in tile units: about 0.105 of a tile wide and 0.62 of it tall. */
     width: calc(var(--room) * 0.31); height: calc(var(--room) * 0.55);
     -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;

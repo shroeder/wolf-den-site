@@ -240,6 +240,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // What the pearls on THIS spin just added, so the medallion can show the step arriving rather than
     // silently being a different number than it was. Zero means nothing is in flight.
     const [pearlFlew, setPearlFlew] = useState(0);
+    // ── THE PEARL ITSELF FLIES INTO THE MULTIPLIER ─────────────────────────────────────
+    // Luke: "pearls should animate a shiny pearl into the multiplier."
+    //
+    // It was a "+1" text badge popping onto the medallion, which says the same thing and shows nothing. The
+    // pearl is a DRAWN OBJECT and it is sitting on the reel a few inches away, so the honest version is that
+    // the object travels: it lifts off the cell it landed on and lands in the number it is about to raise.
+    //
+    // Measured rather than guessed. Both ends are real elements at spin time, so the flight is computed from
+    // their bounding rects and handed to CSS as a delta — which is the only way to get it right on a grid
+    // that resizes with the cabinet, and it means one keyframe serves a pearl landing anywhere on either
+    // outside reel.
+    const [fliers, setFliers] = useState([]);
+    const multRef = useRef(null);
+    const gridRef = useRef(null);
     // The free round's collector symbol, if this cabinet has one. Null everywhere but The Deep.
     const plusSym = useMemo(() => slot5(machineId).free?.plus?.sym || null, [machineId]);
     // Which reels a collector can land on — The Deep's two outside reels. Marked on the glass for the whole
@@ -736,7 +750,28 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     setPearlFlew(sp.pearls.length * (slot5(machineId).free?.plus?.step || 1));
                     Cas.signature();
                     Haptic.crit();
-                    timers.current.push(setTimeout(() => setPearlFlew(0), 1100));
+                    // One pearl per cell, each measured from where it actually landed to where the number
+                    // actually is. Next frame, so the cells have been painted and their rects are real.
+                    requestAnimationFrame(() => {
+                        const to = multRef.current?.getBoundingClientRect();
+                        const box = gridRef.current?.getBoundingClientRect();
+                        if (!to || !box) return;
+                        setFliers(sp.pearls.map((at, i) => {
+                            const cell = gridRef.current.querySelector(`[data-cell="${at}"]`);
+                            const from = cell?.getBoundingClientRect();
+                            if (!from) return null;
+                            return {
+                                id: `${freeIdx}-${at}-${i}`,
+                                // Positioned inside the grid, so the numbers stay right when the page scrolls.
+                                x: from.left - box.left + from.width / 2,
+                                y: from.top - box.top + from.height / 2,
+                                dx: (to.left + to.width / 2) - (from.left + from.width / 2),
+                                dy: (to.top + to.height / 2) - (from.top + from.height / 2),
+                                size: from.width * 0.62,
+                            };
+                        }).filter(Boolean));
+                    });
+                    timers.current.push(setTimeout(() => { setPearlFlew(0); setFliers([]); }, 1100));
                 } else {
                     setPearlAt([]);
                 }
@@ -993,7 +1028,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 markup — so `~` never matched and nothing has ever dimmed behind a winning line. A state
                 class on the container cannot be defeated by the order of two elements. */}
             <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}${mult >= 5 ? " is-hot" : ""}`}>
-                <div className="s5-grid">
+                <div className="s5-grid" ref={gridRef}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         // ── AND THESE TWO REELS ARE THE ONES THAT PAY THE MULTIPLIER ─────────────
                         // Luke: "I'm not seeing the multipliers in reels 1 and 5 — did you even do that?"
@@ -1052,7 +1087,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
                                     <span className={`s5-cell is-${symbolRole(sym, machineId)}${real && flashSym && sym === flashSym ? " is-flash" : ""}${real && breaking.includes(reel * ROWS + row) ? " is-breaking" : ""}${real && dropping.includes(reel * ROWS + row) ? " is-dropping" : ""}${real && !inRound && lockedAt.includes(reel * ROWS + row) ? " is-locked" : ""}${real && pearlAt.includes(reel * ROWS + row) ? " is-pearled" : ""}${real && tease ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
-                                        key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${Math.max(0, row) * 40}ms` }}>
+                                        key={i} data-cell={row >= 0 ? reel * ROWS + row : undefined}
+                                        style={{ "--tone": symbolTone(sym, machineId), "--drop": `${Math.max(0, row) * 40}ms` }}>
                                         {/* The wild's travelling shine. Its own element because the cell
                                             has already spent ::before on the plate and ::after on the
                                             frame, and a shine needs to clip separately from both. */}
@@ -1117,6 +1153,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         })}
                     </div>
                 ) : null}
+
+                {/* ── THE PEARLS, IN FLIGHT ───────────────────────────────────────────
+                    Above everything, because a pearl travelling to the counter must not be clipped by the
+                    window it is leaving. Each one carries its own start and its own delta — see the launch
+                    in runFree — so the same keyframe flies a pearl from either outside reel, at any row, at
+                    any cabinet size. */}
+                {fliers.map((f, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={f.id} className="s5-pearlfly" alt="" aria-hidden="true" draggable="false"
+                        src={artFor(art, machineId, plusSym)}
+                        style={{
+                            left: `${f.x}px`, top: `${f.y}px`, width: `${f.size}px`,
+                            "--dx": `${f.dx}px`, "--dy": `${f.dy}px`, "--i": i,
+                        }} />
+                ))}
 
                 {/* The winning line, drawn across the window. One at a time — five lines flashing at once is
                     a light show nobody can read, and reading it is the entire point. */}
@@ -1229,10 +1280,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     moment the pearl lands, which is the same fix as the retrigger beat
                                     one layer down: a number that changes because you watched something
                                     hit it is an event, and a number that has simply changed is not. */}
-                                <span className={`s5-fb-mult is-grown${pearlFlew ? " is-collecting" : ""}`}>
+                                <span ref={multRef} className={`s5-fb-mult is-grown${pearlFlew ? " is-collecting" : ""}`}>
                                     <b style={{ "--len": 1 + String(result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1).length }}>
                                         &times;{result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1}</b>
-                                    {pearlFlew ? <u className="s5-fb-plus">+{pearlFlew}</u> : null}
+                                    {/* The "+1" text badge lived here. The pearl itself does the job now —
+                                        see the fliers below — and a number popping on at the same moment as
+                                        the thing that caused it is the same fact told twice. */}
                                 </span>
                             </>
                         ) : <span className="s5-fb-mult">

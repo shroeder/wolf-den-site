@@ -300,13 +300,13 @@ const HARVEST = {
     // Base game 40 per cent of the return, the built round 60, which is what a Pharaoh's-Fortune bonus
     // is supposed to be: the base game keeps you in the chair and the bonus is the payday.
     pays: {
-        wolf: { 3: 5.41, 4: 33.28, 5: 281.84 },
-        chest: { 3: 2.83, 4: 15.21, 5: 102.18 },
-        laurel: { 3: 1.4, 4: 7.05, 5: 40.04 },
-        doubloon: { 3: 0.62, 4: 3.33, 5: 16.61 },
-        bone: { 3: 0.42, 4: 1.77, 5: 8.09 },
+        wolf: { 3: 6.65, 4: 40.9, 5: 346.6 },
+        chest: { 3: 3.48, 4: 18.7, 5: 125.7 },
+        laurel: { 3: 1.72, 4: 8.67, 5: 49.2 },
+        doubloon: { 3: 0.762, 4: 4.09, 5: 20.4 },
+        bone: { 3: 0.516, 4: 2.18, 5: 9.95 },
     },
-    scatterPays: { 3: 0.83, 4: 3.33, 5: 16.61 },
+    scatterPays: { 3: 1.02, 4: 4.09, 5: 16.61 },
     // ── AND IT DOES NOT CASCADE ──────────────────────────────────────────────────────────────────────
     // It used to: every win threshed away, what was above falling into the hole, the multiplier climbing
     // with each break, and eight breaks opening the round. That is The Vault's mechanic and The Vault is
@@ -383,13 +383,13 @@ const DEEP = {
     // The Deep took 99.17% to 118.33% on the fill alone — a low symbol's three-of-a-kind is the most common
     // event on a reel, so it costs far more than its size suggests. Swept: the new bottom rungs are small
     // (Herring 0.14, Mackerel 0.26) and the top four/five came down about 8% to pay for them.
-        wolf: { 3: 18.43, 4: 128.8, 5: 1444.7 },
-        chest: { 3: 5.46, 4: 38.54, 5: 330.8 },
-        laurel: { 3: 1.84, 4: 11.11, 5: 94.37 },
-        doubloon: { 3: 0.23, 4: 4.19, 5: 32.72 },
-        bone: { 3: 0.12, 4: 1.06, 5: 9.17 },
+        wolf: { 3: 21.9, 4: 153.2, 5: 1718.2 },
+        chest: { 3: 6.49, 4: 45.8, 5: 393.4 },
+        laurel: { 3: 2.19, 4: 13.2, 5: 112.2 },
+        doubloon: { 3: 0.274, 4: 4.98, 5: 38.9 },
+        bone: { 3: 0.143, 4: 1.26, 5: 10.9 },
     },
-    scatterPays: { 3: 0.92, 4: 4.19, 5: 27.61 },
+    scatterPays: { 3: 1.09, 4: 4.98, 5: 27.61 },
     // ── THREE STARFISH ON A LINE ─────────────────────────────────────────────────────────────────────
     // Luke, with a reference machine: "you trigger free spins by getting three bonus symbols on a payline,
     // and then you get eight free spins, and wilds once they pop up they stay in place, and then there's a
@@ -409,9 +409,18 @@ const DEEP = {
     // Eight rather than fourteen because the round is now worth far more per spin: sticky wilds on the
     // cabinet with the floor's rarest wild and steepest table compound hard, and a growing multiplier on
     // top of that compounds again. Fourteen of these would be a different machine.
-    free: { kind: "collect", spins: 8, sticky: true,
+    // ── TWELVE, NOT EIGHT ─────────────────────────────────────────────────────────
+    // Eight was tuned when the round retriggered off scatters-anywhere, which on a lineTrigger cabinet fired
+    // constantly — so the round was really eight spins plus a stack of unearned extensions, and the paytable
+    // was priced on the whole of that. Fixing the retrigger (see runFreeSpins) took the cabinet to 60.81% and
+    // dropped the share of money living in its features to 18.81%, against the 30-50% check:slot5 asks for.
+    //
+    // The fix is to make the ROUND worth what it was, not to hand the difference back to the base game: a
+    // sticky-wild round that compounds is the reason to play this machine. Twelve hauls, so the board fills
+    // and the pearls have time to climb.
+    free: { kind: "collect", spins: 12, sticky: true,
         plus: { sym: "plus1", reels: [0, 4], step: 1 },
-        label: "Eight hauls. Every kraken stays, every pearl adds one." },
+        label: "Twelve hauls. Every kraken stays, every pearl adds one." },
 };
 
 const MENAGERIE = {
@@ -477,15 +486,15 @@ const MENAGERIE = {
     pays: {
         // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
         // COMPLETE a line of them, so it must be worth less than the thing it is completing.
-        dire: { 3: 2.53, 4: 15.21, 5: 135.87 },
-        keeper: { 3: 2.2, 4: 12.67, 5: 110.54 },
-        wolf: { 3: 1.33, 4: 7.58, 5: 65.1 },
-        chest: { 3: 0.63, 4: 3.3, 5: 21.67 },
-        laurel: { 3: 0.33, 4: 1.52, 5: 8.63 },
-        doubloon: { 3: 0.16, 4: 0.76, 5: 3.68 },
-        bone: { 3: 0.1, 4: 0.42, 5: 1.72 },
+        dire: { 3: 1.63, 4: 9.8, 5: 87.6 },
+        keeper: { 3: 1.42, 4: 8.17, 5: 71.3 },
+        wolf: { 3: 0.857, 4: 4.89, 5: 42.0 },
+        chest: { 3: 0.406, 4: 2.13, 5: 14.0 },
+        laurel: { 3: 0.213, 4: 0.98, 5: 5.56 },
+        doubloon: { 3: 0.103, 4: 0.49, 5: 2.37 },
+        bone: { 3: 0.064, 4: 0.271, 5: 1.11 },
     },
-    scatterPays: { 3: 0.1, 4: 0.5, 5: 2.58 },
+    scatterPays: { 3: 0.064, 4: 0.322, 5: 2.58 },
     // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
     // "If you trigger the bonus you get a certain amount of free spins depending on how many scatters you
     // get." Three is the door; every one after that is worth a lot more than the last, which is what makes
@@ -553,13 +562,13 @@ const VAULT = {
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 3.28, 4: 25.1, 5: 325.3 },
-        chest: { 3: 0.95, 4: 7.25, 5: 71.6 },
-        laurel: { 3: 0.34, 4: 2.13, 5: 16.9 },
-        doubloon: { 3: 0.15, 4: 0.72, 5: 5.12 },
-        bone: { 3: 0.1, 4: 0.37, 5: 1.49 },
+        wolf: { 3: 3.48, 4: 26.7, 5: 345.5 },
+        chest: { 3: 1.01, 4: 7.69, 5: 76.0 },
+        laurel: { 3: 0.361, 4: 2.26, 5: 18.0 },
+        doubloon: { 3: 0.16, 4: 0.764, 5: 5.44 },
+        bone: { 3: 0.106, 4: 0.393, 5: 1.58 },
     },
-    scatterPays: { 3: 0.7, 4: 3.63, 5: 23.9 },
+    scatterPays: { 3: 0.743, 4: 3.85, 5: 23.9 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -850,9 +859,26 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
             ? { ...evaluate(m, chain.steps[0].grid, { lineBet, mult }), total: chain.total }
             : evaluate(m, grid, { lineBet, mult });
 
-        // RETRIGGER — the same condition that opened the round, whatever this cabinet's is.
+        // ── RETRIGGER, BY THE SAME RULE THAT OPENED THE ROUND ───────────────────────────────
+        // The comment above this line already claimed "the same condition that opened the round, whatever
+        // this cabinet's is" — and then tested `r.scatters >= 3`, which is the SCATTER-ANYWHERE rule. On the
+        // two cabinets that trigger off a PAYLINE (The Harvest and The Deep, `lineTrigger`) that is a
+        // different rule entirely, and it was wrong in both directions at once:
+        //
+        //   Luke: "it's rewarding free spins during the bonus incorrectly — it's doing it as if a scatter,
+        //   but should only be if on a winning payline."
+        //   And: "then it didn't retrigger during the bonus when it should have — I had one two three
+        //   across the top."
+        //
+        // Three moons scattered anywhere paid a retrigger it had not earned; three moons ON THE TOP ROW,
+        // which is a payline and IS the trigger, paid nothing. One wrong test, both symptoms.
+        //
+        // `evaluate` already answers this exactly once, for both kinds of cabinet, and returns it as
+        // `freeSpins`. Asking it rather than re-deriving it here is the whole fix — the rule now cannot
+        // drift between the spin that opens a round and the spin that extends it, because there is only one
+        // of it.
         const deep = Boolean(chain && m.cascade && chain.cascades >= m.cascade.trigger);
-        const again = (r.scatters >= 3 || deep) && left + RETRIGGER <= CEILING;
+        const again = (r.freeSpins || deep) && left + RETRIGGER <= CEILING;
         if (again) { left += RETRIGGER; added += RETRIGGER; }
 
         // ── AND THE ONES THAT JUST LOCKED ────────────────────────────────────────────────────────────────
@@ -1309,9 +1335,18 @@ export const multValue = (s) => MULTS[s] || 0;
 function spinColossal(m, rng, free = false) {
     const giants = m.colossal.giants || [];
     return m.colossal.strips.map((bag, reel) => {
+        // ── THE LAST REEL IS THE MULTIPLIER REEL, ALWAYS ─────────────────────────────────
+        // Luke: "the multipliers are currently exclusive to the bonus, but I want them regardless of bonus
+        // or not."
+        //
+        // It was `free && isLast`, so in the base game the fifth colossal reel was ordinary symbols and the
+        // whole idea — a reel of numbers you watch come to rest — only existed inside a round you reach once
+        // in ninety spins. Now it is what the cabinet IS: every spin has a multiplier reel on the right.
+        //
+        // It is expensive, and the paytable below paid for it rather than the feature being watered down.
         const isLast = reel === REELS - 1;
-        const useBag = free && isLast ? m.colossal.multStrip : bag;
-        const stacks = free && isLast ? m.colossal.multStacks : m.colossal.stacks;
+        const useBag = isLast ? m.colossal.multStrip : bag;
+        const stacks = isLast ? m.colossal.multStacks : m.colossal.stacks;
         const col = stackedColumn(useBag, COLOSSAL_ROWS, rng, stacks, giants);
         // ── A GIANT IS THE WHOLE REEL ────────────────────────────────────────────────────────────────
         // Luke: "the sprite in the big reels needs to be the whole reel — even if it cuts the sprite off,
@@ -1360,8 +1395,9 @@ export function runColossal(m, { lineBet = 1, rng = Math.random, free = false, m
     // mile: the reel is twelve rows deep, so a sum averaged x20 and the cabinet returned 31,000%. A stack
     // still matters under "biggest" — it is what puts a 25x on the screen at all, and it is what makes the
     // reel worth watching as it comes to rest — but twelve cells cannot each multiply your money.
+    // Read on EVERY spin now, not only in the round — see the note in spinColossal.
     let reelMult = 0;
-    if (free) for (const s of col[REELS - 1]) reelMult = Math.max(reelMult, multValue(s));
+    for (const s of col[REELS - 1]) reelMult = Math.max(reelMult, multValue(s));
     const applied = Math.max(1, reelMult);
 
     // Paid separately so the screen can light each set on its own, and so the scatter cannot be paid twice.
@@ -1394,7 +1430,7 @@ export function runColossal(m, { lineBet = 1, rng = Math.random, free = false, m
     }
 
     return {
-        main, col, sent, giants, reelMult: free ? reelMult : 0, applied: free ? applied : 1,
+        main, col, sent, giants, reelMult, applied,
         mainWins: mainWins.wins, colWins: colWins.wins, scatters,
         total: mainWins.total + colWins.total + scatterWin,
         mainTotal: mainWins.total, colTotal: colWins.total, scatterWin,
@@ -1647,10 +1683,22 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
             total += paid * bet;
             winAgain = { paid, cascades: chain.cascades, need: m.winAgain.need,
                 slots: m.winAgain.slots, label: m.winAgain.label, row: nextMeter };
-            nextMeter = [];
+            // ── AND THE TOTAL GOES BACK TO THE TOP LEFT ─────────────────────────────────
+            // Luke: "winning it again should take the total amount won and put it in the top left of the
+            // win it again row."
+            //
+            // It used to clear to empty, so the biggest thing that happens on this cabinet ended with a
+            // blank row and nothing to show for it. Seeding the next row with what you just won is what
+            // makes the meter a RUN rather than a series of unrelated cycles: the 19 you just collected is
+            // the first rung of the next one, and a good fire leaves you already halfway to the next.
+            //
+            // It compounds, which is the point and also the cost — see the paytable note; the sweep pays
+            // for it.
+            nextMeter = [paid];
+            return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain,
+                meter: nextMeter.slice(0, m.winAgain.slots), total, bet };
         }
-        // AND THEN THIS SPIN GOES ON. After a fire the row is empty, so this spin starts the next one —
-        // which is the right shape: you have just been paid out and you are building again from your own win.
+        // A spin that did not fire pushes its own win on and ages the rest one place along.
         nextMeter = [Math.max(0, reelWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
     }
     return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter, total, bet };
