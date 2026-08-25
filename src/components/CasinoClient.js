@@ -1797,7 +1797,11 @@ export default function CasinoClient({ initial }) {
                                         return (
                                             <span key={`${row}-${col}`}
                                                 className={`cas-bcell${hit || burning ? " is-hit" : ""}${burning ? " is-burnt" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}`}>
-                                                {card ? (n === 0 ? "★" : n) : ""}
+                                                {/* The number is wrapped so it can sit ABOVE the flame.
+                                                    A bare text node cannot take a z-index, and the flame
+                                                    is absolutely positioned and later in the DOM, so it
+                                                    would paint straight over the digit it is lighting. */}
+                                                <b className="cas-bnum">{card ? (n === 0 ? "★" : n) : ""}</b>
                                                 {burning ? <i className="cas-flame" aria-hidden="true" /> : null}
                                             </span>
                                         );

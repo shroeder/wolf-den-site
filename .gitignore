@@ -24,6 +24,8 @@ scripts/_tmp-*.mjs
 
 # throwaway session-minting helpers used by the shot rig; never committed
 scripts/_*.mjs
+# and the throwaway HTML fixtures the shot rig points at for owner-gated screens
+scripts/_*.html
 .vault-art/
 .harvest-art/
 .bingo-art/

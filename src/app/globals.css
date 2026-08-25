@@ -17846,18 +17846,61 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-pull:active:not(:disabled) { transform: translateY(2px);
     box-shadow: 0 2px 8px rgba(180,120,20,0.4); }
 
-/* ── THE WHEEL ───────────────────────────────────────────────────────────────────────────────────────
-   Twenty pockets drawn as a ring of segments rather than a spinning disc: the pocket that came up is
-   what matters, and a real rotation would need the wheel to stop on a known index, which is animation
-   work for information a highlight already carries. The two wolf pockets are visible on purpose — the
-.cas-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 12px 0 8px; }
-.cas-num { aspect-ratio: 1; border-radius: 7px; font-size: 11px; font-weight: 900; cursor: pointer;
-    color: #98a0aa; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
-.cas-num.is-mine { color: #eaf1f8; border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); background: color-mix(in srgb, var(--acc, #ffd75e) 12%, transparent); }
-.cas-num.is-drawn { color: #cbd3dc; background: rgba(169,130,255,0.22); border-color: rgba(169,130,255,0.5); }
-.cas-num.is-hit { color: #22180a; border-color: transparent;
-    background: linear-gradient(180deg, var(--acc, #ffd75e), color-mix(in srgb, var(--acc, #ffd75e) 58%, #000));
-    box-shadow: 0 0 14px color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); animation: casHit .34s cubic-bezier(.2,1.5,.3,1) both; }
+/* ── THE KENO BOARD, AND THIRTEEN LINES OF DEAD CSS ──────────────────────────────
+   A comment block describing THE WHEEL used to start here and was never closed. The wheel's rules were
+   deleted at some point and its closing marker went with them, so everything from `.cas-grid` down to
+   `@keyframes casHit` — the entire keno number board — sat inside an unterminated comment and never
+   reached the browser. Confirmed in the built bundle: `.cas-grid` and `.cas-num` are not in it at all,
+   while `.cas-bcell` twenty lines further down is.
+
+   That is the real reason keno looked the way it did. The board was not under-designed, it was UNSTYLED:
+   forty native <button> elements at their user-agent default, which is why they were white, why they were
+   different widths, and why they wrapped into ragged rows of thirteen instead of the eight this rule has
+   been asking for all along. Luke's screenshot showed exactly that and I first read it as a styling opinion.
+
+   The lesson worth keeping is that CSS fails SILENTLY and generously: no error, no warning, no missing
+   file — the rules simply are not there, and the page still renders, just wrong. Only a screenshot catches
+   it, and only if somebody looks at the right part of it.
+
+   A real keno board is a backlit cabinet: dark glass, numbers as lamps behind it, and the ones that came
+   out are the only lit things in the room. So every number is a lamp with four states, ordered by how much
+   you care — off, yours, drawn, and yours-and-drawn. Only the last one blazes, because that is the one you
+   are hunting and everything else on the board is context for it. */
+.cas-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 4px 0 2px;
+    padding: 9px 8px; border-radius: 13px;
+    background:
+        radial-gradient(120% 90% at 50% 0%, rgba(103,227,208,.07), transparent 60%),
+        linear-gradient(180deg, #0a1418, #060d10);
+    border: 1px solid rgba(103,227,208,.16);
+    box-shadow: inset 0 3px 14px rgba(0,0,0,.85), inset 0 0 0 1px rgba(0,0,0,.5); }
+
+/* A lamp that is off. Barely there — it is the dark the lit ones are read against. */
+.cas-num { aspect-ratio: 1; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+    display: grid; place-items: center; -webkit-appearance: none; appearance: none;
+    color: #55636e; border: 1px solid rgba(255,255,255,.06);
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+    transition: color .16s ease, background .16s ease, box-shadow .16s ease, transform .16s ease; }
+.cas-num:disabled { cursor: default; }
+.cas-num:active:not(:disabled) { transform: translateY(1px); }
+
+/* YOURS. Chosen but not yet called — an outline, not a fill, so it cannot be mistaken for a result. */
+.cas-num.is-mine { color: #bfe8ff;
+    border-color: rgba(103,227,208,.65);
+    background: linear-gradient(180deg, rgba(103,227,208,.16), rgba(103,227,208,.06));
+    box-shadow: inset 0 0 0 1px rgba(103,227,208,.25); }
+
+/* DRAWN, but not yours. Lit cold and pale: it happened, it is not about you. */
+.cas-num.is-drawn { color: #dbe6f2;
+    border-color: rgba(255,255,255,.28);
+    background: linear-gradient(180deg, #4d5a6b, #2a3340);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+
+/* YOURS AND DRAWN. The whole game. It is the only thing on the board that burns. */
+.cas-num.is-hit { color: #06221c; border-color: rgba(180,255,235,.9);
+    background: linear-gradient(180deg, #d9fff5, #5affd0 52%, #12b9a0);
+    box-shadow: 0 0 18px rgba(90,255,208,.95), inset 0 1px 0 rgba(255,255,255,.7);
+    animation: casHit .34s cubic-bezier(.2,1.5,.3,1) both; }
 @keyframes casHit { from { transform: scale(.6); } to { transform: none; } }
 
 /* ── WHAT YOU WON THAT WAS NOT GOLD ──────────────────────────────────────────────────────────────────
@@ -18101,6 +18144,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
 .cas-bcard { margin-top: 5px; }
 .cas-bcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    /* `relative` + `overflow: hidden` so the dragon's flame is drawn inside the square it set alight and
+       cannot bleed onto its neighbours — see .cas-flame. */
+    position: relative; overflow: hidden;
     border-radius: 8px; font-size: 13px; font-weight: 800; color: #cbd3dc;
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
     transition: background .18s ease, color .18s ease, transform .18s ease; }
@@ -22044,19 +22090,31 @@ body.cas-seated .social-fab { display: none; }
    `--flip` mirrors the sprite for a right-to-left pass. A dragon flying backwards is the single most
    noticeable thing a sprite can do wrong, and it is one multiply to get right. */
 .cas-bcard { position: relative; }
+/* ── AND THE PATH IS IN LEFT/TOP, NOT IN TRANSLATE ────────────────────────────────────
+   The first cut animated `translate(var(--x1), var(--y1))` with the endpoints as percentages of the card,
+   and the dragon sat in the top-left corner and barely moved. A PERCENTAGE IN `translate()` RESOLVES
+   AGAINST THE ELEMENT'S OWN SIZE, not against its positioned ancestor — so "fly to 90% across the card"
+   was being read as "move 90% of your own width", which for a sprite 30% as wide as the card is a third of
+   the distance intended, from the wrong origin.
+
+   `left` and `top` percentages DO resolve against the positioned ancestor, which is the card. So the path
+   lives there and the transform is left to do the two things it is actually good at: the mirror and the
+   scale. Animating left/top is the slower of the two, and for one element for 1.25 seconds that is not a
+   trade worth thinking about. Caught by filming it. */
 .cas-dragon { position: absolute; z-index: 5; pointer-events: none;
-    left: 0; top: 0; width: 30%; aspect-ratio: 1; margin: -15% 0 0 -15%;
+    width: 30%; aspect-ratio: 1; margin: -15% 0 0 -15%;
+    left: var(--x1); top: var(--y1);
     background: url("/images/casino/bingo-dragon.webp") center/contain no-repeat;
     filter: drop-shadow(0 0 18px rgba(255,140,40,.85));
     animation: casDragonFly 1.25s cubic-bezier(.35,0,.5,1) both; }
 @keyframes casDragonFly {
-    0%   { transform: translate(var(--x1), var(--y1)) scaleX(var(--flip)) scale(.45); opacity: 0; }
+    0%   { left: var(--x1); top: var(--y1); transform: scaleX(var(--flip)) scale(.45); opacity: 0; }
     18%  { opacity: 1; }
     82%  { opacity: 1; }
-    100% { transform: translate(var(--x2), var(--y2)) scaleX(var(--flip)) scale(1.05); opacity: 0; }
+    100% { left: var(--x2); top: var(--y2); transform: scaleX(var(--flip)) scale(1.05); opacity: 0; }
 }
 /* The card dims a shade while the pass is happening, so the fire is the brightest thing on it. */
-.cas-bcard.is-burning .cas-bcell:not(.is-burnt) { filter: brightness(.72); transition: filter .3s ease; }
+.cas-bcard.is-burning .cas-bcell:not(.is-burnt) { filter: brightness(.78); transition: filter .3s ease; }
 
 /* ── A SQUARE THAT CAUGHT ───────────────────────────────────────────────
    It is marked exactly as a drawn square is, because it IS one — the fire is a second way to HAVE a
@@ -22072,12 +22130,20 @@ body.cas-seated .social-fab { display: none; }
     45% { transform: scale(1.28); }
     100% { transform: scale(1); }
 }
-.cas-flame { position: absolute; inset: -18% -10% 40% -10%; pointer-events: none; border-radius: 50%;
-    background: radial-gradient(ellipse at 50% 100%, rgba(255,214,120,.95), rgba(255,120,30,.55) 45%, transparent 72%);
-    animation: casFlame .7s ease-in-out infinite alternate; }
+/* CONTAINED. The first cut used negative insets and a wide soft radial, and at card size that is not a
+   flame on a square — it is an orange smear across three of them, which made the whole card look washed
+   out and made it impossible to tell which squares had actually caught. It lives inside its own cell now
+   (`.cas-bcell` is `overflow: hidden`), sits along the bottom edge where a flame belongs, and the licking
+   is done by scaling it rather than by growing past the tile. */
+/* The digit, lifted over the flame. See the note in CasinoClient. */
+.cas-bnum { position: relative; z-index: 1; font: inherit; color: inherit; }
+.cas-flame { position: absolute; left: 8%; right: 8%; bottom: 0; height: 62%; pointer-events: none; z-index: 0;
+    transform-origin: 50% 100%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,236,190,.95) 0%, rgba(255,150,50,.7) 38%, transparent 70%);
+    animation: casFlame .55s ease-in-out infinite alternate; }
 @keyframes casFlame {
-    from { transform: scaleY(.82) translateY(2px); opacity: .75; }
-    to   { transform: scaleY(1.12) translateY(-2px); opacity: 1; }
+    from { transform: scaleY(.78) scaleX(.94); opacity: .7; }
+    to   { transform: scaleY(1.06) scaleX(1.04); opacity: 1; }
 }
 
 /* The owner's strip, matched to the one on the five-reel cabinets so a forced feature always looks like a
