@@ -76,6 +76,14 @@ function forcedSpin(m, stake, offerId, want, meter = []) {
         // The Vault's two. Three moons is the rarest trigger on that cabinet and three tumbles in one spin is
         // not much commoner — neither is something to sit and wait for while judging how it lands.
         if (want === "gems" && p.gems) return p;
+        // ── THE COLOSSAL CABINET'S TWO ───────────────────────────────────────────────────────────────
+        // `free` already matches its bonus, since playColossal returns a free round in the same field. These
+        // two are the things the free round cannot be relied on to show: a WILD COLUMN CROSSING from the
+        // small board to the big one — the whole point of the machine, and a full column on a 5x3 is rare —
+        // and a five-of-a-kind of one of the giants, which is the top of the paytable and the thing anybody
+        // playing it is actually hunting.
+        if (want === "send" && (p.colossal?.sent || []).length) return p;
+        if (want === "giant" && (p.colossal?.colWins || []).some((w) => (w.symbol === "keeper" || w.symbol === "dire") && w.count >= 4)) return p;
         if (want === "winagain" && p.winAgain) return p;
         if (want === "tease") {
             const targets = [{ sym: m.scatter, need: 3 },

@@ -743,6 +743,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                             : "SPIN"}
                     </button>
                 </div>
+
+                {/* ⚠ OWNER ONLY — REMOVE BEFORE THE FLOOR OPENS. This screen shipped without one, which made
+                    the most elaborate bonus on the floor the one nobody could look at: it opens one spin in
+                    thirty-six, and its two best moments — a wild column crossing from the small board to the
+                    big one, and five of a giant down a line — are rarer again. Forcing re-rolls a REAL spin
+                    until it lands what was asked for, the same as every other cabinet: no special-case code
+                    anywhere near the money, and the gate is server-side. */}
+                {owner ? (
+                    <div className="s5-owner">
+                        <i>owner</i>
+                        <button type="button" className="s5-f-free" disabled={locked} onClick={() => pull("free")}>Force free spins</button>
+                        <button type="button" className="s5-f-again" disabled={locked} onClick={() => pull("send")}>Force wild transfer</button>
+                        <button type="button" className="s5-f-hoard" disabled={locked} onClick={() => pull("giant")}>Force giant line</button>
+                    </div>
+                ) : null}
             </div>
         );
     }

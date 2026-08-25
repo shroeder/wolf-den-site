@@ -648,9 +648,16 @@ export async function sendTownChat(buyerId, body, channel = "global") {
     // the member has earned, the same list the tab was drawn from.
     const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
     if (chan !== "global") {
-        const { standingFor, channelsFor } = await import("@/lib/marketplace/roles.js");
+        const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);
         if (!channelsFor(buyerId, roles).includes(chan)) return { ok: false, error: "not_in_channel" };
+        // ── WRITING IS ARRIVING ──────────────────────────────────────────────────────────────────────────
+        // The join row is normally created by the first READ of a room, and the window starts there. Post
+        // before you have ever opened the room and the row gets stamped AFTER your own message, so the feed
+        // filters it out and you have just talked to a wall — which is exactly what the first person into
+        // the staff room did while I was testing it. Speaking is arriving too, and it has to be recorded
+        // before the message it is arriving with.
+        await joinedAt(buyerId, chan);
     }
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
