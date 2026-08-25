@@ -81,7 +81,66 @@ export const CHIP_STORE = [
     { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 300000,
         blurb: "The rarest object on the floor. A one percent tail on the rarest tier in the game." },
 ];
-export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id) || null;
+// ── AND THE VENDOR BEHIND THE ROPE ─────────────────────────────────────────────────────
+// Luke: "a VIP only vendor next to the bartender — he has a secret list of things that you can only get from
+// him if you're in the VIP room, that you spend your chips to get, like maybe two or three unique pets."
+//
+// The SAME shelf machinery, with a flag. `vip: true` items are refused by buyWithChips unless the buyer has
+// VIP standing at the moment of purchase, and they never appear on the Counter's list at all — a shelf that
+// shows you three things you cannot buy is a shelf that exists to make you feel outside.
+//
+// These are the only `once` items left in the file, and correctly so: a pet is a thing you either own or do
+// not, and the partial unique index in migration 398 enforces it server-side.
+//
+// PRICED AGAINST THE CHESTS, which is the only honest reference now that the Counter sells nothing else. A
+// Mythic chest is 10,500; the cheapest pet here is worth about four of them and the dearest about fourteen.
+// They pay nothing and do nothing — Luke, on wiring luck to them: "nevermind don't do the luck" — so what
+// they cost is entirely a statement about what they ARE, which is the last thing left to buy.
+export const VIP_STORE = [
+    { id: "vip_ferret", kind: "pet", ref: "house_ferret", name: "The House Ferret", price: 40000, once: true, vip: true,
+        blurb: "Knows which floorboard the chips roll under." },
+    { id: "vip_lynx", kind: "pet", ref: "velvet_lynx", name: "Velvet Lynx", price: 90000, once: true, vip: true,
+        blurb: "Has never once been asked to leave." },
+    { id: "vip_crane", kind: "pet", ref: "midnight_crane", name: "Midnight Crane", price: 150000, once: true, vip: true,
+        blurb: "Stands at the end of the bar and misses nothing." },
+];
+
+// Both shelves are looked up through one function, because `chipItem` is what buyWithChips validates against
+// and a second lookup table is how an item becomes purchasable from the wrong room.
+export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id)
+    || VIP_STORE.find((i) => i.id === id)
+    || null;
+
+// ── WHAT THE FLOOR'S OWN TROPHIES ARE WORTH AT THE COUNTER ────────────────────────────────
+// Luke: "the pets and the badges that you get from the casino should give you casino benefits like discounts."
+// (He also asked for a luck bonus and then withdrew it — "nevermind don't do the luck" — so there is none,
+// and nothing in this file touches a payout table.)
+//
+// A DISCOUNT IS THE SAFE LEVER, and it is worth being precise about why, because the obvious alternative is
+// not. Anything that raises what a machine RETURNS has to be re-priced against the ceiling every time a new
+// perk is added, and check:casino exists because that is exactly how a floor turns into a money printer. A
+// discount cannot do that: it moves what chips BUY, which is a number priced by hand in this file and nowhere
+// else. The worst case is that chests get cheaper, which is a thing anybody can see and reverse in one line.
+//
+// SMALL, AND CAPPED HARD. Owning all five casino pets and all nine casino badges is a very long road and it
+// comes to 15% off — about a rung and a half down the chest ladder. Big enough to be worth having, nowhere
+// near big enough to be the reason to chase them.
+export const DISCOUNT_PER_PET = 0.015;
+export const DISCOUNT_PER_BADGE = 0.005;
+export const DISCOUNT_MAX = 0.15;
+
+/**
+ * What this member pays, as a fraction off. Rounded DOWN to whole chips at the point of sale so a discount
+ * can never produce a fractional price, and clamped so no future badge can push it past the cap by accident.
+ */
+export function counterDiscount({ pets = 0, badges = 0 } = {}) {
+    const raw = (Number(pets) || 0) * DISCOUNT_PER_PET + (Number(badges) || 0) * DISCOUNT_PER_BADGE;
+    return Math.max(0, Math.min(DISCOUNT_MAX, raw));
+}
+
+/** The price after the discount. One function, used by the shelf AND by the till — see the note in
+ *  chip-store.js about what happens when a screen and a payment path each do their own arithmetic. */
+export const pricedFor = (price, discount) => Math.max(1, Math.round(Number(price) * (1 - (discount || 0))));
 
 // ── THE LEDGER ───────────────────────────────────────────────────────────────────────────────────────────────
 /**
@@ -231,23 +290,68 @@ const STAT_WORDS = {
 };
 const statLabel = (k) => STAT_WORDS[k] || k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
+// ── THE TROPHIES THIS MEMBER ACTUALLY HOLDS ───────────────────────────────────────────
+// Counted from the two tables that already own the answer rather than from any tally of our own — a counter
+// the store keeps for itself is a counter that can disagree with what somebody actually owns, and this one
+// decides what they pay.
+//
+// Both queries are pinned to the CASINO's own ids: `casino_%` badges and the five `casinoExclusive` pets. A
+// discount that quietly counted every badge in the game would grow every time anybody shipped one.
+export async function casinoTrophies(buyerId) {
+    if (!buyerId) return { pets: 0, badges: 0 };
+    const { COLLECTIBLES } = await import("@/lib/marketplace/collectibles.js");
+    const casinoPets = COLLECTIBLES.filter((c) => c.casinoExclusive).map((c) => c.id);
+    const [pets, badges] = await Promise.all([
+        db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_cosmetic_unlock
+              WHERE buyer_id = $1 AND category = 'pet' AND ref = ANY($2)`,
+            [buyerId, casinoPets],
+        ).catch(() => null),
+        db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug LIKE 'casino\\_%'`,
+            [buyerId],
+        ).catch(() => null),
+    ]);
+    return { pets: Number(pets?.n || 0), badges: Number(badges?.n || 0) };
+}
+
 /**
  * The shelf as this member sees it: once-only things they already own are marked rather than hidden, because
  * a shelf that quietly shrinks reads as things going missing.
+ *
+ * `vip` selects WHICH shelf. The Counter never lists the vendor's pets and the vendor never lists chests —
+ * two rooms, two lists, one set of machinery. Showing the VIP items greyed out on the public Counter was the
+ * obvious alternative and it is the wrong one: a shelf whose job is to show you three things you cannot buy
+ * exists to make you feel outside.
  */
-export async function chipShelf(buyerId) {
-    const [balance, owned] = await Promise.all([chipBalance(buyerId), ownedOnce(buyerId)]);
-    const details = await Promise.all(CHIP_STORE.map((i) => detailFor(i).catch(() => null)));
+export async function chipShelf(buyerId, { vip = false } = {}) {
+    const list = vip ? VIP_STORE : CHIP_STORE;
+    const [balance, owned, trophies] = await Promise.all([
+        chipBalance(buyerId), ownedOnce(buyerId), casinoTrophies(buyerId),
+    ]);
+    const discount = counterDiscount(trophies);
+    const details = await Promise.all(list.map((i) => detailFor(i).catch(() => null)));
     return {
         balance,
+        // What the floor's own trophies are taking off, and what earned it — a discount nobody can see the
+        // source of is a discount nobody believes they have, which is the same argument as the pet rail at
+        // the top of the casino screen.
+        discount,
+        trophies,
         // The rate goes with the shelf so the screen can print the GOLD behind every price without keeping
         // its own copy of it. A second copy is a shelf that lies the day the rate moves — and it moved once
         // already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started quoting prices
         // three times too low.
         rate: CHIP_RATE,
-        items: CHIP_STORE.map((i, n) => ({
-            id: i.id, kind: i.kind, name: i.name, blurb: i.blurb, price: i.price,
-            once: Boolean(i.once), owned: owned.has(i.id), afford: balance >= i.price,
+        items: list.map((i, n) => ({
+            id: i.id, kind: i.kind, name: i.name, blurb: i.blurb,
+            // `price` is what it COSTS THIS MEMBER, and `was` is the list price when the two differ. The till
+            // recomputes the same number from the same function rather than trusting this one — see
+            // buyWithChips. A screen and a payment path doing their own arithmetic is how somebody gets
+            // charged a price they were never shown.
+            price: pricedFor(i.price, discount),
+            was: discount > 0 ? i.price : null,
+            once: Boolean(i.once), owned: owned.has(i.id), afford: balance >= pricedFor(i.price, discount),
             ...(details[n] || {}),
             // The shelf's own blurb wins over the catalogue's — it is written for this counter.
             blurb: i.blurb,

@@ -6,7 +6,9 @@
 // saying "I bought the thing and it isn't there".
 //
 // The first cut of that shelf invented EVERY id on it. This is the check that caught it.
-import { CHIP_STORE, CHIP_RATE } from "../src/lib/marketplace/chips.js";
+import {
+    CHIP_STORE, VIP_STORE, CHIP_RATE, DISCOUNT_MAX, counterDiscount, pricedFor,
+} from "../src/lib/marketplace/chips.js";
 import { DECORATIONS } from "../src/lib/marketplace/decorations.js";
 import { GEMS } from "../src/lib/marketplace/gems.js";
 import { CONSUMABLES } from "../src/lib/marketplace/consumables.js";
@@ -24,7 +26,10 @@ const chests = new Set(Object.keys(CHEST_TIERS));
 const problems = [];
 const seen = new Set();
 
-for (const item of CHIP_STORE) {
+// BOTH SHELVES. The VIP vendor is the same machinery behind a flag, and an item nobody can see is exactly
+// the item whose broken ref nobody would ever notice — it would sit there taking chips from the three people
+// allowed to reach it. Checked together so a shelf cannot be added without being checked.
+for (const item of [...CHIP_STORE, ...VIP_STORE]) {
     if (seen.has(item.id)) problems.push(`two shelf entries share the id "${item.id}"`);
     seen.add(item.id);
     if (!(item.price > 0)) problems.push(`${item.id} is priced at ${item.price}`);
@@ -57,10 +62,32 @@ for (const item of CHIP_STORE) {
 // ── AND WHAT THE SHELF COSTS IN GOLD ─────────────────────────────────────────────────────────────────────────
 // The only reason anybody can judge these prices. A chip is minted at CHIP_RATE per gold staked and the
 // machines return 1.00x of that, so the gold behind a price is simply price / CHIP_RATE.
+// ── AND THE DISCOUNT CANNOT RUN AWAY ─────────────────────────────────────────────────────────────────────────
+// The floor's own trophies take a little off every price (counterDiscount). It is capped, and this is what
+// proves the cap holds against the whole set rather than against the numbers somebody had in mind: every
+// casino pet and every casino badge that exists today, counted, priced, and compared.
+{
+    const allPets = 5;      // the casinoExclusive five in collectibles.js
+    const allBadges = 9;    // casino_% badges, including casino_vip_room
+    const worst = counterDiscount({ pets: allPets, badges: allBadges });
+    if (worst > DISCOUNT_MAX + 1e-9) {
+        problems.push(`owning everything gives ${(worst * 100).toFixed(1)}% off, past the ${(DISCOUNT_MAX * 100).toFixed(0)}% cap`);
+    }
+    // A discount that can reach a free chest is not a discount, it is a second currency.
+    if (worst >= 0.5) problems.push(`the discount reaches ${(worst * 100).toFixed(0)}% — that is a sale, not a perk`);
+    const cheapest = Math.min(...CHIP_STORE.map((i) => i.price), ...VIP_STORE.map((i) => i.price));
+    if (pricedFor(cheapest, worst) < 1) problems.push("the discount can price something at nothing");
+    console.log(`  every trophy owned (${allPets} pets, ${allBadges} badges) is ${(worst * 100).toFixed(1)}% off, cap ${(DISCOUNT_MAX * 100).toFixed(0)}%
+`);
+}
+
 console.log(`  a chip is ${CHIP_RATE} per gold staked — so ${Math.round(1 / CHIP_RATE)} gold through a machine is 1 chip\n`);
 console.log(`  ${"item".padEnd(28)} ${"chips".padStart(6)}   ${"gold behind it".padStart(15)}`);
-for (const item of [...CHIP_STORE].sort((a, b) => a.price - b.price)) {
-    console.log(`  ${item.name.padEnd(28)} ${String(item.price).padStart(6)}   ${Math.round(item.price / CHIP_RATE).toLocaleString().padStart(15)}`);
+for (const [where, list] of [["THE COUNTER", CHIP_STORE], ["BEHIND THE ROPE", VIP_STORE]]) {
+    console.log(`  ── ${where}`);
+    for (const item of [...list].sort((a, b) => a.price - b.price)) {
+        console.log(`  ${item.name.padEnd(28)} ${String(item.price).padStart(6)}   ${Math.round(item.price / CHIP_RATE).toLocaleString().padStart(15)}`);
+    }
 }
 
 if (problems.length) {
@@ -68,5 +95,5 @@ if (problems.length) {
     for (const p of problems) console.log(`  ✗ ${p}`);
     process.exit(1);
 }
-console.log(`\ncheck:chips — all ${CHIP_STORE.length} items on the counter name something that exists.`);
+console.log(`\ncheck:chips — all ${CHIP_STORE.length + VIP_STORE.length} items on the two shelves name something that exists.`);
 process.exit(0);

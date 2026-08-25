@@ -1181,8 +1181,27 @@ export async function settleKeno(buyerId) {
 // be a member standing outside the room.
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
 
-export async function moveCasino(buyerId, { x, y, facing } = {}) {
+/**
+ * Walk. `zone` is which room you are visible in — the floor by default, the VIP lounge when the lounge says so.
+ *
+ * ── AND THE ZONE IS NEVER TAKEN FROM THE CALLER WITHOUT A CHECK ───────────────────────────────
+ * The only value other than the floor this will accept is the lounge, and only for somebody who may actually
+ * be in it. That check is here rather than at the route because this function is the ONE thing that writes the
+ * zone column: a member's position row is what every "who else is here" query reads, so an unchecked zone in a
+ * POST body would let anybody appear inside the VIP room to everybody standing in it — without ever passing
+ * the door, and while still being unable to read a word of its chat. A ghost in a private room is a worse bug
+ * than an open door, because nothing about it looks broken.
+ */
+export async function moveCasino(buyerId, { x, y, facing, zone } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    let where = CASINO_ZONE;
+    if (zone && zone !== CASINO_ZONE) {
+        const { VIP_ZONE, vipStanding } = await import("@/lib/marketplace/vip.js");
+        if (zone !== VIP_ZONE) return { ok: false, error: "bad_zone" };
+        const { vip } = await vipStanding(buyerId);
+        if (!vip) return { ok: false, error: "not_vip" };
+        where = VIP_ZONE;
+    }
     const cx = clampN(x, 4, 96);
     const cy = clampN(y, 55, 90);
     const f = facing === -1 ? -1 : 1;
@@ -1190,7 +1209,7 @@ export async function moveCasino(buyerId, { x, y, facing } = {}) {
         `INSERT INTO mkt_town_presence (buyer_id, x, y, facing, zone, updated_at)
          VALUES ($1, $2, $3, $4, $5, NOW())
          ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, zone = $5, updated_at = NOW()`,
-        [buyerId, cx, cy, f, CASINO_ZONE],
+        [buyerId, cx, cy, f, where],
     ).catch(() => {});
     return { ok: true };
 }

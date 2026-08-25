@@ -11,6 +11,9 @@ import { buyWithChips } from "@/lib/marketplace/chip-store.js";
 // between the two would be a runtime landmine in a serverless bundle rather than a compile error.
 import { blackjackState, dealBlackjack, doubleBlackjack, hitBlackjack, splitBlackjack, standBlackjack } from "@/lib/marketplace/blackjack.js";
 import { bingoState, buyBingoCard } from "@/lib/marketplace/bingo.js";
+import {
+    VIP_ZONE, clearVipNote, enterVipLounge, leaveVipNote, vipLoungeState, vipShadows, vipStanding,
+} from "@/lib/marketplace/vip.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -35,10 +38,19 @@ export async function GET(request) {
         try {
             const buyer = await gate();
             if (!buyer) return noStore({ open: false });
-            const [floor, table, hall] = await Promise.all([
+            // ── AND WHETHER THE ROPE OPENS FOR YOU ────────────────────────────────────
+            // `shadows` is anonymous on purpose — positions only, no names and no ids. Everybody on the floor
+            // can see it, and "who is in the VIP room right now" is not something the floor is entitled to
+            // know about a member. What it gets is the shape of a room with people in it, which is all the
+            // door needs to say.
+            const [floor, table, hall, standing, shadows] = await Promise.all([
                 getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(),
+                vipStanding(buyer.id), vipShadows(),
             ]);
-            return noStore({ open: true, ...floor, blackjack: table, bingo: hall });
+            return noStore({
+                open: true, ...floor, blackjack: table, bingo: hall,
+                vip: { allowed: standing.vip, shadows },
+            });
         } catch (error) {
             return internalError(error, { event: "marketplace.casino.state.failure" });
         }
@@ -66,7 +78,9 @@ export async function POST(request) {
                     return noStore(await spinSlot5(buyer.id, { bet: b?.bet, machine: b?.machine, offerId: b?.offer, force: b?.force }));
                 // ── THE COUNTER ── the shelf, and buying off it. The price is read from the catalog in code,
                 // never from the body; `item` is only a key.
-                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id)) });
+                // `vip: true` asks for the VENDOR's list instead of the Counter's. chipShelf refuses nothing
+                // by itself — the till is where a VIP item is gated — but the two rooms show two lists.
+                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id, { vip: b?.vip === true })) });
                 case "chip_buy": return noStore(await buyWithChips(buyer.id, String(b?.item || "")));
                 // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets
@@ -97,6 +111,20 @@ export async function POST(request) {
                     return noStore(await buyBingoCard(buyer.id, {
                         bet: b?.bet, force: isOwner(buyer.id) && b?.force === "dragon",
                     }));
+                // ── BEHIND THE ROPE ───────────────────────────────────────────────────
+                // Every one of these re-checks VIP standing inside the lib rather than here, and that is
+                // deliberate rather than sloppy: the gate guards a PRIVATE CHAT, and a check that runs at
+                // the door and then trusts a flag is a door somebody walks through once and stays behind
+                // forever — including after they stop qualifying. See vipStanding.
+                case "vip_enter": return noStore(await enterVipLounge(buyer.id));
+                case "vip_state": return noStore(await vipLoungeState(buyer.id));
+                case "vip_note": return noStore(await leaveVipNote(buyer.id, b?.body));
+                case "vip_note_clear": return noStore(await clearVipNote(buyer.id));
+                // Walking about in the lounge. Its own verb rather than a flag on `move`, because the zone
+                // is what decides which room you are visible in — and one verb that can write either zone
+                // from a POST body is one verb that can put somebody in a room they cannot enter.
+                case "vip_move":
+                    return noStore(await moveCasino(buyer.id, { x: b?.x, y: b?.y, facing: b?.facing, zone: VIP_ZONE }));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

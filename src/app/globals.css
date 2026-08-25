@@ -17546,8 +17546,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
        cabinets standing in front of them, which reads as a doll house. The overflow crops the dead
        cornice off the top, which is the half of the picture nothing was using. */
     background: url("/images/casino/room.webp") repeat-x left 82% / auto 122%; }
-@media (min-width: 700px) { .cas-world { width: 326%; } }
-@media (min-width: 1024px) { .cas-world { width: 264%; } }
+/* ── AND IT GREW A BAY AT THE NEAR END ─────────────────────────────────────────────────
+   Luke: "extend the background a little bit and add a VIP only section." 540% -> 620%, and the nine machines
+   were re-spaced from 8..96 at 11 apart to 20..92 at 9 apart (see MACHINES in CasinoClient). Those two
+   numbers go together: 9 points of a 620% world is the same walk as 11 points of a 540% one, so the floor
+   crosses exactly as it did and everything below 14 is new room. The wall is `repeat-x`, so it simply
+   continues — there was nothing to redraw. */
+.cas-world { width: max(620%, calc(var(--room) * 7.3)); }
+@media (min-width: 700px) { .cas-world { width: 374%; } }
+@media (min-width: 1024px) { .cas-world { width: 303%; } }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
    the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
    that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of
@@ -22156,3 +22163,189 @@ body.cas-seated .social-fab { display: none; }
     font-weight: 800; color: #ffc9d4; background: rgba(255,90,120,.10);
     border: 1px solid rgba(255,90,120,.4); }
 .cas-owner button:disabled { opacity: .4; cursor: default; }
+
+/* ══ THE ROPE, AND THE ROOM BEHIND IT ═════════════════════════════════════════════════════════════════
+   Luke: "a little barrier over the front of a door with a VIP sign... and it shows VIPs walking around
+   behind the drapes, the sprites are darkened and they look as if they're actually back behind the drapes,
+   so you're going to have to figure out how to mask that properly."
+
+   THE MASK IS THE ARTWORK. The doorway in vip-door.webp is painted deep solid black, and the silhouettes
+   are a layer UNDERNEATH it — so the arch, its pillars and its drapes are what covers them, at exactly the
+   shape the painter drew. A CSS clip-path would have been a second copy of that outline, kept in step by
+   hand, and wrong the first time the door is redrawn. */
+.cas-vipdoor { position: absolute; bottom: 15%; transform: translateX(-50%); z-index: 3;
+    width: calc(var(--room) * 0.50); display: grid; justify-items: center; gap: 2px;
+    -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
+    font: inherit; color: inherit; cursor: pointer; }
+.cas-vipdoor img { position: relative; z-index: 2; display: block; width: 100%; height: auto;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
+.cas-vipdoor b { position: relative; z-index: 4; font-size: 10px; font-weight: 900; letter-spacing: .1em;
+    text-transform: uppercase; color: #d8b6ff; text-shadow: 0 2px 6px #000; }
+/* Lit when you are stood at it, exactly as a cabinet is. */
+.cas-vipdoor.is-near img { filter: drop-shadow(0 0 16px rgba(180,90,255,.75)) drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
+.cas-vipdoor.is-near b { color: #f0e2ff; }
+/* And a member who can actually go in gets a standing glow, so the rope reads as OPEN to them from across
+   the room rather than only once they are touching it. */
+.cas-vipdoor.is-open img { filter: drop-shadow(0 0 12px rgba(255,215,94,.5)) drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
+
+/* The dark behind the drapes. Sized and placed to sit inside the painted archway, and BEHIND the door image
+   in the stacking order — which is the whole mask. */
+/* ── THE MASK, AND TWO THINGS THAT WERE WRONG ABOUT IT ────────────────────────────────
+   Luke: "the sprites are darkened and they look as if they're actually back behind the drapes, so you're
+   going to have to figure out how to mask that properly."
+
+   FIRST TRY: figures UNDER the door image, letting the painted arch clip them. Elegant, and it does not
+   work — the archway is painted DEEP SOLID BLACK, which is opaque. Nothing behind an opaque pixel shows
+   through, so the doorway was a black hole with four invisible people in it. "Draw it under and let the art
+   clip it" only works when the art has a hole in it, and a painting of a dark doorway does not.
+
+   SECOND TRY, and the one here: the layer sits ABOVE the art, inset to land inside the painted opening. That
+   is the clip-path-shaped compromise I was trying to avoid, but it costs almost nothing to get right,
+   because it is BLACK ON BLACK — an inset a few percent too small leaves painted archway showing, which is
+   exactly what should be there, and the shape only has to be inside the opening rather than equal to it.
+
+   AND A SILHOUETTE NEEDS A LIGHT. A dark shape on a dark ground is not a silhouette, it is nothing. The
+   opening carries a low violet-gold spill and the figures are cut out of it — which is also what a door
+   ajar on a lit room looks like from a dark floor, so the fix and the truth are the same picture. */
+.cas-vipdoor-in { position: absolute; z-index: 3; left: 32%; right: 32%; top: 27%; bottom: 17%;
+    overflow: hidden; border-radius: 44% 44% 4% 4% / 26% 26% 4% 4%; pointer-events: none;
+    background:
+        radial-gradient(120% 80% at 50% 100%, rgba(255,196,110,.50), transparent 70%),
+        linear-gradient(180deg, rgba(60,24,100,.72), rgba(150,80,200,.34) 62%, rgba(255,190,120,.40)); }
+/* Somebody in there. Not a person, a SHAPE: shoulders and a head, in near-black, at low opacity, moving.
+   Anything more legible would be a face in a room you are not allowed into, and the point is the shape. */
+/* A person, made of two shapes. Stacked gradients were tried first and came out as thin vertical smears —
+   a radial with a soft stop does not draw a shoulder. A rounded body element with a round head on ::before
+   is unmistakable at forty pixels, which is the size this is actually seen at.
+
+   Deliberately no more than that: anything more legible would be a face in a room you are not allowed into,
+   and the SHAPE is the whole message. */
+/* THREE AT MOST, and wide. The doorway is a narrow slot — at the size this is actually seen, four figures
+   in it is about ten pixels each, and ten pixels cannot carry a head and a pair of shoulders. Three at 26%
+   can. See the slice in CasinoClient: what is being shown is that the room is occupied, and three people is
+   as legible a way to say "occupied" as six would be, at three times the size. */
+.cas-vipshade { position: absolute; bottom: 0; width: 26%; height: 34%;
+    transform-origin: 50% 100%;
+    background: #06040c;
+    /* SHOULDERS: short and wide, with the corners rounded hard at the top. A tall rounded box plus a head
+       reads as one column, which is what the first two attempts were — the shape that says "person" is a
+       narrow head sitting clear of a wide, low body, and the gap between them matters more than either. */
+    border-radius: 48% 48% 6% 6% / 74% 74% 6% 6%;
+    opacity: .92; filter: blur(.35px);
+    animation: casShade 9s ease-in-out infinite alternate;
+    animation-delay: calc(var(--i, 0) * -1.7s); }
+/* The head, sitting CLEAR of the shoulders — the sliver of lit doorway between the two is what makes the
+   silhouette a person rather than a post. */
+.cas-vipshade::before { content: ""; position: absolute; left: 50%; bottom: 92%;
+    width: 44%; aspect-ratio: 1; transform: translateX(-50%);
+    background: #06040c; border-radius: 50%; }
+/* Drifting, not walking — they are people in a room, seen through a doorway, not a walk cycle. */
+@keyframes casShade {
+    from { transform: translateX(-50%) translateX(-16%); }
+    to   { transform: translateX(-50%) translateX(16%); }
+}
+
+/* ══ INSIDE ═══════════════════════════════════════════════════════════════════════════════════════════
+   Built like the floor, because it is the floor's little brother: a wide painted scene, people standing in
+   it, and things you walk up to. */
+.vip { display: grid; gap: 10px; padding-bottom: 20px; }
+.vip-top { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 2px; }
+.vip-top b { font-family: var(--font-display); font-size: 15px; letter-spacing: .06em; color: #e6d2ff; }
+.vip-out { -webkit-appearance: none; appearance: none; border: 0; background: none; cursor: pointer;
+    font-size: 12px; color: #b48fe0; padding: 4px 2px; }
+.vip-purse { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 900;
+    color: #ffd75e; font-variant-numeric: tabular-nums; }
+.vip-purse img { display: block; }
+
+.vip-roomwrap { position: relative; --vroom: clamp(190px, 40vh, 380px); }
+.vip-room { position: relative; height: var(--vroom); overflow: hidden; border-radius: 14px;
+    border: 1px solid rgba(180,90,255,.22); cursor: pointer;
+    box-shadow: inset 0 3px 14px rgba(0,0,0,.8); }
+/* ── ONE ROOM, SEEN WHOLE ─────────────────────────────────────────────────────────
+   This started as a panning camera like the casino floor's, and shooting it showed why that was wrong: the
+   painting is 3:2 and the world was 260% wide, so the picture covered a quarter of it and the rest was black.
+   The floor gets away with panning because its wall REPEATS — there is always more of it. A single painted
+   interior has edges, and a camera that can reach them will.
+
+   So the lounge is one screen. It is a small room and you can see all of it, which is truer to what it is
+   than a room you have to scroll: the couch, the fountain and the bar are all in view at once, and walking
+   moves YOU across it rather than moving the room past you. `cover` on a 3:2 painting in a ~1.4:1 window
+   crops a sliver off the sides and nothing that matters. */
+.vip-world { position: absolute; inset: 0;
+    background: url("/images/casino/vip-room.webp") no-repeat center center / cover; }
+
+/* The two you can talk to, standing where the bar is painted. */
+.vip-npc { position: absolute; bottom: 6%; transform: translateX(-50%); z-index: 3;
+    width: calc(var(--vroom) * 0.34); display: grid; justify-items: center; gap: 1px;
+    -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
+    font: inherit; color: inherit; cursor: pointer; }
+.vip-npc img { display: block; width: 100%; height: auto;
+    filter: drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
+/* Named only when you are stood at them. Two labels twelve points apart overlapped into one unreadable
+   word, and a room where everything is captioned is a room made of captions. */
+.vip-npc b { font-size: 9.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+    color: #cbb2e8; text-shadow: 0 2px 5px #000; opacity: 0; transition: opacity .18s ease; }
+.vip-npc.is-near b { opacity: 1; }
+.vip-npc.is-near img { filter: drop-shadow(0 0 14px rgba(255,215,94,.7)) drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
+.vip-npc.is-near b { color: #ffe9b8; }
+
+/* Everybody else, and you. Same shapes the casino floor uses so the two rooms read as one building. */
+.vip-other, .vip-me { position: absolute; bottom: 8%; transform: translateX(-50%); z-index: 2;
+    width: calc(var(--vroom) * 0.16); display: grid; justify-items: center; gap: 2px;
+    transition: left .5s cubic-bezier(.3,.9,.3,1); }
+.vip-other img, .vip-me img { width: 100%; height: auto; display: block;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
+.vip-other i, .vip-me i { width: 62%; aspect-ratio: .55; border-radius: 44% 44% 18% 18%;
+    background: linear-gradient(180deg, #6a5b86, #33294a); box-shadow: 0 6px 10px rgba(0,0,0,.6); }
+.vip-me { z-index: 4; }
+.vip-me i { background: linear-gradient(180deg, #ffd9a0, #c98f4a); }
+.vip-me.is-left i { transform: scaleX(-1); }
+.vip-other em { font-style: normal; font-size: 8px; color: #b9a7d4; text-shadow: 0 1px 3px #000;
+    white-space: nowrap; }
+
+/* One button, in one place, whatever you are stood at. */
+.vip-act { display: grid; }
+.vip-act > span { text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: #8b7ba8; padding: 10px 0; }
+.vip-talk { padding: 11px 0; border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 14px;
+    color: #1a1006; border: 1px solid rgba(0,0,0,.3);
+    background: linear-gradient(180deg, #ffe9a8, #f0c04e 52%, #c9932c);
+    box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.vip-talk:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+
+.vip-panel { display: grid; gap: 10px; padding: 12px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(180,90,255,.10), rgba(0,0,0,.35));
+    border: 1px solid rgba(180,90,255,.28);
+    animation: vipIn .28s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes vipIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.vip-panel h4 { margin: 0; font-family: var(--font-display); font-size: 14px; color: #e6d2ff;
+    letter-spacing: .04em; }
+.vip-panel h5 { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .14em;
+    text-transform: uppercase; color: #9b86bd; }
+/* What the bartender says. Bigger than body text and set apart, because it is the one thing on this screen
+   nobody outside the room is ever told. */
+.vip-said { margin: 0; font-size: 13.5px; line-height: 1.5; color: #f0e6ff;
+    padding: 10px 12px; border-radius: 10px; border-left: 3px solid #b45aff;
+    background: rgba(0,0,0,.28); }
+
+.vip-board { display: grid; gap: 8px; }
+.vip-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.vip-notes li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); }
+.vip-notes li.is-mine { border-color: rgba(255,215,94,.4); background: rgba(255,215,94,.07); }
+.vip-notes b { font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+    color: #b48fe0; }
+.vip-notes span { font-size: 13px; line-height: 1.4; color: #e2e8f0; }
+.vip-empty { margin: 0; font-size: 12px; color: #8b7ba8; }
+.vip-write { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.vip-write input { padding: 9px 11px; border-radius: 10px; font-size: 13px; color: #eaf1f8;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); }
+.vip-write button { padding: 9px 14px; border-radius: 10px; cursor: pointer; font-weight: 800;
+    font-size: 12px; color: #1a1006; border: 0;
+    background: linear-gradient(180deg, #ffe9a8, #f0c04e); }
+.vip-write button:disabled { opacity: .4; cursor: default; }
+.vip-take { justify-self: start; -webkit-appearance: none; appearance: none; border: 0; background: none;
+    cursor: pointer; font-size: 11px; color: #b48fe0; text-decoration: underline; padding: 2px; }
+
+.vip-chat { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }

@@ -660,7 +660,11 @@ function heroInner(m) {
 // line. What differs is which channel it asks for, and every part of the answer to that lives on the server:
 // which rooms exist for you, what is in them, and how far back you may see. The tab not rendering is a
 // courtesy, not the lock.
-function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
+// EXPORTED, because the VIP lounge shows the vip channel inside the room it belongs to. Pointing the lounge
+// at its own new chat would have split the VIP conversation across two places and left neither worth reading,
+// and copying this component would have meant two composers, two poll loops and two ideas about the join
+// window. One chat, rendered wherever the room is.
+export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
     const [messages, setMessages] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);

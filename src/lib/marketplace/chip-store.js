@@ -1,7 +1,9 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { chipItem, moveChips, chipShelf } from "@/lib/marketplace/chips.js";
+import {
+    chipItem, moveChips, chipShelf, casinoTrophies, counterDiscount, pricedFor,
+} from "@/lib/marketplace/chips.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -26,6 +28,24 @@ export async function buyWithChips(buyerId, itemId) {
     const item = chipItem(itemId);
     if (!item) return { ok: false, error: "no_such_item" };
 
+    // ── THE VENDOR BEHIND THE ROPE SELLS TO VIPS ───────────────────────────────────────
+    // The VIP items are not on the Counter's list, but "not listed" is not a gate — `item` is an id from a
+    // POST body and the whole shelf's ids are guessable. Checked at the TILL, which is the only place that
+    // matters, and re-checked on every purchase rather than trusted from whenever the room was entered.
+    if (item.vip) {
+        const { vipStanding } = await import("@/lib/marketplace/vip.js");
+        const { vip } = await vipStanding(buyerId);
+        if (!vip) return { ok: false, error: "not_vip" };
+    }
+
+    // ── AND THE PRICE IS RECOMPUTED, NEVER TAKEN FROM THE SCREEN ───────────────────────────
+    // The floor's own trophies take a little off (see counterDiscount in chips.js). The shelf showed a
+    // number and this charges one, and they are the same number because they come out of the same two
+    // functions given the same inputs — not because anybody passed a price along. A till that trusts a
+    // price from the client is a till that charges whatever the client says.
+    const trophies = await casinoTrophies(buyerId);
+    const price = pricedFor(item.price, counterDiscount(trophies));
+
     // ── ONCE MEANS ONCE ──────────────────────────────────────────────────────────────────────────────────
     // Checked here for the message, and enforced by a partial UNIQUE index in the migration for the truth —
     // two taps arriving together both pass this read, and only the index stops the second one.
@@ -37,7 +57,7 @@ export async function buyWithChips(buyerId, itemId) {
     }
 
     // Charged first. `moveChips` guards the balance inside the UPDATE and returns null if it could not.
-    const after = await moveChips(buyerId, -item.price, "store", { ref: item.id, meta: { name: item.name } });
+    const after = await moveChips(buyerId, -price, "store", { ref: item.id, meta: { name: item.name, list: item.price, paid: price } });
     if (after === null) return { ok: false, error: "not_enough_chips" };
 
     // The receipt, and the second half of the once-only guard. If THIS is the write that loses the race, the
@@ -47,9 +67,9 @@ export async function buyWithChips(buyerId, itemId) {
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (buyer_id, item_id) WHERE once DO NOTHING
          RETURNING id`,
-        [buyerId, item.id, item.price, Boolean(item.once)]).catch(() => null);
+        [buyerId, item.id, price, Boolean(item.once)]).catch(() => null);
     if (item.once && !receipt) {
-        await moveChips(buyerId, item.price, "store_refund", { ref: item.id, meta: { why: "already owned" } });
+        await moveChips(buyerId, price, "store_refund", { ref: item.id, meta: { why: "already owned" } });
         return { ok: false, error: "already_owned" };
     }
 
@@ -57,12 +77,14 @@ export async function buyWithChips(buyerId, itemId) {
     if (!granted) {
         // Put it back, and take the receipt with it — otherwise a once-only item is marked owned and was
         // never delivered, which is the worst outcome available and the hardest to notice.
-        await moveChips(buyerId, item.price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
+        await moveChips(buyerId, price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
         if (receipt) await db.query(`DELETE FROM mkt_chip_purchase WHERE id = $1`, [receipt.id]).catch(() => {});
         return { ok: false, error: "grant_failed" };
     }
 
-    return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId)) };
+    // The shelf that comes back is the one they are standing at — handing a VIP the Counter's list after
+    // they bought a pet from the vendor would redraw the wrong room around them.
+    return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId, { vip: Boolean(item.vip) })) };
 }
 
 // ── DELIVERING THE GOODS ─────────────────────────────────────────────────────────────────────────────────────
@@ -119,6 +141,18 @@ async function grant(buyerId, item) {
             const after = await db.queryOne(
                 `SELECT count FROM mkt_user_chest WHERE buyer_id = $1 AND tier = $2`, [buyerId, item.ref]);
             return Boolean(after) && Number(after.count) > Number(before?.count || 0);
+        }
+        // ── A PET, THROUGH THE SAME DOOR EVERY OTHER PET USES ───────────────────────────
+        // `mkt_cosmetic_unlock` with category 'pet' is what pet-drops.js writes for a chest, a boss, a fish
+        // and the casino floor, so a pet bought from the vendor is the same row and shows up in the same
+        // place. RETURNING is what proves it landed: ON CONFLICT DO NOTHING returns no row when it was
+        // already owned, and reporting success for a grant that did nothing is how somebody pays twice.
+        case "pet": {
+            const r = await db.queryOne(
+                `INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2)
+                 ON CONFLICT DO NOTHING RETURNING ref`,
+                [buyerId, item.ref]);
+            return Boolean(r);
         }
         case "consumables": {
             // `ref` is a list of consumable ids, because the House Pack is three things rather than one.

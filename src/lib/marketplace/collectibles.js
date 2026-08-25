@@ -305,6 +305,32 @@ export const COLLECTIBLES = [
         activeStat: "xp_gain", hint: "Works the floor at four in the morning and misses nothing",
         spritePrompt: "a small pale grey owl in a threadbare waistcoat perched on a stack of ledgers, round spectacles, tired knowing eyes" },
 
+    // ── THE THREE BEHIND THE ROPE ─────────────────────────────────────────────
+    // Luke: "there's a VIP only vendor next to the bartender, and if you talk to him he has a secret list of
+    // things you can only get from him if you're in the VIP room — maybe two or three unique pets."
+    //
+    // THEY ARE BOUGHT, NOT DROPPED, which makes them the only pets in the game with no `chance` at all. That
+    // is the whole design: the casino five are a chase priced in luck, and these are a chase priced in chips.
+    // A VIP who has been playing all year can decide to own one, which is a different feeling from hoping,
+    // and it is the right one for a room you had to qualify to stand in.
+    //
+    // `vipOnly` is read by the vendor and by check:chips, and by nothing else. NOT ONE OF THEM TOUCHES
+    // COMBAT and none of them carries a casinoPerk either — Luke, asked about wiring luck to them: "nevermind
+    // don't do the luck." So they are what a trophy should be: rare, yours, and worth looking at. Their
+    // `activeStat` is the same cosmetic farm stat every other pet carries.
+    { id: "velvet_lynx", name: "Velvet Lynx", Icon: GiCat, color: "#b45aff", rarity: "legendary", source: "vip",
+        vipOnly: true, activeStat: "fortune", hint: "Has never once been asked to leave",
+        spritePrompt: "an elegant long-eared lynx with deep violet-grey fur lounging on a gold velvet cushion, "
+            + "one paw draped over the edge, wearing a thin gold collar" },
+    { id: "midnight_crane", name: "Midnight Crane", Icon: GiRaven, color: "#5ad0ff", rarity: "mythic", source: "vip",
+        vipOnly: true, activeStat: "xp_gain", hint: "Stands at the end of the bar and misses nothing",
+        spritePrompt: "a tall slender crane with midnight-blue plumage and silver-tipped wings standing on one "
+            + "leg, long neck curved, a single silver ring on its ankle" },
+    { id: "house_ferret", name: "The House Ferret", Icon: GiCat, color: "#ffd75e", rarity: "epic", source: "vip",
+        vipOnly: true, activeStat: "gold_find", hint: "Knows which floorboard the chips roll under",
+        spritePrompt: "a sleek cream-and-gold ferret standing upright holding a single casino chip in its front "
+            + "paws, bright dark eyes, tiny gold waistcoat" },
+
     // `raidExclusive` flag in pet-drops.js maybeGrantRaidPet(); drop odds are tiny (best on a Golem boss kill).
     // `raidChance` = the ABSOLUTE per-raid-completion drop probability (Luke's spec: easiest 0.025% → hardest 0.0005%).
     { id: "warbanner_wolf", name: "Warbanner Wolf", Icon: GiWolfHead, color: "#e0433f", rarity: "mythic", source: "raid", raidExclusive: true, eliteOnly: true, raidChance: 0.00025, activeStat: "might", hint: "Rallied from a Town raid — the pack's fiercest", spritePrompt: "a battle-scarred grey war-wolf draped in a tattered crimson war banner, snarling and armored for battle" },

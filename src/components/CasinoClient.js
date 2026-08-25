@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import FeatureDailies from "@/components/FeatureDailies";
+import VipLounge from "@/components/casino/VipLounge.js";
 import SceneMusic from "@/components/SceneMusic";
 import { GiSpeaker, GiSpeakerOff } from "react-icons/gi";
 import { Haptic, Sfx, unlock, isMuted, setMuted } from "@/components/arena/arena-audio.js";
@@ -67,23 +68,36 @@ function SoundToggle({ off, onToggle }) {
     );
 }
 
+// ── AND THE ROOM GREW A BAY AT THE NEAR END ─────────────────────────────────────────
+// Luke: "extend the background a little bit and add a VIP only section."
+//
+// The nine machines used to run 8 to 96 at a spacing of 11, which left four points of floor at either end —
+// nowhere near enough for a doorway you can stand in front of. So the world got wider (see .cas-world) and the
+// row was re-spaced to 20..92 at a spacing of 9, which is the SAME PHYSICAL DISTANCE apart in a bigger room.
+// That is the part worth being careful about: shrinking the gap in percent while growing the room in pixels
+// leaves the walk between two cabinets exactly as long as it was, and REACH moved from 6 to 5 to hold the same
+// ratio against it. Nothing about how the floor feels to cross has changed.
+//
+// What the arithmetic bought is everything below 14, which is now the VIP bay.
 const MACHINES = [
-    { id: "slot", x: 8, label: "The Hunt", kind: "Slots", live: true },
-    { id: "slot2", x: 19, label: "The Harvest", kind: "Slots", live: true },
-    { id: "slot3", x: 30, label: "The Deep", kind: "Slots", live: true },
-    { id: "slot4", x: 41, label: "The Menagerie", kind: "Slots", live: true },
-    { id: "slot5", x: 52, label: "The Vault", kind: "Slots", live: true },
-    // Shifted down 11 apiece when the wheel came out, so the row has no hole in the middle of it. The
-    // decorations sit on the midpoints of this spacing and follow automatically.
-    { id: "keno", x: 63, label: "Keno", kind: "Keno", live: true },
+    { id: "slot", x: 20, label: "The Hunt", kind: "Slots", live: true },
+    { id: "slot2", x: 29, label: "The Harvest", kind: "Slots", live: true },
+    { id: "slot3", x: 38, label: "The Deep", kind: "Slots", live: true },
+    { id: "slot4", x: 47, label: "The Menagerie", kind: "Slots", live: true },
+    { id: "slot5", x: 56, label: "The Vault", kind: "Slots", live: true },
+    { id: "keno", x: 65, label: "Keno", kind: "Keno", live: true },
     { id: "bingo", x: 74, label: "The Hall", kind: "Bingo", live: true },
-    { id: "blackjack", x: 85, label: "The Table", kind: "Blackjack", live: true },
+    { id: "blackjack", x: 83, label: "The Table", kind: "Blackjack", live: true },
     // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────
     // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
     // floor to reach it and you pass everything you could have been playing on the way back. It is the only
     // thing in the room that is not a game, and the only place chips are worth anything.
-    { id: "store", x: 96, label: "The Counter", kind: "Chips", live: true },
+    { id: "store", x: 92, label: "The Counter", kind: "Chips", live: true },
 ];
+
+// Where the rope is. In the bay the re-spacing above opened up, far enough from The Hunt at 20 that walking to
+// one is never ambiguous about the other.
+const VIP_X = 7;
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
@@ -91,7 +105,9 @@ const MACHINES = [
 // spacing of 11, which meant there was almost nowhere on the whole floor you were NOT at a cabinet — every
 // machine's reach very nearly touched its neighbour's, so spacing them out would have bought nothing. At 6
 // there is real room between them to stand in, which is the point of a room.
-const REACH = 6;
+// Was 6 against a spacing of 11. The row is spaced 9 now (see MACHINES), so 5 holds the same ratio and the
+// same feeling of there being real room between the cabinets to stand in.
+const REACH = 5;
 
 // ── HOW FAST YOU WALK ────────────────────────────────────────────────────────────────────────────────────────
 // Percent of the floor per second, and the interval it is applied on. Not a frame loop: the room re-renders
@@ -115,23 +131,28 @@ const DEAL_MS = 145;
 //
 // `back` stands a prop against the wall instead of out on the carpet — smaller, dimmer and higher up, so the
 // same three pictures read as a room with depth rather than a row of stickers on one line.
+// On the midpoints of the machine spacing, which is now 9 rather than 11 — so these moved with it. The rope
+// that used to stand at 2.5 is gone: the VIP door brings its own, and a second velvet rope four points away
+// from it would read as two halves of one barrier.
 const DECOR = [
-    { id: "rope", x: 2.5 },
-    { id: "plant", x: 13.5, back: true },
+    { id: "plant", x: 15.5, back: true },
     { id: "stool", x: 24.5 },
-    { id: "plant", x: 35.5 },
-    { id: "rope", x: 46.5, back: true },
-    { id: "stool", x: 57.5 },
-    { id: "plant", x: 68.5, back: true },
-    { id: "stool", x: 79.5 },
-    { id: "plant", x: 90.5 },
+    { id: "plant", x: 33.5 },
+    { id: "rope", x: 42.5, back: true },
+    { id: "stool", x: 51.5 },
+    { id: "plant", x: 60.5, back: true },
+    { id: "stool", x: 69.5 },
+    { id: "plant", x: 78.5 },
+    { id: "stool", x: 87.5, back: true },
 ];
 
 // ── THE LIGHTING ────────────────────────────────────────────────────────────────────────────────────────
 // Chandeliers, hung at a wider spacing than anything on the floor so the two rhythms do not line up and turn
 // the room into wallpaper. Each one is a sprite plus a cone of light thrown down onto the carpet — the cone
 // is what actually does the work, because a lamp that does not light anything is just a picture of a lamp.
-const LAMPS = [6, 25, 44, 63, 82, 99];
+// Hung against the machines rather than with them, so the two rhythms never line up — a light directly over
+// every cabinet turns the room into wallpaper. Re-spaced with the row; the first one now lights the VIP bay.
+const LAMPS = [8, 24, 40, 56, 72, 88];
 
 // ── EACH CABINET BURNS A DIFFERENT COLOUR ────────────────────────────────────────────────────────────────────
 // Nine games sharing one gold accent is nine games that look like one game with the middle swapped out. Each
@@ -423,6 +444,9 @@ export default function CasinoClient({ initial }) {
     // The hall. `card` is the whole answer the moment it arrives; `called` is how far the ceremony has got
     // through the forty balls, which is the only thing the animation actually advances.
     const [card, setCard] = useState(null);
+    // The lounge, once you are in it. Null means you are on the floor — the two are one screen or the other,
+    // never both, because they are two rooms and you are only ever standing in one.
+    const [vip, setVip] = useState(null);
     // ── THE DRAGON'S PASS, AS IT HAPPENS ────────────────────────────────────────────────────────────────
     // `dragon` is the flight currently on screen (or null); `lit` is how many of its squares have caught so
     // far, so the fire spreads along the path a square at a time rather than the whole line igniting at
@@ -1172,6 +1196,32 @@ export default function CasinoClient({ initial }) {
         } else { Cas.bust(); Haptic.hit(0.5); }
     }, [busy, at]);
 
+    // Standing at the rope, on the same rule as standing at a cabinet.
+    const vipNear = Math.abs(x - VIP_X) <= REACH;
+
+    // ── GOING IN ─────────────────────────────────────────────────────────────
+    // The SERVER decides, every time, even though the button only renders for somebody the state already said
+    // is allowed. That is not belt and braces for its own sake: the standing is derived from lifetime spend
+    // and can change between the page loading and the rope being touched, and the room on the other side is a
+    // private chat. The refusal is a real answer rather than a disabled button, so somebody who has fallen
+    // below the line is told what happened instead of finding a control that does nothing.
+    const enterVip = useCallback(async () => {
+        if (busy) return;
+        unlock();
+        setBusy(true); setErr(null);
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "vip_enter" }),
+        }).then((x2) => x2.json()).catch(() => null);
+        setBusy(false);
+        if (!r?.ok) {
+            setErr(r?.error === "not_vip" ? "The rope stays where it is." : "That didn't go through.");
+            return;
+        }
+        Cas.jackpot(); Haptic.crit();
+        setVip(r);
+    }, [busy]);
+
     const toggleNumber = useCallback((n) => {
         setTicket((p) => (p.includes(n) ? p.filter((v) => v !== n) : p.length >= 5 ? p : [...p, n]));
     }, []);
@@ -1179,6 +1229,19 @@ export default function CasinoClient({ initial }) {
     // Every timer this component starts is cleared on unmount — walking out mid-spin must not leave a
     // callback firing into a component that is gone.
     useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+
+    // ── TWO ROOMS, ONE SCREEN ──────────────────────────────────────────────────────────
+    // Returning early rather than rendering the lounge inside the floor. They are two rooms and you are only
+    // ever standing in one — leaving the floor mounted underneath would keep its poll running, its music
+    // playing and its presence writing the casino zone, which would put you in two rooms at once as far as
+    // everybody else is concerned.
+    if (vip) {
+        return (
+            <VipLounge state={vip} chips={st?.chips} me={st?.me}
+                onChips={(n) => setSt((p) => ({ ...p, chips: n }))}
+                onClose={() => setVip(null)} />
+        );
+    }
 
     return (
         <section className="cas">
@@ -1248,6 +1311,56 @@ export default function CasinoClient({ initial }) {
                         <img src={`/images/casino/decor_${d.id}.webp`} alt="" draggable="false" />
                     </div>
                 ))}
+                {/* ── THE ROPE, AND THE PEOPLE BEHIND IT ──────────────────────────────────
+                    Luke: "a little barrier over the front of a door with a VIP sign... and it shows VIPs
+                    walking around behind the drapes, the sprites are darkened and they look as if they're
+                    actually back behind the drapes, so you're going to have to figure out how to mask that."
+
+                    The masking is the whole trick and it is done with the ART rather than with CSS. The
+                    doorway in vip-door.webp is painted DEEP SOLID BLACK, and the silhouettes are drawn in a
+                    layer UNDERNEATH it — so the archway, its pillars and its drapes are what clips them, at
+                    the exact shape the painter drew, with no mask to keep in step with the picture. A CSS
+                    clip-path would have been a second copy of the arch's outline, wrong the moment the door
+                    is ever redrawn.
+
+                    THEY ARE REAL PEOPLE. `vip.shadows` is the live position of everybody actually standing in
+                    the lounge right now — anonymised to nothing but an x, because the floor is not entitled to
+                    know WHO is in the VIP room. What it gets is the shape of a room with people in it, which
+                    is the entire point: a locked door tells you that you cannot go in, and a locked door with
+                    people moving behind it tells you what you are missing. */}
+                <button type="button"
+                    className={`cas-vipdoor${vipNear ? " is-near" : ""}${st?.vip?.allowed ? " is-open" : ""}`}
+                    style={{ left: `${VIP_X}%` }}
+                    aria-label={st?.vip?.allowed ? "The VIP lounge" : "The VIP lounge \u2014 members only"}
+                    onClick={() => {
+                        if (draggedJustNow()) return;
+                        // Walk over first, go in second — the same two-step every cabinet on this floor
+                        // uses, so the rope is not a special case you have to learn. Standing at it and
+                        // touching it again is what opens it.
+                        if (!vipNear) { setX(VIP_X); return; }
+                        if (st?.vip?.allowed) { enterVip(); return; }
+                        setErr("Members only. The rope stays where it is.");
+                    }}>
+                    <span className="cas-vipdoor-in" aria-hidden="true">
+                        {/* At most four, and spread by INDEX rather than dropped at their true x. The
+                            doorway is a narrow slot: people at their real positions bunch into one
+                            black mass about a third of the time, and a mass is not four people. Their own
+                            position still nudges them, so the group is never in exactly the same shape
+                            twice — what is being shown is that the room is occupied, which is all the floor
+                            is entitled to know anyway. Three, because at the size the doorway is actually
+                            seen a fourth makes all of them too small to read as people. */}
+                        {(st?.vip?.shadows || []).slice(0, 3).map((sh) => (
+                            <i key={sh.i} className="cas-vipshade"
+                                style={{ left: `${22 + sh.i * 28 + (sh.x % 6)}%`, "--i": sh.i }} />
+                        ))}
+                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/casino/vip-door.webp" alt="" draggable="false" />
+                    {/* What the rope says when you are stood at it. Nothing at a distance — a label under
+                        every object in the room is a room made of labels. */}
+                    <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members only") : "The Lounge"}</b>
+                </button>
+
                 {MACHINES.map((m) => (
                     <button key={m.id} type="button"
                         className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
