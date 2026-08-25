@@ -151,6 +151,32 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     // deliberately NOT the landing grid, because the landing grid is the answer and this is the wait.
     // useMemo, not a ref: it is derived, deterministic and read during render, and a ref read in render is
     // the one thing the compiler will not let past.
+    // ── HOW MUCH RUN-UP A REEL HAS ───────────────────────────────────────────────────────────────────────
+    // Luke: "is there any way to have the real reels at all times instead of the fake one and then the
+    // swap? A big part of the slot is seeing what goes by and what comes into view — the near-miss effect
+    // is a lot of dopamine we are throwing away."
+    //
+    // He is right and it was the single worst thing about this cabinet's motion. A reel that scrolls
+    // invented symbols and then SWAPS to the answer has no near miss in it at all: nothing was ever
+    // approaching, so a giant sliding to a stop one row short of a line never happened — the row simply
+    // appeared. The whole tension of a reel is that you can see what is coming.
+    //
+    // So there is no swap. Each reel is ONE strip — six lead-in symbols and then the real column, in the
+    // same DOM — and stopping is the strip travelling the last of its distance. The symbols that land are
+    // the symbols you watched arrive.
+    // ── THE LEAD-IN MUST BE LONGER THAN THE WINDOW ───────────────────────────────────────────────────────
+    // The real column lives in the same strip, so the only thing keeping it secret while the reel runs is
+    // being BELOW the window. A six-cell lead on a twelve-row board put eight real symbols on screen mid
+    // spin — the answer, printed early — which is why the first cut had to blank them, and blanking them is
+    // what left the reels empty while they turned.
+    //
+    // Window plus eight: the reel spins inside the first few cells of the lead, and stopping travels the
+    // whole remaining lead so the real column rises through it. Nothing is hidden and nothing is revealed
+    // early; the strip's POSITION does both jobs.
+    const leadCol = rows + 8;
+    const leadMain = ROWS + 8;
+    const runInCol = useMemo(() => Array.from({ length: leadCol }), [leadCol]);
+    const runInMain = useMemo(() => Array.from({ length: leadMain }), [leadMain]);
     const filler = useMemo(() => {
         const pool = ["bone", "doubloon", "laurel", "chest", "wolf"];
         return Array.from({ length: REELS }, (_, r) =>
@@ -184,9 +210,11 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
         };
     }, [rows]);
 
-    // Which board to draw for a reel: the landed spin, the resting board, or nothing while it runs.
-    const restCol = (reel, row) => (colLanded > reel ? col?.[reel]?.[row] : (data ? null : idle.col[reel][row]));
-    const restMain = (reel, row) => (landed > reel ? main?.[reel]?.[row] : (data ? null : idle.main[reel][row]));
+    // Which board to draw for a reel: the spin's own column, or the resting board when there is no spin.
+    // Never null any more — a reel that is still turning hides its result by having it below the window,
+    // which is how a real reel does it and is the whole point of the strip.
+    const restCol = (reel, row) => (data ? col?.[reel]?.[row] : idle.col[reel][row]);
+    const restMain = (reel, row) => (data ? main?.[reel]?.[row] : idle.main[reel][row]);
     // The strip only runs during an actual press. At rest there is nothing to wait for.
     const colRunning = (reel) => Boolean(data) && colLanded <= reel;
     const mainRunning = (reel) => Boolean(data) && landed <= reel;
@@ -210,14 +238,26 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : colRunning(reel) ? " is-spin" : ""}${sent.includes(reel) ? " is-sent" : ""}`}>
-                            {colRunning(reel) ? (
-                                <span className="col5-run" aria-hidden="true">
-                                    {filler[reel].concat(filler[reel]).map((f, i) => (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img key={i} src={cellArt(f)} alt="" draggable="false" />
-                                    ))}
-                                </span>
-                            ) : null}
+                            <div className="col5-strip" style={{ "--lead": leadCol }}>
+                                {/* ── THE LEAD-IN ─────────────────────────────────────────────────────
+                                    Ordinary symbols ABOVE the real ones in the same strip. While the reel
+                                    runs these cycle; when it stops, the strip travels the rest of the way
+                                    and the real column comes up out of them. That is the whole point: the
+                                    symbols you are about to get arrive from somewhere. */}
+                                {runInCol.map((f, i) => {
+                                    // A lead-in tile is a REAL tile in every way but meaning: same plate,
+                                    // same rim, same colour. Drawn without them first, and the board went
+                                    // visibly unstyled the moment it started turning — which is its own
+                                    // kind of swap, just in the other direction.
+                                    const fs = filler[reel][i % filler[reel].length];
+                                    return (
+                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
+                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={cellArt(fs)} alt="" draggable="false" />
+                                        </span>
+                                    );
+                                })}
                             {Array.from({ length: rows }, (_, row) => {
                                 const sym = restCol(reel, row);
                                 // ── ONE PICTURE, NOT SIX ────────────────────────────────────────────
@@ -253,6 +293,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                     </span>
                                 );
                             })}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -272,14 +313,17 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <div className="col5-grid" style={{ "--rows": ROWS }}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : mainRunning(reel) ? " is-spin" : ""}${sending.includes(reel) ? " is-sending" : ""}`}>
-                            {mainRunning(reel) ? (
-                                <span className="col5-run" aria-hidden="true">
-                                    {filler[reel].concat(filler[reel]).map((f, i) => (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img key={i} src={cellArt(f)} alt="" draggable="false" />
-                                    ))}
-                                </span>
-                            ) : null}
+                            <div className="col5-strip" style={{ "--lead": leadMain }}>
+                                {runInMain.map((f, i) => {
+                                    const fs = filler[reel][i % filler[reel].length];
+                                    return (
+                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
+                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={cellArt(fs)} alt="" draggable="false" />
+                                        </span>
+                                    );
+                                })}
                             {Array.from({ length: ROWS }, (_, row) => {
                                 const sym = restMain(reel, row);
                                 return (
@@ -292,6 +336,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                     </span>
                                 );
                             })}
+                            </div>
                         </div>
                     ))}
                 </div>

@@ -19614,7 +19614,7 @@ body.cas-seated .social-fab { display: none; }
    figure. In the reference Lil' Red stands directly on the reel strip with nothing behind her — she IS the
    strip for those rows — and the box was what made ours read as a picture pasted into a slot. What is left
    is the light she throws, which is the part that says "this one matters". */
-.col5-cell.is-giant { grid-row: span var(--span, 4); aspect-ratio: auto; border-radius: 5px;
+.col5-cell.is-giant { height: calc(var(--cell-h) * var(--span, 12)); aspect-ratio: auto; border-radius: 5px;
     background: radial-gradient(62% 46% at 50% 42%, color-mix(in srgb, var(--tone, #fff) 26%, transparent), transparent 74%); }
 /* ── AND THEY FILL THE BLOCK ───────────────────────────────────────────────────────────────────────────
    Luke: "those sprites look good, but they need to occupy the whole space, even if they get cut off a
@@ -19649,7 +19649,7 @@ body.cas-seated .social-fab { display: none; }
 
 /* ── THE REELS TURNING ── the small board settles first, because it decides what the big one becomes. */
 .col5-reel.is-spin { filter: blur(1.1px) brightness(.8); opacity: .9; }
-.col5-reel.is-stop { animation: col5Land .22s cubic-bezier(.2,1.5,.4,1) both; }
+/* superseded: the reel no longer jumps as a whole — its STRIP settles. See col5Settle. */
 @keyframes col5Land { from { transform: translateY(-7px); } to { transform: none; } }
 /* The column that is about to send, and the column that just received. */
 .col5-reel.is-sending { animation: col5Send .3s ease-in-out infinite alternate; }
@@ -19740,7 +19740,7 @@ body.cas-seated .social-fab { display: none; }
    icons. Ours is a dark machine, so the channel is a lit slate rather than cream — but it is a CHANNEL,
    with its own ground, its own inner shadow and a real gap either side. */
 .col5-grid { gap: 3px; }
-.col5-reel { gap: 0; padding: 3px 0; border-radius: 5px; overflow: hidden;
+.col5-reel { padding: 0; border-radius: 5px; overflow: hidden;
     background: linear-gradient(180deg, #1b2133 0%, #141a29 12%, #141a29 88%, #1b2133 100%);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), inset 0 6px 10px -6px rgba(0,0,0,.9),
         inset 0 -6px 10px -6px rgba(0,0,0,.9); }
@@ -19775,9 +19775,12 @@ body.cas-seated .social-fab { display: none; }
 .col5-cell img, .col5-cell b { position: relative; z-index: 3; }
 
 .col5-grid.is-tall { height: auto; overflow: visible; }
+/* The window is exactly the board: the strip behind it is taller and that is the point. */
+.col5-grid.is-tall .col5-reel { height: calc(var(--cell-h) * 12); }
+.col5-main .col5-reel { height: calc(var(--cell-h) * 3); }
 /* Slightly wider than tall, which is the compromise between the reference's portrait cells and twelve rows
    of them on a phone. At 1:1 the tall board alone was 879px and the cabinet 1281 — a machine you cannot see. */
-.col5-grid.is-tall .col5-cell { min-height: 0; aspect-ratio: 1.16; }
+.col5-grid.is-tall .col5-cell { min-height: 0; aspect-ratio: auto; height: var(--cell-h); }
 /* (replaced by the max-height ceiling above — a percentage height here was the bug.) */
 .col5-main .col5-cell { aspect-ratio: 1; }
 
@@ -19786,7 +19789,7 @@ body.cas-seated .social-fab { display: none; }
    two giants reported a span of five and rendered exactly one cell tall, squashing a standing figure into
    a letterbox. Measured (span 5, height 73px, one row) rather than noticed by eye, because at a glance it
    just looked like a small symbol. */
-.col5-grid.is-tall .col5-cell.is-giant { aspect-ratio: auto; }
+.col5-grid.is-tall .col5-cell.is-giant { aspect-ratio: auto; height: calc(var(--cell-h) * var(--span, 12)); }
 
 /* ── THE SAME MEDALLIONS AS EVERY OTHER CABINET ───────────────────────────────────────────────────────
    Luke: "for every tile the floating sprite with no anchor, no square anchor or anything, kind of doesn't
@@ -20009,8 +20012,7 @@ body.cas-seated .social-fab { display: none; }
 
 /* Rows are a fixed height now rather than an aspect ratio, which is what lets the board be told how tall it
    is allowed to be. The giants still span, and now span the whole reel. */
-.col5-grid.is-tall .col5-cell { aspect-ratio: auto; height: var(--col5-row); }
-.col5-main .col5-cell { aspect-ratio: auto; height: calc(var(--col5-row) * 1.18); }
+.col5-grid .col5-cell { aspect-ratio: auto; height: var(--cell-h); }
 
 /* ── A SYMBOL CANNOT BE BIGGER THAN ITS CELL ───────────────────────────────────────────────────────────
    Luke: "size the smaller sprites to fit." They did not: measured, a cell was 69x33 and the symbol inside
@@ -20032,8 +20034,8 @@ body.cas-seated .social-fab { display: none; }
    The row height is already a variable. Using it directly is a length, and a length cannot be ignored. */
 .col5-cell img { width: auto; height: auto; object-fit: contain;
     max-width: 92%; max-height: calc(var(--col5-row) * 1.06); }
-.col5-grid.is-tall .col5-cell img { max-width: 96%; max-height: calc(var(--col5-row) * 0.94); }
-.col5-main .col5-cell img { max-height: calc(var(--col5-row) * 1.08); }
+.col5-grid.is-tall .col5-cell img { max-width: 96%; max-height: calc(var(--cell-h) * 0.94); }
+.col5-main .col5-cell img { max-height: calc(var(--cell-h) * 0.92); }
 /* ── AND THE GIANT GETS THE SAME TREATMENT, FOR THE SAME REASON ───────────────────────────────────────
    `height: 100%` on the giant collapsed it to a sliver the moment the small symbols were fixed — the same
    indefinite-grid-area problem, one row further down. Its height is the row height times the rows it spans,
@@ -20044,7 +20046,7 @@ body.cas-seated .social-fab { display: none; }
    390px cell. Matched selector depth. */
 .col5-grid.is-tall .col5-cell.is-giant img,
 .col5-cell.is-giant img { max-width: none; max-height: none; width: 100%;
-    height: calc(var(--col5-row) * var(--span, 12)); }
+    height: calc(var(--cell-h) * var(--span, 12)); }
 
 /* ── A GIANT IS THE WHOLE REEL ─────────────────────────────────────────────────────────────────────────
    "The sprite needs to be the whole reel, even if it cuts the sprite off." It is: the engine fills the
@@ -20057,7 +20059,58 @@ body.cas-seated .social-fab { display: none; }
    A reel that has not landed renders a strip of ordinary symbols and scrolls it. Before this a running reel
    was an empty channel and its symbols simply appeared, which is exactly the "mysteriously dropping in
    place" Luke described — there was nothing to see, so there was no spin to watch. */
-.col5-reel { position: relative; }
+/* ══ THE REEL IS A WINDOW, AND THE STRIP TRAVELS THROUGH IT ═══════════════════════════════════════════════
+   Luke: "is there any way to have the real reels at all times instead of the fake one and then the swap? A
+   big part of the slot is seeing what goes by and what comes into view — the near-miss effect is a lot of
+   dopamine we are throwing away."
+
+   The worst thing about this cabinet's motion, and he named it exactly. A reel that scrolls invented symbols
+   and then SWAPS to the answer has no near miss in it: nothing was ever approaching, so a giant sliding to
+   a stop one row short of a line never happened — the row simply appeared. The entire tension of a reel is
+   being able to see what is coming.
+
+   There is no swap now. Each reel is one strip — six lead-in symbols, then the real column, in the same DOM
+   — and the reel is a window over it. Running cycles the lead-in; stopping is the strip travelling the last
+   of its distance, so the symbols that land are the symbols you watched arrive. The lead-in is `aria-hidden`
+   and carries no tile, because it is scenery: only the real column is the board.
+
+   Flex column, not grid. The giant spans rows by being one tall element rather than by `grid-row: span`,
+   which is both simpler and the thing that kept fighting `aspect-ratio` — see the note on that fix. */
+.col5-reel { position: relative; overflow: hidden; display: block; }
+/* ── ONE CELL HEIGHT PER BOARD ────────────────────────────────────────────────────────────────────────
+   The strip offset has to be the LEAD-IN's own height, and the two boards do not use the same cell: the
+   main board's are 1.18 rows tall. Written as `--col5-row * -6` it was right for the tall board and 18%
+   short on the small one, which showed as a sliver of a fourth row peeking under the main reels. Each
+   board declares its cell height once and the cells, the window and the travel all read it. */
+.col5-grid.is-tall { --cell-h: var(--col5-row); }
+.col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); }
+.col5-strip { display: flex; flex-direction: column; will-change: transform;
+    /* At rest the strip is pulled up by exactly the lead-in, so the window holds the real column. */
+    transform: translateY(calc(var(--cell-h) * -1 * var(--lead, 6))); }
+/* Running: cycle within the lead-in, so nothing real is shown before it is decided. */
+.col5-reel.is-spin .col5-strip { animation: col5Roll .28s linear infinite; }
+/* Running: the reel turns inside the TOP of the lead-in, where nothing real can be on screen. */
+@keyframes col5Roll {
+    from { transform: translateY(0); }
+    to { transform: translateY(calc(var(--cell-h) * -4)); }
+}
+/* Stopping: the remaining lead-in scrolls up and the real column comes in behind it, settling with a small
+   overshoot — which is the reel's weight, and the beat a near miss lives in. */
+/* Longer, because it now travels a whole board rather than two cells — and eased so it arrives fast and
+   lands soft, which is where the last-moment tension lives. */
+.col5-reel.is-stop .col5-strip { animation: col5Settle .62s cubic-bezier(.12,.72,.22,1.03) both; }
+/* Stopping: the strip travels the whole remaining lead-in, so the real column rises up through the window
+   at speed and settles. This is the near miss — you watch what is coming and you see what just missed. */
+@keyframes col5Settle {
+    from { transform: translateY(calc(var(--cell-h) * -4)); }
+    to { transform: translateY(calc(var(--cell-h) * -1 * var(--lead, 6))); }
+}
+/* The lead-in keeps its plate and rim — it is a real tile in every way but meaning. Stripped of them it
+   made the board go visibly unstyled the instant it started turning, which is its own kind of swap. */
+.col5-cell.is-lead { flex: none; }
+/* Every cell in a strip is a fixed height — the flex column is what the reel measures. */
+.col5-strip .col5-cell { flex: none; }
+
 .col5-run { position: absolute; inset: 0; z-index: 0; display: block; overflow: hidden; }
 /* ── THE RUNNING SYMBOLS ARE THE SAME SIZE AS THE RESTING ONES ─────────────────────────────────────────
    Luke: "when we spin the sprites are all cut off." They were: the strip drew each symbol into a box one
@@ -20083,8 +20136,7 @@ body.cas-seated .social-fab { display: none; }
 }
 /* The blur belongs to the moving strip, not to the reel — blurring the reel blurred its frame too. */
 .col5-reel.is-spin { filter: none; opacity: 1; }
-/* And it lands rather than fading in: a short overshoot as the strip is replaced by the real symbols. */
-.col5-reel.is-stop { animation: col5Land .2s cubic-bezier(.2,1.6,.4,1) both; }
+/* (the landing lives on the strip now — col5Settle) */
 
 /* ── THE TRANSFER RUNS UP ──────────────────────────────────────────────────────────────────────────────
    The boards are the other way round now — colossal on top, main underneath, on Luke's call — so the wild
