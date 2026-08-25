@@ -19780,6 +19780,50 @@ body.cas-seated .social-fab { display: none; }
 .col5-cell::before, .col5-cell::after { inset: 4%; border-radius: 7px; }
 .col5-cell::after { border-width: 1px; }
 .col5-cell.is-mid::after { border-width: 1.5px; }
+
+/* ── AND EVERY TILE IS COLOURED ────────────────────────────────────────────────────────────────────────
+   Luke: "we need coloured background on each sprite, otherwise there's just no way for the human eye to
+   group this many objects."
+
+   That is the real argument and it is about COUNT, not taste. A 5x3 board is fifteen things and you read
+   them one at a time; this board is sixty-five, and nobody reads sixty-five small pictures — you read
+   BANDS of colour and then check the picture. The house ladder tints by RANK, which is right on a
+   fifteen-tile machine where rank is the only grouping that matters, and useless here: it gives four
+   colours to seven symbols, so the wolf pup and the kettle land on the same flat stone and the eye has
+   nothing to group by.
+
+   So on the colossal cabinet the plate is the SYMBOL'S OWN hue, at enough strength to read as a block of
+   colour at 41px, with the rank ladder kept on top of it as the frame — colour tells you WHAT, the rim
+   still tells you HOW MUCH. Low tiles get the biggest change: they were flat grey stone and are now a
+   real, if quiet, colour. */
+.col5-cell::before {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--tone) 52%, #0a0d18 48%),
+        color-mix(in srgb, var(--tone) 30%, #05070e 70%));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tone) 55%, transparent),
+        inset 0 -3px 7px rgba(0, 0, 0, .5);
+}
+.col5-cell::after { border-color: color-mix(in srgb, var(--tone) 48%, transparent); }
+/* The ladder, kept — as the RIM rather than as the fill. */
+.col5-cell.is-mid::before {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--tone) 68%, #0a0d18 32%),
+        color-mix(in srgb, var(--tone) 42%, #05070e 58%));
+}
+.col5-cell.is-mid::after { border-color: color-mix(in srgb, var(--tone) 78%, transparent); }
+.col5-cell.is-bonus::before, .col5-cell.is-scatter::before {
+    background: radial-gradient(120% 92% at 50% 12%,
+        color-mix(in srgb, var(--tone) 82%, #fff 18%),
+        color-mix(in srgb, var(--tone) 74%, #100a02 26%) 76%);
+}
+.col5-cell.is-bonus::after, .col5-cell.is-scatter::after {
+    border-color: rgba(255, 214, 110, .95); border-width: 1.5px; }
+.col5-cell.is-wild::before {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--tone) 74%, #1a0a2e 26%),
+        color-mix(in srgb, var(--tone) 44%, #0a0416 56%));
+}
+.col5-cell.is-wild::after { border-color: color-mix(in srgb, var(--tone) 95%, transparent); border-width: 1.5px; }
 .col5-cell.is-blank::before, .col5-cell.is-blank::after { display: none; }
 .col5-cell.is-wild::after { border-radius: 7px; }
 /* The giant is the one thing on the board that is NOT a medallion: it is a figure standing on the reel,
@@ -19827,6 +19871,19 @@ body.cas-seated .social-fab { display: none; }
 .s5-cab.is-colossal { padding: 5px; background: linear-gradient(180deg, #4a3a17, #241a0a 60%, #1a1206); }
 .s5-cab.is-colossal::before { display: none; }
 .s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
+
+/* ── THE WINNING LINE ─────────────────────────────────────────────────────────────────────────────────
+   Drawn over the glass, the way every other cabinet does it. Two strokes: a wide dark one underneath so
+   the line survives crossing a bright tile, and the bright one on top. It draws itself on rather than
+   appearing, because a line that appears is a mark and a line that draws is a path. */
+.col5-line { position: absolute; inset: 6px; z-index: 6; pointer-events: none; overflow: visible; }
+.col5-line polyline { fill: none; stroke-linejoin: round; stroke-linecap: round;
+    stroke: var(--acc, #7fe0a0); stroke-width: 1.6;
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acc, #7fe0a0) 90%, transparent))
+        drop-shadow(0 0 1.5px rgba(0,0,0,.9));
+    stroke-dasharray: 200; stroke-dashoffset: 200;
+    animation: col5Draw .32s ease-out forwards; }
+@keyframes col5Draw { to { stroke-dashoffset: 0; } }
 
 /* ── WHAT THIS PRESS PAID, AND THEN GONE ──────────────────────────────────────────────────────────────
    Not a readout — an event. It sits over the bottom of the tall board for as long as it is true and takes
@@ -19960,9 +20017,15 @@ body.cas-seated .social-fab { display: none; }
 
    And much less blur. At 1.4px over a 30px symbol there was nothing left to recognise, which is what makes
    a spinning reel read as a smear rather than as reels — the eye needs to half-catch a symbol going past. */
+/* ── AND NOTHING IS BLURRED ────────────────────────────────────────────────────────────────────────────
+   Luke: "when it spins it's using these blurred out-of-focus sprites that look terrible." Twice now, and
+   he is right both times — I dropped 1.4px to 0.7px when the honest number was zero. A blur is how a
+   PHOTOGRAPH of a moving reel looks; a drawn symbol scrolled at speed already reads as motion, and
+   blurring it just makes the art look badly exported. Real cabinets scroll crisp symbols fast. So does
+   this one now: the movement is the movement. */
 .col5-run img { display: block; width: 88%; height: calc(var(--col5-row) * 0.88); margin: 0 auto
     calc(var(--col5-row) * 0.12);
-    object-fit: contain; opacity: .92; filter: blur(0.7px); }
+    object-fit: contain; opacity: 1; filter: none; }
 .col5-reel.is-spin .col5-run { animation: col5Run .34s linear infinite; }
 @keyframes col5Run {
     from { transform: translateY(calc(var(--col5-row) * -4)); }

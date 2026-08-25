@@ -184,6 +184,13 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     const isGiantAt = (reel, row) => giants.find((g) => g.reel === reel && g.row === row);
     const insideGiant = (reel, row) => giants.some((g) => g.reel === reel && row > g.row && row < g.row + g.len);
 
+    // The win's `cells` are flat indices (reel * rows + row) for the reels it actually paid on, which is
+    // exactly the path — recovered rather than sent again, so the drawn line and the lit tiles cannot
+    // disagree about which cells won.
+    const lineOf = (w) => {
+        const h = w.set === "col" ? rows : ROWS;
+        return w.cells.map((c) => c % h);
+    };
     const litCells = lit ? new Set(lit.cells) : null;
     const cellLit = (set, reel, row, height) => litCells && lit.set === set && litCells.has(reel * height + row);
 
@@ -241,6 +248,12 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                         </div>
                     ))}
                 </div>
+                {lit && lit.set === "main" ? (
+                    <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${ROWS * 20}`}
+                        preserveAspectRatio="none" aria-hidden="true">
+                        <polyline points={lineOf(lit).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                    </svg>
+                ) : null}
             </div>
 
             {/* The wilds falling from one board into the other — one element per travelling column. */}
@@ -279,6 +292,19 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                         </div>
                     ))}
                 </div>
+                {/* ── AND THE LINE IS DRAWN ────────────────────────────────────────────────────────────
+                    Luke: "when we win we should show the line like we do in other slots." Every other
+                    cabinet on this floor draws the winning path over the glass; this one lit the cells and
+                    left you to join them up yourself — which on a hundred lines across twelve rows is not
+                    something anybody can do. The path IS the line's own row-per-reel, which is already in
+                    the win, so there is nothing to work out: a polyline through the middle of each cell it
+                    used, in a viewBox the same shape as the board. */}
+                {lit && lit.set === "col" ? (
+                    <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${rows * 20}`}
+                        preserveAspectRatio="none" aria-hidden="true">
+                        <polyline points={lineOf(lit).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                    </svg>
+                ) : null}
             </div>
 
             {/* ── NO RIBBON ────────────────────────────────────────────────────────────────────────────
