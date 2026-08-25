@@ -169,7 +169,11 @@ export const SLOT_THEMES = {
         // Picked by matching each pet's own catalogue colour to the rung. The Chameleon fell out of that as
         // the wild, which is the joke writing itself: an animal that turns into whatever is beside it.
         art: {
-            wolf: "pet:chameleon",
+            // ── THE WILD IS NOT BORROWED ANY MORE ────────────────────────────────────────────────────
+            // `wolf: "pet:chameleon"` used to live here, and an `art:` override beats the drawn file at
+            // reels/slot4-wolf.webp outright — so a purpose-drawn WILD wordmark published to that path was
+            // never once shown. Same trap the Harvest hit when it was borrowing cooking sprites. The other
+            // five stay borrowed on purpose: they are a menagerie and the pets ARE the menagerie.
             moon: "pet:spirit_fox",
             chest: "pet:radiant_phoenix",
             laurel: "pet:golem_heart",

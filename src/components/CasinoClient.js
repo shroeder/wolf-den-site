@@ -1328,7 +1328,20 @@ export default function CasinoClient({ initial }) {
                         <button type="button" className="cas-leave" onClick={() => setSeated(false)}
                             aria-label="Leave this machine">Leave</button>
                         <b>{st?.slots?.[at.id]?.label || at.label}</b>
-                        <span className="cas-purse-sm">{money(st?.gold)}<i>gold</i></span>
+                        {/* ── BOTH PURSES, WITH THEIR OWN COINS ────────────────────────────────────
+                            Luke: "since we already showed coins at the top, just show the coin amount with
+                            the coin sprite and the chip amount with the chip sprite... that way we can free
+                            up that entire row." The machine below had a whole strip spending 86px on two
+                            numbers already half-shown up here. Two 15px sprites say which is which without
+                            the words, and the strip is gone. */}
+                        <span className="cas-purse-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/casino/hud-coin.webp" alt="" width={15} height={15} />
+                            {money(st?.gold)}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/casino/hud-chip.webp" alt="" width={15} height={15} />
+                            <b className="cas-purse-chips">{money(st?.chips)}</b>
+                        </span>
                     </div>
 
                     {/* ── STANDING AT A MACHINE IS NOT PLAYING IT ──────────────────────────────────

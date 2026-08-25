@@ -19025,7 +19025,7 @@ body.cas-seated .social-fab { display: none; }
 .s5-cell.is-bonus::before {
     background: radial-gradient(circle, color-mix(in srgb, var(--tone) 36%, transparent), transparent 70%); }
 /* The wild gets a ring as well. It is the one symbol whose whole job is to be spotted. */
-.s5-cell.is-wild::after { content: ""; position: absolute; inset: 12%; border-radius: 50%;
+.s5-cell.is-wild::after, .col5-cell.is-wild::after { content: ""; position: absolute; inset: 12%; border-radius: 50%;
     border: 1px solid color-mix(in srgb, var(--tone) 55%, transparent); pointer-events: none; }
 .s5-cell img { position: relative; z-index: 1; }
 
@@ -19743,12 +19743,9 @@ body.cas-seated .social-fab { display: none; }
 /* A hairline between symbols in a strip, so twelve of them read as twelve rather than as a texture. */
 .col5-grid.is-tall .col5-cell + .col5-cell,
 .col5-grid .col5-cell + .col5-cell { box-shadow: inset 0 1px 0 rgba(255,255,255,.045); }
-/* The wash that says what a symbol IS — kept, but as a soft pool behind it rather than a filled tile, which
-   is what made the board look like a spreadsheet of coloured boxes. */
-.col5-cell::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; z-index: 0;
-    background: radial-gradient(closest-side, color-mix(in srgb, var(--tone, #fff) 34%, transparent), transparent 72%); }
+/* The wash is a real MEDALLION now — see the ladder further down, which the colossal cells share with every
+   other cabinet rather than reimplementing. */
 .col5-cell img, .col5-cell b { position: relative; z-index: 1; }
-.col5-cell.is-blank::before { display: none; }
 
 .col5-grid.is-tall { height: auto; overflow: visible; }
 /* Slightly wider than tall, which is the compromise between the reference's portrait cells and twelve rows
@@ -19764,34 +19761,40 @@ body.cas-seated .social-fab { display: none; }
    just looked like a small symbol. */
 .col5-grid.is-tall .col5-cell.is-giant { aspect-ratio: auto; }
 
-/* ── A STACK OF WILDS IS ONE BLOCK ────────────────────────────────────────────────────────────────────
-   The wild is a fifth of the tall board and it has to be: thin it out and the cabinet falls from 96.8% to
-   67%, because on eighty lines the wild is what does most of the paying. But twenty per cent of a 5x12 as
-   separate tiles reads as a repeated texture — three reels of the same lizard.
+/* ── THE SAME MEDALLIONS AS EVERY OTHER CABINET ───────────────────────────────────────────────────────
+   Luke: "for every tile the floating sprite with no anchor, no square anchor or anything, kind of doesn't
+   fit how we do sprites for the other machines."
 
-   The reference has the same density and does not have the problem, because its stacked wilds form ONE
-   continuous panel down the reel. So: a wild's wash is a full-bleed column rather than a soft pool, and
-   consecutive wilds therefore run together into an unbroken violet bar. Same symbols, same odds, and a
-   stack now reads as a deliberate block — which is also what it is, since a full column is what transfers.
-   The hairline between cells is dropped inside a run so the bar has no rungs across it. */
-.col5-cell.is-wild::before { inset: 0; border-radius: 0;
-    background: linear-gradient(90deg,
-        color-mix(in srgb, var(--tone, #b45aff) 10%, transparent),
-        color-mix(in srgb, var(--tone, #b45aff) 34%, transparent) 50%,
-        color-mix(in srgb, var(--tone, #b45aff) 10%, transparent));
-    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--tone, #b45aff) 45%, transparent),
-        inset -1px 0 0 color-mix(in srgb, var(--tone, #b45aff) 45%, transparent); }
-.col5-cell.is-wild + .col5-cell.is-wild { box-shadow: none; }
+   Right, and the house style is not a preference here, it is a LADDER that carries information — see the
+   note above .s5-cell: low is flat pale stone with no frame, mid gets a real colour and a bronze rim,
+   bonus and scatter are gilded and lit from inside, and the wild adds a second bezel. A symbol's rank is
+   legible before you have identified the symbol. The colossal reels floated their sprites on a soft pool
+   and threw all of that away — a board where a wolf pup and a phoenix look equally important.
+
+   So the colossal cells are added to the SAME selectors rather than given a second set of rules that would
+   drift from them the first time the ladder is touched. Inset and radius are tightened a little because
+   these cells are 41px rather than 74, and a 5% inset on a small tile is a hairline nobody can see. */
+/* A LENGTH radius, not a percentage. A percentage radius resolves per axis, so on a 69x41 cell 22% is
+   15px across and 9px down — the tiles came out subtly elliptical and the wild, which has a second bezel,
+   came out as a visible oval among rounded rectangles. */
+.col5-cell::before, .col5-cell::after { inset: 4%; border-radius: 7px; }
+.col5-cell::after { border-width: 1px; }
+.col5-cell.is-mid::after { border-width: 1.5px; }
+.col5-cell.is-blank::before, .col5-cell.is-blank::after { display: none; }
+.col5-cell.is-wild::after { border-radius: 7px; }
+/* The giant is the one thing on the board that is NOT a medallion: it is a figure standing on the reel,
+   and framing it would put a picture in a frame inside a frame. */
+.col5-cell.is-giant::before, .col5-cell.is-giant::after { display: none; }
 
 /* The giant keeps its own lit alcove — it is the one thing on the board that IS a tile. */
 .col5-cell.is-giant { border-radius: 5px; }
 .col5-cell.is-giant::before { display: none; }
 
-/* ── A WIN IS LIT, NOT BOXED ── on a hundred lines a boxed cell is a board full of boxes. */
-.col5-cell.is-lit { box-shadow: none; }
-.col5-cell.is-lit::before { display: block; inset: 0; border-radius: 4px;
-    background: radial-gradient(closest-side, color-mix(in srgb, var(--tone, #fff) 62%, transparent), transparent 78%); }
-.col5-cell.is-lit img { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tone, #fff) 90%, transparent)) brightness(1.15); }
+/* ── A WIN LIGHTS ITS MEDALLION ── the tile stays a tile; it just catches fire. */
+.col5-cell.is-lit { z-index: 2; }
+.col5-cell.is-lit::after { border-color: #fff;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tone, #fff) 90%, transparent); }
+.col5-cell.is-lit img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #fff) 90%, transparent)) brightness(1.15); }
 
 /* ── THE CONTROLS STAY WITHIN REACH ───────────────────────────────────────────────────────────────────
    A colossal cabinet is a big object — twelve rows of portrait cells is most of a phone screen before the
@@ -19824,6 +19827,26 @@ body.cas-seated .social-fab { display: none; }
 .s5-cab.is-colossal { padding: 5px; background: linear-gradient(180deg, #4a3a17, #241a0a 60%, #1a1206); }
 .s5-cab.is-colossal::before { display: none; }
 .s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
+
+/* ── WHAT THIS PRESS PAID, AND THEN GONE ──────────────────────────────────────────────────────────────
+   Not a readout — an event. It sits over the bottom of the tall board for as long as it is true and takes
+   no room at all when it is not, which is what let the whole balance strip go. */
+.col5-flash { position: absolute; left: 50%; bottom: 6px; z-index: 8; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    padding: 4px 12px; border-radius: 999px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(14,9,2,.92), rgba(6,4,1,.96));
+    border: 1px solid color-mix(in srgb, var(--acc, #7fe0a0) 55%, transparent);
+    box-shadow: 0 4px 18px rgba(0,0,0,.7);
+    animation: col5FlashIn .26s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes col5FlashIn { from { transform: translateX(-50%) translateY(8px); opacity: 0; }
+    to { transform: translateX(-50%); opacity: 1; } }
+.col5-flash-spin { font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
+    color: #c9a24a; }
+.col5-flash-mult { font-family: var(--font-display); font-size: 1rem; color: #ffd75e;
+    text-shadow: 0 0 12px rgba(255,215,94,.9); }
+.col5-flash-won { font-size: 13px; font-weight: 800; color: #e8dcc6; }
+.col5-flash-won b { font-size: 16px; font-weight: 900; color: #fff3d0;
+    text-shadow: 0 0 14px rgba(255,200,90,.95); font-variant-numeric: tabular-nums; }
 
 /* ── THE RIBBON IS ONE LINE ───────────────────────────────────────────────────────────────────────────
    Five readouts across a single strip: where you are in a free round, the multiplier reel, balance, chips
@@ -20303,7 +20326,7 @@ body.cas-seated .social-fab { display: none; }
    off the dark cabinet instead of every tile sitting at the same mid-tone. */
 
 /* ── LOW: FLAT STONE ─────────────────────────────────────────────────────────────────────────────── */
-.s5-cell::before {
+.s5-cell::before, .col5-cell::before {
     inset: 5%;
     border-radius: 20%;
     background: linear-gradient(180deg,
@@ -20311,25 +20334,26 @@ body.cas-seated .social-fab { display: none; }
         color-mix(in srgb, var(--tone) 26%, #8d8474 74%));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -3px 7px rgba(0, 0, 0, .35);
 }
-.s5-cell::after {
+.s5-cell::after, .col5-cell::after {
     content: ""; position: absolute; inset: 5%; border-radius: 20%; pointer-events: none; z-index: 2;
     border: 1.5px solid rgba(60, 46, 26, .55);
 }
 
 /* ── MID: A REAL COLOUR, AND A BRONZE RIM ────────────────────────────────────────────────────────── */
-.s5-cell.is-mid::before {
+.s5-cell.is-mid::before, .col5-cell.is-mid::before {
     background: radial-gradient(120% 90% at 50% 14%,
         color-mix(in srgb, var(--tone) 46%, #fff 54%),
         color-mix(in srgb, var(--tone) 88%, #2a1d0c 12%) 78%);
     box-shadow: inset 0 2px 0 rgba(255, 255, 255, .55), inset 0 -5px 10px rgba(0, 0, 0, .45);
 }
-.s5-cell.is-mid::after {
+.s5-cell.is-mid::after, .col5-cell.is-mid::after {
     border: 2px solid rgba(206, 152, 74, .85);
     box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .6);
 }
 
 /* ── BONUS AND SCATTER: GILDED, AND LIT FROM INSIDE ──────────────────────────────────────────────── */
-.s5-cell.is-bonus::before, .s5-cell.is-scatter::before {
+.s5-cell.is-bonus::before, .s5-cell.is-scatter::before,
+.col5-cell.is-bonus::before, .col5-cell.is-scatter::before {
     background: radial-gradient(120% 92% at 50% 10%,
         #fff,
         color-mix(in srgb, var(--tone) 68%, #fff 32%) 34%,
@@ -20337,7 +20361,8 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: inset 0 2px 0 rgba(255, 255, 255, .8), inset 0 -6px 12px rgba(0, 0, 0, .45),
         0 0 18px color-mix(in srgb, var(--tone) 55%, transparent);
 }
-.s5-cell.is-bonus::after, .s5-cell.is-scatter::after {
+.s5-cell.is-bonus::after, .s5-cell.is-scatter::after,
+.col5-cell.is-bonus::after, .col5-cell.is-scatter::after {
     border: 2.5px solid #ffe6a4;
     box-shadow: inset 0 0 0 1px rgba(40, 22, 6, .8), 0 0 16px color-mix(in srgb, var(--tone) 70%, transparent);
     /* The studs. Four of them, and they are the detail that makes a border read as hardware rather than
@@ -20350,7 +20375,7 @@ body.cas-seated .social-fab { display: none; }
 }
 
 /* ── WILD: EVERYTHING, PLUS A SHINE THAT NEVER STOPS ─────────────────────────────────────────────── */
-.s5-cell.is-wild::before {
+.s5-cell.is-wild::before, .col5-cell.is-wild::before {
     background: radial-gradient(120% 92% at 50% 8%,
         #fff,
         color-mix(in srgb, var(--tone) 62%, #fff 38%) 30%,

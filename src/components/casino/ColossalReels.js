@@ -281,28 +281,23 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 </div>
             </div>
 
-            {/* ── THE RIBBON, EARNING ITS HEIGHT ──────────────────────────────────────────────────────
-                Luke: "do we really need to show the lines and won in a big area, or show so much of the top
-                bg, or have a big area dedicated to balance and chips?"
+            {/* ── NO RIBBON ────────────────────────────────────────────────────────────────────────────
+                Balance and chips are in the page header now, beside the coin and chip sprites — they were
+                the only permanent things on this strip and they were already half-shown up there. What is
+                left is WHAT THIS PRESS PAID, which is not a readout: it is an event, it matters for about
+                four seconds, and a number that spends most of its life reading 0 does not deserve a
+                reserved row. It arrives over the reels and leaves.
 
-                No. LINES read 100 and would read 100 for ever — a constant given a third of a bar. So the
-                strip is one line now and carries only things that CHANGE: where you are in a free round,
-                what the multiplier reel is showing, what the press has paid, and the two money numbers that
-                used to have a panel of their own below the cabinet. The line count moved to the Pays screen,
-                which is where a rule that never changes belongs. */}
-            <div className="col5-bar">
-                {free ? (
-                    <span className="col5-cell-b"><i>Free spin</i><b>{free.at + 1}/{free.of}</b></span>
-                ) : null}
-                {free ? (
-                    <span className={`col5-mult${(spin?.applied || 1) > 1 ? " is-on" : ""}`}>
-                        <b>&times;{spin?.applied || 1}</b>
-                    </span>
-                ) : null}
-                <span className="col5-cell-b"><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
-                <span className="col5-cell-b is-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
-                <span className={`col5-cell-b is-won${won > 0 ? " is-hot" : ""}`}><i>Won</i><b>{won.toLocaleString()}</b></span>
-            </div>
+                The free-round counter joins it, because that is the other thing that is only true
+                sometimes. Between them they took a whole strip of a screen that had none to spare. */}
+            {(free || won > 0) ? (
+                <div className="col5-flash" role="status">
+                    {free ? <span className="col5-flash-spin">Free spin {free.at + 1}/{free.of}</span> : null}
+                    {free && (spin?.applied || 1) > 1
+                        ? <span className="col5-flash-mult">&times;{spin.applied}</span> : null}
+                    {won > 0 ? <span className="col5-flash-won"><b>{won.toLocaleString()}</b> chips</span> : null}
+                </div>
+            ) : null}
 
             {/* Three moons between the two boards, and what they bought. */}
             {shout ? (

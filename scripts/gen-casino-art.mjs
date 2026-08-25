@@ -221,6 +221,48 @@ const JOBS = {
                 + "frame, no background, no floor. It must read clearly at 90 pixels wide." }),
     },
 
+    // ── THE WILD IS A WORD, NOT AN ANIMAL ────────────────────────────────────────────────────────────
+    // Luke: "I'm hoping for this one we could have a wild sprite that isn't the iguana — instead it's the
+    // actual word WILD in rainbow or something."
+    //
+    // Which is what a real cabinet does, and for a reason worth saying: the wild is the only symbol whose
+    // job is not to be itself. Every other tile is a thing you are collecting; the wild is a RULE. Drawing
+    // it as one more animal puts it in the same category as the things it substitutes for, and on a board
+    // where a fifth of the tiles are wild that is a board that looks like it is mostly chameleons.
+    "reels/slot4-wolf": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "The single word WILD in bold chunky capital letters, filling the frame, the letters cut from "
+            + "polished iridescent metal that shifts through magenta, cyan, violet and gold like an oil "
+            + "slick, with a heavy bevelled gold outline around every letter and small sparks of light "
+            + "coming off the corners",
+            { framing: "sprite", extra: "The word WILD and nothing else — four letters, W I L D, spelled "
+                + "correctly, in one straight horizontal line, seen straight on and flat. Bold heavy display "
+                + "lettering, very thick strokes, filling the width of the frame. PRISMATIC rainbow metal "
+                + "with a hard gold bevel. It must read at 40 pixels wide, so the letters must be chunky and "
+                + "widely spaced. Nothing else in frame — no animal, no border, no plate, no background." }),
+    },
+    // ── THE TWO NUMBERS IN THE HEADER ────────────────────────────────────────────────────────────────
+    // Luke: "just show the coin amount with the coin sprite and the chip amount with the chip sprite... that
+    // way we can free up that entire row." Two tiny icons buy back a whole strip of the screen.
+    "hud-coin": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A single thick gold coin seen face on, a wolf's head stamped in relief on it, milled edge, "
+            + "polished and catching one hard highlight",
+            { framing: "sprite", extra: "Hot polished gold. Perfectly circular, seen straight on and flat. "
+                + "Must read at 18 pixels wide — chunky, almost no fine detail. Nothing else in frame." }),
+    },
+    "hud-chip": {
+        size: "1024x1024",
+        prompt: housePrompt(
+            "A single casino gaming chip seen face on, deep emerald green with cream edge spots around its "
+            + "rim and a small gold wolf's head in the middle",
+            { framing: "sprite", extra: "Vivid emerald green and cream with a gold centre. Perfectly "
+                + "circular, seen straight on and flat. Must read at 18 pixels wide — chunky, almost no fine "
+                + "detail. Nothing else in frame." }),
+    },
+
     "fs-mult": {
         size: "1024x1024",
         prompt: housePrompt(

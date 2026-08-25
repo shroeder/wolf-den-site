@@ -119,7 +119,11 @@ const LOOK = {
         laurel: { rank: 3, role: "mid", tone: "#37f5c0", name: "Golem Heart" },
         chest: { rank: 4, role: "bonus", tone: "#ffd75e", name: "Radiant Phoenix" },
         moon: { rank: 5, role: "scatter", tone: "#8fd3ff", name: "Spirit Fox" },
-        wolf: { rank: 6, role: "wild", tone: "#b45aff", name: "Chameleon" },
+        // Not an animal any more — the wild on this cabinet is the WORD, in prismatic metal. The wild is
+        // the only symbol whose job is not to be itself: everything else is a thing you are collecting and
+        // this one is a RULE, so drawing it as one more creature filed it with the things it substitutes
+        // for. On a board that is a fifth wild, that read as a board of chameleons.
+        wolf: { rank: 6, role: "wild", tone: "#b45aff", name: "Wild" },
         // ── THE TWO GIANTS ───────────────────────────────────────────────────────────────────────
         // Luke, on the reference: "it has a Lil' Red and a Big Bad Wolf, and they're not repeating tiles,
         // they're actually one big one, and they only show up in the big reels. Those are the best paying
