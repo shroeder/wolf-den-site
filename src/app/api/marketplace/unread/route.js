@@ -4,7 +4,7 @@ import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketpla
 import { unreadDmCount } from "@/lib/marketplace/dm.js";
 import { incomingRequestCount } from "@/lib/marketplace/friends.js";
 import { unreadCountForBuyer, unreadCountForVendor } from "@/lib/marketplace/messaging.js";
-import { markSeen } from "@/lib/marketplace/social-notify.js";
+import { dismissAllUnread, markSeen } from "@/lib/marketplace/social-notify.js";
 import { channelUnread } from "@/lib/marketplace/town.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -13,6 +13,17 @@ export const dynamic = "force-dynamic";
 
 function noStore(body) {
     return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
+}
+
+// Mark everything read in one tap — every thread and every room this member can see. Friend requests are
+// deliberately untouched; see dismissAllUnread for why that is the point rather than a gap.
+export async function POST() {
+    return withRequestLogging(null, "POST /api/marketplace/unread", async () => {
+        const buyer = await getAuthenticatedBuyer().catch(() => null);
+        if (!buyer) return noStore({ ok: false, error: "not_signed_in" });
+        const r = await dismissAllUnread(buyer.id).catch(() => ({ ok: false }));
+        return noStore(r);
+    });
 }
 
 // Total unread across the unified inbox (friend DMs + buyer/vendor threads) + pending friend requests.

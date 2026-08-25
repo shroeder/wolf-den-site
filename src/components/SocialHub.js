@@ -211,6 +211,9 @@ export default function SocialHub() {
     // is a client that can decide it differently.
     const [channels, setChannels] = useState(["global"]);
     const [requests, setRequests] = useState(0);
+    // Mark everything read. Declared up here with the other state because there is an early return further
+    // down and a hook after it is a hook that does not always run.
+    const [clearing, setClearing] = useState(false);
     const [bubble, setBubble] = useState(false);
     const prevTotalRef = useRef(-1);
     const [open, setOpen] = useState(false);
@@ -246,6 +249,19 @@ export default function SocialHub() {
         const iv = setInterval(() => { if (document.visibilityState === "visible") refreshUnread(); }, 30000);
         return () => clearInterval(iv);
     }, [refreshUnread]);
+
+    // ── ONE TAP CLEARS THE LOT ───────────────────────────────────────────────────────────────────────────
+    // The counts are zeroed here rather than waited for: the poll is on a thirty-second timer, and a badge
+    // that survives the tap which dismissed it reads as a button that did not work. `requests` is left alone
+    // — the server does not clear it and neither should the screen. See dismissAllUnread for why.
+    const dismissAll = useCallback(async () => {
+        if (clearing) return;
+        setClearing(true);
+        const r = await fetch("/api/marketplace/unread", { method: "POST" }).catch(() => null);
+        if (r?.ok) { setUnread(0); setGlobalNew(0); setRoomNew({}); setBubble(false); }
+        setClearing(false);
+        refreshUnread();
+    }, [clearing, refreshUnread]);
 
     // Lock the page behind the full-screen hub so nothing scrolls underneath.
     useEffect(() => {
@@ -402,6 +418,20 @@ export default function SocialHub() {
                         ) : (
                             <span className="social-topbar-title">Social</span>
                         )}
+                        {/* ── ONE TAP CLEARS THE LOT ──────────────────────────────────────────────
+                            Luke: "can we add a dismissal feature in the social to dismiss all unread, make
+                            it clean." Four things feed that badge and every one of them wanted VISITING to
+                            clear it — open each thread, open each room. After a weekend the only way to get
+                            the dot off the button was to walk the whole hub.
+
+                            It appears only when there is something to clear, so it is never a control that
+                            does nothing, and it is deliberately quiet next to Close: this is the thing you
+                            reach for occasionally, not the thing you reach for on the way out. Friend
+                            requests survive it on purpose — see dismissAllUnread. */}
+                        {!thread && (unread > 0 || globalNew > 0) ? (
+                            <button type="button" className="social-clear" onClick={dismissAll} disabled={clearing}
+                                aria-label="Mark everything read">{clearing ? "Clearing…" : "Mark all read"}</button>
+                        ) : null}
                         <button type="button" className="social-exit" onClick={closeHub} aria-label="Close">Close ✕</button>
                     </div>
                     {thread ? (

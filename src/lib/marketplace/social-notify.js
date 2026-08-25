@@ -53,6 +53,47 @@ export async function markSeen(userId) {
 
 // New DM message -> push always; email when offline. `firstUnread` (only the first unread message in a
 // thread sets it) rate-limits the email so a burst of messages is at most one email.
+// ── CLEAR THE LOT ────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "can we add a dismissal feature in the social to dismiss all unread, make it clean."
+//
+// The badge is fed by four different things and every one of them had to be cleared by VISITING it: open each
+// thread, open each room. Come back after a weekend and the only way to get the dot off the button is to walk
+// the whole hub. That is a chore the badge invented for itself.
+//
+// WHAT THIS CLEARS AND WHAT IT DELIBERATELY DOES NOT. Every message thread and every room you can see are a
+// READ-STATE — they mean "there is something here you have not looked at", and saying "I have looked" is a
+// thing you are entitled to do in one tap. Friend requests are not that. A pending request is somebody waiting
+// on an answer from you, and dismissing it would either quietly decline it or lie about it still being there.
+// So it survives, and that is the point rather than a limitation: once this has run, a badge on the hub means
+// exactly one thing — a person is waiting on you.
+//
+// Both message families live in the same table (a null vendor_id is a friend DM, a set one is a vendor
+// thread) and all three counts read the same two columns, so one statement covers all of them. The rooms are
+// asked for by name because which rooms exist for a member is the server's fact — see the unread route.
+export async function dismissAllUnread(userId) {
+    if (!userId) return { ok: false };
+    // Stamp whichever side of each thread is this member. NOW() rather than the last message's timestamp:
+    // a message that lands mid-request should still count as unread, and it will, because it is later.
+    await db.query(
+        `UPDATE mkt_dm_thread
+            SET a_last_read_at = CASE WHEN user_a = $1 THEN NOW() ELSE a_last_read_at END,
+                b_last_read_at = CASE WHEN user_b = $1 THEN NOW() ELSE b_last_read_at END
+          WHERE user_a = $1 OR user_b = $1`,
+        [userId]
+    ).catch(() => {});
+    // And every room this member is actually in. Never a hardcoded list — a room they cannot see must not
+    // be touched, and roles.js is the only thing that knows which those are.
+    let rooms = ["global", "announce"];
+    try {
+        const { standingFor, channelsFor } = await import("@/lib/marketplace/roles.js");
+        const st = await standingFor(userId);
+        if (st) rooms = channelsFor(userId, st.roles);
+    } catch { /* the default pair is what everybody has */ }
+    const { markChannelSeen } = await import("@/lib/marketplace/town.js");
+    await Promise.all(rooms.map((c) => markChannelSeen(userId, c).catch(() => {})));
+    return { ok: true, rooms };
+}
+
 export async function notifyNewDm(recipientId, senderId, threadId, preview, { firstUnread = false } = {}) {
     try {
         if (!recipientId || recipientId === senderId) return;

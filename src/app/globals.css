@@ -6772,7 +6772,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     padding: 12px 14px;
     flex: 0 0 auto;
 }
-.social-topbar-title { font-weight: 800; font-size: 1.1rem; }
+.social-topbar-title { font-weight: 800; font-size: 1.1rem; margin-right: auto; }
+/* ── MARK ALL READ ────────────────────────────────────────────────────────────────────────────────────
+   Luke: "add a dismissal feature in the social to dismiss all unread, make it clean." Quiet on purpose —
+   it sits beside Close and must never be mistaken for it, because one of them throws away your place in
+   four rooms and the other does not. Rendered only when there is something to clear. */
+.social-clear { flex: 0 0 auto; background: none; border: 1px solid rgba(255,255,255,0.14);
+    color: #9aa2ab; border-radius: 999px; padding: 6px 11px; font-size: 0.76rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: color .15s ease, border-color .15s ease; }
+.social-clear:hover, .social-clear:focus-visible { color: var(--ink); border-color: rgba(255,255,255,0.3); }
+.social-clear:disabled { opacity: .55; cursor: default; }
 .social-crumb {
     background: none;
     border: none;
@@ -19118,22 +19127,27 @@ body.cas-seated .social-fab { display: none; }
    with 42px shoulders is 100px of a 640px viewport spent on two controls you press with one thumb — on a
    cabinet whose whole problem is that fifteen rows of reels do not fit. A 72px target is still well past
    the 44px anybody recommends, and the twenty-odd pixels it gives back go to the glass. */
-.s5-panel { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
-.s5-stepper { display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; border-radius: 11px;
+/* Shrunk once and Luke: "we're still using a bunch of space for the bottom controls, that's way too big."
+   `align-items: stretch` was the real cost — the bet block had no height of its own, it was inflated to
+   match the disc, so every pixel off the button was being paid for twice and shown once. Centred, the two
+   controls size themselves and the panel is as tall as the disc alone. 56px is still a comfortable thumb
+   target and it hands roughly a whole reel row back to the glass. */
+.s5-panel { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.s5-stepper { display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; border-radius: 10px;
     background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); overflow: hidden; }
 .s5-stepper button { border: none; background: rgba(255, 255, 255, .05); color: #e8dcc6; cursor: pointer;
-    font-size: 19px; font-weight: 700; line-height: 1; height: 100%; }
+    font-size: 17px; font-weight: 700; line-height: 1; height: 100%; }
 .s5-stepper button:active { background: rgba(255, 255, 255, .12); }
 .s5-stepper button:disabled { color: #4a525b; cursor: default; background: rgba(255, 255, 255, .02); }
-.s5-stepper > span { display: grid; gap: 0; justify-items: center; padding: 4px 2px; }
-.s5-stepper i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .12em;
+.s5-stepper > span { display: grid; gap: 0; justify-items: center; padding: 5px 2px; }
+.s5-stepper i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
-.s5-stepper b { font-size: 15px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+.s5-stepper b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
 
 /* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
    bar, and because nothing else on the screen is round. */
-.s5-spin { width: 72px; height: 72px; border-radius: 999px; border: none; cursor: pointer;
-    font-family: var(--font-display); font-size: 13px; font-weight: 900; letter-spacing: .08em;
+.s5-spin { width: 56px; height: 56px; border-radius: 999px; border: none; cursor: pointer;
+    font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .06em;
     color: #2a1c05; background: radial-gradient(circle at 50% 32%, #ffe9a8, #f0c04e 52%, #c9932c 100%);
     box-shadow: 0 4px 0 #8d6716, 0 10px 22px rgba(0, 0, 0, .5), inset 0 2px 4px rgba(255, 255, 255, .5); }
 .s5-spin:active { transform: translateY(3px); box-shadow: 0 1px 0 #8d6716, 0 4px 12px rgba(0, 0, 0, .5); }
@@ -19977,11 +19991,24 @@ body.cas-seated .social-fab { display: none; }
    ground behind a busy board is unreadable, and the board is the thing you came to read.
 
    `padding-bottom` is the strip the win readout hangs into — see .col5-flash. */
-/* SEE-THROUGH, because the ROOM is now carrying the machine's scene (see .cas-stage::before). A second
-   blurred copy of the same painting here was two backdrops fighting; this just lets the first one up. The
-   bottom strip is the room the win readout hangs into — see .col5-flash. */
-.s5-cab.is-colossal { padding: 5px 5px 30px; overflow: hidden;
-    background: linear-gradient(180deg, rgba(30,22,8,.5), rgba(10,7,3,.62) 60%, rgba(6,4,1,.68)); }
+/* ── THE PAINTING IS THE FRAME ────────────────────────────────────────────────────────────────────────
+   Luke: "bring back the colourful background on top and bottom and maybe the sides as well, just a little
+   bit of a frame for the machine to make it really pop, while still keeping everything in view."
+
+   The room behind the whole screen was too far away to do that job — heavily blurred and scrimmed, it read
+   as atmosphere rather than as part of the cabinet. This is the machine's own scene at full colour, and the
+   boards are opaque, so the only place it shows is the padding: a band across the top, a wider one along
+   the bottom, and a rule down each side. That is a frame, and it costs nothing but the padding.
+
+   Barely blurred and barely scrimmed on purpose — it is meant to pop. It can afford to, because nothing has
+   to be read through it. The bottom band is also where the win readout lives; see .col5-flash.
+
+   The space came out of the controls (see .s5-panel), which is the trade he asked for: the frame is paid for
+   in chrome rather than in glass. */
+.s5-cab.is-colossal { padding: 19px 11px 40px; overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(8,5,2,.34), rgba(8,5,2,.16) 22%, rgba(8,5,2,.16) 74%, rgba(8,5,2,.42)),
+        var(--mast) center / cover no-repeat, #0c0904; }
 .s5-cab.is-colossal::before { display: none; }
 .s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
 
@@ -20021,7 +20048,7 @@ body.cas-seated .social-fab { display: none; }
    down and not cover the bottom slot." At `bottom: 6px` it lay straight across the middle row of the small
    board, which is the row you have to read to know whether a column is about to send. The cabinet carries
    the room for it below (see .s5-cab.is-colossal), paid for by the panel shrink above. */
-.col5-flash { position: absolute; left: 50%; bottom: -17px; z-index: 8; transform: translateX(-50%);
+.col5-flash { position: absolute; left: 50%; bottom: -30px; z-index: 8; transform: translateX(-50%);
     display: flex; align-items: center; gap: 8px; white-space: nowrap;
     padding: 4px 12px; border-radius: 999px; pointer-events: none;
     background: linear-gradient(180deg, rgba(14,9,2,.92), rgba(6,4,1,.96));
@@ -20257,8 +20284,20 @@ body.cas-seated .social-fab { display: none; }
    main board's are 1.18 rows tall. Written as `--col5-row * -6` it was right for the tall board and 18%
    short on the small one, which showed as a sliver of a fourth row peeking under the main reels. Each
    board declares its cell height once and the cells, the window and the travel all read it. */
-.col5-grid.is-tall { --cell-h: var(--col5-row); }
-.col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); }
+/* ── BOTH BOARDS TURN AT THE SAME SPEED ───────────────────────────────────────────────────────────────
+   Luke: "on the top reel spins slow and then it starts spinning fast after the bottom rail has finished —
+   realistically the top rail should always spin fast, it shouldn't change."
+
+   It was not a change, it was a comparison, and the top board really was the slower of the two. One roll
+   duration was shared by both while the MAIN board's cells are 1.18x taller — so in the same tenth of a
+   second the bottom rail covered eighteen percent more glass. Side by side the tall board reads as sluggish;
+   the moment the bottom rail lands there is nothing slower-looking beside it and it appears to pick up.
+
+   Speed is distance over time, so the time has to follow the cell. Both boards now run at the FAST rate —
+   the one the bottom rail was already doing — which is what he asked for and what a real cabinet does.
+   ANY change to --cell-h has to be matched here or the two drift apart again. */
+.col5-grid.is-tall { --cell-h: var(--col5-row); --roll-ms: 475ms; }
+.col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); --roll-ms: 560ms; }
 /* ── REELS FALL ───────────────────────────────────────────────────────────────────────────────────────
    Luke: "reels go down, not up — you have them going up." He was right and the cause was the strip's
    ORDER, now fixed in the JSX: the real column is written FIRST and the lead-in after it. So the resting
@@ -20283,7 +20322,7 @@ body.cas-seated .social-fab { display: none; }
    i and cell i+8 are the same symbol by construction. That also makes the hand-off to the settle exact,
    because `-(--spin)` and `-(--spin - 8)` show identical content — the reel decelerates out of the loop
    from wherever it happens to be, with nothing to see. */
-.col5-reel.is-spin .col5-strip { animation: col5Roll .56s linear infinite; }
+.col5-reel.is-spin .col5-strip { animation: col5Roll var(--roll-ms, 475ms) linear infinite; }
 @keyframes col5Roll {
     from { transform: translateY(calc(var(--cell-h) * -1 * var(--spin, 20))); }
     to { transform: translateY(calc(var(--cell-h) * -1 * (var(--spin, 20) - 8))); }
