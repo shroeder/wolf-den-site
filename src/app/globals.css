@@ -18629,7 +18629,28 @@ body.cas-seated .social-fab { display: none; }
    without the keyframe needing to know where that is. A transition cannot do this job — while the reel
    spins its transform belongs to an animation, which sits above the cascade, so removing the animation
    never "changes" the computed value and no transition ever starts. */
+/* ── THE WINDOW AND THE STRIP ─────────────────────────────────────────────────────────────────────────
+   Same change as the colossal cabinet, for the same reason: the reel already built a strip of nine filler
+   symbols followed by the real column, and then threw it away by swapping to the bare grid the moment the
+   reel landed. The symbols never arrived — they were replaced — so there was no near miss on any of these
+   four machines either.
+
+   The strip is constant now and the reel is a window over it. At rest it is pulled up by exactly the nine
+   filler cells, so the window holds the real three. */
+/* The window is exactly the three rows the machine plays. Without a height the reel simply grew to the
+   whole twelve-cell strip and the cabinet showed its own filler above and below the board — the strip has
+   to be taller than the window or there is nothing to travel, and the window has to be stated or it is not
+   a window at all. */
+.s5-reel { overflow: hidden; height: calc(var(--s5cell) * 3); }
+.s5-strip { transform: translateY(calc(var(--s5cell) * -9)); }
 .s5-reel.is-spin .s5-strip { animation: s5Run .22s linear infinite; }
+/* Stopping travels the whole remaining filler, so the real column rises through the window and settles
+   with a little weight in it. That last third of a second is where a near miss lives. */
+.s5-reel.is-stop .s5-strip { animation: s5Settle .5s cubic-bezier(.12,.74,.22,1.04) both; }
+@keyframes s5Settle {
+    from { transform: translateY(calc(var(--s5cell) * -4)); }
+    to { transform: translateY(calc(var(--s5cell) * -9)); }
+}
 .s5-reel.is-spin .s5-cell img { filter: blur(2px); opacity: .9; }
 /* ── A REEL FALLS. IT DOES NOT RISE. ─────────────────────────────────────────────────────────────
    This ran `to { translateY(-3 cells) }` from an implicit start of zero, which walks the strip UPWARDS —
@@ -18638,9 +18659,11 @@ body.cas-seated .social-fab { display: none; }
    spin animation is reverse and then it reverses again when it stops."
    Both halves now move the same way, which is down: the strip starts three cells high and falls to rest,
    over and over, and the landing continues that fall rather than reversing it. */
+/* Running cycles the TOP of the filler — cells 0..6 of nine — so nothing real can be on screen before the
+   reel is asked to stop. It used to run 0 to -3 and then swap; the swap is what this replaces. */
 @keyframes s5Run {
-    from { transform: translateY(calc(var(--s5cell) * -3)); }
-    to { transform: translateY(0); }
+    from { transform: translateY(0); }
+    to { transform: translateY(calc(var(--s5cell) * -4)); }
 }
 .s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 340ms) cubic-bezier(.17,.84,.32,1) both; }
 @keyframes s5Settle { from { transform: translateY(calc(var(--s5cell) * -2.2)); } }

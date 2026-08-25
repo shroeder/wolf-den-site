@@ -859,30 +859,46 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}`}
                             style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
                             <div className="s5-strip">
-                                {/* Chooses between two things already drawn. Nothing here is random, so a
-                                    re-render cannot change what is on the reels. */}
-                                {(grid && landed > reel
-                                    ? grid[reel]
-                                    : spinning || result
-                                        ? [...filler[reel], ...(grid?.[reel] || idle[reel])]
-                                        : idle[reel]
-                                ).map((sym, i) => (
+                                {/* ── ONE STRIP, ALWAYS: NO SWAP AT THE END ───────────────────────────
+                                    Luke, of the colossal cabinet and then of these: "a big part of the slot
+                                    is seeing what goes by and what comes into view — the near-miss effect
+                                    is a lot of dopamine we are throwing away."
+
+                                    This already BUILT the right thing — nine filler symbols and then the
+                                    real column, in one strip — and then threw it away at the last moment by
+                                    swapping to the bare grid the instant the reel landed. So the symbols
+                                    never arrived; they were replaced. A wild sliding to a stop one row
+                                    short of a line never happened here either.
+
+                                    The strip is the same every time now and the reel is a window over it:
+                                    running cycles the top of the filler, stopping travels the rest so the
+                                    real column rises up through the window. The `idle` tail is what a
+                                    machine at rest shows, so the same expression serves both. */}
+                                {[...filler[reel], ...(grid?.[reel] || idle[reel])].map((sym, i, all) => {
+                                    // Which row of the REAL column this cell is, or -1 for a filler cell.
+                                    // Everything that marks a cell — locked, breaking, teased, on the drawn
+                                    // line — has to be gated on this, or the filler above the window picks
+                                    // up the last spin's state as it scrolls past.
+                                    const row = i - (all.length - ROWS);
+                                    const real = row >= 0 && landed > reel;
+                                    return (
                                     // EVERY CELL CARRIES ITS SYMBOL'S COLOUR. The wash behind the symbol is
                                     // the same hue the symbol was drawn in — one map, see SYMBOL_LOOK — so a
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${flashSym && sym === flashSym && landed > reel ? " is-flash" : ""}${breaking.includes(reel * ROWS + (i % ROWS)) ? " is-breaking" : ""}${dropping.includes(reel * ROWS + (i % ROWS)) ? " is-dropping" : ""}${lockedAt.includes(reel * ROWS + (i % ROWS)) && landed > reel ? " is-locked" : ""}${tease && landed > reel ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
-                                        key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${(i % ROWS) * 40}ms` }}>
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${real && flashSym && sym === flashSym ? " is-flash" : ""}${real && breaking.includes(reel * ROWS + row) ? " is-breaking" : ""}${real && dropping.includes(reel * ROWS + row) ? " is-dropping" : ""}${real && lockedAt.includes(reel * ROWS + row) ? " is-locked" : ""}${real && tease ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
+                                        key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${Math.max(0, row) * 40}ms` }}>
                                         {/* The wild's travelling shine. Its own element because the cell
                                             has already spent ::before on the plate and ::after on the
                                             frame, and a shine needs to clip separately from both. */}
                                         {symbolRole(sym, machineId) === "wild" ? <i className="s5-shine" aria-hidden="true" /> : null}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
-                                            className={`${lit && lit.line[reel] === (i % ROWS) && reel < lit.count ? "is-lit" : ""}${flashSym && sym === flashSym && landed > reel ? " is-flash-img" : ""}`.trim()} />
+                                            className={`${real && lit && lit.line[reel] === row && reel < lit.count ? "is-lit" : ""}${real && flashSym && sym === flashSym ? " is-flash-img" : ""}`.trim()} />
                                     </span>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
