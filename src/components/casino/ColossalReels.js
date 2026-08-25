@@ -35,7 +35,7 @@ const SEND_MS = 620;      // a wild column falling from the small board into the
 const LINE_MS = 620;      // one winning line lit
 const BONUS_MS = 2400;
 
-export default function ColossalReels({ machineId, art, bet, data, onDone, playing }) {
+export default function ColossalReels({ machineId, art, bet, data, onDone, playing, gold, chips }) {
     const m = slot5(machineId);
     const rows = data?.rows || 12;
 
@@ -281,16 +281,27 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 </div>
             </div>
 
-            {/* ── THE RIBBON ── where you are, what the multiplier reel is showing, what the press has paid. */}
+            {/* ── THE RIBBON, EARNING ITS HEIGHT ──────────────────────────────────────────────────────
+                Luke: "do we really need to show the lines and won in a big area, or show so much of the top
+                bg, or have a big area dedicated to balance and chips?"
+
+                No. LINES read 100 and would read 100 for ever — a constant given a third of a bar. So the
+                strip is one line now and carries only things that CHANGE: where you are in a free round,
+                what the multiplier reel is showing, what the press has paid, and the two money numbers that
+                used to have a panel of their own below the cabinet. The line count moved to the Pays screen,
+                which is where a rule that never changes belongs. */}
             <div className="col5-bar">
-                <span className="col5-cell-b"><i>{free ? "Free spin" : "Lines"}</i>
-                    <b>{free ? `${free.at + 1} / ${free.of}` : data?.lines || 100}</b></span>
+                {free ? (
+                    <span className="col5-cell-b"><i>Free spin</i><b>{free.at + 1}/{free.of}</b></span>
+                ) : null}
                 {free ? (
                     <span className={`col5-mult${(spin?.applied || 1) > 1 ? " is-on" : ""}`}>
-                        <b>&times;{spin?.applied || 1}</b><em>reel five</em>
+                        <b>&times;{spin?.applied || 1}</b>
                     </span>
                 ) : null}
-                <span className="col5-cell-b"><i>Won</i><b>{won.toLocaleString()}</b></span>
+                <span className="col5-cell-b"><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
+                <span className="col5-cell-b is-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
+                <span className={`col5-cell-b is-won${won > 0 ? " is-hot" : ""}`}><i>Won</i><b>{won.toLocaleString()}</b></span>
             </div>
 
             {/* Three moons between the two boards, and what they bought. */}

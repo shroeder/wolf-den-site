@@ -19812,6 +19812,33 @@ body.cas-seated .social-fab { display: none; }
 }
 
 
+/* ── THE CABINET'S OWN CHROME, TRIMMED ────────────────────────────────────────────────────────────────
+   Half-height masthead, no caption, and the PAYS button floated onto the art instead of sitting in a
+   marquee row of its own. */
+/* ── AND THE MASTHEAD GOES ENTIRELY ───────────────────────────────────────────────────────────────────
+   Halving it left a 38px sliver of painted scene peeping out from behind the reel panel and clipped by the
+   cabinet's own corner radius — which reads as a rendering fault, not as a machine. A masthead needs room
+   to be a masthead; this cabinet has none, and it does not need one: the machine's name is already across
+   the page header in letters twice the size. The gold frame is what says "cabinet" here, and that stays.
+   Another 38px to the reels. */
+.s5-cab.is-colossal { padding: 5px; background: linear-gradient(180deg, #4a3a17, #241a0a 60%, #1a1206); }
+.s5-cab.is-colossal::before { display: none; }
+.s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
+
+/* ── THE RIBBON IS ONE LINE ───────────────────────────────────────────────────────────────────────────
+   Five readouts across a single strip: where you are in a free round, the multiplier reel, balance, chips
+   and what the press paid. It replaces both the old two-item bar and the balance panel that used to sit
+   under the whole cabinet. */
+.col5-bar { padding: 3px 8px; gap: 6px; }
+.col5-cell-b { gap: 0; }
+.col5-cell-b i { font-size: 6.5px; letter-spacing: .14em; }
+.col5-cell-b b { font-size: 12.5px; line-height: 1.15; }
+.col5-cell-b.is-chips b { color: #7fe0a0; }
+/* The one number that matters while the reels are still moving lights up when it is not zero. */
+.col5-cell-b.is-won b { color: #8f98a3; }
+.col5-cell-b.is-won.is-hot b { color: #ffe9bd; text-shadow: 0 0 12px rgba(255,200,90,.9); }
+.col5-mult b { font-size: 1rem; }
+
 /* ══ IT HAS TO FIT, AND IT HAS TO SPIN ════════════════════════════════════════════════════════════════════
    Luke: "I don't want to have to scroll to see the whole game, it needs to fit within my screen — so maybe
    make everything a little bit smaller. And the reels need to look like they're actually spinning, not just
@@ -19826,10 +19853,23 @@ body.cas-seated .social-fab { display: none; }
    that allows rather than as large as I felt like. */
 .s5:has(.col5) {
     /* what the cabinet has to fit into, after the site header, the readout, the panel and the gaps */
-    /* Measured against the real thing rather than estimated: at 336 the SPIN button sat just below the
-       fold — "fits" has to mean the button you press is on the screen, not that the document happens not to
-       scroll. */
-    --col5-avail: calc(100dvh - 408px);
+    /* ── WHAT THE CHROME IS ALLOWED TO COST ──────────────────────────────────────────────────────────
+       Luke: "I suspect with a little ingenuity you can maximize screen space for the reels and get the play
+       button into view. Do we really need to show the lines and won in a big area, or so much of the top
+       bg, or a big area dedicated to balance and chips?"
+
+       No to all three. The masthead lost its caption (the machine's name is already across the page header
+       in bigger letters) and half its height; LINES was a constant given a third of a bar; balance and
+       chips gave up their own panel and moved onto the cabinet's ribbon. That is about 150px handed back to
+       the reels — which is why the reserve here drops from 408 to 292 and the rows get BIGGER rather than
+       the page getting shorter: 33px a row before, 40px now, and the play button in view.
+
+       274 was found by walking it rather than derived, because the chrome above and below is not one number
+       anybody could add up: at 266 the rows reach 42px and SPIN's lower edge lands at 911 of 915, which is
+       on the screen by four pixels and therefore not on it; at 292 the board is smaller for nothing. The
+       reserve is the largest reel that still leaves the button comfortably in view, which is the only
+       definition of "fits" that matters. Rows: 33px before this pass, 41px after. */
+    --col5-avail: calc(100dvh - 274px);
     /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
     --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
 }

@@ -747,25 +747,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
 
                     So it takes the same `.s5-cab` every other machine on this floor is built from — the
                     masthead, the marquee, the gold — and the two reel sets become windows inside it. */}
-                <div className="s5-cab" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
-                    <span className="s5-marquee"><i aria-hidden="true" />{slot5(machineId).label.toUpperCase()}<i aria-hidden="true" />
-                        <button type="button" className="s5-pays" onClick={() => setPays(true)}
-                            aria-label="What this machine pays">PAYS</button>
-                    </span>
+                {/* THE MASTHEAD KEEPS ITS ART AND LOSES ITS CAPTION. The machine's name is already across
+                    the top of the page in letters twice this size — printing it again inside the cabinet
+                    spent 40px of a screen that has none to spare on saying the same thing twice. The
+                    painted scene stays, at half the height, because that is what makes it a cabinet. */}
+                <div className="s5-cab is-colossal" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
+                    <button type="button" className="s5-pays is-float" onClick={() => setPays(true)}
+                        aria-label="What this machine pays">PAYS</button>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
+                        gold={gold} chips={chips}
                         playing={Boolean(result?.colossal)} onDone={() => setPhase("done")} />
                 </div>
 
                 {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
 
-                {/* THE SAME PANEL AS EVERY OTHER CABINET. The first cut of this screen grew its own readout
-                    and its own row of stake buttons, which is how a floor ends up with two of everything —
-                    and it called `setBet`, which does not exist here (the bet is the parent's, changed
-                    through `onBet`). One readout, one stepper, one button, shared. */}
-                <div className="s5-readout">
-                    <span><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
-                    <span className="s5-ro-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
-                </div>
+                {/* NO SEPARATE READOUT. Balance and chips moved onto the cabinet's own ribbon — they were
+                    a two-column panel of their own under the machine, which is 86px spent on two numbers
+                    you glance at. What is left below the glass is the one control anybody presses. */}
                 <div className="s5-panel">
                     <div className="s5-stepper">
                         <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
