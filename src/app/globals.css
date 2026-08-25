@@ -19856,8 +19856,17 @@ body.cas-seated .social-fab { display: none; }
    place" Luke described — there was nothing to see, so there was no spin to watch. */
 .col5-reel { position: relative; }
 .col5-run { position: absolute; inset: 0; z-index: 0; display: block; overflow: hidden; }
-.col5-run img { display: block; width: 88%; height: var(--col5-row); margin: 0 auto;
-    object-fit: contain; opacity: .8; filter: blur(1.4px); }
+/* ── THE RUNNING SYMBOLS ARE THE SAME SIZE AS THE RESTING ONES ─────────────────────────────────────────
+   Luke: "when we spin the sprites are all cut off." They were: the strip drew each symbol into a box one
+   row tall and full width, while a resting cell draws it at 88% of BOTH — so a spinning symbol was scaled
+   up against its own row and clipped top and bottom by the reel. Matched to the resting cell, so a symbol
+   is the same object moving as it is standing still.
+
+   And much less blur. At 1.4px over a 30px symbol there was nothing left to recognise, which is what makes
+   a spinning reel read as a smear rather than as reels — the eye needs to half-catch a symbol going past. */
+.col5-run img { display: block; width: 88%; height: calc(var(--col5-row) * 0.88); margin: 0 auto
+    calc(var(--col5-row) * 0.12);
+    object-fit: contain; opacity: .92; filter: blur(0.7px); }
 .col5-reel.is-spin .col5-run { animation: col5Run .34s linear infinite; }
 @keyframes col5Run {
     from { transform: translateY(calc(var(--col5-row) * -4)); }

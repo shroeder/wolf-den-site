@@ -55,7 +55,9 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     const spin = free ? data?.free?.spins?.[free.at] : data;
     const main = spin?.main;
     const col = spin?.col;
-    const giants = spin?.giants || [];
+    // At rest the machine draws its own board (see `idle`), and that board has a giant standing in it — so
+    // it needs a giants list of its own or the figure is tiled twelve times instead of drawn once.
+    const giants = spin?.giants || (data ? [] : [{ reel: 3, row: 0, len: 12, sym: "dire" }]);
 
     // ── ONE SPIN, PLAYED ─────────────────────────────────────────────────────────────────────────────────
     const playOne = useCallback(async (sp, isFree) => {
@@ -145,6 +147,40 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
         return Array.from({ length: REELS }, (_, r) =>
             Array.from({ length: 8 }, (_, i) => pool[(i * 3 + r * 2) % pool.length]));
     }, []);
+
+    // ── A MACHINE AT REST SHOWS ITS REELS ────────────────────────────────────────────────────────────────
+    // Luke: "what's with this blurred-out preview? Just have it at rest with all the sprites."
+    //
+    // Before the first press there is no spin to draw, and the running strip was filling the gap — so a
+    // member walking up to the cabinet met two boards of blurred smears. That is the screen advertising
+    // itself as broken. A slot at rest shows a board; it is the first thing anybody sees of the machine and
+    // it should look like the machine.
+    //
+    // Deterministic rather than random: an idle board that reshuffles on every render would be a machine
+    // spinning by itself, and nothing here may look like a result that was not played for.
+    const idle = useMemo(() => {
+        const pool = ["bone", "doubloon", "laurel", "chest", "wolf", "keeper", "dire"];
+        const at = (r, i) => pool[(r * 5 + i * 3) % pool.length];
+        return {
+            main: Array.from({ length: REELS }, (_, r) =>
+                Array.from({ length: ROWS }, (_, i) => (at(r, i) === "keeper" || at(r, i) === "dire" ? "bone" : at(r, i)))),
+            // The tall board gets one giant standing in it at rest, because the giants ARE the machine and a
+            // resting board that never shows one is an advert that leaves out the product.
+            col: Array.from({ length: REELS }, (_, r) => (r === 3
+                ? Array.from({ length: rows }, () => "dire")
+                : Array.from({ length: rows }, (_, i) => {
+                    const v = at(r, i);
+                    return v === "keeper" || v === "dire" ? "laurel" : v;
+                }))),
+        };
+    }, [rows]);
+
+    // Which board to draw for a reel: the landed spin, the resting board, or nothing while it runs.
+    const restCol = (reel, row) => (colLanded > reel ? col?.[reel]?.[row] : (data ? null : idle.col[reel][row]));
+    const restMain = (reel, row) => (landed > reel ? main?.[reel]?.[row] : (data ? null : idle.main[reel][row]));
+    // The strip only runs during an actual press. At rest there is nothing to wait for.
+    const colRunning = (reel) => Boolean(data) && colLanded <= reel;
+    const mainRunning = (reel) => Boolean(data) && landed <= reel;
     const isGiantAt = (reel, row) => giants.find((g) => g.reel === reel && g.row === row);
     const insideGiant = (reel, row) => giants.some((g) => g.reel === reel && row > g.row && row < g.row + g.len);
 
@@ -158,8 +194,8 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <span className="col5-tag">{data?.label || "The Colossal Reels"}</span>
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : " is-spin"}${sent.includes(reel) ? " is-sent" : ""}`}>
-                            {colLanded <= reel ? (
+                        <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : colRunning(reel) ? " is-spin" : ""}${sent.includes(reel) ? " is-sent" : ""}`}>
+                            {colRunning(reel) ? (
                                 <span className="col5-run" aria-hidden="true">
                                     {filler[reel].concat(filler[reel]).map((f, i) => (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -168,7 +204,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                 </span>
                             ) : null}
                             {Array.from({ length: rows }, (_, row) => {
-                                const sym = colLanded > reel ? col?.[reel]?.[row] : null;
+                                const sym = restCol(reel, row);
                                 // ── ONE PICTURE, NOT SIX ────────────────────────────────────────────
                                 // A giant's run is drawn once at the height of the block. The rows it
                                 // covers render nothing at all — they are the same symbol to the maths and
@@ -184,8 +220,16 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                         </span>
                                     );
                                 }
+                                // ── `is-giant` COMES FROM THE LIST, NEVER FROM THE ROLE ──────────────
+                                // symbolRole("dire") is "giant", so building the class from the role gave
+                                // EVERY cell holding a giant `is-giant` — and that class carries
+                                // `grid-row: span var(--span, 4)`. Twelve of them, each defaulting to a
+                                // span of four, turned a twelve-row grid into a forty-eight-row one and
+                                // the board grew to three times the screen. The list is what knows where a
+                                // giant actually starts; the role is only what colour it is.
+                                const role = sym ? (isMult(sym) ? "mult" : symbolRole(sym, machineId)) : "blank";
                                 return (
-                                    <span key={row} className={`col5-cell is-${sym ? (isMult(sym) ? "mult" : symbolRole(sym, machineId)) : "blank"}${cellLit("col", reel, row, rows) ? " is-lit" : ""}`}
+                                    <span key={row} className={`col5-cell is-${role === "giant" ? "top" : role}${cellLit("col", reel, row, rows) ? " is-lit" : ""}`}
                                         style={{ "--tone": sym && !isMult(sym) ? symbolTone(sym, machineId) : "#ffd75e" }}>
                                         {sym && isMult(sym) ? <b>&times;{multValue(sym)}</b> : sym ? (
                                             // eslint-disable-next-line @next/next/no-img-element
@@ -211,8 +255,8 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <span className="col5-tag">Main reels — a full wild column sends</span>
                 <div className="col5-grid" style={{ "--rows": ROWS }}>
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : " is-spin"}${sending.includes(reel) ? " is-sending" : ""}`}>
-                            {landed <= reel ? (
+                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : mainRunning(reel) ? " is-spin" : ""}${sending.includes(reel) ? " is-sending" : ""}`}>
+                            {mainRunning(reel) ? (
                                 <span className="col5-run" aria-hidden="true">
                                     {filler[reel].concat(filler[reel]).map((f, i) => (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -221,7 +265,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                 </span>
                             ) : null}
                             {Array.from({ length: ROWS }, (_, row) => {
-                                const sym = landed > reel ? main?.[reel]?.[row] : null;
+                                const sym = restMain(reel, row);
                                 return (
                                     <span key={row} className={`col5-cell is-${sym ? symbolRole(sym, machineId) : "blank"}${cellLit("main", reel, row, ROWS) ? " is-lit" : ""}`}
                                         style={{ "--tone": sym ? symbolTone(sym, machineId) : "#333" }}>
