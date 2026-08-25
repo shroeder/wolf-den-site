@@ -19743,9 +19743,25 @@ body.cas-seated .social-fab { display: none; }
 /* A hairline between symbols in a strip, so twelve of them read as twelve rather than as a texture. */
 .col5-grid.is-tall .col5-cell + .col5-cell,
 .col5-grid .col5-cell + .col5-cell { box-shadow: inset 0 1px 0 rgba(255,255,255,.045); }
-/* The wash is a real MEDALLION now — see the ladder further down, which the colossal cells share with every
-   other cabinet rather than reimplementing. */
-.col5-cell img, .col5-cell b { position: relative; z-index: 1; }
+/* ── THE FILL HAS TO EXIST BEFORE IT CAN BE COLOURED ──────────────────────────────────────────────────
+   The colossal tiles came out with coloured RIMS and identical dark fills, and the reason is that a
+   pseudo-element with no `content` does not render at all. The shared ladder sets `background` on
+   `.s5-cell::before` but declares `content: ""` in an EARLIER rule — and for the colossal cells that
+   earlier rule was the soft-pool one I deleted when the medallions went in. So `::after` kept drawing
+   (it declares its own content) and `::before` silently stopped, which is precisely "the border is
+   coloured and the background is not".
+
+   Two lines, and they are the whole of the tile colour Luke asked for twice. */
+.col5-cell::before { content: ""; position: absolute; z-index: 0; pointer-events: none; }
+/* ── AND THE SYMBOL SITS ABOVE ITS OWN FRAME ──────────────────────────────────────────────────────────
+   The ladder's `::after` — the rim — is `z-index: 2`, which is above the 1 the symbol had. On the other
+   cabinets that is harmless because the rim is a border and nothing else, so there is nothing to hide
+   behind. The moment the colossal `::before` started painting a real filled plate, the two pseudo-elements
+   between them sandwiched the artwork: the WILD wordmark and the giant both vanished into flat colour
+   while every borrowed pet sprite carried on rendering, because those two are the only symbols whose art
+   is mostly transparent and therefore had nothing left once something was drawn over them.
+   Above both, at 3. */
+.col5-cell img, .col5-cell b { position: relative; z-index: 3; }
 
 .col5-grid.is-tall { height: auto; overflow: visible; }
 /* Slightly wider than tall, which is the compromise between the reference's portrait cells and twelve rows
