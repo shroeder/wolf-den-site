@@ -1316,10 +1316,19 @@ export default function CasinoClient({ initial }) {
                 card listed is on the machine's own screen the moment you sit down. What it actually did was
                 push the floor's bounties below the fold.
 
-                So there is no panel any more, only the stage. Nothing renders here until you sit. */}
+                So there is no panel any more, only the stage. Nothing renders here until you sit.
+
+                ── AND THE ROOM TAKES THE MACHINE'S OWN PAINTING ────────────────────────────────────────
+                Luke: "the custom background for the Menagerie can be used instead of all the dead black
+                space around the frames." The black is HERE, not on the cabinet — the stage is a flat
+                #0d0913 with a faint accent wash, and the cabinet only ever showed its scene as a 50px
+                strip across the top. Every machine on this floor already has a painted scene; sitting at
+                one now puts it behind the whole screen. (The comment lives up here because a JSX comment
+                in an expression position is a parse error, which this file has now made twice.) */}
             {seated && at ? (
                 <div className={`cas-stage${at.live ? "" : " is-dark"}`}
-                    style={{ "--acc": ACCENT[at.id] || "#ffd75e" }}
+                    style={{ "--acc": ACCENT[at.id] || "#ffd75e",
+                        "--mast": `url(/images/casino/mast/${at.id}.webp)` }}
                     role="dialog" aria-modal="true" aria-label={at.label}>
                     <div className="cas-panel-head">
                         {/* A WORD, NOT AN ARROW. An arrow in the corner of a full-screen game is browser

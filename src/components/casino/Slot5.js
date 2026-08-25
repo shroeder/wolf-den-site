@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
+import WinTally, { isBigWin } from "@/components/casino/WinTally";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { symbolTone, symbolRole, symbolName, slot5, LINES } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
@@ -120,7 +121,16 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
     const [result, setResult] = useState(null);    // the whole server response
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
-    const [counted, setCounted] = useState(0);     // the chip counter, ticking up
+    // ── THE LOCK FOLLOWS THE CELEBRATION ─────────────────────────────────────────────────────────────────
+    // Luke, earlier: "you shouldn't be able to spin while it's spinning or counting up after the spin." That
+    // was enforced by comparing a locally-ticked counter against the total — which was fine while the count
+    // was always ~880ms and wrong the moment WinTally made it depend on the size of the win. A COLOSSAL WIN
+    // holds the screen for six seconds; the button would have come back after one, over the top of it.
+    //
+    // So there is one flag and the celebration owns it: raised when the reels finish on a paying spin, and
+    // dropped by WinTally itself when the number has landed and its held beat is over. Whatever the tiers do
+    // to the timing from now on, the button agrees with the screen.
+    const [celebrating, setCelebrating] = useState(false);
     const [phase, setPhase] = useState("idle");    // idle | spin | lines | free | pick | gems | done
 
     // Win It Again: the payout the row is currently counting out, and what to do once it has. See the note
@@ -215,7 +225,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // a rule and a list.
     // `atRest`, not `idle` — `idle` is already the reels' resting faces further down this file, and a
     // second one would shadow it.
-    const counting = phase === "done" && Number(result?.wonChips || 0) > counted;
+    const counting = celebrating;
     const atRest = phase === "idle" || (phase === "done" && !counting);
     const locked = busy || spinning || !atRest || broke;
     const step = (d) => {
@@ -482,7 +492,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (busy || spinning) return;
         unlock();
         clearTimers();
-        setResult(null); setShowLine(-1); setCounted(0); setLanded(0);
+        setResult(null); setShowLine(-1); setCelebrating(false); setLanded(0);
         setFreeIdx(-1); setFreeWon(0);
         setChainAt(-1); setChainWon(0); setBreaking([]); setDropping([]);
         setPhase("spin"); setSpinning(true);
@@ -661,18 +671,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     }, [playGrid, runChain, announceFree]);
 
 
-    // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────
-    // Counted up rather than stated. A number that lands already-final is a receipt; a number climbing is the
-    // only part of a win that lasts longer than a second.
+    // The counting itself lives in WinTally now — this only raises the flag the moment a paying spin has
+    // finished playing, and WinTally drops it when the celebration is over.
     useEffect(() => {
-        // Counts only once everything has played — same reason as the line above it.
-        if (!result?.wonChips || phase !== "done") return undefined;
-        const target = result.wonChips;
-        if (counted >= target) return undefined;
-        const step = Math.max(1, Math.round(target / 26));
-        const t = setTimeout(() => setCounted((n) => Math.min(target, n + step)), 34);
-        return () => clearTimeout(t);
-    }, [result, counted, phase]);
+        if (phase === "done" && Number(result?.wonChips || 0) > 0) setCelebrating(true);
+    }, [result, phase]);
 
     // The horns, once, and only for a win that actually beat the stake.
     const celebrated = useRef(false);
@@ -683,7 +686,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (x >= BIG_WIN_AT) { celebrated.current = true; Cas.jackpot(); Haptic.crit(); }
         else if (x >= CELEBRATE_AT) { celebrated.current = true; Cas.coins(Math.min(1, x / 20)); }
     }, [result, phase]);
-    useEffect(() => { if (phase === "spin") celebrated.current = false; }, [phase]);
+    useEffect(() => { if (phase === "spin") { celebrated.current = false; setCelebrating(false); } }, [phase]);
 
     const lit = useMemo(() => {
         if (showLine < 0 || !activeWins.length) return null;
@@ -756,7 +759,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         aria-label="What this machine pays">PAYS</button>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
                         gold={gold} chips={chips}
-                        playing={Boolean(result?.colossal)} onDone={() => setPhase("done")} />
+                        playing={Boolean(result?.colossal)} pressed={phase === "spin"}
+                        onDone={() => setPhase("done")} />
                 </div>
 
                 {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
@@ -1048,6 +1052,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-go" onClick={() => setPhase(result.hold ? "pick" : result.warren ? "warren" : "done")}>Collect</button>
                 </div>
             ) : null}
+
+            {/* ── A BIG ONE TAKES THE CABINET ─────────────────────────────────────────────────────────
+                Luke: "add a splash screen that says big win", and coins with it. Ten times the stake and
+                up, on every machine on the floor — see WinTally for what the tiers are and why the count
+                is timed off the multiple rather than off the chips. Inside `.s5-cab` on purpose: the same
+                rule the tumble bar and the shout already follow, so it covers the glass rather than
+                shoving the panel down the page. */}
+            {phase === "done" && celebrating && result?.wonChips && isBigWin(result.multiple) ? (
+                <WinTally key={`b${result.id || result.wonChips}`} chips={result.wonChips}
+                    multiple={result.multiple || 0} tone={symbolTone(slot5(machineId).wild, machineId)}
+                    onDone={() => setCelebrating(false)} />
+            ) : null}
             </div>
 
             {/* ── WHAT JUST HAPPENED ──────────────────────────────────────────────────────────────────── */}
@@ -1061,7 +1077,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             <div className="s5-say">
                 {phase === "spin" ? <span className="s5-dim">…</span>
                     : lit ? <span><b>{lit.count}</b> {symbolName(lit.symbol, machineId)} — <b>{lit.chips.toLocaleString()}</b> chips</span>
-                    : result?.wonChips && phase === "done" ? <span className="s5-won"><b>{counted.toLocaleString()}</b> chips</span>
+                    : result?.wonChips && phase === "done" && !isBigWin(result.multiple)
+                        ? <WinTally key={`w${result.id || result.wonChips}`} chips={result.wonChips}
+                            multiple={result.multiple || 0} tone={symbolTone(slot5(machineId).wild, machineId)}
+                            onDone={() => setCelebrating(false)} />
                     : result && phase === "done" ? <span className="s5-dim">No line this time.</span>
                     : result ? <span className="s5-dim" />
                     : <span className="s5-dim">Twenty lines.</span>}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { slot5, symbolTone, symbolRole, isMult, multValue } from "@/lib/marketplace/casino-slot5.js";
+import WinTally, { isBigWin, tierFor } from "@/components/casino/WinTally";
 
 // ── COLOSSAL REELS ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke, with a Lil' Red cabinet on screen: "there's a regular reel on the left and a huge reel on the right,
@@ -34,8 +35,10 @@ const SETTLE = 260;
 const SEND_MS = 620;      // a wild column falling from the small board into the big one
 const LINE_MS = 620;      // one winning line lit
 const BONUS_MS = 2400;
+// The count plus its held beat — what a paying spin costs in time before the machine moves on.
+const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
-export default function ColossalReels({ machineId, art, bet, data, onDone, playing, gold, chips }) {
+export default function ColossalReels({ machineId, art, bet, data, onDone, playing, pressed = false, gold, chips }) {
     const m = slot5(machineId);
     const rows = data?.rows || 12;
 
@@ -45,6 +48,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     const [sent, setSent] = useState([]);            // reels whose transfer has landed
     const [lit, setLit] = useState(null);            // the win currently drawn
     const [won, setWon] = useState(0);
+    const [paid, setPaid] = useState(null);          // the win being counted right now
     const [free, setFree] = useState(null);          // { at, of } while the bonus runs
     const [shout, setShout] = useState(null);
     const timers = useRef([]);
@@ -102,7 +106,17 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
             await wait(wins.length > 6 ? LINE_MS * 2.6 : LINE_MS * 1.9);
         }
         setLit(null);
-        if (sp.chips) { setWon((n) => n + sp.chips); if (!isFree) Cas.coins(0.5); }
+        // ── THE COUNT, AND THE ROOM WAITING FOR IT ───────────────────────────────────────────────────────
+        // Luke: "we are missing the slow count up and celebration when you win." This printed the total and
+        // moved on. It hands to WinTally now — one component, every cabinet — and a spin that pays big is
+        // not over until the count is: `holdFor` is how long the celebration owns the screen, and the play
+        // loop waits it out rather than starting the next free spin over the top of it.
+        if (sp.chips) {
+            setPaid({ chips: sp.chips, multiple: sp.multiple || 0, k: Date.now() });
+            await wait(holdFor(sp.multiple || 0));
+            setWon((n) => n + sp.chips);
+            setPaid(null);
+        }
     }, []);
 
     // ── THE WHOLE PRESS ──────────────────────────────────────────────────────────────────────────────────
@@ -111,7 +125,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
         let dead = false;
         (async () => {
             unlock();
-            setWon(0); setFree(null); setShout(null);
+            setWon(0); setFree(null); setShout(null); setPaid(null);
             await playOne(data, false);
             if (dead) return;
 
@@ -216,10 +230,47 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     const restCol = (reel, row) => (data ? col?.[reel]?.[row] : idle.col[reel][row]);
     const restMain = (reel, row) => (data ? main?.[reel]?.[row] : idle.main[reel][row]);
     // The strip only runs during an actual press. At rest there is nothing to wait for.
-    const colRunning = (reel) => Boolean(data) && colLanded <= reel;
-    const mainRunning = (reel) => Boolean(data) && landed <= reel;
+    // ── THE REELS START ON THE THUMB, NOT ON THE SERVER ──────────────────────────────────────────────────
+    // `data` does not exist until the round trip comes back, so a reel could not begin turning until the
+    // answer already existed — which left the cabinet sitting dead on its resting board for the whole of a
+    // press, near two seconds on a cold function. Filming the new fall is what showed it: four frames of a
+    // machine that had visibly not noticed being pressed.
+    //
+    // A reel that has been pressed but not answered is RUNNING. That is what a real one does, and it is the
+    // only part of a slot that never needed to know the outcome.
+    const colRunning = (reel) => (pressed || Boolean(data)) && colLanded <= reel;
+    const mainRunning = (reel) => (pressed || Boolean(data)) && landed <= reel;
     const isGiantAt = (reel, row) => giants.find((g) => g.reel === reel && g.row === row);
     const insideGiant = (reel, row) => giants.some((g) => g.reel === reel && row > g.row && row < g.row + g.len);
+
+    // ── THE MULTIPLIER REEL, GROUPED ─────────────────────────────────────────────────────────────────────
+    // Luke: "the multipliers in the last reel need to be grouped and use sprites."
+    //
+    // A twelve-row reel that lands four ×3s in a row drew four separate ×3s, which reads as four things you
+    // have to add up — and they are not four things, they are one. The reel pays its BEST multiplier, once
+    // (see runColossal, which takes the max), so a run of the same plate is a single symbol that happens to
+    // be tall. Same rule the giants already follow, and the same shape of fix: one drawing at the height of
+    // the block, and the rows it covers render nothing.
+    //
+    // The plates are painted (scripts/gen-mult-plates.mjs) and the NUMERAL is not part of the art — see the
+    // note at the top of that file for why a picture of "×25" is a symbol that lies one time in five.
+    const multRuns = useMemo(() => {
+        const out = [];
+        for (let r = 0; r < REELS; r += 1) {
+            const c = col?.[r] || [];
+            let i = 0;
+            while (i < c.length) {
+                if (!isMult(c[i])) { i += 1; continue; }
+                let j = i + 1;
+                while (j < c.length && c[j] === c[i]) j += 1;
+                out.push({ reel: r, row: i, len: j - i, sym: c[i] });
+                i = j;
+            }
+        }
+        return out;
+    }, [col]);
+    const isMultAt = (reel, row) => multRuns.find((g) => g.reel === reel && g.row === row);
+    const insideMult = (reel, row) => multRuns.some((g) => g.reel === reel && row > g.row && row < g.row + g.len);
 
     // The win's `cells` are flat indices (reel * rows + row) for the reels it actually paid on, which is
     // exactly the path — recovered rather than sent again, so the drawn line and the lit tiles cannot
@@ -256,7 +307,17 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                 // A giant's run is drawn once at the height of the block. The rows it
                                 // covers render nothing at all — they are the same symbol to the maths and
                                 // the same drawing to the eye, which is the entire point of it.
-                                if (sym && insideGiant(reel, row)) return null;
+                                if (sym && (insideGiant(reel, row) || insideMult(reel, row))) return null;
+                                const mr = sym && isMult(sym) ? isMultAt(reel, row) : null;
+                                if (mr) {
+                                    return (
+                                        <span key={row} className="col5-cell is-multblock" style={{ "--span": mr.len }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={`/images/casino/mult/${sym}.png`} alt="" draggable="false" />
+                                            <b>&times;{multValue(sym)}</b>
+                                        </span>
+                                    );
+                                }
                                 const g = sym ? isGiantAt(reel, row) : null;
                                 if (g) {
                                     return (
@@ -384,13 +445,26 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
 
                 The free-round counter joins it, because that is the other thing that is only true
                 sometimes. Between them they took a whole strip of a screen that had none to spare. */}
-            {(free || won > 0) ? (
+            {/* ── AND IT SITS UNDER THE BOARDS, NOT OVER THEM ─────────────────────────────────────────
+                Luke: "move the win amount down and not cover the bottom slot." It was pinned to the bottom
+                of the reel stack, which put a pill straight across the middle row of the small board — the
+                one board you have to read to know whether a column is about to send. It hangs off the
+                cabinet's bottom edge now, in the strip the panel shrink paid for. */}
+            {(free || paid || won > 0) ? (
                 <div className="col5-flash" role="status">
                     {free ? <span className="col5-flash-spin">Free spin {free.at + 1}/{free.of}</span> : null}
                     {free && (spin?.applied || 1) > 1
                         ? <span className="col5-flash-mult">&times;{spin.applied}</span> : null}
-                    {won > 0 ? <span className="col5-flash-won"><b>{won.toLocaleString()}</b> chips</span> : null}
+                    {paid && !isBigWin(paid.multiple)
+                        ? <WinTally key={paid.k} chips={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
+                        : won > 0 ? <span className="col5-flash-won"><b>{won.toLocaleString()}</b> chips</span> : null}
                 </div>
+            ) : null}
+
+            {/* A big one takes the whole cabinet — title, coins, and a number climbing at the size it is
+                worth. See WinTally for what "big" means and why it is read off the multiple. */}
+            {paid && isBigWin(paid.multiple) ? (
+                <WinTally key={paid.k} chips={paid.chips} multiple={paid.multiple} tone={symbolTone(m.wild, machineId)} />
             ) : null}
 
             {/* Three moons between the two boards, and what they bought. */}
