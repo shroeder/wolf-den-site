@@ -196,10 +196,6 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     // The win's `cells` are flat indices (reel * rows + row) for the reels it actually paid on, which is
     // exactly the path — recovered rather than sent again, so the drawn line and the lit tiles cannot
     // disagree about which cells won.
-    const lineOf = (w) => {
-        const h = w.set === "col" ? rows : ROWS;
-        return w.cells.map((c) => c % h);
-    };
     // Every cell on every winning line, per board. Built once per render rather than searched per cell —
     // sixty-five cells times twenty wins is a scan nobody needs to do thirteen hundred times.
     const litCells = { main: new Set(), col: new Set() };
@@ -209,7 +205,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     return (
         <div className={`col5${free ? " is-free" : ""}`}>
             {/* ── THE COLOSSAL BOARD ── twelve rows, eighty of the hundred lines, and where the giants live. */}
-            <div className="col5-col">
+            <div className={`col5-col${litCells.col.size ? " is-lining" : ""}`}>
                 <span className="col5-tag">{data?.label || "The Colossal Reels"}</span>
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
@@ -260,15 +256,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                         </div>
                     ))}
                 </div>
-                {lit?.some((w) => w.set === "main") ? (
-                    <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${ROWS * 20}`}
-                        preserveAspectRatio="none" aria-hidden="true">
-                        {lit.filter((w) => w.set === "main").map((w, i) => (
-                            <polyline key={i} style={{ "--k": i }}
-                                points={lineOf(w).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
-                        ))}
-                    </svg>
-                ) : null}
+
             </div>
 
             {/* The wilds falling from one board into the other — one element per travelling column. */}
@@ -279,7 +267,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
             ) : null}
 
             {/* ── THE SMALL BOARD ── the lever. It is on top because the transfer falls downward. */}
-            <div className="col5-main">
+            <div className={`col5-main${litCells.main.size ? " is-lining" : ""}`}>
                 <span className="col5-tag">Main reels — a full wild column sends</span>
                 <div className="col5-grid" style={{ "--rows": ROWS }}>
                     {Array.from({ length: REELS }, (_, reel) => (
@@ -307,22 +295,17 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                         </div>
                     ))}
                 </div>
-                {/* ── AND THE LINE IS DRAWN ────────────────────────────────────────────────────────────
-                    Luke: "when we win we should show the line like we do in other slots." Every other
-                    cabinet on this floor draws the winning path over the glass; this one lit the cells and
-                    left you to join them up yourself — which on a hundred lines across twelve rows is not
-                    something anybody can do. The path IS the line's own row-per-reel, which is already in
-                    the win, so there is nothing to work out: a polyline through the middle of each cell it
-                    used, in a viewBox the same shape as the board. */}
-                {lit?.some((w) => w.set === "col") ? (
-                    <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${rows * 20}`}
-                        preserveAspectRatio="none" aria-hidden="true">
-                        {lit.filter((w) => w.set === "col").map((w, i) => (
-                            <polyline key={i} style={{ "--k": i }}
-                                points={lineOf(w).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
-                        ))}
-                    </svg>
-                ) : null}
+                {/* ── NO DRAWN LINES ──────────────────────────────────────────────────────────────────
+                    Luke: "never mind, don't show the lines — just brighten up all the tiles that hit."
+
+                    Which is the better answer on this board and it took drawing them to see why. Twenty
+                    polylines crossing a 5x12 grid is a cat's cradle: the lines overlap, they cross tiles
+                    that did not win on their way to ones that did, and the thing you are actually trying to
+                    read — WHICH SYMBOLS PAID — is underneath all of it. A path is the right idiom for
+                    twenty lines on three rows and the wrong one for forty across twelve.
+
+                    So the tiles carry it instead. The winners light and everything else drops back, which
+                    says the same thing with no ink at all. */}
             </div>
 
             {/* ── NO RIBBON ────────────────────────────────────────────────────────────────────────────

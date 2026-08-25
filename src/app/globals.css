@@ -19906,22 +19906,34 @@ body.cas-seated .social-fab { display: none; }
 .s5-cab.is-colossal::before { display: none; }
 .s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
 
-/* ── THE WINNING LINE ─────────────────────────────────────────────────────────────────────────────────
-   Drawn over the glass, the way every other cabinet does it. Two strokes: a wide dark one underneath so
-   the line survives crossing a bright tile, and the bright one on top. It draws itself on rather than
-   appearing, because a line that appears is a mark and a line that draws is a path. */
-.col5-line { position: absolute; inset: 6px; z-index: 6; pointer-events: none; overflow: visible; }
-/* Every winning line at once, each drawing itself on a beat behind the last — so twenty lines arrive as a
-   spreading picture rather than as twenty things appearing. They are staggered by 25ms, which is under a
-   frame and a half apiece: fast enough to read as one event, slow enough to see the shape build. */
-.col5-line polyline { fill: none; stroke-linejoin: round; stroke-linecap: round;
-    stroke: var(--acc, #7fe0a0); stroke-width: 1.6;
-    animation-delay: calc(var(--k, 0) * 25ms);
-    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acc, #7fe0a0) 90%, transparent))
-        drop-shadow(0 0 1.5px rgba(0,0,0,.9));
-    stroke-dasharray: 200; stroke-dashoffset: 200;
-    animation: col5Draw .3s ease-out forwards; }
-@keyframes col5Draw { to { stroke-dashoffset: 0; } }
+/* ── A HIT IS A TILE THAT LIGHTS ──────────────────────────────────────────────────────────────────────
+   Luke: "never mind, don't show the lines — just brighten up all the tiles that hit."
+
+   Better, and drawing them is what showed why. Twenty polylines across a 5x12 grid is a cat's cradle: they
+   overlap, they cross tiles that did not win on the way to ones that did, and the thing you are trying to
+   read — which symbols paid — ends up underneath the ink. A path is the right idiom for twenty lines on
+   three rows and the wrong one for forty across twelve.
+
+   So the board says it instead: the winners come up bright and everything else steps back. Both halves
+   matter. Brightening alone barely registers on a board that is already colourful; it is the CONTRAST that
+   makes ten scattered tiles read as one shape at a glance. */
+.col5-cell.is-lit { z-index: 4; }
+.col5-cell.is-lit::before { filter: brightness(1.9) saturate(1.35); }
+.col5-cell.is-lit::after { border-color: #fff; border-width: 1.5px;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--tone, #fff) 95%, transparent),
+        inset 0 0 8px color-mix(in srgb, var(--tone, #fff) 60%, transparent); }
+.col5-cell.is-lit img { filter: brightness(1.18) drop-shadow(0 0 7px color-mix(in srgb, var(--tone, #fff) 90%, transparent)); }
+/* A single pulse rather than a loop: it happened, it is not still happening. */
+.col5-cell.is-lit { animation: col5Hit .34s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes col5Hit { 0% { transform: scale(1); } 45% { transform: scale(1.09); } 100% { transform: scale(1); } }
+
+/* Everything that did not pay steps back while a win is up. */
+.col5-main.is-lining .col5-cell:not(.is-lit),
+.col5-col.is-lining .col5-cell:not(.is-lit) { opacity: .34; filter: saturate(.5); }
+.col5-main.is-lining .col5-cell, .col5-col.is-lining .col5-cell { transition: opacity .18s ease, filter .18s ease; }
+/* The giant is never dimmed: it is the whole reel, and half a board going dark around a standing figure
+   that did not happen to be on a paying line reads as the figure being switched off. */
+.col5-col.is-lining .col5-cell.is-giant { opacity: 1; filter: none; }
 
 /* ── WHAT THIS PRESS PAID, AND THEN GONE ──────────────────────────────────────────────────────────────
    Not a readout — an event. It sits over the bottom of the tall board for as long as it is true and takes
