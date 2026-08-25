@@ -713,11 +713,28 @@ function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
                         ? "No messages yet — say hello to the whole Den."
                         : "Nothing here yet. You see what is said from the day you joined this room onward."}</p>
                 ) : (
-                    messages.map((m) => (
-                        <div key={m.id} className={`gchat-row${m.mine ? " mine" : ""}`}>
+                    /* ── RUNS BY THE SAME PERSON READ AS ONE ─────────────────────────────────────────
+                        GrayKitsune: "is there a way we can merge chat so the 'just now xxx' doesn't show if
+                        the message is from the same user as the previous message? Like how discord works."
+
+                        Yes, and he had just written four in a row to prove the point — four heroes, four
+                        names, four timestamps, all identical, for four short lines. The repetition was
+                        carrying no information and taking most of the width.
+
+                        A message joins the one above it when it is the SAME PERSON and within five minutes.
+                        Time matters as much as identity: two lines from the same member an hour apart are
+                        two moments, and merging them would quietly claim they were one. Announcements never
+                        join, because each one is its own event. */
+                    messages.map((m, i) => {
+                        const prev = i > 0 ? messages[i - 1] : null;
+                        const cont = Boolean(prev) && !m.notice && !prev.notice
+                            && prev.name === m.name && prev.role?.name === m.role?.name
+                            && (new Date(m.at) - new Date(prev.at)) < 5 * 60 * 1000;
+                        return (
+                        <div key={m.id} className={`gchat-row${m.mine ? " mine" : ""}${cont ? " is-cont" : ""}`}>
                             {/* The hero sprite is a second, bigger tap target for the same profile the name
                                 links to — tapping someone's hero to size them up is the instinct. */}
-                            {m.alias ? (
+                            {cont ? <span className="gchat-hero is-cont" aria-hidden="true" /> : m.alias ? (
                                 <Link href={`/marketplace/u/${m.alias}`} className="gchat-hero is-link" title={`Inspect ${m.name}`} aria-label={`Inspect ${m.name}`}>
                                     {heroInner(m)}
                                 </Link>
@@ -725,6 +742,7 @@ function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
                                 <span className="gchat-hero" aria-hidden="true">{heroInner(m)}</span>
                             )}
                             <span className="gchat-main">
+                                {cont ? null : (
                                 <span className="gchat-top">
                                     {m.alias ? (
                                         <Link href={`/marketplace/u/${m.alias}`} className="gchat-name">{m.name}</Link>
@@ -741,14 +759,16 @@ function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
                                     ) : null}
                                     <span className="gchat-time">{relTime(m.at)}</span>
                                 </span>
+                                )}
                                 {/* An Arbiter announcement gets structure and opens collapsed. Same
                                     component the plaza uses — see NoticeBody on why it is shared. */}
                                 {m.notice
                                     ? <NoticeBody body={m.body} className="gchat-body" />
-                                    : <span className="gchat-body">{m.body}</span>}
+                                    : <span className="gchat-body" title={relTime(m.at)}>{m.body}</span>}
                             </span>
                         </div>
-                    ))
+                        );
+                    })
                 )}
                 <div ref={endRef} />
             </div>

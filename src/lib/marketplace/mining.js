@@ -113,8 +113,18 @@ const COLLAPSE_SEAM_TIER = 1;
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
 // The Miner's Lamp buys five floors of safe roof — the same lever Shoring buys, which is what makes it
 // legible: a member who owns both can add the two numbers themselves.
+// ── EVERY THIRD LEVEL FROM THE FIRST, NOT FROM THE THIRD ─────────────────────────────────────────────────
+// ValkyrieSylve: "what's the incentive to level up shoring all the way to 10 if you get the max safe steps
+// at 9?" None — and it was arithmetic, not intent. The track runs to 10 and paid on floor(n/3), which lands
+// on 3, 6 and 9; ten is not divisible by three, so the last level of the track bought literally nothing. The
+// first two were the same dead ground at the other end: two upgrades before anything moved.
+//
+// Shifted by two, so the steps land on 1, 4, 7 and 10. Same cadence, same three-level spacing, same value at
+// zero — but the first level of the track does something and the last level of the track finishes it, which
+// is the least a maxed track can owe you. It is a small buff to early miners, which is the direction the
+// plaza was already pointing: "it is brutal sometimes even with upgrades."
 export const safeDepthFor = (shoringLevel = 0, lamp = false) =>
-    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? 5 : 0);
+    COLLAPSE_FREE_DEPTH + Math.floor((Math.max(0, shoringLevel) + 2) / 3) + (lamp ? 5 : 0);
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
 const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
 const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.

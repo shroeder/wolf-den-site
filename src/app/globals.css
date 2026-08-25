@@ -6917,6 +6917,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Tapping a hero opens that member's profile — same destination as their name. */
 .gchat-hero.is-link { cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
 .gchat-hero.is-link:hover, .gchat-hero.is-link:focus-visible { border-color: rgba(255,215,94,0.55); transform: translateY(-1px); }
+/* ── A RUN BY ONE PERSON IS ONE BLOCK ─────────────────────────────────────────────────────────────────
+   GrayKitsune, having just written four one-line messages in a row: "can we merge chat so the 'just now
+   xxx' doesn't show if the message is from the same user as the previous message? Like how discord works."
+   The continuation keeps the hero column so the text stays on its line, but the square is empty and the
+   name and timestamp are gone — the time is still there on hover. Tighter to the line above, so the block
+   reads as one turn rather than four. */
+.gchat-row.is-cont { margin-top: -5px; }
+.gchat-hero.is-cont { background: none; border: none; }
+
 .gchat-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; max-width: 78%; }
 .gchat-top { display: flex; gap: 7px; align-items: baseline; }
 .gchat-row.mine .gchat-top { flex-direction: row-reverse; }

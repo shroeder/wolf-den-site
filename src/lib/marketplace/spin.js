@@ -81,7 +81,15 @@ function prizeDesc(p) {
         case "doubloons": return "Sailing coin. Spend it with the Quartermaster on crates, ammo and evolve stones.";
         case "stone": return "A Lightstone or a Darkstone — makes a level-six pet's ability permanent, and changes the animal.";
         case "parts": return "A haul of Forge salvage \— Iron Filings through Emberheart Shard \— to spend enhancing your gear at the Forge.";
-        case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
+        // ── IT REPLACES YOUR PRIZE, IT IS NOT ADDED TO ONE ───────────────────────────────────────────────
+        // Three members read this the same wrong way in one evening. SoullessShiitake: "it definitely seems
+        // to imply you're getting 2 prizes." ValkyrieSylve quoted the line back verbatim and added "we all
+        // play card games, text is everything." They are right and the copy was simply false: landing this
+        // wedge pays nothing by itself — it sends you to a nine-wedge disc and you take ONE prize off it.
+        //
+        // Eric had it exactly: the point is not a second prize, it is a BETTER one. Nothing on the mini disc
+        // is worse than 700 gold and the top of it is a Gold Chest, so the copy should sell the floor.
+        case "mini_wheel": return "Re-spin on the Mini Wheel — one prize, from a far richer list.";
         case "respin": return "A free bonus spin — spin again on the house.";
         case "bonus_game": return "Play a pick-a-box match-3 round to win wheel-exclusive gear.";
         case "major_jackpot": return "The progressive community jackpot — win the entire pot.";
@@ -663,7 +671,7 @@ export async function doSpin(buyerId) {
     // use on a wedge it cannot apply to would be the worst of both.
     const subGame = prize.kind === "mini_wheel" || prize.kind === "bonus_game";
     const dealer = !subGame && (await claimPowerUse(buyerId, "dealer_s_choice"));
-    if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
+    if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel — a richer spin!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
     // Held, not paid. The member has not chosen yet, and a prize that has been handed over cannot be swapped
     // for the other one without clawing it back.

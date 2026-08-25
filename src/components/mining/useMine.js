@@ -109,7 +109,20 @@ export function useMine(initial) {
     // A seam is gone or spent, so the only way to another one is back down the tunnel. This used to call a
     // `prospect()` that no longer exists — surfacing a seam on demand was the OLD survey, and removing it left
     // two live calls to a function that was never declared.
+    // ── AND IT HAS TO CLOSE THE FACE ─────────────────────────────────────────────────────────────────────────
+    // Sunflower Jinxx: "I just did a mine trip... it's stuck in the crack the seam, button registers the click,
+    // but nothing is happening." Both halves of that were literally true and this line is why.
+    //
+    // The minigame is a full-screen modal driven by `breakNode`, captured on open so a mid-reveal refresh
+    // cannot unmount the payoff out from under you. This sent you back to the tunnel by switching the TAB —
+    // underneath it. So when the seam went (expired at twelve hours, or claimed on another device) every swing
+    // came back `node_gone`, said "that seam collapsed" into a toast rendered BEHIND the modal, switched a tab
+    // nobody could see, and left the face exactly where it was. Tap, request, refusal, no change. Forever.
+    //
+    // Leaving the face is leaving the face. Anything that sends you back to the tunnel closes it.
     const backToTunnel = useCallback((autoStart = false) => {
+        setBreakNode(null);
+        setCrack(null);
         setTab("descend");
         if (autoStart) startTrip();
     }, [startTrip]);
