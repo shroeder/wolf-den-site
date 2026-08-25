@@ -198,11 +198,27 @@ const HUNT = {
     // solve it with nine or ten symbols; with four, the commonest one has to be a symbol you are pleased to
     // see FOUR of and indifferent to three of, which is exactly the job blanks do on a physical reel strip.
     pays: {
-        wolf: { 3: 14.7, 4: 132, 5: 1830 },
-        chest: { 3: 5.03, 4: 43.9, 5: 439 },
+    // ── EVERY SYMBOL PAYS AT THREE ───────────────────────────────────────────────────────────────────
+    // Luke, on The Vault: "again, not a payline for both blues and the orange?" — three times in a row, on
+    // three different boards. He was right every time and it was not the evaluator: the two LOW symbols had
+    // no three-of-a-kind pay at all, and Sapphire had no four either. Sapphire is the commonest thing on the
+    // reel, so the board was permanently full of three-in-a-row that paid nothing, on the twenty lines the
+    // machine advertises. Nothing tells you that. It reads as broken, and "it reads as broken" is worse than
+    // any RTP number.
+    //
+    // The same hole was in The Hunt (Bone) and The Deep (Herring and Mackerel) — and those three cabinets
+    // are exactly the three with the enormous top prizes. That is the trade that had been made without
+    // anyone deciding it: everything at the bottom of the ladder removed to pay for the top of it.
+    //
+    // Filled in at The Menagerie's ratios, which were the one complete ladder on the floor, and paid for out
+    // of the SAME cabinet's five-of-a-kind rather than by lifting the floor. That is not levelling a cabinet
+    // down to a target — it is moving money from rare-and-enormous to common-and-small on one machine, which
+    // is the actual fix for "nothing ever pays".
+        wolf: { 3: 14.7, 4: 132, 5: 1610 },
+        chest: { 3: 5.03, 4: 43.9, 5: 396 },
         laurel: { 3: 1.83, 4: 13.2, 5: 110 },
         doubloon: { 3: 0.92, 4: 5.03, 5: 36.6 },
-        bone: { 4: 1.83, 5: 14.7 },
+        bone: { 3: 0.48, 4: 1.83, 5: 14.7 },
     },
     // Scatters pay a multiple of the TOTAL bet, not the line bet, because they do not sit on a line. This is
     // the one payout a player can always find without understanding paylines.
@@ -320,11 +336,31 @@ const DEEP = {
         { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
     ],
     pays: {
-        wolf: { 3: 20.9, 4: 159, 5: 2114 },
-        chest: { 3: 6.19, 4: 47.5, 5: 475 },
-        laurel: { 3: 2.09, 4: 13.7, 5: 116 },
-        doubloon: { 4: 4.75, 5: 37.1 },
-        bone: { 5: 10.4 },
+    // ── EVERY SYMBOL PAYS AT THREE ───────────────────────────────────────────────────────────────────
+    // Luke, on The Vault: "again, not a payline for both blues and the orange?" — three times in a row, on
+    // three different boards. He was right every time and it was not the evaluator: the two LOW symbols had
+    // no three-of-a-kind pay at all, and Sapphire had no four either. Sapphire is the commonest thing on the
+    // reel, so the board was permanently full of three-in-a-row that paid nothing, on the twenty lines the
+    // machine advertises. Nothing tells you that. It reads as broken, and "it reads as broken" is worse than
+    // any RTP number.
+    //
+    // The same hole was in The Hunt (Bone) and The Deep (Herring and Mackerel) — and those three cabinets
+    // are exactly the three with the enormous top prizes. That is the trade that had been made without
+    // anyone deciding it: everything at the bottom of the ladder removed to pay for the top of it.
+    //
+    // Filled in at The Menagerie's ratios, which were the one complete ladder on the floor, and paid for out
+    // of the SAME cabinet's five-of-a-kind rather than by lifting the floor. That is not levelling a cabinet
+    // down to a target — it is moving money from rare-and-enormous to common-and-small on one machine, which
+    // is the actual fix for "nothing ever pays".
+    //
+    // The Deep took 99.17% to 118.33% on the fill alone — a low symbol's three-of-a-kind is the most common
+    // event on a reel, so it costs far more than its size suggests. Swept: the new bottom rungs are small
+    // (Herring 0.14, Mackerel 0.26) and the top four/five came down about 8% to pay for them.
+        wolf: { 3: 20.9, 4: 146, 5: 1638 },
+        chest: { 3: 6.19, 4: 43.7, 5: 375 },
+        laurel: { 3: 2.09, 4: 12.6, 5: 107 },
+        doubloon: { 3: 0.26, 4: 4.75, 5: 37.1 },
+        bone: { 3: 0.14, 4: 1.2, 5: 10.4 },
     },
     scatterPays: { 3: 1.04, 4: 4.75, 5: 31.3 },
     free: { kind: "expanding", spins: 14, label: "Fourteen spins, and every wild takes its whole reel" },
@@ -388,12 +424,38 @@ const VAULT = {
     // check-slot5.mjs). The meter still holds five spins and still fires on three tumbles, the way Luke
     // specced it; the gem ladder is untouched. What moved is the base, which is the part that was written
     // for a machine that no longer exists.
+    // ── EVERY SYMBOL PAYS AT THREE, AND THIS IS WHAT IT COST ─────────────────────────────────────
+    // Luke, after seeing the dashes in the paytable: "yeah that's a problem, there should always be pay
+    // tables for anything listed if it's 3 or more." Agreed, and it is the better rule — I had argued the
+    // other way and was wrong. A symbol printed on the reel that cannot pay on the line the machine is
+    // drawing for you is a promise the cabinet does not keep, and no footnote fixes that.
+    //
+    // It is expensive HERE specifically, because this is the machine that tumbles. Filling Sapphire and
+    // Topaz in took the cabinet from 95% to 395% — not because the new rungs are big, but because a pay
+    // on the commonest symbol makes almost every spin start a chain, and a chain hands every OTHER pay
+    // another go at the board. Removing any one of the three additions roughly halved the result; a
+    // three-pay of 0.03 still returned 365%.
+    //
+    // So the money comes back out of the top of the ladder and out of the multiplier climb, and the
+    // machine's character moves with it: The Vault used to be rare enormous chains, and is now constant
+    // small ones with the Gem Vault and the Win It Again row on top. Three in four spins pay something.
+    // That is what a tumbling cabinet actually is, and it is the honest shape for one.
+    //
+    // Swept, not guessed: ladder [1,2,3,4,6,8,12] with the table at x0.195.
+    //
+    // AND THE METER IS THE OTHER HALF OF THE BILL. Win It Again pays back the sum of your last five wins
+    // when a spin breaks three times, and three breaks used to be uncommon — with every symbol paying at
+    // three it happens on roughly one spin in four, which took the meter from a flourish to a THIRD of the
+    // machine's whole return. It scales with the paytable, so the same x0.195 pays for it; but a "boom boom
+    // boom" that fires every fourth spin is a celebration that has stopped being one, and `winAgain.need`
+    // is the dial for that if Luke wants it rarer than he first specced.
+    cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 12.1, 4: 92, 5: 1208 },
-        chest: { 3: 3.47, 4: 26.6, 5: 266 },
-        laurel: { 3: 1.21, 4: 7.81, 5: 62.9 },
-        doubloon: { 4: 2.6, 5: 19 },
-        bone: { 5: 5.49 },
+        wolf: { 3: 2.35, 4: 17.92, 5: 235.29 },
+        chest: { 3: 0.68, 4: 5.18, 5: 51.81 },
+        laurel: { 3: 0.24, 4: 1.52, 5: 12.25 },
+        doubloon: { 3: 0.11, 4: 0.51, 5: 3.7 },
+        bone: { 3: 0.07, 4: 0.27, 5: 1.07 },
     },
     scatterPays: { 3: 0.5, 4: 2.6, 5: 17.3 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
@@ -809,7 +871,11 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
         // The chain's own ladder, times whatever the round is running at. In the base game `round` is 1 and
         // this is just the ladder; inside a free round the two stack, which is the entire reason a free
         // cascade is worth waiting for rather than being a cascade you happened not to pay for.
-        const mult = CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round;
+        // Per cabinet, falling back to the house ladder. The Vault needs its own now that every symbol
+        // pays at three: chains got both longer and far more common, and a 20x top rung on top of that is
+        // what took the machine to 395%. Gentler climb, bigger paytable — same money, better shape.
+        const ladder = m.cascadeMult || CASCADE_MULT;
+        const mult = ladder[Math.min(n, ladder.length - 1)] * round;
         const r = evaluate(m, working, { lineBet, mult });
         const lineWins = r.wins.filter((w) => w.kind === "line");
         // The scatter pays once, on the first pass only — otherwise a tumbling machine pays its scatter
@@ -894,7 +960,12 @@ const WARREN_STAGES = [
 // Which is why the Deep Warren seeds TWO Elders against its one Mother. At one apiece a return trip would be
 // a coin flip and the loop would almost never run; at two the odds of getting back are 2/3, so a run that
 // reaches the bottom usually takes a couple of geodes and can, rarely, take five.
-const DEEP_ELDERS = 2;
+// Four, since the Deep Warren's wall stopped resetting between geodes (see runWarren). With a board that
+// persists, the number of trips to the Hoard is decided ONCE — by how many Elders sit above the Mother in
+// the shuffle — rather than by an independent coin flip per visit, and the expected count is elders/2. Four
+// keeps that at two while putting enough of them in the wall that "a few Elders in the eggs" is true of the
+// thing rather than only of the odds.
+const DEEP_ELDERS = 4;
 const HOARD_VALUE = 560;
 
 export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
@@ -914,28 +985,57 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     let ended = false;
     let geodes = 0;
 
+    // ── THE WALL REMEMBERS ───────────────────────────────────────────────────────────────────────────────
+    // Luke: "when you return from the hoard the eggs you opened should still be open."
+    //
+    // Every visit used to build a brand-new fifteen and shuffle it, so cracking a geode and coming back put
+    // you in front of a full wall again — which quietly says the room resets, and a room that resets is not
+    // a room, it is a slot machine inside a slot machine. Now the board and the cursor live OUTSIDE the loop
+    // and are rebuilt only when the stage actually changes. Come back from the Hoard and the eggs you tore
+    // open are still torn open, the crowd you let out is still on the floor, and there are fewer places left
+    // for the Mother to not be.
+    //
+    // That is a real change to the odds and it is the point of it: the wall empties, so every return is a
+    // little more dangerous than the last, and the fifth room stops being an unbounded loop.
+    let board = null;
+    let cursor = 0;
+    let boardStage = -1;
+
     while (!ended && stages.length < MAX_VISITS) {
         const cfg = WARREN_STAGES[stage];
-        // Only the last room carries a second Elder. Everywhere above it, one Elder against one Mother is
-        // the coin flip that keeps the ladder honest — the fifth room is one run in sixteen and has to stay
-        // that way whatever happens once you are down there.
-        const elders = stage === LAST ? DEEP_ELDERS : 1;
-        const board = [
-            ...Array.from({ length: NESTS - elders - 1 }, () => ({ kind: "pups" })),
-            ...Array.from({ length: elders }, () => ({ kind: "elder" })),
-            { kind: "mother" },
-        ];
-        for (let i = board.length - 1; i > 0; i -= 1) {
-            const j = Math.floor(rng() * (i + 1));
-            [board[i], board[j]] = [board[j], board[i]];
+        if (stage !== boardStage) {
+            // ── AND THE DEEP WARREN HOLDS SEVERAL ELDERS ─────────────────────────────────────────────
+            // Luke: "keep in mind we should have a few elders in the eggs, that way you can get to the
+            // hoard a few times." Everywhere above it, one Elder against one Mother is the coin flip that
+            // keeps the ladder honest; down here the whole shape of the room is how many Elders are still
+            // hiding in what is left of the wall.
+            const elders = stage === LAST ? DEEP_ELDERS : 1;
+            board = [
+                ...Array.from({ length: NESTS - elders - 1 }, () => ({ kind: "pups" })),
+                ...Array.from({ length: elders }, () => ({ kind: "elder" })),
+                { kind: "mother" },
+            ];
+            for (let i = board.length - 1; i > 0; i -= 1) {
+                const j = Math.floor(rng() * (i + 1));
+                [board[i], board[j]] = [board[j], board[i]];
+            }
+            cursor = 0;
+            boardStage = stage;
         }
 
+        // A pup nest's value, rolled the same way whether you opened it or only get to see it afterwards.
+        const rollPups = () => {
+            const [lo, hi] = cfg.pups;
+            const n = lo + Math.floor(rng() * (hi - lo + 1));
+            return Array.from({ length: n }, () => cfg.value * (0.7 + rng() * 0.9));
+        };
+
         const opened = [];
-        for (const nest of board) {
+        while (cursor < board.length) {
+            const nest = board[cursor];
+            cursor += 1;
             if (nest.kind === "pups") {
-                const [lo, hi] = cfg.pups;
-                const n = lo + Math.floor(rng() * (hi - lo + 1));
-                const pups = Array.from({ length: n }, () => cfg.value * (0.7 + rng() * 0.9));
+                const pups = rollPups();
                 total += pups.reduce((a, v) => a + v, 0) * lineBet;
                 opened.push({ kind: "pups", pups });
                 continue;
@@ -946,6 +1046,19 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
 
         const last = opened[opened.length - 1];
         const visit = { stage, key: cfg.key, name: cfg.name, opened };
+
+        // ── WHAT YOU LEFT BEHIND ─────────────────────────────────────────────────────────────────────
+        // Luke: "when you lose by picking the other thing it should show what the value of the non-picked
+        // eggs were — where other bears and wolves were."
+        //
+        // A round that ends by turning over the wrong thing and then just stops is the one moment the
+        // machine owes you an answer. Every unopened nest, rolled and sent — the Elder you were one egg
+        // away from especially. It is added to nothing: this is what the wall HELD, not what you won.
+        if (last?.kind === "mother") {
+            visit.rest = board.slice(cursor).map((n) => (
+                n.kind === "pups" ? { kind: "pups", pups: rollPups() } : { kind: n.kind }
+            ));
+        }
 
         // AN ELDER IN THE LAST ROOM IS A GEODE. One crack, its own value, and then straight back onto the
         // same wall — the visit carries the geode rather than there being a separate room in the data,

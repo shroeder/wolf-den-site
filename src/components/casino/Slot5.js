@@ -725,7 +725,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 that it is filling while you are looking at something else. */}
             {slot5(machineId).winAgain ? (
                 <WinAgainBar meter={shownMeter || { slots: slot5(machineId).winAgain.slots, recent: [], label: slot5(machineId).winAgain.label }}
-                    bet={bet} firing={meterFire}
+                    firing={meterFire}
                     onFired={() => { setMeterFire(null); const go = afterMeter.current; afterMeter.current = null; go?.(); }} />
             ) : null}
             {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}

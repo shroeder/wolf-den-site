@@ -19446,6 +19446,50 @@ body.cas-seated .social-fab { display: none; }
 .s5-window.is-lining .s5-cell.is-locked img { opacity: 1 !important; }
 .s5-cell.is-locked img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #b47cff) 65%, transparent)); }
 
+/* ── WHAT THE WALL STILL HELD ─────────────────────────────────────────────────────────────────────────
+   Luke: "when you lose by picking the other thing it should show what the value of the non-picked eggs
+   were — where other bears and wolves were."
+
+   The round ended on the wrong egg and then simply stopped, with a wall full of eggs nobody would ever see
+   inside. They turn over now, dimmed and one after another so the board reads left to right, holding what
+   they held. Held BACK — greyed, never lit — so it can only read as what was there and never as something
+   collected: the moment this exists for is being one egg away from an Elder and getting to know it. */
+.wr-egg.is-rest { opacity: .62; }
+.wr-egg.is-rest img { filter: grayscale(.55) brightness(.72); }
+.wr-was { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; pointer-events: none;
+    animation: wrWas .3s ease both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes wrWas { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+.wr-was b { font-size: .58rem; font-weight: 900; letter-spacing: .02em; padding: 1px 5px; border-radius: 999px;
+    color: #d8cdb8; background: rgba(6,4,2,.86); box-shadow: 0 0 0 1px rgba(255,215,140,.3);
+    font-variant-numeric: tabular-nums; }
+/* The Elder is the whole point of the reveal, so he is the one thing in it that is allowed to shine. */
+.wr-was.is-elder b { color: #14100a; font-size: .5rem; letter-spacing: .1em;
+    background: linear-gradient(180deg, #ffe27a, #f3b23a); box-shadow: 0 0 14px rgba(255,200,90,.95); }
+.wr-was.is-elder { opacity: 1; }
+.wr-egg.is-rest:has(.wr-was.is-elder) { opacity: 1; }
+.wr-egg.is-rest:has(.wr-was.is-elder) img { filter: none; }
+.wr-was.is-mother b { color: #ffd0d0; background: rgba(60,6,10,.9); box-shadow: 0 0 0 1px rgba(255,90,90,.5); }
+
+/* ── THE TWENTY LINES, DRAWN ──────────────────────────────────────────────────────────────────────────
+   The machine has advertised "twenty lines" since it shipped and never once showed them, so the only way
+   to know whether three-in-a-row sat on one was to have the table memorised. Twenty little 5x3 grids with
+   the shape lit on each — the cheapest possible answer to a question that came up three times in a row. */
+.pt-lines { margin: 14px 0 4px; }
+.pt-lines h5 { margin: 0 0 8px; font-family: var(--font-display); font-size: 13px;
+    color: var(--acc, #ffd75e); }
+.pt-lines-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
+@media (max-width: 380px) { .pt-lines-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pt-line { position: relative; display: grid; justify-items: center; gap: 2px; padding: 4px 2px 3px;
+    border-radius: 7px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09); }
+.pt-line-cells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5px; width: 100%; padding: 0 3px; }
+.pt-line-cells i { aspect-ratio: 1; border-radius: 1.5px; background: rgba(255,255,255,.09); }
+/* The lit cells ARE the line, so they carry the cabinet's own accent and a glow — at this size a border
+   would vanish and only a filled block reads. */
+.pt-line-cells i.is-on { background: var(--acc, #ffd75e);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--acc, #ffd75e) 80%, transparent); }
+.pt-line u { text-decoration: none; font-size: 8px; font-weight: 800; color: #8f98a3;
+    font-variant-numeric: tabular-nums; }
+
 /* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
    Five rooms deep, and the room is the point — each stage is a different painted place behind the
    burrows, so going deeper is something you SEE rather than a number going up.

@@ -90,6 +90,11 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
     );
     if (!built) return null;
     const { rows, heads, m } = built;
+    // Which symbols have no three-of-a-kind pay. Derived from the same `rows` the grid renders, so the
+    // sentence underneath can never disagree with the dashes above it.
+    const shortLadders = rows
+        .filter((r) => r.role !== "scatter" && !r.cells[0])
+        .map((r) => ({ id: r.id, tone: r.tone, from: r.cells[1] ? "four" : "five" }));
 
     return (
         <div className="pt-scrim" role="dialog" aria-modal="true" aria-label="What this machine pays"
@@ -131,6 +136,37 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                     ))}
                 </div>
 
+                {/* ── AND THE TWENTY LINES, DRAWN ──────────────────────────────────────────────────────
+                    Luke, three boards running: "what are the paylines? The blue three across the bottom
+                    isn't one?" — and then "again, not a payline for both blues and the orange?"
+
+                    He was reading the board correctly every time. The bottom row IS line 3 of 20. The
+                    machine has advertised "twenty lines" since it shipped and has never once shown them,
+                    so the only way to know whether a run of three sits on one was to have the table in
+                    your head. A slot that will not show its lines is asking you to take its word for it.
+
+                    Twenty little 5x3 grids, the shape drawn on each. Cheap, and it ends the argument. */}
+                {m ? (
+                    <div className="pt-lines">
+                        <h5>The {LINES.length} lines</h5>
+                        <div className="pt-lines-grid">
+                            {LINES.map((line, i) => (
+                                <div key={i} className="pt-line">
+                                    <span className="pt-line-cells" aria-hidden="true">
+                                        {Array.from({ length: 3 }, (_, row) => (
+                                            Array.from({ length: 5 }, (_, reel) => (
+                                                <i key={`${row}-${reel}`}
+                                                    className={line[reel] === row ? "is-on" : ""} />
+                                            ))
+                                        ))}
+                                    </span>
+                                    <u>{i + 1}</u>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
                 {/* ── THE THREE THINGS A TABLE OF NUMBERS CANNOT SAY ───────────────────────────────────
                     A grid shows what each symbol is worth and nothing about how the machine works. These are
                     the rules that decide whether the grid ever applies, and every one of them is invisible on
@@ -138,6 +174,20 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                 {m ? (
                     <ul className="pt-notes">
                         <li>Lines pay <b>left to right</b> from the first reel. A run that starts on reel two pays nothing.</li>
+                        {/* A dash in a small grid is not an answer to "why did three of these pay me nothing".
+                            Said in words, naming the symbols, because this is the single most confusing thing
+                            about the machine — on the cabinets that tumble it is most of the paytable. */}
+                        {shortLadders.length ? (
+                            <li>
+                                {shortLadders.map((r, i) => (
+                                    <span key={r.id}>
+                                        {i > 0 ? (i === shortLadders.length - 1 ? " and " : ", ") : null}
+                                        <b style={{ color: r.tone }}>{pretty(r.id, machineId)}</b> pays from <b>{r.from}</b>
+                                    </span>
+                                ))}
+                                {" "}— three on a line is not a win for {shortLadders.length > 1 ? "those" : "that one"}.
+                            </li>
+                        ) : null}
                         <li>
                             <b style={{ color: lookFor(machineId, m.wild)?.tone }}>{pretty(m.wild, machineId)}</b> is <b>wild</b> —
                             it stands in for any symbol except the {pretty(m.scatter, machineId)}, and it only appears on the middle three reels.

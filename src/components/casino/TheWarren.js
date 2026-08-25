@@ -45,6 +45,9 @@ const SHAKE_MS = 700;
 // animals appeared somewhere else on screen — which is a shake and a spawn, not a hatch.
 const CRACK_MS = 420;
 const HOP_MS = 380;
+// The wall turning itself over at the end. Long enough to read a board of fifteen, short enough that it is
+// a reveal rather than a screen you are stuck on.
+const REST_MS = 2600;
 const SETTLE_MS = 520;
 // Long enough to actually enjoy him. The old shout held 2,400ms and most of that was reading; this is the
 // same budget spent on the animal instead of on a caption.
@@ -78,6 +81,8 @@ export default function TheWarren({ warren, onDone, owner = false }) {
     const [elder, setElder] = useState(null);      // { x, art }
     const [inHoard, setInHoard] = useState(false);
     const [done, setDone] = useState(false);
+    // What every UNOPENED nest held, once the Mother has ended it. Slot index -> the thing inside.
+    const [rest, setRest] = useState(null);
     // Which board slots have been opened, so a burrow cannot be picked twice and the room visibly empties.
     const [spent, setSpent] = useState([]);
     const timers = useRef([]);
@@ -203,8 +208,18 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                 setInHoard(false);
             }
 
-            setSpent([]);
-            setHops([]);   // a new wall is a new floor; the last one's crowd stays behind in it
+            // ── A NEW ROOM IS A NEW WALL; THE SAME ROOM IS NOT ───────────────────────────────────────
+            // Luke: "when you return from the hoard the eggs you opened should still be open."
+            //
+            // This cleared the board after every Elder, which is right when he takes you DOWN a room and
+            // wrong when he hands you a geode and puts you back on the same wall — the Deep Warren is a
+            // loop, and wiping it each time round said the room had reset when the server knows perfectly
+            // well that it has not. The next visit's `stage` says which of the two just happened.
+            const sameRoom = stages[stage + 1]?.room === cur?.room;
+            if (!sameRoom) {
+                setSpent([]);
+                setHops([]);   // a new wall is a new floor; the last one's crowd stays behind in it
+            }
             setAt(0);
             setStage((n) => n + 1);
             setBusy(false);
@@ -217,9 +232,33 @@ export default function TheWarren({ warren, onDone, owner = false }) {
         Haptic.crit();
         await wait(2100);
         setBanner(null);
+
+        // ── AND THEN THE WALL OPENS ITSELF ───────────────────────────────────────────────────────────
+        // Luke: "when you lose by picking the other thing it should show what the value of the non-picked
+        // eggs were — where other bears and wolves were."
+        //
+        // A round that ends on the wrong egg and then simply stops is the one moment the machine owes you
+        // an answer, and it was giving none: the wall went dark still full of eggs nobody would ever see
+        // inside. Every unopened nest turns over dim, holding what it held — and the Elder you were one
+        // egg away from is the whole reason to do it. Held back until after the Mother's shout so it reads
+        // as what WAS there and never as something you collected.
+        const left = cur?.rest || [];
+        if (left.length) {
+            // `spent` is the value this callback closed over, and the Mother's own egg was added to it by a
+            // setState at the top of this same invocation — so reading it here is one behind, which shifted
+            // every label by a slot and put "ELDER" on a shell that had already been opened. The egg in hand
+            // is added explicitly rather than waiting for a render that will not come until after this.
+            const closed = [...spent, slot];
+            const idx = Array.from({ length: slots }, (_, i) => i).filter((i) => !closed.includes(i));
+            const map = {};
+            idx.forEach((slotAt, k) => { if (left[k]) map[slotAt] = left[k]; });
+            setRest(map);
+            Cas.coins(0.3);
+            await wait(REST_MS);
+        }
         setDone(true);
         setBusy(false);
-    }, [busy, done, spent, cur, at, stage, pool]);
+    }, [busy, done, spent, cur, at, stage, pool, slots, stages]);
 
     // ── CRACKING ONE ─────────────────────────────────────────────────────────────────────────────────────
     // Its own handler rather than a branch of `open`, because the Hoard is not a board being walked: it is
@@ -358,7 +397,8 @@ export default function TheWarren({ warren, onDone, owner = false }) {
             {!inHoard ? <div className="wr-wall">
                 {Array.from({ length: slots }, (_, i) => (
                     <button key={`${stage}-${inHoard}-${i}`} type="button"
-                        className={`wr-egg${shaking === i ? " is-shaking" : ""}${cracking === i ? " is-cracking" : ""}${spent.includes(i) && cracking !== i ? " is-open" : ""}`}
+                        className={`wr-egg${shaking === i ? " is-shaking" : ""}${cracking === i ? " is-cracking" : ""}${spent.includes(i) && cracking !== i ? " is-open" : ""}${rest?.[i] ? " is-rest" : ""}`}
+                        style={{ "--i": i }}
                         disabled={busy || done || spent.includes(i)}
                         onClick={() => open(i)}
                         aria-label={inHoard ? "Open a mound" : "Open an egg"}>
@@ -373,6 +413,15 @@ export default function TheWarren({ warren, onDone, owner = false }) {
                         {/* The shell coming apart: a flash inside it and a ring thrown outwards. Its own
                             element because the egg is an <img> and an image cannot carry pseudo-elements. */}
                         {cracking === i ? <i className="wr-break" aria-hidden="true" /> : null}
+                        {/* What this one held. The Elder gets his own face — being one egg away from him is
+                            the thing worth knowing — and a nest of pups shows what it was worth. */}
+                        {rest?.[i] ? (
+                            <span className={`wr-was is-${rest[i].kind}`}>
+                                {rest[i].kind === "pups"
+                                    ? <b>{(rest[i].pups || []).reduce((a, v) => a + v, 0).toLocaleString()}</b>
+                                    : <b>{rest[i].kind === "elder" ? "ELDER" : "HER"}</b>}
+                            </span>
+                        ) : null}
                     </button>
                 ))}
             </div> : null}

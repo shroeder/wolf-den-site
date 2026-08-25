@@ -20,7 +20,9 @@ import { Haptic } from "@/components/arena/arena-audio.js";
 const STEP_MS = 260;        // one slot lighting — the "boom"
 const BLOW_MS = 2200;       // the explosion, on top of everything, before the round carries on
 
-export default function WinAgainBar({ meter, bet, firing, onFired }) {
+// No `bet` any more: the row arrives in chips, so there is nothing left here to convert — and a
+// prop the component does not read is a second opinion about units waiting to disagree with the first.
+export default function WinAgainBar({ meter, firing, onFired }) {
     const slots = meter?.slots || 5;
     const recent = meter?.recent || [];
     const [lit, setLit] = useState(-1);
@@ -81,7 +83,7 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
                     const won = Number(v) > 0;
                     return (
                         <div key={i} className={`wa-slot${won ? " is-full" : ""}${firing && lit >= i ? " is-lit" : ""}`}>
-                            <b>{won ? Math.round(v * (bet || 0)).toLocaleString() : ""}</b>
+                            <b>{won ? Math.round(v).toLocaleString() : ""}</b>
                             {/* Numbers, not "RECENT WIN 2". The reference has a cabinet's width to spend and
                                 this has 375px — the words were the widest thing in the row and the row is
                                 what has to fit. */}
@@ -92,7 +94,10 @@ export default function WinAgainBar({ meter, bet, firing, onFired }) {
                 {/* The divider before it — a rule in the rack, so the sum cannot be counted as a sixth win. */}
                 <i className="wa-div" aria-hidden="true" />
                 <div className={`wa-total${firing && total != null ? " is-paid" : ""}`}>
-                    <b>{(firing && total != null ? total : recent.reduce((a, n) => a + n, 0) * (bet || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</b>
+                    {/* The row arrives in chips now (see the meter payload), so the total is a plain sum —
+                        it used to multiply by the bet a second time, which is where the four-times-too-big
+                        numbers came from. */}
+                    <b>{Math.round(firing && total != null ? total : recent.reduce((a, n) => a + n, 0)).toLocaleString()}</b>
                     <em>total</em>
                 </div>
             </div>

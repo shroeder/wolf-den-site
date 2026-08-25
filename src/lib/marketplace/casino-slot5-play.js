@@ -212,7 +212,16 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             slots: m.winAgain.slots, need: m.winAgain.need, label: m.winAgain.label,
             // What to DRAW. On an ordinary spin that is the row as it now stands; on a firing spin it is the
             // row the payout was made of, because the animation lights those slots before it empties them.
-            recent: r.winAgain ? r.winAgain.row : (r.meter || []),
+            // ── IN CHIPS, LIKE EVERY OTHER NUMBER ON THE SCREEN ──────────────────────────────────
+            // Luke: "does 7 equal 27? is it using some conversion accidentally?" It was. The row is
+            // stored as MULTIPLES OF THE BET (see readMeter — deliberately, so a bet change cannot
+            // corrupt it), and the screen was rendering `multiple x bet`, which is the ENGINE's unit,
+            // not chips. Chips are `engine x CHIP_RATE`, and CHIP_RATE is 0.25 — so a spin that paid 7
+            // chips wrote 27 into the row, every slot read four times too big, and the total promised
+            // 606 for a payout of about 152. Converted here, with chipsFor, exactly like the pups and
+            // the geode and the win itself. Stored in multiples, shown in chips.
+            recent: (r.winAgain ? r.winAgain.row : (r.meter || []))
+                .map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
             cleared: Boolean(r.winAgain),
             fired: r.winAgain ? { total: chipsFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
         } : null,
@@ -371,6 +380,13 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 opened: st.opened.map((n) => (n.kind === "pups"
                     ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
                     : { kind: n.kind })),
+                // ── AND WHAT THE WALL STILL HELD ─────────────────────────────────────────────────
+                // Only on the visit the Mother ended, because that is the only one with anything left
+                // to say. Converted the same way as `opened` — the screen must never do arithmetic on
+                // a payout, and a number shown in different units from the one beside it is a lie.
+                rest: st.rest ? st.rest.map((n) => (n.kind === "pups"
+                    ? { kind: "pups", pups: n.pups.map((v) => chipsFor(stake, (v * (stake / LINES.length)) / stake)) }
+                    : { kind: n.kind })) : null,
             })),
             chips: chipsFor(stake, r.warren.total / stake),
             art: await warrenArt(),
