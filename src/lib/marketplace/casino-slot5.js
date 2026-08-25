@@ -512,7 +512,10 @@ const VAULT = {
     // small ones with the Gem Vault and the Win It Again row on top. Three in four spins pay something.
     // That is what a tumbling cabinet actually is, and it is the honest shape for one.
     //
-    // Swept, not guessed: ladder [1,2,3,4,6,8,12] with the table at x0.195.
+    // Swept, not guessed: ladder [1,2,3,4,6,8,12] with the table at x0.195 — then x0.2325 when
+    // Win It Again's threshold went from three cascades to six. Firing 1 spin in 3.7 rather than
+    // 1 in 22.7 was paying for a sixth of this cabinet's return, so the table had to take the
+    // difference back. The rule is to bring the LOW cabinet up, never to file the others down.
     //
     // AND THE METER IS THE OTHER HALF OF THE BILL. Win It Again pays back the sum of your last five wins
     // when a spin breaks three times, and three breaks used to be uncommon — with every symbol paying at
@@ -522,13 +525,13 @@ const VAULT = {
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 2.35, 4: 17.92, 5: 235.29 },
-        chest: { 3: 0.68, 4: 5.18, 5: 51.81 },
-        laurel: { 3: 0.24, 4: 1.52, 5: 12.25 },
-        doubloon: { 3: 0.11, 4: 0.51, 5: 3.7 },
-        bone: { 3: 0.07, 4: 0.27, 5: 1.07 },
+        wolf: { 3: 3.01, 4: 22.96, 5: 301.47 },
+        chest: { 3: 0.87, 4: 6.63, 5: 66.38 },
+        laurel: { 3: 0.31, 4: 1.95, 5: 15.69 },
+        doubloon: { 3: 0.14, 4: 0.66, 5: 4.74 },
+        bone: { 3: 0.09, 4: 0.34, 5: 1.38 },
     },
-    scatterPays: { 3: 0.5, 4: 2.6, 5: 17.3 },
+    scatterPays: { 3: 0.64, 4: 3.33, 5: 22.17 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -544,7 +547,18 @@ const VAULT = {
     // Three breaks in one spin pays out everything the meter has been holding. `need` is the number of
     // CASCADES, not of wins; `slots` is how many spins the meter remembers. Both live here rather than in
     // the engine so the cabinet owns its own feature, the way every other one does.
-    winAgain: { slots: 5, need: 3, label: "WIN IT AGAIN" },
+    // ── SIX, NOT THREE ───────────────────────────────────────────────────────────────────────────────
+    // Luke: "something is wrong with Win It Again, it shouldn't clear, and somehow it's completely clearing
+    // itself out." Measured over 60,000 spins: at `need: 3` it fired ONE SPIN IN 3.7. Firing empties the
+    // row, so the meter was being wiped every four spins and could never fill — an average of 1.44 of its
+    // five slots had anything in them when a spin began. The feature is a bank you watch grow, and it was
+    // never getting past the first note.
+    //
+    // Three cascades is simply a common event on this cabinet: 12% of spins reach exactly three and 27%
+    // reach three or more. Six is the first rung that is rare enough to be an event — 1 spin in 22.7 — and
+    // that is long enough for the row to fill, age, and start pushing good spins off the end, which is the
+    // tension the whole thing was built for.
+    winAgain: { slots: 5, need: 6, label: "WIN IT AGAIN" },
     second: { kind: "gems", label: "The Gem Vault" },
 };
 

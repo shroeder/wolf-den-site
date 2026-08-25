@@ -57,8 +57,14 @@ export const isBigWin = (multiple) => tierFor(multiple).label !== null;
  * @param {string} tone      the machine's colour, for the coins and the glow
  * @param {Function} onDone  called once the count and its held beat are over
  */
-export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", onDone = null }) {
-    const tier = useMemo(() => tierFor(multiple), [multiple]);
+export default function WinTally({ chips = 0, multiple = 0, tone = "#ffd75e", ms = null, onDone = null }) {
+    // `ms` overrides the tier's own duration. There is one caller: the free-round recap, which is counting a
+    // whole round rather than a spin and wants longer than the ordinary tier would give it. The TIER still
+    // decides everything else, so a recap cannot accidentally become a splash.
+    const tier = useMemo(() => {
+        const t = tierFor(multiple);
+        return ms ? { ...t, ms } : t;
+    }, [multiple, ms]);
     const [at, setAt] = useState(0);
     const [over, setOver] = useState(false);
     const doneRef = useRef(onDone);

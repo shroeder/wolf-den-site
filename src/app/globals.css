@@ -20123,6 +20123,30 @@ body.cas-seated .social-fab { display: none; }
 .col5-flash-won b { font-size: 16px; font-weight: 900; color: #fff3d0;
     text-shadow: 0 0 14px rgba(255,200,90,.95); font-variant-numeric: tabular-nums; }
 
+/* ── THE COLOSSAL ROUND'S ENDING ──────────────────────────────────────────────────────────────────────
+   Luke: "when finishing the free spins we need a recap modal with dopamine and sprites and motion and
+   sounds and particle effects." It borrows .s5-tally wholesale — the screen the five-reel bonus already
+   ends on — so this is only what it takes to make that screen an overlay on this cabinet, plus the sizing
+   for the shared count-up sitting inside it. */
+.col5-tally { position: absolute; inset: 0; z-index: 40; align-content: center;
+    border-radius: inherit; padding: 16px 12px;
+    /* Darker than the shared screen, because that one sits on a cabinet and this one sits on THIRTY-TWO
+       lit symbols. At the borrowed opacity the board read straight through the recap and the two fought. */
+    background: radial-gradient(78% 60% at 50% 42%, color-mix(in srgb, var(--acc, #ffd75e) 18%, rgba(0,0,0,.82)), rgba(0,0,0,.95)); }
+/* Centred on the overlay and sized to it. The borrowed rule is a fixed 480px square pinned at 34% of a much
+   smaller card; dropped into a full-cabinet overlay that put the fan's origin up in the corner. */
+.col5-tally .s5-tally-rays { left: 50%; top: 46%; width: 175%; height: auto; aspect-ratio: 1; opacity: .34; }
+/* The count-up is the shared component, so the recap tells it what size to be rather than drawing its own. */
+.col5-tally .s5-tally-n { position: relative; z-index: 2; line-height: 1.05; }
+.col5-tally .s5-tally-n .wt-line { font-size: 0; gap: 0; }
+.col5-tally .s5-tally-n .wt-line b { font-family: var(--font-display); font-size: 2.9rem; font-weight: 900;
+    color: #fff; text-shadow: 0 0 30px color-mix(in srgb, var(--tone, #ffd75e) 85%, transparent),
+        0 4px 0 rgba(0,0,0,.5); }
+/* The giant floats rather than sits — the one bit of motion the borrowed screen does not already have. */
+.col5-tally .s5-tally-star { animation: col5TallyFloat 2.8s ease-in-out infinite; }
+@keyframes col5TallyFloat { 0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+    50% { transform: translateY(-9px) rotate(1.5deg); } }
+
 /* ══ THE BONUS ARRIVING ════════════════════════════════════════════════════════════════════════════════════
    Luke: "I keep getting the bonus and there is no build up or visibility, we should do the same thing we do
    for other slots." The held reel is in ColossalReels; this is what it looks like.

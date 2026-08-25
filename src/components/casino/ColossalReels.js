@@ -6,6 +6,7 @@ import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 import { slot5, symbolTone, symbolRole, isMult, multValue } from "@/lib/marketplace/casino-slot5.js";
 import WinTally, { isBigWin, tierFor } from "@/components/casino/WinTally";
+import Burst from "@/components/casino/Burst";
 
 // ── COLOSSAL REELS ───────────────────────────────────────────────────────────────────────────────────────────
 // Luke, with a Lil' Red cabinet on screen: "there's a regular reel on the left and a huge reel on the right,
@@ -41,6 +42,17 @@ const BONUS_MS = 2400;
 // Three moons across the two boards opens the round — the same number the engine triggers on. A tease that
 // disagreed with the payout would be the machine lying, so it is read from one place.
 const SCATTER_NEED = 3;
+// The figure that stands in the middle of the recap. The giants ARE this machine, so the round ends on one
+// rather than on the wild — the wild is what pays, the giant is what you were chasing.
+const GIANT_FOR_TALLY = "dire";
+// Ten reel-stops in a press (five small, then five tall). Only the last few can be held, and only so many —
+// see landOne for why a hold with six reels still to come is not tension, it is a wait.
+const STEPS = REELS * 2;
+// The top of the free-spin ladder (bySctr tops out at six moons). Past it another scatter buys nothing and
+// holding for one would be the machine promising something it cannot pay.
+const SCATTER_TOP = 6;
+const HOLD_WINDOW = 3;
+const MAX_HOLDS = 3;
 // The count plus its held beat — what a paying spin costs in time before the machine moves on.
 const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
@@ -56,6 +68,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
     const [won, setWon] = useState(0);
     const [paid, setPaid] = useState(null);          // the win being counted right now
     const [tease, setTease] = useState(null);        // { board, reel } — a reel held because it could open the bonus
+    const [tally, setTally] = useState(null);        // the free round's recap, held until it is collected
     const [free, setFree] = useState(null);          // { at, of } while the bonus runs
     const [shout, setShout] = useState(null);
     const timers = useRef([]);
@@ -108,14 +121,34 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
         let seen = 0;
         let held = 0;
 
-        const landOne = async (board, r, gap, sound) => {
-            const live = scat && seen === SCATTER_NEED - 1;
+        const landOne = async (board, r, gap, sound, step) => {
+            // ── THE DRAMA BELONGS AT THE END ─────────────────────────────────────────────────────────
+            // Luke: "the slow reel is too slow." It was, and badly — the rule "you are one short, so hold"
+            // is written for a FIVE reel machine and this one lands ten. Two moons on the small board made
+            // every one of the eight reels behind them live, each held longer than the last: 900ms, 1280,
+            // 1660, 2040... over eight seconds of held reels on a single spin.
+            //
+            // Two bounds, and both of them are about where tension actually lives. A reel held while six
+            // more are still to come is not tense — there are plenty of chances left and you know it — so
+            // only the last three stops can hold at all, and never more than three in one spin. The build
+            // now runs at most ~2.4s and it runs at the END, which is the only place it means anything.
+            // ── AND A FOURTH MOON IS WORTH HOLDING FOR TOO ───────────────────────────────────────────
+            // First cut held only at exactly one short, which is the right rule on a machine where the
+            // scatter either triggers or does nothing. Here the round is SIZED by the count — three moons
+            // is eight spins, four is fifteen, five is twenty-five — so the tension does not end when the
+            // bonus is secured, it changes into something better. Measured a forced bonus that fired zero
+            // holds because the third moon landed early: correct by the old rule, and a dead spin to watch.
+            //
+            // Live from one-short upward, until the ladder runs out at six. Still bounded by the window and
+            // the cap, so this costs no extra time — it just spends it on the spins that deserve it.
+            const left = STEPS - step;
+            const live = scat && seen >= SCATTER_NEED - 1 && seen < SCATTER_TOP
+                && left <= HOLD_WINDOW && held < MAX_HOLDS;
             if (live) {
-                // The hold begins the instant the previous reel lands — the first moment you can see you are
-                // one short — and it grows each time, because a second hold the same length as the first
-                // reads as the machine repeating itself rather than as the tension climbing.
+                // Each hold is longer than the last — a second one the same length as the first reads as
+                // the machine repeating itself rather than as the tension climbing.
                 held += 1;
-                const hold = 900 + (held - 1) * 380;
+                const hold = 620 + (held - 1) * 240;
                 setTease({ board, reel: r });
                 Cas.anticipate(hold);
                 Haptic.hit(0.3);
@@ -132,8 +165,8 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
             if (got) { Cas.reelStop(r, 1); Haptic.crit(); } else { Cas.nearMiss(); Haptic.hit(0.5); }
         };
 
-        for (let r = 0; r < REELS; r += 1) await landOne("main", r, MAIN_STOP, 0.4);
-        for (let r = 0; r < REELS; r += 1) await landOne("col", r, COL_STOP, 0.6);
+        for (let r = 0; r < REELS; r += 1) await landOne("main", r, MAIN_STOP, 0.4, r);
+        for (let r = 0; r < REELS; r += 1) await landOne("col", r, COL_STOP, 0.6, REELS + r);
         await wait(SETTLE);
 
         // ── THE TRANSFER ─────────────────────────────────────────────────────────────────────────────────
@@ -191,7 +224,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
         let dead = false;
         (async () => {
             unlock();
-            setWon(0); setFree(null); setShout(null); setPaid(null);
+            setWon(0); setFree(null); setShout(null); setPaid(null); setTally(null);
             await playOne(data, false);
             if (dead) return;
 
@@ -214,6 +247,31 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
                 }
                 Cas.music(null);
                 setFree(null);
+
+                // ── A ROUND IS A STORY AND IT NEEDS AN ENDING ────────────────────────────────────────
+                // Luke: "when finishing the free spins we need a recap modal with dopamine and sprites and
+                // motion and sounds and particle effects." The five-reel cabinets have had one since the
+                // bonus shipped — rays, a coin burst, the machine's own wild dancing, the total counted UP
+                // rather than printed, and the parts that made it listed underneath. This one just stopped:
+                // the last free spin finished and the reels sat there.
+                //
+                // Same object, not a second one. It takes the .s5-tally the other cabinets use, so the two
+                // bonus rounds on this floor end the same way and any future work on that screen reaches
+                // both. What differs is what a COLOSSAL round has to report: the moons that opened it, the
+                // biggest multiplier the bonus reel handed over, and the best single spin.
+                const sps = data.free.spins || [];
+                const total = sps.reduce((n, x) => n + (x.chips || 0), 0);
+                setTally({
+                    total,
+                    spins: sps.length,
+                    scatters: data.free.scatters,
+                    best: Math.max(0, ...sps.map((x) => x.chips || 0)),
+                    mult: Math.max(1, ...sps.map((x) => x.applied || 1)),
+                    sent: sps.filter((x) => (x.sent || []).length).length,
+                });
+                Cas.jackpot();
+                Haptic.crit();
+                return;   // the round is not over until it has been collected
             }
             if (!dead) onDone?.();
         })();
@@ -534,6 +592,39 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
                     <i>{shout.scatters} {m.scatter === "moon" ? "moons" : "scatters"} across both boards</i>
                     <b>{shout.spins} FREE SPINS</b>
                     <em>{shout.label}</em>
+                </div>
+            ) : null}
+
+            {/* ── THE ROUND'S ENDING ───────────────────────────────────────────────────────────────────
+                Built from .s5-tally — the same screen the five-reel bonus ends on — so the floor has one
+                idea of what finishing a round looks like. Rays turning behind it, coins thrown twice (once
+                as it opens and once as the number lands), the machine's own giant standing in the middle,
+                and the total counted UP. What is listed underneath is what a colossal round is made of:
+                the moons that opened it, the best single spin, the biggest multiplier the bonus reel gave,
+                and how many columns went wild across the two boards. */}
+            {tally ? (
+                <div className="s5-tally col5-tally" role="dialog" aria-label="Free round complete">
+                    <i className="s5-tally-rays" aria-hidden="true" />
+                    <Burst kind="hoard" tone={symbolTone(m.wild, machineId)} />
+                    <Burst kind="coin" tone="#7ad4ff" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="s5-tally-star" src={cellArt(GIANT_FOR_TALLY)} alt="" draggable="false" />
+                    <span className="s5-tally-kick">The round is done</span>
+                    {/* multiple 0 keeps this the plain counter — anything past ten is a TIER with a title,
+                        and WinTally would draw its full-screen splash inside the recap. The round gets a
+                        longer count than a spin would because it is a bigger number and the whole point of
+                        the screen is watching it arrive. */}
+                    <span className="s5-tally-n"><WinTally chips={tally.total} multiple={0} ms={1700}
+                        tone={symbolTone(m.wild, machineId)} /></span>
+                    <span className="s5-tally-sub">chips</span>
+                    <div className="s5-tally-rows">
+                        <span><i>Spins</i><b>{tally.spins}</b></span>
+                        <span><i>{m.scatter === "moon" ? "Moons" : "Scatters"}</i><b>{tally.scatters}</b></span>
+                        {tally.mult > 1 ? <span><i>Top multiplier</i><b>&times;{tally.mult}</b></span> : null}
+                        <span><i>Best spin</i><b>{tally.best.toLocaleString()}</b></span>
+                        {tally.sent > 0 ? <span><i>Wild columns</i><b>{tally.sent}</b></span> : null}
+                    </div>
+                    <button type="button" className="s5-go" onClick={() => { setTally(null); onDone?.(); }}>Collect</button>
                 </div>
             ) : null}
         </div>
