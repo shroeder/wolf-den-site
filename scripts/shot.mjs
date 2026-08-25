@@ -28,7 +28,7 @@
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
-import { QUIET_HIDE, QUIET_SEEN, quiet } from "./lib/shot-quiet.mjs";
+import { QUIET_HIDE, QUIET_SEEN, installQuiet, quiet } from "./lib/shot-quiet.mjs";
 
 // ── SHOT_QUIET=1 ── seed every known "already seen this" marker and hide every known scrim, so a shot is of
 // the page rather than of whichever launch card this profile has not dismissed yet. See lib/shot-quiet.mjs.
@@ -110,65 +110,11 @@ if (process.env.SHOT_COOKIE) {
 // underneath. SHOT_HIDE takes a comma-separated list of selectors and hides them before anything is captured.
 //
 //   SHOT_HIDE=".checkin-overlay,.promo" node scripts/shot.mjs …
-if (process.env.SHOT_HIDE) {
-    const sel = process.env.SHOT_HIDE.split(",").map((x) => x.trim()).filter(Boolean).join(", ");
-    const css = `${sel} { display: none !important; }`;
-    await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `(() => {
-            const put = () => {
-                // At document-start there may be no head AND no documentElement yet. This used to call
-                // .appendChild on null, which threw — and because the throw happened BEFORE the listener
-                // below was registered, the whole hook died silently and SHOT_HIDE hid nothing at all. A
-                // screenshot rig that quietly ignores half its arguments is worse than one that fails.
-                const root = document.head || document.documentElement;
-                if (!root) return false;
-                const s = document.createElement("style");
-                s.textContent = ${JSON.stringify(css)};
-                root.appendChild(s);
-                return true;
-            };
-            // Listener FIRST, so a failed early attempt cannot cost us the retry.
-            document.addEventListener("DOMContentLoaded", put);
-            // Announcements mount after hydration and some replace the head, so keep trying until the rule
-            // is in a document that still has it.
-            put();
-            let n = 0;
-            const t = setInterval(() => { put(); if (++n > 40) clearInterval(t); }, 100);
-        })();`,
-    });
-}
-
-// LAUNCH MODALS COVER EVERYTHING. Every new feature ships a full-screen "X is open" announcement that shows
-// once per browser, and a fresh headless profile is always a fresh browser — so the shot is of the modal, not
-// the page. Dismissing it with a click does not work reliably either: the CLICK below returns early when WAIT
-// already matches, and WAIT usually matches because the page IS rendered, underneath the modal.
-//
-// So the markers are seeded BEFORE any page script runs. Semicolon-separated keys, each set to "1":
-//   SHOT_SEEN="wolfden-dungeons-announce-v1;wolfden-howto-market" node scripts/shot.mjs …
-//
-// SOME MARKERS ARE NOT FLAGS, THEY ARE TIMESTAMPS. The web-push prompt snoozes for a week by storing
-// Date.now() and comparing against it — so seeding its key with "1" reads as "dismissed in 1970", which is
-// well outside the snooze window, and the banner shows anyway. It then sits over the bottom of every
-// screenshot of every page, which is how it covered the casino's buttons in four shots running.
-//
-// So an entry may carry its own value, and the word `now` means the current timestamp:
-//   SHOT_SEEN="wolfden-webpush-dismissed=now;wolfden-market-announce-v1" node scripts/shot.mjs …
-if (process.env.SHOT_SEEN) {
-    const keys = process.env.SHOT_SEEN.split(";").map((k) => k.trim()).filter(Boolean);
-    const setters = keys.map((entry) => {
-        const eq = entry.indexOf("=");
-        const key = eq === -1 ? entry : entry.slice(0, eq);
-        const raw = eq === -1 ? "1" : entry.slice(eq + 1);
-        const value = raw === "now" ? "String(Date.now())"
-            // The daily check-in remembers the STORE-LOCAL DAY it last ran, not a flag and not a timestamp.
-            : raw === "now-day" ? 'new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date())'
-                : JSON.stringify(raw);
-        return `localStorage.setItem(${JSON.stringify(key)}, ${value});`;
-    });
-    await send("Page.addScriptToEvaluateOnNewDocument", {
-        source: `try { ${setters.join(" ")} } catch (e) {}`,
-    });
-}
+// Both hooks live in lib/shot-quiet.mjs now, because check-feel.mjs needed the same two and had neither —
+// see the note there. What is left here is the CHOICE of what to quiet, which is the caller's business:
+// SHOT_HIDE is a comma-separated selector list, SHOT_SEEN a semicolon-separated set of localStorage markers,
+// and SHOT_QUIET=1 merges the standing list into both (see the top of this file).
+await installQuiet(send, { hide: process.env.SHOT_HIDE, seen: process.env.SHOT_SEEN });
 
 await send("Page.navigate", { url });
 // Let the sprites actually arrive — a blank shot proves nothing. 2600ms was not enough on a cold dev server:

@@ -48,6 +48,8 @@
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 
+import { QUIET_HIDE, QUIET_SEEN, installQuiet } from "./lib/shot-quiet.mjs";
+
 const ARGV = process.argv.slice(2);
 const BASE = (ARGV.find((a) => a.startsWith("--url=")) || "").slice(6) || "http://localhost:3000";
 const ONLY = (ARGV.find((a) => a.startsWith("--screen=")) || "").slice(9);
@@ -83,7 +85,10 @@ const SLOT5 = { main: ".s5-window, .col5-main", act: ".s5-spin",
 
 const SCREENS = [
     // The floor itself — the room you walk around, before you sit at anything.
-    { id: "casino", path: "/marketplace/casino", main: ".cas-room", act: ".cas-mach.is-live" },
+    { id: "casino", path: "/marketplace/casino", main: ".cas-room", act: ".cas-mach.is-live",
+        // Both deliberate: the mute button lives in the room's corner on Luke's instruction, and the social
+        // button floats over every screen in the game.
+        allowOver: ["cas-audiobar", "social-fab"] },
 
     // The five slot cabinets.
     { id: "slot-hunt", path: "/marketplace/casino?at=slot", ...SLOT5 },
@@ -175,6 +180,18 @@ const evaluate = async (expr) => (await send("Runtime.evaluate", { expression: e
 
 await send("Page.enable");
 await send("Runtime.enable");
+
+// ── NOTHING MAY BE SITTING OVER THE SCREEN BEING MEASURED ─────────────────────────────────────
+// The shot rig has dismissed every launch card, check-in and prompt in the Den since it was written. This gate
+// did not, and the difference cost two wrong answers in one afternoon: it reported the casino floor as silent
+// and the counter as unresponsive, and both readings were of an undismissed "Badge earned" modal sitting over
+// the page — one the gate's own previous run had earned by walking into the VIP lounge.
+//
+// A gate measuring through a modal does not report the modal. It reports whatever the modal made the screen
+// underneath look like, which is a wrong answer delivered with complete confidence, and it is worse than no
+// gate at all. UNCONDITIONAL here rather than behind an env flag: there is no version of this measurement
+// that wants a launch card in the way.
+await installQuiet(send, { hide: QUIET_HIDE.join(","), seen: QUIET_SEEN.join(";") });
 await send("Network.enable");
 if (process.env.SHOT_COOKIE) {
     await send("Network.setCookie", {
@@ -330,10 +347,37 @@ const REACTION = (actSel) => `(() => {
   });
   mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
 
+  // ── A CSS ANIMATION IS SOMETHING HAPPENING, AND IT MUTATES NOTHING ─────────────────────────
+  // The observer only sees DOM changes, so a panel that mounts in one mutation and then spends 280ms
+  // animating in reads as "over in 2ms". That is how this gate called the casino stage, the VIP lounge and
+  // the counter INSTANT while all three were mid-reveal — it was measuring the wrong thing and saying so
+  // with confidence, which is worse than staying quiet.
+  //
+  // getAnimations() is the missing half: anything running right after the press is time the player spends
+  // watching, whether or not it touches the DOM. The longest one wins, because that is when the screen
+  // actually settles.
+  let animMs = 0;
+  const measureAnims = () => {
+    try {
+      for (const a of document.getAnimations()) {
+        if (a.playState !== 'running') continue;
+        const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+        if (!t) continue;
+        const total = (Number(t.delay) || 0) + (Number(t.activeDuration) || 0);
+        // Ignore the room's ambience — chandeliers and glows loop forever and are not a response to a press.
+        if (!Number.isFinite(total) || t.iterations === Infinity) continue;
+        if (total > animMs) animMs = total;
+      }
+    } catch (e) { /* getAnimations is Chrome-only; absence just means no credit */ }
+  };
+
   act.click();
+  requestAnimationFrame(() => { measureAnims(); setTimeout(measureAnims, 60); });
   return new Promise(res => setTimeout(() => {
     mo.disconnect();
-    res(JSON.stringify({ sounds, buzzes, changes, firstAt, lastAt, modal, newImgs }));
+    // Whichever finished last: the final DOM change, or the animation the press started.
+    const settled = Math.max(lastAt || 0, animMs);
+    res(JSON.stringify({ sounds, buzzes, changes, firstAt, lastAt: settled, animMs, modal, newImgs }));
   }, 5000));
 })()`;
 
@@ -393,7 +437,13 @@ for (const sc of SCREENS) {
         if (d.act && d.clear < MIN_CLEAR) fail(at, "FIT", `the main action sits ${d.clear}px off the bottom — under ${MIN_CLEAR} is off screen on a real phone`);
         if (!d.act) fail(at, "FIT", `nothing matching ${sc.act} — no obvious thing to press`);
         if (d.gap != null && d.gap > MAX_GAP) fail(at, "SPACE", `${d.gap}px of dead space under the main content`);
-        if (d.over.length) fail(at, "OVERLAP", `on the content at rest: ${[...new Set(d.over)].slice(0, 4).join(", ")}`);
+        // ── SOME THINGS ARE MEANT TO BE ON THE CONTENT ─────────────────────────────────
+        // The casino's mute button is in the corner of the room because Luke asked for it there — "move the
+        // mute button down into the top right of the animation frame, not the entire screen" — and the
+        // social button floats over every screen in the game by design. Reporting both on every run is how
+        // a gate trains somebody to skim past it, and the next real overlap goes with them.
+        const over = [...new Set(d.over)].filter((c) => !(sc.allowOver || []).includes(c));
+        if (over.length) fail(at, "OVERLAP", `on the content at rest: ${over.slice(0, 4).join(", ")}`);
         if (d.small.length) fail(at, "TAP", `under ${MIN_TAP}px: ${[...new Set(d.small)].slice(0, 4).join(" · ")}`);
         // ── ADVISORY, NOT A FAILURE, UNTIL IT IS CALIBRATED ─────────────────────────────────────────
         // This one is not trustworthy yet and I am not going to pretend otherwise. On the casino it calls
@@ -417,7 +467,11 @@ for (const sc of SCREENS) {
                 if (!rx.changes) fail(`${sc.id} press`, "DEAD", "pressing the main action changed nothing on screen");
                 else {
                     if (rx.firstAt > 200) fail(`${sc.id} press`, "LAGGY", `nothing moved for ${Math.round(rx.firstAt)}ms after the tap — a control has to answer instantly`);
-                    if (rx.lastAt < 400) fail(`${sc.id} press`, "INSTANT", `the whole thing was over in ${Math.round(rx.lastAt)}ms — there is nothing to watch`);
+                    if (rx.lastAt < 400) {
+                        fail(`${sc.id} press`, "INSTANT",
+                            `the whole thing was over in ${Math.round(rx.lastAt)}ms — there is nothing to watch`
+                            + (rx.animMs ? ` (longest animation ${Math.round(rx.animMs)}ms)` : " (and nothing animated)"));
+                    }
                 }
             }
         }

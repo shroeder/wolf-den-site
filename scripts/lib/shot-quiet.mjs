@@ -31,6 +31,13 @@ export const QUIET_SEEN = [
 // The happy-hour card has no class at all and is matched through the dialog it wraps.
 export const QUIET_HIDE = [
     ".checkin-overlay",
+    // ── THE BADGE POP ────────────────────────────────────────────────────────────────────────────────
+    // It is marked seen on DISMISS and server-side, deliberately — a tab closed mid-read should hand the
+    // badge back rather than swallow it (see BadgePop). Which is right for a member and merciless for a
+    // rig: an undismissed badge sits over EVERY page load forever. It cost two wrong readings on the
+    // casino before I shot the screen and saw it — check:feel reported the floor as silent and the counter
+    // as unresponsive, and both were measuring a modal that had been sitting there since the run before.
+    ".bdg-scrim",
     ".plu-scrim", ".petx-overlay", ".levelup-overlay",
     ".gm-overlay", ".arl-scrim", ".ck-scrim", ".ckmg-scrim", ".cmp-scrim", ".dgl-scrim",
     ".fga-scrim", ".jwr-scrim", ".mk-scrim", ".mkl-scrim", ".mmg-scrim", ".poll-scrim",
@@ -57,4 +64,60 @@ export const QUIET_HIDE = [
 export function quiet(env, extra, sep) {
     const have = (env || "").split(sep).map((x) => x.trim()).filter(Boolean);
     return [...new Set([...have, ...extra])].join(sep);
+}
+
+// ── AND THE TWO HOOKS THAT ACTUALLY APPLY IT ─────────────────────────────────────────────────────────────────
+// The lists above were shared; the CODE that installed them was not. shot.mjs had both hooks written out
+// inline and check-feel.mjs had NEITHER — so the screenshot rig quietly dismissed every overlay in the Den and
+// the polish gate measured straight through them.
+//
+// That is not a cosmetic difference. check:feel reported the casino floor as silent and the counter as
+// unresponsive, twice, and both readings were of an undismissed "Badge earned" modal sitting over the page.
+// A gate that measures through a modal does not report the modal — it reports whatever the modal made the
+// screen underneath look like, which is a wrong answer delivered with total confidence.
+//
+// So both hooks live here now and both callers use them. `send` is a CDP sender; call this after Page.enable
+// and BEFORE navigating, because both hooks run at document-start.
+export async function installQuiet(send, { hide = "", seen = "" } = {}) {
+    const sel = String(hide).split(",").map((x) => x.trim()).filter(Boolean).join(", ");
+    if (sel) {
+        const css = `${sel} { display: none !important; }`;
+        await send("Page.addScriptToEvaluateOnNewDocument", {
+            source: `(() => {
+                const put = () => {
+                    // At document-start there may be no head AND no documentElement yet. Calling appendChild
+                    // on null throws, and because the throw would happen BEFORE the listener below is
+                    // registered, the whole hook dies silently and nothing is hidden at all.
+                    const root = document.head || document.documentElement;
+                    if (!root) return false;
+                    const s = document.createElement("style");
+                    s.textContent = ${JSON.stringify(css)};
+                    root.appendChild(s);
+                    return true;
+                };
+                document.addEventListener("DOMContentLoaded", put);
+                put();
+                let n = 0;
+                const t = setInterval(() => { put(); if (++n > 40) clearInterval(t); }, 100);
+            })();`,
+        });
+    }
+
+    const keys = String(seen).split(";").map((k) => k.trim()).filter(Boolean);
+    if (keys.length) {
+        const setters = keys.map((entry) => {
+            const eq = entry.indexOf("=");
+            const key = eq === -1 ? entry : entry.slice(0, eq);
+            const raw = eq === -1 ? "1" : entry.slice(eq + 1);
+            // `now` is a timestamp, not a flag: the web-push prompt snoozes by storing Date.now() and
+            // comparing against it, so a "1" reads as 1970 and the banner shows anyway.
+            const value = raw === "now" ? "String(Date.now())"
+                : raw === "now-day" ? 'new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date())'
+                    : JSON.stringify(raw);
+            return `localStorage.setItem(${JSON.stringify(key)}, ${value});`;
+        });
+        await send("Page.addScriptToEvaluateOnNewDocument", {
+            source: `try { ${setters.join(" ")} } catch (e) {}`,
+        });
+    }
 }

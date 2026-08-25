@@ -18333,7 +18333,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background:
         radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 9%, transparent), transparent 62%),
         linear-gradient(180deg, #17102180, #0d0913 34%), #0d0913;
-    animation: casSit .22s ease both; }
+    /* .22s was under the 400ms check:feel asks for — "something should happen a little slower with
+       animations". Sitting down at a machine takes over the whole screen; it can afford four tenths. */
+    animation: casSit .42s cubic-bezier(.2,1.1,.35,1) both; }
 /* ── AND THE ROOM IS THE MACHINE'S OWN SCENE ──────────────────────────────────────────────────────────
    Luke: "the custom background for the Menagerie can be used instead of all the dead black space around
    the frames." The dead space is this element — everything the cabinet does not cover, which on a phone
@@ -18359,7 +18361,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
         var(--room);
     background-size: cover, cover, cover; background-position: center, center, center;
     filter: blur(6px) saturate(1.25); transform: scale(1.04); }
-@keyframes casSit { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: none; } }
+@keyframes casSit { from { opacity: 0; transform: scale(1.035); } to { opacity: 1; transform: none; } }
 
 /* The head becomes the machine's own title bar: a way out, the name, and what you have to spend. */
 .cas-stage .cas-panel-head { position: sticky; top: 0; z-index: 2; flex: none;
@@ -19145,12 +19147,24 @@ body.cas-seated .social-fab { display: none; }
 
 /* ── INSPECT ──────────────────────────────────────────────────────────────────────────────────────────
    What it does, before it asks for the chips. */
+/* ── IT USED TO JUST BE THERE ─────────────────────────────────────────────────────
+   check:feel, on the counter: "over in 2ms — and nothing animated." Literally nothing: picking a chest up
+   off the shelf put a full card on the screen in one frame. This is the screen with the biggest numbers in
+   the game on it, and it was the one screen in the casino that opened like a dialog box.
+   Luke's rule: "something should happen a little slower with animations." */
 .cs-scrim { position: fixed; inset: 0; z-index: 72; display: grid; place-items: center; padding: 18px;
-    background: rgba(6,4,10,.84); backdrop-filter: blur(4px); }
+    background: rgba(6,4,10,.84); backdrop-filter: blur(4px);
+    animation: csScrim .22s ease both; }
+@keyframes csScrim { from { opacity: 0; } to { opacity: 1; } }
 .cs-card { position: relative; width: min(380px, 100%); max-height: 86vh; overflow-y: auto; padding: 18px 16px 16px;
     border-radius: 18px; text-align: center;
+    animation: csCard .42s cubic-bezier(.2,1.35,.35,1) both;
     background: linear-gradient(180deg, #1c1526, #120c1a);
     border: 1px solid rgba(255,215,94,.3); box-shadow: 0 18px 50px rgba(0,0,0,.7); }
+@keyframes csCard {
+    from { opacity: 0; transform: translateY(14px) scale(.94); }
+    to { opacity: 1; transform: none; }
+}
 .cs-x { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 999px;
     cursor: pointer; font-size: 12px; border: 1px solid rgba(255,255,255,.14);
     background: rgba(255,255,255,.05); color: #cbd3dc; }
@@ -22345,8 +22359,8 @@ body.cas-seated .social-fab { display: none; }
 .vip-panel { display: grid; gap: 10px; padding: 12px; border-radius: 14px;
     background: linear-gradient(180deg, rgba(180,90,255,.10), rgba(0,0,0,.35));
     border: 1px solid rgba(180,90,255,.28);
-    animation: vipIn .28s cubic-bezier(.2,1.3,.4,1) both; }
-@keyframes vipIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    animation: vipIn .42s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes vipIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 .vip-panel h4 { margin: 0; font-family: var(--font-display); font-size: 14px; color: #e6d2ff;
     letter-spacing: .04em; }
 .vip-panel h5 { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .14em;
