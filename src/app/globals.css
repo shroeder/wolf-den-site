@@ -19754,7 +19754,7 @@ body.cas-seated .social-fab { display: none; }
 /* Slightly wider than tall, which is the compromise between the reference's portrait cells and twelve rows
    of them on a phone. At 1:1 the tall board alone was 879px and the cabinet 1281 — a machine you cannot see. */
 .col5-grid.is-tall .col5-cell { min-height: 0; aspect-ratio: 1.16; }
-.col5-grid.is-tall .col5-cell img { width: 90%; height: 90%; }
+/* (replaced by the max-height ceiling above — a percentage height here was the bug.) */
 .col5-main .col5-cell { aspect-ratio: 1; }
 
 /* ── AND A GIANT TAKES ITS HEIGHT FROM THE SPAN, NOT FROM A RATIO ─────────────────────────────────────
@@ -19841,7 +19841,40 @@ body.cas-seated .social-fab { display: none; }
    is allowed to be. The giants still span, and now span the whole reel. */
 .col5-grid.is-tall .col5-cell { aspect-ratio: auto; height: var(--col5-row); }
 .col5-main .col5-cell { aspect-ratio: auto; height: calc(var(--col5-row) * 1.18); }
-.col5-cell img { width: 88%; height: 88%; }
+
+/* ── A SYMBOL CANNOT BE BIGGER THAN ITS CELL ───────────────────────────────────────────────────────────
+   Luke: "size the smaller sprites to fit." They did not: measured, a cell was 69x33 and the symbol inside
+   it was 62x56 — overflowing the bottom by 27px and cropped by the reel, which is why every wolf had lost
+   its feet.
+
+   The cause is that a PERCENTAGE height was being asked to do the job. `height: 88%` resolves against the
+   cell's height, and through a grid item with `place-items: center` that resolution is not reliable — the
+   image kept its intrinsic ratio off the width instead and came out nearly twice as tall as its box. So
+   the sizing is stated as a CEILING rather than as a target: `max-height` cannot be quietly ignored, and
+   `height: auto` lets the sprite keep its own proportions underneath it. A symbol is now as large as its
+   cell allows and never one pixel larger. */
+/* ── AND THE CEILING IS A LENGTH, NOT A PERCENTAGE ────────────────────────────────────────────────────
+   `max-height: 94%` was computing to 94% and doing nothing: read straight off the element, the cell was
+   32.5px, the max-height was "94%", and the image still rendered 62px tall. A percentage height on a GRID
+   ITEM resolves against the grid area, and with `align-items: center` the browser treats that area as
+   indefinite — so `max-width` applied and `max-height` was silently dropped. That is why two passes at this
+   with percentages both failed.
+   The row height is already a variable. Using it directly is a length, and a length cannot be ignored. */
+.col5-cell img { width: auto; height: auto; object-fit: contain;
+    max-width: 92%; max-height: calc(var(--col5-row) * 1.06); }
+.col5-grid.is-tall .col5-cell img { max-width: 96%; max-height: calc(var(--col5-row) * 0.94); }
+.col5-main .col5-cell img { max-height: calc(var(--col5-row) * 1.08); }
+/* ── AND THE GIANT GETS THE SAME TREATMENT, FOR THE SAME REASON ───────────────────────────────────────
+   `height: 100%` on the giant collapsed it to a sliver the moment the small symbols were fixed — the same
+   indefinite-grid-area problem, one row further down. Its height is the row height times the rows it spans,
+   and `--span` is already on the cell, so that is a length too. Twelve rows unless told otherwise, which is
+   what a giant is now: the whole reel. */
+/* Specificity, not just order: `.col5-grid.is-tall .col5-cell img` is three classes and beats a two-class
+   giant rule outright, so the 0.94-row ceiling above kept winning and the giant rendered 31px tall inside a
+   390px cell. Matched selector depth. */
+.col5-grid.is-tall .col5-cell.is-giant img,
+.col5-cell.is-giant img { max-width: none; max-height: none; width: 100%;
+    height: calc(var(--col5-row) * var(--span, 12)); }
 
 /* ── A GIANT IS THE WHOLE REEL ─────────────────────────────────────────────────────────────────────────
    "The sprite needs to be the whole reel, even if it cuts the sprite off." It is: the engine fills the
