@@ -84,6 +84,12 @@ const MACHINES = {
             laurel: "a frost-covered laurel wreath in silver-blue",
             star: "a single bright four-pointed star with a soft violet glow",
             bone: "a pale bone bleached white, cold blue shadow",
+            // The free round's collector. Deliberately NOT drawn with its own "+1" on it — the numeral is
+            // laid over the sprite in the house display face, for the same reason the multiplier plates are
+            // (gen-mult-plates.mjs has the long version: an image model asked for a numeral gets it wrong
+            // often enough that a symbol whose whole meaning is its number cannot be trusted to the model).
+            plus1: "a single luminous pearl held in an open silver oyster shell, the pearl glowing bright "
+                + "aqua-white from within, cold blue rim light, NO text or numbers anywhere",
         },
     },
 };
@@ -101,6 +107,18 @@ for (const [machineId, m] of Object.entries(MACHINES)) {
         });
     }
 }
+// ── DO NOT REDRAW WHAT IS ALREADY THERE ─────────────────────────────────────────────────────────────────────
+// Without this, adding ONE symbol to a cabinet redraws all six of them: money spent to replace art that was
+// already approved, and six new rolls of the dice on symbols nobody asked to change. `--force` is the way to
+// deliberately redraw a set.
+if (!ARGV.includes("--force") && !PUBLISH) {
+    const before = jobs.length;
+    for (let i = jobs.length - 1; i >= 0; i -= 1) {
+        if (fs.existsSync(path.join(PUBLIC, `${jobs[i].name}.webp`))) jobs.splice(i, 1);
+    }
+    if (before !== jobs.length) console.log(`skipping ${before - jobs.length} already drawn (--force to redraw)`);
+}
+
 if (!jobs.length) { console.error("nothing to draw"); process.exit(1); }
 
 if (PUBLISH) console.log(`publishing ${jobs.length} existing preview(s) — no OpenAI calls, $0.00`);

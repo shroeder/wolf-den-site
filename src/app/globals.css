@@ -20172,6 +20172,18 @@ body.cas-seated .social-fab { display: none; }
     animation: col5Held .55s ease-in-out infinite; }
 @keyframes col5Held { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
+/* ── THE PEARL'S NUMERAL ──────────────────────────────────────────────────────────────────────────────
+   Laid over the sprite rather than drawn into it. z-index 4 for the same reason the multiplier plates need
+   it: a rule further up puts every symbol image at 3, and a number written on a thing has to sit above the
+   thing. Learned that one the hard way — see .col5-cell.is-multblock b. */
+.s5-cell .s5-plus { position: absolute; left: 0; right: 0; bottom: 13%; z-index: 4; text-align: center;
+    font-family: var(--font-display); font-weight: 900; line-height: 1;
+    font-size: clamp(11px, calc(var(--s5cell) * 0.28), 20px);
+    color: #eafffb; letter-spacing: -.02em;
+    text-shadow: 0 0 10px rgba(90,255,208,.95), 0 2px 0 rgba(0,0,0,.75); }
+/* The multiplier the pearls have built, so it reads as a thing that grew rather than a constant. */
+.s5-fb-mult.is-grown b { color: #5affd0; text-shadow: 0 0 12px rgba(90,255,208,.8); }
+
 /* ── THE MULTIPLIER PLATES ────────────────────────────────────────────────────────────────────────────
    Luke: "the multipliers in the last reel need to be grouped and use sprites." Painted ovals now, one per
    rung, escalating bronze → silver → gold → emerald → prismatic so the ladder is readable from the metal

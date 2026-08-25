@@ -391,6 +391,21 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
                 // And whether THIS spin bought more spins, and how — a chain that ran away with itself
                 // and a third scatter landing are not the same moment and must not read as one.
                 retrigger: sp.retrigger || null,
+                // ── THE THINGS THAT MAKE A ROUND CHANGE AS IT RUNS ───────────────────────────────
+                // `mult` is what THIS spin was paid at, which on a collecting round is not the round's
+                // flat multiplier — it grows every time a pearl lands, so the round's own number is 1 and
+                // useless. `held`/`justHeld` are the wilds welded to the board: already held when the
+                // reels started, and the ones that clamp shut on this spin, which is the moment worth
+                // watching. `pearls` is where the collectors landed.
+                //
+                // All four were missing here while the SECOND round's mapping a hundred lines down sends
+                // held and justHeld — which is why sticky worked when it was a second round and silently
+                // did nothing the day it became the main one. The Deep's new round collected 4.9 pearls a
+                // go in the simulator and drew x1 with nothing held on the screen.
+                mult: sp.mult || 1,
+                held: sp.held || [],
+                justHeld: sp.justHeld || [],
+                pearls: sp.pearls || [],
             })),
             total: r.free.total,
             chips: chipsFor(stake, r.free.total / stake),

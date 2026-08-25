@@ -109,6 +109,9 @@ const LOOK = {
         chest: { rank: 4, role: "bonus", tone: "#e34b3a", name: "Crab" },
         star: { rank: 5, role: "scatter", tone: "#ffcc44", name: "Starfish" },
         wolf: { rank: 6, role: "wild", tone: "#8b5aa8", name: "Kraken" },
+        // Pays nothing and lands only in the free round, on the two outside reels. `role: "mult"` is what
+        // stops the paytable listing it as a symbol you can line up — it is a collector, not a payer.
+        plus1: { rank: 0, role: "mult", tone: "#5affd0", name: "Pearl of Fortune" },
     },
     // ── THE MENAGERIE ── the member's own menagerie, picked by matching each pet's catalogue colour to the
     // rung. The Chameleon fell out of that as the wild, which is the joke writing itself: an animal that
@@ -344,12 +347,20 @@ const DEEP = {
     scatter: "star",
     // SAVAGE. Almost no cheap wins — bone does not pay at all, doubloon needs four — and the top of the table
     // is the largest number on the floor. This is the cabinet that goes quiet for twenty spins.
+    // ── THE STARFISH HAD TO MOVE ONTO EVERY REEL ─────────────────────────────────────────────────────
+    // It sat on reels one, three and five, which is the right shape for a scatter you count anywhere and an
+    // IMPOSSIBLE one for a line trigger: three on a payline walks reels one, two and three, and reel two
+    // could never show one. The bonus fired zero times in 200,000 spins — the cabinet was a base game with
+    // a feature nailed shut, and the RTP said so at 50%.
+    //
+    // The same trap is written up a few hundred lines below on evaluate()'s lineTrigger, about The Harvest,
+    // in nearly these words. I read that note, moved the trigger, and did not check this cabinet's reels.
     strips: [
-        { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 7, wolf: 0 },
-        { bone: 32, doubloon: 23, laurel: 13, chest: 6, star: 0, wolf: 5 },
-        { bone: 32, doubloon: 22, laurel: 12, chest: 6, star: 6, wolf: 6 },
-        { bone: 32, doubloon: 23, laurel: 13, chest: 6, star: 0, wolf: 5 },
-        { bone: 34, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
+        { bone: 33, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
+        { bone: 31, doubloon: 22, laurel: 13, chest: 6, star: 4, wolf: 5 },
+        { bone: 31, doubloon: 21, laurel: 12, chest: 6, star: 5, wolf: 6 },
+        { bone: 31, doubloon: 22, laurel: 13, chest: 6, star: 4, wolf: 5 },
+        { bone: 33, doubloon: 24, laurel: 14, chest: 6, star: 6, wolf: 0 },
     ],
     pays: {
     // ── EVERY SYMBOL PAYS AT THREE ───────────────────────────────────────────────────────────────────
@@ -372,18 +383,35 @@ const DEEP = {
     // The Deep took 99.17% to 118.33% on the fill alone — a low symbol's three-of-a-kind is the most common
     // event on a reel, so it costs far more than its size suggests. Swept: the new bottom rungs are small
     // (Herring 0.14, Mackerel 0.26) and the top four/five came down about 8% to pay for them.
-        wolf: { 3: 20.9, 4: 146, 5: 1638 },
-        chest: { 3: 6.19, 4: 43.7, 5: 375 },
-        laurel: { 3: 2.09, 4: 12.6, 5: 107 },
-        doubloon: { 3: 0.26, 4: 4.75, 5: 37.1 },
-        bone: { 3: 0.14, 4: 1.2, 5: 10.4 },
+        wolf: { 3: 18.43, 4: 128.8, 5: 1444.7 },
+        chest: { 3: 5.46, 4: 38.54, 5: 330.8 },
+        laurel: { 3: 1.84, 4: 11.11, 5: 94.37 },
+        doubloon: { 3: 0.23, 4: 4.19, 5: 32.72 },
+        bone: { 3: 0.12, 4: 1.06, 5: 9.17 },
     },
-    scatterPays: { 3: 1.04, 4: 4.75, 5: 31.3 },
-    free: { kind: "expanding", spins: 14, label: "Fourteen spins, and every wild takes its whole reel" },
-    // Same shape as The Hunt's, and it plays completely differently: down here the wild is the rarest
-    // symbol on the floor and the pays above it are the steepest, so a board that fills up is worth
-    // several times what the same board is worth up top.
-    second: { kind: "sticky", spins: 10, label: "Ten hauls, and every kraken stays in the net" },
+    scatterPays: { 3: 0.92, 4: 4.19, 5: 27.61 },
+    // ── THREE STARFISH ON A LINE ─────────────────────────────────────────────────────────────────────
+    // Luke, with a reference machine: "you trigger free spins by getting three bonus symbols on a payline,
+    // and then you get eight free spins, and wilds once they pop up they stay in place, and then there's a
+    // chance for a +1 multiplier on reels 1 and 5 and it adds to the free spin multiplier."
+    //
+    // A LINE trigger rather than scatter-anywhere, which is a real difference and not a detail: three stars
+    // scattered across the glass is a common accident, three on one of twenty declared lines from reel one
+    // is a shape you can watch forming. The Menagerie already runs this way and the tease system knows how
+    // to hold a reel for it honestly — see teaseFor, which walks the lines rather than counting symbols.
+    lineTrigger: true,
+    // ── AND THE ROUND ITSELF ─────────────────────────────────────────────────────────────────────────
+    // Eight spins that compound three ways. Every kraken that lands STAYS for the rest of the round, so the
+    // board fills up. The two outside reels can drop a Pearl, and every pearl adds one to a multiplier that
+    // applies from that spin onward — so the round gets both denser and worth more as it goes, and the last
+    // spin is the best one you will play.
+    //
+    // Eight rather than fourteen because the round is now worth far more per spin: sticky wilds on the
+    // cabinet with the floor's rarest wild and steepest table compound hard, and a growing multiplier on
+    // top of that compounds again. Fourteen of these would be a different machine.
+    free: { kind: "collect", spins: 8, sticky: true,
+        plus: { sym: "plus1", reels: [0, 4], step: 1 },
+        label: "Eight hauls. Every kraken stays, every pearl adds one." },
 };
 
 const MENAGERIE = {
@@ -449,15 +477,15 @@ const MENAGERIE = {
     pays: {
         // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
         // COMPLETE a line of them, so it must be worth less than the thing it is completing.
-        dire: { 3: 2.48, 4: 14.88, 5: 132.95 },
-        keeper: { 3: 2.15, 4: 12.4, 5: 108.16 },
-        wolf: { 3: 1.3, 4: 7.42, 5: 63.7 },
-        chest: { 3: 0.62, 4: 3.23, 5: 21.2 },
-        laurel: { 3: 0.32, 4: 1.49, 5: 8.44 },
-        doubloon: { 3: 0.16, 4: 0.74, 5: 3.6 },
-        bone: { 3: 0.1, 4: 0.41, 5: 1.68 },
+        dire: { 3: 2.53, 4: 15.21, 5: 135.87 },
+        keeper: { 3: 2.2, 4: 12.67, 5: 110.54 },
+        wolf: { 3: 1.33, 4: 7.58, 5: 65.1 },
+        chest: { 3: 0.63, 4: 3.3, 5: 21.67 },
+        laurel: { 3: 0.33, 4: 1.52, 5: 8.63 },
+        doubloon: { 3: 0.16, 4: 0.76, 5: 3.68 },
+        bone: { 3: 0.1, 4: 0.42, 5: 1.72 },
     },
-    scatterPays: { 3: 0.1, 4: 0.49, 5: 2.52 },
+    scatterPays: { 3: 0.1, 4: 0.5, 5: 2.58 },
     // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
     // "If you trigger the bonus you get a certain amount of free spins depending on how many scatters you
     // get." Three is the door; every one after that is worth a lot more than the last, which is what makes
@@ -525,13 +553,13 @@ const VAULT = {
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 3.01, 4: 22.96, 5: 301.47 },
-        chest: { 3: 0.87, 4: 6.63, 5: 66.38 },
-        laurel: { 3: 0.31, 4: 1.95, 5: 15.69 },
-        doubloon: { 3: 0.14, 4: 0.66, 5: 4.74 },
-        bone: { 3: 0.09, 4: 0.34, 5: 1.38 },
+        wolf: { 3: 3.07, 4: 23.44, 5: 307.8 },
+        chest: { 3: 0.89, 4: 6.77, 5: 67.77 },
+        laurel: { 3: 0.32, 4: 1.99, 5: 16.02 },
+        doubloon: { 3: 0.14, 4: 0.67, 5: 4.84 },
+        bone: { 3: 0.09, 4: 0.35, 5: 1.41 },
     },
-    scatterPays: { 3: 0.64, 4: 3.33, 5: 22.17 },
+    scatterPays: { 3: 0.65, 4: 3.4, 5: 22.64 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -740,6 +768,10 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
     //
     // Forty is about ninety seconds at the free clock, which is a long bonus rather than a chore.
     const CEILING = 40;
+    // How often an outside reel deals a Pearl in a collecting round. Swept: at 0.22 an eight-spin round
+    // collects about 3.5 of them, so it ends around x4.5 — big enough that the last spins are the ones you
+    // are playing for, small enough that a round can still disappoint.
+    const PEARL_CHANCE = 0.22;
 
     // ── EVERY ROUND RETRIGGERS, ON THE CONDITION THAT OPENED IT ──────────────────────────────────────────
     // Luke: "any free spins bonus should be retriggerable by getting the same condition during the free spin."
@@ -762,9 +794,30 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
     // which turns a choice into a right answer.
     const RETRIGGER = Math.min(m.free?.spins || offer.spins || 5, offer.spins || 5);
 
+    // ── THE PEARLS ARE NOT ON THE BASE REELS ─────────────────────────────────────────────────────────────
+    // A collector that can land outside the round it belongs to is a symbol that means nothing most of the
+    // time, and it would have to be paid for out of the base game's return. It is dealt HERE, per spin, on
+    // the reels the cabinet names — which is also why the base strips do not have to be rebuilt around it.
+    const plus = offer.plus || null;
+    let collected = 0;
+
     while (i < left && i < CEILING) {
         const grid = spinGrid(m, rng);
         for (const [reel, row] of stuck) grid[reel][row] = m.wild;
+
+        // Dealt before scoring so a pearl can cover a cell — it is a symbol on the reel, not an overlay.
+        // Never onto a stuck wild: the round's own wilds are the thing you have been collecting and a pearl
+        // erasing one would be the machine taking back what it gave you.
+        const pearls = [];
+        if (plus) {
+            for (const reel of plus.reels) {
+                if (rng() >= PEARL_CHANCE) continue;
+                const row = Math.floor(rng() * ROWS);
+                if (stuck.some((q) => q[0] === reel && q[1] === row)) continue;
+                grid[reel][row] = plus.sym;
+                pearls.push(reel * ROWS + row);
+            }
+        }
 
         // EXPANDING: a wild takes its whole reel. Applied before scoring, so it pays as five wilds would.
         if (offer.kind === "expanding") {
@@ -773,9 +826,14 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
             }
         }
 
+        // Every pearl on the board raises the round's multiplier, and it applies to THIS spin — the one you
+        // watched it land on. Counting it from the next spin is the same total over a long round and much
+        // worse to watch: the symbol lands, the number moves, and the win it is multiplying is right there.
+        if (plus) collected += pearls.length * (plus.step || 1);
         const mult = offer.kind === "fixed" ? (offer.mult || 1)
             : offer.kind === "growing" ? (i + 1)
             : offer.kind === "ladder" ? (LADDER[i % LADDER.length])
+            : offer.kind === "collect" ? (1 + collected)
             : (offer.mult || 1);
 
         // ── A CASCADING MACHINE CASCADES IN ITS OWN FREE ROUND ───────────────────────────────────────────
@@ -815,11 +873,11 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
         total += r.total;
         // `retrigger` carries what this spin bought and HOW, so the screen can shout the right thing: a
         // chain that ran away with itself and a third scatter landing are not the same moment.
-        spins.push({ grid, ...r, mult, chain, held: heldBefore, justHeld,
+        spins.push({ grid, ...r, mult, chain, held: heldBefore, justHeld, pearls,
             retrigger: again ? { spins: RETRIGGER, by: deep ? "chain" : "scatter" } : null });
         i += 1;
     }
-    return { total, spins, stuck, added, base: offer.spins };
+    return { total, spins, stuck, added, base: offer.spins, collected };
 }
 
 // ── BUILDING YOUR OWN FREE ROUND ─────────────────────────────────────────────────────────────────────────────
@@ -1489,8 +1547,14 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
         } else {
             // `mult` off the cabinet rather than hardcoded to 1: a round can now carry a flat multiplier of
             // its own (The Harvest doubles every tumbling spin), and a hardcoded 1 silently discarded it.
+            //
+            // AND `sticky` AND `plus` THE SAME WAY. Both were dropped here — sticky was written `false`
+            // outright — so The Deep's round declared wilds that lock and pearls that add to a multiplier
+            // and got neither: eight ordinary spins at x1. The round's shape belongs to the CABINET; this
+            // is the place that hands it over, and anything it forgets is a feature that exists only in the
+            // config file. That is how the pearls came back collected: 0.00 on a 200,000-spin sweep.
             offer = { id: m.free.kind, kind: m.free.kind, label: m.free.label, spins: m.free.spins,
-                mult: m.free.mult || 1, sticky: false };
+                mult: m.free.mult || 1, sticky: Boolean(m.free.sticky), plus: m.free.plus || null };
         }
         free = runFreeSpins(m, offer, { lineBet, rng });
         free.kind = offer.kind || "deals";

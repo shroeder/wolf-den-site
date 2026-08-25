@@ -204,6 +204,8 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [round, setRound] = useState("free");
     // The cells holding a locked wild, so the grid can draw them as welded rather than as landed.
     const [lockedAt, setLockedAt] = useState([]);
+    // The free round's collector symbol, if this cabinet has one. Null everywhere but The Deep.
+    const plusSym = useMemo(() => slot5(machineId).free?.plus?.sym || null, [machineId]);
     const [chainWon, setChainWon] = useState(0);
     const timers = useRef([]);
 
@@ -957,6 +959,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                             has already spent ::before on the plate and ::after on the
                                             frame, and a shine needs to clip separately from both. */}
                                         {symbolRole(sym, machineId) === "wild" ? <i className="s5-shine" aria-hidden="true" /> : null}
+                                        {/* ── THE PEARL SAYS WHAT IT IS WORTH ─────────────────────────
+                                            The sprite is drawn without a numeral on purpose — an image
+                                            model cannot be trusted with one, and the multiplier plates
+                                            already went through this. The step is read off the cabinet so
+                                            a pearl worth two would say so without anyone editing this. */}
+                                        {plusSym && sym === plusSym
+                                            ? <b className="s5-plus">+{slot5(machineId).free?.plus?.step || 1}</b> : null}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={artFor(art, machineId, sym)} alt="" draggable="false"
                                             className={`${real && lit && lit.line[reel] === row && reel < lit.count ? "is-lit" : ""}${real && flashSym && sym === flashSym ? " is-flash-img" : ""}`.trim()} />
@@ -1039,9 +1048,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     {/* On a locking round the multiplier is always 1 and the number that matters is how many
                         wilds are welded to the board — which is the whole mechanic, and is the thing that
                         makes the last spins worth more than the first. */}
+                    {/* ── A COLLECTING ROUND HAS TWO NUMBERS AND BOTH ARE THE POINT ────────────────
+                        Wilds welding themselves to the board AND a multiplier that grows every time a pearl
+                        lands. `free.mult` is the OFFER's flat multiplier and on this round it is always 1 —
+                        the live one is on the spin being played, because it changes underneath you. */}
                     {round === "locked"
                         ? <span className="s5-fb-mult is-held"><b>{lockedAt.length}</b><em>held</em></span>
-                        : <span className="s5-fb-mult"><b>&times;{result?.free?.mult}</b></span>}
+                        : result?.free?.kind === "collect" ? (
+                            <>
+                                <span className="s5-fb-mult is-held"><b>{lockedAt.length}</b><em>held</em></span>
+                                <span className="s5-fb-mult is-grown">
+                                    <b>&times;{result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1}</b>
+                                </span>
+                            </>
+                        ) : <span className="s5-fb-mult"><b>&times;{result?.free?.mult}</b></span>}
                     <span className="s5-fb-cell is-won">
                         <i>This round</i>
                         <b><Tally n={freeWon} ms={520} /></b>
