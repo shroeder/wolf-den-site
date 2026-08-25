@@ -73,11 +73,27 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                             <b>{item.name}</b>
                             <span>{item.blurb}</span>
                         </span>
+                        {/* ── THE PRICE IS A NUMBER AND A CHIP ────────────────────────────────────
+                            It used to print the GOLD behind every price on a second line — "14,000 gold
+                            played" — on the theory that a chip is a currency nobody has an instinct for
+                            and gold is one they do. Luke: "get rid of gold played here and show the chips
+                            right next to the amount, make sure they're vertically aligned."
+
+                            He is right, and the reason is that the theory stopped being true. The shelf
+                            sells one kind of thing now, in five rungs, so the ladder itself teaches what a
+                            chip is worth — and a second, larger, greyer number under every price was doing
+                            nothing but making the real one harder to find. The chip sprite says the unit in
+                            the space the sentence was taking, and it is the same sprite the header uses.
+
+                            Centred on the number rather than baseline-aligned: a 46px round sprite next to
+                            a 15px numeral has no baseline worth sharing, and `align-items: center` on the
+                            row is what actually makes the two read as one price. */}
                         <span className="cs-price">
                             {item.owned ? <b className="cs-owned">Owned</b> : (
                                 <>
                                     <b>{item.price.toLocaleString()}</b>
-                                    <i>{Math.round(item.price / (shelf.rate || 0.25)).toLocaleString()} gold played</i>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/images/casino/hud-chip.webp" alt="chips" width={16} height={16} />
                                 </>
                             )}
                         </span>

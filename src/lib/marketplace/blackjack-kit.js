@@ -9,9 +9,25 @@
 // invisible until you have already lost to them.
 //
 // So this table plays by the rules everybody already knows — six decks, dealer stands on all 17, blackjack
-// pays 3:2, double on your first two — and the house takes its edge as an OPENLY STATED RAKE on the money you
-// win. Your stake always comes back whole. The table says the number out loud before you sit down, which is
-// the one version of a house edge a player can actually make a decision about.
+// pays 3:2, double on your first two — and it took its edge as an openly stated RAKE on winnings instead.
+//
+// ── AND THEN THE RAKE STOPPED BEING NEEDED AT ALL ────────────────────────────────────────────────────────────
+// Luke: "remove rake from this, we don't want to rake anything." And, in the same breath: "convert blackjack,
+// keno and bingo to give out chips, not gold."
+//
+// Those two are ONE change and the second is why the first is safe. A rake existed because this table paid
+// GOLD, so its return had to fight the gold economy's RTP ceiling like any other gold faucet. It does not pay
+// gold any more. You stake gold and the table pays CHIPS, at CHIP_RATE per gold, which is exactly the deal
+// every slot machine on this floor already offers — and the slots are enforced at 1.00x in chips, not at the
+// gold ceiling, precisely because the gold never comes back.
+//
+// So the edge is not a cut of your winnings; the edge is the conversion. Gold in, chips out, and chips buy
+// chests and nothing else. A basic-strategy player getting 99.5% of their stake back IN CHIPS is the same
+// bargain as a slot returning 1.00x in chips, and it is a better one to sit down at, because the rules are
+// the rules everybody already knows and nothing is being skimmed off the top of a win you just watched land.
+//
+// check:blackjack was rewritten to ask the question that now matters — is this table in line with the slots —
+// rather than the gold-ceiling question, which it can no longer fail in any meaningful way.
 //
 // SPLITTING IS IN, and it is bounded on purpose. A pair may be split ONCE, into two hands played in order —
 // no re-splitting a split, because each extra fork multiplies the states a half-finished implementation can
@@ -28,9 +44,11 @@
 // NO SHOE MEMORY: the deck is fresh every hand. A persistent six-deck shoe is countable, and a countable shoe
 // on a website with an API is not a game, it is a withdrawal mechanism.
 
-// A fifth of what you WIN. Tuned against check-blackjack, which plays a basic-strategy simulation and reports
-// the real return — see that script for the number this actually produces.
-export const BLACKJACK_RAKE = 0.2;
+// ZERO. Kept as a named export rather than deleted because `mkt_casino_hand.rake` is a real column with real
+// history in it, every settlement still writes the field, and check:blackjack still prints it — a constant at
+// zero says "this table does not rake" in one place, where a scattering of removed arithmetic would leave
+// nobody able to tell whether it was a decision or a bug. If it ever needs to come back, it comes back here.
+export const BLACKJACK_RAKE = 0;
 
 export const DECKS = 6;
 export const DEALER_STANDS_ON = 17;
@@ -121,7 +139,10 @@ export function settleHand({ player, dealer, stake, doubled = false, fromSplit =
     return { back: bet, outcome: "push", won: 0, rake: 0, bet };
 }
 
-// The rake applies to WINNINGS only, never to the stake — the whole reason this is the honest version of a
+// The rake applies to WINNINGS only, never to the stake — and it is zero, so this is simply the pay. Left as
+// one function so the settlement shape has exactly one place that decides what a win returns.
+// The original note, kept because it is still the reason the arithmetic is shaped this way:
+// the rake applied to WINNINGS only, never to the stake — the whole reason this was the honest version of a
 // house edge is that a push and a loss are exactly what they look like.
 function raked(bet, winnings, outcome) {
     const rake = Math.round(winnings * BLACKJACK_RAKE);

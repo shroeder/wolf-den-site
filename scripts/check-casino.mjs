@@ -172,9 +172,28 @@ for (let k = 0; k <= KENO_PICKS; k += 1) {
     console.log(`  ${k} hit${k === 1 ? " " : "s"}  ${pct(p).padStart(8)}  ${odds.padStart(12)}  pays ${String(pay).padStart(4)}x  ->  ${pct(p * pay)}`);
 }
 const kr = kenoRtp();
-console.log(`  return       ${pct(kr)}`);
+console.log(`  return       ${pct(kr)}  in CHIPS`);
 if (Math.abs(kenoTotal - 1) > 1e-6) problems.push(`keno's outcome probabilities sum to ${kenoTotal.toFixed(6)}, not 1 — the maths is wrong`);
-if (kr > RTP_CEILING) problems.push(`keno returns ${pct(kr)}, above the ${pct(RTP_CEILING)} ceiling`);
+
+// ── KENO IS NOT A GOLD GAME ANY MORE, SO IT IS NOT UNDER THE GOLD CEILING ────────────────────────────────────
+// It used to be checked against RTP_CEILING like the three-reel cabinets, and that was right while it paid
+// gold. It pays CHIPS now (Luke: "convert blackjack, keno and bingo to give out chips, not gold"), which puts
+// it on the same floor as the five-reel machines — and check:slot5 has the long argument for why the LEVEL of
+// a chip floor is not a thing a gate should enforce. Luke, on watching me do exactly that: "are you trying to
+// balance the slots or what, don't do that please... when you do that you really kind of make everything
+// boring." Chips never convert back to gold, so 100% was always an arbitrary constant to defend.
+//
+// What IS worth failing the build over is keno being a different deal from the machines standing next to it —
+// a cabinet nobody should play, or one everybody should. So the band is wide, and it is centred on where the
+// five-reel floor actually sits (97.6% to 108.5% when this was written), not on a round number.
+const CHIP_FLOOR_LO = 0.90;
+const CHIP_FLOOR_HI = 1.12;
+if (kr < CHIP_FLOOR_LO) {
+    problems.push(`keno returns ${pct(kr)} in chips while the five-reel floor pays 97-108% — it is the one cabinet nobody should sit at`);
+}
+if (kr > CHIP_FLOOR_HI) {
+    problems.push(`keno returns ${pct(kr)} in chips, well above the five-reel floor — it is the smart pick, which makes the other cabinets decorative`);
+}
 
 // ── PRIZES, WHICH ARE NOT IN THE RETURN ──────────────────────────────────────────────────────────────────────
 // Said out loud rather than folded into the RTP. The gold maths above is exact and provable; a chest is worth
@@ -210,9 +229,12 @@ for (const pet of CASINO_PETS) {
 }
 console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.lossRefund)} keno refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
 
+// Keno is deliberately absent from this list. The ceiling below is the GOLD ceiling and these are the gold
+// machines; a chip cabinet in here would be measured against a rule that does not apply to it, and the only
+// way to satisfy that rule would be to nerf a game for failing a test meant for a different currency. What
+// the pets do to keno is printed underneath instead, because it is worth knowing and not worth failing on.
 const perked = [
     ...Object.values(SLOT_MACHINES).map((m) => ({ name: m.label, r: perkedRtp(slotRtps[m.id]) })),
-    { name: "keno", r: perkedRtp(kr, MAX_PERKS, kenoLoss) },
 ].sort((a, b) => b.r - a.r);
 
 console.log("");
@@ -223,6 +245,12 @@ for (const m of perked) {
         problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — past the ${pct(RTP_CEILING)} ceiling. Lower a perk in collectibles.js or a payout in casino.js.`);
     }
     if (m.r >= 1) problems.push(`with all five pets, ${m.name} returns ${pct(m.r)} — that is a money printer with a lever on it`);
+}
+{
+    // Printed, not gated — see the note on the list above. A chip cabinet over 100% is not a money printer,
+    // because there is no path from chips back to gold; it is a cabinet that hands out slightly more tickets.
+    const kp = perkedRtp(kr, MAX_PERKS, kenoLoss);
+    console.log(`  ${"keno (chips)".padEnd(22)} ${pct(kp).padStart(7)}   ${`${pct(kp - kr)} from the pets`.padStart(14)}`);
 }
 
 // ── AND EVERY CABINET HAS A VOICE AND A TUNE ────────────────────────────────────────────────────────────────

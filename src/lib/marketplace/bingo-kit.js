@@ -1,27 +1,26 @@
 // ── BINGO, AND WHY IT IS NOT KENO WITH A GRID ────────────────────────────────────────────────────────────────
 // This floor already has a game where you pick numbers and the house draws some. Adding a second one with a
 // nicer layout would be exactly the thing the three slot cabinets were built to avoid: one machine painted
-// twice. So the reason bingo exists here is the one thing no other machine on the floor has —
+// twice.
 //
-//   EVERYBODY IN THE ROOM PLAYS THE SAME DRAW.
+// The original answer was EVERYBODY IN THE ROOM PLAYS THE SAME DRAW — a shared three-minute round, the ritual
+// of a real hall, the one thing a solo game cannot reproduce.
 //
-// The forty balls belong to a ROUND, not to a player. Anyone who buys a card in the same three-minute window
-// is watching the same numbers come out, which is the entire ritual of bingo and the only part of it that a
-// solo game cannot reproduce. The card is still yours and still random, so the odds are identical whether you
-// are alone or the floor is full — what changes is whether anyone is there to groan with you.
+// ── AND IT IS GONE, BECAUSE NOBODY WAS EVER IN THE ROOM ──────────────────────────────────────────────────────
+// Luke: "you can remove all multiplayer for many of the games that we had previously tried to do."
 //
-// NO ROUNDS TABLE. The round is derived from the clock: `roundOf(now)` is a number, the draw is a seeded
-// shuffle of that number, and the whole thing needs no scheduler, no cron and no row. A game that needs a
-// timer to advance is a game that stops when the timer does.
+// He is right and the evidence was on his own screen: the hall said "nobody yet" and the keno board said
+// "Drawn in 1s" with an empty player list. A shared round is a wonderful idea for a floor with forty people on
+// it and a cruel one for a floor with two, because what it actually delivers is A WAIT. Three minutes of
+// nothing, ending in a draw you were told about rather than shown, in exchange for company that is not there.
+// The odds were always identical either way — a random card against a known set of forty balls is a random
+// card — so the shared round was buying atmosphere with the player's time, and it was buying none.
 //
-// THE DRAW IS SEEDED SERVER-SIDE and salted, but this is belt-and-braces rather than load-bearing: a random
-// card against a KNOWN set of forty balls has exactly the same odds as against an unknown one. There is no
-// version of seeing the draw early that helps you, which is worth stating so nobody later "fixes" it into
-// something slower for no reason.
-
-/** How long one round's numbers stand. Three minutes: long enough to walk over and buy in, short enough that
- *  nobody is waiting around for the next one. */
-export const ROUND_MS = 3 * 60 * 1000;
+// So the draw belongs to the CARD now. You buy, the balls come out, you see how you did. No round, no clock,
+// no waiting for strangers. What replaces the ritual is a thing that can only happen to you — see the dragon.
+//
+// THE DRAW IS STILL SEEDED, per card rather than per round, which keeps `drawFor` reproducible for the check
+// script and for anything that ever needs to replay a card from its row.
 
 export const BALLS = 75;
 // FORTY BALLS, and the number is load-bearing. At thirty, a card paid something on 15.7% of deals — and this
@@ -31,9 +30,6 @@ export const DRAWN = 40;
 /** Five columns of fifteen, the way a bingo card has always been laid out: B is 1-15, I is 16-30, and so on. */
 export const COLUMNS = ["B", "I", "N", "G", "O"];
 export const PER_COLUMN = 15;
-
-export const roundOf = (nowMs) => Math.floor(nowMs / ROUND_MS);
-export const roundEndsAt = (round) => (round + 1) * ROUND_MS;
 
 /** A deterministic generator from one integer. Same seed, same numbers, on every server that asks. */
 export function seeded(seed) {
@@ -46,9 +42,9 @@ export function seeded(seed) {
     };
 }
 
-/** The forty balls for a round. Drawn in order, because the order is the show. */
-export function drawFor(round, salt = 0) {
-    const rng = seeded((round * 2654435761 + salt) >>> 0);
+/** The forty balls for one card, from its own seed. Drawn in order, because the order is the show. */
+export function drawFor(seed, salt = 0) {
+    const rng = seeded((seed * 2654435761 + salt) >>> 0);
     const pool = Array.from({ length: BALLS }, (_, i) => i + 1);
     for (let i = pool.length - 1; i > 0; i -= 1) {
         const j = Math.floor(rng() * (i + 1));
@@ -76,26 +72,121 @@ export function makeCard(rng = Math.random) {
     });
 }
 
-const marked = (n, hits) => n === 0 || hits.has(n);
+// ── THE DRAGON ───────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "for bingo we need to create a bonus that has a dragon that flies around and lights tiles on fire to
+// give you free tiles, that happens randomly."
+//
+// This is the thing that replaces the shared round, and it replaces it exactly: what the hall was FOR was a
+// moment where the whole table reacts at once, and this is a moment that belongs to one card. A dragon comes
+// over the board, sets squares alight, and every burning square is yours whether the ball comes out or not.
+//
+// TWO RULES MAKE IT WORTH WATCHING RATHER THAN JUST WORTH HAVING:
+//
+//   1. IT ONLY BURNS SQUARES YOU DID NOT ALREADY HAVE. A dragon that lands on a number already drawn has
+//      given you nothing, and it would do that 53% of the time — over half of the best event in the game
+//      spent on squares that were already marked. Every square it lights is a square that changes the card.
+//
+//   2. IT BURNS AFTER THE DRAW, NOT BEFORE. Same reason. The draw decides what you have; the dragon decides
+//      what you get anyway. That ordering is also what makes it showable: the balls come out, the card
+//      settles, you can see exactly what you are one square away from — and then the dragon arrives.
+//
+// WHAT IT IS WORTH. Free squares are enormously powerful here, because a line needs five and the card is
+// mostly near-misses: the difference between four-of-five and a line is the entire game. The dragon is
+// therefore priced as a real feature rather than a garnish — it is what carries this cabinet from the gold
+// paytable's 88% up to the 1.00x in chips that every slot on this floor returns. See check:bingo, which
+// deals two million cards through this exact function and prints what the dragon is worth on its own.
+export const DRAGON_CHANCE = 0.12;
 
-/** Every line on the card: five rows, five columns, two diagonals. */
-export function linesOf(card, drawn) {
+// ── HOW IT FLIES, AND WHY THAT IS THE WHOLE DESIGN ───────────────────────────────────────────────────────────
+// The first cut had the dragon light FIVE SCATTERED SQUARES, which is the obvious reading of "lights tiles on
+// fire" and it broke the game outright: check:bingo priced it at 618% return. The reason is worth writing down
+// because it is not obvious until you measure it — every square on this card sits on THREE patterns at once (a
+// row, a column, and for eight of them a diagonal), so five scattered free squares do not add five squares,
+// they add fifteen near-completions spread across every line on the board. Six-line cards went from one in
+// seven thousand to one in a hundred and forty, and the six-line pay is the jackpot.
+//
+// So the dragon makes a PASS. It enters at one edge and burns a straight trail across the card — a row, a
+// column or a diagonal — and lights every cold square on that one line. Which is better on both counts:
+//
+//   IT IS BETTER TO WATCH. "A dragon flew across your card and set that whole row on fire" is a thing you can
+//   see happen in one movement and describe afterwards. Five squares lighting up in unrelated places is a
+//   status effect, not an event.
+//
+//   IT IS BOUNDED. A pass completes at most ONE line directly, and every other line it helps, it helps by
+//   exactly one square. That is a feature that can be priced — 12% of cards, worth about a third of this
+//   cabinet's return — instead of one that detonates the top of the paytable.
+//
+// The trail is only ever the COLD squares on the line it crosses, so a pass over a row you had four of burns
+// the one square you needed, and the number of squares that actually catch fire is itself the drama.
+const DRAGON_PATHS = (() => {
+    const at = (col, row) => col * 5 + row;
+    const paths = [];
+    for (let row = 0; row < 5; row += 1) paths.push({ kind: "row", i: row, cells: [0, 1, 2, 3, 4].map((col) => at(col, row)) });
+    for (let col = 0; col < 5; col += 1) paths.push({ kind: "col", i: col, cells: [0, 1, 2, 3, 4].map((row) => at(col, row)) });
+    paths.push({ kind: "diag", i: 0, cells: [at(0, 0), at(1, 1), at(2, 2), at(3, 3), at(4, 4)] });
+    paths.push({ kind: "diag", i: 1, cells: [at(4, 0), at(3, 1), at(2, 2), at(1, 3), at(0, 4)] });
+    return paths;
+})();
+export { DRAGON_PATHS };
+
+/**
+ * The dragon's pass over one card, or null if it did not come.
+ *
+ * Returns `{ kind, i, cells, burnt }` — the whole flight, not just the result, because the screen has to
+ * ANIMATE it: it needs the line the dragon flew along (so the sprite can travel it) as well as which squares
+ * actually caught (so only the cold ones ignite). A function that returned the burnt cells alone would leave
+ * the client guessing at the path, and it would guess wrong on any pass that burned nothing.
+ *
+ * `force` is the owner's trigger. It makes the dragon CERTAIN rather than making a special card, so the button
+ * tests the real feature instead of a demonstration of it.
+ */
+export function dragonFor(card, drawn, rng = Math.random, { force = false } = {}) {
+    if (!force && rng() >= DRAGON_CHANCE) return null;
     const hits = new Set(drawn);
-    const lines = [];
-    for (let row = 0; row < 5; row += 1) {
-        lines.push({ kind: "row", i: row, cells: card.map((col) => col[row]) });
-    }
-    for (let col = 0; col < 5; col += 1) {
-        lines.push({ kind: "col", i: col, cells: card[col] });
-    }
-    lines.push({ kind: "diag", i: 0, cells: [card[0][0], card[1][1], card[2][2], card[3][3], card[4][4]] });
-    lines.push({ kind: "diag", i: 1, cells: [card[4][0], card[3][1], card[2][2], card[1][3], card[0][4]] });
-    return lines.filter((l) => l.cells.every((n) => marked(n, hits)));
+    const path = DRAGON_PATHS[Math.floor(rng() * DRAGON_PATHS.length)];
+    const burnt = path.cells.filter((at) => {
+        const n = card[Math.floor(at / 5)][at % 5];
+        // Never the free centre (it is already yours) and never a ball that already came out — a dragon that
+        // lands on a square you had has given you nothing, and it would do that half the time.
+        return n !== 0 && !hits.has(n);
+    });
+    return { kind: path.kind, i: path.i, cells: path.cells, burnt };
 }
 
-export const cornersOf = (card, drawn) => {
+/** The cell indices a pass actually set alight. Null-safe, so callers can pass a dragon that never came. */
+export const burntOf = (dragon) => dragon?.burnt || [];
+
+// A square counts when the free centre is on it, the ball came out, or the dragon set it on fire. One
+// predicate, used by every pattern below, so a new way of marking a square can never be honoured by the rows
+// and forgotten by the diagonals.
+const marked = (n, hits, burnt, at) => n === 0 || hits.has(n) || burnt.has(at);
+
+/** Every line on the card: five rows, five columns, two diagonals. `burnt` is the dragon's cell indices. */
+export function linesOf(card, drawn, burnt = []) {
     const hits = new Set(drawn);
-    return [card[0][0], card[4][0], card[0][4], card[4][4]].every((n) => marked(n, hits));
+    const fire = new Set(burnt);
+    // Cell indices alongside the numbers, because a burning square is identified by WHERE it is and a drawn
+    // one by WHAT it is — the two patterns need different keys and every line has to check both.
+    const at = (col, row) => col * 5 + row;
+    const lines = [];
+    for (let row = 0; row < 5; row += 1) {
+        lines.push({ kind: "row", i: row, cells: card.map((col) => col[row]), at: card.map((_, col) => at(col, row)) });
+    }
+    for (let col = 0; col < 5; col += 1) {
+        lines.push({ kind: "col", i: col, cells: card[col], at: card[col].map((_, row) => at(col, row)) });
+    }
+    lines.push({ kind: "diag", i: 0, cells: [card[0][0], card[1][1], card[2][2], card[3][3], card[4][4]],
+        at: [at(0, 0), at(1, 1), at(2, 2), at(3, 3), at(4, 4)] });
+    lines.push({ kind: "diag", i: 1, cells: [card[4][0], card[3][1], card[2][2], card[1][3], card[0][4]],
+        at: [at(4, 0), at(3, 1), at(2, 2), at(1, 3), at(0, 4)] });
+    return lines.filter((l) => l.cells.every((n, k) => marked(n, hits, fire, l.at[k])));
+}
+
+export const cornersOf = (card, drawn, burnt = []) => {
+    const hits = new Set(drawn);
+    const fire = new Set(burnt);
+    return [[0, 0], [4, 0], [0, 4], [4, 4]]
+        .every(([col, row]) => marked(card[col][row], hits, fire, col * 5 + row));
 };
 
 // ── WHAT A CARD PAYS ─────────────────────────────────────────────────────────────────────────────────────────
@@ -113,20 +204,34 @@ export const cornersOf = (card, drawn) => {
 // consolation rather than a win: half the card back, on a card that got no line at all.
 //
 // Tuned against check:bingo, which deals two million cards against real draws.
+// ── AND THE LADDER WAS REPRICED AROUND THE DRAGON ────────────────────────────────────────────────────────────
+// These were 1 / 2.5 / 8 / 15 / 40 / 300, tuned for a card with no bonus on it and a return of 88% in GOLD.
+// Two things moved at once and both push the same way:
+//
+//   THE DRAGON. A pass lands on one card in eight and is worth about a third of this cabinet's whole return.
+//   Every rung above a single line got more frequent, so every rung above a single line has to pay less for
+//   the same money.
+//
+//   THE CURRENCY. It pays CHIPS now, and the floor's rule for a chip game is 1.00x rather than the gold
+//   ceiling's 88% — see the long note at the top of check:bingo. So there are twelve more points to spend,
+//   and they are spent here rather than being handed to the top tier.
+//
+// A LINE STILL GETS YOUR CARD BACK, which is the one rule in this game worth saying out loud, and it is why
+// `1` is untouched. Everything above it was solved for by check:bingo against two million real cards.
 export const BINGO_PAYS = {
     corners: 0.5,
     1: 1,
-    2: 2.5,
-    3: 8,
-    4: 15,
-    5: 40,
-    6: 300,   // six lines or more — about one card in seven thousand
+    2: 1.5,
+    3: 5,
+    4: 10,
+    5: 25,
+    6: 200,   // six lines or more — about one card in two thousand
 };
 
 /** The single source of truth for what one card won. The screen shows what this returned. */
-export function scoreCard(card, drawn) {
-    const lines = linesOf(card, drawn);
-    const corners = cornersOf(card, drawn);
+export function scoreCard(card, drawn, burnt = []) {
+    const lines = linesOf(card, drawn, burnt);
+    const corners = cornersOf(card, drawn, burnt);
     const n = lines.length;
     // Best pattern only — the patterns are nested (three lines contains one line), so paying each of them
     // would be paying the same achievement three times. Corners only counts when nothing else did.

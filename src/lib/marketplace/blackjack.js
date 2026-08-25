@@ -3,11 +3,23 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import {
-    freshShoe, handValue, isBlackjack, playDealer, settleHand, canSplit, pairValue, BLACKJACK_RAKE,
+    freshShoe, handValue, isBlackjack, playDealer, settleHand, canSplit, pairValue,
 } from "@/lib/marketplace/blackjack-kit.js";
 // The table is a machine on the same floor, so it pays into the same three things every other machine does.
 // Imported one way only: casino.js knows nothing about blackjack, which keeps the cycle from ever existing.
 import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "@/lib/marketplace/casino.js";
+// ── THE TABLE PAYS CHIPS ─────────────────────────────────────────────────────────────────────────────────────
+// Luke: "convert blackjack, keno and bingo to give out chips, not gold."
+//
+// This is the change that makes the whole floor one economy instead of two. Every slot machine already works
+// this way — you stake GOLD and the machine pays CHIPS at CHIP_RATE, the gold never comes back, and chips buy
+// chests at the Counter and nothing else. The three table games were the exception: they took gold and paid
+// gold, which meant they were the only things on the floor that had to be balanced against the gold economy's
+// RTP ceiling, and it is why this one needed a rake at all (see blackjack-kit.js for that story).
+//
+// The stake is still taken in GOLD, deliberately. That is the mint: gold staked is what chips are made of, and
+// a table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
+import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 
 // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -73,9 +85,10 @@ function publicView(row, { reveal = false } = {}) {
         dealerValue: handValue(shown),
         dealerHidden: open && dealer.length > shown.length,
         outcome: row.outcome || null,
+        // `won` is CHIPS — what the settlement actually credited. The rake fields that used to sit here are
+        // gone: the table takes none, and a field that is always zero is one the screen has to keep deciding
+        // not to render.
         won: row.won || 0,
-        rake: row.rake || 0,
-        rakeRate: BLACKJACK_RAKE,
     };
 }
 
@@ -104,27 +117,34 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     const results = hands.map((h) => settleHand({
         player: h.cards, dealer: dealerCards, stake: row.stake, doubled: h.doubled, fromSplit: h.fromSplit,
     }));
-    const back = results.reduce((n, r) => n + r.back, 0);
-    const won = results.reduce((n, r) => n + r.won, 0);
-    const rake = results.reduce((n, r) => n + r.rake, 0);
+    // `back` and `won` are in GOLD — the units the stake was taken in and the units the rules are written in.
+    // Nothing below this line is.
+    const backGold = results.reduce((n, r) => n + r.back, 0);
+    const wonGold = results.reduce((n, r) => n + r.won, 0);
+    const rake = results.reduce((n, r) => n + r.rake, 0);   // zero; the column still exists — see the kit
 
-    let gold = null;
+    // ── ONE CONVERSION, IN ONE PLACE ─────────────────────────────────────────────────────────────────────
+    // Exactly like casino-slot5-play.js: the game engine works in multiples of the stake and knows nothing
+    // about chips, and the rate is applied here and only here. `chipsFor` also floors any non-zero return at
+    // one chip, which matters at this table more than anywhere: a 25-gold push returns 6.25, and a push that
+    // rounds to nothing is the machine telling you that you lost a hand you did not lose.
+    const back = chipsFor(backGold, 1);
+    const won = chipsFor(wonGold, 1);
+
+    let chips = null;
     if (back > 0) {
-        const paid = await db.queryOne(
-            `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back],
-        ).catch(() => null);
-        gold = paid?.gold ?? null;
-        if (paid) {
-            await logCoin(buyerId, back, "casino_blackjack_win", {
-                balanceAfter: gold,
-                meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome), won, rake, hands: hands.length },
-            });
-        }
+        chips = await moveChips(buyerId, back, "casino_blackjack_win", {
+            ref: String(row.id),
+            meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome),
+                goldStaked: row.stake, backGold, wonGold, rate: CHIP_RATE, hands: hands.length },
+        });
     }
-    if (gold == null) {
-        const g = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-        gold = g?.gold ?? 0;
-    }
+    if (chips == null) chips = await chipBalance(buyerId);
+    // The gold balance is unchanged by a settlement now — the stake left at the deal and nothing comes back in
+    // gold — but the screen still shows both numbers in its header, so it is read once and handed along rather
+    // than left stale from before the hand.
+    const g = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const gold = g?.gold ?? 0;
 
     const finished = hands.map((h, i) => ({ ...h, outcome: results[i].outcome, won: results[i].won, rake: results[i].rake }));
     // The row's own outcome is the first hand's when there is one hand, and "split" when there are two —
@@ -151,7 +171,7 @@ async function settleAll(buyerId, row, dealerCards, hands) {
     const prize = await rollCasinoPrize(buyerId, { jackpot: results.some((r) => r.outcome === "blackjack"), perks });
     const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
 
-    return { hand: publicView(shape, { reveal: true }), gold, won, outcome, prize, pet };
+    return { hand: publicView(shape, { reveal: true }), gold, chips, won, wonGold, outcome, prize, pet };
 }
 
 /**
@@ -170,7 +190,7 @@ async function advance(buyerId, row, hands, active) {
     const alive = hands.some((h) => !handValue(h.cards).bust);
     const dealer = alive ? playDealer(parse(row.dealer, []), shoe) : parse(row.dealer, []);
     const s = await settleAll(buyerId, row, dealer, hands);
-    return { ok: true, gold: s.gold, hand: s.hand, bet: row.stake, won: s.won, outcome: s.outcome, prize: s.prize, pet: s.pet };
+    return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
 }
 
 /** Take one stake. Returns the new balance, or null if it could not be paid. */
@@ -222,7 +242,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // A natural on either side ends it immediately — there is no turn to take.
     if (isBlackjack(player) || isBlackjack(dealer)) {
         const s = await settleAll(buyerId, row, dealer, hands);
-        return { ok: true, natural: true, gold: s.gold, hand: s.hand, bet: stake, won: s.won, outcome: s.outcome, prize: s.prize, pet: s.pet };
+        return { ok: true, natural: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
     }
     return { ok: true, gold: paid.gold, hand: publicView(row), bet: stake };
 }
@@ -327,7 +347,7 @@ export async function splitBlackjack(buyerId) {
         const shoeNow = parse(saved.shoe, []);
         const dealer = playDealer(parse(saved.dealer, []), shoeNow);
         const s = await settleAll(buyerId, saved, dealer, split);
-        return { ok: true, gold: s.gold, hand: s.hand, bet: row.stake * 2, won: s.won, outcome: s.outcome, prize: s.prize, pet: s.pet };
+        return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
     }
     return { ok: true, hand: publicView(saved) };
 }
@@ -335,5 +355,8 @@ export async function splitBlackjack(buyerId) {
 /** The table as the room needs it: whatever hand is in progress, or nothing. */
 export async function blackjackState(buyerId) {
     const row = await openHand(buyerId);
-    return { hand: row ? publicView(row) : null, rakeRate: BLACKJACK_RAKE, minBet: MIN_BET, maxBet: MAX_BET };
+    // `rakeRate` used to ride along here so the felt could print what the house kept. It is zero and the felt
+    // no longer says anything about it, so sending it would be a number nobody reads that still has to be
+    // kept true. The constant itself stays in the kit — see the note there.
+    return { hand: row ? publicView(row) : null, minBet: MIN_BET, maxBet: MAX_BET };
 }

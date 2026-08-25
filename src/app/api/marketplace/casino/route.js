@@ -36,7 +36,7 @@ export async function GET(request) {
             const buyer = await gate();
             if (!buyer) return noStore({ open: false });
             const [floor, table, hall] = await Promise.all([
-                getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(buyer.id),
+                getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(),
             ]);
             return noStore({ open: true, ...floor, blackjack: table, bingo: hall });
         } catch (error) {
@@ -85,11 +85,18 @@ export async function POST(request) {
                 case "bj_stand": return noStore(await standBlackjack(buyer.id));
                 case "bj_double": return noStore(await doubleBlackjack(buyer.id));
                 case "bj_split": return noStore(await splitBlackjack(buyer.id));
-                // ── THE HALL ── one verb. A card is bought, dealt and scored in a single answer, and the
-                // balls that follow on screen are a ceremony over a result already banked. What the ROUND
-                // shares is the forty numbers, not the moment of watching them: buy at any point in the
-                // three minutes and you are playing the same draw as everybody else who did.
-                case "bingo": return noStore(await buyBingoCard(buyer.id, { bet: b?.bet }));
+                // ── THE HALL ── one verb. A card is bought, dealt, flown over and scored in a single answer,
+                // and the balls that follow on screen are a ceremony over a result already banked. There is no
+                // shared round any more (see bingo-kit.js): the forty numbers belong to the card.
+                //
+                // `force` is the owner's dragon trigger, and it is checked HERE rather than trusted from the
+                // body — the same rule as the slot cabinet's forced bonuses one screen up. This whole route is
+                // already behind `gate()`, so it is belt and braces, and it stays that way on purpose: the day
+                // the floor opens to members, the gate above changes and this line must not have to.
+                case "bingo":
+                    return noStore(await buyBingoCard(buyer.id, {
+                        bet: b?.bet, force: isOwner(buyer.id) && b?.force === "dragon",
+                    }));
                 default: return noStore({ ok: false, error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

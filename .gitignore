@@ -26,3 +26,4 @@ scripts/_tmp-*.mjs
 scripts/_*.mjs
 .vault-art/
 .harvest-art/
+.bingo-art/

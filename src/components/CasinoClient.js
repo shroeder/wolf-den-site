@@ -267,11 +267,26 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
     );
 }
 
+// How fast the keno hopper empties. Slower than bingo's forty because there are only ten of them and each
+// one matters four times as much — a ten-ball draw that is over in a second is a number appearing, not a draw.
+const KENO_BALL_MS = 230;
+
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
-// Seconds left on a round, from the end time the server sent. Recomputed on a local tick rather than polled:
-// the clock is the same for everybody and asking a server what time it is would be a request per second.
-const secsLeft = (closesAt) => Math.max(0, Math.ceil((closesAt - Date.now()) / 1000));
+// ── QUICK PICK ─────────────────────────────────────────────────────────────────
+// Every keno lounge on earth has this button, and the reason is not laziness — it is that picking five
+// numbers by hand before EVERY ticket is friction on the one action the game is made of, and friction on the
+// repeat is what stops somebody buying a second one. The picks are still validated server-side; this only
+// fills the form.
+const KENO_PICKS = 5;
+function quickPick(pool = 40) {
+    const bag = Array.from({ length: pool }, (_, i) => i + 1);
+    for (let i = 0; i < KENO_PICKS; i += 1) {
+        const j = i + Math.floor(Math.random() * (bag.length - i));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    return bag.slice(0, KENO_PICKS).sort((a, b) => a - b);
+}
 
 // Every way a hand can end, said the way somebody would say it out loud. "dealer_bust" is a state name, not
 // a sentence, and a table that reports state names is a table that reads like a debug log.
@@ -297,26 +312,11 @@ const OUTCOME_SHORT = {
     dealer_blackjack: "lost",
 };
 
-// ── A SHARED ROUND, ON THE MACHINE'S FACE ────────────────────────────────────────────────────────────────────
-// The clock, who else is in it, and what you already have riding. All three matter: a countdown with nobody
-// named on it is just a wait, and the whole reason these two games became shared is that somebody else is
-// playing the same numbers.
-function Round({ game, st, tick, verb }) {
-    const r = st?.rounds?.[game];
-    if (!r) return null;
-    const left = secsLeft(r.closesAt ?? (Date.now() + (r.msLeft || 0)));
-    const mine = r.mine || [];
-    const others = (r.players || []).length;
-    return (
-        <div className="cas-round" data-tick={tick}>
-            <span className="cas-round-clock">{verb} in {left}s</span>
-            <span className="cas-round-who">
-                {others > 1 ? `${others} in this round` : others === 1 ? "you, so far" : "nobody yet"}
-                {mine.length ? ` · ${mine.length} of yours riding` : ""}
-            </span>
-        </div>
-    );
-}
+// ── THE SHARED-ROUND RAIL IS GONE ───────────────────────────────────────────────────
+// `Round` lived here — the countdown, the player count and what you had riding — along with `secsLeft`, the
+// clock it ran on. Both are DELETED rather than left unmounted, because a component nothing renders is the
+// thing that makes the next person believe the feature still exists. Keno and bingo resolve in one answer
+// now; there is no window to count down and nobody else's tickets to name. See casino.js and bingo-kit.js.
 
 // A card, drawn in CSS like every other thing on this floor. Red suits red, black suits pale — the one piece
 // of card design that is not decoration, because it is how you read a hand at a glance.
@@ -407,6 +407,9 @@ export default function CasinoClient({ initial }) {
     // The ticket: five numbers of forty, and the last draw.
     const [ticket, setTicket] = useState([]);
     const [keno, setKeno] = useState(null);
+    // How many of the ten have come out of the hopper. The result is banked the moment the request answers
+    // — this is only the ceremony over it, exactly as the bingo draw is.
+    const [kenoOut, setKenoOut] = useState(0);
     // The last thing that was not gold. Cleared at the start of every play so it can never look like the
     // machine just paid out twice.
     const [prize, setPrize] = useState(null);
@@ -420,6 +423,13 @@ export default function CasinoClient({ initial }) {
     // The hall. `card` is the whole answer the moment it arrives; `called` is how far the ceremony has got
     // through the forty balls, which is the only thing the animation actually advances.
     const [card, setCard] = useState(null);
+    // ── THE DRAGON'S PASS, AS IT HAPPENS ────────────────────────────────────────────────────────────────
+    // `dragon` is the flight currently on screen (or null); `lit` is how many of its squares have caught so
+    // far, so the fire spreads along the path a square at a time rather than the whole line igniting at
+    // once. Two pieces of state rather than one because the sprite has to be flying BEFORE anything burns —
+    // the travel is the anticipation, and a dragon that arrives already having done it is a status effect.
+    const [dragon, setDragon] = useState(null);
+    const [dragonLit, setDragonLit] = useState(0);
     const [called, setCalled] = useState(0);
     // What each cabinet remembers about you — the tray filling, the multiplier climbing, free pulls banked.
     // Seeded from the server and replaced by every pull's answer, never incremented locally: a meter the
@@ -451,10 +461,6 @@ export default function CasinoClient({ initial }) {
         });
     }, []);
     const [fx, setFx] = useState(null);      // what the features did on the last pull
-    // The two shared games: what settled for you last, and a ticking clock for the round now open.
-    const [settled, setSettled] = useState({});
-    const [tick, setTick] = useState(0);
-    const rakeRate = initial?.blackjack?.rakeRate ?? 0.2;
 
     // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────────
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
@@ -473,12 +479,9 @@ export default function CasinoClient({ initial }) {
     // Who else is on the floor. Polled rather than pushed, because a casino is not a fight — a few seconds of
     // staleness in where somebody is standing costs nothing.
 
-    // The countdown. One second of arithmetic, no requests — the round's end time came down with the state
-    // and the clock is the same for everybody, so there is nothing to ask anyone about.
-    useEffect(() => {
-        const id = setInterval(() => setTick((n) => n + 1), 1000);
-        return () => clearInterval(id);
-    }, []);
+    // The per-second countdown tick lived here. It existed only to repaint the shared-round rail, and there
+    // are no shared rounds — an interval firing once a second forever to update nothing is the kind of thing
+    // that survives a feature by years because it costs nothing visible.
 
     // ── THE CAMERA IS YOURS ──────────────────────────────────────────────────────────────────────────────
     // Luke: "remove the camera snap on tap."
@@ -857,32 +860,59 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
-        setBurst(null);
-        // Chips going down on the felt, not a UI blip. A bet on a shared round resolves nothing yet — the
-        // draw happens when the round closes, for everybody at once.
+        setBurst(null); setKenoOut(0);
+        // Chips going down on the felt, not a UI blip.
         Cas.chips();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify(body),
         }).then((x2) => x2.json()).catch(() => null);
-        setBusy(false);
         if (!r?.ok) {
+            setBusy(false);
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
                 : r?.error === "bad_ticket" ? "Pick five numbers first."
                     : "That didn't go through.");
             return;
         }
+        // Held for keno until the last ball is out — see below. Everything else resolves in one beat.
+        if (body.action !== "keno") setBusy(false);
         onResult(r);
-        setSt((p) => ({ ...p, gold: r.gold }));
-        // A bet PLACED is not a result. Keno hands back a round to wait for, and celebrating
-        // at that moment would be the machine cheering for taking your money.
-        if (r.placed) {
-            setSt((p) => ({ ...p, rounds: { ...(p.rounds || {}), keno: { ...(p.rounds?.keno || {}), msLeft: Math.max(0, (r.closesAt || 0) - Date.now()), closesAt: r.closesAt } } }));
-            setSettled((p) => ({ ...p, [body.action]: null }));
-            // The chips already said it. A second sound here would be the machine congratulating you for
-            // handing over a stake.
+        // Gold went out, chips came back — both live in the purse at the top of the screen, and showing
+        // only one of them is how a currency conversion becomes invisible to the person it happened to.
+        setSt((p) => ({ ...p, gold: r.gold, chips: r.chips ?? p?.chips }));
+
+        // ── THE HOPPER, ONE BALL AT A TIME ────────────────────────────────────────
+        // The ticket used to be placed into a shared round and answered 45 seconds later with a sentence.
+        // It resolves instantly now (see the note in casino.js), so the ten balls are a ceremony over a
+        // result that is already banked — the same shape as the bingo draw, and the same reason: the DRAW
+        // is the game. A keno ticket that prints its answer in one line has no game in it at all.
+        //
+        // The celebration waits for the last ball. Firing it on the response would be the machine telling
+        // you that you won before it had shown you why.
+        if (body.action === "keno" && Array.isArray(r.drawn)) {
+            setKenoOut(0);
+            const acc2 = ACCENT.keno;
+            r.drawn.forEach((n, i) => timers.current.push(setTimeout(() => {
+                setKenoOut(i + 1);
+                // Pitched off the ball's own number, so a draw is a little melody rather than the same pop
+                // ten times — and one of YOURS lands harder, because that is the whole feedback loop.
+                Cas.ball(n);
+                if ((r.picks || []).includes(n)) { Cas.daub(); Haptic.hit(0.35); }
+            }, i * KENO_BALL_MS)));
+            timers.current.push(setTimeout(() => {
+                setBusy(false);
+                absorb(r);
+                if (r.won > 0) {
+                    const big = r.won >= r.bet * 10;
+                    setFlash(big ? "big" : "win");
+                    if (big) { Cas.jackpot(); Haptic.crit(); throwBurst("hoard", acc2); }
+                    else { Cas.coins(0.35); Haptic.hit(0.6); throwBurst("coin", acc2); }
+                    timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
+                } else Cas.lose();
+            }, r.drawn.length * KENO_BALL_MS + 320));
             return;
         }
+
         absorb(r);
         const acc = ACCENT.keno;
         if (r.won > 0) {
@@ -957,30 +987,27 @@ export default function CasinoClient({ initial }) {
             // The rounds ride along on the poll that was already running for the other people in the room.
             // A shared game needs no channel of its own: the draw is something the floor learns
             // the next time it looks, which is at most six seconds and usually less.
+            // The poll is still here for the OTHER PEOPLE in the room — that is real shared state and it is
+            // the only thing on this floor that ever was. What rode along on it was the shared-round
+            // settlement for keno, and there are no shared rounds any more: a ticket resolves in the answer
+            // to the request that bought it, so there is nothing that can settle while you were away.
             if (r?.open) {
-                setSt((p) => ({ ...p, others: r.others, gold: r.gold, rounds: r.rounds }));
+                setSt((p) => ({ ...p, others: r.others, gold: r.gold, chips: r.chips ?? p?.chips }));
                 if (r.pot) setPot(r.pot.amount);
-                // Anything that settled while you were away is announced rather than quietly banked.
-                for (const game of ["keno"]) {
-                    const done = r.rounds?.[game]?.settled || [];
-                    if (done.length) setSettled((p) => ({ ...p, [game]: done }));
-                    const first = done.find((d) => d.prize || d.pet);
-                    if (first) absorb(first);
-                }
             }
         }, 6000);
         return () => clearInterval(id);
-    }, [absorb]);
+    }, []);
 
-    const buyCard = useCallback(async () => {
+    const buyCard = useCallback(async (force) => {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
-        setCard(null); setCalled(0); setBurst(null);
+        setCard(null); setCalled(0); setBurst(null); setDragon(null); setDragonLit(0);
         Cas.chips();
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "bingo", bet }),
+            body: JSON.stringify({ action: "bingo", bet, force: force || undefined }),
         }).then((x2) => x2.json()).catch(() => null);
         if (!r?.ok) {
             setBusy(false);
@@ -988,7 +1015,9 @@ export default function CasinoClient({ initial }) {
             return;
         }
         setCard(r);
-        setSt((p) => ({ ...p, gold: r.gold }));
+        // Gold went out, chips came back. Both are in the purse at the top of the screen, and showing only
+        // one of them is how a currency conversion becomes invisible to the person it happened to.
+        setSt((p) => ({ ...p, gold: r.gold, chips: r.chips }));
 
         // Ball by ball. The last five are slowed down: by then you can see what you need, and the pause is
         // where the game actually lives.
@@ -1005,7 +1034,36 @@ export default function CasinoClient({ initial }) {
                 if (late) Haptic.hit(0.2);
             }, at));
         });
-        const total = (r.drawn?.length || 0) * BALL_MS + 5 * 220 + 260;
+        const balls = (r.drawn?.length || 0) * BALL_MS + 5 * 220 + 260;
+
+        // ── AND THEN THE DRAGON ──────────────────────────────────────────────────────────────────────
+        // AFTER the draw, never during it, and the ordering is the whole feature. By the last ball the card
+        // has settled and you can see exactly what you are one square short of — which is the only moment at
+        // which a thing that hands you free squares means anything. A dragon that flew over a blank card
+        // would be a bonus arriving before there was anything for it to be a bonus TO.
+        //
+        // Three beats: it flies (the travel is the anticipation), the squares catch one after another along
+        // its path (so the fire spreads rather than appearing), and only then do the lines resolve.
+        const flight = r.dragon;
+        const DRAGON_FLY = 1250;      // the pass itself
+        const BURN_STEP = 190;        // one square catching
+        const burnCount = flight?.burnt?.length || 0;
+        const dragonMs = flight ? DRAGON_FLY + burnCount * BURN_STEP + 420 : 0;
+        if (flight) {
+            timers.current.push(setTimeout(() => {
+                setDragon(flight);
+                Cas.jackpot(); Haptic.crit();
+            }, balls));
+            // Each square catches on its own beat, with its own daub, so the count is something you hear as
+            // well as see. A pass that burns nothing still flies — and it still says so, which is the
+            // honest version: the dragon came and the squares were already yours.
+            flight.burnt.forEach((_, k) => timers.current.push(setTimeout(() => {
+                setDragonLit(k + 1);
+                Cas.daub(); Haptic.hit(0.3);
+            }, balls + DRAGON_FLY + k * BURN_STEP)));
+        }
+
+        const total = balls + dragonMs;
         timers.current.push(setTimeout(() => {
             setBusy(false);
             absorb(r);
@@ -1295,16 +1353,16 @@ export default function CasinoClient({ initial }) {
                 like this, and a room that has to explain itself in a pill is a room that has not earned
                 the gesture. What is left is the one thing this row was ever for: a way into the machine
                 you are standing in front of. */}
-            <div className="cas-walk">
-                {at?.live ? (
-                    <button type="button" className="cas-sit" onClick={() => setSeated(true)}>
-                        {/* You do not "Play The Counter". It is the one thing on this floor that is not a
-                            game, and a button offering to play it is the screen not knowing what it is
-                            standing in front of. */}
-                        {at.id === "store" ? "Spend your chips" : `Play ${at.label}`}
-                    </button>
-                ) : <span>{at ? at.label : "walk to a machine"}</span>}
-            </div>
+            {/* ── AND THE BUTTON IS GONE TOO ──────────────────────────────────────────────────────
+                Luke: "you can remove the play button."
+
+                It was the last survivor of the movement rail, and it had already been made redundant by the
+                thing that replaced the rail: TAPPING A CABINET WALKS YOU TO IT AND SITS YOU DOWN (see the
+                machine's own onClick above). So the floor had two ways in — the object itself, and a bar
+                underneath restating the object's name — and the bar was costing about sixty pixels of a
+                phone screen on a page whose whole problem is that the room wants to be bigger.
+
+                Nothing renders here now. The room got the height. */}
 
             {/* ── THE MACHINE YOU ARE SAT AT ──────────────────────────────────────────────────────────────
                 Luke: "we dont need to show the info under the button."
@@ -1435,38 +1493,100 @@ export default function CasinoClient({ initial }) {
                     {/* Each machine draws its own game. The slot's ceremony is three landings; the ticket
                         resolves in one, so it gets a result and a celebration and no theatre. */}
                     {at.live && at.id === "keno" ? (
-                        <>
-                            {/* ── THE ROUND ───────────────────────────────────────────────────────────
-                                Ten balls for the whole lounge. Everybody holding a ticket inside the window
-                                plays the same ten, which is what keno IS — and it is also why the draw
-                                cannot arrive with the ticket: you choose your five, so a draw you could see
-                                before buying again would be an unlimited payout. */}
-                            <Round game="keno" st={st} tick={tick} verb="Drawn" />
-                            {settled.keno?.length ? (
-                                <p className={`cas-fx${settled.keno.some((d) => d.won > 0) ? " is-big" : ""}`}>
-                                    Drawn: {(settled.keno[0].outcome?.drawn || []).join(" · ")}
-                                    {settled.keno.some((d) => d.won > 0)
-                                        ? ` — ${money(settled.keno.reduce((n, d) => n + d.won, 0))} gold`
-                                        : " — nothing this time"}
-                                </p>
-                            ) : null}
+                        <div className="cas-keno">
+                            {/* ── THE BOARD, WHICH IS THE WHOLE GAME ───────────────────
+                                Luke: "we need a huge huge huge polish pass on keno — go look up how keno
+                                works and actually make it look amazing."
+
+                                What was here was forty white form buttons in a rectangle, a countdown rail
+                                and a line of text. That is a number picker, not a keno lounge. What a real
+                                board actually has, and what this now has:
+
+                                  A LIT BOARD. Keno boards are backlit lamps in a dark cabinet, not paper.
+                                  Every number is a lamp: off, yours, drawn, or yours-and-drawn — and the
+                                  last of those is the only one that glows, because that is the one you are
+                                  hunting and everything else is context.
+
+                                  THE BALLS COMING OUT. Ten of them, one at a time, in the order drawn, over
+                                  the board rather than beside it. The draw is the show; it used to be a
+                                  sentence printed after the fact.
+
+                                  THE PAYTABLE, ON THE MACHINE. Keno is unreadable without it — nobody has
+                                  an instinct for what four-of-five is worth — and it lights the rung you
+                                  are on as the balls land, so the table teaches itself while you watch.
+
+                                  A QUICK PICK. Every keno lounge on earth has one, and picking five numbers
+                                  by hand on a phone before every single ticket is the friction that stops
+                                  people playing a second one. */}
+                            <div className="cas-keno-head">
+                                <span className="cas-keno-title">Pick five of forty. Ten come out.</span>
+                                <span className="cas-keno-tools">
+                                    <button type="button" className="cas-keno-tool" disabled={busy}
+                                        onClick={() => { unlock(); Cas.chips(); setTicket(quickPick()); }}>Quick pick</button>
+                                    <button type="button" className="cas-keno-tool" disabled={busy || !ticket.length}
+                                        onClick={() => { unlock(); setTicket([]); }}>Clear</button>
+                                </span>
+                            </div>
+
+                            {/* ── THE HOPPER ────────────────────────────────────
+                                Ten slots, always drawn, filling as the balls come out — so the row does not
+                                reflow ten times while you are trying to read it, and so an empty hopper says
+                                "ten of these are coming" before the first one lands. A ball that is one of
+                                yours arrives gold and larger; that is the entire feedback loop of keno. */}
+                            <div className="cas-keno-hopper" aria-live="polite">
+                                {Array.from({ length: st?.keno?.drawn || 10 }, (_, i) => {
+                                    const n = keno?.drawn?.[i];
+                                    const out = keno ? i < kenoOut : false;
+                                    const mine = out && ticket.includes(n);
+                                    return (
+                                        <span key={i}
+                                            className={`cas-kball${out ? " is-out" : ""}${mine ? " is-mine" : ""}${out && i === kenoOut - 1 ? " is-new" : ""}`}>
+                                            {out ? n : ""}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+
                             <div className="cas-grid">
                                 {Array.from({ length: st?.keno?.pool || 40 }, (_, i) => i + 1).map((n) => {
                                     const mine = ticket.includes(n);
-                                    const drew = keno?.drawn?.includes(n);
+                                    {/* Only the balls that have actually come OUT are on the board — the
+                                        draw is already banked, and lighting all ten at once would hand over
+                                        the answer before the hopper has shown it. */}
+                                    const drew = Boolean(keno && keno.drawn.slice(0, kenoOut).includes(n));
                                     return (
-                                        <button key={n} type="button"
+                                        <button key={n} type="button" disabled={busy}
                                             className={`cas-num${mine ? " is-mine" : ""}${drew ? " is-drawn" : ""}${mine && drew ? " is-hit" : ""}`}
                                             onClick={() => toggleNumber(n)}>{n}</button>
                                     );
                                 })}
                             </div>
+
+                            {/* ── WHAT IT PAYS, AND WHERE YOU ARE ON IT ────────────────────
+                                The rung you are standing on lights as the balls land, so the ladder is being
+                                taught while it is being climbed rather than printed somewhere to be studied.
+                                Read off the server's own table — a hand-typed copy here is a paytable that
+                                lies the day somebody retunes the real one. */}
+                            <div className="cas-keno-pays">
+                                {[2, 3, 4, 5].map((k) => {
+                                    const pays = st?.keno?.pays?.[k];
+                                    if (!pays) return null;
+                                    const here = Boolean(keno && !busy && keno.hits.length === k);
+                                    return (
+                                        <span key={k} className={`cas-keno-rung${here ? " is-here" : ""}`}>
+                                            <i>{k} of 5</i><b>{pays}x</b>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+
                             <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}`}>
-                                {keno
-                                    ? `${keno.hits.length} of 5 — ${keno.won > 0 ? `${money(keno.won)} gold` : "nothing"}`
-                                    : `${ticket.length} of 5 picked`}
+                                {keno && !busy
+                                    ? `${keno.hits.length} of 5 — ${keno.won > 0 ? `${money(keno.won)} chips` : "nothing"}`
+                                    : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
+                                        : `${ticket.length} of 5 picked`}
                             </p>
-                        </>
+                        </div>
                     ) : null}
 
                     {/* ── THE CABINET THAT HAS BEEN REBUILT ───────────────────────────────────────────
@@ -1643,20 +1763,29 @@ export default function CasinoClient({ initial }) {
                         that can disagree with the one that paid the money. */}
                     {at.live && at.id === "bingo" ? (
                         <div className="cas-hall">
+                            {/* ── THE HALL DOES NOT KEEP A ROOM WAITING ANY MORE ──────
+                                This said "Everyone who buys in this round plays the same forty numbers"
+                                over a player list that read "nobody yet", above a countdown. All three are
+                                gone with the shared round — see bingo-kit.js. What stands in the same space
+                                is what the game is actually about now: forty balls, a line gets your card
+                                back, and something might come over the roof. */}
                             <div className="cas-hall-top">
-                                <span>{st?.bingo?.players?.length
-                                    ? `${st.bingo.players.length} in this round — same forty numbers`
-                                    : "Everyone who buys in this round plays the same forty numbers"}</span>
+                                <span>Forty balls. A line gets your card back{card?.dragon ? " — and something is circling" : ""}.</span>
                             </div>
 
                             <div className="cas-bhead" aria-hidden="true">
                                 {["B", "I", "N", "G", "O"].map((L) => <b key={L}>{L}</b>)}
                             </div>
-                            <div className="cas-bcard">
+                            {/* The card is `position: relative` so the dragon can fly OVER it in its own
+                                layer — the flight is in the card's coordinates, not the page's. */}
+                            <div className={`cas-bcard${dragon ? " is-burning" : ""}`}>
                                 {[0, 1, 2, 3, 4].map((row) => (
                                     [0, 1, 2, 3, 4].map((col) => {
                                         const n = card?.card?.[col]?.[row];
                                         const hit = n === 0 || (card && card.drawn.slice(0, called).includes(n));
+                                        {/* ── A SQUARE THE DRAGON HAS ALREADY REACHED ──── */}
+                                        const burnAt = (card?.dragon?.burnt || []).indexOf(col * 5 + row);
+                                        const burning = burnAt >= 0 && burnAt < dragonLit;
                                         const won = Boolean(card && !busy && (
                                             card.lines?.some((l) => (l.kind === "row" && l.i === row)
                                                 || (l.kind === "col" && l.i === col)
@@ -1667,12 +1796,39 @@ export default function CasinoClient({ initial }) {
                                         ));
                                         return (
                                             <span key={`${row}-${col}`}
-                                                className={`cas-bcell${hit ? " is-hit" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}`}>
+                                                className={`cas-bcell${hit || burning ? " is-hit" : ""}${burning ? " is-burnt" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}`}>
                                                 {card ? (n === 0 ? "★" : n) : ""}
+                                                {burning ? <i className="cas-flame" aria-hidden="true" /> : null}
                                             </span>
                                         );
                                     })
                                 ))}
+
+                                {/* ── THE PASS ────────────────────────────
+                                    The sprite travels the line it burned, in the card's own grid space, so
+                                    a row flight crosses left to right and a column flight dives top to
+                                    bottom. The endpoints are percentages of the card computed off the
+                                    path's first and last cell — which means one keyframe serves all twelve
+                                    possible flights instead of twelve of them.
+
+                                    Mirrored for a right-to-left pass, because a dragon flying backwards is
+                                    the single most noticeable thing a sprite can do wrong. */}
+                                {dragon ? (() => {
+                                    const cells = dragon.cells || [];
+                                    const first = cells[0] ?? 0;
+                                    const last = cells[cells.length - 1] ?? 24;
+                                    const pos = (k) => ({ x: (Math.floor(k / 5) + 0.5) * 20, y: ((k % 5) + 0.5) * 20 });
+                                    const a = pos(first);
+                                    const b = pos(last);
+                                    return (
+                                        <i className="cas-dragon" aria-hidden="true"
+                                            style={{
+                                                "--x1": `${a.x}%`, "--y1": `${a.y}%`,
+                                                "--x2": `${b.x}%`, "--y2": `${b.y}%`,
+                                                "--flip": b.x < a.x ? -1 : 1,
+                                            }} />
+                                    );
+                                })() : null}
                             </div>
 
                             {/* The balls, in the order they came out. The newest one is the loud one. */}
@@ -1680,15 +1836,19 @@ export default function CasinoClient({ initial }) {
                                 {(card?.drawn || []).slice(0, called).map((n, i) => (
                                     <span key={`${n}-${i}`} className={`cas-ball${i === called - 1 ? " is-new" : ""}`}>{n}</span>
                                 ))}
-                                {!card ? <span className="cas-balls-idle">Forty balls. A line gets your card back.</span> : null}
+                                {!card ? <span className="cas-balls-idle">Forty balls from seventy-five.</span> : null}
                             </div>
 
                             <p className={`cas-result${card && !busy && card.won > 0 ? " is-win" : ""}`}>
-                                {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 2.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 300)}x`
-                                    : busy ? `${called} of ${card.drawn.length} called…`
-                                        : card.label
-                                            ? `${card.label} — ${card.won > 0 ? `${money(card.won)} gold` : "no pay"}`
-                                            : "Not this time."}
+                                {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 1.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 200)}x`
+                                    : dragon && busy
+                                        ? (dragon.burnt?.length
+                                            ? `The dragon burns ${dragonLit} of ${dragon.burnt.length}…`
+                                            : "The dragon passes — every square was already yours.")
+                                        : busy ? `${called} of ${card.drawn.length} called…`
+                                            : card.label
+                                                ? `${card.label} — ${card.won > 0 ? `${money(card.won)} chips` : "no pay"}`
+                                                : "Not this time."}
                             </p>
                         </div>
                     ) : null}
@@ -1764,12 +1924,18 @@ export default function CasinoClient({ initial }) {
                             </div>
 
                             <p className={`cas-result${hand && !hand.open && hand.won > 0 ? " is-win" : ""}`}>
-                                {!hand ? `Blackjack pays 3:2. The house rakes ${Math.round(rakeRate * 100)}% of what you win — never your stake.`
+                                {/* ── NO RAKE TO DECLARE ─────────────────────────────────────────
+                                    This used to say what share of a win the house kept, and the "(rake 40)"
+                                    on the end of every payout was the same fact again at the worst possible
+                                    moment — on the line announcing that you had won. Luke: "remove rake from
+                                    this, we don't want to rake anything." Both are gone because the rake is
+                                    gone; what stands in its place is the thing that IS true now, which is
+                                    that the table pays chips. */}
+                                {!hand ? "Blackjack pays 3:2. Dealer stands on all 17. The table takes no rake."
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
                                         : hand.outcome === "split" ? "Both hands played."
                                             : OUTCOME[hand.outcome] || "Hand over."}
-                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} gold` : ""}
-                                {hand && !hand.open && hand.rake > 0 ? ` (rake ${money(hand.rake)})` : ""}
+                                {hand && !hand.open && hand.won > 0 ? ` +${money(hand.won)} chips` : ""}
                             </p>
                         </div>
                     ) : null}
@@ -1868,8 +2034,8 @@ export default function CasinoClient({ initial }) {
                                     if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
                                     if (at.id === "bingo") return buyCard();
-                                    // Both of these now PLACE a bet on the open round rather than resolving
-                                    // one. The answer says when it closes; the result arrives on the poll.
+                                    // The ticket resolves in one answer now — there is no round to place it
+                                    // into. The ten balls that follow are the ceremony over it.
                                     return play({ action: "keno", bet, picks: ticket }, setKeno);
                                 }}>
                                 {busy ? "…"
@@ -1880,6 +2046,24 @@ export default function CasinoClient({ initial }) {
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
                             )}
+                            {/* ── THE OWNER'S DRAGON ─────────────────────────────────────
+                                Luke: "also need an admin button to trigger that in bingo."
+
+                                It buys a REAL card at the real stake and makes the pass certain — it does not
+                                fabricate a demonstration. That distinction is the whole value of the button:
+                                what gets tested is the feature every other player will get, including the
+                                case that matters most and is hardest to catch by waiting, which is a pass
+                                that burns nothing because every square on the line was already yours.
+
+                                Gated on the server too (see the route). A button that is only hidden on the
+                                screen is not a gate — the same rule the whole floor is built on. */}
+                            {at.id === "bingo" && st?.owner ? (
+                                <div className="cas-owner">
+                                    <span>Owner</span>
+                                    <button type="button" disabled={busy || (st?.gold || 0) < bet}
+                                        onClick={() => buyCard("dragon")}>Force the dragon</button>
+                                </div>
+                            ) : null}
                             {err ? <p className="cas-err">{err}</p> : null}
                         </div>
                     ) : at.live ? null : (
@@ -1891,8 +2075,17 @@ export default function CasinoClient({ initial }) {
             {/* THE DAY'S THREE, at the very bottom. This sat between the room and the walk controls for
                 exactly one screenshot: it is tall enough on a phone that it pushed the ◀ ▶ buttons off the
                 bottom of the screen, so the floor became a room you could not walk around. Anything that
-                is not the room or the machine goes below both. */}
-            <FeatureDailies feature="casino" />
+                is not the room or the machine goes below both.
+
+                ── AND IT IS NOT PRESSED UP AGAINST THE GLASS ───────────────────────────────────────
+                Luke: "you can have the quests have more margin top so they're not so close to the
+                animation frame." With the Play button removed there was nothing between the bottom edge of
+                the room and the bounty card at all, so the card read as part of the room rather than as the
+                next thing down the page. The gap is on the wrapper rather than on FeatureDailies itself,
+                because that component is mounted on eight other screens and none of them has this problem. */}
+            <div className="cas-dailies">
+                <FeatureDailies feature="casino" />
+            </div>
 
         </section>
     );

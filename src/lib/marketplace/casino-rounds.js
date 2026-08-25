@@ -2,6 +2,10 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+// Gold in, chips out — the same one-way conversion every slot machine on this floor already runs. See the
+// long note in blackjack.js: the stake is still gold because gold staked is what chips are MADE of, and a
+// table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
+import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 
 // ── THE SHARED FLOOR ─────────────────────────────────────────────────────────────────────────────────────────
 // Keno and roulette are both played by everyone at once: one draw, one pocket, and every ticket in the window
@@ -121,18 +125,18 @@ export async function settleBets(buyerId, game, { roll, score, reason }) {
         ).catch(() => null);
         if (!claimed) continue;
 
-        if (won > 0) {
-            const back = await db.queryOne(
-                `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, won],
-            ).catch(() => null);
-            if (back) {
-                await logCoin(buyerId, won, reason, {
-                    balanceAfter: back.gold,
-                    meta: { bet: row.stake, round: String(row.round), won },
-                });
-            }
+        // `won` is what the SCORER returned, which is in gold — the units the stake was taken in and the units
+        // the paytable is written in. The ticket row keeps that number, because it is the honest record of what
+        // the bet was worth; the payout is converted once, here, and nowhere else.
+        const wonChips = won > 0 ? chipsFor(won, 1) : 0;
+        if (wonChips > 0) {
+            await moveChips(buyerId, wonChips, reason, {
+                ref: String(row.id),
+                meta: { bet: row.stake, round: String(row.round), wonGold: won, rate: CHIP_RATE },
+            });
         }
-        results.push({ id: String(row.id), round: Number(row.round), stake: row.stake, choice, outcome, won, detail });
+        results.push({ id: String(row.id), round: Number(row.round), stake: row.stake, choice, outcome,
+            won: wonChips, wonGold: won, detail });
     }
     return results;
 }

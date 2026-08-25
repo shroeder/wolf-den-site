@@ -74,16 +74,41 @@ const MACHINES = {
             moon: "a crescent moon in soft warm amber",
         },
     },
+    // ── THE DEEP ── and the reason this block was wrong for weeks.
+    //
+    // It described "Moonrise": cold moonlight, a silver wolf, a cratered moon, a frosted laurel. That cabinet
+    // does not exist any more. slot3 is THE DEEP — Herring, Mackerel, Tidewyrm, Crab, Starfish, Kraken — and
+    // the art on disk is the underwater set, drawn by hand-editing this file and never written back.
+    //
+    // WHICH IS EXACTLY HOW THE MACKEREL WENT MISSING. `doubloon` had no entry here at all, so the skip-what-
+    // already-exists guard below had nothing to skip and nothing to draw, and the file simply never existed:
+    // /images/casino/reels/slot3-doubloon.webp 404s on production, and every Mackerel that lands on the reel
+    // renders as a broken-image icon. Nothing caught it, because a 404 on an <img> is not an error anybody
+    // sees in a log — it is a grey box on somebody's phone.
+    //
+    // Two fixes, and they are the cause and the class:
+    //   THE CAUSE  — the Mackerel is described below and gets drawn.
+    //   THE CLASS  — check:reels (scripts/check-reels.mjs) now walks every cabinet's strips and fails the
+    //                build if any symbol a reel can land has no art file. A symbol that can appear and has
+    //                no drawing is not a style question, it is a missing asset, and the build should say so.
     slot3: {
-        mood: "COLD moonlight — polished silver, deep violet shadow, pale blue rim light. Austere, expensive, "
-            + "slightly eerie.",
+        mood: "COLD DEEP WATER — abyssal blue-green, shafts of pale light from far above, wet and glistening. "
+            + "Everything down here is cold; the two features are the only warm things in the frame.",
         symbols: {
-            wolf: "a howling wolf's head in profile, silver-white fur, violet shadow",
-            moon: "a full moon, cratered, glowing pale blue-white",
-            chest: "a dark iron strongbox banded in silver, violet light escaping the lid",
-            laurel: "a frost-covered laurel wreath in silver-blue",
-            star: "a single bright four-pointed star with a soft violet glow",
-            bone: "a pale bone bleached white, cold blue shadow",
+            wolf: "an enormous purple-black KRAKEN, its bulbous head facing forward and its coiling tentacles "
+                + "filling the lower frame, one huge amber eye burning in the middle of it",
+            chest: "a big armoured red CRAB seen head-on, claws raised wide and open",
+            laurel: "a coiling sea-serpent TIDEWYRM in jade and turquoise, its long neck curled into an S and "
+                + "its finned head turned in profile",
+            star: "a fat five-armed STARFISH seen flat-on, molten gold and glowing from within",
+            bone: "a single silver HERRING seen side-on, slim and bright, its scales catching a cold sheen",
+            // ── THE MACKEREL ── the one that was never drawn. It has to hold apart from the Herring above it
+            // at 44 pixels, and the two of them are the commonest things on this reel, so they are the pair
+            // most worth telling apart. The Herring is SLIM and SILVER; the Mackerel is DEEP-BODIED and
+            // TIGER-STRIPED in green-teal, which is a difference of shape and hue rather than of detail —
+            // detail is what dies first at reel size.
+            doubloon: "a single MACKEREL seen side-on, a deep-bodied fish with a forked tail, its back "
+                + "banded with bold dark tiger stripes over vivid green-teal, its belly bright silver-white",
             // The free round's collector. Deliberately NOT drawn with its own "+1" on it — the numeral is
             // laid over the sprite in the house display face, for the same reason the multiplier plates are
             // (gen-mult-plates.mjs has the long version: an image model asked for a numeral gets it wrong

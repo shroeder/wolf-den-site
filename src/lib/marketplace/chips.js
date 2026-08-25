@@ -51,57 +51,35 @@ export const CHIP_STORE = [
     // against the real catalogs and fails the build, which is the only reason this class of bug ever gets
     // caught before a member pays for a decoration that does not exist.
 
-    // ── COSMETIC ── the safe shelf. Nothing here touches combat or the gold economy, so it can be generous.
-    { id: "deco_lamp", kind: "decoration", ref: "deco_lamp_post", name: "Lamp Post", price: 500, once: true,
-        blurb: "The light outside a room where it is always evening." },
-    { id: "deco_lights", kind: "decoration", ref: "deco_lantern_string", name: "String Lights", price: 690, once: true,
-        blurb: "Strung over the tables. Never switched off." },
-    { id: "deco_idol", kind: "decoration", ref: "deco_golden_idol", name: "Golden Idol", price: 2800, once: true,
-        blurb: "It has watched a great many people lose." },
-
-    // ── POWER ── the expensive shelf, and the reason the rate above matters. These are real, so they are
-    // priced like it: a fourth-water gem is several evenings of play, not an afternoon.
-    { id: "gem_ruby3", kind: "gems", ref: "ruby_t3", name: "Ruby, Third Water", price: 1600,
-        blurb: "Cut, sized and ready for a socket." },
-    { id: "gem_any4", kind: "gems", ref: "sapphire_t4", name: "Sapphire, Fourth Water", price: 4400,
-        blurb: "The good stuff. The counter does not haggle." },
-    { id: "parts_t3", kind: "parts", ref: [3, 40], name: "A Handful of Parts", price: 470,
-        blurb: "Forty third-tier forge parts." },
-    { id: "parts_t4", kind: "parts", ref: [4, 25], name: "A Case of Parts", price: 1310,
-        blurb: "Twenty-five fourth-tier forge parts." },
-
-    // ── THE TOP SHELF ────────────────────────────────────────────────────────────────────────────────
-    // Luke: "the shop should have way better stuff — mythic chests 3500 chips." And, asking after it: the
-    // ladder does not stop at Mythic. It runs Mythic -> Ascendant -> Eternal -> Celestial -> Primordial,
-    // and the last two are the ONLY route in the game to a celestial or primordial piece — 55 items that
-    // nothing else can drop. So the counter now reaches all the way to the top of the ladder.
+    // ── THE SHELF IS CHESTS. THAT IS THE WHOLE SHELF. ────────────────────────────────────────────────────
+    // Luke: "remove all things you can buy except for chests." It used to also sell three decorations, two
+    // gems, two bundles of forge parts and two consumable packs, and every one of those was a SECOND, worse
+    // route to a thing another feature already hands out — a sapphire you can cut at the Jewelcutter, parts
+    // the Forge pays you in, a lamp post the farm sells. A counter that sells nine kinds of thing is a
+    // counter with no answer to "what are chips for".
     //
-    // PRICED OFF THE ONE HE SET. 3,500 for a Mythic is the anchor and each rung is roughly 2.5x the one
-    // below it, which is steeper than the odds improve — deliberately. A chip is minted at CHIP_RATE per
-    // gold STAKED, not lost, so at the machines' RTP chips accumulate far faster than gold drains; a shelf
-    // priced off the odds alone would put a Primordial inside a fortnight. These are meant to be the things
-    // you save for, and the Primordial is meant to be the thing you save for all year.
+    // Chips are for chests. One ladder, five rungs, and the top two are the only route in the game to a
+    // celestial or primordial piece. That is a currency a member can hold an opinion about.
+    //
+    // ── AND THREE TIMES WHAT THEY WERE ───────────────────────────────────────────────────────────────────
+    // Luke: "triple the cost of all chests." Every price below is exactly 3x what it was, so the SHAPE of
+    // the ladder is untouched — each rung is still about 2.5x the one under it — and only the distance to
+    // the first rung has moved. A chip is minted at CHIP_RATE per gold STAKED rather than lost, so chips
+    // pile up far faster than gold drains and the old anchor put a Mythic inside an evening. These are
+    // meant to be the thing you save for, and the Primordial the thing you save for all year.
     //
     // Repeatable, deliberately: `once` is right for a decoration you either own or do not, and wrong for a
     // chest, which is the whole reason to come back.
-    { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 3500,
+    { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 10500,
         blurb: "Legendaries are ordinary in here. Mythics are not." },
-    { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 9000,
+    { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 27000,
         blurb: "The first chest that can hand you an ascendant piece at all." },
-    { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 20000,
+    { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 60000,
         blurb: "Nothing below it opens this often onto the eternal tier." },
-    { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 45000,
+    { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 135000,
         blurb: "One of only two chests that can hold a celestial piece." },
-    { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 100000,
+    { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 300000,
         blurb: "The rarest object on the floor. A one percent tail on the rarest tier in the game." },
-
-    // ── CONSUMABLES ── small, repeatable, and the thing most likely to be bought on the way out.
-    { id: "pack_house", kind: "consumables", ref: ["pot_adrenaline", "elixir_renewal", "sail_lucky_lure"],
-        name: "The House Pack", price: 750,
-        blurb: "A draught, an elixir and a lure. Compliments of the floor." },
-    { id: "pack_forge", kind: "consumables", ref: ["forge_power_scroll", "forge_enchant_scroll"],
-        name: "The Smith's Envelope", price: 1190,
-        blurb: "Two scrolls the forge will be glad to see." },
 ];
 export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id) || null;
 

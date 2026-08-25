@@ -16,7 +16,20 @@ import {
     freshShoe, handValue, isBlackjack, playDealer, settleHand, basicStrategy, canSplit, pairValue,
     BLACKJACK_RAKE, DECKS, DEALER_STANDS_ON, BLACKJACK_PAYS,
 } from "../src/lib/marketplace/blackjack-kit.js";
-import { RTP_CEILING, RTP_TARGET } from "../src/lib/marketplace/casino.js";
+import { CHIP_RATE } from "../src/lib/marketplace/chips.js";
+
+// ── AND THIS TABLE IS NOT A GOLD GAME ANY MORE ───────────────────────────────────────────────────────────────
+// It used to be measured against RTP_CEILING, and the rake existed to hold it under that. Both are gone: the
+// table pays CHIPS (Luke: "convert blackjack, keno and bingo to give out chips, not gold") and takes no rake
+// (Luke: "remove rake from this, we don't want to rake anything"), which are the same decision. See the long
+// note at the top of blackjack-kit.js — the edge on a chip game is the CONVERSION, not a cut of a win.
+//
+// So the question is the one check:slot5 asks of the five-reel floor: is this cabinet a different deal from
+// the ones next to it? The five-reel machines return 97.6% to 108.5% in chips. A basic-strategy blackjack
+// player against these rules gets about 99.5%, which lands in the middle of them without anything being tuned
+// — which is the nicest possible answer, because it means the rules everybody already knows are the rules.
+const CHIP_FLOOR_LO = 0.90;
+const CHIP_FLOOR_HI = 1.12;
 
 const HANDS = Number(process.env.HANDS || 2_000_000);
 const STAKE = 100;
@@ -103,11 +116,11 @@ const rtp = returned / staked;
 
 console.log("THE TABLE");
 console.log(`  rules        ${DECKS} decks, dealer stands on ${DEALER_STANDS_ON}, blackjack pays ${BLACKJACK_PAYS}:1, double on two, split once, double after split`);
-console.log(`  the rake     ${pct(BLACKJACK_RAKE)} of winnings — never of the stake`);
+console.log(`  the rake     ${pct(BLACKJACK_RAKE)} — the table takes none`);
+console.log(`  paid in      CHIPS at ${CHIP_RATE} per gold staked — the gold does not come back`);
 console.log(`  hands        ${HANDS.toLocaleString()}, perfect basic strategy including pairs (SIMULATED, not enumerated)`);
 console.log(`  split        ${(splits / HANDS * 100).toFixed(2)}% of hands were split`);
-console.log(`  return       ${pct(rtp)}   target ${pct(RTP_TARGET)}   ceiling ${pct(RTP_CEILING)}`);
-console.log(`  house edge   ${pct(1 - rtp)}`);
+console.log(`  return       ${pct(rtp)}   the five-reel chip floor pays ${pct(CHIP_FLOOR_LO)}-${pct(CHIP_FLOOR_HI)}`);
 console.log(`  of which rake ${pct(rakeTaken / staked)} — the rest is the game's own small edge`);
 
 console.log("\n  how hands ended");
@@ -115,15 +128,17 @@ for (const [k, n] of Object.entries(tally).sort((a, b) => b[1] - a[1])) {
     console.log(`    ${k.padEnd(18)} ${pct(n / HANDS).padStart(7)}`);
 }
 
-if (rtp > RTP_CEILING) {
-    problems.push(`the table returns ${pct(rtp)} to a basic-strategy player, above the ${pct(RTP_CEILING)} ceiling — raise BLACKJACK_RAKE`);
+if (rtp > CHIP_FLOOR_HI) {
+    problems.push(`the table returns ${pct(rtp)} in chips to a basic-strategy player, above the ${pct(CHIP_FLOOR_HI)} the five-reel floor pays — it is the smart pick on the floor`);
 }
-if (rtp >= 1) problems.push(`the table returns ${pct(rtp)} — it pays people to play it`);
+// Deliberately NOT "rtp >= 1 is a money printer". Chips never convert back to gold, so a chip cabinet a
+// point over 100% hands out slightly more tickets and nothing more — two of the five-reel machines are
+// already above it. The band above is what matters.
 // A floor whose games all sit near 88% and one that sits at 70% is a floor with a trap on it. Blackjack is
 // the game people arrive knowing, so it being the WORST value on the floor would be the meanest possible
 // version of that.
-if (rtp < 0.82) {
-    problems.push(`the table returns ${pct(rtp)}, well under the ${pct(RTP_TARGET)} the rest of the floor pays — the game everybody already knows should not be the trap`);
+if (rtp < CHIP_FLOOR_LO) {
+    problems.push(`the table returns ${pct(rtp)} in chips, under the ${pct(CHIP_FLOOR_LO)} the five-reel floor pays — the game everybody already knows should not be the trap`);
 }
 
 if (problems.length) {
@@ -132,4 +147,4 @@ if (problems.length) {
     process.exit(1);
 }
 console.log(`\ncheck:blackjack — a perfect player gets ${pct(rtp)} back. The house keeps ${pct(1 - rtp)}.`);
-console.log("Splitting correctly is worth roughly half a point to the player; the rake absorbs it.");
+console.log("Splitting correctly is worth roughly half a point to the player, and the table lets them keep it.");

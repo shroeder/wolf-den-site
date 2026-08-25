@@ -72,6 +72,38 @@ const BIG_WIN_AT = 10;
 // names, so a path built from the machine id only works for the cabinets that happen to have a generic set.
 const artFor = (art, machineId, sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
 
+// ── A SPRITE THAT DOES NOT LOAD MUST NOT BECOME A BROKEN-IMAGE ICON ──────────────────────────────────────────
+// Luke, with a photo of The Harvest: "dead images?" — two cells in the bottom row drawn as the browser's grey
+// torn-photo placeholder, in the middle of a paying board.
+//
+// The cause on that board was a sprite that failed to fetch on a phone, and the cause is not really the point:
+// the reel resolver builds a URL from the machine id and the symbol id, and there are FOUR different places a
+// cabinet's art can come from (a drawn set in public/, a gem path, a pet on Blob, a fish sprite). Any of them
+// can 404 after a rename, and every one of them fails the same way — as a torn photo where a symbol should be.
+// While auditing this I found /images/casino/reels/slot3-doubloon.webp genuinely missing on production; it
+// happens to be unreachable because The Deep overrides its art to /images/fish/, but nothing about the code
+// GUARANTEED that, and the next rename gets it.
+//
+// So a sprite that fails is remembered and simply not drawn again. The cell keeps its coloured wash, its ring
+// and its frame — every cell already carries the symbol's own hue behind it (see SYMBOL_LOOK) — so the worst a
+// dead sprite can do now is read as a plain coloured tile, which is a machine missing a picture rather than a
+// machine that is broken.
+//
+// Module-level, because a 404 is a fact about a URL and not about one mounted component: the second cabinet to
+// ask for the same dead sprite should not have to discover it again. `bump` is only there to repaint the cells
+// already on screen at the moment it fails.
+const DEAD_SPRITES = new Set();
+
+function ReelImg({ src, className }) {
+    const [, bump] = useState(0);
+    if (DEAD_SPRITES.has(src)) return null;
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" draggable="false" className={className}
+            onError={() => { DEAD_SPRITES.add(src); bump((n) => n + 1); }} />
+    );
+}
+
 // ── THE NUMBER IS COUNTED, NOT PRINTED ───────────────────────────────────────────────────────────────────────
 // A total that appears is a receipt. A total that RUNS is the machine paying you, and the two are the same
 // number — the only difference is the ~1.4s of climbing, which is the part worth sitting through. Eased out,
@@ -204,10 +236,26 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const [round, setRound] = useState("free");
     // The cells holding a locked wild, so the grid can draw them as welded rather than as landed.
     const [lockedAt, setLockedAt] = useState([]);
+    const [pearlAt, setPearlAt] = useState([]);   // cells where a collector landed, marked for the whole spin
+    // What the pearls on THIS spin just added, so the medallion can show the step arriving rather than
+    // silently being a different number than it was. Zero means nothing is in flight.
+    const [pearlFlew, setPearlFlew] = useState(0);
     // The free round's collector symbol, if this cabinet has one. Null everywhere but The Deep.
     const plusSym = useMemo(() => slot5(machineId).free?.plus?.sym || null, [machineId]);
+    // Which reels a collector can land on — The Deep's two outside reels. Marked on the glass for the whole
+    // round rather than only at the instant something lands on them; see the note on `.s5-reel.is-collector`.
+    const plusReels = useMemo(() => slot5(machineId).free?.plus?.reels || [], [machineId]);
     const [chainWon, setChainWon] = useState(0);
     const timers = useRef([]);
+
+    // ── WHAT THE OVERLAY DRAWS, AND EXACTLY HOW LONG FOR ────────────────────────────────────────────────
+    // The held wilds are furniture for the duration of the round and then they are gone — "floating there the
+    // whole time until they're dismissed by the game after the free spins". `freeDone` is the tally, which is
+    // still the round, so the board is still bolted down behind it; anything after that is the base game and
+    // the board must be ordinary again. Derived rather than stored so there is exactly one rule about when
+    // they exist, instead of a second piece of state that can disagree with `lockedAt`.
+    const inRound = phase === "free" || phase === "freeIntro" || phase === "freeDone";
+    const heldWilds = inRound ? lockedAt : [];
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
     // bet is owned by the room (every cabinet shares it) and a second copy here would drift from it.
@@ -591,6 +639,10 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         setFreeWon(0);
         setFreeIdx(-1);
         setLockedAt([]);
+        // The board starts the round bare. Without these a round opening straight after another one would
+        // begin with the previous round's pearls still marked on the glass.
+        setPearlAt([]);
+        setPearlFlew(0);
         Cas.jackpot();
         Haptic.crit();
         timers.current.push(setTimeout(() => runFree(r, 0, which), 2100));
@@ -667,6 +719,27 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             // its own sound. This is the beat the whole feature is made of: the board is permanently
             // better than it was a second ago, and you watched it happen.
             onLanded: () => {
+                // ── AND A PEARL IS WORTH HEARING ─────────────────────────────────────────────────────
+                // It landed in silence. The multiplier on the bar went up by one and nothing marked the
+                // moment — which is the same complaint as a bonus with no build-up, one layer down: the
+                // best thing that happens in this round happened and the machine did not react.
+                // ── AND IT STAYS MARKED FOR THE WHOLE SPIN ───────────────────────────────────────────
+                // It used to clear itself after 900ms, which is less than half of FREE_HOLD_MS — so on most
+                // spins the pearl had already stopped being special before the spin it landed on was over,
+                // and what was left on screen was an oyster nobody had any reason to look at. It is marked
+                // now until the next spin clears it, which is the honest length of "this spin had a pearl".
+                //
+                // The counter is told a pearl is inbound at the same moment, so the +1 that lands and the
+                // number that changes are one event rather than two things that happened near each other.
+                if (sp.pearls?.length) {
+                    setPearlAt(sp.pearls);
+                    setPearlFlew(sp.pearls.length * (slot5(machineId).free?.plus?.step || 1));
+                    Cas.signature();
+                    Haptic.crit();
+                    timers.current.push(setTimeout(() => setPearlFlew(0), 1100));
+                } else {
+                    setPearlAt([]);
+                }
                 if (!sp.justHeld?.length) return;
                 setLockedAt((p) => [...p, ...sp.justHeld]);
                 Cas.reelStop(4, 0.8);
@@ -675,7 +748,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             onDone: settle,
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [playGrid, runChain, announceFree]);
+    }, [playGrid, runChain, announceFree, machineId]);
 
 
     // ── THE FLAG, AND WHY IT CANNOT BE ALLOWED TO STICK ──────────────────────────────────────────────────
@@ -922,7 +995,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             <div className={`s5-window${lit ? " is-lining" : ""}${flashSym ? " is-flashing" : ""}${mult >= 5 ? " is-hot" : ""}`}>
                 <div className="s5-grid">
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}`}
+                        // ── AND THESE TWO REELS ARE THE ONES THAT PAY THE MULTIPLIER ─────────────
+                        // Luke: "I'm not seeing the multipliers in reels 1 and 5 — did you even do that?"
+                        //
+                        // It WAS done, and the sweep says so: a pearl lands 0.44 times a spin and a round
+                        // finishes on about x5.8. What was missing is that nothing ever said WHERE to look.
+                        // A pearl arrived on an outer reel, flashed for under a second and was replaced by
+                        // the next spin, so the mechanic he described from his reference machine — "there's
+                        // a chance for a +1 multiplier on reels 1 and 5" — was invisible as a RULE. You
+                        // cannot notice a pattern on two specific reels if the two reels are never marked.
+                        //
+                        // So for the whole collecting round the two outside reels are lit as what they are:
+                        // a cold aqua rail down each edge of the glass, in the pearl's own colour. It costs
+                        // nothing, it is on screen before anything lands, and it turns eight spins of "a
+                        // thing sometimes flashes" into eight spins of watching two particular reels.
+                        <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}${inRound && plusReels.includes(reel) ? " is-collector" : ""}`}
                             style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
                             <div className="s5-strip">
                                 {/* ── ONE STRIP, ALWAYS: NO SWAP AT THE END ───────────────────────────
@@ -964,7 +1051,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     // violet glow means a wild before you have focused on the picture. The
                                     // wild and the scatter get a stronger one than the paying symbols,
                                     // because those two are the ones you are actually hunting for.
-                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${real && flashSym && sym === flashSym ? " is-flash" : ""}${real && breaking.includes(reel * ROWS + row) ? " is-breaking" : ""}${real && dropping.includes(reel * ROWS + row) ? " is-dropping" : ""}${real && lockedAt.includes(reel * ROWS + row) ? " is-locked" : ""}${real && tease ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
+                                    <span className={`s5-cell is-${symbolRole(sym, machineId)}${real && flashSym && sym === flashSym ? " is-flash" : ""}${real && breaking.includes(reel * ROWS + row) ? " is-breaking" : ""}${real && dropping.includes(reel * ROWS + row) ? " is-dropping" : ""}${real && !inRound && lockedAt.includes(reel * ROWS + row) ? " is-locked" : ""}${real && pearlAt.includes(reel * ROWS + row) ? " is-pearled" : ""}${real && tease ? (sym === tease.sym ? " is-teased" : " is-hushed") : ""}`}
                                         key={i} style={{ "--tone": symbolTone(sym, machineId), "--drop": `${Math.max(0, row) * 40}ms` }}>
                                         {/* The wild's travelling shine. Its own element because the cell
                                             has already spent ::before on the plate and ::after on the
@@ -977,8 +1064,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                             a pearl worth two would say so without anyone editing this. */}
                                         {plusSym && sym === plusSym
                                             ? <b className="s5-plus">+{slot5(machineId).free?.plus?.step || 1}</b> : null}
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={artFor(art, machineId, sym)} alt="" draggable="false"
+                                        <ReelImg src={artFor(art, machineId, sym)}
                                             className={`${real && lit && lit.line[reel] === row && reel < lit.count ? "is-lit" : ""}${real && flashSym && sym === flashSym ? " is-flash-img" : ""}`.trim()} />
                                     </span>
                                     );
@@ -987,6 +1073,51 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         </div>
                     ))}
                 </div>
+                {/* ── THE HELD WILDS DO NOT LEAVE. NOT EVEN FOR THE SPIN. ─────────────────────────────
+                    Luke: "walking wild should be locked all the time — the way it works right now is they
+                    lock but then the spin animation happens and they disappear and then show back up again.
+                    They should truly be locked, floating there the whole time until they're dismissed by the
+                    game after the free spins."
+
+                    He is exactly right and the reason is structural, not cosmetic. A held wild was a CELL IN
+                    THE STRIP, and the strip is the thing that moves: a reel spins by translating twelve cells
+                    past a three-cell window, so anything drawn in the strip is carried away with it by
+                    definition. The wild came back at the end because the next grid put it back — which is not
+                    a wild that stayed, it is a wild that landed again in the same place, and that is precisely
+                    what the player was seeing.
+
+                    A thing that does not move cannot live in the thing that moves. So the held wilds are their
+                    own layer over the glass, in the window's coordinates rather than the strip's, and the
+                    reels spin UNDERNEATH them. The board is genuinely better than it was a second ago and it
+                    stays that way while the reels run, which is the whole feeling the mechanic is for.
+
+                    Three details that matter:
+                      • Keyed by CELL, so React keeps a wild that was already held and mounts only the ones
+                        that just welded — which is what makes the clamp animation fire on the new ones and
+                        only the new ones. Re-keying them all would re-weld the whole board every spin.
+                      • Opaque plate, matching the reel's own gradient, so the filler scrolling past behind
+                        cannot show through a symbol that is supposed to be bolted down.
+                      • Still carries `is-lit` when a payline runs through it, because a held wild is on more
+                        winning lines than anything else on the board and it would be absurd for the one
+                        symbol that is always paying to be the one that never lights. */}
+                {heldWilds.length ? (
+                    <div className="s5-held" aria-hidden="true">
+                        {heldWilds.map((at) => {
+                            const reel = Math.floor(at / ROWS);
+                            const row = at % ROWS;
+                            const sym = slot5(machineId).wild;
+                            return (
+                                <span key={at} className="s5-cell is-wild is-locked"
+                                    style={{ "--tone": symbolTone(sym, machineId), gridColumn: reel + 1, gridRow: row + 1 }}>
+                                    <i className="s5-shine" aria-hidden="true" />
+                                    <ReelImg src={artFor(art, machineId, sym)}
+                                        className={lit && lit.line[reel] === row && reel < lit.count ? "is-lit" : ""} />
+                                </span>
+                            );
+                        })}
+                    </div>
+                ) : null}
+
                 {/* The winning line, drawn across the window. One at a time — five lines flashing at once is
                     a light show nobody can read, and reading it is the entire point. */}
                 {lit ? (
@@ -1051,9 +1182,28 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 <div className="s5-freebar">
                     <i className="s5-fb-fill" aria-hidden="true"
                         style={{ "--p": `${roundLen ? Math.min(100, ((freeIdx + 1) / roundLen) * 100) : 0}%` }} />
+                    {/* ── THE NUMBERS CANNOT BE ALLOWED TO OUTGROW THEIR PLATES ───────────────────
+                        Luke: "I see a problem with the numbers in those little boxes — I feel like it's
+                        pretty easy for those numbers to bound outside and become illegible."
+
+                        He is reading the construction correctly. Every one of these windows is a DRAWN
+                        bezel with a fixed type size inside it: the medallion is a 52px disc with a 1.25rem
+                        numeral in the middle, and the two rectangles are 16px tabular figures on a
+                        background image, all of it `white-space: nowrap` inside a bar that is
+                        `overflow: hidden`. So none of it wraps and none of it shrinks — it simply grows
+                        past the edge of the picture it is supposed to be sitting in and then gets sliced
+                        off by the bar. `x12` already overflows the disc, and this round pays in chips off
+                        a 2,500 stake, so "THIS ROUND" reaches six and seven figures on a real bonus.
+
+                        Nothing here can be solved by picking a smaller size, because the whole range from
+                        "6/8" to "1,284,300" has to be legible in the same box. So every number states how
+                        many characters it is and the type fits itself to that — see `--len` in globals.
+                        A short number keeps the size it has today and a long one steps down exactly as far
+                        as it has to, which is the only version of this that is right at both ends. */}
                     <span className="s5-fb-cell">
                         <i>Spin</i>
-                        <b>{freeIdx + 1}<s>/</s>{roundLen}</b>
+                        <b style={{ "--len": String(freeIdx + 1).length + 1 + String(roundLen).length }}>
+                            {freeIdx + 1}<s>/</s>{roundLen}</b>
                         {roundGrew ? <u>+{roundGrew}</u> : null}
                     </span>
                     {/* On a locking round the multiplier is always 1 and the number that matters is how many
@@ -1064,18 +1214,34 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         lands. `free.mult` is the OFFER's flat multiplier and on this round it is always 1 —
                         the live one is on the spin being played, because it changes underneath you. */}
                     {round === "locked"
-                        ? <span className="s5-fb-mult is-held"><b>{lockedAt.length}</b><em>held</em></span>
+                        ? <span className="s5-fb-mult is-held">
+                            <b style={{ "--len": String(lockedAt.length).length }}>{lockedAt.length}</b>
+                            <em>held</em></span>
                         : result?.free?.kind === "collect" ? (
                             <>
-                                <span className="s5-fb-mult is-held"><b>{lockedAt.length}</b><em>held</em></span>
-                                <span className="s5-fb-mult is-grown">
-                                    <b>&times;{result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1}</b>
+                                <span className="s5-fb-mult is-held">
+                                    <b style={{ "--len": String(lockedAt.length).length }}>{lockedAt.length}</b>
+                                    <em>held</em></span>
+                                {/* ── AND THE PEARL PUTS THE NUMBER UP, VISIBLY ───────────────────
+                                    The multiplier used to just BE a different number on the spin after a
+                                    pearl landed — the single best event in the round, delivered as a
+                                    quiet substitution. The step now flies onto the medallion at the
+                                    moment the pearl lands, which is the same fix as the retrigger beat
+                                    one layer down: a number that changes because you watched something
+                                    hit it is an event, and a number that has simply changed is not. */}
+                                <span className={`s5-fb-mult is-grown${pearlFlew ? " is-collecting" : ""}`}>
+                                    <b style={{ "--len": 1 + String(result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1).length }}>
+                                        &times;{result.free.spins?.[Math.max(0, freeIdx)]?.mult || 1}</b>
+                                    {pearlFlew ? <u className="s5-fb-plus">+{pearlFlew}</u> : null}
                                 </span>
                             </>
-                        ) : <span className="s5-fb-mult"><b>&times;{result?.free?.mult}</b></span>}
+                        ) : <span className="s5-fb-mult">
+                            <b style={{ "--len": 1 + String(result?.free?.mult ?? 1).length }}>
+                                &times;{result?.free?.mult}</b></span>}
                     <span className="s5-fb-cell is-won">
                         <i>This round</i>
-                        <b><Tally n={freeWon} ms={520} /></b>
+                        <b style={{ "--len": Math.max(1, Number(freeWon || 0).toLocaleString().length) }}>
+                            <Tally n={freeWon} ms={520} /></b>
                     </span>
                 </div>
             ) : null}
@@ -1136,7 +1302,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <span className="s5-tally-sub">chips</span>
                     <div className="s5-tally-rows">
                         <span><i>Spins</i><b>{result[round].spins.length}</b></span>
-                        {result[round].mult > 1 ? <span><i>Multiplier</i><b>&times;{result[round].mult}</b></span> : null}
+                        {/* ── THE ROUND'S OWN NUMBERS, NOT THE OFFER'S ─────────────────────────────────
+                            `mult` on the round object is the OFFER's flat multiplier, which on a collecting
+                            round is 1 for ever — so a Deep round that climbed to x6 by gathering pearls
+                            would have ended on a card that never mentioned the multiplier, which is the
+                            entire thing the round is about. The live number lives on the SPINS. Same for
+                            the wilds welded to the board: it is what a sticky round IS. */}
+                        {(() => {
+                            const sp = result[round].spins || [];
+                            const top = Math.max(1, ...sp.map((x) => x.mult || 1));
+                            const held = Math.max(0, ...sp.map((x) => (x.held || []).length + (x.justHeld || []).length));
+                            const pearls = sp.reduce((n, x) => n + (x.pearls || []).length, 0);
+                            return (<>
+                                {top > 1 ? <span><i>Top multiplier</i><b>&times;{top}</b></span> : null}
+                                {pearls > 0 ? <span><i>Pearls</i><b>{pearls}</b></span> : null}
+                                {held > 0 ? <span><i>Wilds held</i><b>{held}</b></span> : null}
+                            </>);
+                        })()}
                         {tallyGrew > 0 ? <span><i>Retriggered</i><b>+{tallyGrew}</b></span> : null}
                         <span><i>Best spin</i><b>{Math.max(0, ...result[round].spins.map((x) => x.chips || 0)).toLocaleString()}</b></span>
                     </div>

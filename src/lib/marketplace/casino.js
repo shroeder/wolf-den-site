@@ -1,6 +1,6 @@
 import "server-only";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { CHIP_RATE, chipBalance, chipsFor, moveChips } from "@/lib/marketplace/chips.js";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -10,7 +10,7 @@ import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 import {
-    ROUND_MS, openBets, placeBet, roundEndsAt, roundOf, roundPlayers, settleBets,
+    settleBets,
 } from "@/lib/marketplace/casino-rounds.js";
 import {
     BANKS, GAMBLE_WIN_CHANCE, POT_RATE, POT_SEED_SHARE, SLOT_BONUSES, applyBonuses, bonusEv, emptyBanks,
@@ -978,7 +978,21 @@ export const KENO_DRAWN = 10;
 
 // By how many of your five came up. Nothing for two or fewer than two is deliberate — a game that pays on
 // almost every ticket is a game where nothing means anything.
-export const KENO_PAYS = { 0: 0, 1: 0, 2: 0.5, 3: 3, 4: 25, 5: 600 };
+// ── AND THE TICKET COMES BACK AT TWO ─────────────────────────────────────────────────────────────────────────
+// Two hits paid 0.5x, which is the same mistake bingo's paytable had at one line and the one the three-reel
+// machines had on a pair: the thing that happens MOST OFTEN when something happens at all — 27.8% of tickets,
+// more than every other paying outcome put together — paid you half your money and called it a win. A ticket
+// that lights up and hands back less than it cost is a ticket that made a fool of you.
+//
+// So two of five gets your ticket back, exactly like a line on a bingo card. You hit two, you are level, play
+// again. That is worth 13.9 points of return on its own, and it is the whole of the raise this game needed.
+//
+// WHY IT COULD BE RAISED AT ALL: keno pays CHIPS now rather than gold (Luke: "convert blackjack, keno and
+// bingo to give out chips, not gold"), so it is no longer fighting the gold economy's 88% ceiling — it is a
+// machine on the chip floor, and the rule there is the one check:slot5 states at length: chips are tickets,
+// not money, so what matters is that no cabinet is the smart pick. At 84.60% keno was the smart pick to
+// AVOID; the five slot cabinets return 97.6% to 108.5% and this now sits at 98.48%, in the middle of them.
+export const KENO_PAYS = { 0: 0, 1: 0, 2: 1, 3: 3, 4: 25, 5: 600 };
 
 const choose = (n, k) => {
     if (k < 0 || k > n) return 0;
@@ -998,12 +1012,26 @@ export function kenoRtp() {
     return r;
 }
 
-// ── ONE DRAW, EVERYBODY'S TICKETS ────────────────────────────────────────────────────────────────────────────
-// Keno is SHARED: everybody holding a ticket in the window plays the same ten balls, which is what keno is.
-// A keno lounge where each player gets private numbers is a slot machine with a grid on it.
+// ── ONE TICKET, ONE DRAW, RIGHT NOW ──────────────────────────────────────────────────────────────────────────
+// Keno used to be SHARED: everybody holding a ticket in a 45-second window played the same ten balls, and the
+// balls did not exist until the window shut. That is what keno IS in a lounge, and it was the right shape for
+// a floor with people on it.
 //
-// And the same rule holds, harder: you PICK your numbers, so a draw visible before the window shuts would let
-// anybody buy a five-of-five ticket every round. The ten balls do not exist until the round is over.
+// Luke: "you can remove all multiplayer for many of the games that we had previously tried to do." His
+// screenshot is the argument — the keno board said "Drawn in 1s" with "nobody yet" beside it. What the shared
+// round actually delivered on this floor was a WAIT, and a wait is the one thing a game may never charge for
+// without giving something back. The odds were identical either way, so it was buying atmosphere with the
+// player's time and buying none.
+//
+// So the ticket draws immediately and settles in the same answer. The ten balls come out on screen after that,
+// which is a ceremony over a result already banked — the same thing bingo does, and the same thing every slot
+// on this floor does.
+//
+// THE SECURITY ARGUMENT THAT FORCED THE OLD SHAPE IS GONE WITH IT. The rule was "the outcome of a round does
+// not exist until the round is over", because you PICK your numbers and a draw visible while bets were open
+// would let anybody buy a five-of-five ticket. With a private draw there is no window to see into: the picks
+// are validated, the stake is taken, and only then is anything rolled. Nothing exists early because nothing
+// exists until the ticket does.
 export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // The ticket is validated here and not trusted: a POST body can carry six numbers, or the same number
@@ -1013,12 +1041,20 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     if (clean.length !== KENO_PICKS) return { ok: false, error: "bad_ticket" };
     const stake = clampBet(bet);
 
+    // Any ticket left riding on the OLD shared rounds is drained first and paid out. There will not be many —
+    // the floor is owner-only — but an open bet that nothing will ever settle again is somebody's gold gone,
+    // and deleting the path that pays it is how that happens silently.
     const settled = await settleKeno(buyerId);
-    const perks = await casinoPerks(buyerId);
-    const placed = await placeBet(buyerId, "keno", { stake, choice: { picks: clean }, reason: "casino_keno_bet" });
-    if (!placed.ok) return placed;
 
-    let gold = placed.gold;
+    const perks = await casinoPerks(buyerId);
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, stake],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_gold" };
+    await logCoin(buyerId, -stake, "casino_keno_bet", { balanceAfter: paid.gold, meta: { bet: stake, picks: clean } });
+
+    let gold = paid.gold;
     let onHouse = false;
     if (onTheHouse(perks)) {
         const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
@@ -1029,12 +1065,64 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
             await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "keno" } });
         }
     }
-    await tickCasinoQuests(buyerId, "keno", 0);
 
-    return { ok: true, placed: true, round: placed.round, closesAt: placed.closesAt, bet: stake, picks: clean, gold, onHouse, settled };
+    const { drawn } = rollKeno();
+    const hits = clean.filter((n) => drawn.includes(n));
+    const pays = KENO_PAYS[hits.length] || 0;
+    // The paytable is in multiples of the stake — gold units. One conversion, here, like everywhere else.
+    const wonGold = Math.round(stake * pays);
+    const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
+    let chips = null;
+    if (won > 0) {
+        chips = await moveChips(buyerId, won, "casino_keno_win", {
+            meta: { bet: stake, hits: hits.length, picks: clean, wonGold, rate: CHIP_RATE },
+        });
+    }
+
+    // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
+    // Only on a LOSING ticket, only on the stake that actually lost, and only sometimes: REFUND_CHANCE
+    // decides whether the pet's budget arrives as a dribble nobody notices or as a moment. It refunds in
+    // GOLD, deliberately and unlike everything else in this function — it is a refund of a stake, not a
+    // payout, and handing back chips for gold that was lost would quietly be a second conversion.
+    let refund = 0;
+    if (perks.lossRefund > 0 && won <= 0 && !onHouse) {
+        if (Math.random() < REFUND_CHANCE) {
+            refund = Math.max(1, Math.round(stake * Math.min(1, perks.lossRefund / REFUND_CHANCE)));
+            const back = await db.queryOne(
+                `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, refund],
+            ).catch(() => null);
+            if (back) { gold = back.gold; await logCoin(buyerId, refund, "casino_cat_refund", { balanceAfter: back.gold, meta: { game: "keno" } }); }
+            else refund = 0;
+        }
+    }
+
+    const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
+    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
+    await tickCasinoQuests(buyerId, "keno", 0);
+    if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
+    if (chips == null) chips = await chipBalance(buyerId);
+
+    return {
+        ok: true,
+        bet: stake,
+        picks: clean,
+        drawn,
+        hits,
+        pays,
+        won,
+        wonGold,
+        chips,
+        gold,
+        onHouse,
+        refund,
+        prize,
+        pet,
+        // Anything the old shared rounds still owed, so a legacy ticket is not silently swallowed.
+        settled,
+    };
 }
 
-/** Ten balls from forty, drawn once for the whole floor. Only ever called for a round that has closed. */
+/** Ten balls from forty. Private to one ticket now — see the note above. */
 const rollKeno = () => {
     const pool = Array.from({ length: KENO_POOL }, (_, i) => i + 1);
     for (let i = pool.length - 1; i > 0; i -= 1) {
@@ -1051,6 +1139,10 @@ function scoreKeno(choice, outcome, stake) {
     return { won: Math.round(stake * pays), detail: { hits, pays } };
 }
 
+// ── DRAINING THE OLD SHARED ROUNDS ───────────────────────────────────────────────────────────────────────────
+// Nothing places bets into `mkt_casino_bet` any more. This stays because rows already in there have somebody's
+// gold in them, and it runs on the way into every ticket until there is nothing left to drain. It pays in
+// chips, like everything else does now.
 export async function settleKeno(buyerId) {
     const done = await settleBets(buyerId, "keno", { roll: rollKeno, score: scoreKeno, reason: "casino_keno_win" });
     if (!done.length) return [];
@@ -1124,27 +1216,14 @@ export async function casinoOccupants(selfId) {
     }));
 }
 
-/** What the room needs to draw itself: your purse, who else is here, and the machine's own numbers. */
-// Everything the two shared games need drawn: the live round, its clock, who is in it, and whatever of
-// yours is still waiting on one. Settling runs FIRST — a member who closed the tab mid-round should be paid
-// before they are shown anything, not after they wonder where their gold went.
-async function sharedRounds(buyerId) {
-    const now = Date.now();
-    const out = {};
-    for (const game of ["keno"]) {
-        const settled = await settleKeno(buyerId);
-        const round = roundOf(game, now);
-        out[game] = {
-            round,
-            msLeft: Math.max(0, roundEndsAt(game, round) - now),
-            roundMs: ROUND_MS[game],
-            players: await roundPlayers(game, round),
-            mine: await openBets(buyerId, game),
-            settled,
-        };
-    }
-    return out;
-}
+// ── THERE ARE NO SHARED ROUNDS LEFT TO DESCRIBE ───────────────────────────────────────
+// `sharedRounds` built the live round, its clock, who was in it and what you had riding, for the one game
+// that had rounds. All of it is gone with them — a ticket resolves in the answer to the request that bought
+// it. Deleted rather than left returning an empty object: a payload key that is always `{}` is a thing the
+// client keeps a countdown alive for.
+//
+// Legacy tickets are still drained, but on the way INTO a ticket (see playKeno) rather than on every state
+// read. There is no longer any way for one to appear while you are looking at the screen.
 
 export async function getCasinoState(buyerId) {
     const [me, others] = await Promise.all([
@@ -1192,7 +1271,6 @@ export async function getCasinoState(buyerId) {
         // ── THE TWO SHARED GAMES ────────────────────────────────────────────────────────────────────
         // Which round is running, when it shuts, who is in it, and anything of yours still riding on one.
         // Settled first, so a member who has been away collects before they see the room.
-        rounds: await sharedRounds(buyerId),
         perks: await casinoPerks(buyerId),
     };
 }

@@ -17463,7 +17463,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    `--room` is the height, and every object below is a fraction OF IT. The fractions are the ones that were
    tuned by eye at 34vh, so the scene is unchanged in proportion — and changing how big the casino feels is
    now genuinely one number. */
-.cas-roomwrap { position: relative; --room: clamp(210px, 46vh, 460px); }
+/* ── AND THEN IT GOT THE HEIGHT THE PLAY BUTTON WAS USING ────────────────────────────────────────────
+   Luke: "you can extend the animation frame vertically so we can see more and it's more immersive."
+
+   Which is exactly the one-number change the note above promised. 46vh -> 58vh, and because every object
+   in the room is a fraction OF `--room`, the whole scene grows together rather than the cabinets staying
+   the same size in a taller box — that distinction is the entire reason this variable exists, and getting
+   it wrong is written up above.
+
+   The ceiling goes up with it (460 -> 580) so a tall phone and a desktop both get the benefit; the floor
+   stays at 210 because below that the cabinets stop being readable at all and a bigger fraction of nothing
+   is still nothing. */
+.cas-roomwrap { position: relative; --room: clamp(210px, 58vh, 580px); }
 .cas-room { position: relative; height: var(--room); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
@@ -17703,13 +17714,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     width: 160%; font-size: clamp(9px, 1.7vh, 12px); color: #b7bec7;
     text-shadow: 0 1px 3px #0a0710, 0 0 8px #0a0710; }
 
-/* One control, not three. The floor itself is how you move now — see the component — so this row is only
-   ever "the machine you are standing at", and it gets the whole width. */
-.cas-walk { display: grid; grid-template-columns: 1fr; align-items: center; gap: 8px; }
-.cas-walk button { padding: 11px 0; border-radius: 12px; font-size: 16px; cursor: pointer;
-    color: #eaf1f8; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); }
-.cas-walk span { text-align: center; font-size: 11px; color: #98a0aa; letter-spacing: .1em;
-    text-transform: uppercase; }
+/* `.cas-walk` and `.cas-sit` lived here. The row is gone — tapping a cabinet is how you sit down, so a bar
+   underneath restating the cabinet's name was a second way in that cost sixty pixels of a phone screen. The
+   rules are deleted rather than left orphaned: a style for markup nothing renders is the thing that makes
+   the next person believe the markup still exists.
+
+   ── AND THE BOUNTIES GET AIR ────────────────────────────────────────────────────────────────────────
+   With the row gone the bounty card sat flush against the bottom edge of the room and read as part of it.
+   The gap goes on this wrapper rather than on FeatureDailies, which is mounted on eight other screens that
+   do not have a room above them. */
+.cas-dailies { margin-top: 22px; }
 
 /* `.cas-panel` and `.cas-panel.is-dark` lived here until the floor card was removed — walking up to a
    cabinet no longer prints anything under the room, so there is no panel to style. The HEAD survives
@@ -18315,12 +18329,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A thumb reaches the bottom of a phone; make the thing it reaches for worth the trip. */
 .cas-stage .cas-pull { padding: 16px 0; font-size: 1.08rem; }
 
-/* Getting in: the walk row's middle becomes the way to sit down once you are stood at something live. */
-.cas-sit { padding: 11px 8px; border-radius: 12px; cursor: pointer;
-    font-weight: 900; font-size: 13px; letter-spacing: .02em; color: #160f04;
-    border: 1px solid rgba(0,0,0,.3); background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
-    box-shadow: 0 3px 0 rgba(0,0,0,.35); }
-.cas-sit:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+/* `.cas-sit` was the walk row's button. Removed with the row — see the note at .cas-dailies. */
 /* The cabinets in the room are buttons now, so they must not look like form controls. */
 .cas-mach { -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
     font: inherit; color: inherit; cursor: pointer; }
@@ -18917,8 +18926,22 @@ body.cas-seated .social-fab { display: none; }
     white-space: nowrap; }
 .s5-fb-cell i { font-style: normal; font-size: 7px; font-weight: 900; letter-spacing: .16em;
     text-transform: uppercase; color: #a98c5c; text-shadow: 0 1px 0 rgba(0,0,0,.9); }
-.s5-fb-cell b { font-size: 16px; font-weight: 900; line-height: 1.05; color: #ffe9bd;
-    font-variant-numeric: tabular-nums;
+/* ── A NUMBER FITS ITS OWN PLATE ──────────────────────────────────────────────────────────────────────
+   Luke: "those numbers can bound outside and become illegible."
+
+   Every window here is a DRAWN bezel at a fixed size with `white-space: nowrap` inside it, in a bar that is
+   `overflow: hidden`. So a number that is too wide does not wrap and does not shrink — it runs past the
+   picture and is then sliced off at the edge of the rack. "6 / 8" and "1,284,300" both have to live in this
+   box, which is a range no single font-size can serve.
+
+   `--len` is the character count, set by the component that knows the string. The size is the smaller of the
+   size we want and the size that fits, so short numbers are untouched and long ones step down exactly as far
+   as they must. 9.6px per character is the measured width of one tabular figure at 16px in this face; the
+   cell is ~96px of usable width between its bezels, hence 96/len. The `max-width` and `overflow` are the
+   backstop for the case this arithmetic is ever wrong — clipping inside the plate is survivable, escaping it
+   is not. */
+.s5-fb-cell b { font-size: min(16px, calc(96px / var(--len, 4))); font-weight: 900; line-height: 1.05;
+    color: #ffe9bd; font-variant-numeric: tabular-nums; max-width: 100%; overflow: hidden;
     text-shadow: 0 0 12px color-mix(in srgb, var(--acc, #ffd75e) 75%, transparent), 0 1px 0 rgba(0,0,0,.9); }
 .s5-fb-cell b s { text-decoration: none; color: #8a7346; margin: 0 1px; font-size: 12px; }
 /* What a retrigger bought, riding the corner of the window it changed rather than inside the number. */
@@ -18939,7 +18962,11 @@ body.cas-seated .social-fab { display: none; }
     filter: drop-shadow(0 0 14px rgba(255,200,90,.8));
     animation: s5FbBeat 1.7s ease-in-out infinite; }
 @keyframes s5FbBeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-.s5-fb-mult b { font-family: var(--font-display); font-size: 1.25rem; line-height: 1; color: #ffe9bd;
+/* The disc is the tighter of the two: a 52px medallion whose usable inner face is about 38px, so "x12" was
+   already crossing the rim before anybody counted. Same rule as the windows above — 38px of face, divided by
+   how many characters are going into it. */
+.s5-fb-mult b { font-family: var(--font-display); font-size: min(1.25rem, calc(38px / var(--len, 2)));
+    line-height: 1; color: #ffe9bd; max-width: 88%; overflow: hidden;
     text-shadow: 0 0 14px rgba(255,200,90,1), 0 2px 0 rgba(0,0,0,.8); }
 .s5-fb-mult em { position: absolute; bottom: 4px; font-style: normal; font-size: .42rem; font-weight: 900;
     letter-spacing: .1em; text-transform: uppercase; color: #c8a86a; }
@@ -18947,9 +18974,10 @@ body.cas-seated .social-fab { display: none; }
 .s5-fb-mult.is-held { filter: drop-shadow(0 0 14px rgba(120,210,255,.85)); }
 
 @media (max-width: 340px) {
-    .s5-fb-cell b { font-size: 14px; }
+    /* The same two rules one size down, rather than a flat size that would undo the fitting above. */
+    .s5-fb-cell b { font-size: min(14px, calc(80px / var(--len, 4))); }
     .s5-fb-mult { width: 44px; }
-    .s5-fb-mult b { font-size: 1.05rem; }
+    .s5-fb-mult b { font-size: min(1.05rem, calc(32px / var(--len, 2))); }
 }
 
 /* ── THE CASCADE COUNTER ── the same rack, one machine along. It shows two plain readouts rather than the
@@ -19027,8 +19055,13 @@ body.cas-seated .social-fab { display: none; }
 .cs-what { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
 .cs-what b { font-size: 13.5px; color: #eaf1f8; }
 .cs-what span { font-size: 11.5px; color: #8f98a3; line-height: 1.35; }
-.cs-price { flex: 0 0 auto; display: grid; gap: 1px; justify-items: end; }
-.cs-price b { font-size: 14px; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
+/* The price is a numeral and the chip it is denominated in, on one line, centred on each other. This was a
+   two-row grid with the gold behind the price underneath; the second row is gone and the row is now the two
+   halves of one number. `align-items: center` is the whole fix Luke asked for — a round sprite and a numeral
+   share no baseline, so baseline alignment leaves the chip sitting low every time. */
+.cs-price { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+.cs-price b { font-size: 15px; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; line-height: 1; }
+.cs-price img { width: 16px; height: 16px; display: block; flex: 0 0 auto; }
 .cs-price i { font-style: normal; font-size: 9px; color: #7d8792; }
 .cs-owned { color: #8f98a3 !important; font-size: 12px !important; }
 
@@ -19613,6 +19646,76 @@ body.cas-seated .social-fab { display: none; }
 .s5-window.is-lining .s5-cell.is-locked img { opacity: 1 !important; }
 .s5-cell.is-locked img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #b47cff) 65%, transparent)); }
 
+/* ── AND IT IS BOLTED TO THE GLASS, NOT TO THE REEL ───────────────────────────────────────────────────
+   Luke: "walking wild should be locked all the time — they lock, then the spin animation happens and they
+   disappear and then show back up again. They should truly be locked, floating there the whole time until
+   they're dismissed by the game after the free spins."
+
+   The mechanic was drawn inside `.s5-strip`, and the strip is the thing that travels: a reel spins by
+   translating twelve cells past a three-cell window, so a symbol living in the strip is carried away with it
+   by definition. What came back at the end was not the same wild staying put — it was the next grid putting
+   a wild back in the same cell, which is exactly what it looked like.
+
+   This layer is in the WINDOW's coordinates instead. It is a five-by-three grid pinned over the glass, the
+   reels run underneath it, and a wild that has welded itself simply never moves again until the round ends.
+
+   `--s5cell` is the same variable the reels are sized from, so the two grids cannot drift apart; a second
+   hardcoded row height here would be a layer that lines up until somebody changes the cabinet size.
+
+   The plate is OPAQUE and matches `.s5-reel`'s own gradient exactly. A translucent one would let the filler
+   scroll past behind a symbol that is supposed to be bolted down, which is the same illusion breaking a
+   different way. */
+.s5-held { position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, var(--s5cell)); }
+.s5-held .s5-cell { background: linear-gradient(180deg, #241a30 0%, #171021 46%, #241a30 100%); }
+/* It is bolted down, so it does not blur, dim or travel with anything. */
+.s5-held .s5-cell img { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tone, #b47cff) 70%, transparent)) !important;
+    opacity: 1 !important; }
+.s5-held .s5-cell img.is-lit {
+    filter: drop-shadow(0 0 11px var(--acc, #ffd75e)) brightness(1.18) !important; }
+
+/* ── THE TWO REELS THAT CARRY THE MULTIPLIER ──────────────────────────────────────────────────────────
+   Luke: "I'm not seeing the multipliers in reels 1 and 5."
+
+   They were there — a pearl lands 0.44 times a spin and a round finishes around x5.8 — but nothing ever
+   marked WHICH reels could produce one, so a rule about two specific reels was being delivered as an
+   occasional flash somewhere on the glass. A rule you cannot see the shape of is not a rule anybody learns.
+
+   A cold aqua rail down each outside edge, lit for the whole round, in the pearl's own colour. On screen
+   before anything lands, which is the entire point: it tells you where to watch rather than reporting that
+   something already happened. */
+.s5-reel.is-collector { background:
+    linear-gradient(180deg, rgba(90,255,208,.13), rgba(90,255,208,.04) 40%, rgba(90,255,208,.13)),
+    linear-gradient(180deg, #241a30 0%, #171021 46%, #241a30 100%);
+    box-shadow: inset 0 0 0 1px rgba(90,255,208,.34), inset 0 0 22px rgba(90,255,208,.16); }
+.s5-reel.is-collector::after { content: ""; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+    pointer-events: none; z-index: 4;
+    background: linear-gradient(180deg, rgba(90,255,208,.55), transparent 14%, transparent 86%, rgba(90,255,208,.55));
+    animation: s5Collector 2.4s ease-in-out infinite; }
+@keyframes s5Collector { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+/* A pearl stays marked for the whole spin it landed on rather than for 900ms — see the note in Slot5. */
+.s5-cell.is-pearled::before { background: radial-gradient(circle, rgba(90,255,208,.75), transparent 74%);
+    animation: s5PearlGlow 1.1s ease-in-out infinite alternate; }
+@keyframes s5PearlGlow { from { opacity: .65; } to { opacity: 1; } }
+
+/* ── THE STEP ARRIVING ON THE MEDALLION ───────────────────────────────────────────────────────────────
+   The multiplier used to simply BE a bigger number on the next spin. It flies in now, at the moment the
+   pearl lands, so the number changes because something hit it. */
+.s5-fb-mult.is-collecting { animation: s5MultHit .5s cubic-bezier(.2,1.7,.4,1); }
+@keyframes s5MultHit { 0% { transform: scale(1); } 45% { transform: scale(1.3); } 100% { transform: scale(1); } }
+.s5-fb-plus { position: absolute; top: -6px; right: -6px; text-decoration: none;
+    font-size: 10px; font-weight: 900; color: #05231c; padding: 0 5px; border-radius: 999px;
+    background: linear-gradient(180deg, #b6ffe9, #5affd0);
+    box-shadow: 0 0 12px rgba(90,255,208,.95);
+    animation: s5PlusFly .9s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes s5PlusFly {
+    0% { transform: translate(-18px, 26px) scale(.5); opacity: 0; }
+    40% { transform: translate(0, 0) scale(1.25); opacity: 1; }
+    70% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(0, -6px) scale(.9); opacity: 0; }
+}
+
 /* ── WHAT THE WALL STILL HELD ─────────────────────────────────────────────────────────────────────────
    Luke: "when you lose by picking the other thing it should show what the value of the non-picked eggs
    were — where other bears and wolves were."
@@ -20183,6 +20286,15 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: 0 0 16px rgba(255,215,94,.9), inset 0 0 14px rgba(255,215,94,.45);
     animation: col5Held .55s ease-in-out infinite; }
 @keyframes col5Held { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* The beat a pearl lands on. It raises the round's multiplier, which is the best thing that happens in a
+   Deep round, and it used to happen in silence with no mark on the board at all. */
+.s5-cell.is-pearled { animation: s5Pearl .85s cubic-bezier(.2,1.4,.4,1) both; z-index: 5; }
+.s5-cell.is-pearled::after { border-color: #5affd0 !important;
+    box-shadow: 0 0 20px rgba(90,255,208,.95), inset 0 0 14px rgba(90,255,208,.5) !important; }
+@keyframes s5Pearl {
+    0% { transform: scale(1); } 30% { transform: scale(1.16); } 100% { transform: scale(1); }
+}
 
 /* ── THE PEARL'S NUMERAL ──────────────────────────────────────────────────────────────────────────────
    Laid over the sprite rather than drawn into it. z-index 4 for the same reason the multiplier plates need
@@ -21861,3 +21973,120 @@ body.cas-seated .social-fab { display: none; }
     .thf-count b { font-size: 1.45rem; }
     .thf-lamp { width: 28px; height: 44px; }
 }
+
+/* ══ THE KENO LOUNGE ══════════════════════════════════════════════════════════════════════════════════
+   Luke: "we need a huge huge huge polish pass on keno — go look up how keno works and actually make it
+   look amazing."
+
+   What was here was forty white form buttons in a rectangle. A real keno board is a BACKLIT CABINET: dark
+   glass, numbers as lamps behind it, and the ten that come out are the only things in the room that are
+   lit. Everything below is that one idea — the board is dark, and light is the whole language. */
+.cas-keno { display: grid; gap: 10px; }
+.cas-keno-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cas-keno-title { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: #8fa4b8; }
+.cas-keno-tools { display: flex; gap: 6px; }
+.cas-keno-tool { padding: 6px 11px; border-radius: 999px; cursor: pointer;
+    font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: #bfe8ff; background: rgba(103, 227, 208, .10);
+    border: 1px solid rgba(103, 227, 208, .34); }
+.cas-keno-tool:active { background: rgba(103, 227, 208, .22); }
+.cas-keno-tool:disabled { opacity: .4; cursor: default; }
+
+/* ── THE HOPPER ────────────────────────────────────────────────────────
+   Ten slots, ALWAYS drawn, filling as the balls come out. Two reasons it is not a list that grows: the row
+   would reflow ten times while you are trying to read it, and an empty hopper is what tells you ten of
+   these are coming. A ball that is one of yours is gold and bigger — that is the entire feedback loop of
+   keno and it is worth spending the loudest thing on the screen on. */
+.cas-keno-hopper { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px;
+    padding: 8px 7px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.3));
+    border: 1px solid rgba(255,255,255,.07); }
+.cas-kball { aspect-ratio: 1; border-radius: 999px; display: grid; place-items: center;
+    font-size: 11px; font-weight: 900; font-variant-numeric: tabular-nums; color: #6b7683;
+    background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.09); }
+.cas-kball.is-out { color: #dce8f4;
+    background: radial-gradient(circle at 50% 32%, #55637a, #262e3a); border: 1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.5); }
+/* One of yours. The only lit thing on the rail. */
+.cas-kball.is-mine { color: #2a1c05;
+    background: radial-gradient(circle at 50% 30%, #fff0bb, #f0c04e 52%, #c9932c);
+    border-color: rgba(255,231,160,.7);
+    box-shadow: 0 0 14px rgba(255,200,90,.9), inset 0 1px 0 rgba(255,255,255,.55); }
+.cas-kball.is-new { animation: casBallDrop .34s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes casBallDrop {
+    0% { transform: translateY(-12px) scale(.4); opacity: 0; }
+    60% { transform: translateY(0) scale(1.22); opacity: 1; }
+    100% { transform: none; opacity: 1; }
+}
+
+/* ── THE PAYTABLE, ON THE MACHINE ─────────────────────────────────────────
+   Keno is unreadable without one — nobody has an instinct for what four-of-five is worth — and the rung
+   you landed on lights, so the ladder teaches itself while it is being climbed. */
+.cas-keno-pays { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.cas-keno-rung { display: grid; justify-items: center; gap: 1px; padding: 5px 2px; border-radius: 9px;
+    background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07); }
+.cas-keno-rung i { font-style: normal; font-size: 8.5px; font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: #7d8792; }
+.cas-keno-rung b { font-size: 13px; font-weight: 900; color: #cfe0ee; font-variant-numeric: tabular-nums; }
+.cas-keno-rung.is-here { background: rgba(103,227,208,.16); border-color: rgba(103,227,208,.6);
+    box-shadow: 0 0 16px rgba(103,227,208,.4); }
+.cas-keno-rung.is-here i { color: #9fe8dc; }
+.cas-keno-rung.is-here b { color: #67e3d0; text-shadow: 0 0 12px rgba(103,227,208,.9); }
+
+/* ══ THE DRAGON OVER THE BINGO CARD ═══════════════════════════════════════════════════════════════════
+   Luke: "create a bonus that has a dragon that flies around and lights tiles on fire to give you free
+   tiles."
+
+   The card is the stage, so the flight lives in the CARD's coordinates — `--x1/--y1` to `--x2/--y2` are
+   percentages of the card computed from the path's first and last square, which means one keyframe serves
+   all twelve possible passes instead of twelve of them.
+
+   `--flip` mirrors the sprite for a right-to-left pass. A dragon flying backwards is the single most
+   noticeable thing a sprite can do wrong, and it is one multiply to get right. */
+.cas-bcard { position: relative; }
+.cas-dragon { position: absolute; z-index: 5; pointer-events: none;
+    left: 0; top: 0; width: 30%; aspect-ratio: 1; margin: -15% 0 0 -15%;
+    background: url("/images/casino/bingo-dragon.webp") center/contain no-repeat;
+    filter: drop-shadow(0 0 18px rgba(255,140,40,.85));
+    animation: casDragonFly 1.25s cubic-bezier(.35,0,.5,1) both; }
+@keyframes casDragonFly {
+    0%   { transform: translate(var(--x1), var(--y1)) scaleX(var(--flip)) scale(.45); opacity: 0; }
+    18%  { opacity: 1; }
+    82%  { opacity: 1; }
+    100% { transform: translate(var(--x2), var(--y2)) scaleX(var(--flip)) scale(1.05); opacity: 0; }
+}
+/* The card dims a shade while the pass is happening, so the fire is the brightest thing on it. */
+.cas-bcard.is-burning .cas-bcell:not(.is-burnt) { filter: brightness(.72); transition: filter .3s ease; }
+
+/* ── A SQUARE THAT CAUGHT ───────────────────────────────────────────────
+   It is marked exactly as a drawn square is, because it IS one — the fire is a second way to HAVE a
+   square, not a second kind of square, and the moment it reads as its own category the scoring stops being
+   obvious. What it gets on top is heat: an ember wash, a flame, and a hard pop as it lights. */
+.cas-bcell.is-burnt { color: #2a1204 !important;
+    background: linear-gradient(180deg, #ffd08a, #ff8a3d 55%, #e0501a) !important;
+    border-color: rgba(255,190,120,.9) !important;
+    box-shadow: 0 0 20px rgba(255,130,40,.9), inset 0 1px 0 rgba(255,240,200,.6) !important;
+    animation: casCatch .34s cubic-bezier(.2,1.7,.4,1) both; }
+@keyframes casCatch {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.28); }
+    100% { transform: scale(1); }
+}
+.cas-flame { position: absolute; inset: -18% -10% 40% -10%; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255,214,120,.95), rgba(255,120,30,.55) 45%, transparent 72%);
+    animation: casFlame .7s ease-in-out infinite alternate; }
+@keyframes casFlame {
+    from { transform: scaleY(.82) translateY(2px); opacity: .75; }
+    to   { transform: scaleY(1.12) translateY(-2px); opacity: 1; }
+}
+
+/* The owner's strip, matched to the one on the five-reel cabinets so a forced feature always looks like a
+   forced feature wherever it is triggered from. */
+.cas-owner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+    padding: 7px 9px; border-radius: 10px; border: 1px dashed rgba(255,90,120,.45); }
+.cas-owner > span { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase;
+    color: #ff5a7a; }
+.cas-owner button { padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 11px;
+    font-weight: 800; color: #ffc9d4; background: rgba(255,90,120,.10);
+    border: 1px solid rgba(255,90,120,.4); }
+.cas-owner button:disabled { opacity: .4; cursor: default; }
