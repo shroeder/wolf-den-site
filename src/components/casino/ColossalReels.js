@@ -38,6 +38,9 @@ const SETTLE = 470;
 const SEND_MS = 620;      // a wild column falling from the small board into the big one
 const LINE_MS = 620;      // one winning line lit
 const BONUS_MS = 2400;
+// Three moons across the two boards opens the round — the same number the engine triggers on. A tease that
+// disagreed with the payout would be the machine lying, so it is read from one place.
+const SCATTER_NEED = 3;
 // The count plus its held beat — what a paying spin costs in time before the machine moves on.
 const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
@@ -52,6 +55,7 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     const [lit, setLit] = useState(null);            // the win currently drawn
     const [won, setWon] = useState(0);
     const [paid, setPaid] = useState(null);          // the win being counted right now
+    const [tease, setTease] = useState(null);        // { board, reel } — a reel held because it could open the bonus
     const [free, setFree] = useState(null);          // { at, of } while the bonus runs
     const [shout, setShout] = useState(null);
     const timers = useRef([]);
@@ -68,9 +72,56 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
 
     // ── ONE SPIN, PLAYED ─────────────────────────────────────────────────────────────────────────────────
     const playOne = useCallback(async (sp, isFree) => {
-        setLanded(0); setColLanded(0); setSending([]); setSent([]); setLit(null);
-        for (let r = 0; r < REELS; r += 1) { await wait(MAIN_STOP); setLanded(r + 1); Cas.reelStop(r, 0.4); }
-        for (let r = 0; r < REELS; r += 1) { await wait(COL_STOP); setColLanded(r + 1); Cas.reelStop(r, 0.6); }
+        setLanded(0); setColLanded(0); setSending([]); setSent([]); setLit(null); setTease(null);
+
+        // ── THE BONUS HAS TO BE WATCHED ARRIVING ─────────────────────────────────────────────────────────
+        // Luke: "I keep getting the bonus and there is no build up or visibility, we should do the same
+        // thing we do for other slots." The five-reel cabinets have had this from the start — a reel that
+        // could complete the trigger does not stop on time, a riser runs for exactly the gap, the scatters
+        // light and the rest of the board drops back. This cabinet had none of it. Ten reels landed on a
+        // metronome and then a card appeared saying you had won eight free spins, which is the machine
+        // telling you about a thing that happened rather than letting it happen.
+        //
+        // The rule is the same rule: you are LIVE when you are one short. Three moons across both boards
+        // triggers it, so on the beat the second one lands, every reel still to come is holding something.
+        // The count runs across BOTH boards in landing order — the small one first, then the tall one —
+        // because that is the order the player sees them in, and being one short after nine reels with the
+        // tall board's last column still turning is the best moment this machine has.
+        //
+        // What it deliberately does NOT do is look at the answer before deciding to hold. A reel is held
+        // because it COULD land the moon, never because it does — see the note in Slot5's teaseFor about
+        // what a tease has to be.
+        const scat = m.scatter;
+        const inCol = (grid, r) => (grid?.[r] || []).filter((x) => x === scat).length;
+        let seen = 0;
+        let held = 0;
+
+        const landOne = async (board, r, gap, sound) => {
+            const live = scat && seen === SCATTER_NEED - 1;
+            if (live) {
+                // The hold begins the instant the previous reel lands — the first moment you can see you are
+                // one short — and it grows each time, because a second hold the same length as the first
+                // reads as the machine repeating itself rather than as the tension climbing.
+                held += 1;
+                const hold = 900 + (held - 1) * 380;
+                setTease({ board, reel: r });
+                Cas.anticipate(hold);
+                Haptic.hit(0.3);
+                await wait(hold);
+            }
+            await wait(gap);
+            const got = inCol(board === "main" ? sp.main : sp.col, r);
+            if (board === "main") setLanded(r + 1); else setColLanded(r + 1);
+            seen += got;
+            if (!live) { Cas.reelStop(r, sound); return; }
+            // Both answers are loud. A hold that resolves quietly either way was a pause, not a hold — but
+            // the miss stays short and soft, because most of them miss.
+            setTease(null);
+            if (got) { Cas.reelStop(r, 1); Haptic.crit(); } else { Cas.nearMiss(); Haptic.hit(0.5); }
+        };
+
+        for (let r = 0; r < REELS; r += 1) await landOne("main", r, MAIN_STOP, 0.4);
+        for (let r = 0; r < REELS; r += 1) await landOne("col", r, COL_STOP, 0.6);
         await wait(SETTLE);
 
         // ── THE TRANSFER ─────────────────────────────────────────────────────────────────────────────────
@@ -287,11 +338,11 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     return (
         <div className={`col5${free ? " is-free" : ""}`}>
             {/* ── THE COLOSSAL BOARD ── twelve rows, eighty of the hundred lines, and where the giants live. */}
-            <div className={`col5-col${litCells.col.size ? " is-lining" : ""}`}>
+            <div className={`col5-col${litCells.col.size ? " is-lining" : ""}${tease ? " is-teasing" : ""}`}>
                 <span className="col5-tag">{data?.label || "The Colossal Reels"}</span>
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : colRunning(reel) ? " is-spin" : ""}${sent.includes(reel) ? " is-sent" : ""}`}>
+                        <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : colRunning(reel) ? " is-spin" : ""}${sent.includes(reel) ? " is-sent" : ""}${tease?.board === "col" && tease.reel === reel ? " is-held" : ""}`}>
                             <div className="col5-strip" style={{ "--spin": leadCol }}>
                             {/* ── THE REAL COLUMN COMES FIRST IN THE STRIP ────────────────────────────
                                 Luke: "reels go down, not up — you have them going up."
@@ -383,11 +434,11 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
             ) : null}
 
             {/* ── THE SMALL BOARD ── the lever. It is on top because the transfer falls downward. */}
-            <div className={`col5-main${litCells.main.size ? " is-lining" : ""}`}>
+            <div className={`col5-main${litCells.main.size ? " is-lining" : ""}${tease ? " is-teasing" : ""}`}>
                 <span className="col5-tag">Main reels — a full wild column sends</span>
                 <div className="col5-grid" style={{ "--rows": ROWS }}>
                     {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : mainRunning(reel) ? " is-spin" : ""}${sending.includes(reel) ? " is-sending" : ""}`}>
+                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : mainRunning(reel) ? " is-spin" : ""}${sending.includes(reel) ? " is-sending" : ""}${tease?.board === "main" && tease.reel === reel ? " is-held" : ""}`}>
                             <div className="col5-strip" style={{ "--spin": leadMain }}>
                             {/* ── THE REAL COLUMN COMES FIRST IN THE STRIP ────────────────────────────
                                 Luke: "reels go down, not up — you have them going up."

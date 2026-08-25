@@ -20086,6 +20086,31 @@ body.cas-seated .social-fab { display: none; }
 .col5-flash-won b { font-size: 16px; font-weight: 900; color: #fff3d0;
     text-shadow: 0 0 14px rgba(255,200,90,.95); font-variant-numeric: tabular-nums; }
 
+/* ══ THE BONUS ARRIVING ════════════════════════════════════════════════════════════════════════════════════
+   Luke: "I keep getting the bonus and there is no build up or visibility, we should do the same thing we do
+   for other slots." The held reel is in ColossalReels; this is what it looks like.
+
+   Two boards, thirty-two symbols on screen at the busiest, and the thing you need to see is a moon. So the
+   whole machine drops back and only the scatters stay lit — the same trick the five-reel cabinets use, and
+   the only one that works at this density. A highlight on the moons alone would be lost in the noise; taking
+   the noise away cannot be. */
+.col5-col.is-teasing .col5-cell, .col5-main.is-teasing .col5-cell {
+    filter: saturate(.25) brightness(.42); transition: filter .22s ease; }
+.col5-col.is-teasing .col5-cell.is-scatter, .col5-main.is-teasing .col5-cell.is-scatter {
+    filter: none; animation: col5Moon .85s ease-in-out infinite; }
+@keyframes col5Moon {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50% { transform: scale(1.07); filter: brightness(1.45); }
+}
+/* And the reel that is holding says so — a lit rail down its edge, so you know WHICH one you are waiting on
+   rather than only that something is happening. */
+.col5-reel.is-held { position: relative; }
+.col5-reel.is-held::after { content: ""; position: absolute; inset: -2px; z-index: 6; pointer-events: none;
+    border-radius: 6px; border: 2px solid #ffe9a8;
+    box-shadow: 0 0 16px rgba(255,215,94,.9), inset 0 0 14px rgba(255,215,94,.45);
+    animation: col5Held .55s ease-in-out infinite; }
+@keyframes col5Held { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
 /* ── THE MULTIPLIER PLATES ────────────────────────────────────────────────────────────────────────────
    Luke: "the multipliers in the last reel need to be grouped and use sprites." Painted ovals now, one per
    rung, escalating bronze → silver → gold → emerald → prismatic so the ladder is readable from the metal
@@ -20119,8 +20144,14 @@ body.cas-seated .social-fab { display: none; }
        the whole thing and the 96% rule underneath took over — measured 32px again, which is 96% of a row. */
     max-height: calc(var(--cell-h) * var(--span, 1));
     object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,.65)); }
+/* ── FOUR, BECAUSE THE PLATE IS THREE ─────────────────────────────────────────────────────────────────
+   Luke: "the multipliers has no sprite, it's supposed to say the multiplier as a sprite like 25x." The
+   plate was drawing and the NUMBER was not — behind it the whole time. A rule further up sets both the
+   symbol image and its label to `z-index: 3`, and this rule, being more specific, quietly put the label
+   back down to 1 while the plate kept 3. So every multiplier was a beautifully painted empty medallion.
+   The number has to sit above the thing it is written on. */
 .col5-grid.is-tall .col5-cell.is-multblock b { position: absolute; left: 0; right: 0;
-    top: 50%; translate: 0 -50%; z-index: 1; text-align: center;
+    top: 50%; translate: 0 -50%; z-index: 4; text-align: center;
     font-family: var(--font-display); font-weight: 900; line-height: 1;
     font-size: clamp(13px, calc(var(--cell-h) * 0.52), 30px);
     color: #fff6d8; letter-spacing: -.02em;
