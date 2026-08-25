@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
-import { symbolTone, symbolRole, symbolName, slot5 } from "@/lib/marketplace/casino-slot5.js";
+import { symbolTone, symbolRole, symbolName, slot5, LINES } from "@/lib/marketplace/casino-slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import HoldAndSpin from "@/components/casino/HoldAndSpin.js";
 import TheLocks from "@/components/casino/TheLocks.js";
@@ -318,7 +318,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const teaseFor = useCallback((g) => {
         const m = slot5(machineId);
         const targets = [
-            { sym: m.scatter, need: 3 },
+            { sym: m.scatter, need: 3, line: Boolean(m.lineTrigger) },
             m.second?.kind === "hold"
                 ? { sym: m.second.trigger, need: m.second.need || 6 }
                 : { sym: m.bonus, need: 5 },
@@ -327,6 +327,27 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         for (let k = 0; k < REELS; k += 1) {
             let live = null;
             for (const t of targets) {
+                // ── A TEASE MUST BE A PROMISE THE MACHINE CAN KEEP ───────────────────────────────────
+                // Luke: "it's slow rolling like I can get the bonus when I can't." Dead right, and it was
+                // this: the tease counted scatters ANYWHERE on the reels so far, which is the correct rule
+                // for a scatter-anywhere trigger and the wrong one for The Harvest, whose bonus needs three
+                // moons on a PAYLINE from reel one. Two moons on rows that share no line can never be
+                // completed by a third, and the machine was slow-rolling the reel anyway — the single most
+                // dishonest thing a slot can do, because the whole point of a held reel is that it means
+                // something.
+                //
+                // For a line trigger, a reel is live only if some line still has the scatter on EVERY reel
+                // behind it. That is the same walk `evaluate` does to decide the trigger, so the tease and
+                // the payout can no longer disagree about what is possible.
+                if (t.line) {
+                    if (k !== t.need - 1) continue;
+                    const open = LINES.some((line) => {
+                        for (let r = 0; r < k; r += 1) if (g[r][line[r]] !== t.sym) return false;
+                        return true;
+                    });
+                    if (open) { live = t.sym; break; }
+                    continue;
+                }
                 let soFar = 0;
                 for (let r = 0; r < k; r += 1) soFar += g[r].filter((x) => x === t.sym).length;
                 if (soFar === t.need - 1) { live = t.sym; break; }
@@ -716,8 +737,25 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     if (slot5(machineId).colossal) {
         return (
             <div className="s5">
-                <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
-                    playing={Boolean(result?.colossal)} onDone={() => setPhase("done")} />
+                {/* ── IT IS A CABINET, NOT A PAGE ──────────────────────────────────────────────────────
+                    The first cut drew two bare grids stacked on a dark page, and Luke: "this doesn't even
+                    remotely resemble the image I sent you. It's super jank." He is right — count what the
+                    reference actually has and none of it was there: a painted masthead with the machine's
+                    name across it, a brass cabinet around the glass, five visible REEL STRIPS you can point
+                    at, symbols on a lit ground rather than floating in the dark, and a payline drawn over
+                    the win. It was a spreadsheet of icons.
+
+                    So it takes the same `.s5-cab` every other machine on this floor is built from — the
+                    masthead, the marquee, the gold — and the two reel sets become windows inside it. */}
+                <div className="s5-cab" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
+                    <span className="s5-marquee"><i aria-hidden="true" />{slot5(machineId).label.toUpperCase()}<i aria-hidden="true" />
+                        <button type="button" className="s5-pays" onClick={() => setPays(true)}
+                            aria-label="What this machine pays">PAYS</button>
+                    </span>
+                    <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
+                        playing={Boolean(result?.colossal)} onDone={() => setPhase("done")} />
+                </div>
+
                 {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
 
                 {/* THE SAME PANEL AS EVERY OTHER CABINET. The first cut of this screen grew its own readout

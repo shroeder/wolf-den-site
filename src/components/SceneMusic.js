@@ -149,6 +149,27 @@ export default function SceneMusic({ vibe = "town", place = "top-right", muted: 
         try { setOwnMuted(localStorage.getItem(KEY) === "1"); } catch { /* default on */ setOwnMuted(false); }
     }, [controlled]);
 
+    // ── DUCKED WHILE A BONUS IS PLAYING ──────────────────────────────────────────────────────────────────
+    // The casino's bonus rounds have their own music, on a completely separate audio graph (casino-audio.js
+    // builds on the arena's context; this file builds its own). Neither could see the other, so a bonus
+    // played its bed straight over the top of the room's tune — two pieces of music at once, in different
+    // keys, which is what Luke heard twice.
+    //
+    // Ducked to silence rather than stopped: stopping tears down the context and starting it again costs a
+    // fade-in and a rebuilt graph every time a bonus ends, on a page that may open a dozen of them.
+    const ducked = useRef(false);
+    useEffect(() => {
+        const onBed = (e) => {
+            ducked.current = Boolean(e?.detail?.on);
+            const a = audio.current;
+            if (!a) return;
+            try { a.master.gain.setTargetAtTime(ducked.current ? 0 : a.cfgMaster, a.ctx.currentTime, 0.25); }
+            catch { /* context gone */ }
+        };
+        window.addEventListener("wolfden-bed", onBed);
+        return () => window.removeEventListener("wolfden-bed", onBed);
+    }, []);
+
     const stop = useCallback(() => {
         const a = audio.current; if (!a) return;
         clearInterval(a.schedTimer);
@@ -173,7 +194,8 @@ export default function SceneMusic({ vibe = "town", place = "top-right", muted: 
         const fb = ctx.createGain(); fb.gain.value = 0.26;
         const wet = ctx.createGain(); wet.gain.value = 0.34;
         lp.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(master);
-        master.gain.setTargetAtTime(cfg.master, ctx.currentTime, 1.4); // fade in
+        // Its own resting level, remembered so the bonus duck above has something to come back to.
+        master.gain.setTargetAtTime(ducked.current ? 0 : cfg.master, ctx.currentTime, 1.4); // fade in
 
         // A single plucked note with a quick attack + exponential decay (lute-ish).
         const pluck = (midi, t, dur, gainVal, type, detune = 0) => {
@@ -214,7 +236,10 @@ export default function SceneMusic({ vibe = "town", place = "top-right", muted: 
         };
         tick();
         const schedTimer = setInterval(tick, 25);
-        audio.current = { ctx, master, lp, delay, schedTimer };
+        // `cfgMaster` is this scene's resting level, carried on the handle so the bonus duck above knows
+        // what to fade back UP to — reading it off cfg at duck time would need the closure this listener
+        // deliberately does not have.
+        audio.current = { ctx, master, lp, delay, schedTimer, cfgMaster: cfg.master };
     }, [vibe]);
 
     // Kick off on the first user gesture (autoplay policy) if not muted.

@@ -112,72 +112,50 @@ const bed = { name: null, bar: 0, timer: null, bus: null };
 // onto each of them without a second thought.
 const PROG = [0, 3, 1, 4];
 
-// ── THE PICKER ── sparse, slow, suspended. A held root underneath, a figure climbing over it, one high
-// shimmer late in the bar and a breath of air at the end. Nothing resolves: the whole point of the screen is
-// that it has not happened yet, and the music is a question mark held for as long as you want to take.
-const PICK_FIGS = [
-    [0, 2, 4, 6],
-    [0, 3, 5, 7],
-    [0, 2, 5, 7],
-    [0, 4, 6, 7],
-];
-const bedPick = (bar) => {
-    const S = 0.3;
-    const r = PROG[bar % 4];
-    const b = bed.bus;
-    const airy = Math.floor(bar / 4) % 2 === 1;     // the eight-bar clock: every other pass opens out
-    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 2.3, gain: 0.05, bus: b });
-    tone({ at: 0.03, freq: voice.bodyHz * 0.75 * (airy ? 1.5 : 1), type: "triangle", dur: 1.5, gain: 0.022, bus: b });
-    PICK_FIGS[bar % 4].forEach((k, i) => {
-        tone({ at: k * S, freq: step(r + i, i > 2 ? 1 : 0), type: "triangle", dur: 0.55, gain: 0.034, bus: b });
-        tone({ at: k * S, freq: step(r + i, i > 2 ? 2 : 1), type: "sine", dur: 0.34, gain: airy ? 0.016 : 0.011, bus: b });
-    });
-    tone({ at: 5 * S, freq: step(r + 3, 2), type: "sine", dur: 1, gain: 0.017, bus: b });
-    noise({ at: 7 * S, dur: 0.22, gain: 0.013, type: "highpass", freq: 7000, bus: b });
-    // The turnaround. Four bars is a phrase, and a phrase has to sound like it ended.
-    if (bar % 4 === 3) tone({ at: 6.5 * S, freq: step(r + 4, 1), to: step(r, 2), type: "sine", dur: 0.5, gain: 0.02, bus: b });
-};
-bedPick.bar = 8 * 300;
+// ── AND IT STOPPED TRYING TO BE A TUNE ───────────────────────────────────────────────────────────────────────
+// Luke, twice: "the bonus music is terrible." He is right and the diagnosis is not subtle — I had written a
+// MELODY. Four phrases, a chord cycle, a fill on the fourth bar. A written tune is the one thing a procedural
+// generator cannot get away with, because every listener has an opinion about a tune and none of them is
+// "inoffensive": a synthesised triangle wave playing notes I chose is a ringtone, and it sits on top of a
+// cabinet that already has twenty-five sound effects and a room tune of its own.
+//
+// So there is no melody in either bed any more. What is left is ATMOSPHERE — a held root, a slow pulse, and
+// air. It cannot be out of tune with the cabinet's effects because it barely has notes; it cannot get boring
+// in the way a repeated phrase does because there is no phrase; and it does the one job a bed actually has,
+// which is to stop the room being silent between taps. Quieter, too. A bonus round should sound like somewhere
+// you are, not like something playing at you.
 
-// ── THE FREE SPINS ── the same key at nearly twice the tempo, with a floor under it. Bass on every other
-// step, a kick you feel rather than hear, hats between, and four written phrases over a four-bar harmony,
-// because this half is not a question — it is the thing being handed to you, and it should push.
-const FREE_MELS = [
-    [0, 2, 4, 2, 3, 4, 6, 4],
-    [4, 3, 2, 3, 4, 6, 4, 2],
-    [2, 4, 6, 4, 5, 6, 8, 6],
-    [6, 4, 3, 4, 2, 1, 0, 2],
-];
-const bedFree = (bar) => {
-    const S = 0.19;
-    const r = PROG[bar % 4];
-    const mel = FREE_MELS[bar % 4];
+// THE PICKER: two notes and a breath. Slow enough that nothing feels urgent, which is right for a screen
+// where nothing has been decided yet.
+const bedPick = (bar) => {
     const b = bed.bus;
-    // The eight-bar clock. Second pass moves the lead up an octave and puts a shaker on the offbeats, so the
-    // form is eight bars long even though the harmony is four — the cheapest way to stop a loop repeating.
-    const lift = Math.floor(bar / 4) % 2;
-    for (let k = 0; k < 8; k += 1) {
-        if (k % 2 === 0) {
-            tone({ at: k * S, freq: step(r, -1), type: "sawtooth", dur: 0.16, gain: 0.05, bus: b });
-            noise({ at: k * S, dur: 0.09, gain: 0.05, type: "lowpass", freq: 190, sweepTo: 60, bus: b });
-        } else {
-            noise({ at: k * S, dur: 0.035, gain: 0.014, type: "highpass", freq: 8000, bus: b });
-            if (lift) noise({ at: k * S + S * 0.5, dur: 0.03, gain: 0.008, type: "highpass", freq: 9500, bus: b });
-        }
-        const n = mel[k];
-        tone({ at: k * S, freq: step(r + n, 1 + lift), type: "triangle", dur: 0.24, gain: 0.036, bus: b });
-        tone({ at: k * S + 0.015, freq: step(r + n, 2 + lift), type: "sine", dur: 0.14, gain: 0.012, bus: b });
-    }
-    // THE FILL. The back half of every fourth bar, sweeping into the downbeat — it is what makes the form come
-    // ROUND rather than start again, and it is the single thing that was missing from the first cut.
-    if (bar % 4 === 3) {
-        for (let k = 0; k < 4; k += 1) {
-            noise({ at: (6 + k * 0.5) * S, dur: 0.06, gain: 0.016 + k * 0.006, type: "bandpass", freq: 2600 + k * 900, q: 1.4, bus: b });
-        }
-        tone({ at: 7 * S, freq: step(r, 1), to: step(PROG[0], 2), type: "triangle", dur: 0.3, gain: 0.032, bus: b });
-    }
+    const r = PROG[bar % 4];
+    // The floor under it, moving a little bar to bar so it is not a drone.
+    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 3.4, gain: 0.055, bus: b });
+    tone({ at: 0.05, freq: step(r, -1), type: "sine", dur: 3.0, gain: 0.03, bus: b });
+    // One high note, late, quiet. The only thing in the bed you could call an event.
+    tone({ at: 1.7, freq: step(r + 2, 1), type: "sine", dur: 1.8, gain: 0.016, bus: b });
+    // And air moving through the room.
+    noise({ at: 0.2, dur: 2.4, gain: 0.008, type: "bandpass", freq: 900, sweepTo: 1600, q: .7, bus: b });
 };
-bedFree.bar = 8 * 190;
+bedPick.bar = 3600;
+
+// THE FREE SPINS: the same room with a pulse in it. A heartbeat rather than a beat — it says the round is
+// running without playing anything anybody has to agree with.
+const bedFree = (bar) => {
+    const b = bed.bus;
+    const r = PROG[bar % 4];
+    tone({ freq: voice.bodyHz * 0.5, type: "sine", dur: 2.6, gain: 0.06, bus: b });
+    tone({ at: 0.05, freq: step(r, -1), type: "sine", dur: 2.4, gain: 0.032, bus: b });
+    // Four soft pulses to the bar. Low, short, felt more than heard.
+    for (let k = 0; k < 4; k += 1) {
+        noise({ at: k * 0.65, dur: 0.13, gain: 0.03, type: "lowpass", freq: 170, sweepTo: 60, bus: b });
+        tone({ at: k * 0.65, freq: voice.bodyHz * 0.5, type: "sine", dur: 0.12, gain: 0.028, bus: b });
+    }
+    // A shimmer on the halfway mark, an octave up, barely there.
+    tone({ at: 1.3, freq: step(r + 4, 1), type: "sine", dur: 1.1, gain: 0.014, bus: b });
+};
+bedFree.bar = 2600;
 
 const MUSIC = { pick: bedPick, free: bedFree };
 
@@ -505,6 +483,23 @@ export const Cas = {
         // whatever happens after. Under a bed swap that tail plays underneath the new one — two tracks.
         // Each bed hangs its notes on a gain node of its own, and stopping one silences that node.
         if (bed.bus) { killBus(bed.bus); bed.bus = null; }
+
+        // ── AND THE ROOM'S OWN TUNE HAS TO GET OUT OF THE WAY ────────────────────────────────────────
+        // Luke, after the two beds stopped overlapping each other: "it's STILL playing the background
+        // track and the bonus music at the same time." Correct, and it was a third source I had not
+        // accounted for — SceneMusic, the casino floor's tune, which builds its OWN AudioContext with its
+        // own mute and knows nothing about this file. Killing the bed's tail fixed bed-versus-bed and did
+        // nothing about bed-versus-room.
+        //
+        // Announced rather than wired: a window event, which SceneMusic listens for and ducks itself on.
+        // The alternative is threading a boolean from a slot machine's phase up through the cabinet, the
+        // floor and the hall to reach a component none of them own, and every one of those would then have
+        // an opinion about music.
+        if (typeof window !== "undefined") {
+            try { window.dispatchEvent(new CustomEvent("wolfden-bed", { detail: { on: Boolean(name) } })); }
+            catch { /* no window, no room to duck */ }
+        }
+
         bed.name = name;
         bed.bar = 0;
         if (!name) return this;
