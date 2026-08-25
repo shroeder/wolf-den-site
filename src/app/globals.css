@@ -19490,6 +19490,140 @@ body.cas-seated .social-fab { display: none; }
 .pt-line u { text-decoration: none; font-size: 8px; font-weight: 800; color: #8f98a3;
     font-variant-numeric: tabular-nums; }
 
+
+/* ══ COLOSSAL REELS ═══════════════════════════════════════════════════════════════════════════════════════
+   The Menagerie, rebuilt as the machine Luke pointed at: a 5x3 board and a 5x12 board spun together, a
+   hundred lines between them, a wild that crosses from the small one to the big one, and two giant figures
+   that only live on the tall set and are what everybody is actually playing for.
+
+   STACKED, NOT SIDE BY SIDE. The reference is a landscape cabinet with room for both sets abreast; this
+   opens on a phone. Side by side gives each set about 190px — 38px cells, and a 5x3 board floating in a
+   column of dead space beside a tower twelve rows tall. Above and below, both get the full width, and the
+   transfer runs DOWNWARD, which is the direction it already reads as. */
+.col5 { position: relative; display: grid; gap: 8px; min-width: 0; }
+.col5-tag { display: block; margin: 0 0 3px; font-size: .5rem; font-weight: 900; letter-spacing: .2em;
+    text-transform: uppercase; color: #8f98a3; text-align: center; }
+.col5-main, .col5-col { position: relative; padding: 7px 7px 8px; border-radius: 12px; min-width: 0;
+    background: linear-gradient(180deg, rgba(10,14,26,.9), rgba(4,6,12,.95));
+    border: 1px solid color-mix(in srgb, var(--acc, #7fe0a0) 34%, transparent);
+    box-shadow: inset 0 0 40px rgba(0,0,0,.7); }
+/* The tall board is where the money is, so it gets the brighter frame — the eye should go there. */
+.col5-col { border-color: color-mix(in srgb, var(--acc, #7fe0a0) 62%, transparent);
+    box-shadow: inset 0 0 50px rgba(0,0,0,.8), 0 0 26px -8px color-mix(in srgb, var(--acc, #7fe0a0) 70%, transparent); }
+
+/* ── THE BOARDS ── five columns, and however many rows the set has. `minmax(0, 1fr)` on both axes because a
+   grid child's floor is min-content otherwise, and a 5x12 of min-content is 600px wide on a 390px phone. */
+.col5-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; min-width: 0; }
+.col5-reel { display: grid; grid-template-rows: repeat(var(--rows), minmax(0, 1fr)); gap: 2px; min-width: 0; }
+.col5-cell { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 5px; overflow: hidden;
+    display: grid; place-items: center;
+    background: color-mix(in srgb, var(--tone, #333) 16%, rgba(0,0,0,.6));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone, #333) 34%, transparent); }
+.col5-cell img { width: 86%; height: 86%; object-fit: contain; }
+.col5-cell.is-blank { background: rgba(255,255,255,.03); box-shadow: none; }
+/* ── AND THE TALL BOARD HAS TO FIT ────────────────────────────────────────────────────────────────────
+   Twelve square cells five columns wide is 936px on a 412px phone, and with the main board above it the
+   cabinet ran to a screen and a half — a slot machine you have to scroll is a slot machine you cannot watch.
+   The board is given a HEIGHT and the twelve rows divide it, so the cells come out wider than they are tall.
+   `object-fit: contain` is what makes that survivable: every symbol stays whole and simply sits smaller in a
+   letterboxed cell, rather than being squashed. The giants are unaffected — a five-row block is 1:2, which is
+   the ratio they were drawn at. */
+.col5-grid.is-tall { height: min(46vh, 400px); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.col5-grid.is-tall .col5-reel { min-height: 0; }
+.col5-grid.is-tall .col5-cell { aspect-ratio: auto; min-height: 0; border-radius: 3px; }
+.col5-grid.is-tall .col5-cell img { width: 96%; height: 96%; }
+
+/* ── THE TWO GIANTS ────────────────────────────────────────────────────────────────────────────────────
+   Luke: "they're not repeating tiles, they're actually one big one, and they only show up in the big reels.
+   Those are the best paying ones — the goal is to get them to line up."
+
+   So the cell spans the whole run and the rows underneath render nothing at all. `object-fit: contain` on a
+   tall box is what keeps the figure whole; stretching one to fill would be the amputation trap again. */
+.col5-cell.is-giant { grid-row: span var(--span, 4); aspect-ratio: auto; border-radius: 6px;
+    background:
+        radial-gradient(70% 50% at 50% 38%, color-mix(in srgb, var(--tone, #fff) 38%, transparent), transparent 70%),
+        linear-gradient(180deg, rgba(6,4,14,.86), rgba(2,1,6,.94));
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone, #fff) 70%, transparent),
+        0 0 20px -4px color-mix(in srgb, var(--tone, #fff) 60%, transparent); }
+/* ── AND THEY FILL THE BLOCK ───────────────────────────────────────────────────────────────────────────
+   Luke: "those sprites look good, but they need to occupy the whole space, even if they get cut off a
+   little bit." `contain` was letterboxing a 1:2 figure into a block that is rarely exactly 1:2, so a giant
+   sat in the middle of its column with air above and below it and read as a picture of a prize rather than
+   as the prize. `cover` fills the block edge to edge and crops whatever does not fit — which on a standing
+   figure is the very top of the crown or the last of the paws, and neither is what you are looking at. */
+.col5-cell.is-giant img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%;
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tone, #fff) 60%, transparent)); }
+/* It breathes, because it is the best thing that can be on the board and a still picture of it is a picture. */
+.col5-cell.is-giant::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
+    background-size: 260% 100%; animation: col5Sheen 3.4s ease-in-out infinite; }
+@keyframes col5Sheen { 0% { background-position: 180% 0; } 60%, 100% { background-position: -80% 0; } }
+
+/* ── THE MULTIPLIER REEL ── free spins only, last colossal column, stacked. */
+.col5-cell.is-mult { background: linear-gradient(180deg, rgba(60,40,4,.92), rgba(24,15,2,.95));
+    box-shadow: inset 0 0 0 1px rgba(255,215,94,.7), 0 0 12px -4px rgba(255,200,90,.8); }
+.col5-cell.is-mult b { font-family: var(--font-display); font-size: .62rem; line-height: 1; color: #ffe9bd;
+    text-shadow: 0 0 8px rgba(255,200,90,1); }
+
+/* ── A WINNING CELL ── lit rather than dimmed-around, because on a hundred lines the dim would be the board. */
+.col5-cell.is-lit { z-index: 2;
+    box-shadow: inset 0 0 0 2px #fff, 0 0 18px -2px color-mix(in srgb, var(--tone, #fff) 90%, transparent);
+    animation: col5Lit .3s ease both; }
+@keyframes col5Lit { from { transform: scale(.9); } to { transform: scale(1); } }
+
+/* ── THE REELS TURNING ── the small board settles first, because it decides what the big one becomes. */
+.col5-reel.is-spin { filter: blur(1.1px) brightness(.8); opacity: .9; }
+.col5-reel.is-stop { animation: col5Land .22s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes col5Land { from { transform: translateY(-7px); } to { transform: none; } }
+/* The column that is about to send, and the column that just received. */
+.col5-reel.is-sending { animation: col5Send .3s ease-in-out infinite alternate; }
+@keyframes col5Send { from { filter: none; } to { filter: brightness(1.9) saturate(1.4); } }
+.col5-reel.is-sent .col5-cell { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone, #b45aff) 85%, transparent); }
+
+/* ── THE TRANSFER ITSELF ───────────────────────────────────────────────────────────────────────────────
+   Luke: "if you get a stacking wild in a column on the small screen it transfers over to the big screen."
+   It is the whole reason to look at the small board, so it gets its own beat with nothing else moving: a
+   bar of light falls out of the main column and down into the tall one. */
+.col5-send { position: absolute; left: 7px; right: 7px; top: 26px; bottom: 0; z-index: 6; pointer-events: none; }
+.col5-send i { position: absolute; top: 0; width: calc((100% - 8px) / 5); height: 100%;
+    left: calc(var(--reel) * ((100% - 8px) / 5 + 2px));
+    background: linear-gradient(180deg, rgba(180,90,255,0) 0%, rgba(180,90,255,.75) 30%, rgba(255,255,255,.9) 55%, rgba(180,90,255,0) 100%);
+    filter: blur(1px); animation: col5Fall .62s cubic-bezier(.35,0,.35,1) both; }
+@keyframes col5Fall { from { transform: translateY(-40%) scaleY(.4); opacity: 0; } 40% { opacity: 1; } to { transform: translateY(45%) scaleY(1.1); opacity: 0; } }
+
+/* ── THE RIBBON ── same language as the other cabinets: dark, gold-trimmed, nothing wraps. */
+.col5-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 5px 10px; border-radius: 10px; white-space: nowrap;
+    background: linear-gradient(180deg, rgba(16,10,3,.9), rgba(6,4,1,.95));
+    border: 1px solid color-mix(in srgb, var(--acc, #7fe0a0) 45%, transparent); }
+.col5-cell-b { display: grid; justify-items: center; gap: 0; }
+.col5-cell-b i, .col5-mult em { font-style: normal; font-size: 7px; font-weight: 900; letter-spacing: .16em;
+    text-transform: uppercase; color: #a98c5c; }
+.col5-cell-b b { font-size: 14px; font-weight: 900; color: #ffe9bd; font-variant-numeric: tabular-nums; }
+.col5-mult { display: grid; justify-items: center; }
+.col5-mult b { font-family: var(--font-display); font-size: 1.05rem; line-height: 1; color: #8f98a3; }
+.col5-mult.is-on b { color: #ffd75e; text-shadow: 0 0 14px rgba(255,215,94,.95);
+    animation: col5Beat 1.6s ease-in-out infinite; }
+@keyframes col5Beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+/* ── THREE MOONS ACROSS BOTH BOARDS ── the announcement, over everything. */
+.col5-shout { position: absolute; inset: 0; z-index: 9; display: grid; align-content: center;
+    justify-items: center; gap: 3px; border-radius: 14px;
+    background: radial-gradient(70% 45% at 50% 50%, rgba(20,50,30,.94), rgba(0,0,0,.96));
+    animation: col5In .3s ease both; }
+@keyframes col5In { from { opacity: 0; } to { opacity: 1; } }
+.col5-shout i { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--acc, #7fe0a0); }
+.col5-shout b { font-family: var(--font-display); font-size: 2rem; line-height: 1.05; color: #fff;
+    text-shadow: 0 0 30px color-mix(in srgb, var(--acc, #7fe0a0) 90%, transparent);
+    animation: col5Pop .45s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes col5Pop { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+.col5-shout em { font-style: normal; font-size: 11.5px; color: #cbe9d6; }
+
+/* Free spins tint the whole thing, so you can tell at a glance which round you are in. */
+.col5.is-free .col5-col { border-color: #ffd75e;
+    box-shadow: inset 0 0 50px rgba(0,0,0,.8), 0 0 30px -6px rgba(255,215,94,.7); }
+
 /* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
    Five rooms deep, and the room is the point — each stage is a different painted place behind the
    burrows, so going deeper is something you SEE rather than a number going up.

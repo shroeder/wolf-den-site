@@ -894,6 +894,47 @@ async function markDefeatIfDead(bossId, hp, defeatedBy = null) {
 // Counted over bosses that ACTUALLY DREW — `winner_buyer_id IS NOT NULL` — so a boss with no prize attached is
 // not one of the three. A prize-less week should not serve part of somebody's suspension.
 export const RAFFLE_COOLDOWN_BOSSES = 3;
+// ── AND YOU HAVE TO HAVE BEEN A CUSTOMER ─────────────────────────────────────────────────────────────────────
+// Luke: "I want to restrict winners of the physical prize further. If they've never spent money either in
+// person or via online, they are exempt from winning."
+//
+// The prize is a real object off a shelf in Montgomery and the shop pays for it. Everything else the boss hands
+// out is in-game and costs nothing to mint; this one line item is the only place the game reaches into the
+// till. Handing it to an account that has never bought anything, in a game attached to a card shop, is the shop
+// buying a present for a stranger.
+//
+// TWO WAYS TO HAVE SPENT, and both are already recorded for other reasons:
+//   in person   an XP event of purchase_spend / purchase_flat / first_purchase, which is how a Square sale at
+//               the counter reaches a member's account (see the intake handshake).
+//   online      a PAID row in mkt_credit_purchase — store credit bought with a card. `status = 'paid'` matters:
+//               a pending row is a checkout somebody opened and abandoned.
+//
+// It is a SILENT bar, like every other one on this draw. It decides the pool and never reaches the client: a
+// member who has not bought anything is simply not in the hat, and is told nothing, because "you did not
+// qualify because you have never spent money" is a sentence a game should not say to somebody playing it.
+//
+// One query for the whole pool rather than one per member — a boss can have sixty fighters and this runs
+// inside the settle.
+async function everSpentIds(ids) {
+    if (!ids.length) return new Set();
+    const [store, online] = await Promise.all([
+        db.query(
+            `SELECT DISTINCT buyer_id FROM mkt_xp_event
+              WHERE buyer_id = ANY($1)
+                AND action IN ('purchase_spend', 'purchase_flat', 'first_purchase')`,
+            [ids],
+        ).catch(() => []),
+        db.query(
+            `SELECT DISTINCT buyer_id FROM mkt_credit_purchase
+              WHERE buyer_id = ANY($1) AND status = 'paid'`,
+            [ids],
+        ).catch(() => []),
+    ]);
+    const out = new Set();
+    for (const r of [...(store || []), ...(online || [])]) out.add(r.buyer_id);
+    return out;
+}
+
 async function raffleLockedIds(currentBossId) {
     const rows = await db.query(
         `SELECT winner_buyer_id FROM boss_event
@@ -984,12 +1025,20 @@ async function finalizeBossKill(bossId) {
     // this function hands out, the pet rolls, the chests, the XP, the spin token. They are out of the hat for
     // the physical prize only, and only for three, which at the current cadence is about a month.
     const lockedOut = await raffleLockedIds(bossId).catch(() => new Set());
+    // Who has ever actually bought something, in the shop or online — see everSpentIds. Asked once for
+    // everyone who could possibly be in the hat, fighters and fortune-ticket holders alike.
+    const couldWin = [...new Set([...pool.map((p) => p.id), ...petBonuses.keys()])];
+    const spent = await everSpentIds(couldWin).catch(() => new Set(couldWin));
     // barredFromPrizes sits beside isHouse everywhere isHouse decides the POOL, and nowhere that decides
     // what the screen says. A silent bar that announces itself is not a silent bar.
-    const rafflePool = pool.filter((p) => !isHouse(p.id) && !barredFromPrizes(p.id) && !lockedOut.has(p.id));
+    const rafflePool = pool.filter((p) => !isHouse(p.id) && !barredFromPrizes(p.id) && !lockedOut.has(p.id)
+        && spent.has(p.id));
     const inRaffle = new Set(rafflePool.map((p) => p.id));
     for (const [buyerId, bonus] of petBonuses) {
         if (inRaffle.has(buyerId) || isHouse(buyerId) || barredFromPrizes(buyerId) || lockedOut.has(buyerId)) continue;
+        // The fortune-ticket half of the hat gets the same test. Free entries are still entries into a draw
+        // for a real object, and the rule is about the prize, not about how you got your tickets.
+        if (!spent.has(buyerId)) continue;
         const tickets = fortuneTickets(bonus?.stats?.fortune || 0, boss);
         if (tickets > 0) rafflePool.push({ id: buyerId, dmg: 0, tickets });
     }
@@ -1000,8 +1049,11 @@ async function finalizeBossKill(bossId) {
     // fairness dial.
     if (!rafflePool.length && boss.prize_name) {
         // The cooldown is dropped when it would empty the hat; the house exclusion is not, "because that one
-        // is a promise, not a fairness dial". A bar is the same kind of thing, so it survives here too.
-        for (const p of pool) if (!isHouse(p.id) && !barredFromPrizes(p.id)) rafflePool.push(p);
+        // is a promise, not a fairness dial". A bar is the same kind of thing, so it survives here too — and
+        // so does the has-ever-spent test, for exactly the same reason. If nobody who turned up has ever
+        // bought anything, the right outcome is that the shelf keeps its prize this week, not that it is
+        // given to somebody the rule was written to exclude.
+        for (const p of pool) if (!isHouse(p.id) && !barredFromPrizes(p.id) && spent.has(p.id)) rafflePool.push(p);
     }
     if (rafflePool.length && boss.prize_name) {
         const totalTickets = rafflePool.reduce((s, p) => s + p.tickets, 0);

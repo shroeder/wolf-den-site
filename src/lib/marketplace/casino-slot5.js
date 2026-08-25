@@ -120,6 +120,18 @@ const LOOK = {
         chest: { rank: 4, role: "bonus", tone: "#ffd75e", name: "Radiant Phoenix" },
         moon: { rank: 5, role: "scatter", tone: "#8fd3ff", name: "Spirit Fox" },
         wolf: { rank: 6, role: "wild", tone: "#b45aff", name: "Chameleon" },
+        // ── THE TWO GIANTS ───────────────────────────────────────────────────────────────────────
+        // Luke, on the reference: "it has a Lil' Red and a Big Bad Wolf, and they're not repeating tiles,
+        // they're actually one big one, and they only show up in the big reels. Those are the best paying
+        // ones — the goal is to get them to line up, because that's how you get the massive payout, when
+        // you get four or five of the big ones stacked next to each other."
+        //
+        // So: two characters, drawn ONCE at the height of the block they fill rather than tiled, on the
+        // colossal set only, above everything else on the ladder. A pair rather than one, because the
+        // reference's pull is the girl and the wolf — two things you are hunting at once, and a board with
+        // one of each on it is a board where either could be the one that lines up.
+        keeper: { rank: 7, role: "giant", tone: "#ffd08a", name: "The Keeper" },
+        dire: { rank: 8, role: "giant", tone: "#ff5a7a", name: "The Dire Wolf" },
     },
     // ── THE VAULT ── cut gems, which are a colour ladder somebody already built: five stones in five hues,
     // and the Wolf's Eye — the secret sixth — as the scatter.
@@ -376,26 +388,81 @@ const MENAGERIE = {
     blurb: "Something is always moving. Three moons and it starts again.",
     wild: "wolf",
     scatter: "moon",
-    // BUSY. The highest hit rate on the floor and the flattest table — small things happen constantly, which
-    // is the whole character, and its free round can restart itself forever.
+    // ── IT IS A COLOSSAL-REELS CABINET NOW ───────────────────────────────────────────────────────────
+    // Two sets spun at once: this ordinary 5x3 and a 5x12 beside it. The scatter already lived only on
+    // reels one, three and five, which is exactly where Luke's reference puts it — "the bonus icon shows up
+    // on reels 1, 3 and 5 in both screens" — so the strips did not have to move for that.
+    //
+    // The WILD did have to. It was on reels two and four only, which is the right shape for a machine whose
+    // wild is a rare substitution and the wrong one for a machine whose wild arrives in blocks and is meant
+    // to fill a column: a column that can never be all wild can never transfer, and the transfer is the
+    // whole cabinet. It is on every reel now, in a smaller amount, and it STACKS (see `stacks`).
     strips: [
-        { bone: 22, doubloon: 20, laurel: 18, chest: 10, moon: 6, wolf: 0 },
-        { bone: 21, doubloon: 19, laurel: 17, chest: 10, moon: 0, wolf: 8 },
-        { bone: 21, doubloon: 18, laurel: 16, chest: 10, moon: 5, wolf: 9 },
-        { bone: 21, doubloon: 19, laurel: 17, chest: 10, moon: 0, wolf: 8 },
-        { bone: 22, doubloon: 20, laurel: 18, chest: 10, moon: 5, wolf: 0 },
+        { bone: 21, doubloon: 19, laurel: 17, chest: 10, moon: 6, wolf: 4 },
+        { bone: 20, doubloon: 18, laurel: 16, chest: 10, moon: 0, wolf: 6 },
+        { bone: 20, doubloon: 17, laurel: 15, chest: 10, moon: 5, wolf: 7 },
+        { bone: 20, doubloon: 18, laurel: 16, chest: 10, moon: 0, wolf: 6 },
+        { bone: 21, doubloon: 19, laurel: 17, chest: 10, moon: 5, wolf: 4 },
     ],
-    pays: {
-        wolf: { 3: 10.5, 4: 60, 5: 514 },
-        chest: { 3: 5, 4: 26, 5: 171 },
-        laurel: { 3: 2.6, 4: 12, 5: 68 },
-        doubloon: { 3: 1.3, 4: 6, 5: 29 },
-        bone: { 3: 0.9, 4: 3.4, 5: 13.5 },
+    // A drawn wild is extended into a run rather than sitting alone, which is what "wilds come in big
+    // blocks" means and the only way a three-row column is ever entirely wild.
+    stacks: { wolf: [2, 3] },
+    colossal: {
+        label: "The Colossal Reels",
+        // The tall set is the same symbols at slightly leaner odds — it is twelve rows and eighty lines, so
+        // it does not need the main set's density to be busy.
+        // ── AND THE MOON IS ALMOST GONE FROM THE TALL SET ────────────────────────────────────────────
+        // Thirty-six scatter-eligible cells over here against nine on the main board, so the density that
+        // makes three moons a hunt on a 5x3 makes them nearly certain on a 5x12: at the main set's weight
+        // the bonus fired on one spin in TWO. A quarter of a point puts the door back at one spin in 36.
+        strips: [
+            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 1.4, dire: 1.4 },
+            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 1.4, dire: 1.4 },
+            { bone: 21, doubloon: 17, laurel: 14, chest: 8, moon: 0.25, wolf: 6, keeper: 1.4, dire: 1.4 },
+            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 1.4, dire: 1.4 },
+            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 1.4, dire: 1.4 },
+        ],
+        // Blocks, and bigger ones than the small set gets — twelve rows can carry them. The two giants take
+        // a third to a half of the column each, which is what makes "four or five of them lined up" a thing
+        // that can actually happen and what makes it worth watching the tall reels come to rest.
+        stacks: { wolf: [3, 6], chest: [2, 3], keeper: [4, 6], dire: [4, 6] },
+        // Drawn as ONE image over the rows they occupy rather than tiled — see `giants` in the client. The
+        // engine still stores them as a run of ordinary cells, because the maths must not care how tall a
+        // picture is: a line through row 7 hits The Dire Wolf whether he is drawn once or six times.
+        giants: ["keeper", "dire"],
+        // ── AND THE LAST COLOSSAL REEL CHANGES IN THE BONUS ──────────────────────────────────────────
+        // "The final column is actually different during the bonus — it's got normal pay symbols, but then
+        // it has stacking multipliers." 25x is deliberately once in a long while; the small ones are what
+        // you actually live on. The mini and the major that also sit here on the reference are not built:
+        // Luke, explicitly, "for now we won't do the mini or the major."
+        multStrip: { bone: 20, doubloon: 16, laurel: 12, chest: 7, m2: 14, m3: 9, m5: 5, m10: 2, m25: 1 },
+        multStacks: { m2: [2, 4], m3: [2, 3], m5: [2, 3], m10: [1, 2], m25: [1, 1] },
     },
-    scatterPays: { 3: 1.3, 4: 6, 5: 31 },
-    free: { kind: "retrigger", spins: 14, label: "Fourteen spins, and three more moons buys fourteen more" },
-    second: { kind: "hold", trigger: "chest", need: 6, spins: 3, label: "The Stampede",
-        values: [1.7, 1.7, 2.6, 2.6, 3.4, 5, 8.5, 15.5], full: 223 },
+    // ── A HUNDRED LINES, PAID AT A HUNDREDTH ─────────────────────────────────────────────────────────
+    // Every number here is the old table x0.11. That is not the cabinet being nerfed: it now resolves 100
+    // lines across two grids instead of 20 across one, and the 5x12 set alone lands eight winning lines on
+    // an average press. A per-line pay written for a 5x3 board pays five times over on this one.
+    pays: {
+        // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
+        // COMPLETE a line of them, so it must be worth less than the thing it is completing.
+        dire: { 3: 1.63, 4: 9.77, 5: 87.32 },
+        keeper: { 3: 1.41, 4: 8.14, 5: 71.04 },
+        wolf: { 3: 0.86, 4: 4.88, 5: 41.84 },
+        chest: { 3: 0.41, 4: 2.12, 5: 13.92 },
+        laurel: { 3: 0.21, 4: 0.98, 5: 5.54 },
+        doubloon: { 3: 0.1, 4: 0.49, 5: 2.36 },
+        bone: { 3: 0.07, 4: 0.27, 5: 1.1 },
+    },
+    scatterPays: { 3: 0.1, 4: 0.49, 5: 2.52 },
+    // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
+    // "If you trigger the bonus you get a certain amount of free spins depending on how many scatters you
+    // get." Three is the door; every one after that is worth a lot more than the last, which is what makes
+    // a fourth moon on a board that already has three the best second on the machine.
+    free: { kind: "colossal", spins: 8, label: "The Colossal Reels",
+        bySctr: { 3: 8, 4: 15, 5: 25, 6: 40 } },
+    // THE STAMPEDE IS GONE. It was this cabinet's hold-and-spin and a good one, but the machine Luke is
+    // pointing at has ONE bonus and this is it — a cabinet with a colossal free round AND a hold has two
+    // second features and no identity. Same call as The Harvest's Wagon; its numbers are in the history.
 };
 
 const VAULT = {
@@ -490,7 +557,34 @@ const pick = (bag, rng) => {
 };
 
 /** A grid: five reels of three symbols, top to bottom. */
+// ── A COLUMN, WITH THINGS THAT STACK ─────────────────────────────────────────────────────────────────────────
+// "Wilds come in big blocks." A column drawn symbol-by-symbol out of a weighted bag gives you a wild here and a
+// wild there and never a block, so a drawn wild is EXTENDED into a run — which is what makes a full column, and
+// a full column is what transfers. Same machinery for the multipliers, which stack for the same reason.
+function stackedColumn(bag, rows, rng, stacks = {}, whole = []) {
+    const col = [];
+    let guard = 0;
+    while (col.length < rows) {
+        const sym = pick(bag, rng);
+        const run = stacks[sym];
+        const n = run ? run[0] + Math.floor(rng() * (run[1] - run[0] + 1)) : 1;
+        // ── A GIANT IS NEVER CUT OFF BY THE BOTTOM OF THE REEL ────────────────────────────────────────
+        // The two giants are drawn as ONE picture over the rows they occupy, so a run that ran out of reel
+        // came out as a standing figure cropped into a single cell — a crowned head in a letterbox, which
+        // reads as a rendering fault rather than as a symbol. Anything in `whole` is re-drawn rather than
+        // truncated: it lands at full height or it does not land. The guard is because a bag that is nearly
+        // all giants could otherwise spin here forever.
+        if (whole.includes(sym) && col.length + n > rows && guard < 24) { guard += 1; continue; }
+        for (let i = 0; i < n && col.length < rows; i += 1) col.push(sym);
+    }
+    return col;
+}
+
 export function spinGrid(m, rng = Math.random) {
+    // `stacks` makes a drawn symbol come out as a RUN rather than alone — the difference between a wild here
+    // and there and a wild BLOCK, and on a colossal cabinet the only way a three-row column is ever entirely
+    // wild. Cabinets without it are drawn cell by cell exactly as before.
+    if (m.stacks) return m.strips.map((bag) => stackedColumn(bag, ROWS, rng, m.stacks));
     return m.strips.map((bag) => Array.from({ length: ROWS }, () => pick(bag, rng)));
 }
 
@@ -500,12 +594,15 @@ export function spinGrid(m, rng = Math.random) {
 //
 // `mult` is the feature multiplier — 1 in the base game, more inside free spins. It multiplies LINE and
 // SCATTER wins, and deliberately not the pick bonus, which brings its own numbers.
-export function evaluate(m, grid, { lineBet = 1, mult = 1 } = {}) {
+// `lines`/`rows` so the same evaluator can read the COLOSSAL set, which is twelve rows tall on its own
+// hundred-line table; `noScatter` because a colossal cabinet spins two grids and the scatter must be counted
+// across the pair and paid once, rather than paid twice by two independent calls.
+export function evaluate(m, grid, { lineBet = 1, mult = 1, lines = LINES, rows = ROWS, noScatter = false } = {}) {
     const wins = [];
     let total = 0;
 
-    for (let i = 0; i < LINES.length; i += 1) {
-        const line = LINES[i];
+    for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
         const seq = line.map((row, reel) => grid[reel][row]);
         // The symbol the run is made of is the first non-wild — a line that opens with wilds pays as whatever
         // it turns into. A line of nothing but wilds pays as wilds, which is the top award on the machine.
@@ -520,13 +617,13 @@ export function evaluate(m, grid, { lineBet = 1, mult = 1 } = {}) {
         // WHICH CELLS. A cascade cannot break the winning symbols without knowing which ones they are, and
         // the line-drawing overlay wants the same list. Cheap to carry, impossible to reconstruct later.
         const cells = [];
-        for (let reel = 0; reel < n; reel += 1) cells.push(reel * ROWS + line[reel]);
+        for (let reel = 0; reel < n; reel += 1) cells.push(reel * rows + line[reel]);
         wins.push({ kind: "line", line: i, symbol: lead, count: n, amount, cells });
     }
 
     // Scatters pay from anywhere, on the total bet.
     const scatters = grid.flat().filter((s) => s === m.scatter).length;
-    const sPay = m.scatterPays[scatters];
+    const sPay = noScatter ? 0 : m.scatterPays[scatters];
     if (sPay) {
         const amount = sPay * lineBet * LINES.length * mult;
         total += amount;
@@ -1081,6 +1178,160 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
     return { total, stages, geodes, reached, full: geodes > 0 };
 }
 
+// ══ COLOSSAL REELS ═══════════════════════════════════════════════════════════════════════════════════════════
+// Luke, with a Lil' Red cabinet on screen: "let's have the Menagerie do this. There's a regular reel on the left
+// and a huge reel on the right, and wilds come in big blocks. One of the cool features is if you get a stacking
+// wild in a column on the small screen it transfers over to the big screen. And there's a bonus you get by
+// getting three scatters between both screens — you get free spins depending on how many scatters. The bonus
+// icon shows up on reels 1, 3 and 5 in both screens. And the cool thing about the bonus is when you get even
+// ONE wild in a column on the small screen it grows to fit the whole screen on the big one. Also the final
+// column is different during the bonus — normal pay symbols, but stacking multipliers, 2x 3x 5x 10x 25x."
+//
+// TWO REEL SETS, ONE SPIN. The main set is the ordinary 5x3 this file has always dealt in; the colossal set is
+// 5x12 beside it. They are spun independently off their own strips, they pay on their own line sets, and the
+// only thing that crosses between them is the WILD TRANSFER — which is the whole idea, because it is the one
+// mechanic that makes you watch the small screen when the big one has all the money on it.
+//
+// A HUNDRED LINES, and they are not authored by hand. The main set keeps the house's twenty patterns. The
+// colossal set is twelve rows, which is four bands of three — so the same twenty patterns are translated down
+// into each band, giving eighty. Twenty plus eighty is the hundred the reference cabinet prints on its glass,
+// and every one of them is a shape somebody already looked at rather than eighty new ones nobody has.
+export const COLOSSAL_ROWS = 12;
+export const COLOSSAL_LINES = [0, 3, 6, 9].flatMap((off) => LINES.map((l) => l.map((r) => r + off)));
+// The stake is split across every line the cabinet plays, and this one plays a hundred — twenty on the main
+// set and eighty on the tall one. Splitting it twenty ways, the way every other cabinet does, was paying a
+// hundred lines out of a twenty-line stake and returned 31,000%.
+export const COLOSSAL_TOTAL_LINES = LINES.length + COLOSSAL_LINES.length;
+
+// ── THE MULTIPLIER REEL ──────────────────────────────────────────────────────────────────────────────────────
+// Only during free spins, only the last colossal reel. Stacked like everything else on this machine, and
+// deliberately weighted so the small ones are ordinary and 25x is a story. The mini and the major jackpots the
+// reference also puts here are NOT built — Luke: "for now we won't do the mini or the major."
+const MULTS = { m2: 2, m3: 3, m5: 5, m10: 10, m25: 25 };
+export const isMult = (s) => Object.prototype.hasOwnProperty.call(MULTS, s);
+export const multValue = (s) => MULTS[s] || 0;
+
+
+/** The tall set. `free` swaps reel five for the multiplier reel. */
+function spinColossal(m, rng, free = false) {
+    return m.colossal.strips.map((bag, reel) => {
+        const isLast = reel === REELS - 1;
+        const useBag = free && isLast ? m.colossal.multStrip : bag;
+        const stacks = free && isLast ? m.colossal.multStacks : m.colossal.stacks;
+        return stackedColumn(useBag, COLOSSAL_ROWS, rng, stacks, m.colossal.giants || []);
+    });
+}
+
+// ── THE TRANSFER ─────────────────────────────────────────────────────────────────────────────────────────────
+// The one thing that crosses between the two sets, and the reason to look at the small one. In the base game a
+// main column has to be FULLY wild to send; in free spins a single wild anywhere in the column does it, which
+// is what turns the bonus from "the same game with more spins" into a different game.
+function transferWilds(m, main, col, free) {
+    const sent = [];
+    for (let reel = 0; reel < REELS; reel += 1) {
+        const n = main[reel].filter((s) => s === m.wild).length;
+        const send = free ? n >= 1 : n >= main[reel].length;
+        if (!send) continue;
+        sent.push(reel);
+        for (let row = 0; row < COLOSSAL_ROWS; row += 1) col[reel][row] = m.wild;
+    }
+    return sent;
+}
+
+/**
+ * One press of a colossal cabinet: both sets, the transfer between them, and what the pair paid.
+ * The scatter is counted across BOTH sets and paid once, which is Luke's "three scatters between both screens".
+ */
+export function runColossal(m, { lineBet = 1, rng = Math.random, free = false, mult = 1 } = {}) {
+    const main = spinGrid(m, rng);
+    const col = spinColossal(m, rng, free);
+    const sent = transferWilds(m, main, col, free);
+
+    // ── THE MULTIPLIER REEL, READ ────────────────────────────────────────────────────────────────────────
+    // The BIGGEST multiplier showing on the last colossal reel multiplies what the tall set paid.
+    //
+    // I tried summing them first, which is the obvious reading of "stacking multipliers" and is wrong by a
+    // mile: the reel is twelve rows deep, so a sum averaged x20 and the cabinet returned 31,000%. A stack
+    // still matters under "biggest" — it is what puts a 25x on the screen at all, and it is what makes the
+    // reel worth watching as it comes to rest — but twelve cells cannot each multiply your money.
+    let reelMult = 0;
+    if (free) for (const s of col[REELS - 1]) reelMult = Math.max(reelMult, multValue(s));
+    const applied = Math.max(1, reelMult);
+
+    // Paid separately so the screen can light each set on its own, and so the scatter cannot be paid twice.
+    const mainWins = evaluate(m, main, { lineBet, mult, lines: LINES, rows: ROWS, noScatter: true });
+    const colWins = evaluate(m, col, { lineBet, mult: mult * applied, lines: COLOSSAL_LINES, rows: COLOSSAL_ROWS, noScatter: true });
+
+    // THE SCATTER PAYS ONCE, ON THE PAIR. It only lives on reels one, three and five of either set — see the
+    // strips — so "three between both screens" is a real hunt across two boards rather than three on one.
+    const scatters = [...main.flat(), ...col.flat()].filter((s) => s === m.scatter).length;
+    const sPay = m.scatterPays[Math.min(scatters, 5)];
+    const scatterWin = sPay ? sPay * lineBet * COLOSSAL_TOTAL_LINES * mult : 0;
+
+    // ── WHERE THE BIG PICTURES GO ────────────────────────────────────────────────────────────────────────
+    // Runs of a giant symbol, derived from the finished column rather than tracked while it is built — two
+    // stacks of The Dire Wolf that land touching SHOULD read as one taller wolf, and deriving it is the only
+    // version that gets that right. The maths never sees this; it is purely how the column is drawn.
+    const giants = [];
+    if (m.colossal.giants?.length) {
+        for (let reel = 0; reel < REELS; reel += 1) {
+            let row = 0;
+            while (row < COLOSSAL_ROWS) {
+                const sym = col[reel][row];
+                if (!m.colossal.giants.includes(sym)) { row += 1; continue; }
+                let len = 1;
+                while (row + len < COLOSSAL_ROWS && col[reel][row + len] === sym) len += 1;
+                giants.push({ reel, row, len, sym });
+                row += len;
+            }
+        }
+    }
+
+    return {
+        main, col, sent, giants, reelMult: free ? reelMult : 0, applied: free ? applied : 1,
+        mainWins: mainWins.wins, colWins: colWins.wins, scatters,
+        total: mainWins.total + colWins.total + scatterWin,
+        mainTotal: mainWins.total, colTotal: colWins.total, scatterWin,
+    };
+}
+
+// ── ONE PRESS OF A COLOSSAL CABINET ──────────────────────────────────────────────────────────────────────────
+// The base spin, and then the free round it may have bought. Kept beside runColossal rather than inside
+// playSpin because the two machines share almost nothing: this one has no chain, no hold, no pick, and its
+// bonus is counted off a pair of grids.
+export function playColossal(m, { bet = 100, rng = Math.random, lineBet = 1 } = {}) {
+    const first = runColossal(m, { lineBet, rng, free: false });
+    let total = first.total;
+    let free = null;
+
+    // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
+    // Three across the pair opens it; a fourth is worth nearly twice as much again. Clamped to the table's
+    // top entry so six moons on a very good board cannot ask for a key that does not exist.
+    if (first.scatters >= 3) {
+        const table = m.free.bySctr || {};
+        const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
+        const key = keys.filter((k) => k <= first.scatters).pop() ?? keys[0];
+        const count = table[key] || m.free.spins;
+        const spins = [];
+        let ftotal = 0;
+        for (let i = 0; i < count; i += 1) {
+            // EVERY BONUS SPIN IS A FULL COLOSSAL SPIN, with the two things that change in the bonus: one
+            // wild in a main column sends the whole colossal column, and the last colossal reel is the
+            // multiplier reel. Both live in runColossal behind its `free` flag.
+            const sp = runColossal(m, { lineBet, rng, free: true });
+            ftotal += sp.total;
+            spins.push(sp);
+        }
+        total += ftotal;
+        free = { kind: "colossal", label: m.free.label, spins, total: ftotal, base: count,
+            scatters: first.scatters, mult: 1 };
+    }
+
+    return { grid: first.main, colossal: first, base: { wins: first.mainWins, total: first.mainTotal },
+        chain: null, free, locked: null, hold: null, built: null, warren: null, gems: null,
+        winAgain: null, meter: [], total, bet };
+}
+
 // ── HOLD AND SPIN ────────────────────────────────────────────────────────────────────────────────────────────
 // The other kind of bonus round, and the reason The Harvest and The Menagerie do not simply have The Hunt's.
 // Six or more coins land, every coin LOCKS in place, and you get three respins — every new coin resets the
@@ -1145,6 +1396,13 @@ export function runHold(m, cfg, { lineBet = 1, rng = Math.random } = {}) {
 // through playSpin — reported the Vault putting 0.00% of its money in features while quietly under-counting
 // its whole return. A gate that cannot see a feature is a gate that lies about the machine.
 export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", meter = [] } = {}) {
+    // ── A COLOSSAL CABINET IS A DIFFERENT PRESS ──────────────────────────────────────────────────────
+    // Two reel sets, a hundred lines between them, a wild that crosses from the small one to the big one and
+    // a free round whose length is bought by the number of scatters. None of the machinery below it applies:
+    // it does not cascade, it has no hold and no pick, and its scatter is counted across a pair of grids. So
+    // it gets its own path rather than five more branches threaded through this one.
+    if (m.colossal) return playColossal(m, { bet, rng, lineBet: bet / COLOSSAL_TOTAL_LINES });
+
     const lineBet = bet / LINES.length;
     const grid = spinGrid(m, rng);
 

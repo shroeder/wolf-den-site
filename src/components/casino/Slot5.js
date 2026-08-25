@@ -10,6 +10,7 @@ import TheLocks from "@/components/casino/TheLocks.js";
 import TheWarren from "@/components/casino/TheWarren.js";
 import GemVault from "@/components/casino/GemVault.js";
 import WinAgainBar from "@/components/casino/WinAgainBar.js";
+import ColossalReels from "@/components/casino/ColossalReels.js";
 
 // ── THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────────────
 // Five reels, three rows, twenty lines. The maths is entirely server-side (casino-slot5.js) and this screen
@@ -703,6 +704,45 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         return (
             <div className="s5 is-bonus">
                 <GemVault gems={result.gems} bet={bet} onDone={() => setPhase("done")} />
+            </div>
+        );
+    }
+
+    // ── THE COLOSSAL CABINET RENDERS ITSELF ──────────────────────────────────────────────────────────────
+    // Two boards, a hundred lines, a transfer that falls from one into the other and a bonus that changes the
+    // last reel of the big one. None of that is a variation on the five-reel window below — it is a different
+    // machine that happens to live on the same floor — so it draws its own screen and hands back when the
+    // press is finished, the way the Warren and the Threshing Floor do.
+    if (slot5(machineId).colossal) {
+        return (
+            <div className="s5">
+                <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
+                    playing={Boolean(result?.colossal)} onDone={() => setPhase("done")} />
+                {pays ? <Paytable kind="five" machineId={machineId} art={art} bet={bet} rate={rate} onClose={() => setPays(false)} /> : null}
+
+                {/* THE SAME PANEL AS EVERY OTHER CABINET. The first cut of this screen grew its own readout
+                    and its own row of stake buttons, which is how a floor ends up with two of everything —
+                    and it called `setBet`, which does not exist here (the bet is the parent's, changed
+                    through `onBet`). One readout, one stepper, one button, shared. */}
+                <div className="s5-readout">
+                    <span><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
+                    <span className="s5-ro-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
+                </div>
+                <div className="s5-panel">
+                    <div className="s5-stepper">
+                        <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
+                            onClick={() => step(-1)}>−</button>
+                        <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
+                        <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
+                            onClick={() => step(1)}>+</button>
+                    </div>
+                    <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}
+                        onClick={() => pull(null)} disabled={locked}>
+                        {spinning ? <span className="s5-spin-wait" aria-hidden="true" />
+                            : broke ? <span className="s5-spin-broke">NOT<br />ENOUGH</span>
+                            : "SPIN"}
+                    </button>
+                </div>
             </div>
         );
     }

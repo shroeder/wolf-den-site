@@ -165,6 +165,62 @@ const JOBS = {
             + "no reflections of objects. Just a bare dark window in a gold frame.",
         ),
     },
+    // ══ THE TWO GIANTS ═══════════════════════════════════════════════════════════════════════════
+    // Luke, on the reference cabinet: "it has a Lil' Red and a Big Bad Wolf, and they're not repeating tiles,
+    // they're actually one big one, and they only show up in the big reels. Those are the best paying ones —
+    // the goal is to get them to line up, because that's how you get the massive payout, when you get four or
+    // five of the big ones stacked next to each other."
+    //
+    // So these are drawn TALL and once, at roughly the height of the block they fill, rather than as a tile
+    // that repeats down a column. Everything else on this floor is a 1:1 medallion; these two are the only
+    // symbols in the building that are a figure, and that is exactly why they read as the prize.
+    // ── AND THEY HAVE TO BE THE BRIGHTEST THING IN THE BUILDING ──────────────────────────────────
+    // Luke, on the first cut: "those tall ones are kind of weak and not very juicy... I was thinking
+    // something more exciting and REGAL and shiny and PRISMATIC, not stale and old like yours. Think about
+    // the pop art we want — it needs to be very very dopamine inducing."
+    //
+    // He is right and it was my fault twice over, in the same way as the Threshing Floor: the house style
+    // already asks for "rich saturated jewel-tone colours", and I overrode it in the per-asset line with
+    // "deep emerald green, warm brass" and "black and deep crimson fur". A model given a muted palette will
+    // give you a muted drawing however bright the house style is. The Keeper came back olive on olive and
+    // the wolf came back black on grey — invisible on a dark reel and dead on a bright one.
+    //
+    // These two are the TOP OF THE PAYTABLE on a machine whose whole pull is lining them up, so they have to
+    // out-shine every gem, fruit and coin on the floor. Prismatic and lit from inside, not painted dark.
+    "reels/slot4-keeper": {
+        size: "1024x1536",
+        px: { width: 320, height: 640 },
+        prompt: housePrompt(
+            "THE KEEPER of a fantasy menagerie: a radiant regal woman standing straight and facing the "
+            + "viewer, crowned in gold, wearing flowing IRIDESCENT robes whose colour shifts through cyan, "
+            + "magenta and gold like oil on water, gold filigree armour at the shoulders, one hand raised "
+            + "holding a blazing white-gold lantern, and a spirit fox of pure white flame curled on her "
+            + "shoulder, light pouring off the whole figure",
+            { framing: "sprite", extra: "FULL FIGURE head to foot, tall narrow portrait proportions roughly "
+                + "one part wide to two tall, seen straight on and flat with no perspective. PRISMATIC and "
+                + "BRILLIANT: hot cyan, electric magenta, blazing gold, a rainbow sheen across the robes and "
+                + "a hard white specular glint on every gold edge. She GLOWS from within and is the "
+                + "brightest, most saturated thing on the machine. Absolutely not muted, not drab, not dark, "
+                + "not olive, not dusty, no earth tones anywhere. Nothing else in frame, no background, no "
+                + "floor. She must read clearly at 90 pixels wide." }),
+    },
+    "reels/slot4-dire": {
+        size: "1024x1536",
+        px: { width: 320, height: 640 },
+        prompt: housePrompt(
+            "THE DIRE WOLF: an enormous regal wolf standing four-square and facing the viewer, head high and "
+            + "proud, its fur an IRIDESCENT aurora shifting through electric violet, hot cyan and magenta "
+            + "with a prismatic rainbow sheen along every strand, eyes blazing molten gold, wearing a heavy "
+            + "gold-and-gemstone collar, ribbons of coloured light crackling off its ruff",
+            { framing: "sprite", extra: "FULL BODY head to paws, tall narrow portrait proportions roughly one "
+                + "part wide to two tall, filling the frame top to bottom, seen straight on and flat with no "
+                + "perspective. PRISMATIC and BRILLIANT: electric violet, hot cyan and magenta fur with a "
+                + "rainbow oil-slick sheen, molten gold eyes, blazing gold collar set with vivid gems. It "
+                + "GLOWS from within and is the brightest, most saturated thing on the machine. Absolutely "
+                + "not black, not grey, not muted, not drab, no dull earth tones anywhere. Nothing else in "
+                + "frame, no background, no floor. It must read clearly at 90 pixels wide." }),
+    },
+
     "fs-mult": {
         size: "1024x1024",
         prompt: housePrompt(
@@ -382,12 +438,12 @@ await Promise.all(Array.from({ length: 3 }, async () => {
         try {
             let buf;
             if (PUBLISH) {
-                const src = path.join(OUT, `${name}.png`);
+                const src = path.join(OUT, `${name.replace(/\//g, "__")}.png`);
                 if (!fs.existsSync(src)) throw new Error(`no preview at ${src} — generate it first`);
                 buf = fs.readFileSync(src);
             } else {
                 buf = await generate(job);
-                fs.writeFileSync(path.join(OUT, `${name}.png`), buf);
+                fs.writeFileSync(path.join(OUT, `${name.replace(/\//g, "__")}.png`), buf);
             }
             if (APPLY || PUBLISH) {
                 // webp at the size it is actually drawn at. The cabinets render about 90px wide and the room
@@ -397,11 +453,17 @@ await Promise.all(Array.from({ length: 3 }, async () => {
                 // the note on the wall), and a width cap on a 3:1 image throws away two thirds of its
                 // vertical resolution — the wall came out 427px tall for a room that draws it at 320.
                 const wide = job.size === "1536x1024";
+                // `px` for the jobs that are neither square nor a wall — the two giants are 1:2 figures and a
+                // square cap would have thrown away half of each of them.
+                const box = job.px || (wide ? { height: 620 } : { width: 384, height: 384 });
                 const webp = await sharp(buf)
-                    .resize(wide ? { height: 620, fit: "inside" } : { width: 384, height: 384, fit: "inside" })
+                    .resize({ ...box, fit: "inside" })
                     .webp({ quality: 88 })
                     .toBuffer();
-                fs.writeFileSync(path.join(PUBLIC, `${name}.webp`), webp);
+                // A name may carry a subdirectory (reels/slot4-dire); make it rather than throwing on write.
+                const dest = path.join(PUBLIC, `${name}.webp`);
+                fs.mkdirSync(path.dirname(dest), { recursive: true });
+                fs.writeFileSync(dest, webp);
             }
             done += 1;
             console.log(`✓ ${name.padEnd(10)} ${(buf.length / 1024).toFixed(0)}KB`);

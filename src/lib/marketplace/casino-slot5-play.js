@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
-import { slot5, playSpin, FREE_SPIN_OFFERS, LINES } from "@/lib/marketplace/casino-slot5.js";
+import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL_LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
@@ -287,7 +287,41 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         //
         // Per-spin chips are converted here, by the same function that pays the total, so the counter can
         // climb as the round runs without the client doing any arithmetic of its own.
-        free: r.free ? {
+        // ── THE COLOSSAL CABINET SENDS TWO GRIDS ─────────────────────────────────────────────────────
+        // Its own branch rather than a fifth set of flags threaded through the free-round mapping below,
+        // because almost nothing about it is the same shape: two boards, two win lists, a hundred lines
+        // between them, a transfer that crosses from one to the other, and a bonus whose length was bought
+        // by a scatter count. Everything is converted to chips here, like every other payout in this file.
+        colossal: r.colossal ? (() => {
+            const c = r.colossal;
+            const toChips = (list) => list.map((w) => ({ ...w, chips: chipsFor(stake, w.amount / stake) }));
+            const spinOf = (x) => ({
+                main: x.main, col: x.col, sent: x.sent, giants: x.giants,
+                mainWins: toChips(x.mainWins), colWins: toChips(x.colWins),
+                // What the multiplier reel was showing, and what it applied. Sent even when it is 1 so the
+                // screen can draw the reel honestly rather than inferring a multiplier from the payout.
+                reelMult: x.reelMult, applied: x.applied,
+                scatters: x.scatters,
+                chips: chipsFor(stake, x.total / stake),
+                multiple: x.total / stake,
+            });
+            return {
+                label: m.colossal.label,
+                rows: COLOSSAL_ROWS,
+                lines: COLOSSAL_TOTAL_LINES,
+                ...spinOf(c),
+                // The free round, when the pair of boards found three moons. `bySctr` decided the length
+                // before the first bonus spin was rolled, so the screen can announce it up front.
+                free: r.free ? {
+                    label: r.free.label,
+                    base: r.free.base,
+                    scatters: r.free.scatters,
+                    chips: chipsFor(stake, r.free.total / stake),
+                    spins: r.free.spins.map(spinOf),
+                } : null,
+            };
+        })() : null,
+        free: r.free && !r.colossal ? {
             offer: offer.id,
             // ── THE CABINET'S OWN LABEL ──────────────────────────────────────────────────────────
             // `offer` in this file is always a FREE_SPIN_OFFERS entry — the deal chooser's, which only
