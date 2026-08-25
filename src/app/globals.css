@@ -19911,12 +19911,16 @@ body.cas-seated .social-fab { display: none; }
    the line survives crossing a bright tile, and the bright one on top. It draws itself on rather than
    appearing, because a line that appears is a mark and a line that draws is a path. */
 .col5-line { position: absolute; inset: 6px; z-index: 6; pointer-events: none; overflow: visible; }
+/* Every winning line at once, each drawing itself on a beat behind the last — so twenty lines arrive as a
+   spreading picture rather than as twenty things appearing. They are staggered by 25ms, which is under a
+   frame and a half apiece: fast enough to read as one event, slow enough to see the shape build. */
 .col5-line polyline { fill: none; stroke-linejoin: round; stroke-linecap: round;
     stroke: var(--acc, #7fe0a0); stroke-width: 1.6;
+    animation-delay: calc(var(--k, 0) * 25ms);
     filter: drop-shadow(0 0 3px color-mix(in srgb, var(--acc, #7fe0a0) 90%, transparent))
         drop-shadow(0 0 1.5px rgba(0,0,0,.9));
     stroke-dasharray: 200; stroke-dashoffset: 200;
-    animation: col5Draw .32s ease-out forwards; }
+    animation: col5Draw .3s ease-out forwards; }
 @keyframes col5Draw { to { stroke-dashoffset: 0; } }
 
 /* ── WHAT THIS PRESS PAID, AND THEN GONE ──────────────────────────────────────────────────────────────

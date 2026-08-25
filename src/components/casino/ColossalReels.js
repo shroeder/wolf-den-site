@@ -81,16 +81,25 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
             await wait(240);
         }
 
-        // Lines, small board then big — same order they were spun in, so the eye follows one thing.
+        // ── EVERY WINNING LINE, AT ONCE ──────────────────────────────────────────────────────────────────
+        // Luke: "can we just show all the paying paylines once we win? All at once."
+        //
+        // Right, and cycling them was actively hurting the machine twice over. A hundred-line cabinet pays
+        // ten or twenty lines on an ordinary spin, and lighting them one at a time at 620ms meant a spin
+        // took seven seconds to finish telling you about itself — so the reels sat still while you waited,
+        // which is the opposite of what a busy machine should feel like. And it made a big win look like a
+        // long win rather than a BIG one: twelve small flashes in a row read as twelve small wins.
+        //
+        // All together, the board lights up at once and you see the shape of what you got. Ten lines
+        // crossing the glass is the picture of a good spin; one line at a time is a queue.
         const wins = [...(sp.mainWins || []).map((w) => ({ ...w, set: "main" })),
             ...(sp.colWins || []).map((w) => ({ ...w, set: "col" }))];
-        // A hundred lines can pay forty at once, and forty lit one at a time is half a minute. The biggest
-        // dozen are drawn; the rest are in the total, which is the number anybody actually reads.
-        const show = wins.sort((a, b) => b.chips - a.chips).slice(0, 12);
-        for (const w of show) {
-            setLit(w);
-            Cas.coin(Math.min(4, Math.round(Math.log2(1 + w.chips))));
-            await wait(LINE_MS);
+        if (wins.length) {
+            setLit(wins);
+            // One rattle sized to the whole spin rather than a note per line — twenty coin pings in a row
+            // is a noise, and the size of the pile is the thing worth hearing.
+            Cas.coins(Math.min(1, 0.3 + wins.length / 24));
+            await wait(wins.length > 6 ? LINE_MS * 2.6 : LINE_MS * 1.9);
         }
         setLit(null);
         if (sp.chips) { setWon((n) => n + sp.chips); if (!isFree) Cas.coins(0.5); }
@@ -191,8 +200,11 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
         const h = w.set === "col" ? rows : ROWS;
         return w.cells.map((c) => c % h);
     };
-    const litCells = lit ? new Set(lit.cells) : null;
-    const cellLit = (set, reel, row, height) => litCells && lit.set === set && litCells.has(reel * height + row);
+    // Every cell on every winning line, per board. Built once per render rather than searched per cell —
+    // sixty-five cells times twenty wins is a scan nobody needs to do thirteen hundred times.
+    const litCells = { main: new Set(), col: new Set() };
+    for (const w of (lit || [])) for (const c of w.cells) litCells[w.set]?.add(c);
+    const cellLit = (set, reel, row, height) => litCells[set].has(reel * height + row);
 
     return (
         <div className={`col5${free ? " is-free" : ""}`}>
@@ -248,10 +260,13 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                         </div>
                     ))}
                 </div>
-                {lit && lit.set === "main" ? (
+                {lit?.some((w) => w.set === "main") ? (
                     <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${ROWS * 20}`}
                         preserveAspectRatio="none" aria-hidden="true">
-                        <polyline points={lineOf(lit).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                        {lit.filter((w) => w.set === "main").map((w, i) => (
+                            <polyline key={i} style={{ "--k": i }}
+                                points={lineOf(w).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                        ))}
                     </svg>
                 ) : null}
             </div>
@@ -299,10 +314,13 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                     something anybody can do. The path IS the line's own row-per-reel, which is already in
                     the win, so there is nothing to work out: a polyline through the middle of each cell it
                     used, in a viewBox the same shape as the board. */}
-                {lit && lit.set === "col" ? (
+                {lit?.some((w) => w.set === "col") ? (
                     <svg className="col5-line" viewBox={`0 0 ${REELS * 20} ${rows * 20}`}
                         preserveAspectRatio="none" aria-hidden="true">
-                        <polyline points={lineOf(lit).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                        {lit.filter((w) => w.set === "col").map((w, i) => (
+                            <polyline key={i} style={{ "--k": i }}
+                                points={lineOf(w).map((row, reel) => `${reel * 20 + 10},${row * 20 + 10}`).join(" ")} />
+                        ))}
                     </svg>
                 ) : null}
             </div>

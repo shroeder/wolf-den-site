@@ -449,13 +449,13 @@ const MENAGERIE = {
     pays: {
         // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
         // COMPLETE a line of them, so it must be worth less than the thing it is completing.
-        dire: { 3: 1.71, 4: 10.26, 5: 91.69 },
-        keeper: { 3: 1.48, 4: 8.55, 5: 74.59 },
-        wolf: { 3: 0.9, 4: 5.12, 5: 43.93 },
-        chest: { 3: 0.43, 4: 2.23, 5: 14.62 },
-        laurel: { 3: 0.22, 4: 1.03, 5: 5.82 },
-        doubloon: { 3: 0.11, 4: 0.51, 5: 2.48 },
-        bone: { 3: 0.07, 4: 0.28, 5: 1.16 },
+        dire: { 3: 2.48, 4: 14.88, 5: 132.95 },
+        keeper: { 3: 2.15, 4: 12.4, 5: 108.16 },
+        wolf: { 3: 1.3, 4: 7.42, 5: 63.7 },
+        chest: { 3: 0.62, 4: 3.23, 5: 21.2 },
+        laurel: { 3: 0.32, 4: 1.49, 5: 8.44 },
+        doubloon: { 3: 0.16, 4: 0.74, 5: 3.6 },
+        bone: { 3: 0.1, 4: 0.41, 5: 1.68 },
     },
     scatterPays: { 3: 0.1, 4: 0.49, 5: 2.52 },
     // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
@@ -1201,7 +1201,20 @@ export function runWarren(m, { lineBet = 1, rng = Math.random } = {}) {
 // into each band, giving eighty. Twenty plus eighty is the hundred the reference cabinet prints on its glass,
 // and every one of them is a shape somebody already looked at rather than eighty new ones nobody has.
 export const COLOSSAL_ROWS = 12;
-export const COLOSSAL_LINES = [0, 3, 6, 9].flatMap((off) => LINES.map((l) => l.map((r) => r + off)));
+// ── FIVE SHAPES PER BAND, NOT TWENTY ─────────────────────────────────────────────────────────────────────────
+// It was all twenty patterns in each of the four bands: eighty colossal lines, a hundred with the main set.
+// That is the number the reference prints on its glass and it was the wrong number for this cabinet, because
+// a hundred lines splits the stake a hundred ways. Measured at bet 100: EVERY three-of-a-kind paid 1 chip,
+// five Golem Hearts paid 1 chip, and five Dire Wolves — the top of the paytable — paid 23. The machine hit on
+// 96% of spins and 44% of those wins were two chips or less, so it "won" almost every press and the number
+// never moved. Luke: "I would expect to see a lot more chips out of this."
+//
+// The straight three and the two chevrons, in each of the four bands. Twenty colossal lines, forty in total,
+// so a line is worth two and a half times what it was — and far fewer of them pay at once, which is what
+// turns a handful of crumbs into one win you can see. Every one of the twelve rows is still reachable: the
+// bands cover the board, it is the number of SHAPES through each band that came down.
+const COLOSSAL_PATTERNS = [LINES[0], LINES[1], LINES[2], LINES[3], LINES[4]];
+export const COLOSSAL_LINES = [0, 3, 6, 9].flatMap((off) => COLOSSAL_PATTERNS.map((l) => l.map((r) => r + off)));
 // The stake is split across every line the cabinet plays, and this one plays a hundred — twenty on the main
 // set and eighty on the tall one. Splitting it twenty ways, the way every other cabinet does, was paying a
 // hundred lines out of a twenty-line stake and returned 31,000%.
