@@ -18637,7 +18637,7 @@ body.cas-seated .social-fab { display: none; }
 .s5 { --s5cell: clamp(46px, 17vw, 74px); display: grid; gap: 10px; }
 /* The colossal cabinet is the one fighting for height, and ten pixels between it and its own panel is a
    gap nobody reads. Six, and the four go to the reels. */
-.s5.is-colossal-stack { gap: 6px; }
+.s5.is-colossal-stack { gap: 6px; padding-bottom: 18px; }
 .s5-window { position: relative; border-radius: 14px; overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--acc, #ffd75e) 26%, transparent);
     background: radial-gradient(120% 90% at 50% 20%, rgba(255,255,255,.05), rgba(0,0,0,.55)); }
@@ -19149,7 +19149,7 @@ body.cas-seated .social-fab { display: none; }
     font-size: 17px; font-weight: 700; line-height: 1; height: 100%; }
 .s5-stepper button:active { background: rgba(255, 255, 255, .12); }
 .s5-stepper button:disabled { color: #4a525b; cursor: default; background: rgba(255, 255, 255, .02); }
-.s5-stepper > span { display: grid; gap: 0; justify-items: center; padding: 5px 2px; }
+.s5-stepper > span { display: grid; gap: 0; justify-items: center; padding: 3px 2px; }
 .s5-stepper i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
 .s5-stepper b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
@@ -19157,8 +19157,8 @@ body.cas-seated .social-fab { display: none; }
 
 /* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
    bar, and because nothing else on the screen is round. */
-.s5-spin { width: 56px; height: 56px; border-radius: 999px; border: none; cursor: pointer;
-    font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .06em;
+.s5-spin { width: 50px; height: 50px; border-radius: 999px; border: none; cursor: pointer;
+    font-family: var(--font-display); font-size: 10px; font-weight: 900; letter-spacing: .04em;
     color: #2a1c05; background: radial-gradient(circle at 50% 32%, #ffe9a8, #f0c04e 52%, #c9932c 100%);
     box-shadow: 0 4px 0 #8d6716, 0 10px 22px rgba(0, 0, 0, .5), inset 0 2px 4px rgba(255, 255, 255, .5); }
 .s5-spin:active { transform: translateY(3px); box-shadow: 0 1px 0 #8d6716, 0 4px 12px rgba(0, 0, 0, .5); }
@@ -20031,8 +20031,8 @@ body.cas-seated .social-fab { display: none; }
    top on the machine's edge. It is in the control row now with a real ground under it. */
 .s5-pays.is-tile { position: static; transform: none; flex: 0 0 auto; align-self: stretch;
     display: inline-flex; align-items: center; justify-content: center;
-    padding: 0 11px; border-radius: 10px; cursor: pointer;
-    font-family: var(--font-display); font-size: 11px; font-weight: 900; letter-spacing: .1em;
+    padding: 0 10px; border-radius: 9px; cursor: pointer;
+    font-family: var(--font-display); font-size: 10px; font-weight: 900; letter-spacing: .08em;
     color: #2a1c05; border: 1px solid rgba(255,226,150,.55);
     background: linear-gradient(180deg, #f2d488, #d5a63f 62%, #b8862a);
     box-shadow: 0 2px 0 #7d5c15, inset 0 1px 0 rgba(255,255,255,.45); }
@@ -20048,7 +20048,7 @@ body.cas-seated .social-fab { display: none; }
 /* `.s5-stepper > span` sets display:grid at (0,1,1) and a bare `.s5-meters` is (0,1,0), so the two meters
    stacked on top of each other instead of sitting side by side. Named through the same combinator to win. */
 .s5-stepper > .s5-meters { display: flex; align-items: center; justify-content: center; gap: 16px;
-    min-width: 0; padding: 4px 2px; }
+    min-width: 0; padding: 3px 2px; }
 .s5-meter { display: grid; gap: 0; justify-items: center; min-width: 0; }
 .s5-meter i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; white-space: nowrap; }
@@ -20309,8 +20309,14 @@ body.cas-seated .social-fab { display: none; }
 
        AND THE LAST OF IT. "Do you see a big gap between the bottom reel and the spin button?" Forty-three
        pixels of one, and every one of them was the band held for the win readout. That readout hangs off
-       the cabinet now instead of being housed by it, so the band goes and the reserve goes 224 -> 198. */
-    --col5-avail: calc(100dvh - 198px);
+       the cabinet now instead of being housed by it, so the band goes and the reserve goes 224 -> 198.
+
+       THEN BACK OFF, BECAUSE 198 WAS TOO FAR. "Buttons are off screen on bottom." Five pixels of slack
+       measured true in the rig and is not true on a phone — Android's bottom bar overlays the viewport that
+       dvh reports, so a layout tuned to the last pixel loses the last pixel. 222, plus 18px of padding under
+       the row and a smaller disc: the button now sits ~35px clear of the bottom, which survives a browser
+       that lies to you. A reserve that only fits in a measurement is not a reserve. */
+    --col5-avail: calc(100dvh - 222px);
     /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
     --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
 }
