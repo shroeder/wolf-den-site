@@ -17547,14 +17547,23 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
        cornice off the top, which is the half of the picture nothing was using. */
     background: url("/images/casino/room.webp") repeat-x left 82% / auto 122%; }
 /* ── AND IT GREW A BAY AT THE NEAR END ─────────────────────────────────────────────────
-   Luke: "extend the background a little bit and add a VIP only section." 540% -> 620%, and the nine machines
-   were re-spaced from 8..96 at 11 apart to 20..92 at 9 apart (see MACHINES in CasinoClient). Those two
-   numbers go together: 9 points of a 620% world is the same walk as 11 points of a 540% one, so the floor
-   crosses exactly as it did and everything below 14 is new room. The wall is `repeat-x`, so it simply
-   continues — there was nothing to redraw. */
-.cas-world { width: max(620%, calc(var(--room) * 7.3)); }
-@media (min-width: 700px) { .cas-world { width: 374%; } }
-@media (min-width: 1024px) { .cas-world { width: 303%; } }
+   Luke: "extend the background a little bit and add a VIP only section." The nine machines were re-spaced
+   from 8..96 at 11 apart to 20..92 at 9 apart (see MACHINES in CasinoClient), which is the same physical
+   walk in a bigger room — and everything below 14 became the VIP bay. The wall is `repeat-x`, so it simply
+   continues; there was nothing to redraw.
+
+   ── AND ITS WIDTH IS TIED TO ONE VARIABLE, WHICH IS WHAT MAKES THE ARCHES FINDABLE ──────────────
+   This used to be `max(620%, --room * 7.3)` with two breakpoint overrides, so the world's width came from
+   the VIEWPORT and the wall tile's width came from `--room`. Both are reasonable on their own and together
+   they mean the number of arches across the floor changes with the window — fine while the wall was pure
+   texture, and impossible the moment anything has to be positioned ON an arch.
+
+   The VIP entrance is one of the wall's own arches (see .cas-vipdoor), so the geometry has to be knowable.
+   The wall is a 3:1 tile drawn at `auto 122%`, so one tile is exactly 3.66 x --room. At 7.32 x --room the
+   world is exactly TWO tiles at every screen size, every arch sits at a fixed fraction of it, and the arch
+   the rope hangs on is in the same place on a phone and on a desktop. `--room` is already clamped, so this
+   cannot run away. */
+.cas-world { width: calc(var(--room) * 7.32); }
 /* The floor used to be a 38%-tall wash with a hard top border, which was the only thing telling you where
    the ground was when the room was a gradient. The room is a painted wall now and has its own carpet, so
    that border drew a bright seam straight across the middle of the arches. What is left is a soft pool of
@@ -22164,86 +22173,89 @@ body.cas-seated .social-fab { display: none; }
     border: 1px solid rgba(255,90,120,.4); }
 .cas-owner button:disabled { opacity: .4; cursor: default; }
 
-/* ══ THE ROPE, AND THE ROOM BEHIND IT ═════════════════════════════════════════════════════════════════
-   Luke: "a little barrier over the front of a door with a VIP sign... and it shows VIPs walking around
-   behind the drapes, the sprites are darkened and they look as if they're actually back behind the drapes,
-   so you're going to have to figure out how to mask that properly."
+/* ══ THE ROPE, AND THE ARCH IT HANGS ACROSS ═══════════════════════════════════════
+   Luke: "you made it look like double arches — we already have arches in the background, why can't you just
+   put all the VIPs walking around in there."
 
-   THE MASK IS THE ARTWORK. The doorway in vip-door.webp is painted deep solid black, and the silhouettes
-   are a layer UNDERNEATH it — so the arch, its pillars and its drapes are what covers them, at exactly the
-   shape the painter drew. A CSS clip-path would have been a second copy of that outline, kept in step by
-   hand, and wrong the first time the door is redrawn. */
-.cas-vipdoor { position: absolute; bottom: 15%; transform: translateX(-50%); z-index: 3;
-    width: calc(var(--room) * 0.50); display: grid; justify-items: center; gap: 2px;
+   There is no door sprite any more. The VIP entrance is one of the WALL's own arches; this element is a box
+   sized and placed onto that arch's recess, and the only things it draws are the people inside it, the rope
+   across the front and the sign above.
+
+   THE ARITHMETIC. The wall tile is a 3:1 image at `auto 122%`, so it is `3.66 * --room` wide, and its five
+   arches sit at roughly 0.056, 0.242, 0.425, 0.607 and 0.789 of it. The world is two tiles (see .cas-world),
+   so arch N of the first tile is at `(0.056 + 0.183N) / 2` of the world — the second one, which the rope
+   hangs on, at 11.8%. That is why VIP_X is 11.8 and not a round number: it is where an arch actually is. */
+.cas-vipdoor { position: absolute; left: 11.8%; bottom: 15%; transform: translateX(-50%); z-index: 3;
+    /* The recess between two pillars, in tile units: about 0.105 of a tile wide and 0.62 of it tall. */
+    width: calc(var(--room) * 0.31); height: calc(var(--room) * 0.55);
     -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
     font: inherit; color: inherit; cursor: pointer; }
-.cas-vipdoor img { position: relative; z-index: 2; display: block; width: 100%; height: auto;
-    filter: drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
-.cas-vipdoor b { position: relative; z-index: 4; font-size: 10px; font-weight: 900; letter-spacing: .1em;
-    text-transform: uppercase; color: #d8b6ff; text-shadow: 0 2px 6px #000; }
-/* Lit when you are stood at it, exactly as a cabinet is. */
-.cas-vipdoor.is-near img { filter: drop-shadow(0 0 16px rgba(180,90,255,.75)) drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
-.cas-vipdoor.is-near b { color: #f0e2ff; }
-/* And a member who can actually go in gets a standing glow, so the rope reads as OPEN to them from across
-   the room rather than only once they are touching it. */
-.cas-vipdoor.is-open img { filter: drop-shadow(0 0 12px rgba(255,215,94,.5)) drop-shadow(0 10px 18px rgba(0,0,0,.65)); }
 
-/* The dark behind the drapes. Sized and placed to sit inside the painted archway, and BEHIND the door image
-   in the stacking order — which is the whole mask. */
-/* ── THE MASK, AND TWO THINGS THAT WERE WRONG ABOUT IT ────────────────────────────────
-   Luke: "the sprites are darkened and they look as if they're actually back behind the drapes, so you're
-   going to have to figure out how to mask that properly."
+/* ── THE MASK IS THE RECESS ─────────────────────────────────────────────────────────
+   Luke: "they need to be masked properly so you can see them back there... but they don't just clip through
+   the walls and stuff — we only want to see them in the archway."
 
-   FIRST TRY: figures UNDER the door image, letting the painted arch clip them. Elegant, and it does not
-   work — the archway is painted DEEP SOLID BLACK, which is opaque. Nothing behind an opaque pixel shows
-   through, so the doorway was a black hole with four invisible people in it. "Draw it under and let the art
-   clip it" only works when the art has a hole in it, and a painting of a dark doorway does not.
+   `overflow: hidden` on an arch-shaped box is the whole answer: somebody wandering to the edge of the lounge
+   is cut off by the pillar exactly as they would be by a real one, and nothing can ever appear outside the
+   opening. The rounded top follows the arch; a few percent inside it is deliberate, because overshooting
+   onto the painted gold would be the one error that shows.
 
-   SECOND TRY, and the one here: the layer sits ABOVE the art, inset to land inside the painted opening. That
-   is the clip-path-shaped compromise I was trying to avoid, but it costs almost nothing to get right,
-   because it is BLACK ON BLACK — an inset a few percent too small leaves painted archway showing, which is
-   exactly what should be there, and the shape only has to be inside the opening rather than equal to it.
+   The dark wash is a floor of its own, not a filter on the sprites — it has to sit BEHIND them so the recess
+   still reads as a dark room when nobody is in it. */
+.cas-vipdoor-in { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    border-radius: 48% 48% 5% 5% / 34% 34% 4% 4%;
+    /* TRANSPARENT, and that is the point. The first version painted an opaque violet panel here and covered
+       up the very arch it was supposed to be sitting inside — the same mistake as the extra gold arch,
+       wearing a different hat. The second still left a pale rounded rectangle floating over the recess.
+       The wall has already painted a dark arch with drapes; there is nothing for this box to draw. It is a
+       CLIP, not a surface. */
+    background: none; }
 
-   AND A SILHOUETTE NEEDS A LIGHT. A dark shape on a dark ground is not a silhouette, it is nothing. The
-   opening carries a low violet-gold spill and the figures are cut out of it — which is also what a door
-   ajar on a lit room looks like from a dark floor, so the fix and the truth are the same picture. */
-.cas-vipdoor-in { position: absolute; z-index: 3; left: 32%; right: 32%; top: 27%; bottom: 17%;
-    overflow: hidden; border-radius: 44% 44% 4% 4% / 26% 26% 4% 4%; pointer-events: none;
-    background:
-        radial-gradient(120% 80% at 50% 100%, rgba(255,196,110,.50), transparent 70%),
-        linear-gradient(180deg, rgba(60,24,100,.72), rgba(150,80,200,.34) 62%, rgba(255,190,120,.40)); }
-/* Somebody in there. Not a person, a SHAPE: shoulders and a head, in near-black, at low opacity, moving.
-   Anything more legible would be a face in a room you are not allowed into, and the point is the shape. */
-/* A person, made of two shapes. Stacked gradients were tried first and came out as thin vertical smears —
-   a radial with a soft stop does not draw a shoulder. A rounded body element with a round head on ::before
-   is unmistakable at forty pixels, which is the size this is actually seen at.
+/* ── AND THEY ARE THE REAL PEOPLE, PUSHED BACK ───────────────────────────────────────
+   Luke: "the VIPs should be the actual hero sprites, not just some random black looking things... kind of
+   darkened out so it looks like they're farther away and back in the room."
 
-   Deliberately no more than that: anything more legible would be a face in a room you are not allowed into,
-   and the SHAPE is the whole message. */
-/* THREE AT MOST, and wide. The doorway is a narrow slot — at the size this is actually seen, four figures
-   in it is about ten pixels each, and ten pixels cannot carry a head and a pair of shoulders. Three at 26%
-   can. See the slice in CasinoClient: what is being shown is that the room is occupied, and three people is
-   as legible a way to say "occupied" as six would be, at three times the size. */
-.cas-vipshade { position: absolute; bottom: 0; width: 26%; height: 34%;
-    transform-origin: 50% 100%;
-    background: #06040c;
-    /* SHOULDERS: short and wide, with the corners rounded hard at the top. A tall rounded box plus a head
-       reads as one column, which is what the first two attempts were — the shape that says "person" is a
-       narrow head sitting clear of a wide, low body, and the gap between them matters more than either. */
-    border-radius: 48% 48% 6% 6% / 74% 74% 6% 6%;
-    opacity: .92; filter: blur(.35px);
+   So: their own avatars, at 62% the size they are on the floor, dimmed and blued-down. Distance is three
+   things at once and doing only one of them looks like a bug rather than depth — smaller, darker, and
+   losing contrast into the colour of the room they are standing in. */
+.cas-vipwho { position: absolute; bottom: 9%; transform: translateX(-50%);
+    width: 46%; display: block;
     animation: casShade 9s ease-in-out infinite alternate;
     animation-delay: calc(var(--i, 0) * -1.7s); }
-/* The head, sitting CLEAR of the shoulders — the sliver of lit doorway between the two is what makes the
-   silhouette a person rather than a post. */
-.cas-vipshade::before { content: ""; position: absolute; left: 50%; bottom: 92%;
-    width: 44%; aspect-ratio: 1; transform: translateX(-50%);
-    background: #06040c; border-radius: 50%; }
-/* Drifting, not walking — they are people in a room, seen through a doorway, not a walk cycle. */
+.cas-vipwho img, .cas-vipwho i { display: block; width: 100%; height: auto; }
+.cas-vipwho i { width: 76%; margin: 0 auto; aspect-ratio: .55;
+    border-radius: 44% 44% 18% 18%; background: #120a20; }
+/* Brightness AND saturation together, plus a violet cast from the room's own light. */
+.cas-vipwho img { filter: brightness(.28) saturate(.45) drop-shadow(0 0 6px rgba(90,40,150,.45)); }
 @keyframes casShade {
-    from { transform: translateX(-50%) translateX(-16%); }
-    to   { transform: translateX(-50%) translateX(16%); }
+    from { transform: translateX(-50%) translateX(-13%); }
+    to   { transform: translateX(-50%) translateX(13%); }
 }
+
+/* The sign, hung above the arch. Cropped out of the door art that is no longer used — the painting was
+   already paid for and the sign was the one part of it worth keeping. */
+.cas-vipsign { position: absolute; z-index: 4; left: 50%; bottom: 99%; width: 78%; height: auto;
+    transform: translateX(-50%); display: block;
+    filter: drop-shadow(0 0 14px rgba(255,190,90,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.7)); }
+/* And the rope across the front. The floor's own decoration — it was already drawn, and a barrier is
+   exactly what it is for. */
+.cas-viprope { position: absolute; z-index: 4; left: 50%; bottom: -6%; width: 106%; height: auto;
+    transform: translateX(-50%); display: block;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+
+.cas-vipdoor b { position: absolute; z-index: 5; left: 50%; bottom: -22%; transform: translateX(-50%);
+    font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+    white-space: nowrap; color: #d8b6ff; text-shadow: 0 2px 6px #000; }
+/* Lit when you are stood at it, exactly as a cabinet is. */
+.cas-vipdoor.is-near .cas-vipsign {
+    filter: drop-shadow(0 0 22px rgba(255,210,120,.95)) drop-shadow(0 4px 8px rgba(0,0,0,.7)); }
+.cas-vipdoor.is-near b { color: #f0e2ff; }
+/* A member who can actually go in gets a warm pool on the floor of the recess — light spilling out of the
+   room beyond — so the rope reads as OPEN to them from across the floor rather than only once they are
+   touching it. A soft radial rather than an inset shadow: an inset draws the BOX's edge, and the box is a
+   rounded rectangle that has no business being visible on top of a painted arch. */
+.cas-vipdoor.is-open .cas-vipdoor-in {
+    background: radial-gradient(90% 34% at 50% 100%, rgba(255,186,104,.30), transparent 76%); }
 
 /* ══ INSIDE ═══════════════════════════════════════════════════════════════════════════════════════════
    Built like the floor, because it is the floor's little brother: a wide painted scene, people standing in

@@ -18,11 +18,10 @@
 // areas laid over them in CSS. That is the same trick the tavern uses for its keeper.
 //
 // Two images:
-//   lounge   the room itself, 3:1, wide enough to walk across
-//   door     the way in, seen from the casino floor: an archway, a rope, and a sign over it
+//   lounge      the room itself, wide, painted flat
+//   bartender   and vendor, the two you can talk to, as cut-outs that stand in it
 //
-// The door is a SEPARATE object rather than part of the floor's wall tile because the wall repeats — it is
-// `repeat-x` across the whole world (see .cas-world) — and anything painted into it would appear nine times.
+// There is no `door` job. See the note where it used to be.
 //
 // Run:  node scripts/gen-vip-lounge.mjs            preview, local PNGs only
 //       node scripts/gen-vip-lounge.mjs --apply    write into public/images/casino/
@@ -81,26 +80,21 @@ const CUTOUT = "The subject is CUT OUT and completely ISOLATED on a FULLY TRANSP
     + "empty transparency. Nothing else whatsoever in frame.";
 
 const JOBS = {
-    // ── THE DOOR, FROM OUTSIDE ───────────────────────────────────────────────────────────────────────────
-    // What you see standing on the casino floor. It has to read at about 150 pixels wide against a repeating
-    // wall of arches, and it has to say CLOSED TO YOU without looking broken — so: a deep dark archway (the
-    // silhouettes of the people inside are drawn over it by the page, see .cas-vipdoor), heavy drapes pulled
-    // back, a brass rope across the front at waist height, and a lit sign above.
+    // ── THE DOOR THAT SHOULD NEVER HAVE BEEN DRAWN ─────────────────────────────────────
+    // A `door` job lived here and produced a fine painting of a gold archway with drapes, a rope and a VIP
+    // sign, which was then stood on the casino floor in front of one of the wall's own gold archways.
     //
-    // TALL, because it is a door in a wall and the wall is 122% of the room's height. A wide crop would have
-    // to be scaled down to fit and the rope would land somewhere near the floor.
-    door: {
-        size: "1024x1536",
-        file: "vip-door",
-        prompt: `${HOUSE} A single free-standing grand VIP entrance archway, seen straight on from the front. `
-            + "An ornate carved gold arch on two gold pillars. The opening inside the arch is DEEP SOLID "
-            + "BLACK and unlit, so nothing beyond it can be made out. Heavy deep-violet velvet curtains hang "
-            + "inside the arch on both sides, tied back with gold cords and tassels. Across the front of the "
-            + "opening at waist height stands a polished brass stanchion barrier with a thick violet velvet "
-            + "rope slung between two posts. Mounted above the arch is a lit sign board with warm bulbs "
-            + "around its edge, reading the three capital letters V I P and nothing else. "
-            + `Rich violet and gold, glowing, expensive, slightly forbidding. ${CUTOUT}`,
-    },
+    // Luke: "the VIP room should not be janky — you made it look like double arches. We already have arches
+    // in the background, why can't you just put all the VIPs walking around in there?"
+    //
+    // He is right, and it is the most ordinary kind of mistake there is: I generated an asset for something
+    // the game already had. The wall has been a repeating frieze of arches with dark recesses since the floor
+    // was painted, and the VIP entrance is now simply one of them — positioned onto a real arch, with the
+    // people drawn inside its recess (see .cas-vipdoor in globals.css).
+    //
+    // The job is deleted rather than left behind a flag, because a generator that can still produce the wrong
+    // answer will produce it again. The only piece worth keeping was the sign, which was cropped out of the
+    // last preview into vip-sign.webp — it hangs over the arch, and the arch was already there.
 
     // ── THE ROOM, FROM INSIDE ────────────────────────────────────────────────────────────────────────────
     // A 3:1 panorama, painted flat with NO vanishing point. That is not a stylistic choice, it is the only

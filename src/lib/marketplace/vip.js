@@ -197,25 +197,27 @@ export async function vipOccupants(selfId) {
     }));
 }
 
-// ── THE SILHOUETTES BEHIND THE DRAPES ────────────────────────────────────────────────────────────────────────
+// ── THE PEOPLE BEHIND THE DRAPES ──────────────────────────────────────────────────────
 // Luke: "it shows VIPs walking around behind the drapes, the sprites are darkened and they look as if they're
-// actually back behind the drapes."
+// actually back behind the drapes." And, on the first cut: "the VIPs should be the actual hero sprites, not
+// just some random black looking things."
 //
-// Which is the single best idea in the whole description, because it is what makes the rope mean something. A
-// locked door tells you that you cannot go in; a locked door with people moving behind it tells you what you
-// are missing. So the floor is handed the POSITIONS of whoever is really in the lounge — no names, no avatars,
-// no ids, just how many and roughly where.
+// So it hands back the AVATAR, and that is a deliberate reversal. The first version returned positions only,
+// on the reasoning that "who is in the VIP room right now" is not something the floor is entitled to know —
+// which is a real concern and the wrong call here, because the whole point of the rope is that you can see
+// who is on the other side of it. A room full of anonymous shapes is a screensaver; a room with three people
+// you recognise in it is a room you want to be in. That is what the door is FOR.
 //
-// Anonymous deliberately: everybody outside the rope can see this, and "who is in the VIP room right now" is
-// not a thing the floor is entitled to know about a member. What it gets is the shape of a room with people in
-// it, which is all the door needs to say.
+// It is still the minimum: a sprite and an x. No names, no ids, no standing — you can see that somebody is in
+// there and who, exactly as you could if you were stood at a real rope looking through a real doorway.
 export async function vipShadows() {
     const rows = await db.query(
-        `SELECT x FROM mkt_town_presence
-          WHERE zone = $1 AND updated_at > NOW() - INTERVAL '90 seconds' LIMIT 6`,
+        `SELECT p.x, b.avatar_sprite_url
+           FROM mkt_town_presence p JOIN mkt_buyer b ON b.id = p.buyer_id
+          WHERE p.zone = $1 AND p.updated_at > NOW() - INTERVAL '90 seconds' LIMIT 6`,
         [VIP_ZONE],
     ).catch(() => []);
-    return rows.map((r, i) => ({ i, x: Number(r.x) || 50 }));
+    return rows.map((r, i) => ({ i, x: Number(r.x) || 50, sprite: r.avatar_sprite_url || null }));
 }
 
 // ── GOING IN ─────────────────────────────────────────────────────────────────────────────────────────────────

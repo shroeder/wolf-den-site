@@ -95,9 +95,9 @@ const MACHINES = [
     { id: "store", x: 92, label: "The Counter", kind: "Chips", live: true },
 ];
 
-// Where the rope is. In the bay the re-spacing above opened up, far enough from The Hunt at 20 that walking to
-// one is never ambiguous about the other.
-const VIP_X = 7;
+// Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
+// the wall tile are sized off --room (see .cas-world). Not a free choice — it is where an arch actually is.
+const VIP_X = 11.8;
 
 // How close you have to stand for a machine to be usable. Wide enough that walking to something feels like
 // arriving rather than threading a needle.
@@ -1312,52 +1312,64 @@ export default function CasinoClient({ initial }) {
                     </div>
                 ))}
                 {/* ── THE ROPE, AND THE PEOPLE BEHIND IT ──────────────────────────────────
-                    Luke: "a little barrier over the front of a door with a VIP sign... and it shows VIPs
-                    walking around behind the drapes, the sprites are darkened and they look as if they're
-                    actually back behind the drapes, so you're going to have to figure out how to mask that."
+                    Luke, on the first cut: "the VIP room should not be janky — you made it look like double
+                    arches. We already have arches in the background, why can't you just put all the VIPs
+                    walking around in there? And the VIPs should be the actual hero sprites, not just some
+                    random black looking things. They need to be masked properly so you can see them back
+                    there, kind of darkened out so it looks like they're further away and back in the room,
+                    but they don't clip through the walls — we only want to see them in the archway."
 
-                    The masking is the whole trick and it is done with the ART rather than with CSS. The
-                    doorway in vip-door.webp is painted DEEP SOLID BLACK, and the silhouettes are drawn in a
-                    layer UNDERNEATH it — so the archway, its pillars and its drapes are what clips them, at
-                    the exact shape the painter drew, with no mask to keep in step with the picture. A CSS
-                    clip-path would have been a second copy of the arch's outline, wrong the moment the door
-                    is ever redrawn.
+                    Every word of that is a correction to something I did wrong, and they are all one mistake:
+                    I DREW A DOOR INSTEAD OF USING THE ONE THAT WAS THERE. The casino wall is a repeating
+                    frieze of gold arches with dark recesses behind red drapes — it has been since the floor
+                    was painted — and I generated a second gold arch and stood it in front of one. Two arches,
+                    one inside the other, which is exactly as bad as it sounds.
 
-                    THEY ARE REAL PEOPLE. `vip.shadows` is the live position of everybody actually standing in
-                    the lounge right now — anonymised to nothing but an x, because the floor is not entitled to
-                    know WHO is in the VIP room. What it gets is the shape of a room with people in it, which
-                    is the entire point: a locked door tells you that you cannot go in, and a locked door with
-                    people moving behind it tells you what you are missing. */}
+                    So there is no door sprite any more. The VIP entrance IS one of the wall's own arches:
+                    the alcove below is positioned onto a real one, the people are drawn inside its recess,
+                    and the only things added are the rope across the front and the sign above.
+
+                    HOW THE ARCH IS FOUND is the part that had to be made honest. The wall is `repeat-x` at
+                    `auto 122%`, so a tile is exactly `3 x 1.22 x --room` wide (it is a 3:1 image) and its
+                    arches sit at fixed fractions of it. That is deterministic ONLY if the world is also
+                    sized off `--room`, which is why the media queries on .cas-world are gone — see the note
+                    there. With both tied to one variable, arch N lands at the same place at every size.
+
+                    THE MASK IS THE RECESS. `overflow: hidden` on an arch-shaped box means a sprite can walk
+                    behind the pillar and be cut off by it, which is the "don't clip through the walls" half
+                    of the note. And they are darkened and shrunk rather than drawn plain, because the point
+                    is that they are further away, in another room, behind a rope. */}
                 <button type="button"
                     className={`cas-vipdoor${vipNear ? " is-near" : ""}${st?.vip?.allowed ? " is-open" : ""}`}
-                    style={{ left: `${VIP_X}%` }}
                     aria-label={st?.vip?.allowed ? "The VIP lounge" : "The VIP lounge \u2014 members only"}
                     onClick={() => {
                         if (draggedJustNow()) return;
-                        // Walk over first, go in second — the same two-step every cabinet on this floor
-                        // uses, so the rope is not a special case you have to learn. Standing at it and
-                        // touching it again is what opens it.
+                        // Walk over first, go in second \u2014 the same two-step every cabinet on this floor
+                        // uses, so the rope is not a special case you have to learn.
                         if (!vipNear) { setX(VIP_X); return; }
                         if (st?.vip?.allowed) { enterVip(); return; }
                         setErr("Members only. The rope stays where it is.");
                     }}>
+                    {/* Inside the arch. The people are real \u2014 their own avatars, at their own positions in
+                        the lounge \u2014 pushed back with a dark wash and a little scale so they read as being
+                        in a room beyond this one. */}
                     <span className="cas-vipdoor-in" aria-hidden="true">
-                        {/* At most four, and spread by INDEX rather than dropped at their true x. The
-                            doorway is a narrow slot: people at their real positions bunch into one
-                            black mass about a third of the time, and a mass is not four people. Their own
-                            position still nudges them, so the group is never in exactly the same shape
-                            twice — what is being shown is that the room is occupied, which is all the floor
-                            is entitled to know anyway. Three, because at the size the doorway is actually
-                            seen a fourth makes all of them too small to read as people. */}
                         {(st?.vip?.shadows || []).slice(0, 3).map((sh) => (
-                            <i key={sh.i} className="cas-vipshade"
-                                style={{ left: `${22 + sh.i * 28 + (sh.x % 6)}%`, "--i": sh.i }} />
+                            <span key={sh.i} className="cas-vipwho"
+                                style={{ left: `${18 + sh.i * 26 + (sh.x % 10)}%`, "--i": sh.i }}>
+                                {sh.sprite
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    ? <img src={sh.sprite} alt="" draggable="false" />
+                                    : <i />}
+                            </span>
                         ))}
                     </span>
+                    {/* The rope across the front, and the sign above. The only two things this adds to the
+                        wall \u2014 the arch was already there. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/images/casino/vip-door.webp" alt="" draggable="false" />
-                    {/* What the rope says when you are stood at it. Nothing at a distance — a label under
-                        every object in the room is a room made of labels. */}
+                    <img className="cas-vipsign" src="/images/casino/vip-sign.webp" alt="" draggable="false" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="cas-viprope" src="/images/casino/decor_rope.webp" alt="" draggable="false" />
                     <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members only") : "The Lounge"}</b>
                 </button>
 
