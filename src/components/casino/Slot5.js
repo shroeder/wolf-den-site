@@ -940,12 +940,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                     running cycles the top of the filler, stopping travels the rest so the
                                     real column rises up through the window. The `idle` tail is what a
                                     machine at rest shows, so the same expression serves both. */}
-                                {[...filler[reel], ...(grid?.[reel] || idle[reel])].map((sym, i, all) => {
+                                {/* ── AND THESE REELS FALL TOO ────────────────────────────────────────
+                                    The colossal cabinet was fixed when Luke said "reels go down, not up",
+                                    because that is the machine he had open. These four were not, and they
+                                    kept scrolling upward for days — found by check:feel measuring the strip
+                                    transform rather than by anyone looking, which is the entire argument
+                                    for that gate.
+
+                                    Same fix: the REAL column is written first and the filler after it, so
+                                    the resting position is zero and every offset that hides the answer is
+                                    negative. Stopping then walks the strip back toward zero, which moves
+                                    the tape downward past the window. See s5Run. */}
+                                {[...(grid?.[reel] || idle[reel]), ...filler[reel]].map((sym, i, all) => {
                                     // Which row of the REAL column this cell is, or -1 for a filler cell.
                                     // Everything that marks a cell — locked, breaking, teased, on the drawn
-                                    // line — has to be gated on this, or the filler above the window picks
-                                    // up the last spin's state as it scrolls past.
-                                    const row = i - (all.length - ROWS);
+                                    // line — has to be gated on this, or the filler scrolling past picks up
+                                    // the last spin's state.
+                                    const row = i < ROWS ? i : -1;
                                     const real = row >= 0 && landed > reel;
                                     return (
                                     // EVERY CELL CARRIES ITS SYMBOL'S COLOUR. The wash behind the symbol is

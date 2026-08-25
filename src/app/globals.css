@@ -18688,15 +18688,10 @@ body.cas-seated .social-fab { display: none; }
    to be taller than the window or there is nothing to travel, and the window has to be stated or it is not
    a window at all. */
 .s5-reel { overflow: hidden; height: calc(var(--s5cell) * 3); }
-.s5-strip { transform: translateY(calc(var(--s5cell) * -9)); }
-.s5-reel.is-spin .s5-strip { animation: s5Run .22s linear infinite; }
+.s5-reel.is-spin .s5-strip { animation: s5Run .33s linear infinite; }
 /* Stopping travels the whole remaining filler, so the real column rises through the window and settles
    with a little weight in it. That last third of a second is where a near miss lives. */
-.s5-reel.is-stop .s5-strip { animation: s5Settle .5s cubic-bezier(.12,.74,.22,1.04) both; }
-@keyframes s5Settle {
-    from { transform: translateY(calc(var(--s5cell) * -4)); }
-    to { transform: translateY(calc(var(--s5cell) * -9)); }
-}
+
 .s5-reel.is-spin .s5-cell img { filter: blur(2px); opacity: .9; }
 /* ── A REEL FALLS. IT DOES NOT RISE. ─────────────────────────────────────────────────────────────
    This ran `to { translateY(-3 cells) }` from an implicit start of zero, which walks the strip UPWARDS —
@@ -18707,12 +18702,29 @@ body.cas-seated .social-fab { display: none; }
    over and over, and the landing continues that fall rather than reversing it. */
 /* Running cycles the TOP of the filler — cells 0..6 of nine — so nothing real can be on screen before the
    reel is asked to stop. It used to run 0 to -3 and then swap; the swap is what this replaces. */
+/* ── AND THESE FALL, AT ONE SPEED, AND BRAKE ──────────────────────────────────────────────────────
+   Measured by check:feel rather than reported: these four cabinets travelled UPWARD one hundred percent
+   of the time, swung 2.6x in speed while running, and their stop peaked at ELEVEN times the spin. Every
+   one of those is a note Luke had already given me about the colossal cabinet — and the fix went there
+   and nowhere else, because that was the machine in the screenshot.
+
+   The real column is written first in the strip now (see Slot5), so rest is zero and everything that
+   hides the answer is negative. Running cycles six cells deep in the filler; stopping walks the whole
+   six home. Both travel toward zero, which is downward.
+
+   `.s5-strip` rests at 0 rather than -9. The loop is six cells because the filler is nine and the window
+   is three — six is the largest travel that never shows a real cell. And the curve opens at 1.2x its own
+   average instead of 4.9x, so the brake starts near the speed the reel was already turning. */
+.s5-strip { transform: translateY(0); }
 @keyframes s5Run {
-    from { transform: translateY(0); }
-    to { transform: translateY(calc(var(--s5cell) * -4)); }
+    from { transform: translateY(calc(var(--s5cell) * -9)); }
+    to { transform: translateY(calc(var(--s5cell) * -3)); }
 }
-.s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 340ms) cubic-bezier(.17,.84,.32,1) both; }
-@keyframes s5Settle { from { transform: translateY(calc(var(--s5cell) * -2.2)); } }
+.s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 420ms) cubic-bezier(.33,.4,.55,1) both; }
+@keyframes s5Settle {
+    from { transform: translateY(calc(var(--s5cell) * -3)); }
+    to { transform: translateY(0); }
+}
 
 .s5-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .s5-lines polyline { fill: none; stroke: var(--acc, #ffd75e); stroke-width: 1.6; stroke-linejoin: round;
