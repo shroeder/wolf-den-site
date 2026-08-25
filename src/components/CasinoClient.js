@@ -380,7 +380,11 @@ export default function CasinoClient({ initial }) {
     // says it will not patch up. Every deep link into the casino — from a bounty card, a badge, a message —
     // logged an error. Starting at the door on both sides and walking to the machine in an effect is the same
     // result one frame later, with the two renders agreeing.
-    const [x, setX] = useState(14);
+    // Where you come in. Was 14, which was the empty end of the floor before the VIP bay existed — and is now
+    // inside the rope's reach (11.8 + REACH), so walking into the casino stood you at a door most people
+    // cannot open. 17 clears it and lands you at The Hunt, which is the first cabinet and a better thing to
+    // arrive facing.
+    const [x, setX] = useState(17);
     const [facing, setFacing] = useState(1);
     const [at, setAt] = useState(null);          // the machine you are standing at
     const [bet, setBet] = useState(100);
@@ -1016,7 +1020,12 @@ export default function CasinoClient({ initial }) {
             // settlement for keno, and there are no shared rounds any more: a ticket resolves in the answer
             // to the request that bought it, so there is nothing that can settle while you were away.
             if (r?.open) {
-                setSt((p) => ({ ...p, others: r.others, gold: r.gold, chips: r.chips ?? p?.chips }));
+                // `vip` rides along so the silhouettes behind the rope move as people come and go — and so
+                // the door notices the moment somebody's standing changes. Forgetting it here is half of why
+                // the rope told the owner "members only": the API had the answer and nothing merged it.
+                setSt((p) => ({
+                    ...p, others: r.others, gold: r.gold, chips: r.chips ?? p?.chips, vip: r.vip ?? p?.vip,
+                }));
                 if (r.pot) setPot(r.pot.amount);
             }
         }, 6000);

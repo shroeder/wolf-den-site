@@ -62,10 +62,46 @@ const SIZES = [[375, 667], [412, 720], [390, 800]];
 // `open` is whatever it takes to get past a lobby to the thing itself, run in the page. `main` is the element
 // the feature is actually about — what must not be covered and what the controls sit under. `act` is the
 // thing you press, which must always be reachable. Adding a feature here is how it joins the gate.
+// ── THE CASINO IS NINE SCREENS, NOT ONE ─────────────────────────────────────────────────
+// There was one `casino` entry here and it opened The Deep, so every gate run ever made checked ONE of the
+// five slot cabinets and none of the four rooms that are not slot machines. Luke, asked whether the polish
+// gate had covered any of it: "did you do the polish gate on the casino and slots bingo blackjack vip, all
+// features of slots?" It had not, and it could not have — the machines live behind a `seated` state, so
+// nothing that only navigates to /marketplace/casino has ever seen one.
+//
+// `?at=<id>` walks you to a cabinet on load (see CasinoClient), which is what makes each of them reachable
+// as its own screen. `open` then sits you down at it. Every cabinet, every table, and the room behind the
+// rope now gets measured at all three phone sizes.
+//
+// The five-reel cabinets share `main`, `act` and `motion` because they ARE one component with five paytables
+// — but they are listed separately anyway, because the thing being checked is the ART and the LAYOUT, and
+// those differ per cabinet. The Menagerie in particular renders a completely different grid (colossal).
+const SEAT = "const b=[...document.querySelectorAll('.cas-mach')].find(x=>x.className.includes('is-near')); if(b) b.click();";
+const SLOT5 = { main: ".s5-window, .col5-main", act: ".s5-spin",
+    motion: ".s5-reel:last-child .s5-strip, .col5-grid.is-tall .col5-reel:last-child .col5-strip",
+    open: SEAT };
+
 const SCREENS = [
-    { id: "casino", path: "/marketplace/casino", main: ".s5-window, .col5-main", act: ".s5-spin, .cas-pull",
-        motion: ".s5-reel:last-child .s5-strip, .col5-grid.is-tall .col5-reel:last-child .col5-strip",
-        open: "const b=[...document.querySelectorAll('button')].find(x=>/The Deep/i.test(x.textContent)); if(b) b.click();" },
+    // The floor itself — the room you walk around, before you sit at anything.
+    { id: "casino", path: "/marketplace/casino", main: ".cas-room", act: ".cas-mach.is-live" },
+
+    // The five slot cabinets.
+    { id: "slot-hunt", path: "/marketplace/casino?at=slot", ...SLOT5 },
+    { id: "slot-harvest", path: "/marketplace/casino?at=slot2", ...SLOT5 },
+    { id: "slot-deep", path: "/marketplace/casino?at=slot3", ...SLOT5 },
+    { id: "slot-menagerie", path: "/marketplace/casino?at=slot4", ...SLOT5 },
+    { id: "slot-vault", path: "/marketplace/casino?at=slot5", ...SLOT5 },
+
+    // The four that are not slot machines.
+    { id: "keno", path: "/marketplace/casino?at=keno", main: ".cas-keno, .cas-grid", act: ".cas-pull", open: SEAT },
+    { id: "bingo", path: "/marketplace/casino?at=bingo", main: ".cas-bcard", act: ".cas-pull", open: SEAT },
+    { id: "blackjack", path: "/marketplace/casino?at=blackjack", main: ".cas-felt", act: ".cas-pull, .cas-act", open: SEAT },
+    { id: "counter", path: "/marketplace/casino?at=store", main: ".cs-shelf", act: ".cs-item", open: SEAT },
+
+    // And the room behind the rope. Two clicks: the first walks to the arch, the second opens it — the same
+    // two-step a member does, which is also the only way to prove the rope actually opens.
+    { id: "vip", path: "/marketplace/casino", main: ".vip-room", act: ".vip-talk, .vip-out",
+        open: "const d=document.querySelector('.cas-vipdoor'); if(d){ d.click(); setTimeout(()=>d.click(), 700); }" },
     { id: "farm", path: "/marketplace/farm", main: ".farm-plots, .farm-yard, .card", act: ".btn-gold" },
     { id: "arena", path: "/marketplace/arena", main: ".ar-stage, .card", act: ".btn-gold" },
     { id: "mine", path: "/marketplace/mine", main: ".mine-face, .card", act: ".btn-gold" },
@@ -323,7 +359,9 @@ for (const sc of SCREENS) {
     for (const [W, H] of SIZES) {
         await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: true });
         await send("Page.navigate", { url: BASE + sc.path });
-        await sleep(4000);
+        // The VIP entry is two clicks with a walk between them and a round trip after it, so it needs
+        // longer than a screen that is simply there when the page settles.
+        await sleep(sc.id === "vip" ? 7000 : 4500);
         const d = JSON.parse((await evaluate(PROBE(sc))) || "null");
         const at = `${sc.id} @ ${W}x${H}`;
         if (!d) { fail(at, "unreachable", "the probe returned nothing"); continue; }

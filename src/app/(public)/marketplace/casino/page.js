@@ -6,6 +6,7 @@ import { bingoState } from "@/lib/marketplace/bingo.js";
 import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { vipShadows, vipStanding } from "@/lib/marketplace/vip.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -25,8 +26,21 @@ export default async function CasinoPage() {
 
     // A hand left open survives a refresh, which is the whole reason the table lives in a row: closing the
     // tab mid-hand must not be a way to lose a stake, and it must not be a way to escape one either.
-    const [floor, table, hall] = await Promise.all([
-        getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(buyer.id),
+    // ── AND THE ROPE HAS TO BE IN THE FIRST PAINT ───────────────────────────────────────
+    // `vip` was added to the API route's GET and NOT to this one, and the client only ever reads `initial`
+    // plus the three fields its poll merges. So the door rendered "Members only" to the owner forever: the
+    // server knew the answer, the API said so when asked directly, and nothing on the page was ever told.
+    //
+    // Caught by check:feel, which could not reach the lounge at all and said so instead of quietly passing.
+    // That is the entire argument for the gate opening every room rather than the first one.
+    const [floor, table, hall, standing, shadows] = await Promise.all([
+        getCasinoState(buyer.id), blackjackState(buyer.id), bingoState(),
+        vipStanding(buyer.id), vipShadows(),
     ]);
-    return <CasinoClient initial={{ ...floor, blackjack: table, bingo: hall }} />;
+    return (
+        <CasinoClient initial={{
+            ...floor, blackjack: table, bingo: hall,
+            vip: { allowed: standing.vip, shadows },
+        }} />
+    );
 }

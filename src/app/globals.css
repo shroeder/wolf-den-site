@@ -17475,6 +17475,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    stays at 210 because below that the cabinets stop being readable at all and a bigger fraction of nothing
    is still nothing. */
 .cas-roomwrap { position: relative; --room: clamp(210px, 58vh, 580px); }
+/* ── EXCEPT ON A SHORT PHONE ───────────────────────────────────────────────────────
+   Taking the room to 58vh is what Luke asked for — "extend the animation frame vertically so we can see more
+   and it's more immersive" — and on a 667px-tall phone it pushed the cabinets off the bottom of the screen.
+   check:feel measured the first one at -1px. That is the exact failure this gate exists to catch and I
+   introduced it while making something else better.
+   58vh is a bigger room only when there IS more room. Below 700px of viewport the fixed chrome above the
+   floor (site header, purse, nav) is most of the screen, so the fraction has to come down or the room grows
+   into space that does not exist. Every phone Luke has shot this on is over 700 and keeps the taller frame. */
+@media (max-height: 700px) { .cas-roomwrap { --room: clamp(200px, 44vh, 300px); } }
 .cas-room { position: relative; height: var(--room); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
@@ -18312,8 +18321,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
    100dvh, not 100vh: on a phone the browser's own chrome grows and shrinks as you scroll, and vh does not
    know that, so the pull button ends up under the address bar exactly when somebody reaches for it. */
+/* ── AND THE BUTTON IS NOT ON THE VERY EDGE ──────────────────────────────────────────
+   check:feel, on keno and blackjack at all three phone sizes: the main action sits 12px off the bottom, and
+   the gate's floor is 20. Its own note says why the number is 20 and not 5 — "five pixels measured true in
+   this rig and was still off screen on his phone, because Android's bottom bar overlays the viewport that
+   dvh reports."
+   `env(safe-area-inset-bottom)` on top of it, because a notched phone eats more than Android's bar does. */
 .cas-stage { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
-    height: 100dvh; padding: 0; margin: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain;
+    height: 100dvh; margin: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: 0 0 calc(22px + env(safe-area-inset-bottom, 0px));
     background:
         radial-gradient(120% 55% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 9%, transparent), transparent 62%),
         linear-gradient(180deg, #17102180, #0d0913 34%), #0d0913;
