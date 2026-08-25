@@ -79,6 +79,12 @@ const CUTOUT = "The subject is CUT OUT and completely ISOLATED on a FULLY TRANSP
     + "room, no wall, no floor, no shelf, no furniture and no scenery of any kind behind or around it — only "
     + "empty transparency. Nothing else whatsoever in frame.";
 
+// The player's hero is a stocky chibi — big head, short legs, heavy outline. Anybody who shares a floor with
+// them has to be built the same way; a realistic figure scaled down reads as a different game standing in it.
+const CHIBI = "Drawn in the same build as a stocky chibi RPG hero sprite: large head, short sturdy body, "
+    + "short legs, heavy dark outline, standing squarely on both feet with the whole body and both feet "
+    + "visible and nothing cropped. Full length, head to feet.";
+
 const JOBS = {
     // ── THE DOOR THAT SHOULD NEVER HAVE BEEN DRAWN ─────────────────────────────────────
     // A `door` job lived here and produced a fine painting of a gold archway with drapes, a rope and a VIP
@@ -95,6 +101,30 @@ const JOBS = {
     // The job is deleted rather than left behind a flag, because a generator that can still produce the wrong
     // answer will produce it again. The only piece worth keeping was the sign, which was cropped out of the
     // last preview into vip-sign.webp — it hangs over the arch, and the arch was already there.
+
+    // ── THE SIGN OVER THE ARCH ───────────────────────────────────────────────────
+    // Drawn properly, after being CROPPED out of the deleted door painting for a day. Luke: "vip sign is
+    // clearly cut out of a sprite." It was: a hard rectangle with the sign's bottom frame and bulbs sliced
+    // off and the arch's scrollwork cut through on both sides, opaque, sitting on a painted wall.
+    //
+    // Reusing art already paid for is usually right and it was wrong here, because the thing being reused
+    // was drawn ATTACHED to something. A crop can only be as clean as the silhouette it cuts along, and a
+    // sign painted into an archway has no silhouette of its own — there is no line where the sign stops and
+    // the arch starts. Cheaper to draw the object than to keep cutting around one that was never separate.
+    //
+    // WIDE, because it hangs across the mouth of an arch: a portrait crop would have to be scaled down to
+    // span it and the lettering would go with it.
+    sign: {
+        size: "1536x1024",
+        file: "vip-sign",
+        prompt: `${HOUSE} A single ornate hanging casino sign board, seen straight on from the front. A `
+            + "rectangular gold-framed plaque with a deep red panel inside it, reading the three capital "
+            + "letters V I P in large gold serif letters and nothing else. Round warm-lit bulbs set evenly "
+            + "all the way around the gold frame, including along the BOTTOM edge. A small decorative gold "
+            + "crest on the top edge and two short gold chains rising from the top corners as if it hangs "
+            + "from them. Rich gold and deep red, warm glowing bulbs, expensive. "
+            + `The whole sign complete and unclipped with space around it. ${CUTOUT}`,
+    },
 
     // ── THE ROOM, FROM INSIDE ────────────────────────────────────────────────────────────────────────────
     // A 3:1 panorama, painted flat with NO vanishing point. That is not a stylistic choice, it is the only
@@ -124,33 +154,32 @@ const JOBS = {
             + `NO PEOPLE and no characters anywhere in the room. ${NO_TEXT}`,
     },
 
-    // ── THE TWO YOU CAN TALK TO ──────────────────────────────────────────────────────────────────────────
-    // Drawn as separate sprites rather than painted into the room, and this is the opposite call from the
-    // couch — for a reason worth stating, because it looks inconsistent otherwise.
+    // ── THE TWO YOU CAN TALK TO ───────────────────────────────────────────────────
+    // FULL BODY, and the first cut was not. I asked for "head and torso only, nothing below the bar" while
+    // picturing them behind a bar — and then placed them in a room where the bar is off to one side, so what
+    // shipped was two enormous floating busts standing on a carpet. Luke: "what's up with the wolf torsos."
     //
-    // The couch is FURNITURE: you never touch it, so cutting it out buys nothing. These two are things you
-    // walk up to and interact with, exactly like a cabinet on the floor, and everything you can interact with
-    // on this floor is its own object with its own hit area and its own hover state. A bartender painted into
-    // the wall is a bartender you cannot tell is different from the bottles behind him.
+    // A character that shares a floor with the player has to be a WHOLE PERSON standing on it, at a size that
+    // makes sense next to them. The hero is a stocky chibi — big head, short legs, heavy outline — so these
+    // match that build rather than being realistic figures scaled down, which would read as a different game.
+    // They are drawn a little taller than the hero because they are the adults behind the counter.
     bartender: {
         size: "1024x1536",
         file: "vip-bartender",
-        prompt: `${HOUSE} A single friendly grizzled wolf-man bartender, seen from the front from the waist `
-            + "up, facing the viewer. Grey-and-silver fur, one ear notched, a neat dark waistcoat over a "
-            + "white shirt with the sleeves rolled up, a bar towel over one shoulder. He is polishing a glass "
-            + "and looking directly out with a knowing half-smile. Warm amber rim light along his shoulders. "
-            + `Head and torso only. ${CUTOUT} ${NO_TEXT}`,
+        prompt: `${HOUSE} A single friendly grizzled wolf-man bartender standing and facing the viewer. `
+            + "Grey-and-silver fur, one ear notched, a neat dark waistcoat over a white shirt with the "
+            + "sleeves rolled up, dark trousers, a bar towel over one shoulder. He holds a glass in one hand "
+            + "and a polishing cloth in the other, with a knowing half-smile. "
+            + `${CHIBI} ${CUTOUT} ${NO_TEXT}`,
     },
-
     vendor: {
         size: "1024x1536",
         file: "vip-vendor",
-        prompt: `${HOUSE} A single sly well-dressed fox merchant, seen from the front from the `
-            + "waist up, facing the viewer. Russet fur, a deep violet velvet coat with gold frogging, a "
-            + "monocle, rings on his fingers. He is holding open a small ornate wooden case with a soft "
-            + "violet glow spilling out of it, angled towards the viewer so the glow lights his face from "
-            + "below. Conspiratorial expression. Head and torso only. "
-            + `${CUTOUT} ${NO_TEXT}`,
+        prompt: `${HOUSE} A single sly well-dressed fox merchant standing and facing the viewer. Russet fur, `
+            + "a deep violet velvet coat with gold frogging over dark trousers and buckled boots, a monocle, "
+            + "rings on his fingers. He holds a small ornate wooden case open in both hands with a soft "
+            + "violet glow spilling out of it, lighting his face from below. Conspiratorial expression. "
+            + `${CHIBI} ${CUTOUT} ${NO_TEXT}`,
     },
 };
 

@@ -2,61 +2,140 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
-import { Haptic, unlock } from "@/components/arena/arena-audio.js";
+import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { GlobalChatTab } from "@/components/SocialHub";
 
 // ── BEHIND THE ROPE ──────────────────────────────────────────────────────────────────────────────────────────
-// The room a VIP walks into. It is built out of the same four parts the casino floor is — a wide painted scene,
-// people standing in it, things you can walk up to, and a panel that opens when you do — because it IS the
-// casino floor's little brother and a second set of conventions in the same building would be a second thing
-// to learn for no reason.
+// The room a VIP walks into.
 //
-// WHAT IS ACTUALLY IN HERE, and what each one reuses:
-//   the room      one painted 3:1 elevation (gen-vip-lounge.mjs). Flat, no vanishing point, because the
-//                 camera pans and a perspective scene is right from exactly one camera position.
-//   other VIPs    `mkt_town_presence` on the lounge's own zone. Same machinery as the floor and the tavern.
-//   the chat      the `vip` channel, which already existed (migration 402) and already has a join window.
-//                 SocialHub's own GlobalChatTab renders it; this screen only says which channel to point at.
-//   the bartender a sprite you tap, who says one true thing about how the game works. See vip.js.
-//   the vendor    a sprite you tap, who opens ChipStore against the VIP shelf. The same component the
-//                 Counter uses, handed a different list.
+// ── AND IT IS A ROOM YOU WALK AROUND, WHICH IT WAS NOT ───────────────────────────────────────────────────────
+// The first cut was one fixed screen you could not move in. Luke: "no idea what I'm looking at, but it doesn't
+// match what I told you at all — dude's tiny, what's up with the wolf torsos, can't scroll left and right or
+// walk around." Three mistakes, all mine:
 //
-// The only thing written from scratch is the noticeboard, because nothing else in the game is a message left
-// for a group rather than for a person.
+//   IT DID NOT SCROLL. I made the lounge a single static view, reasoning that a painted interior has edges and
+//   a panning camera can reach them. That constraint is real and the conclusion was wrong: what he asked for
+//   was a room people walk around in, so the answer was to give the camera somewhere to GO, not to take the
+//   camera away. It runs the casino floor's own machinery now — a world wider than the window, a scrollLeft
+//   camera that follows you, drag to look, tap to walk.
+//
+//   THE HERO WAS TINY. Sized at 0.16 of the room where the floor draws the same sprite at 0.282. There was no
+//   reason for the difference: I picked a number instead of reading the one already in use next door.
+//
+//   THE NPCs WERE FLOATING TORSOS. I prompted them "head and torso only, nothing below the bar" while
+//   picturing them behind a bar, then placed them in a room whose bar is off to one side. Both are drawn full
+//   length now, in the hero's own chibi build, standing on the floor he stands on.
+//
+// Everything else is still borrowed rather than rebuilt: the `vip` chat channel, `mkt_town_presence` for who
+// else is here, and the Counter's own ChipStore for the vendor.
 
 const POST = (body) => fetch("/api/marketplace/casino", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
 }).then((r) => r.json()).catch(() => null);
 
-// Where the two people you can talk to are PAINTED in the room, as a percentage across it. They are not
-// placed freely: the bar is at the right-hand end of the picture and they have to stand at it, so these two
-// numbers belong to the painting and move only when it is redrawn.
-const BARTENDER_X = 78;
-const VENDOR_X = 90;
-// How close you have to stand to talk to somebody, in the same units. The floor uses 5 against a machine
-// spacing of 9; these two are 12 apart, so 6 keeps the same feel without their reaches overlapping.
+// Where the two you can talk to stand, across the world. The bar is at the right-hand end of the painting, so
+// they stand at it and you walk the room to reach them.
+const BARTENDER_X = 74;
+const VENDOR_X = 87;
+// Close enough to talk. The floor uses 5 against cabinets spaced 9; these two are 13 apart, so 6 keeps the
+// same feel without their reaches touching.
 const REACH = 6;
+
+// The same walk the casino floor runs, at the same speed, so the two rooms move identically.
+const WALK_PER_SEC = 26;
+const WALK_TICK_MS = 62;
 
 export default function VipLounge({ state, chips, me, onClose, onChips }) {
     const [st, setSt] = useState(state || null);
-    const [x, setX] = useState(20);
+    const [x, setX] = useState(24);
     const [facing, setFacing] = useState(1);
-    // Which of the two is open, or null. One at a time: they stand a foot apart and two panels would cover
-    // the room they are standing in.
+    const [goal, setGoal] = useState(null);
     const [open, setOpen] = useState(null);
     const [note, setNote] = useState("");
     const [saying, setSaying] = useState(null);
     const [busy, setBusy] = useState(false);
-    const xRef = useRef(20);
+    const xRef = useRef(24);
     const roomRef = useRef(null);
 
     useEffect(() => { xRef.current = x; }, [x]);
 
+    // ── WALKING ──────────────────────────────────────────────────────────────────────────────────────────
+    // `goal` is where you are heading, or null when you are still. Tapping the floor and tapping a person both
+    // set a goal and this loop does the walking — one mechanism rather than two, exactly as on the floor.
+    useEffect(() => {
+        if (goal == null) return undefined;
+        const id = setInterval(() => {
+            setX((p) => {
+                const step = (WALK_PER_SEC * WALK_TICK_MS) / 1000;
+                const d = goal - p;
+                if (Math.abs(d) <= step) { setGoal(null); return goal; }
+                return p + Math.sign(d) * step;
+            });
+        }, WALK_TICK_MS);
+        return () => clearInterval(id);
+    }, [goal]);
+
+    // A footfall every fourth tick — one per tick is a machine gun, none is a conveyor belt.
+    useEffect(() => {
+        if (goal == null) return undefined;
+        const id = setInterval(() => Sfx.step?.(0.3 + Math.random() * 0.35), WALK_TICK_MS * 4);
+        return () => clearInterval(id);
+    }, [goal]);
+
+    // ── THE CAMERA FOLLOWS YOU ───────────────────────────────────────────────────────────────────────────
+    // The world is wider than the window, so the window scrolls to keep you near the middle of it. scrollLeft
+    // on the room rather than a transform on the world, because a transform fights the drag-to-look below.
+    useEffect(() => {
+        const el = roomRef.current;
+        if (!el) return;
+        el.scrollTo({ left: (el.scrollWidth * x) / 100 - el.clientWidth / 2, behavior: "auto" });
+    }, [x]);
+
+    // ── DRAG TO LOOK ─────────────────────────────────────────────────────────────────────────────────────
+    // Touch gets this from the native scroller; a mouse does not, so it drives scrollLeft by hand. Capture is
+    // taken only once the gesture IS a pan and never on pointerdown — capturing early retargets the pointerup
+    // and every button in the scene stops receiving clicks on desktop. The town's camera carries that scar.
+    const pan = useRef({ down: false, moved: false, startX: 0, startY: 0, lastX: 0, mouse: false, cap: null });
+    const panDown = useCallback((e) => {
+        pan.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX,
+            mouse: e.pointerType === "mouse", cap: null };
+    }, []);
+    const panMove = useCallback((e) => {
+        const d = pan.current;
+        if (!d.down) return;
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 4
+            && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) {
+            d.moved = true;
+            if (d.mouse) { try { e.currentTarget.setPointerCapture(e.pointerId); d.cap = e.pointerId; } catch { /* ok */ } }
+        }
+        if (!d.moved) return;
+        if (d.mouse) e.currentTarget.scrollLeft -= e.clientX - d.lastX;
+        d.lastX = e.clientX;
+    }, []);
+    const panUp = useCallback((e) => {
+        const d = pan.current;
+        d.down = false;
+        if (d.cap != null) { try { e.currentTarget.releasePointerCapture(d.cap); } catch { /* ok */ } d.cap = null; }
+    }, []);
+    // True once, if the gesture that just finished was a drag — so a swipe that ends over somebody does not
+    // also walk you to them.
+    const draggedJustNow = useCallback(() => {
+        if (!pan.current.moved) return false;
+        pan.current.moved = false;
+        return true;
+    }, []);
+
+    const walkTo = useCallback((pct) => {
+        unlock();
+        const to = Math.max(6, Math.min(94, pct));
+        setFacing(to < xRef.current ? -1 : 1);
+        setGoal(to);
+    }, []);
+
     // ── YOU ARE HERE, AND SO IS EVERYBODY ELSE ───────────────────────────────────────────────────────────
-    // Position pushed on a timer and the room re-read on the same one. Identical shape to the casino floor:
-    // the walk is local and immediate because it must never wait on a round trip, and the server hears about
-    // it afterwards so the other people in the room see you move.
+    // Position pushed on a timer and the room re-read on the same one. The walk is local and immediate because
+    // it must never wait on a round trip; the server hears about it afterwards so the room sees you move.
     useEffect(() => {
         const id = setInterval(async () => {
             const r = await POST({ action: "vip_move", x: xRef.current, y: 72, facing });
@@ -67,37 +146,19 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
         return () => clearInterval(id);
     }, [facing]);
 
-    const walkTo = useCallback((pct) => {
-        const to = Math.max(6, Math.min(94, pct));
-        setFacing(to < xRef.current ? -1 : 1);
-        setX(to);
-        Cas.chips?.();
-        Haptic.hit(0.2);
-    }, []);
-
-    // Who is within reach, which decides what the button at the bottom offers. Derived rather than stored so
-    // it can never disagree with where you are actually standing.
+    // Who is within reach. Derived, so it can never disagree with where you are standing.
     const near = useMemo(() => {
         if (Math.abs(x - BARTENDER_X) <= REACH) return "bartender";
         if (Math.abs(x - VENDOR_X) <= REACH) return "vendor";
         return null;
     }, [x]);
 
-    // Walking away closes whoever you were talking to — the same rule the floor uses for a cabinet, and the
-    // one that stops a panel hanging over a room you have left.
-    //
-    // DERIVED, not an effect that clears `open` when `near` changes. That version worked and was wrong for a
-    // reason worth keeping: it made the panel a second piece of state that has to be kept in step with where
-    // you are standing, and there is exactly one frame after you walk away in which the two disagree. Asking
-    // "is the person I opened still the person I am next to" cannot have that frame.
+    // Walking away closes whoever you were talking to. DERIVED rather than an effect that clears `open` when
+    // `near` changes — that version has one frame in which the two disagree.
     const talking = open && open === near ? open : null;
 
     const talk = useCallback(async () => {
         unlock();
-        // Both of them answer, not just the bartender. The sound and the buzz were inside the bartender
-        // branch, so opening the vendor's case — the only place in the game that sells a VIP pet — happened
-        // in complete silence. A panel that appears with no sound is a panel that appeared, not a case that
-        // was opened.
         Cas.chips?.();
         Haptic.hit(0.35);
         setOpen(near);
@@ -145,69 +206,70 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
             </header>
 
             {/* ── THE ROOM ────────────────────────────────────────────────────────────────────────────
-                One painting, scrolled. `--vx` is where the camera is, driven off where you are standing, so
-                the room follows you rather than you sliding around inside a fixed picture. */}
+                A world wider than the window. Tap the floor to walk there, drag to look around — the same
+                two gestures the casino floor uses, because it is the same building. */}
             <div className="vip-roomwrap">
                 <div className="vip-room" ref={roomRef}
-                    style={{ "--vx": `${x}%` }}
-                    onClick={(e) => {
-                        if (e.target !== e.currentTarget) return;
+                    onPointerDown={panDown} onPointerMove={panMove}
+                    onPointerUp={panUp} onPointerCancel={panUp}>
+                    <div className="vip-world" onClick={(e) => {
+                        if (draggedJustNow()) return;
+                        if (e.target !== e.currentTarget && !e.target.classList?.contains("vip-floor")) return;
                         const b = e.currentTarget.getBoundingClientRect();
                         walkTo(((e.clientX - b.left) / b.width) * 100);
                     }}>
-                    <div className="vip-world">
-                        {/* The two you can talk to, painted over the room at the positions the bar is at.
-                            Buttons rather than decoration, because everything you can interact with on this
-                            floor is a button with a hit area and a hover state. */}
+                        <div className="vip-floor" aria-hidden="true" />
+
+                        {/* The two you can talk to, standing at the bar. Buttons, because everything you can
+                            interact with in this building is a button with its own hit area. */}
                         <button type="button"
-                            className={`vip-npc is-bartender${near === "bartender" ? " is-near" : ""}`}
+                            className={`vip-npc${near === "bartender" ? " is-near" : ""}`}
                             style={{ left: `${BARTENDER_X}%` }}
-                            aria-label="The bartender"
-                            onClick={() => { walkTo(BARTENDER_X); }}>
+                            aria-label="Rolf, the bartender"
+                            onClick={() => { if (draggedJustNow()) return; walkTo(BARTENDER_X); }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/vip-bartender.webp" alt="" draggable="false" />
                             <b>Rolf</b>
                         </button>
                         <button type="button"
-                            className={`vip-npc is-vendor${near === "vendor" ? " is-near" : ""}`}
+                            className={`vip-npc${near === "vendor" ? " is-near" : ""}`}
                             style={{ left: `${VENDOR_X}%` }}
-                            aria-label="The vendor"
-                            onClick={() => { walkTo(VENDOR_X); }}>
+                            aria-label="Sable, the vendor"
+                            onClick={() => { if (draggedJustNow()) return; walkTo(VENDOR_X); }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/vip-vendor.webp" alt="" draggable="false" />
                             <b>Sable</b>
                         </button>
 
-                        {/* Everybody else, really here. Behind you, so your own hero is never hidden. */}
+                        {/* Everybody else, really here. Behind you and dimmer, which is the cheapest way of
+                            saying who the camera is following. */}
                         {(st?.others || []).map((o) => (
                             <div key={o.id} className="vip-other" style={{ left: `${o.x}%` }} title={o.name}>
                                 {o.sprite
                                     // eslint-disable-next-line @next/next/no-img-element
                                     ? <img src={o.sprite} alt="" draggable="false" />
-                                    : <i aria-hidden="true" />}
+                                    : <span className="vip-blank" />}
                                 <em>{o.name}</em>
                             </div>
                         ))}
 
-                        {/* You, drawn with your own avatar exactly as the floor draws you — walking out of
-                            one room and into the next should not change what you look like. */}
-                        <div className={`vip-me${facing === -1 ? " is-left" : ""}`} style={{ left: `${x}%` }}>
+                        <div className="vip-you" style={{ left: `${x}%`, "--face": facing }}>
                             {me?.sprite
                                 // eslint-disable-next-line @next/next/no-img-element
                                 ? <img src={me.sprite} alt="" draggable="false" />
-                                : <i aria-hidden="true" />}
+                                : <span className="vip-blank" />}
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* What is within reach. One button, in the same place, whatever you are standing at. */}
+            {/* What is within reach. One button, in one place, whatever you are stood at. */}
             <div className="vip-act">
                 {near ? (
                     <button type="button" className="vip-talk" onClick={talk}>
                         {near === "bartender" ? "Talk to Rolf" : "See what Sable has"}
                     </button>
-                ) : <span>Walk over to the bar</span>}
+                ) : <span>Tap the floor to walk · the bar is to your right</span>}
             </div>
 
             {/* ── THE BARTENDER ───────────────────────────────────────────────────────────────────────
@@ -230,9 +292,8 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                             </ul>
                         ) : <p className="vip-empty">Nobody has left anything yet.</p>}
 
-                        {/* One live note each. Writing a second REPLACES the first rather than being refused —
-                            being told "you already have a note up" is a worse answer than simply changing what
-                            your note says, and it is the same gesture either way. */}
+                        {/* One live note each. A second REPLACES the first rather than being refused — being
+                            told "you already have a note up" is a worse answer than simply changing it. */}
                         <div className="vip-write">
                             <input type="text" value={note} maxLength={st?.noteMax || 220}
                                 placeholder={mine ? "Change your note…" : "Leave a note for the others…"}
@@ -251,8 +312,8 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
             ) : null}
 
             {/* ── THE VENDOR ──────────────────────────────────────────────────────────────────────────
-                The Counter's own component, handed the VIP list instead. Not a second shop screen: the
-                buying, the affording, the inspect card and the receipt are all solved once, over there. */}
+                The Counter's own component, handed the VIP list. Not a second shop screen: the buying, the
+                affording, the inspect card and the receipt are all solved once, over there. */}
             {talking === "vendor" ? (
                 <div className="vip-panel">
                     <h4>Sable opens the case</h4>
@@ -262,10 +323,8 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
             ) : null}
 
             {/* ── THE VIP CHAT ────────────────────────────────────────────────────────────────────────
-                The channel that already existed, shown in the room it belongs to. Pointing the lounge at a
-                NEW channel would have split the VIP conversation across two places and left neither worth
-                reading — and this one already has the join window that stops a new VIP walking into a wall
-                of other people's backlog. */}
+                The channel that already existed, shown in the room it belongs to. A NEW channel would have
+                split the VIP conversation across two places and left neither worth reading. */}
             <div className="vip-chat">
                 <GlobalChatTab open channel="vip" />
             </div>

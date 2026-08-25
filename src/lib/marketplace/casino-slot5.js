@@ -553,13 +553,13 @@ const VAULT = {
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 3.07, 4: 23.44, 5: 307.8 },
-        chest: { 3: 0.89, 4: 6.77, 5: 67.77 },
-        laurel: { 3: 0.32, 4: 1.99, 5: 16.02 },
-        doubloon: { 3: 0.14, 4: 0.67, 5: 4.84 },
-        bone: { 3: 0.09, 4: 0.35, 5: 1.41 },
+        wolf: { 3: 3.28, 4: 25.1, 5: 325.3 },
+        chest: { 3: 0.95, 4: 7.25, 5: 71.6 },
+        laurel: { 3: 0.34, 4: 2.13, 5: 16.9 },
+        doubloon: { 3: 0.15, 4: 0.72, 5: 5.12 },
+        bone: { 3: 0.1, 4: 0.37, 5: 1.49 },
     },
-    scatterPays: { 3: 0.65, 4: 3.4, 5: 22.64 },
+    scatterPays: { 3: 0.7, 4: 3.63, 5: 23.9 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -586,7 +586,11 @@ const VAULT = {
     // reach three or more. Six is the first rung that is rare enough to be an event — 1 spin in 22.7 — and
     // that is long enough for the row to fill, age, and start pushing good spins off the end, which is the
     // tension the whole thing was built for.
-    winAgain: { slots: 5, need: 6, label: "WIN IT AGAIN" },
+    // `need` is the cascades it takes to fire. Luke asked for 5 ("change the win it again to be 5 cascades
+    // instead of 3") — it was actually 6 at the time, not 3, so this makes it fire MORE often rather than
+    // less. That costs return: the note above records what happened when it moved the other way. Re-swept
+    // after the change; see the paytable multiplier.
+    winAgain: { slots: 5, need: 5, label: "WIN IT AGAIN" },
     second: { kind: "gems", label: "The Gem Vault" },
 };
 
@@ -1624,7 +1628,20 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
         // telling you the outcome of a game it is about to pretend to ask you to play. The row records the
         // REELS — what the spin visibly paid — and the bonus pays itself on its own screen.
         const reelWin = total - (gems?.total || 0);
-        nextMeter = [Math.max(0, reelWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
+
+        // ── IT PAYS THE ROW THAT WAS THERE, THEN THIS SPIN GOES ON TOP ────────────────────────
+        // Luke: "the amount that goes up top is AFTER winning it again, not before."
+        //
+        // The order was push-then-pay: this spin's win was banked into slot 1 and THEN the whole row was
+        // summed, so the spin that fired was paying itself a second time as part of its own jackpot. The row
+        // is meant to be what you BANKED on the spins leading up to this one — "every time you win an amount,
+        // that goes up top, and then if you get the cascades you win all the amount in the top right." The
+        // amount you are winning again is the amount that was already up there.
+        //
+        // Pay-then-push also makes the screen honest: the row the bar lights up left to right is exactly the
+        // row that was on screen before the spin, rather than one that silently grew a new first slot on the
+        // way past. Same family as the gem leak documented above — the display must not know something the
+        // player has not been shown yet.
         if (chain && chain.cascades >= m.winAgain.need) {
             const paid = nextMeter.reduce((a, n) => a + n, 0);
             total += paid * bet;
@@ -1632,6 +1649,9 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
                 slots: m.winAgain.slots, label: m.winAgain.label, row: nextMeter };
             nextMeter = [];
         }
+        // AND THEN THIS SPIN GOES ON. After a fire the row is empty, so this spin starts the next one —
+        // which is the right shape: you have just been paid out and you are building again from your own win.
+        nextMeter = [Math.max(0, reelWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
     }
     return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter, total, bet };
 }

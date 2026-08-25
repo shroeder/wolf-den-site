@@ -17474,7 +17474,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    The ceiling goes up with it (460 -> 580) so a tall phone and a desktop both get the benefit; the floor
    stays at 210 because below that the cabinets stop being readable at all and a bigger fraction of nothing
    is still nothing. */
-.cas-roomwrap { position: relative; --room: clamp(210px, 58vh, 580px); }
+/* Luke, twice: "extend the animation frame vertically so we can see more" and then "make the play area
+   taller so I can see more of it." 58vh -> 68vh. Every object in the room is a fraction OF --room, so
+   the whole scene grows together rather than the cabinets staying put in a taller box. */
+.cas-roomwrap { position: relative; --room: clamp(210px, 68vh, 680px); }
 /* ── EXCEPT ON A SHORT PHONE ───────────────────────────────────────────────────────
    Taking the room to 58vh is what Luke asked for — "extend the animation frame vertically so we can see more
    and it's more immersive" — and on a 667px-tall phone it pushed the cabinets off the bottom of the screen.
@@ -22300,51 +22303,60 @@ body.cas-seated .social-fab { display: none; }
     color: #ffd75e; font-variant-numeric: tabular-nums; }
 .vip-purse img { display: block; }
 
-.vip-roomwrap { position: relative; --vroom: clamp(190px, 40vh, 380px); }
-.vip-room { position: relative; height: var(--vroom); overflow: hidden; border-radius: 14px;
-    border: 1px solid rgba(180,90,255,.22); cursor: pointer;
+/* ── THE LOUNGE IS A ROOM YOU WALK AROUND ───────────────────────────────────────────
+   It was one fixed screen. Luke: "can't scroll left and right or walk around." I had made it static on the
+   reasoning that a painted interior has edges a panning camera can reach — true, and the wrong conclusion:
+   the answer was to give the camera somewhere to go, not to remove the camera.
+
+   Same construction as the casino floor now: a WORLD wider than the window, the window scrolling to follow
+   you, drag to look and tap to walk. The world is 1.5x the room height because the painting is 3:2 at
+   `auto 100%`, which on a phone is about two screens of floor to cross. `max(100%, …)` so a desktop window
+   wider than the painting gets a full-bleed room instead of a letterboxed one. */
+.vip-roomwrap { position: relative; --vroom: clamp(240px, 62vh, 620px); }
+@media (max-height: 700px) { .vip-roomwrap { --vroom: clamp(220px, 48vh, 340px); } }
+.vip-room { position: relative; height: var(--vroom); overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -ms-overflow-style: none; cursor: pointer;
+    border-radius: 14px; border: 1px solid rgba(180,90,255,.22);
     box-shadow: inset 0 3px 14px rgba(0,0,0,.8); }
-/* ── ONE ROOM, SEEN WHOLE ─────────────────────────────────────────────────────────
-   This started as a panning camera like the casino floor's, and shooting it showed why that was wrong: the
-   painting is 3:2 and the world was 260% wide, so the picture covered a quarter of it and the rest was black.
-   The floor gets away with panning because its wall REPEATS — there is always more of it. A single painted
-   interior has edges, and a camera that can reach them will.
+.vip-room::-webkit-scrollbar { display: none; }
+.vip-world { position: relative; height: 100%; width: max(100%, calc(var(--vroom) * 1.5));
+    background: url("/images/casino/vip-room.webp") no-repeat left center / auto 100%; }
+/* A pool of lamplight on the carpet, so the bottom of the room is not a flat band of colour — and so there is
+   something to tap that is unambiguously "the floor". */
+.vip-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 16%;
+    background: linear-gradient(180deg, transparent, rgba(255,190,90,.10)); }
 
-   So the lounge is one screen. It is a small room and you can see all of it, which is truer to what it is
-   than a room you have to scroll: the couch, the fountain and the bar are all in view at once, and walking
-   moves YOU across it rather than moving the room past you. `cover` on a 3:2 painting in a ~1.4:1 window
-   crops a sliver off the sides and nothing that matters. */
-.vip-world { position: absolute; inset: 0;
-    background: url("/images/casino/vip-room.webp") no-repeat center center / cover; }
-
-/* The two you can talk to, standing where the bar is painted. */
-.vip-npc { position: absolute; bottom: 6%; transform: translateX(-50%); z-index: 3;
+/* ── THE TWO YOU CAN TALK TO ──────────────────────────────────────────────────────
+   Standing ON the floor, full length, a little taller than the hero because they are the adults behind the
+   counter. They were 0.34 of the room and drawn as torso-only crops, which is how they ended up reading as
+   two enormous floating busts — see the note in VipLounge. */
+.vip-npc { position: absolute; bottom: 4%; transform: translateX(-50%); z-index: 3;
     width: calc(var(--vroom) * 0.34); display: grid; justify-items: center; gap: 1px;
     -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
     font: inherit; color: inherit; cursor: pointer; }
 .vip-npc img { display: block; width: 100%; height: auto;
-    filter: drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
-/* Named only when you are stood at them. Two labels twelve points apart overlapped into one unreadable
-   word, and a room where everything is captioned is a room made of captions. */
+    filter: drop-shadow(0 8px 12px rgba(0,0,0,.65)); }
 .vip-npc b { font-size: 9.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
     color: #cbb2e8; text-shadow: 0 2px 5px #000; opacity: 0; transition: opacity .18s ease; }
 .vip-npc.is-near b { opacity: 1; }
-.vip-npc.is-near img { filter: drop-shadow(0 0 14px rgba(255,215,94,.7)) drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
-.vip-npc.is-near b { color: #ffe9b8; }
+.vip-npc.is-near img { filter: drop-shadow(0 0 14px rgba(255,215,94,.7)) drop-shadow(0 8px 12px rgba(0,0,0,.65)); }
 
-/* Everybody else, and you. Same shapes the casino floor uses so the two rooms read as one building. */
-.vip-other, .vip-me { position: absolute; bottom: 8%; transform: translateX(-50%); z-index: 2;
-    width: calc(var(--vroom) * 0.16); display: grid; justify-items: center; gap: 2px;
-    transition: left .5s cubic-bezier(.3,.9,.3,1); }
-.vip-other img, .vip-me img { width: 100%; height: auto; display: block;
+/* ── YOU, AND EVERYBODY ELSE ─────────────────────────────────────────────────────
+   0.282 of the room, which is not a number I chose — it is what the casino floor draws the same sprite at.
+   The lounge had 0.16 and Luke's first look at it was "dude's tiny". Walking out of one room into the next
+   must not change how big you are. */
+.vip-other, .vip-you { position: absolute; bottom: 3%; text-align: center; z-index: 2;
+    transition: left 62ms linear; }
+.vip-other { transform: translateX(-50%); opacity: .82; }
+.vip-you { transform: translateX(-50%) scaleX(var(--face, 1)); z-index: 4; }
+.vip-other img, .vip-you img, .vip-blank { display: block;
+    width: calc(var(--vroom) * 0.282); height: calc(var(--vroom) * 0.282);
+    object-fit: contain; object-position: bottom;
     filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
-.vip-other i, .vip-me i { width: 62%; aspect-ratio: .55; border-radius: 44% 44% 18% 18%;
-    background: linear-gradient(180deg, #6a5b86, #33294a); box-shadow: 0 6px 10px rgba(0,0,0,.6); }
-.vip-me { z-index: 4; }
-.vip-me i { background: linear-gradient(180deg, #ffd9a0, #c98f4a); }
-.vip-me.is-left i { transform: scaleX(-1); }
-.vip-other em { font-style: normal; font-size: 8px; color: #b9a7d4; text-shadow: 0 1px 3px #000;
-    white-space: nowrap; }
+.vip-blank { border-radius: 44% 44% 18% 18%; background: linear-gradient(180deg, #6a5b86, #33294a); }
+/* The name rides under them and must not flip with the sprite. */
+.vip-other em { display: block; font-style: normal; font-size: 8px; color: #b9a7d4;
+    text-shadow: 0 1px 3px #000; white-space: nowrap; }
 
 /* One button, in one place, whatever you are stood at. */
 .vip-act { display: grid; }
