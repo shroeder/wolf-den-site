@@ -19777,10 +19777,17 @@ body.cas-seated .social-fab { display: none; }
 /* A LENGTH radius, not a percentage. A percentage radius resolves per axis, so on a 69x41 cell 22% is
    15px across and 9px down — the tiles came out subtly elliptical and the wild, which has a second bezel,
    came out as a visible oval among rounded rectangles. */
-.col5-cell::before, .col5-cell::after { inset: 4%; border-radius: 7px; }
+.col5-grid .col5-cell::before, .col5-grid .col5-cell::after { inset: 4%; border-radius: 7px; }
 .col5-cell::after { border-width: 1px; }
 .col5-cell.is-mid::after { border-width: 1.5px; }
 
+/* ── AND EVERY TILE IS COLOURED — WITH THE SPECIFICITY TO ACTUALLY DO IT ───────────────────────────────
+   Written first as `.col5-cell::before`, which is one class and ties with the shared ladder's own
+   `.s5-cell::before, .col5-cell::before` — and the ladder is LATER in the file, so it won. Measured after
+   the fact: mid came out mint and wild violet (those rungs were already tone-based), but LOW came out
+   rgb(0.77, 0.75, 0.70) — the old flat pale stone. Low is Wolf Pup and Copper Kettle, the two most
+   numerous symbols on the board, so the half that failed was exactly the half the colour was for.
+   Prefixed with the grid, which wins on specificity rather than on where it sits in the file. */
 /* ── AND EVERY TILE IS COLOURED ────────────────────────────────────────────────────────────────────────
    Luke: "we need coloured background on each sprite, otherwise there's just no way for the human eye to
    group this many objects."
@@ -19796,39 +19803,39 @@ body.cas-seated .social-fab { display: none; }
    colour at 41px, with the rank ladder kept on top of it as the frame — colour tells you WHAT, the rim
    still tells you HOW MUCH. Low tiles get the biggest change: they were flat grey stone and are now a
    real, if quiet, colour. */
-.col5-cell::before {
+.col5-grid .col5-cell::before {
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--tone) 52%, #0a0d18 48%),
         color-mix(in srgb, var(--tone) 30%, #05070e 70%));
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--tone) 55%, transparent),
         inset 0 -3px 7px rgba(0, 0, 0, .5);
 }
-.col5-cell::after { border-color: color-mix(in srgb, var(--tone) 48%, transparent); }
+.col5-grid .col5-cell::after { border-color: color-mix(in srgb, var(--tone) 48%, transparent); }
 /* The ladder, kept — as the RIM rather than as the fill. */
-.col5-cell.is-mid::before {
+.col5-grid .col5-cell.is-mid::before {
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--tone) 68%, #0a0d18 32%),
         color-mix(in srgb, var(--tone) 42%, #05070e 58%));
 }
-.col5-cell.is-mid::after { border-color: color-mix(in srgb, var(--tone) 78%, transparent); }
-.col5-cell.is-bonus::before, .col5-cell.is-scatter::before {
+.col5-grid .col5-cell.is-mid::after { border-color: color-mix(in srgb, var(--tone) 78%, transparent); }
+.col5-grid .col5-cell.is-bonus::before, .col5-grid .col5-cell.is-scatter::before {
     background: radial-gradient(120% 92% at 50% 12%,
         color-mix(in srgb, var(--tone) 82%, #fff 18%),
         color-mix(in srgb, var(--tone) 74%, #100a02 26%) 76%);
 }
-.col5-cell.is-bonus::after, .col5-cell.is-scatter::after {
+.col5-grid .col5-cell.is-bonus::after, .col5-grid .col5-cell.is-scatter::after {
     border-color: rgba(255, 214, 110, .95); border-width: 1.5px; }
-.col5-cell.is-wild::before {
+.col5-grid .col5-cell.is-wild::before {
     background: linear-gradient(180deg,
         color-mix(in srgb, var(--tone) 74%, #1a0a2e 26%),
         color-mix(in srgb, var(--tone) 44%, #0a0416 56%));
 }
-.col5-cell.is-wild::after { border-color: color-mix(in srgb, var(--tone) 95%, transparent); border-width: 1.5px; }
-.col5-cell.is-blank::before, .col5-cell.is-blank::after { display: none; }
+.col5-grid .col5-cell.is-wild::after { border-color: color-mix(in srgb, var(--tone) 95%, transparent); border-width: 1.5px; }
+.col5-grid .col5-cell.is-blank::before, .col5-grid .col5-cell.is-blank::after { display: none; }
 .col5-cell.is-wild::after { border-radius: 7px; }
 /* The giant is the one thing on the board that is NOT a medallion: it is a figure standing on the reel,
    and framing it would put a picture in a frame inside a frame. */
-.col5-cell.is-giant::before, .col5-cell.is-giant::after { display: none; }
+.col5-grid .col5-cell.is-giant::before, .col5-grid .col5-cell.is-giant::after { display: none; }
 
 /* The giant keeps its own lit alcove — it is the one thing on the board that IS a tile. */
 .col5-cell.is-giant { border-radius: 5px; }
