@@ -19598,24 +19598,30 @@ body.cas-seated .social-fab { display: none; }
 
    So the cell spans the whole run and the rows underneath render nothing at all. `object-fit: contain` on a
    tall box is what keeps the figure whole; stretching one to fill would be the amputation trap again. */
-.col5-cell.is-giant { grid-row: span var(--span, 4); aspect-ratio: auto; border-radius: 6px;
-    background:
-        radial-gradient(70% 50% at 50% 38%, color-mix(in srgb, var(--tone, #fff) 38%, transparent), transparent 70%),
-        linear-gradient(180deg, rgba(6,4,14,.86), rgba(2,1,6,.94));
-    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone, #fff) 70%, transparent),
-        0 0 20px -4px color-mix(in srgb, var(--tone, #fff) 60%, transparent); }
+/* ── AND A GIANT STANDS ON THE REEL, NOT IN A BOX ─────────────────────────────────────────────────────
+   It had an alcove: a dark plate with a hard rim and a glow, which is right for a tile and wrong for a
+   figure. In the reference Lil' Red stands directly on the reel strip with nothing behind her — she IS the
+   strip for those rows — and the box was what made ours read as a picture pasted into a slot. What is left
+   is the light she throws, which is the part that says "this one matters". */
+.col5-cell.is-giant { grid-row: span var(--span, 4); aspect-ratio: auto; border-radius: 5px;
+    background: radial-gradient(62% 46% at 50% 42%, color-mix(in srgb, var(--tone, #fff) 26%, transparent), transparent 74%); }
 /* ── AND THEY FILL THE BLOCK ───────────────────────────────────────────────────────────────────────────
    Luke: "those sprites look good, but they need to occupy the whole space, even if they get cut off a
    little bit." `contain` was letterboxing a 1:2 figure into a block that is rarely exactly 1:2, so a giant
    sat in the middle of its column with air above and below it and read as a picture of a prize rather than
    as the prize. `cover` fills the block edge to edge and crops whatever does not fit — which on a standing
    figure is the very top of the crown or the last of the paws, and neither is what you are looking at. */
-.col5-cell.is-giant img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%;
-    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tone, #fff) 60%, transparent)); }
+/* Whole again. `cover` existed to fill the alcove edge to edge; with the alcove gone there is nothing to
+   fill, and a standing figure cropped at the crown was only ever the price of the box. */
+.col5-cell.is-giant img { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 0 14px color-mix(in srgb, var(--tone, #fff) 75%, transparent))
+        drop-shadow(0 3px 5px rgba(0,0,0,.8)); }
 /* It breathes, because it is the best thing that can be on the board and a still picture of it is a picture. */
+/* A narrow travelling glint rather than a broad white band. At .28 across a fifth of the cell it read as a
+   smear on glass sitting in front of the figure instead of light moving across her. */
 .col5-cell.is-giant::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
-    background-size: 260% 100%; animation: col5Sheen 3.4s ease-in-out infinite; }
+    background: linear-gradient(112deg, transparent 46%, rgba(255,255,255,.16) 50%, transparent 54%);
+    background-size: 300% 100%; animation: col5Sheen 5.2s ease-in-out infinite; }
 @keyframes col5Sheen { 0% { background-position: 180% 0; } 60%, 100% { background-position: -80% 0; } }
 
 /* ── THE MULTIPLIER REEL ── free spins only, last colossal column, stacked. */
@@ -19682,6 +19688,128 @@ body.cas-seated .social-fab { display: none; }
 /* Free spins tint the whole thing, so you can tell at a glance which round you are in. */
 .col5.is-free .col5-col { border-color: #ffd75e;
     box-shadow: inset 0 0 50px rgba(0,0,0,.8), 0 0 30px -6px rgba(255,215,94,.7); }
+
+
+/* ══ COLOSSAL REELS, REBUILT ══════════════════════════════════════════════════════════════════════════════
+   Luke, with the reference beside my first cut: "this doesn't even remotely resemble the image I sent you.
+   It's super jank."
+
+   Fair. Count what the reference has and none of it was there:
+
+     · five visible REEL STRIPS you can point at, each a lit channel with its own ground
+     · symbols sitting ON that ground rather than floating in the dark
+     · cells TALLER than wide, so a symbol is a portrait and not a letterbox
+     · a painted masthead with the machine's name across it
+     · a brass cabinet around the glass instead of two rounded rectangles on a page
+
+   The first three are this block; the last two came from putting the whole screen inside `.s5-cab`, which
+   every other machine on this floor was already built from and this one was not.
+
+   THE ONE THING THAT CANNOT BE COPIED is the arrangement. The reference is a landscape cabinet with both
+   sets abreast; this opens on a phone in portrait. Side by side gives each set about 190px — 38px cells, a
+   5x3 board floating in a column of dead space next to a twelve-row tower. Stacked, both get the full width
+   and the wild transfer runs DOWNWARD, which is the direction it already reads as. On a wide screen they go
+   abreast, which is the reference's own arrangement wherever there is room for it. */
+
+.col5 { gap: 10px; }
+.col5-tag { margin: 0 0 4px; font-size: .48rem; letter-spacing: .24em; color: #c9a24a; }
+
+/* ── THE TWO WINDOWS ── recessed glass in the cabinet, not cards on a page. */
+.col5-main, .col5-col { padding: 6px; border-radius: 9px;
+    background: linear-gradient(180deg, #0a0d18, #05070e 60%, #0a0d18);
+    border: 1px solid rgba(255, 214, 110, .34);
+    box-shadow: inset 0 3px 12px rgba(0,0,0,.9), inset 0 0 0 1px rgba(0,0,0,.6),
+        0 1px 0 rgba(255,226,150,.22); }
+.col5-col { border-color: rgba(255, 214, 110, .5);
+    box-shadow: inset 0 3px 14px rgba(0,0,0,.92), 0 1px 0 rgba(255,226,150,.3); }
+
+/* ── FIVE STRIPS ──────────────────────────────────────────────────────────────────────────────────────
+   The single biggest thing missing. In the reference each reel is a cream channel with a hard edge, and
+   that is most of why a 5x12 of small symbols is legible at all: your eye tracks a column, not a field of
+   icons. Ours is a dark machine, so the channel is a lit slate rather than cream — but it is a CHANNEL,
+   with its own ground, its own inner shadow and a real gap either side. */
+.col5-grid { gap: 3px; }
+.col5-reel { gap: 0; padding: 3px 0; border-radius: 5px; overflow: hidden;
+    background: linear-gradient(180deg, #1b2133 0%, #141a29 12%, #141a29 88%, #1b2133 100%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), inset 0 6px 10px -6px rgba(0,0,0,.9),
+        inset 0 -6px 10px -6px rgba(0,0,0,.9); }
+
+/* ── AND THE CELLS ARE PORTRAITS ──────────────────────────────────────────────────────────────────────
+   They were 78 wide by 33 tall — a letterbox, which is why every animal looked like it was being posted
+   through a slot. The tall board is given the height it needs and the page carries it; a colossal cabinet
+   is a big object and pretending otherwise is what produced the squash. */
+.col5-cell { border-radius: 0; background: none; box-shadow: none; aspect-ratio: auto; }
+.col5-cell img { width: 84%; height: 84%; filter: drop-shadow(0 1px 2px rgba(0,0,0,.8)); }
+/* A hairline between symbols in a strip, so twelve of them read as twelve rather than as a texture. */
+.col5-grid.is-tall .col5-cell + .col5-cell,
+.col5-grid .col5-cell + .col5-cell { box-shadow: inset 0 1px 0 rgba(255,255,255,.045); }
+/* The wash that says what a symbol IS — kept, but as a soft pool behind it rather than a filled tile, which
+   is what made the board look like a spreadsheet of coloured boxes. */
+.col5-cell::before { content: ""; position: absolute; inset: 8%; border-radius: 50%; z-index: 0;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--tone, #fff) 34%, transparent), transparent 72%); }
+.col5-cell img, .col5-cell b { position: relative; z-index: 1; }
+.col5-cell.is-blank::before { display: none; }
+
+.col5-grid.is-tall { height: auto; overflow: visible; }
+/* Slightly wider than tall, which is the compromise between the reference's portrait cells and twelve rows
+   of them on a phone. At 1:1 the tall board alone was 879px and the cabinet 1281 — a machine you cannot see. */
+.col5-grid.is-tall .col5-cell { min-height: 0; aspect-ratio: 1.16; }
+.col5-grid.is-tall .col5-cell img { width: 90%; height: 90%; }
+.col5-main .col5-cell { aspect-ratio: 1; }
+
+/* ── AND A GIANT TAKES ITS HEIGHT FROM THE SPAN, NOT FROM A RATIO ─────────────────────────────────────
+   `aspect-ratio` computes a box's height from its width, which beats `grid-row: span 5` outright — so the
+   two giants reported a span of five and rendered exactly one cell tall, squashing a standing figure into
+   a letterbox. Measured (span 5, height 73px, one row) rather than noticed by eye, because at a glance it
+   just looked like a small symbol. */
+.col5-grid.is-tall .col5-cell.is-giant { aspect-ratio: auto; }
+
+/* ── A STACK OF WILDS IS ONE BLOCK ────────────────────────────────────────────────────────────────────
+   The wild is a fifth of the tall board and it has to be: thin it out and the cabinet falls from 96.8% to
+   67%, because on eighty lines the wild is what does most of the paying. But twenty per cent of a 5x12 as
+   separate tiles reads as a repeated texture — three reels of the same lizard.
+
+   The reference has the same density and does not have the problem, because its stacked wilds form ONE
+   continuous panel down the reel. So: a wild's wash is a full-bleed column rather than a soft pool, and
+   consecutive wilds therefore run together into an unbroken violet bar. Same symbols, same odds, and a
+   stack now reads as a deliberate block — which is also what it is, since a full column is what transfers.
+   The hairline between cells is dropped inside a run so the bar has no rungs across it. */
+.col5-cell.is-wild::before { inset: 0; border-radius: 0;
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tone, #b45aff) 10%, transparent),
+        color-mix(in srgb, var(--tone, #b45aff) 34%, transparent) 50%,
+        color-mix(in srgb, var(--tone, #b45aff) 10%, transparent));
+    box-shadow: inset 1px 0 0 color-mix(in srgb, var(--tone, #b45aff) 45%, transparent),
+        inset -1px 0 0 color-mix(in srgb, var(--tone, #b45aff) 45%, transparent); }
+.col5-cell.is-wild + .col5-cell.is-wild { box-shadow: none; }
+
+/* The giant keeps its own lit alcove — it is the one thing on the board that IS a tile. */
+.col5-cell.is-giant { border-radius: 5px; }
+.col5-cell.is-giant::before { display: none; }
+
+/* ── A WIN IS LIT, NOT BOXED ── on a hundred lines a boxed cell is a board full of boxes. */
+.col5-cell.is-lit { box-shadow: none; }
+.col5-cell.is-lit::before { display: block; inset: 0; border-radius: 4px;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--tone, #fff) 62%, transparent), transparent 78%); }
+.col5-cell.is-lit img { filter: drop-shadow(0 0 10px color-mix(in srgb, var(--tone, #fff) 90%, transparent)) brightness(1.15); }
+
+/* ── THE CONTROLS STAY WITHIN REACH ───────────────────────────────────────────────────────────────────
+   A colossal cabinet is a big object — twelve rows of portrait cells is most of a phone screen before the
+   main board is drawn — so the machine is taller than the viewport and always will be. The reference solves
+   that by being a landscape cabinet; a phone cannot. Pinning the panel means the board is what scrolls and
+   the button you press is always under your thumb, which is what every mobile slot does for the same
+   reason. */
+.s5:has(.col5) .s5-panel { position: sticky; bottom: 6px; z-index: 8;
+    padding: 6px; border-radius: 14px; backdrop-filter: blur(6px);
+    background: linear-gradient(180deg, rgba(12,8,20,.86), rgba(6,4,12,.95));
+    box-shadow: 0 -6px 22px rgba(0,0,0,.6); }
+
+/* ── ABREAST WHERE THERE IS ROOM ── the reference's own arrangement, on a screen that can hold it. */
+@media (min-width: 780px) {
+    .col5 { grid-template-columns: 1fr 1.35fr; align-items: start; }
+    .col5-bar { grid-column: 1 / -1; }
+    .col5-send { display: none; }
+}
 
 /* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
    Five rooms deep, and the room is the point — each stage is a different painted place behind the
