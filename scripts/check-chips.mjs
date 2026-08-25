@@ -12,12 +12,14 @@ import { GEMS } from "../src/lib/marketplace/gems.js";
 import { CONSUMABLES } from "../src/lib/marketplace/consumables.js";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
 import { PART_TIERS } from "../src/lib/marketplace/crafting.js";
+import { CHEST_TIERS } from "../src/lib/marketplace/chests.js";
 
 const decos = new Set(DECORATIONS.map((d) => d.id));
 const gems = new Set((GEMS || []).map((g) => g.id));
 const cons = new Set(Object.keys(CONSUMABLES));
 const pets = new Set(COLLECTIBLES.map((p) => p.id));
 const tiers = new Set(PART_TIERS.map((t) => t.tier));
+const chests = new Set(Object.keys(CHEST_TIERS));
 
 const problems = [];
 const seen = new Set();
@@ -38,6 +40,7 @@ for (const item of CHIP_STORE) {
             if (!(count > 0)) problems.push(`${item.id} grants ${count} parts`);
             break;
         }
+        case "chest": if (!chests.has(item.ref)) miss(`chest tier "${item.ref}"`); break;
         case "consumables": {
             if (!Array.isArray(item.ref)) { problems.push(`${item.id} must list its consumables`); break; }
             for (const c of item.ref) if (!cons.has(c)) miss(`consumable "${c}"`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import ConsumableArt from "@/components/ConsumableArt";
@@ -42,13 +42,31 @@ function rarityOf(reveal) {
 
 // Loot-chest opener with a suspense reveal. Fetches the member's chests, opens one on tap (server rolls
 // the loot), holds a beat of anticipation, then bursts the reward in with a full-screen celebration.
-export default function ChestOpener({ onLoot }) {
+// ── AND IT CAN BE DRIVEN FROM SOMEWHERE ELSE ─────────────────────────────────────────────────────────────
+// Luke, of the quartermaster's gamble: "the doubloon shop has like a random chest but it completely skips the
+// reveal animation and doesn't reveal the thing it gives you."
+//
+// Both true, and the same cause: that shelf had its OWN little reveal — a card naming the tier it had just
+// posted to your chest pile — and the actual opening, the shake, the burst, the sound, the loot, all of that
+// lived only here. So a gamble ended with "Wooden Chest, added to your chests" and you never found out what
+// was in the thing you had just gambled on. The one moment the feature exists for was the one it withheld.
+//
+// `openTier` is the door for that: hand it { tier, image, color, k } and this opens that chest with the real
+// ceremony. `bare` renders the modal and nothing else, so a caller can mount the reveal without also mounting
+// the chest shelf. Reusing this rather than copying it also means the sound, the haptics, the particle counts
+// and every future reveal improvement reach the gamble for free — a second opener would have been a second
+// reveal to keep in step, and it would have drifted by the next change.
+export default function ChestOpener({ onLoot, bare = false, openTier = null }) {
     const [chests, setChests] = useState(null);
     const [modalTier, setModalTier] = useState(null);
     const [phase, setPhase] = useState("idle"); // shaking | revealed
     const [reveal, setReveal] = useState(null);
     const [busy, setBusy] = useState(false);
     const [mounted, setMounted] = useState(false);
+    // A chest handed in from outside. It stands in for the shelf row while it opens, because the caller's
+    // chest may not be in our list yet — the gamble grants it and opens it in the same breath.
+    const [handed, setHanded] = useState(null);
+    const handedRef = useRef(null);
 
     useEffect(() => setMounted(true), []);
 
@@ -129,14 +147,27 @@ export default function ChestOpener({ onLoot }) {
         }, 1500);
     }
 
-    function closeModal() { if (busy) return; setModalTier(null); setReveal(null); setBulk(null); setPhase("idle"); }
+    function closeModal() { if (busy) return; setModalTier(null); setReveal(null); setBulk(null); setPhase("idle"); setHanded(null); }
 
-    if (!chests) return null;
-    const total = chests.reduce((s, c) => s + c.count, 0);
+    // Keyed on `k` rather than on the tier, so gambling two Wooden Chests in a row opens twice instead of
+    // once. Any caller passing a fresh key gets a fresh opening.
+    useEffect(() => {
+        if (!openTier?.k || handedRef.current === openTier.k) return;
+        handedRef.current = openTier.k;
+        setHanded({ tier: openTier.tier, label: openTier.label || null, image: openTier.image || null, color: openTier.color || null, count: 0 });
+        open(openTier.tier);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openTier]);
+
+    // In bare mode there is no shelf to wait for — the caller already knows which chest it wants opened.
+    if (!chests && !bare) return null;
+    const total = (chests || []).reduce((s, c) => s + c.count, 0);
     // "__all" is not a tier, so the shake falls back to the richest chest actually held — the pile should
     // rattle as the best thing in it, not as an empty box.
-    const activeChest = chests.find((c) => c.tier === modalTier)
-        || (modalTier === "__all" ? [...chests].sort((a, z) => RARITY_RANK(z.tier) - RARITY_RANK(a.tier))[0] || chests[0] || null : null);
+    const activeChest = (chests || []).find((c) => c.tier === modalTier)
+        || (modalTier === "__all" ? [...(chests || [])].sort((a, z) => RARITY_RANK(z.tier) - RARITY_RANK(a.tier))[0] || (chests || [])[0] || null : null)
+        // A handed-in chest has not reached our list yet, so it is what shakes.
+        || (handed && handed.tier === modalTier ? handed : null);
     const remaining = activeChest?.count || 0;
 
     const modal = modalTier ? (
@@ -162,6 +193,9 @@ export default function ChestOpener({ onLoot }) {
             )}
         </div>
     ) : null;
+
+    // Bare: the reveal, and nothing around it.
+    if (bare) return mounted && modal ? createPortal(modal, document.body) : null;
 
     return (
         <section className="card chest-card">

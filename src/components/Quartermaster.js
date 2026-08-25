@@ -1,5 +1,6 @@
 "use client";
 
+import ChestOpener from "@/components/ChestOpener";
 import PetStoneShelf from "@/components/PetStoneShelf";
 import RecipeShelf from "@/components/RecipeShelf";
 
@@ -58,26 +59,35 @@ const PieceArt = ({ piece, className }) => (
 
 export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone, recipe = null, onBuyRecipe }) {
     const [tab, setTab] = useState("locker");
-    const [reveal, setReveal] = useState(null);   // the gamble's chest
+    const [opening, setOpening] = useState(null); // the gamble's chest, handed to the real chest opener
     const [got, setGot] = useState(null);         // the piece a crate turned out to hold
     const [buying, setBuying] = useState(null);
     const [rolling, setRolling] = useState(false);
-    useScrollLock(Boolean(reveal) || Boolean(got));
+    // The opener locks scroll itself, so only the crate reveal needs it here.
+    useScrollLock(Boolean(got));
 
     const sets = shop?.pieces || [];
     const gamblePrice = shop?.gamble?.price ?? 250;
 
+    // ── THE GAMBLE ENDS WHERE EVERY OTHER CHEST ENDS ─────────────────────────────────────────────────────
+    // Luke: "the doubloon shop has like a random chest but it completely skips the reveal animation and
+    // doesn't reveal the thing it gives you."
+    //
+    // Both true. This used to wait out the whole round trip, then wait 900ms MORE, and then show a card that
+    // named the tier and said "added to your chests" — so the payoff for a gamble was a receipt. There was no
+    // opening, and the loot, the only thing anybody gambles for, was never shown at all: it went into the pile
+    // and you had to walk to another screen to find out what you had won.
+    //
+    // It hands straight to ChestOpener now — the real one, with the shake, the burst, the sound and the loot.
+    // The crate rattles here while the server rolls, so the wait is the anticipation rather than a disabled
+    // button, and the moment the chest is known the opener takes the screen. Two beats, no receipt.
     async function roll() {
         if (busy || rolling || purse < gamblePrice) return;
         setRolling(true);
-        // THE SPIN BEFORE THE ANSWER. The server already knows what you won the moment it charges you; this
-        // beat exists purely so the lid is shut for a second first. Without it the chest simply appears, and
-        // a gamble whose result is instant is not a gamble, it is a purchase.
         const res = await onGamble?.();
-        setTimeout(() => {
-            setRolling(false);
-            if (res?.won) setReveal(res.won);
-        }, 900);
+        setRolling(false);
+        // A fresh key every time, or gambling the same tier twice in a row would open only once.
+        if (res?.won) setOpening({ ...res.won, k: Date.now() });
     }
 
     // Buy a crate off a SET. The quartermaster picks what is in it, so the only thing to reveal is which one
@@ -194,7 +204,8 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                     <b>An unmarked chest</b>
                     <p>
                         The quartermaster will not say what is in it, and mostly it is pine.
-                        Wooden through mythic, weighted where you would expect.
+                        Wooden through mythic, weighted where you would expect — and he prises it open
+                        on the counter rather than handing it over shut.
                     </p>
                     <div className="qm-odds">
                         {(shop?.gamble?.table || []).map((g) => (
@@ -207,20 +218,8 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                 </div>
             ) : null}
 
-            {reveal ? (
-                <div className="qm-reveal" role="dialog" aria-modal="true" onClick={() => setReveal(null)}>
-                    <span className="qm-burst" aria-hidden="true" style={{ "--c": reveal.color }} />
-                    <div className="qm-reveal-card" style={{ "--c": reveal.color }} onClick={(e) => e.stopPropagation()}>
-                        {reveal.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="qm-reveal-art" src={reveal.image} alt="" draggable="false" />
-                        ) : null}
-                        <b>{reveal.label}</b>
-                        <em>added to your chests</em>
-                        <button type="button" className="qm-buy" onClick={() => setReveal(null)}>Take it</button>
-                    </div>
-                </div>
-            ) : null}
+            {/* The reveal, borrowed whole from the chests screen — see the note on ChestOpener's `openTier`. */}
+            <ChestOpener bare openTier={opening} />
 
             {/* WHICH PIECE WAS IN THE CRATE. You bought the set, so the piece is news — and the last piece of a
                 set is the biggest news the shelf has, which is why it does not read like any other purchase. */}

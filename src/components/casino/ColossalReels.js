@@ -238,26 +238,18 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : colRunning(reel) ? " is-spin" : ""}${sent.includes(reel) ? " is-sent" : ""}`}>
-                            <div className="col5-strip" style={{ "--lead": leadCol }}>
-                                {/* ── THE LEAD-IN ─────────────────────────────────────────────────────
-                                    Ordinary symbols ABOVE the real ones in the same strip. While the reel
-                                    runs these cycle; when it stops, the strip travels the rest of the way
-                                    and the real column comes up out of them. That is the whole point: the
-                                    symbols you are about to get arrive from somewhere. */}
-                                {runInCol.map((f, i) => {
-                                    // A lead-in tile is a REAL tile in every way but meaning: same plate,
-                                    // same rim, same colour. Drawn without them first, and the board went
-                                    // visibly unstyled the moment it started turning — which is its own
-                                    // kind of swap, just in the other direction.
-                                    const fs = filler[reel][i % filler[reel].length];
-                                    return (
-                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
-                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={cellArt(fs)} alt="" draggable="false" />
-                                        </span>
-                                    );
-                                })}
+                            <div className="col5-strip" style={{ "--spin": leadCol }}>
+                            {/* ── THE REAL COLUMN COMES FIRST IN THE STRIP ────────────────────────────
+                                Luke: "reels go down, not up — you have them going up."
+
+                                He is right, and it was baked into the ORDER. With the lead-in written
+                                ABOVE the real column, the only way to bring the real column into the
+                                window was to pull the strip further up — so every reel on this cabinet
+                                landed by rising, which no slot machine has ever done. Reels fall.
+
+                                Real column first, lead-in after: the reel turns deep in the lead below
+                                the window, and stopping walks the strip back toward zero, so the answer
+                                DESCENDS into view. See col5Roll for the other half of it. */}
                             {Array.from({ length: rows }, (_, row) => {
                                 const sym = restCol(reel, row);
                                 // ── ONE PICTURE, NOT SIX ────────────────────────────────────────────
@@ -293,6 +285,25 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                     </span>
                                 );
                             })}
+                                {/* ── THE LEAD-IN ─────────────────────────────────────────────────────
+                                    Ordinary symbols ABOVE the real ones in the same strip. While the reel
+                                    runs these cycle; when it stops, the strip travels the rest of the way
+                                    and the real column comes up out of them. That is the whole point: the
+                                    symbols you are about to get arrive from somewhere. */}
+                                {runInCol.map((f, i) => {
+                                    // A lead-in tile is a REAL tile in every way but meaning: same plate,
+                                    // same rim, same colour. Drawn without them first, and the board went
+                                    // visibly unstyled the moment it started turning — which is its own
+                                    // kind of swap, just in the other direction.
+                                    const fs = filler[reel][i % filler[reel].length];
+                                    return (
+                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
+                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={cellArt(fs)} alt="" draggable="false" />
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
@@ -313,17 +324,18 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                 <div className="col5-grid" style={{ "--rows": ROWS }}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : mainRunning(reel) ? " is-spin" : ""}${sending.includes(reel) ? " is-sending" : ""}`}>
-                            <div className="col5-strip" style={{ "--lead": leadMain }}>
-                                {runInMain.map((f, i) => {
-                                    const fs = filler[reel][i % filler[reel].length];
-                                    return (
-                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
-                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={cellArt(fs)} alt="" draggable="false" />
-                                        </span>
-                                    );
-                                })}
+                            <div className="col5-strip" style={{ "--spin": leadMain }}>
+                            {/* ── THE REAL COLUMN COMES FIRST IN THE STRIP ────────────────────────────
+                                Luke: "reels go down, not up — you have them going up."
+
+                                He is right, and it was baked into the ORDER. With the lead-in written
+                                ABOVE the real column, the only way to bring the real column into the
+                                window was to pull the strip further up — so every reel on this cabinet
+                                landed by rising, which no slot machine has ever done. Reels fall.
+
+                                Real column first, lead-in after: the reel turns deep in the lead below
+                                the window, and stopping walks the strip back toward zero, so the answer
+                                DESCENDS into view. See col5Roll for the other half of it. */}
                             {Array.from({ length: ROWS }, (_, row) => {
                                 const sym = restMain(reel, row);
                                 return (
@@ -336,6 +348,16 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                     </span>
                                 );
                             })}
+                                {runInMain.map((f, i) => {
+                                    const fs = filler[reel][i % filler[reel].length];
+                                    return (
+                                        <span key={`f${i}`} className={`col5-cell is-lead is-${symbolRole(fs, machineId)}`}
+                                            style={{ "--tone": symbolTone(fs, machineId) }} aria-hidden="true">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={cellArt(fs)} alt="" draggable="false" />
+                                        </span>
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}

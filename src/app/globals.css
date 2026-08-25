@@ -20107,26 +20107,41 @@ body.cas-seated .social-fab { display: none; }
    board declares its cell height once and the cells, the window and the travel all read it. */
 .col5-grid.is-tall { --cell-h: var(--col5-row); }
 .col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); }
+/* ── REELS FALL ───────────────────────────────────────────────────────────────────────────────────────
+   Luke: "reels go down, not up — you have them going up." He was right and the cause was the strip's
+   ORDER, now fixed in the JSX: the real column is written FIRST and the lead-in after it. So the resting
+   position is zero — the window is already over the answer — and every offset that shows lead-in is
+   NEGATIVE, sitting further down the strip. Every animation therefore travels back toward zero, which
+   moves the tape DOWNWARD past the window. A reel falls, the way a reel has always fallen.
+
+   `--spin` is how deep, in cells, the reel turns: the window is `rows` tall and the lead is `rows + 8`,
+   so at `-(rows + 8)` the window holds nothing but lead-in and the answer is safely below the glass. */
 .col5-strip { display: flex; flex-direction: column; will-change: transform;
-    /* At rest the strip is pulled up by exactly the lead-in, so the window holds the real column. */
-    transform: translateY(calc(var(--cell-h) * -1 * var(--lead, 6))); }
-/* Running: cycle within the lead-in, so nothing real is shown before it is decided. */
-.col5-reel.is-spin .col5-strip { animation: col5Roll .28s linear infinite; }
-/* Running: the reel turns inside the TOP of the lead-in, where nothing real can be on screen. */
+    transform: translateY(0); }
+
+/* ── AND THE LOOP MUST MATCH THE PATTERN ──────────────────────────────────────────────────────────────
+   Luke, same breath: "every time a lower reel snaps into place the top reels stutter." Not the main
+   thread — measured, and there was not a single long task in a six-second spin. It was THIS: the loop
+   travelled four cells while the filler pattern repeats every EIGHT, so at the end of every cycle the
+   tape snapped back to content four symbols out of phase. Three and a half jumps a second, on every reel
+   still turning — and the colossal reels turn longest, which is why the stutter read as belonging to the
+   moment the reels below them landed.
+
+   Eight cells now, over twice the duration, so the speed is unchanged and the wrap is invisible: cell
+   i and cell i+8 are the same symbol by construction. That also makes the hand-off to the settle exact,
+   because `-(--spin)` and `-(--spin - 8)` show identical content — the reel decelerates out of the loop
+   from wherever it happens to be, with nothing to see. */
+.col5-reel.is-spin .col5-strip { animation: col5Roll .56s linear infinite; }
 @keyframes col5Roll {
-    from { transform: translateY(0); }
-    to { transform: translateY(calc(var(--cell-h) * -4)); }
+    from { transform: translateY(calc(var(--cell-h) * -1 * var(--spin, 20))); }
+    to { transform: translateY(calc(var(--cell-h) * -1 * (var(--spin, 20) - 8))); }
 }
-/* Stopping: the remaining lead-in scrolls up and the real column comes in behind it, settling with a small
-   overshoot — which is the reel's weight, and the beat a near miss lives in. */
-/* Longer, because it now travels a whole board rather than two cells — and eased so it arrives fast and
-   lands soft, which is where the last-moment tension lives. */
+/* Stopping: the strip runs the rest of the way home, so the real column falls through the window at
+   speed and settles. This is the near miss — you watch what is coming and you see what just missed. */
 .col5-reel.is-stop .col5-strip { animation: col5Settle .62s cubic-bezier(.12,.72,.22,1.03) both; }
-/* Stopping: the strip travels the whole remaining lead-in, so the real column rises up through the window
-   at speed and settles. This is the near miss — you watch what is coming and you see what just missed. */
 @keyframes col5Settle {
-    from { transform: translateY(calc(var(--cell-h) * -4)); }
-    to { transform: translateY(calc(var(--cell-h) * -1 * var(--lead, 6))); }
+    from { transform: translateY(calc(var(--cell-h) * -1 * var(--spin, 20))); }
+    to { transform: translateY(0); }
 }
 /* The lead-in keeps its plate and rim — it is a real tile in every way but meaning. Stripped of them it
    made the board go visibly unstyled the instant it started turning, which is its own kind of swap. */

@@ -70,6 +70,31 @@ export const CHIP_STORE = [
     { id: "parts_t4", kind: "parts", ref: [4, 25], name: "A Case of Parts", price: 1310,
         blurb: "Twenty-five fourth-tier forge parts." },
 
+    // ── THE TOP SHELF ────────────────────────────────────────────────────────────────────────────────
+    // Luke: "the shop should have way better stuff — mythic chests 3500 chips." And, asking after it: the
+    // ladder does not stop at Mythic. It runs Mythic -> Ascendant -> Eternal -> Celestial -> Primordial,
+    // and the last two are the ONLY route in the game to a celestial or primordial piece — 55 items that
+    // nothing else can drop. So the counter now reaches all the way to the top of the ladder.
+    //
+    // PRICED OFF THE ONE HE SET. 3,500 for a Mythic is the anchor and each rung is roughly 2.5x the one
+    // below it, which is steeper than the odds improve — deliberately. A chip is minted at CHIP_RATE per
+    // gold STAKED, not lost, so at the machines' RTP chips accumulate far faster than gold drains; a shelf
+    // priced off the odds alone would put a Primordial inside a fortnight. These are meant to be the things
+    // you save for, and the Primordial is meant to be the thing you save for all year.
+    //
+    // Repeatable, deliberately: `once` is right for a decoration you either own or do not, and wrong for a
+    // chest, which is the whole reason to come back.
+    { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 3500,
+        blurb: "Legendaries are ordinary in here. Mythics are not." },
+    { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 9000,
+        blurb: "The first chest that can hand you an ascendant piece at all." },
+    { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 20000,
+        blurb: "Nothing below it opens this often onto the eternal tier." },
+    { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 45000,
+        blurb: "One of only two chests that can hold a celestial piece." },
+    { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 100000,
+        blurb: "The rarest object on the floor. A one percent tail on the rarest tier in the game." },
+
     // ── CONSUMABLES ── small, repeatable, and the thing most likely to be bought on the way out.
     { id: "pack_house", kind: "consumables", ref: ["pot_adrenaline", "elixir_renewal", "sail_lucky_lure"],
         name: "The House Pack", price: 750,
@@ -173,6 +198,31 @@ async function detailFor(item) {
                     art: byId.get(id) || null,
                 })),
                 foot: null,
+            };
+        }
+        // A chest sells on its ODDS, so print them. The weights map is literal percentages that sum to 100
+        // — the note on CHEST_TIERS is emphatic about it — so the table can be read straight onto the card
+        // with no arithmetic, and it cannot drift from what the chest actually rolls.
+        case "chest": {
+            const [{ CHEST_TIERS }, { getChestArt }, { RARITY_META }] = await Promise.all([
+                import("@/lib/marketplace/chests.js"),
+                import("@/lib/marketplace/chest-art.js"),
+                import("@/lib/marketplace/rarity.js"),
+            ]);
+            const t = CHEST_TIERS[item.ref];
+            if (!t) return null;
+            const art = await getChestArt().catch(() => ({}));
+            return {
+                art: art?.[item.ref] || null,
+                tone: t.color,
+                lines: Object.entries(t.weights || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([r, pct]) => ({
+                        label: RARITY_META?.[r]?.label || r,
+                        value: `${pct}%`,
+                        tone: RARITY_META?.[r]?.color || null,
+                    })),
+                foot: "Opens at the Chests screen, same as any other.",
             };
         }
         case "decoration": {

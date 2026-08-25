@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { chipItem, moveChips, chipShelf } from "@/lib/marketplace/chips.js";
+import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
 // Where chips turn into things. This is the half of the casino that decides what a chip is WORTH — the
@@ -103,6 +104,21 @@ async function grant(buyerId, item) {
                  RETURNING count`,
                 [buyerId, item.ref]);
             return Boolean(r);
+        }
+        // ── A CHEST, THROUGH THE FEATURE'S OWN DOOR ──────────────────────────────────────────────────
+        // `addChests` is what every other source of a chest calls — levelling, the boss, the master key —
+        // so a chest bought with chips lands in the same tally, opens with the same animation and rolls
+        // off the same table. Writing the row here would be a second kind of chest that only half works,
+        // which is the exact mistake the note at the top of this file warns about.
+        case "chest": {
+            // It swallows its own errors, so its resolving proves nothing. Read the row back: the tally
+            // has to have actually moved, or the chips go home.
+            const before = await db.queryOne(
+                `SELECT count FROM mkt_user_chest WHERE buyer_id = $1 AND tier = $2`, [buyerId, item.ref]);
+            await addChests(buyerId, { [item.ref]: 1 }, { source: "chip_store", meta: { item: item.id } });
+            const after = await db.queryOne(
+                `SELECT count FROM mkt_user_chest WHERE buyer_id = $1 AND tier = $2`, [buyerId, item.ref]);
+            return Boolean(after) && Number(after.count) > Number(before?.count || 0);
         }
         case "consumables": {
             // `ref` is a list of consumable ids, because the House Pack is three things rather than one.
