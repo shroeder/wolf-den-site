@@ -416,11 +416,11 @@ const MENAGERIE = {
         // makes three moons a hunt on a 5x3 makes them nearly certain on a 5x12: at the main set's weight
         // the bonus fired on one spin in TWO. A quarter of a point puts the door back at one spin in 36.
         strips: [
-            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 1.4, dire: 1.4 },
-            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 1.4, dire: 1.4 },
-            { bone: 21, doubloon: 17, laurel: 14, chest: 8, moon: 0.25, wolf: 6, keeper: 1.4, dire: 1.4 },
-            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 1.4, dire: 1.4 },
-            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 1.4, dire: 1.4 },
+            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 0.34, dire: 0.34 },
+            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 0.34, dire: 0.34 },
+            { bone: 21, doubloon: 17, laurel: 14, chest: 8, moon: 0.25, wolf: 6, keeper: 0.34, dire: 0.34 },
+            { bone: 21, doubloon: 18, laurel: 15, chest: 8, moon: 0, wolf: 5, keeper: 0.34, dire: 0.34 },
+            { bone: 22, doubloon: 19, laurel: 16, chest: 8, moon: 0.25, wolf: 3, keeper: 0.34, dire: 0.34 },
         ],
         // Blocks, and bigger ones than the small set gets — twelve rows can carry them. The two giants take
         // a third to a half of the column each, which is what makes "four or five of them lined up" a thing
@@ -445,13 +445,13 @@ const MENAGERIE = {
     pays: {
         // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
         // COMPLETE a line of them, so it must be worth less than the thing it is completing.
-        dire: { 3: 1.63, 4: 9.77, 5: 87.32 },
-        keeper: { 3: 1.41, 4: 8.14, 5: 71.04 },
-        wolf: { 3: 0.86, 4: 4.88, 5: 41.84 },
-        chest: { 3: 0.41, 4: 2.12, 5: 13.92 },
-        laurel: { 3: 0.21, 4: 0.98, 5: 5.54 },
-        doubloon: { 3: 0.1, 4: 0.49, 5: 2.36 },
-        bone: { 3: 0.07, 4: 0.27, 5: 1.1 },
+        dire: { 3: 1.71, 4: 10.26, 5: 91.69 },
+        keeper: { 3: 1.48, 4: 8.55, 5: 74.59 },
+        wolf: { 3: 0.9, 4: 5.12, 5: 43.93 },
+        chest: { 3: 0.43, 4: 2.23, 5: 14.62 },
+        laurel: { 3: 0.22, 4: 1.03, 5: 5.82 },
+        doubloon: { 3: 0.11, 4: 0.51, 5: 2.48 },
+        bone: { 3: 0.07, 4: 0.28, 5: 1.16 },
     },
     scatterPays: { 3: 0.1, 4: 0.49, 5: 2.52 },
     // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
@@ -1214,11 +1214,24 @@ export const multValue = (s) => MULTS[s] || 0;
 
 /** The tall set. `free` swaps reel five for the multiplier reel. */
 function spinColossal(m, rng, free = false) {
+    const giants = m.colossal.giants || [];
     return m.colossal.strips.map((bag, reel) => {
         const isLast = reel === REELS - 1;
         const useBag = free && isLast ? m.colossal.multStrip : bag;
         const stacks = free && isLast ? m.colossal.multStacks : m.colossal.stacks;
-        return stackedColumn(useBag, COLOSSAL_ROWS, rng, stacks, m.colossal.giants || []);
+        const col = stackedColumn(useBag, COLOSSAL_ROWS, rng, stacks, giants);
+        // ── A GIANT IS THE WHOLE REEL ────────────────────────────────────────────────────────────────
+        // Luke: "the sprite in the big reels needs to be the whole reel — even if it cuts the sprite off,
+        // it needs to be the whole reel." Which is what the reference does: Lil' Red is not a block inside
+        // a column, she IS the column, twelve rows of it, one drawing.
+        //
+        // So a column that drew a giant anywhere becomes entirely that giant. It is a far bigger deal than
+        // it sounds — a full reel of a top payer hits every one of the eighty lines that passes through it,
+        // which is all of them — so the density had to come down by an order of magnitude to pay for it.
+        // That is the right trade anyway: a colossal symbol should be a thing that happens to you, not
+        // wallpaper.
+        const g = col.find((x) => giants.includes(x));
+        return g ? Array.from({ length: COLOSSAL_ROWS }, () => g) : col;
     });
 }
 

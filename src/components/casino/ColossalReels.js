@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
@@ -131,6 +131,20 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
     }, [data, playing]);
 
     const cellArt = (sym) => art?.[machineId]?.[sym] || `/images/casino/reels/${machineId}-${sym}.webp`;
+
+    // ── A REEL THAT IS STILL RUNNING HAS SOMETHING ON IT ─────────────────────────────────────────────────
+    // Luke: "the reels need to look like they're actually spinning, not just mysteriously dropping in
+    // place." They were an empty channel until the symbols appeared — because a reel that has not landed
+    // had nothing to draw. So a running reel renders a strip of ordinary symbols and scrolls it; the strip
+    // is fixed per reel rather than re-rolled every frame, which is what stops it flickering, and it is
+    // deliberately NOT the landing grid, because the landing grid is the answer and this is the wait.
+    // useMemo, not a ref: it is derived, deterministic and read during render, and a ref read in render is
+    // the one thing the compiler will not let past.
+    const filler = useMemo(() => {
+        const pool = ["bone", "doubloon", "laurel", "chest", "wolf"];
+        return Array.from({ length: REELS }, (_, r) =>
+            Array.from({ length: 8 }, (_, i) => pool[(i * 3 + r * 2) % pool.length]));
+    }, []);
     const isGiantAt = (reel, row) => giants.find((g) => g.reel === reel && g.row === row);
     const insideGiant = (reel, row) => giants.some((g) => g.reel === reel && row > g.row && row < g.row + g.len);
 
@@ -139,42 +153,20 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
 
     return (
         <div className={`col5${free ? " is-free" : ""}`}>
-            {/* ── THE SMALL BOARD ── the lever. It is on top because the transfer falls downward. */}
-            <div className="col5-main">
-                <span className="col5-tag">Main reels</span>
-                <div className="col5-grid" style={{ "--rows": ROWS }}>
-                    {Array.from({ length: REELS }, (_, reel) => (
-                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : " is-spin"}${sending.includes(reel) ? " is-sending" : ""}`}>
-                            {Array.from({ length: ROWS }, (_, row) => {
-                                const sym = landed > reel ? main?.[reel]?.[row] : null;
-                                return (
-                                    <span key={row} className={`col5-cell is-${sym ? symbolRole(sym, machineId) : "blank"}${cellLit("main", reel, row, ROWS) ? " is-lit" : ""}`}
-                                        style={{ "--tone": sym ? symbolTone(sym, machineId) : "#333" }}>
-                                        {sym ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={cellArt(sym)} alt="" draggable="false" />
-                                        ) : null}
-                                    </span>
-                                );
-                            })}
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* The wilds falling from one board into the other — one element per travelling column. */}
-            {sending.length ? (
-                <div className="col5-send" aria-hidden="true">
-                    {sending.map((r) => <i key={r} style={{ "--reel": r }} />)}
-                </div>
-            ) : null}
-
             {/* ── THE COLOSSAL BOARD ── twelve rows, eighty of the hundred lines, and where the giants live. */}
             <div className="col5-col">
                 <span className="col5-tag">{data?.label || "The Colossal Reels"}</span>
                 <div className="col5-grid is-tall" style={{ "--rows": rows }}>
                     {Array.from({ length: REELS }, (_, reel) => (
                         <div key={reel} className={`col5-reel${colLanded > reel ? " is-stop" : " is-spin"}${sent.includes(reel) ? " is-sent" : ""}`}>
+                            {colLanded <= reel ? (
+                                <span className="col5-run" aria-hidden="true">
+                                    {filler[reel].concat(filler[reel]).map((f, i) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={i} src={cellArt(f)} alt="" draggable="false" />
+                                    ))}
+                                </span>
+                            ) : null}
                             {Array.from({ length: rows }, (_, row) => {
                                 const sym = colLanded > reel ? col?.[reel]?.[row] : null;
                                 // ── ONE PICTURE, NOT SIX ────────────────────────────────────────────
@@ -196,6 +188,44 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, playi
                                     <span key={row} className={`col5-cell is-${sym ? (isMult(sym) ? "mult" : symbolRole(sym, machineId)) : "blank"}${cellLit("col", reel, row, rows) ? " is-lit" : ""}`}
                                         style={{ "--tone": sym && !isMult(sym) ? symbolTone(sym, machineId) : "#ffd75e" }}>
                                         {sym && isMult(sym) ? <b>&times;{multValue(sym)}</b> : sym ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={cellArt(sym)} alt="" draggable="false" />
+                                        ) : null}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* The wilds falling from one board into the other — one element per travelling column. */}
+            {sending.length ? (
+                <div className="col5-send" aria-hidden="true">
+                    {sending.map((r) => <i key={r} style={{ "--reel": r }} />)}
+                </div>
+            ) : null}
+
+            {/* ── THE SMALL BOARD ── the lever. It is on top because the transfer falls downward. */}
+            <div className="col5-main">
+                <span className="col5-tag">Main reels — a full wild column sends</span>
+                <div className="col5-grid" style={{ "--rows": ROWS }}>
+                    {Array.from({ length: REELS }, (_, reel) => (
+                        <div key={reel} className={`col5-reel${landed > reel ? " is-stop" : " is-spin"}${sending.includes(reel) ? " is-sending" : ""}`}>
+                            {landed <= reel ? (
+                                <span className="col5-run" aria-hidden="true">
+                                    {filler[reel].concat(filler[reel]).map((f, i) => (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img key={i} src={cellArt(f)} alt="" draggable="false" />
+                                    ))}
+                                </span>
+                            ) : null}
+                            {Array.from({ length: ROWS }, (_, row) => {
+                                const sym = landed > reel ? main?.[reel]?.[row] : null;
+                                return (
+                                    <span key={row} className={`col5-cell is-${sym ? symbolRole(sym, machineId) : "blank"}${cellLit("main", reel, row, ROWS) ? " is-lit" : ""}`}
+                                        style={{ "--tone": sym ? symbolTone(sym, machineId) : "#333" }}>
+                                        {sym ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={cellArt(sym)} alt="" draggable="false" />
                                         ) : null}

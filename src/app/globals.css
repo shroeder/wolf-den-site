@@ -19811,6 +19811,83 @@ body.cas-seated .social-fab { display: none; }
     .col5-send { display: none; }
 }
 
+
+/* ══ IT HAS TO FIT, AND IT HAS TO SPIN ════════════════════════════════════════════════════════════════════
+   Luke: "I don't want to have to scroll to see the whole game, it needs to fit within my screen — so maybe
+   make everything a little bit smaller. And the reels need to look like they're actually spinning, not just
+   mysteriously dropping in place. And reverse the screens so the small screen is at the bottom and the big
+   screen on top."
+
+   ── SIZED OFF THE VIEWPORT, NOT OFF A GUESS ───────────────────────────────────────────────────────────
+   Fifteen rows of cells plus a masthead, a ribbon and a control panel cannot be sized by picking numbers
+   and hoping; every previous attempt here was a fixed cell height that fitted one phone. The row height is
+   computed from what is actually left after the chrome, and the two boards divide it in the ratio they
+   have rows — so the whole machine lands inside the screen on any device, and the cells are as large as
+   that allows rather than as large as I felt like. */
+.s5:has(.col5) {
+    /* what the cabinet has to fit into, after the site header, the readout, the panel and the gaps */
+    /* Measured against the real thing rather than estimated: at 336 the SPIN button sat just below the
+       fold — "fits" has to mean the button you press is on the screen, not that the document happens not to
+       scroll. */
+    --col5-avail: calc(100dvh - 408px);
+    /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
+    --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
+}
+.col5 { gap: 5px; }
+.col5-main, .col5-col { padding: 4px; }
+.col5-tag { margin: 0 0 2px; font-size: .42rem; letter-spacing: .2em; }
+
+/* Rows are a fixed height now rather than an aspect ratio, which is what lets the board be told how tall it
+   is allowed to be. The giants still span, and now span the whole reel. */
+.col5-grid.is-tall .col5-cell { aspect-ratio: auto; height: var(--col5-row); }
+.col5-main .col5-cell { aspect-ratio: auto; height: calc(var(--col5-row) * 1.18); }
+.col5-cell img { width: 88%; height: 88%; }
+
+/* ── A GIANT IS THE WHOLE REEL ─────────────────────────────────────────────────────────────────────────
+   "The sprite needs to be the whole reel, even if it cuts the sprite off." It is: the engine fills the
+   entire column with it (see spinColossal), so the span is all twelve rows. `cover` rather than `contain`
+   because filling the reel is the instruction and a crop at the crown is the accepted price of it. */
+.col5-grid.is-tall .col5-cell.is-giant { height: auto; }
+.col5-cell.is-giant img { object-fit: cover; object-position: 50% 26%; }
+
+/* ── THE REELS RUN ─────────────────────────────────────────────────────────────────────────────────────
+   A reel that has not landed renders a strip of ordinary symbols and scrolls it. Before this a running reel
+   was an empty channel and its symbols simply appeared, which is exactly the "mysteriously dropping in
+   place" Luke described — there was nothing to see, so there was no spin to watch. */
+.col5-reel { position: relative; }
+.col5-run { position: absolute; inset: 0; z-index: 0; display: block; overflow: hidden; }
+.col5-run img { display: block; width: 88%; height: var(--col5-row); margin: 0 auto;
+    object-fit: contain; opacity: .8; filter: blur(1.4px); }
+.col5-reel.is-spin .col5-run { animation: col5Run .34s linear infinite; }
+@keyframes col5Run {
+    from { transform: translateY(calc(var(--col5-row) * -4)); }
+    to { transform: translateY(0); }
+}
+/* The blur belongs to the moving strip, not to the reel — blurring the reel blurred its frame too. */
+.col5-reel.is-spin { filter: none; opacity: 1; }
+/* And it lands rather than fading in: a short overshoot as the strip is replaced by the real symbols. */
+.col5-reel.is-stop { animation: col5Land .2s cubic-bezier(.2,1.6,.4,1) both; }
+
+/* ── THE TRANSFER RUNS UP ──────────────────────────────────────────────────────────────────────────────
+   The boards are the other way round now — colossal on top, main underneath, on Luke's call — so the wild
+   column travels UPWARD out of the small board into the big one. Same beat, reversed, because a bar of
+   light falling downward into the board it came from would read as the opposite of what happened. */
+.col5-send { top: auto; bottom: 0; height: 46%; }
+@keyframes col5Fall {
+    from { transform: translateY(45%) scaleY(.4); opacity: 0; }
+    40% { opacity: 1; }
+    to { transform: translateY(-45%) scaleY(1.1); opacity: 0; }
+}
+
+/* The ribbon and the tags shrink with everything else. */
+.col5-bar { padding: 3px 9px; }
+.col5-cell-b b { font-size: 12px; }
+.col5-mult b { font-size: .9rem; }
+
+/* Nothing needs to be sticky once the machine fits. */
+.s5:has(.col5) .s5-panel { position: static; backdrop-filter: none; background: none; box-shadow: none;
+    padding: 0; }
+
 /* ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────
    Five rooms deep, and the room is the point — each stage is a different painted place behind the
    burrows, so going deeper is something you SEE rather than a number going up.
