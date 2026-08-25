@@ -1,6 +1,7 @@
 import { db } from "@/lib/db.js";
 import { isOwner, isStaff } from "@/lib/marketplace/owner.js";
 import { levelForXp } from "@/lib/marketplace/xp-curve.js";
+import { SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
 import { RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
 
 // ── ROLES ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -47,11 +48,10 @@ export const ROLES = {
 // themselves. Seven hundred qualifies four — dumbguy247 $1,053, JT $887, Sky $886, jim $802 — and it lands in
 // a natural gap: the next member down is at $531, so nobody is agonisingly a few dollars short of it.
 //
-// ONE CAVEAT ON THE NUMBER ITSELF. In-store spend is read from the amount stamped on each purchase_spend XP
-// event, and 48 events from 15-23 July predate that stamp. They count as spend for the "have you ever bought
-// anything" test on the raffle, and as ZERO here — so a member who was buying in that first week reads a
-// little lower than they really are. It is under a fortnight of a shop that has been running much longer, and
-// the honest alternative is inventing a number for a row that does not carry one.
+// BOTH SOURCES, WHOLE. Luke: "we have a QR code that people redeem to register if they bought something, and
+// obviously we have online sales — my consideration was only for those two things." Exactly those two, and
+// both now counted in full: the 48 counter redemptions from before 23 July that carry no stamped amount are
+// reconstructed from their XP rather than counted as nothing.
 export const VIP_CENTS = 70000;
 
 /**
@@ -67,12 +67,15 @@ export async function standingFor(buyerId) {
         // deploy. Falls back to the column that has always existed.
         db.queryOne(`SELECT xp, role FROM mkt_buyer WHERE id = $1`, [buyerId])
             .catch(() => db.queryOne(`SELECT xp, NULL AS role FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)),
-        // In-store spend carries its amount in the XP event's meta — see xp.js, which stamps amountCents on
-        // every purchase_spend. COALESCE because the earliest events predate the stamp and carry no amount;
-        // those count as spend for the "have you ever" test and as zero for this one, which is the honest
-        // reading of a row that does not say how much.
+        // ── IN-STORE SPEND, INCLUDING THE EVENTS THAT PREDATE THE STAMP ──────────────────────────────
+        // The QR handshake at the counter writes a purchase_spend event; since 23 July it stamps the real
+        // merchandise amount into the meta. The 48 events before that carry only the Square order id and the
+        // XP — and XP is `dollars x SPEND_XP_PER_DOLLAR`, so the amount is recoverable by dividing it back
+        // out. That is not a guess: awardXp documents the relationship and badges.js already falls back to
+        // exactly this for the same rows. Counting them as zero, which is what this did first, quietly
+        // understated everybody who was buying in the shop's first week.
         db.queryOne(
-            `SELECT COALESCE(SUM((meta->>'amountCents')::bigint), 0) AS c
+            `SELECT COALESCE(SUM(COALESCE((meta->>'amountCents')::numeric, points * 100.0 / ${SPEND_XP_PER_DOLLAR})), 0)::bigint AS c
                FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`,
             [buyerId],
         ).catch(() => null),
