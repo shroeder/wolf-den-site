@@ -36,6 +36,11 @@ const STAFF_BUYER_IDS = new Set([
     "d68dacf6-10e1-40fe-93c8-9ca6ebdbb87e", // Eric D
 ]);
 
+/** Just staff — used by the role and channel system, which treats owner and staff as different things. */
+export function isStaff(buyerId) {
+    return Boolean(buyerId) && STAFF_BUYER_IDS.has(String(buyerId));
+}
+
 /** Owner or staff — the people who cannot win a real-world prize from the shop they work for. */
 export function isHouse(buyerId) {
     return isOwner(buyerId) || (Boolean(buyerId) && STAFF_BUYER_IDS.has(String(buyerId)));

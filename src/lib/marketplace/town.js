@@ -26,6 +26,7 @@ import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
+import { chipFor } from "@/lib/marketplace/roles.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -638,8 +639,19 @@ export async function contributeTownProject(buyerId, projectId, amount) {
 
 // Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
 // during the build). Trimmed + length-capped; empties are dropped.
-export async function sendTownChat(buyerId, body) {
+export async function sendTownChat(buyerId, body, channel = "global") {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+
+    // ── THE PRIVATE ROOMS ARE CHECKED HERE, NOT ONLY WHERE THEY ARE DRAWN ────────────────────────────────
+    // A tab that only renders for VIPs is a hidden door, and a hidden door is not a locked one — this
+    // endpoint takes a channel name from a POST body. Every write is authorised against what the server says
+    // the member has earned, the same list the tab was drawn from.
+    const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    if (chan !== "global") {
+        const { standingFor, channelsFor } = await import("@/lib/marketplace/roles.js");
+        const { roles } = await standingFor(buyerId);
+        if (!channelsFor(buyerId, roles).includes(chan)) return { ok: false, error: "not_in_channel" };
+    }
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
 
@@ -652,9 +664,9 @@ export async function sendTownChat(buyerId, body) {
     // LATER is fine and always was; this only refuses it while it is still on screen.
     const recent = await db.query(
         `SELECT body FROM mkt_town_chat
-          WHERE buyer_id = $1 AND created_at > NOW() - INTERVAL '5 minutes'
+          WHERE buyer_id = $1 AND channel = $2 AND created_at > NOW() - INTERVAL '5 minutes'
           ORDER BY created_at DESC LIMIT 4`,
-        [buyerId]
+        [buyerId, chan]
     ).catch(() => []);
     const norm = (v) => String(v || "").toLowerCase().replace(/[\s\p{P}]+/gu, "");
     const key = norm(text);
@@ -666,13 +678,13 @@ export async function sendTownChat(buyerId, body) {
     if ((recent || []).length >= 4) {
         const burst = await db.queryOne(
             `SELECT COUNT(*)::int AS n FROM mkt_town_chat
-              WHERE buyer_id = $1 AND created_at > NOW() - INTERVAL '1 minute'`,
-            [buyerId]
+              WHERE buyer_id = $1 AND channel = $2 AND created_at > NOW() - INTERVAL '1 minute'`,
+            [buyerId, chan]
         ).catch(() => null);
         if ((burst?.n || 0) >= 6) return { ok: false, error: "too_fast" };
     }
 
-    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
+    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body, channel) VALUES ($1, $2, $3)`, [buyerId, text, chan]).catch(() => {});
     // Chatting pays NOTHING. It used to tick a "send 5 chats" daily, which turned the Den's global feed into
     // five identical wolf emoji from whoever wanted the 80 gold. See the note in town-quests.js.
     return { ok: true };
@@ -703,20 +715,58 @@ export async function markGlobalChatSeen(buyerId) {
     await db.query(`UPDATE mkt_buyer SET global_chat_seen_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
 }
 
-export async function getGlobalChat(buyerId = null, limit = 40) {
+export async function getGlobalChat(buyerId = null, limit = 40, channel = "global") {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
+    const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+
+    // ── A PRIVATE ROOM IS AUTHORISED AND WINDOWED ────────────────────────────────────────────────────────
+    // Two separate rules, and they are not the same rule. AUTHORISED: you are in the room or you get nothing,
+    // checked server-side against the earned list rather than against whichever tab the client asked for.
+    // WINDOWED: you see what was said after you arrived — Luke's "once you join that chat you are only able
+    // to see messages from after your join date" — so a new VIP opens a door rather than being handed a
+    // transcript of a conversation they were not part of.
+    let since = null;
+    if (chan !== "global") {
+        if (!buyerId) return [];
+        const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
+        const { roles } = await standingFor(buyerId);
+        if (!channelsFor(buyerId, roles).includes(chan)) return [];
+        since = await joinedAt(buyerId, chan);
+    }
     // The QUERY is identical for everyone — buyerId only decides the `mine` flag, which is computed in JS below.
     // So the join runs once for the whole plaza instead of once per viewer per poll. This was the last live
     // piece of the Town poll still doing per-viewer database work for a shared answer.
-    const rows = await shared(`town:chat:${n}`, TTL.LIVE, () => db.query(
-        `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind,
-                b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
+    // ── THE GLOBAL FEED STAYS SHARED; THE PRIVATE ONES CANNOT BE ────────────────────────────────────────
+    // The plaza query is deliberately cached for the whole room — one join per poll for everybody. A private
+    // room's answer depends on WHO IS ASKING (their join date), so caching it under a shared key would serve
+    // one member's window to the next. Global keeps the shared read; vip and staff take their own.
+    const sql = `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind, c.channel,
+                b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.role, b.xp
+           FROM mkt_town_chat c
+           JOIN mkt_buyer b ON b.id = c.buyer_id
+          WHERE c.channel = $2 AND ($3::timestamptz IS NULL OR c.created_at >= $3)
+          ORDER BY c.created_at DESC
+          LIMIT $1`;
+    // ── AND IT SURVIVES ITS OWN DEPLOY ───────────────────────────────────────────────────────────────────
+    // `c.channel` arrives in migration 402, and for the minutes between the new code serving and that
+    // migration landing the query above is a reference to a column that does not exist — which the .catch
+    // turns into an EMPTY PLAZA for everybody. A chat that silently empties itself is the worst possible
+    // failure here, so the global feed falls back to the channel-less query it used yesterday. The private
+    // rooms have no fallback and need none: before the migration there is nothing in them to miss.
+    const legacy = `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind,
+                b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, NULL AS role, b.xp
            FROM mkt_town_chat c
            JOIN mkt_buyer b ON b.id = c.buyer_id
           ORDER BY c.created_at DESC
-          LIMIT $1`,
-        [n]
-    ).catch(() => []));
+          LIMIT $1`;
+    const readGlobal = async () => {
+        const r = await db.query(sql, [n, chan, null]).catch(() => null);
+        if (r) return r;
+        return db.query(legacy, [n]).catch(() => []);
+    };
+    const rows = chan === "global"
+        ? await shared(`town:chat:${n}`, TTL.LIVE, readGlobal)
+        : await db.query(sql, [n, chan, since]).catch(() => []);
     // ── MUTED MILESTONES ARE FILTERED PER VIEWER, NOT PER QUERY ──────────────────────────────────────────
     // The query above is deliberately shared across the whole plaza — one join per poll for everybody — so
     // this cannot become a WHERE clause without giving every viewer their own database round trip. One extra
@@ -738,6 +788,12 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
         sprite: r.avatar_sprite_url || null,
         flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
         mine: buyerId ? String(r.buyer_id) === String(buyerId) : false,
+        // ── THE ROLE CHIP ────────────────────────────────────────────────────────────────────────────────
+        // Luke: "it shows up next to my name in chat, each role has its own colour." Resolved from the two
+        // columns the join already carries rather than with a lookup per message — a forty-message feed
+        // would otherwise be forty extra reads. `chipFor` validates the stored choice against what the row
+        // can actually prove, so a lapsed VIP's old preference does not keep drawing a VIP chip.
+        role: chipFor(r.buyer_id, r.role, r.xp),
         // ── AN ANNOUNCEMENT, FLAGGED AS ONE ──────────────────────────────────────────────────────────────
         // The Arbiter's posts are patch notes, and the chat log renders a message as one span of text — so
         // they arrive as an unbroken wall between the emotes and push the actual conversation off the screen.

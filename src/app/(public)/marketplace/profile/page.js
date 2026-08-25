@@ -4,6 +4,7 @@ import CardTab from "@/components/CardTab";
 import EarnChecklist from "@/components/EarnChecklist";
 import GameInterestsCta from "@/components/GameInterestsCta";
 import NotifyPrefsClient from "@/components/NotifyPrefsClient";
+import RolePicker from "@/components/RolePicker";
 import WebPushToggle from "@/components/WebPushToggle";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import NextBadgeNudge from "@/components/NextBadgeNudge";
@@ -133,6 +134,15 @@ export default async function ProfileHubPage() {
             <details className="card hub-collapse">
                 <summary><h2>Earn more XP</h2></summary>
                 <EarnChecklist progress={progress} signedIn />
+            </details>
+
+            {/* ── YOUR ROLE ────────────────────────────────────────────────────────────────────────────
+                Open by default and above notifications, because it is a thing you WEAR — it shows next to
+                your name every time you speak — and a cosmetic nobody discovers is a cosmetic nobody uses.
+                The list of what you have earned is the server's; see RolePicker. */}
+            <details className="card hub-collapse" open>
+                <summary><h2>Your role</h2></summary>
+                <RolePicker />
             </details>
 
             {/* Open by default: this is the destination for the recap email's opt-out link and the

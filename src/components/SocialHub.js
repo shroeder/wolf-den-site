@@ -202,6 +202,10 @@ export default function SocialHub() {
     const [unread, setUnread] = useState(0);
     // Plaza chatter, kept apart from `unread` — see /api/marketplace/unread for why it isn't folded in.
     const [globalNew, setGlobalNew] = useState(0);
+    // Which rooms exist for this member. Seeded with the one everybody has and replaced by the server's
+    // answer on the first chat load — never computed here, because a client that decides its own membership
+    // is a client that can decide it differently.
+    const [channels, setChannels] = useState(["global"]);
     const [requests, setRequests] = useState(0);
     const [bubble, setBubble] = useState(false);
     const prevTotalRef = useRef(-1);
@@ -393,24 +397,45 @@ export default function SocialHub() {
                         <Thread thread={thread} onActivity={refreshUnread} />
                     ) : (
                         <>
+                            {/* ── SIX TABS, DRAWN ────────────────────────────────────────────────────
+                                Luke: "in social tabs we probably want to switch to generated sprites instead
+                                of text to save room." Four words already crowded a phone; VIP and Staff make
+                                six, which does not fit at any size worth reading. Drawn icons (gen-nav-icons)
+                                with the label kept underneath at a size that is a hint rather than the
+                                control — the icon is what you aim at, the word is what confirms it.
+
+                                The two private rooms are rendered only for members who are in them, which
+                                the SERVER decides and sends back with the feed. That is a courtesy, not the
+                                lock: the feed itself refuses a room you are not in, so a hidden tab is not
+                                what is keeping anybody out. */}
                             <div className="social-tabs">
-                                <button type="button" className={`social-tab${tab === "global" ? " is-active" : ""}`} onClick={() => setTab("global")}>
-                                    🌐 Global{globalNew > 0 && tab !== "global" ? <span className="social-tab-badge is-chat">{globalNew > 99 ? "99+" : globalNew}</span> : null}
-                                </button>
-                                <button type="button" className={`social-tab${tab === "messages" ? " is-active" : ""}`} onClick={() => setTab("messages")}>
-                                    Messages{unread > 0 ? <span className="social-tab-badge">{unread}</span> : null}
-                                </button>
-                                <button type="button" className={`social-tab${tab === "friends" ? " is-active" : ""}`} onClick={() => setTab("friends")}>
-                                    Friends{incomingCount > 0 ? <span className="social-tab-badge">{incomingCount}</span> : null}
-                                </button>
-                                <button type="button" className={`social-tab${tab === "discover" ? " is-active" : ""}`} onClick={() => setTab("discover")}>
-                                    Discover
-                                </button>
+                                {[
+                                    ["global", "Global", "social-global", globalNew > 0 && tab !== "global" ? (globalNew > 99 ? "99+" : globalNew) : null],
+                                    ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", null]] : []),
+                                    ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", null]] : []),
+                                    ["messages", "Messages", "social-messages", unread > 0 ? unread : null],
+                                    ["friends", "Friends", "social-friends", incomingCount > 0 ? incomingCount : null],
+                                    ["discover", "Discover", "social-discover", null],
+                                ].map(([key, label, icon, badge]) => (
+                                    <button key={key} type="button" title={label} aria-label={label}
+                                        className={`social-tab${tab === key ? " is-active" : ""}`}
+                                        onClick={() => setTab(key)}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={`/images/nav/${icon}.png`} alt="" width={22} height={22} draggable="false" />
+                                        <i>{label}</i>
+                                        {badge ? <span className={`social-tab-badge${key === "global" ? " is-chat" : ""}`}>{badge}</span> : null}
+                                    </button>
+                                ))}
                             </div>
 
                             <div className="social-body">
-                                {tab === "global" ? (
-                                    <GlobalChatTab open={open} onRead={() => setGlobalNew(0)} />
+                                {tab === "global" || tab === "vip" || tab === "staff" ? (
+                                    // One component, keyed by room — remounting on a change is what makes a
+                                    // room open on its own newest message rather than inheriting the last
+                                    // room's feed for a frame.
+                                    <GlobalChatTab key={tab} open={open} channel={tab}
+                                        onChannels={setChannels}
+                                        onRead={() => setGlobalNew(0)} />
                                 ) : tab === "messages" ? (
                                     <MessagesTab inbox={inbox} onOpenDm={(id, name) => setThread({ id, name })} />
                                 ) : tab === "friends" ? (
@@ -568,7 +593,16 @@ function heroInner(m) {
 // The Global tab — a first-class town/plaza chat. Same stream as the in-town chat: send here and it shows in
 // the plaza (and vice versa). Every message shows the sender's HERO sprite (not their avatar icon), name, and
 // a pretty timestamp. Polls while open.
-function GlobalChatTab({ open, onRead }) {
+// ── ONE CHAT, THREE ROOMS ────────────────────────────────────────────────────────────────────────────────────
+// Luke: "two new channels, one for VIPs and one for staff and owners. These only show up as tabs in social if
+// you are in that group... the chats are exclusive so non-members can't see into them, and once you join that
+// chat you are only able to see messages from after your join date."
+//
+// The same component for all three, because they ARE the same thing — a feed, a composer, and a name on each
+// line. What differs is which channel it asks for, and every part of the answer to that lives on the server:
+// which rooms exist for you, what is in them, and how far back you may see. The tab not rendering is a
+// courtesy, not the lock.
+function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
     const [messages, setMessages] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
@@ -579,14 +613,17 @@ function GlobalChatTab({ open, onRead }) {
     const didFirstScroll = useRef(false);
 
     const load = useCallback(async () => {
-        const r = await fetch("/api/marketplace/global-chat", { cache: "no-store" }).catch(() => null);
+        const r = await fetch(`/api/marketplace/global-chat?channel=${encodeURIComponent(channel)}`, { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.messages) setMessages(d.messages);
         else setMessages((m) => (m === null ? [] : m));
+        // The rooms this member can see come back with the feed rather than from a second endpoint — the hub
+        // needs them to decide which tabs exist, and they are already computed to answer this request.
+        if (d?.channels) onChannels?.(d.channels);
         // That GET marked the feed read server-side; clear the local count now instead of waiting up to 30s
-        // for the next unread poll to catch up.
-        if (d?.authenticated) onRead?.();
-    }, [onRead]);
+        // for the next unread poll to catch up. Only the global feed has an unread count.
+        if (d?.authenticated && channel === "global") onRead?.();
+    }, [onRead, channel, onChannels]);
 
     useEffect(() => {
         if (!open) return undefined;
@@ -594,6 +631,11 @@ function GlobalChatTab({ open, onRead }) {
         const iv = setInterval(() => { if (document.visibilityState === "visible") load(); }, 12000);
         return () => clearInterval(iv);
     }, [open, load]);
+
+    // NO EFFECT RESETTING THE FEED ON A ROOM CHANGE. The hub mounts this with `key={tab}`, so switching
+    // rooms unmounts and remounts it — the latch and the message list start fresh on their own. The effect
+    // that used to do it by hand was a synchronous setState in an effect, which is a cascading render for a
+    // state React was about to throw away anyway.
 
     // ONLY ON THE FIRST LOAD. Following new messages on every refresh was still the app deciding to move
     // your view — restricting it to "you were already at the bottom" made it defensible but not wanted, and
@@ -615,7 +657,7 @@ function GlobalChatTab({ open, onRead }) {
         const r = await fetch("/api/marketplace/global-chat", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ body }),
+            body: JSON.stringify({ body, channel }),
         }).catch(() => null);
         if (r && r.ok) {
             setInput(""); setNote(""); await load(); scrollToEndIfPinned(endRef, true);
@@ -639,7 +681,9 @@ function GlobalChatTab({ open, onRead }) {
                 {messages === null ? (
                     <p className="muted social-empty">Loading the plaza…</p>
                 ) : messages.length === 0 ? (
-                    <p className="muted social-empty">No messages yet — say hello to the whole Den.</p>
+                    <p className="muted social-empty">{channel === "global"
+                        ? "No messages yet — say hello to the whole Den."
+                        : "Nothing here yet. You see what is said from the day you joined this room onward."}</p>
                 ) : (
                     messages.map((m) => (
                         <div key={m.id} className={`gchat-row${m.mine ? " mine" : ""}`}>
@@ -659,6 +703,14 @@ function GlobalChatTab({ open, onRead }) {
                                     ) : (
                                         <span className="gchat-name">{m.name}</span>
                                     )}
+                                    {/* ── THE ROLE CHIP ──────────────────────────────────────────────
+                                        Luke: "it shows up next to my name in chat, each role has its own
+                                        colour." Resolved server-side against what the member can actually
+                                        prove — see chipFor — so this only ever draws it. */}
+                                    {m.role ? (
+                                        <span className={`gchat-role${m.role.glow ? " is-earned" : ""}`}
+                                            style={{ "--role": m.role.tone }}>{m.role.name}</span>
+                                    ) : null}
                                     <span className="gchat-time">{relTime(m.at)}</span>
                                 </span>
                                 {/* An Arbiter announcement gets structure and opens collapsed. Same
@@ -676,7 +728,9 @@ function GlobalChatTab({ open, onRead }) {
                 <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Message the whole Den…"
+                    placeholder={channel === "vip" ? "Message the VIP room…"
+                        : channel === "staff" ? "Message the back room…"
+                        : "Message the whole Den…"}
                     maxLength={200}
                     autoCapitalize="sentences"
                 />
