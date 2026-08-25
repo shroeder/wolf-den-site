@@ -72,6 +72,7 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
         setFacing(to < xRef.current ? -1 : 1);
         setX(to);
         Cas.chips?.();
+        Haptic.hit(0.2);
     }, []);
 
     // Who is within reach, which decides what the button at the bottom offers. Derived rather than stored so
@@ -93,9 +94,14 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
 
     const talk = useCallback(async () => {
         unlock();
+        // Both of them answer, not just the bartender. The sound and the buzz were inside the bartender
+        // branch, so opening the vendor's case — the only place in the game that sells a VIP pet — happened
+        // in complete silence. A panel that appears with no sound is a panel that appeared, not a case that
+        // was opened.
+        Cas.chips?.();
+        Haptic.hit(0.35);
         setOpen(near);
         if (near === "bartender") {
-            Cas.chips?.(); Haptic.hit(0.3);
             const s = await POST({ action: "vip_state" });
             if (s?.open) { setSt(s); setSaying(s.bartender?.text || null); }
         }

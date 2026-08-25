@@ -1387,7 +1387,20 @@ export default function CasinoClient({ initial }) {
                         className={`cas-mach${m.live ? " is-live" : ""}${at?.id === m.id ? " is-near" : ""}`}
                         style={{ left: `${m.x}%` }}
                         aria-label={`${m.label} — ${m.live ? m.kind : "not built yet"}`}
-                        onClick={() => { if (draggedJustNow()) return; setX(m.x); if (m.live) setSeated(true); }}>
+                        onClick={() => {
+                            if (draggedJustNow()) return;
+                            setX(m.x);
+                            if (!m.live) return;
+                            // ── SITTING DOWN IS AN EVENT ───────────────────────────────────────
+                            // check:feel, pressing the floor's main action: "never buzzed the phone." It was
+                            // right — the most consequential tap on the floor, the one that takes over the
+                            // whole screen, did it in silence and without the phone moving. Every other
+                            // machine in this room answers a press; the room itself did not.
+                            unlock();
+                            Cas.chips();
+                            Haptic.hit(0.4);
+                            setSeated(true);
+                        }}>
                         {/* The cabinet, drawn rather than approximated. It was a gradient and a border for
                             as long as the floor plan was still being argued about, which was the right order
                             to do it in — art costs money to get wrong, and the plan changed three times. */}

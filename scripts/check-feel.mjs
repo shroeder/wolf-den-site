@@ -100,8 +100,15 @@ const SCREENS = [
 
     // And the room behind the rope. Two clicks: the first walks to the arch, the second opens it — the same
     // two-step a member does, which is also the only way to prove the rope actually opens.
-    { id: "vip", path: "/marketplace/casino", main: ".vip-room", act: ".vip-talk, .vip-out",
-        open: "const d=document.querySelector('.cas-vipdoor'); if(d){ d.click(); setTimeout(()=>d.click(), 700); }" },
+    // Three staged clicks: walk to the rope, open it, then walk to the bartender — because `act` has to be
+    // the thing the room is FOR. It was ".vip-talk, .vip-out", and the talk button only exists once you are
+    // stood at somebody, so every run pressed "← The floor" instead and then reported the room as silent and
+    // instant. It was: leaving a room is silent and instant. A gate that presses the wrong button measures
+    // the wrong thing perfectly.
+    { id: "vip", path: "/marketplace/casino", main: ".vip-room", act: ".vip-talk",
+        open: "const d=document.querySelector('.cas-vipdoor');"
+            + " if(d){ d.click(); setTimeout(()=>d.click(), 600);"
+            + " setTimeout(()=>{ const b=document.querySelector('.vip-npc.is-bartender'); if(b) b.click(); }, 1400); }" },
     { id: "farm", path: "/marketplace/farm", main: ".farm-plots, .farm-yard, .card", act: ".btn-gold" },
     { id: "arena", path: "/marketplace/arena", main: ".ar-stage, .card", act: ".btn-gold" },
     { id: "mine", path: "/marketplace/mine", main: ".mine-face, .card", act: ".btn-gold" },
@@ -210,7 +217,23 @@ const PROBE = (sc) => `(() => {
         if (!(r.left < m.right && r.right > m.left && r.top < m.bottom && r.bottom > m.top)) continue;
         const speaks = (el.textContent || '').trim().length > 0;
         const taps = el.matches('button,a,[role=button]') || el.querySelector('button,a,[role=button]');
-        if (speaks || taps) out.over.push((el.className || el.tagName).toString().split(' ')[0]);
+        if (!speaks && !taps) continue;
+        // ── IS IT ACTUALLY ON TOP, OR MERELY UNDERNEATH? ────────────────────────────────────────────
+        // Geometry alone cannot answer this and it was getting it wrong on every seated casino screen:
+        // the machine opens as a position:fixed stage over the floor, so all nine cabinets are still
+        // in the DOM, still absolutely positioned, and still overlapping the thing you are looking at —
+        // while being completely covered by it. The gate reported cas-mach on keno, blackjack and the
+        // counter every run, which is the kind of standing false positive that teaches somebody to stop
+        // reading the output.
+        //
+        // elementFromPoint settles it: ask the browser what is actually painted at the middle of the
+        // overlap, and if the answer is not this element or something inside it, it is behind something
+        // and it is not covering anything.
+        const cx = Math.round(Math.max(r.left, m.left) + (Math.min(r.right, m.right) - Math.max(r.left, m.left)) / 2);
+        const cy = Math.round(Math.max(r.top, m.top) + (Math.min(r.bottom, m.bottom) - Math.max(r.top, m.top)) / 2);
+        const top = document.elementFromPoint(cx, cy);
+        if (!top || !(top === el || el.contains(top))) continue;
+        out.over.push((el.className || el.tagName).toString().split(' ')[0]);
       }
     }
 
