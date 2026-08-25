@@ -58,7 +58,12 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                 {shelf.items.map((item) => (
                     <button key={item.id} type="button"
                         className={`cs-item${item.owned ? " is-owned" : ""}${!item.afford && !item.owned ? " is-dear" : ""}`}
-                        onClick={() => { setOpen(item); Cas.chips(); }}>
+                        onClick={() => {
+                            // check:feel, on the counter: "never buzzed the phone." Picking a thing up off
+                            // the shelf made a sound and nothing else — and this is the screen where the
+                            // numbers are largest, so it is the worst one to feel like a list.
+                            unlock(); Cas.chips(); Haptic.hit(0.25); setOpen(item);
+                        }}>
                         {/* THE THING ITSELF. Every one of these is drawn — gems, forge parts, consumables
                             and decorations all carry a sprite somewhere in the game — and the counter was
                             showing a name and a price. Somebody spending four thousand chips on a sapphire
