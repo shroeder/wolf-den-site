@@ -20334,8 +20334,8 @@ body.cas-seated .social-fab { display: none; }
    Speed is distance over time, so the time has to follow the cell. Both boards now run at the FAST rate —
    the one the bottom rail was already doing — which is what he asked for and what a real cabinet does.
    ANY change to --cell-h has to be matched here or the two drift apart again. */
-.col5-grid.is-tall { --cell-h: var(--col5-row); --roll-ms: 475ms; }
-.col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); --roll-ms: 560ms; }
+.col5-grid.is-tall { --cell-h: var(--col5-row); --roll-ms: 475ms; --settle-ms: 700ms; }
+.col5-main .col5-grid { --cell-h: calc(var(--col5-row) * 1.18); --roll-ms: 560ms; --settle-ms: 240ms; }
 /* ── REELS FALL ───────────────────────────────────────────────────────────────────────────────────────
    Luke: "reels go down, not up — you have them going up." He was right and the cause was the strip's
    ORDER, now fixed in the JSX: the real column is written FIRST and the lead-in after it. So the resting
@@ -20365,11 +20365,30 @@ body.cas-seated .social-fab { display: none; }
     from { transform: translateY(calc(var(--cell-h) * -1 * var(--spin, 20))); }
     to { transform: translateY(calc(var(--cell-h) * -1 * (var(--spin, 20) - 8))); }
 }
-/* Stopping: the strip runs the rest of the way home, so the real column falls through the window at
-   speed and settles. This is the near miss — you watch what is coming and you see what just missed. */
-.col5-reel.is-stop .col5-strip { animation: col5Settle .62s cubic-bezier(.12,.72,.22,1.03) both; }
+/* ── AND STOPPING IS A BRAKE, NOT A KICK ──────────────────────────────────────────────────────────────
+   Luke: "take a look at the change in spin speed of the top reels." Measured through a whole press, and my
+   first explanation was wrong. Both boards hold a matched 562px/s the entire time they run — the change is
+   at the END. The settle was travelling the full twenty-cell lead in 620ms on an accelerating curve, which
+   peaked at 2067px/s: nearly four times the spin. So the top board ran at a steady speed, the bottom rail
+   landed, and then the top board VISIBLY SPED UP into its stop. Exactly what he described, and the opposite
+   of what a reel does — a real one holds its speed and brakes.
+
+   Two changes. The travel starts from where the LOOP ENDS rather than from where it began: those two
+   positions show identical content (the filler cycles every eight cells, which is why the loop is seamless),
+   so it is invisible, and it cuts the distance from twenty cells to twelve — twelve being the floor, since
+   the answer is only hidden while the window is fully inside the lead.
+
+   And the duration follows the distance, per board, the same rule --roll-ms already obeys: the tall board
+   has twelve cells to cover and the small one three, so a single duration made one of them slam. At 700ms
+   and 300ms both brake from roughly the speed they were already running at. The curve is near-linear out
+   of the loop and soft into the stop, so the hand-off has no step in it. */
+/* THE CURVE'S OPENING SLOPE IS THE WHOLE POINT. A bezier's starting velocity is y1/x1 times the average,
+   so (.17,.63) opens at 3.7x — which is why the first cut still kicked to 1168px/s against a 562px/s spin
+   even after the distance was halved. (.33,.4) opens at 1.21x: the brake begins at very near the speed the
+   reel was already turning, and (.55,1) brings it to a dead stop with zero velocity at the end. */
+.col5-reel.is-stop .col5-strip { animation: col5Settle var(--settle-ms, 700ms) cubic-bezier(.33,.4,.55,1) both; }
 @keyframes col5Settle {
-    from { transform: translateY(calc(var(--cell-h) * -1 * var(--spin, 20))); }
+    from { transform: translateY(calc(var(--cell-h) * -1 * (var(--spin, 20) - 8))); }
     to { transform: translateY(0); }
 }
 /* The lead-in keeps its plate and rim — it is a real tile in every way but meaning. Stripped of them it

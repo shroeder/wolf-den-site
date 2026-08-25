@@ -31,7 +31,10 @@ const REELS = 5;
 // the big board lands after the small one on purpose, because the small one decides what it is going to be.
 const MAIN_STOP = 190;
 const COL_STOP = 230;
-const SETTLE = 260;
+// The beat after the last reel lands, before anything is lit. It has to outlast the SETTLE ANIMATION or the
+// winning tiles brighten on a board that is still moving — and that animation grew when the settle stopped
+// being a kick and became a brake (700ms on the tall board; see col5Settle).
+const SETTLE = 470;
 const SEND_MS = 620;      // a wild column falling from the small board into the big one
 const LINE_MS = 620;      // one winning line lit
 const BONUS_MS = 2400;
