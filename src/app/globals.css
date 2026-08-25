@@ -18253,13 +18253,20 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    `-1` works here where it did not on the cabinet: the scrim is a layer on this pseudo, so the stage's own
    background can go transparent and there is nothing left underneath to hide behind. */
 .cas-stage { background-color: transparent; }
+/* ── AND IT IS THE ROOM ART, NOT THE MASTHEAD ─────────────────────────────────────────────────────────
+   Luke: "make it so the bg isn't super blurry, you half assed it and just stretched the bg." Both halves
+   true. The masthead is a 5:1 letterbox frieze by design, so `cover`-ing a portrait phone with it scaled it
+   past four times and cropped away most of the composition — and the blur was hiding that rather than being
+   a decision. gen-casino-rooms.mjs draws a 2:3 piece per machine for exactly this, with the detail at the
+   top and bottom where it actually shows and a calm middle where the cabinet stands.
+   Six pixels of blur now, not twenty-two: enough to keep it behind the page, not enough to smear it. */
 .cas-stage::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background-image:
-        radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 16%, transparent), transparent 60%),
-        linear-gradient(180deg, rgba(9,6,14,.5), rgba(9,6,14,.66) 45%, rgba(6,4,10,.74)),
-        var(--mast);
+        radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--acc, #ffd75e) 14%, transparent), transparent 60%),
+        linear-gradient(180deg, rgba(9,6,14,.52), rgba(9,6,14,.7) 45%, rgba(6,4,10,.78)),
+        var(--room);
     background-size: cover, cover, cover; background-position: center, center, center;
-    filter: blur(22px) saturate(1.6) brightness(1.05); transform: scale(1.1); }
+    filter: blur(6px) saturate(1.25); transform: scale(1.04); }
 @keyframes casSit { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: none; } }
 
 /* The head becomes the machine's own title bar: a way out, the name, and what you have to spend. */
@@ -20007,8 +20014,8 @@ body.cas-seated .social-fab { display: none; }
    in chrome rather than in glass. */
 .s5-cab.is-colossal { padding: 19px 11px 40px; overflow: hidden;
     background:
-        linear-gradient(180deg, rgba(8,5,2,.34), rgba(8,5,2,.16) 22%, rgba(8,5,2,.16) 74%, rgba(8,5,2,.42)),
-        var(--mast) center / cover no-repeat, #0c0904; }
+        linear-gradient(180deg, rgba(8,5,2,.3), rgba(8,5,2,.12) 24%, rgba(8,5,2,.12) 72%, rgba(8,5,2,.38)),
+        var(--room) center / cover no-repeat, #0c0904; }
 .s5-cab.is-colossal::before { display: none; }
 .s5-pays.is-float { position: absolute; top: 6px; right: 8px; z-index: 3; }
 
@@ -20203,8 +20210,15 @@ body.cas-seated .social-fab { display: none; }
        anybody could add up: at 266 the rows reach 42px and SPIN's lower edge lands at 911 of 915, which is
        on the screen by four pixels and therefore not on it; at 292 the board is smaller for nothing. The
        reserve is the largest reel that still leaves the button comfortably in view, which is the only
-       definition of "fits" that matters. Rows: 33px before this pass, 41px after. */
-    --col5-avail: calc(100dvh - 274px);
+       definition of "fits" that matters. Rows: 33px before this pass, 41px after.
+
+       AND AGAIN, after the panel shrink. Luke: "can you grow the reels to use up the space we made." The
+       controls gave back 16px and the frame took 24, but centring the panel meant the bet block stopped
+       inflating itself to the disc's height — measured, SPIN's lower edge landed at 757 of 800, so there
+       were forty-three pixels sitting under the button doing nothing. A reserve is a promise about chrome,
+       and the chrome got smaller, so the promise had to. 274 to 248: rows go 33.7px to 35.4px, which is the
+       whole of that slack spent on glass rather than on air. */
+    --col5-avail: calc(100dvh - 248px);
     /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
     --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
 }

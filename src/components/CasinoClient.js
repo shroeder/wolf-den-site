@@ -1328,7 +1328,8 @@ export default function CasinoClient({ initial }) {
             {seated && at ? (
                 <div className={`cas-stage${at.live ? "" : " is-dark"}`}
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e",
-                        "--mast": `url(/images/casino/mast/${at.id}.webp)` }}
+                        "--mast": `url(/images/casino/mast/${at.id}.webp)`,
+                        "--room": `url(/images/casino/room/${at.id}.webp)` }}
                     role="dialog" aria-modal="true" aria-label={at.label}>
                     <div className="cas-panel-head">
                         {/* A WORD, NOT AN ARROW. An arrow in the corner of a full-screen game is browser

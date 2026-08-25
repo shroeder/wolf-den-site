@@ -754,7 +754,9 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     the top of the page in letters twice this size — printing it again inside the cabinet
                     spent 40px of a screen that has none to spare on saying the same thing twice. The
                     painted scene stays, at half the height, because that is what makes it a cabinet. */}
-                <div className="s5-cab is-colossal" style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)` }}>
+                <div className="s5-cab is-colossal"
+                    style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)`,
+                        "--room": `url(/images/casino/room/${machineId}.webp)` }}>
                     <button type="button" className="s5-pays is-float" onClick={() => setPays(true)}
                         aria-label="What this machine pays">PAYS</button>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
