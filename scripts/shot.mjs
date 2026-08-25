@@ -93,6 +93,14 @@ if (process.env.SHOT_COOKIE) {
     await send("Network.setCookie", {
         name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
         domain: new URL(url).hostname, path: "/",
+        // ── SECURE, OR PROD SILENTLY SIGNS YOU OUT ───────────────────────────────────────────────────
+        // The session cookie is issued with Secure+SameSite=Lax, and a cookie set over CDP without them
+        // does not match it — so the request goes out unauthenticated and the rig films the sign-in page
+        // while reporting success. Localhost worked because http exempts it, which is exactly why this
+        // went unnoticed: every shot that mattered was local. Mirror the real cookie's flags whenever the
+        // target is https and the rig can film production too.
+        secure: new URL(url).protocol === "https:",
+        sameSite: "Lax",
     });
 }
 
