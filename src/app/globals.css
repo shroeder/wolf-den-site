@@ -18235,7 +18235,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-stage .cas-panel-head b { text-align: center; font-size: 1.05rem; }
 .cas-leave { width: 40px; height: 40px; border-radius: 11px; font-size: 18px; cursor: pointer;
     color: #eaf1f8; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); }
-.cas-purse-sm { font-size: 12px; font-weight: 900; color: var(--acc, #ffd75e); white-space: nowrap; }
+/* ── THE TWO PURSES SIT ON ONE BASELINE ───────────────────────────────────────────────────────────────
+   Luke: "can we align the chip and text and coin and text vertically in the middle." They were an inline
+   run — two images and two numbers flowing as text — so each sprite sat on the TEXT baseline with its
+   descender space under it and rode visibly high against the digits. A flex row centres them against the
+   numbers instead of against a line box, which is what "in the middle" actually means here. */
+.cas-purse-sm { display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 900; color: var(--acc, #ffd75e); white-space: nowrap; }
+.cas-purse-sm img { display: block; flex: none; width: 15px; height: 15px; object-fit: contain; }
+/* A little air before the second purse, so "coin 1,111" and "chip 431,117" read as two things rather than
+   as one long number. */
+.cas-purse-sm img + * { margin-right: 3px; }
+.cas-purse-sm .cas-purse-chips { color: #7fe0a0; }
 .cas-purse-sm i { font-style: normal; font-size: 8.5px; color: #98a0aa; margin-left: 3px; }
 
 /* Everything between the title bar and the controls is the game, and it gets whatever room is left. */
