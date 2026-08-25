@@ -204,7 +204,7 @@ async function detailFor(item) {
         // — the note on CHEST_TIERS is emphatic about it — so the table can be read straight onto the card
         // with no arithmetic, and it cannot drift from what the chest actually rolls.
         case "chest": {
-            const [{ CHEST_TIERS }, { getChestArt }, { RARITY_META }] = await Promise.all([
+            const [{ CHEST_TIERS }, { getChestArt }, { RARITY_META, rarityRank }] = await Promise.all([
                 import("@/lib/marketplace/chests.js"),
                 import("@/lib/marketplace/chest-art.js"),
                 import("@/lib/marketplace/rarity.js"),
@@ -215,8 +215,11 @@ async function detailFor(item) {
             return {
                 art: art?.[item.ref] || null,
                 tone: t.color,
+                // Best first, down the LADDER — not by percentage. Sorted by weight the list came out
+                // Legendary, Epic, Mythic, Ascendant, which is the one order nobody reads a chest in: the
+                // question a chest answers is how far up it reaches, so the top of the ladder goes first.
                 lines: Object.entries(t.weights || {})
-                    .sort((a, b) => b[1] - a[1])
+                    .sort((a, b) => rarityRank(b[0]) - rarityRank(a[0]))
                     .map(([r, pct]) => ({
                         label: RARITY_META?.[r]?.label || r,
                         value: `${pct}%`,
