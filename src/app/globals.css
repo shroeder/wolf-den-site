@@ -20015,7 +20015,10 @@ body.cas-seated .social-fab { display: none; }
 
    The space came out of the controls (see .s5-panel), which is the trade he asked for: the frame is paid for
    in chrome rather than in glass. */
-.s5-cab.is-colossal { padding: 19px 11px 32px; overflow: hidden;
+/* No `overflow: hidden`. The background is clipped by border-radius on its own, and the hidden overflow was
+   trapping the win readout inside the cabinet — which is what forced the 32px band below the small board.
+   See .col5-flash: it hangs into the panel gap now and the band is gone. */
+.s5-cab.is-colossal { padding: 19px 11px 6px;
     background:
         linear-gradient(180deg, rgba(8,5,2,.3), rgba(8,5,2,.12) 24%, rgba(8,5,2,.12) 72%, rgba(8,5,2,.38)),
         var(--room) center / cover no-repeat, #0c0904; }
@@ -20054,13 +20057,21 @@ body.cas-seated .social-fab { display: none; }
 /* ── WHAT THIS PRESS PAID, AND THEN GONE ──────────────────────────────────────────────────────────────
    Not a readout — an event. It sits over the bottom of the tall board for as long as it is true and takes
    no room at all when it is not, which is what let the whole balance strip go. */
-/* Hung off the BOTTOM EDGE of the reel stack rather than sitting inside it — Luke: "move the win amount
-   down and not cover the bottom slot." At `bottom: 6px` it lay straight across the middle row of the small
-   board, which is the row you have to read to know whether a column is about to send. The cabinet carries
-   the room for it below (see .s5-cab.is-colossal), paid for by the panel shrink above. */
-.col5-flash { position: absolute; left: 50%; bottom: -31px; z-index: 8; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 8px; white-space: nowrap;
-    padding: 4px 12px; border-radius: 999px; pointer-events: none;
+/* ── IT HANGS OFF THE MACHINE, IT DOES NOT GET A ROOM OF ITS OWN ───────────────────────────────────────
+   Luke, of the finished layout: "do you see a big gap between the bottom reel and the spin button?" There
+   was — forty-three pixels on a 720px screen, six percent of the phone, and it was all reserve for THIS.
+
+   Two moves got it wrong in sequence. First it sat inside the boards and lay across the small board's
+   middle row, which is the row you read to know whether a column is about to send. Then it got its own
+   32px band under the cabinet — which fixed the overlap by permanently spending height on something that
+   is on screen for about two seconds a spin.
+
+   It hangs below the cabinet now, over the strip between the machine and its panel. It covers no reel, it
+   costs no height, and the only thing under it is the word BET on a button that is locked while a win is
+   counting anyway. Compact, because it is passing through rather than living there. */
+.col5-flash { position: absolute; left: 50%; bottom: -34px; z-index: 12; z-index: 8; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 7px; white-space: nowrap;
+    padding: 3px 11px; border-radius: 999px; pointer-events: none;
     background: linear-gradient(180deg, rgba(14,9,2,.92), rgba(6,4,1,.96));
     border: 1px solid color-mix(in srgb, var(--acc, #7fe0a0) 55%, transparent);
     box-shadow: 0 4px 18px rgba(0,0,0,.7);
@@ -20226,8 +20237,12 @@ body.cas-seated .social-fab { display: none; }
        assumed — measured below the small board: 40px of cabinet padding, 10px to the panel, and 18px of
        slack under the button. Sixty-eight pixels, doing nothing on every spin that does not pay. The win
        readout needs about thirty-one of them and nothing needs the rest, so the padding drops to 32, the
-       gap to 6, and the reserve goes 274 -> 248 -> 224. Rows: 33.7px, then 35.4px, now 37.0px. */
-    --col5-avail: calc(100dvh - 224px);
+       gap to 6, and the reserve goes 274 -> 248 -> 224. Rows: 33.7px, then 35.4px, now 37.0px.
+
+       AND THE LAST OF IT. "Do you see a big gap between the bottom reel and the spin button?" Forty-three
+       pixels of one, and every one of them was the band held for the win readout. That readout hangs off
+       the cabinet now instead of being housed by it, so the band goes and the reserve goes 224 -> 198. */
+    --col5-avail: calc(100dvh - 198px);
     /* fifteen rows between the two boards, and the tall one is deliberately given the larger share */
     --col5-row: clamp(20px, calc(var(--col5-avail) / 15.6), 46px);
 }
