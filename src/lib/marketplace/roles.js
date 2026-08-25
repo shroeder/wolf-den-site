@@ -41,9 +41,18 @@ export const ROLES = {
     vip: { key: "vip", name: "VIP", tone: "#b45aff", glow: true },
 };
 
-// A thousand dollars, across the counter and online together. Held here rather than inline so the number is
-// one thing to change and so the copy on the profile can quote it without a second constant to drift.
-export const VIP_CENTS = 100000;
+// ── SEVEN HUNDRED DOLLARS, ACROSS THE COUNTER AND ONLINE TOGETHER ────────────────────────────────────────────
+// Luke first said a thousand, then "maybe VIP is seven hundred dollars or more" once he saw where people
+// actually sit. A thousand qualified exactly ONE member, which is not a room, it is somebody talking to
+// themselves. Seven hundred qualifies four — dumbguy247 $1,053, JT $887, Sky $886, jim $802 — and it lands in
+// a natural gap: the next member down is at $531, so nobody is agonisingly a few dollars short of it.
+//
+// ONE CAVEAT ON THE NUMBER ITSELF. In-store spend is read from the amount stamped on each purchase_spend XP
+// event, and 48 events from 15-23 July predate that stamp. They count as spend for the "have you ever bought
+// anything" test on the raffle, and as ZERO here — so a member who was buying in that first week reads a
+// little lower than they really are. It is under a fortnight of a shop that has been running much longer, and
+// the honest alternative is inventing a number for a row that does not carry one.
+export const VIP_CENTS = 70000;
 
 /**
  * Everything the server knows about who somebody is. One call, three cheap reads, used by chat, the profile
