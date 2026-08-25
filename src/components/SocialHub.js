@@ -202,6 +202,10 @@ export default function SocialHub() {
     const [unread, setUnread] = useState(0);
     // Plaza chatter, kept apart from `unread` — see /api/marketplace/unread for why it isn't folded in.
     const [globalNew, setGlobalNew] = useState(0);
+    // Unread per ROOM, keyed by channel. The server sends it that way because which rooms exist for a
+    // member is its fact, not the client's — and a badge for a room you are not in would leak that the
+    // room is there at all.
+    const [roomNew, setRoomNew] = useState({});
     // Which rooms exist for this member. Seeded with the one everybody has and replaced by the server's
     // answer on the first chat load — never computed here, because a client that decides its own membership
     // is a client that can decide it differently.
@@ -227,6 +231,7 @@ export default function SocialHub() {
             setUnread(d.total || 0);
             setRequests(d.requests || 0);
             setGlobalNew(d.global || 0);
+            setRoomNew(d.rooms || {});
             // Pop the notifications bubble on first load with pending items, and again whenever the
             // total grows (something new arrived) — so it grabs attention both on return and live.
             const total = (d.total || 0) + (d.requests || 0);
@@ -341,6 +346,12 @@ export default function SocialHub() {
     const incomingCount = requests || friends?.incoming?.length || 0;
     const totalNotif = (unread || 0) + (requests || 0);
     const openTo = (t) => { setBubble(false); setTab(t); setThread(null); setOpen(true); };
+    // A room's badge, hidden while you are in it — a count of what you are currently reading is noise.
+    const room = (k) => {
+        const n = roomNew[k] || 0;
+        if (!n || tab === k) return null;
+        return n > 99 ? "99+" : n;
+    };
     const closeHub = () => window.history.back();
 
     return (
@@ -409,10 +420,17 @@ export default function SocialHub() {
                                 lock: the feed itself refuses a room you are not in, so a hidden tab is not
                                 what is keeping anybody out. */}
                             <div className="social-tabs">
+                                {/* ── A BADGE ON EVERY TAB ────────────────────────────────────────────
+                                    Luke: "ensure badges work for each tab." Only Global, Messages and
+                                    Friends ever had one, so the two private rooms and the news could fill
+                                    up with nothing to say so — a room you have to remember to check is a
+                                    room nobody checks. `roomNew` is keyed by channel and a tab shows its
+                                    own count, suppressed while you are standing in it. */}
                                 {[
-                                    ["global", "Global", "social-global", globalNew > 0 && tab !== "global" ? (globalNew > 99 ? "99+" : globalNew) : null],
-                                    ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", null]] : []),
-                                    ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", null]] : []),
+                                    ["global", "Global", "social-global", room("global")],
+                                    ["announce", "News", "social-news", room("announce")],
+                                    ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", room("vip")]] : []),
+                                    ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", room("staff")]] : []),
                                     ["messages", "Messages", "social-messages", unread > 0 ? unread : null],
                                     ["friends", "Friends", "social-friends", incomingCount > 0 ? incomingCount : null],
                                     ["discover", "Discover", "social-discover", null],
@@ -429,13 +447,23 @@ export default function SocialHub() {
                             </div>
 
                             <div className="social-body">
-                                {tab === "global" || tab === "vip" || tab === "staff" ? (
+                                {tab === "global" || tab === "announce" || tab === "vip" || tab === "staff" ? (
                                     // One component, keyed by room — remounting on a change is what makes a
                                     // room open on its own newest message rather than inheriting the last
                                     // room's feed for a frame.
                                     <GlobalChatTab key={tab} open={open} channel={tab}
                                         onChannels={setChannels}
-                                        onRead={() => setGlobalNew(0)} />
+                                        onRead={() => {
+                                            // The GET marked THIS room read server-side; clear its badge now
+                                            // rather than waiting up to 30s for the next unread poll, and
+                                            // take it off the bubble's total at the same time.
+                                            setRoomNew((r) => {
+                                                const had = r[tab] || 0;
+                                                if (!had) return r;
+                                                setGlobalNew((g) => Math.max(0, g - had));
+                                                return { ...r, [tab]: 0 };
+                                            });
+                                        }} />
                                 ) : tab === "messages" ? (
                                     <MessagesTab inbox={inbox} onOpenDm={(id, name) => setThread({ id, name })} />
                                 ) : tab === "friends" ? (

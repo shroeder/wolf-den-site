@@ -28,7 +28,11 @@ export async function postSystemChat(body, kind = null) {
     const arbiter = await db.queryOne(`SELECT id FROM mkt_buyer WHERE alias = 'arbiter' LIMIT 1`).catch(() => null);
     if (!arbiter?.id) return false;
     const r = await db.queryOne(
-        `INSERT INTO mkt_town_chat (buyer_id, body, kind) VALUES ($1, $2, $3) RETURNING id`,
+        // ── INTO THE NEWS ROOM ───────────────────────────────────────────────────────────────────────
+        // Both kinds the house writes go here: the automated milestones and the hand-written
+        // announcements. From a reader's side they are one thing — the house talking — and in the plaza
+        // they were a wall of unbroken text sitting between people trying to have a conversation.
+        `INSERT INTO mkt_town_chat (buyer_id, body, kind, channel) VALUES ($1, $2, $3, 'announce') RETURNING id`,
         [arbiter.id, text, kind || null]
     ).catch(() => null);
     return Boolean(r);

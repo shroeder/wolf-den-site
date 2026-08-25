@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getGlobalChat, markGlobalChatSeen, sendTownChat } from "@/lib/marketplace/town.js";
+import { getGlobalChat, markChannelSeen, markGlobalChatSeen, sendTownChat } from "@/lib/marketplace/town.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,7 +31,13 @@ export async function GET(request) {
             }
             // Fetching the feed IS reading it — this endpoint is only called while the chat is on screen. Done
             // after the response so it never delays the render.
-            if (buyer && channel === "global") after(() => markGlobalChatSeen(buyer.id));
+            // Reading a room IS reading it — this endpoint is only called while that tab is on screen. Both
+            // marks are stamped for the plaza: the per-room one drives the tab badges, and the old column on
+            // mkt_buyer still drives the town's own indicator.
+            if (buyer) {
+                after(() => markChannelSeen(buyer.id, channel));
+                if (channel === "global") after(() => markGlobalChatSeen(buyer.id));
+            }
             return NextResponse.json({ ok: true, authenticated: Boolean(buyer), messages, channels, role, channel }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.global_chat.list.failure" });

@@ -77,18 +77,6 @@ const ICONS = {
     market: "A woven wicker basket brimming with fresh produce — orange carrots, leafy greens and a ripe red apple — with a single silver fish laid across the rim and two gold coins leaning against the base",
     // ── THE SOCIAL HUB'S TABS ────────────────────────────────────────────────────────────────────────────
     // Luke: "in social tabs we probably want to switch to generated sprites instead of text to save room."
-    // Four words already crowded a phone; VIP and Staff make six, which does not fit at any size worth
-    // reading. Same rules as every other icon here — one concrete object, loud silhouette, reads at 18px —
-    // and deliberately distinct SHAPES rather than distinct colours, because in a row this small two icons
-    // that differ only in hue are one icon.
-    "social-global": "A glowing blue-green globe with simple bold continents and a bright meridian ring around it",
-    "social-messages": "A single closed envelope of cream paper with a red wax seal stamped with a wolf's head",
-    "social-friends": "Two overlapping wolf-head silhouettes side by side, one warm gold and one cool blue, like a friendship crest",
-    "social-discover": "A brass magnifying glass held at an angle with a small bright star glinting in its lens",
-    "social-vip": "A short purple velvet rope slung between two polished gold posts, a violet gemstone set in the near post",
-    "social-staff": "A polished gold shield badge with a wolf's head embossed on it and a small red ribbon at its base",
-    // ── THE SOCIAL HUB'S TABS ────────────────────────────────────────────────────────────────────────────
-    // Luke: "in social tabs we probably want to switch to generated sprites instead of text to save room."
     // Six tabs of words do not fit a phone once VIP and Staff exist — Global/Messages/Friends/Discover was
     // already scrolling. Same rules as every other icon here: one concrete object, loud silhouette, reads at
     // 18px. Deliberately distinct SHAPES rather than distinct colours, because the row is small and two
@@ -99,6 +87,9 @@ const ICONS = {
     "social-discover": "A brass magnifying glass held at an angle with a small bright star glinting in its lens",
     "social-vip": "A small ornate purple velvet rope barrier between two polished gold posts, with a violet gemstone set in the near post",
     "social-staff": "A polished gold shield badge with a wolf's head embossed on it and a small red ribbon at its base",
+    // The announcements room. A proclamation, not a megaphone: what goes in here is the house writing things
+    // down — records broken, patch notes — and a scroll is the shape of a thing that was WRITTEN.
+    "social-news": "A rolled parchment proclamation scroll, partly unfurled, with a red wax seal and a short blue ribbon hanging from its lower edge",
     // The Casino. A CABINET rather than cards or dice: the floor is nine slot machines and one card table, so
     // the machine is what the place actually is — and at 18px a fanned hand of cards is a smudge while a lit
     // box with three symbols in a window is a silhouette. Deliberately not a die (the Daily Spin owns

@@ -120,6 +120,11 @@ export async function setRole(buyerId, key) {
 // exclusive so non-members can't see into them."
 export const CHANNELS = {
     global: { key: "global", name: "Global" },
+    // ── ANNOUNCEMENTS ────────────────────────────────────────────────────────────────────────────────────
+    // Luke: "let's make an announcements channel and have arena messages and arbiter messages go there."
+    // Everybody can read it and nobody can write to it but the house — see sendTownChat, which refuses it
+    // outright. It is a room in the same sense a noticeboard is a room.
+    announce: { key: "announce", name: "News", readOnly: true },
     vip: { key: "vip", name: "VIP" },
     staff: { key: "staff", name: "Staff" },
 };
@@ -127,7 +132,8 @@ export const CHANNELS = {
 /** Which channels a member may read and write. Global is everybody, including signed-out readers. */
 export function channelsFor(buyerId, roles = []) {
     const has = (k) => roles.some((r) => r.key === k);
-    const out = ["global"];
+    // Announcements sit beside the plaza: no gate, no join window, and everybody has it.
+    const out = ["global", "announce"];
     // Owners and staff are in the VIP room by default, on Luke's call — the room is a perk, and the people
     // running the shop being absent from it would make it a room the shop cannot hear.
     if (has("vip") || has("staff") || has("owner")) out.push("vip");
@@ -146,7 +152,9 @@ export function channelsFor(buyerId, roles = []) {
  * being handed a transcript.
  */
 export async function joinedAt(buyerId, channel) {
-    if (!buyerId || channel === "global") return null;
+    // The two OPEN rooms have no join window — their history is public and a member arriving today should
+    // see what the house said last week. Only the private rooms hide what was said before you were in them.
+    if (!buyerId || channel === "global" || channel === "announce") return null;
     const row = await db.queryOne(
         `INSERT INTO mkt_channel_member (buyer_id, channel) VALUES ($1, $2)
               ON CONFLICT (buyer_id, channel) DO UPDATE SET channel = EXCLUDED.channel

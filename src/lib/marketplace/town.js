@@ -647,6 +647,9 @@ export async function sendTownChat(buyerId, body, channel = "global") {
     // endpoint takes a channel name from a POST body. Every write is authorised against what the server says
     // the member has earned, the same list the tab was drawn from.
     const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    // Nobody writes to the noticeboard but the house. postSystemChat inserts directly and never comes
+    // through here, so this needs no exception for the Arbiter — it just closes the room to members.
+    if (String(channel) === "announce") return { ok: false, error: "read_only" };
     if (chan !== "global") {
         const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);
@@ -703,6 +706,56 @@ export async function sendTownChat(buyerId, body, channel = "global") {
 // How many global-chat messages this member hasn't seen. Excludes their OWN messages — your own chatter is
 // never "unread". A member who has never opened the chat gets everything from the last 7 days rather than all
 // history, so a new member isn't met with a meaningless pile.
+/**
+ * How much of each room this member has not seen, keyed by channel.
+ *
+ * ── ONE QUERY, NOT ONE PER TAB ───────────────────────────────────────────────────────────────────────────
+ * Luke: "ensure badges work for each tab, and the global badge on the chat bubble should reflect messages
+ * from all unread tabs combined." Six tabs polling their own count would be six round trips every thirty
+ * seconds for a number that is one GROUP BY. The private rooms are filtered by the same membership row that
+ * carries the seen mark, so a member who is not in a room cannot be given a count for it — the badge cannot
+ * leak the existence of a conversation the tab is hiding.
+ */
+export async function channelUnread(buyerId, channels = ["global", "announce"]) {
+    if (!buyerId) return {};
+    const rows = await db.query(
+        `SELECT c.channel, COUNT(*)::int AS n
+           FROM mkt_town_chat c
+           LEFT JOIN mkt_channel_member m ON m.buyer_id = $1 AND m.channel = c.channel
+          WHERE c.channel = ANY($2)
+            AND c.buyer_id <> $1
+            AND c.created_at > COALESCE(m.seen_at, NOW() - INTERVAL '7 days')
+            AND (m.joined_at IS NULL OR c.created_at >= m.joined_at)
+          GROUP BY c.channel`,
+        [buyerId, channels],
+        // `seen_at` arrives in migration 403. For the minutes between the new code serving and that landing,
+        // this query names a column that does not exist — which would show every member a badge counting the
+        // whole history of every room. Falling back to the plaza's own mark keeps the numbers sane until the
+        // column is there, and it is the same value the migration seeds from anyway.
+    ).catch(() => db.query(
+        `SELECT c.channel, COUNT(*)::int AS n
+           FROM mkt_town_chat c
+           JOIN mkt_buyer b ON b.id = $1
+          WHERE c.channel = ANY($2) AND c.buyer_id <> $1
+            AND c.created_at > COALESCE(b.global_chat_seen_at, NOW() - INTERVAL '7 days')
+          GROUP BY c.channel`,
+        [buyerId, channels],
+    ).catch(() => []));
+    const out = {};
+    for (const r of rows || []) out[r.channel] = r.n;
+    return out;
+}
+
+/** Stamp one room as read. */
+export async function markChannelSeen(buyerId, channel) {
+    if (!buyerId) return;
+    await db.query(
+        `INSERT INTO mkt_channel_member (buyer_id, channel, seen_at) VALUES ($1, $2, NOW())
+              ON CONFLICT (buyer_id, channel) DO UPDATE SET seen_at = NOW()`,
+        [buyerId, String(channel || "global")],
+    ).catch(() => {});
+}
+
 export async function globalChatUnread(buyerId) {
     if (!buyerId) return 0;
     const row = await db.queryOne(
@@ -724,7 +777,7 @@ export async function markGlobalChatSeen(buyerId) {
 
 export async function getGlobalChat(buyerId = null, limit = 40, channel = "global") {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
-    const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const chan = ["global", "announce", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
 
     // ── A PRIVATE ROOM IS AUTHORISED AND WINDOWED ────────────────────────────────────────────────────────
     // Two separate rules, and they are not the same rule. AUTHORISED: you are in the room or you get nothing,
@@ -733,7 +786,7 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
     // to see messages from after your join date" — so a new VIP opens a door rather than being handed a
     // transcript of a conversation they were not part of.
     let since = null;
-    if (chan !== "global") {
+    if (chan !== "global" && chan !== "announce") {
         if (!buyerId) return [];
         const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);
@@ -771,8 +824,8 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
         if (r) return r;
         return db.query(legacy, [n]).catch(() => []);
     };
-    const rows = chan === "global"
-        ? await shared(`town:chat:${n}`, TTL.LIVE, readGlobal)
+    const rows = (chan === "global" || chan === "announce")
+        ? await shared(`town:chat:${chan}:${n}`, TTL.LIVE, readGlobal)
         : await db.query(sql, [n, chan, since]).catch(() => []);
     // ── MUTED MILESTONES ARE FILTERED PER VIEWER, NOT PER QUERY ──────────────────────────────────────────
     // The query above is deliberately shared across the whole plaza — one join per poll for everybody — so
