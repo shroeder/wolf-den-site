@@ -24,9 +24,18 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 
 const clampBet = (n) => Math.max(MIN_BET, Math.min(MAX_BET, Math.round(Number(n) || MIN_BET)));
 
-// The floor is still owner-gated. Same gate the rest of the casino uses; the machine is finished long before
-// the room is opened, and un-gating is a deliberate act somewhere else.
-const OPEN = false;
+// ── THE FLOOR IS OPEN (2026-08-26) ───────────────────────────────────────────────────────────────────────────
+// This flag is a SECOND, INDEPENDENT gate and it outlived the release by twenty minutes. The casino was opened
+// by removing three owner checks — the building on the street, the page's redirect, and the API route — and
+// every one of those let a member reach the machines. They then pressed the button and got `closed`, because
+// the five-reel cabinets ask this instead of asking the room. Working for exactly one person, which is the
+// signature of an owner gate nobody remembered.
+//
+// The old comment here said un-gating "is a deliberate act somewhere else", which was true and was the trap:
+// it pointed at the room without saying that the room opening would not open this. If a feature is ever gated
+// twice, grep the WHOLE subsystem for a second flag before calling it released — `OPEN`, `*OpenFor`, and a
+// bare `isOwner` in a play path are the three shapes it takes here.
+const OPEN = true;
 export const slot5OpenFor = (buyerId) => OPEN || isOwner(buyerId);
 
 /**
