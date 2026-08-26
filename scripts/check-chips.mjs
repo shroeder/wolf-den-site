@@ -9,7 +9,7 @@
 import {
     CHIP_STORE, VIP_STORE, STAT_STORE, UNLOCK_STORE, CHIP_RATE, DISCOUNT_MAX, counterDiscount, pricedFor,
 } from "../src/lib/marketplace/chips.js";
-import { STAT_TRACKS, UNLOCKS, statCost } from "../src/lib/marketplace/casino-perks.js";
+import { STAT_STEP, STAT_TRACKS, UNLOCKS, statCost } from "../src/lib/marketplace/casino-perks.js";
 import { STAT_META } from "../src/lib/marketplace/items.js";
 import { DECORATIONS } from "../src/lib/marketplace/decorations.js";
 import { GEMS } from "../src/lib/marketplace/gems.js";
@@ -76,6 +76,9 @@ for (const item of [...CHIP_STORE, ...VIP_STORE, ...STAT_STORE, ...UNLOCK_STORE]
         // A kind with no case here is a kind chip-store.js cannot deliver either — its grant() falls through
         // to `return false`, so the sale refunds. Better to refuse the build than to ship a shelf entry that
         // can only ever fail.
+        // A ROLL, not a fixed item: the page hands back one recipe you do not know yet. chip-store.js has a
+        // case for it — this list simply never learned about it, and called a working shelf entry broken.
+        case "recipe": break;
         case "farm_bg": problems.push(`${item.id} is kind "farm_bg", which chip-store.js grant() no longer handles`); break;
         default: problems.push(`${item.id} is kind "${item.kind}", which nothing knows how to deliver`);
     }
@@ -111,7 +114,9 @@ for (const item of [...CHIP_STORE, ...VIP_STORE, ...STAT_STORE, ...UNLOCK_STORE]
     const c1 = statCost(0);
     const c10 = statCost(9);
     const c100 = statCost(99);
-    if (c1 !== 250) problems.push(`the first stat point costs ${c1}, not 250`);
+    // Read from STAT_STEP rather than restated, so moving the ladder cannot make this gate lie. It asserted
+    // 250 for as long as the price has been 500.
+    if (c1 !== STAT_STEP) problems.push(`the first stat point costs ${c1}, not ${STAT_STEP} — statCost and STAT_STEP disagree`);
     if (c10 !== c1 * 10 || c100 !== c1 * 100) {
         problems.push(`the stat ladder is not linear: 1st ${c1}, 10th ${c10}, 100th ${c100}`);
     }
@@ -119,7 +124,7 @@ for (const item of [...CHIP_STORE, ...VIP_STORE, ...STAT_STORE, ...UNLOCK_STORE]
     let sum = 0;
     for (let i = 0; i < 100; i += 1) sum += statCost(i);
     console.log(`  stat tracks   ${STAT_TRACKS.map((t) => t.name).join(", ")} — +${STAT_TRACKS[0].per} a level`);
-    console.log(`                250 then +250 each; 100 levels is ${sum.toLocaleString()} chips for +${STAT_TRACKS[0].per * 100}
+    console.log(`                ${STAT_STEP} then +${STAT_STEP} each; 100 levels is ${sum.toLocaleString()} chips for +${STAT_TRACKS[0].per * 100}
 `);
 }
 

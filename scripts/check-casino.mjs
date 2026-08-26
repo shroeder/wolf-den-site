@@ -225,7 +225,10 @@ for (const pet of CASINO_PETS) {
         : k.lossRefund ? `${pct(k.lossRefund)} of a losing keno ticket back (paid as ${pct(Math.min(1, k.lossRefund / REFUND_CHANCE))} of the stake, ${pct(REFUND_CHANCE)} of losses)`
         : k.prizeChance ? `+${pct(k.prizeChance)} prize chance`
         : k.prizeTierUp ? "prizes roll from a better shelf" : "nothing";
-    console.log(`  ${pet.name.padEnd(18)} ${String(pet.rarity).padEnd(10)} 1 in ${String(Math.round(1 / pet.casinoChance).toLocaleString()).padStart(6)} plays   ${what}`);
+    // They are BOUGHT now, not rolled -- 50,000 chips each on the Counter -- so there is no "1 in N plays"
+    // to print. The ceiling this section enforces is unchanged: it was never about how they were obtained,
+    // only about what they do once somebody holds all five.
+    console.log(`  ${pet.name.padEnd(18)} ${String(pet.rarity).padEnd(10)} ${what}`);
 }
 console.log(`  budget       ${pct(MAX_PERKS.freePlay)} free plays, ${pct(MAX_PERKS.lossRefund)} keno refund, +${pct(MAX_PERKS.prizeChance)} prizes${MAX_PERKS.prizeTierUp ? ", better shelf" : ""}`);
 

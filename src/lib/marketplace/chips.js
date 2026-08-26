@@ -90,6 +90,34 @@ export const CHIP_STORE = [
         blurb: "The house keeps this one back from the lamps. It has never needed them." },
     { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 10000000,
         blurb: "Older than the room it is standing in. The floor has never had more than one." },
+
+    // ── THE FIVE. BOUGHT, NOT ROLLED. ────────────────────────────────────────────────────────────────
+    // These used to fall out of the machines at absolute odds — a hidden roll on every single play, between
+    // 1 in 455 and 1 in 5,556 each. Luke: "we don't do bolt-on rolls like this."
+    //
+    // He is right and the numbers agreed with him before he said it: 145 plays had been recorded and not one
+    // of the five had ever dropped for anybody. A chase nobody can see the end of is not a chase, it is a
+    // rumour — and it made the pets a property of how long you had been at the machines rather than a thing
+    // you could decide to want.
+    //
+    // 50,000 chips each, flat, on the Counter where the chests are. Flat because they are the same KIND of
+    // thing and which one you want is taste, not tier — the same reasoning that flattened Sable's three.
+    // `once`, because a pet is a thing you either own or do not; migration 398's partial unique index is what
+    // actually enforces that, server-side.
+    //
+    // They keep their casinoPerk. That is what separates these from the three behind the rope: Sable's are
+    // trophies that work anywhere, and these five make the FLOOR kinder — free plays, better prizes, the odd
+    // loss pushed back. Buying one is buying a slightly better machine.
+    { id: "cas_copper_paw", kind: "pet", ref: "copper_paw", name: "Copper Paw", price: 50000, once: true,
+        blurb: "It has been under the machines since before the machines were." },
+    { id: "cas_tallyman", kind: "pet", ref: "tallyman", name: "The Tallyman", price: 50000, once: true,
+        blurb: "He is not counting the money. Nobody is sure what he is counting." },
+    { id: "cas_gilded_magpie", kind: "pet", ref: "gilded_magpie", name: "Gilded Magpie", price: 50000, once: true,
+        blurb: "Everything it has ever taken, it took from this room." },
+    { id: "cas_croupiers_cat", kind: "pet", ref: "croupiers_cat", name: "The Croupier's Cat", price: 50000, once: true,
+        blurb: "Sits where the cards land and has never once been moved." },
+    { id: "cas_night_auditor", kind: "pet", ref: "night_auditor", name: "Night Auditor", price: 50000, once: true,
+        blurb: "Comes in when the floor empties. The books are always right by morning." },
 ];
 // ── AND THE VENDOR BEHIND THE ROPE ─────────────────────────────────────────────────────
 // Luke: "a VIP only vendor next to the bartender — he has a secret list of things that you can only get from
@@ -134,16 +162,14 @@ export const CHIP_STORE = [
 //   the band that mythic chests draw from, so it is a real shot at the top of the book — and the till refuses
 //   to sell it to anybody who has already learned everything in that band, because charging for a book
 //   somebody has finished is theft with a receipt.
-// ── SABLE SELLS THREE. THE MACHINES DROP FIVE MORE. ──────────────────────────────────────────────────────────
-// Worth stating plainly because the two sets look alike and are not: the eight casino pets come from two
-// different places and do two different things.
+// ── SABLE SELLS THREE. THE COUNTER SELLS THE OTHER FIVE. ─────────────────────────────────────────────────────
+// All eight are bought now — the five stopped being random drops on Luke's call. What still separates the two
+// sets is what they DO:
 //
-//   THESE THREE are bought, here, with chips. No casinoPerk — they are trophies, and what they carry is an
+//   THESE THREE, behind the rope, carry no casinoPerk. They are trophies, and the ability they carry is an
 //   ordinary pet ability that works anywhere in the game.
-//   THE OTHER FIVE (copper_paw, tallyman, gilded_magpie, croupiers_cat, night_auditor) cannot be bought at
-//   all. They DROP from playing the machines at long odds, and each one carries a casinoPerk that makes the
-//   floor itself kinder — free plays, better prizes, the odd loss pushed back. That is what "The Five" badge
-//   is for, and it is why they are not on this shelf.
+//   THE OTHER FIVE, on the Counter, each carry a casinoPerk that makes the FLOOR kinder. Buying one is buying
+//   a slightly better machine.
 //
 // 50,000 CHIPS EACH, up from 20,000, on Luke's call.
 export const VIP_STORE = [

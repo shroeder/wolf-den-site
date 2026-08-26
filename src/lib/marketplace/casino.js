@@ -8,7 +8,6 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
-import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 import {
     settleBets,
 } from "@/lib/marketplace/casino-rounds.js";
@@ -659,9 +658,9 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
     const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === m.symbols[0].id), perks });
-    // The five. Rolled on every play at absolute odds — see maybeGrantCasinoPet.
+    // THE FIVE ARE BOUGHT NOW, not rolled — 50,000 chips each on the Counter. The per-play roll that used to
+    // sit here is gone with them; see the note on maybeGrantCasinoPet in pet-drops.js.
     await tickCasinoQuests(buyerId, "slot", won);
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
 
     // Double or Nothing gambles the win that is SITTING THERE, so the amount is remembered rather than sent
     // back up and trusted on the way in. Only on a paid pull: gambling a free pull's winnings would be a
@@ -676,14 +675,16 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
         multiple: stake ? Number((won / stake).toFixed(3)) : 0,
         features: [
             ...(free ? ["free"] : []), ...(nudged ? ["nudge"] : []), ...(onHouse ? ["on_house"] : []),
-            ...(potWon > 0 ? ["pot"] : []), ...(pet ? ["pet"] : []), ...(prize ? ["prize"] : []),
+            // No "pet" feature any more -- the five stopped dropping from play (see above), so a flag for
+            // it here would be a column that can never be true again.
+            ...(potWon > 0 ? ["pot"] : []), ...(prize ? ["prize"] : []),
         ],
         jackpot: reels.every((r) => r === m.symbols[0].id),
         streak: meter.streak || 0,
     }).catch(() => {});
 
     return {
-        ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse,
+        ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
         fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
         potWon: potWon > 0 ? potWon : null, pot: await readPot(),
@@ -1172,7 +1173,6 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     }
 
     const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     await tickCasinoQuests(buyerId, "keno", 0);
     if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
     if (chips == null) chips = await chipBalance(buyerId);
@@ -1197,7 +1197,6 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         onHouse,
         refund,
         prize,
-        pet,
         // Anything the old shared rounds still owed, so a legacy ticket is not silently swallowed.
         settled,
     };
@@ -1234,7 +1233,6 @@ export async function settleKeno(buyerId) {
     const perks = await casinoPerks(buyerId);
     const jackpot = done.some((d) => (d.detail?.hits || []).length === KENO_PICKS);
     const prize = await rollCasinoPrize(buyerId, { jackpot, perks });
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
     const won = done.reduce((n, d) => n + d.won, 0);
 
     // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
@@ -1258,7 +1256,7 @@ export async function settleKeno(buyerId) {
         }
     }
     if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
-    return done.map((d, i) => (i === 0 ? { ...d, prize, pet, refund } : d));
+    return done.map((d, i) => (i === 0 ? { ...d, prize, refund } : d));
 }
 
 // ── WALKING THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────
