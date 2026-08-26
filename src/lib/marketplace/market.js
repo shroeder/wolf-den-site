@@ -80,6 +80,20 @@ export async function getMarketState(buyerId) {
         db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
 
+    // ── AND WHAT THEY ARE NOT SUPPOSED TO KNOW EXISTS ────────────────────────────────────────────────────
+    // A stall is the one place in the game where one member's content lands on another member's screen, so it
+    // is the one place the Counter's two content doors could leak through: an owner listing a deep-water fish
+    // or a master prep was showing its name, its picture and its price to the whole Den. Luke: "the other
+    // players who haven't unlocked that tier should not be able to see those in the market."
+    //
+    // Filtered on the way OUT of the query rather than in it, because the same list has to be filtered again
+    // at the till (see buyFromMarket) and a WHERE clause cannot protect the second one. The seller keeps
+    // seeing their own listing under "mine" — it is their stock and hiding it from them would read as the
+    // market having eaten it.
+    const { hiddenRefsFor } = await import("@/lib/marketplace/locked-content.js");
+    const hidden = await hiddenRefsFor(buyerId).catch(() => new Set());
+    const visible = (open || []).filter((r) => !hidden.has(r.ref));
+
     // One dresser for listings and pantry rows alike, so a stall card and a "sell this" card can never
     // disagree about what a thing is called or what it looks like.
     const dress = (r) => {
@@ -130,7 +144,8 @@ export async function getMarketState(buyerId) {
         ok: true,
         art: art?.url || null,
         gold,
-        listings: open.map((r) => ({
+        // `visible`, not `open` — see the note where it is built. This is the list every member sees.
+        listings: visible.map((r) => ({
             ...dress(r),
             seller: sellerName(r),
             mine: String(r.seller_id) === String(buyerId),
@@ -187,17 +202,31 @@ export async function listOnMarket(buyerId, { ref, qty, unitGold } = {}) {
 }
 
 /** Buy a listing outright: claim, then pay, then deliver — in that order, for the reasons at the top. */
+// ── A HIDDEN STALL IS STILL A ROW WITH AN ID ─────────────────────────────────────────────────────────────────
+// The list above stops a non-owner SEEING a locked listing. This stops them buying one, which is a different
+// question with a different answer: listing ids come off a POST body and are sequential integers. Same rule
+// the VIP items at the Counter are held to — not listed is not a gate, checked at the till is.
+async function refuseLocked(buyerId, ref) {
+    if (!ref) return false;
+    const { hiddenRefsFor } = await import("@/lib/marketplace/locked-content.js");
+    const hidden = await hiddenRefsFor(buyerId).catch(() => new Set());
+    return hidden.has(String(ref));
+}
+
 export async function buyFromMarket(buyerId, listingId) {
     if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };
     const id = Number(listingId) || 0;
     if (!id) return { ok: false, error: "bad_listing" };
 
     const peek = await db.queryOne(
-        `SELECT seller_id, qty, unit_gold FROM mkt_market_listing
+        `SELECT seller_id, ref, qty, unit_gold FROM mkt_market_listing
           WHERE id = $1 AND sold_at IS NULL AND cancelled_at IS NULL`, [id]
     ).catch(() => null);
     if (!peek) return { ok: false, error: "gone" };
     if (String(peek.seller_id) === String(buyerId)) return { ok: false, error: "your_own" };
+    // Before the claim, so a refused buy never takes a stack off the shelf. "gone" rather than a reason:
+    // telling somebody the stall exists but is not for them is the leak this is here to prevent.
+    if (await refuseLocked(buyerId, peek.ref)) return { ok: false, error: "gone" };
     const cost = Number(peek.qty) * Number(peek.unit_gold);
 
     // 1. CLAIM — the race is two buyers over one stack, so it is settled before any money moves.
@@ -253,13 +282,21 @@ export async function buyFromMarket(buyerId, listingId) {
 export async function marketStallsByRef(buyerId, refs = []) {
     const want = [...new Set((refs || []).map((r) => String(r || "")).filter(Boolean))];
     if (!MARKET_OPEN(buyerId) || !want.length) return {};
+    // The refs come from the CALLER, which on some screens means from a page the member is looking at — so
+    // this is the third way to ask the market what it is holding, and it needs the same answer as the other
+    // two. Dropped from the question rather than filtered from the answer: a ref that is not asked about
+    // cannot come back.
+    const { hiddenRefsFor } = await import("@/lib/marketplace/locked-content.js");
+    const hidden = await hiddenRefsFor(buyerId).catch(() => new Set());
+    const allowed = want.filter((r) => !hidden.has(r));
+    if (!allowed.length) return {};
     const rows = await db.query(
         `SELECT l.id, l.ref, l.qty, l.unit_gold, b.display_name, b.alias
            FROM mkt_market_listing l JOIN mkt_buyer b ON b.id = l.seller_id
           WHERE l.sold_at IS NULL AND l.cancelled_at IS NULL
             AND l.seller_id <> $1 AND l.ref = ANY($2::text[])
           ORDER BY l.unit_gold ASC, l.created_at ASC`,
-        [buyerId, want]
+        [buyerId, allowed]
     ).catch(() => []);
     const out = {};
     for (const r of rows) {

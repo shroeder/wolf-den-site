@@ -150,6 +150,10 @@ const DEEP_FISH = [
 // that is already in the member's own data, so failing to resolve one would break an owner's kitchen rather
 // than protect anything. Rolling is what is gated, not naming.
 const ALL_FISH = [...FISH, ...DEEP_FISH];
+// EXPORTED so locked-content.js can build the "may this member see this ref" gate off the real list rather
+// than a copy of it. Ids only — the species themselves stay private, because a caller that can read a deep
+// fish's name and weight is a caller that can leak them.
+export const DEEP_FISH_IDS = DEEP_FISH.map((f) => f.id);
 const BY_ID = new Map(ALL_FISH.map((f) => [f.id, f]));
 export const fishById = (id) => BY_ID.get(id) || null;
 export const FISH_COUNT = FISH.length;
@@ -1322,7 +1326,15 @@ export async function memberFishLog(buyerId) {
 // close it came to ITS OWN species maximum, which is the thing that actually took skill and luck. A 21.8cm
 // Sardine at 99% of possible beats a middling whale, and the board stays winnable from the first cast.
 // Rarity breaks ties, so a perfect Kraken still outranks a perfect Sardine.
-export async function denTopCatches(limit = 25) {
+// ── AND IT ONLY RANKS WHAT THE VIEWER IS ALLOWED TO KNOW ABOUT ───────────────────────────────────────────────
+// denFishRecords below maps over FISH, so it was never able to leak — but this one starts from CATCH ROWS and
+// resolves each species with fishById, which reads the full table. One owner landing a deep-water species put
+// its name, its weight and its picture on a board every member can see, which is exactly the thing the Charts
+// are sold on not doing. Luke: "you shouldn't even know about their existence."
+//
+// `hidden` is passed in rather than read here: this is a pure ranking function and fishRecords already knows
+// who is asking.
+export async function denTopCatches(limit = 25, hidden = null) {
     const rows = await db.query(
         `SELECT c.buyer_id, c.species, c.lb, c.caught_at,
                 COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias
@@ -1331,6 +1343,7 @@ export async function denTopCatches(limit = 25) {
     ).catch(() => []);
     return (rows || [])
         .map((r) => {
+            if (hidden && hidden.has(r.species)) return null;
             const f = fishById(r.species);
             if (!f) return null;
             return {

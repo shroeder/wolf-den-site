@@ -2004,7 +2004,11 @@ export const fishRecharge = async (buyerId) => {
 
 export const fishRecords = async (buyerId) => {
     if (!fishingUnlocked(buyerId)) return { records: [], top: [] };
-    const [records, top] = await Promise.all([denFishRecords(), denTopCatches(25)]);
+    // What this member is not allowed to know exists. The record board is already built off the ordinary
+    // species list; the top-catch board ranks real rows and needs telling.
+    const { hiddenRefsFor } = await import("@/lib/marketplace/locked-content.js");
+    const hidden = await hiddenRefsFor(buyerId).catch(() => null);
+    const [records, top] = await Promise.all([denFishRecords(), denTopCatches(25, hidden)]);
     return { records, top };
 };
 
