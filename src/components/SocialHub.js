@@ -778,11 +778,11 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     const here = roster.filter((m) => m.online);
     const away = roster.filter((m) => !m.online);
 
+    // `has-rail` is what turns this into two columns, so it is conditional on there BEING a rail — an empty
+    // roster with the class on would reserve the column and leave the conversation talking to a 76px strip of
+    // nothing. It was unconditional while the phone layout ignored the grid; now that the grid is the layout
+    // at every width, it has to mean what it says.
     return (
-        {/* `has-rail` is what turns this into two columns, so it is conditional on there BEING a rail — an
-            empty roster with the class on would reserve the column and leave the conversation talking to a
-            76px strip of nothing. It was unconditional while the phone layout ignored the grid; now that the
-            grid is the layout at every width, it has to mean what it says. */}
         <div className={`social-global${roster.length ? " has-rail" : ""}`}>
             {note ? <p className="social-note" role="status">{note}</p> : null}
             {roster.length ? (
