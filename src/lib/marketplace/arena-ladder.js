@@ -251,14 +251,30 @@ const isChampion = (rung) => rung % 10 === 0;
  * has real sinks (crates, stones, a recipe). Every tenth also pays a chest, and the last one pays the best
  * chest in the game — once, ever, to whoever gets there.
  */
+// ── THE LAURELS WERE AN EXPONENTIAL AND IT RAN AWAY ──────────────────────────────────────────────────────────
+// The old curve was 60 x 1.055^(rung-1). That reads as a gentle 5.5% a rung and is nothing of the kind over
+// two hundred of them: rung 100 paid 12,027, rung 200 paid 2,543,260, and the Road as a whole paid 48,783,249
+// — of which 48,553,648 was rungs 101-200 alone. A recipe costs 2,500. Luke: "the road is way too rewarding
+// with laurels."
+//
+// LINEAR now, and the point of linear is that it cannot do this. Fifty for the first rung and eight more for
+// every rung after: 842 at rung 100, 1,642 at rung 200, about 169,000 for the whole Road. The late rungs are
+// still worth more than the early ones, which is all the curve was ever for.
+//
+// ── AND THE CHESTS STOP AT MYTHIC ────────────────────────────────────────────────────────────────────────────
+// Luke: "it shouldn't give out the super high tier chests, if anything it should give out one Mythic chest at
+// the most." It was paying three Celestials, three Eternals, three Ascendants and two Primordials — more
+// top-tier chests than every other source in the game put together, on a Road where members are already at
+// rungs 99, 92 and 85 and which was meant to take a year.
+//
+// One Mythic, at the true summit, and nothing above it anywhere. Rung 100 drops to a Gold, which does take
+// something back from the two people about to reach it — that IS the nerf, and grandfathering the old prize
+// would leave exactly the chests the complaint is about in exactly the accounts it is about.
 export function ladderReward(rung) {
-    const laurels = Math.round(60 * Math.pow(1.055, rung - 1));
-    // BOTH summits pay a Primordial. Rung 100 keeps the one it always paid — moving it to 200 would take
-    // something away from everyone who has already earned it — and rung 200 is worth no less.
-    if (rung === LADDER_SIZE || rung === LADDER_MAX) return { laurels, chest: "primordial", label: `${laurels} laurels + a Primordial chest` };
+    const laurels = Math.round(50 + 8 * (rung - 1));
+    if (rung === LADDER_MAX) return { laurels, chest: "mythic", label: `${laurels} laurels + a Mythic chest` };
     if (isChampion(rung)) {
-        const chest = rung >= 170 ? "celestial" : rung >= 140 ? "eternal" : rung >= 110 ? "ascendant"
-            : rung >= 80 ? "mythic" : rung >= 50 ? "gold" : rung >= 20 ? "iron" : "wooden";
+        const chest = rung >= 110 ? "gold" : rung >= 60 ? "iron" : "wooden";
         return { laurels, chest, label: `${laurels} laurels + a ${chest[0].toUpperCase()}${chest.slice(1)} chest` };
     }
     return { laurels, label: `${laurels} laurels` };
