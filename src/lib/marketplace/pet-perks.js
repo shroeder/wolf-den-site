@@ -103,6 +103,9 @@ export const PET_PERKS = {
     // A flat key can never be made unique by rarity. Checked by brute force against the real resolver in the
     // end, not against petPerkValue, which does not account for the clamping petPerk applies.
     tallyman: { name: "Keeps the Book", key: "pack_visit" },
+    // KEPT on chest_luck knowing it caps at 20 by Lv3. For a magpie the ability IS the character — it finds
+    // treasure — and the cap belongs to the key rather than to this pet. Written down so the next person does
+    // not read the flat top of its ladder as a bug.
     gilded_magpie: { name: "Magpie's Take", key: "chest_luck" },
     // NOT extra_strike, however well the name fits: that key pays 1 at every single rarity, so every pet
     // carrying it is a numeric twin of every other and no rarity can make it unique. crit_chance is free at
@@ -119,11 +122,17 @@ export const PET_PERKS = {
     // value comes from petPerkValue(rarity, key) and epic gold_find was already spoken for. chest_luck is
     // free at epic and is nearer the point anyway: a ferret that knows which floorboard the chips roll under
     // is not earning wages, it is finding things.
-    house_ferret: { name: "Under the Floorboards", key: "chest_luck" },
+    // Third key for this one, and the second lesson: chest_luck is CAPPED at 20, so the Ferret stopped
+    // improving at Lv4 and levelling it past that did nothing at all. A capped ability is a worse prize than
+    // a duplicate one. truffle_hog is unique at epic, climbs all the way to 28 at Lv6, and is nearer the
+    // sentence on its card than either of the first two picks: it digs up what is under the floor.
+    house_ferret: { name: "Under the Floorboards", key: "truffle_hog" },
     // fortune at legendary was already BOTH the Unicorn and the Spirit Fox, so this was the third copy of one
     // number. town_haggle is free and is what never being asked to leave actually buys you: everyone gives
     // you the better price.
-    velvet_lynx: { name: "Never Asked to Leave", key: "town_haggle" },
+    // town_haggle caps at 30 — same problem. pack_visit is uncapped to 42 and says what the hint says: a lynx
+    // nobody asks to leave is one the pack keeps coming round to.
+    velvet_lynx: { name: "Never Asked to Leave", key: "pack_visit" },
     midnight_crane: { name: "Misses Nothing", key: "xp_gain" },
 
 
