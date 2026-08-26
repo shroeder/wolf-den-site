@@ -17932,6 +17932,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 }
 
 .cas-result { margin: 0 0 10px; text-align: center; font-size: 12px; color: #98a0aa; }
+/* In the controls rather than in the game, so it cannot end up under them. Tighter margin because it is
+   sitting directly on top of the stake row. */
+.cas-result.is-pinned { margin: 0 0 8px; }
 .cas-result.is-win { color: var(--acc, #ffd75e); font-weight: 900; font-size: 1.05rem;
     text-shadow: 0 0 18px color-mix(in srgb, var(--acc, #ffd75e) 50%, transparent); }
 
@@ -18273,7 +18276,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    minutes is playing the same forty numbers. The line at the top says so, because a shared draw that
    nobody is told about is just a draw. */
 .cas-hall { margin: 0 0 10px; }
-.cas-hall-top { text-align: center; font-size: 10px; color: #9fc6dd; margin-bottom: 8px; }
+/* The caller and his line, on one row. He is 44px and the line is one line, so this costs the eight pixels
+   the old sentence cost and buys somebody to be saying it. */
+.cas-hall-top { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
+    text-align: left; font-size: 11.5px; color: #cfe3f0; margin-bottom: 8px; }
+.cas-caller { flex: 0 0 auto; width: 44px; height: 44px; object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); }
+/* A call arrives; it does not fade in. The key restarts per ball because the span's text changes, and the
+   animation is on the span rather than the row so the badger does not bounce every four seconds. */
+.cas-hall-top span.is-calling { animation: casCall .32s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes casCall { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 .cas-bhead, .cas-bcard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
@@ -18287,28 +18299,59 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     transition: background .18s ease, color .18s ease, transform .18s ease; }
 /* A daub. It lands with a little pop, because the whole appeal of bingo is watching your own card fill in
    — a grid that arrives already completed is a receipt. */
-.cas-bcell.is-hit { color: #0e1116; background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
-    border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
+/* The CELL only tints now — the blot on top of it is the mark. It used to be a solid gold fill, and a
+   solid fill under a magenta blot is mud: two strong colours fighting over the same 56 pixels, with the
+   number caught in the middle of it. */
+.cas-bcell.is-hit { color: #fff; background: rgba(255,255,255,.06);
+    border-color: rgba(255,120,200,.45); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
 /* The free square is ALWAYS marked — that is what free means — so it must not be styled as though it is
    waiting for a ball. This rule sat AFTER .is-hit and overrode its background, so the one cell on the card
    that is marked before the game starts was the one cell that looked empty. Set the whole daubed look here
    rather than only the colour; a rule that wins on one property and loses on another is worse than either. */
 .cas-bcell.is-free, .cas-bcell.is-free.is-hit { color: #0e1116;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e)); border-color: color-mix(in srgb, var(--acc, #ffd75e) 60%, transparent); animation: none; }
+    background: rgba(255,215,94,.10); border-color: rgba(255,215,94,.5); animation: none; }
 /* The line that paid, marked once the balls have stopped. */
 .cas-bcell.is-line { box-shadow: 0 0 0 2px rgba(126,255,178,0.75), 0 0 16px rgba(126,255,178,0.4); }
+/* ── AND THE MARK IS A MARK ──
+   A daubed square was a solid gold fill, which reads as a lit cell rather than as a card somebody has been
+   marking. The blot goes UNDER the number (.cas-bnum is z-index 1) and over the cell, so the digit stays
+   legible through it — which is the whole difference between a daub and a redaction. */
+.cas-bcell.is-hit::before, .cas-bcell.is-free::before { content: ""; position: absolute; inset: 4%;
+    z-index: 0; background: url("/images/casino/bingo/daub.webp") center / contain no-repeat;
+    opacity: .92; pointer-events: none; }
+/* The middle square is marked before the game starts and it is the one square the house signs. */
+.cas-bcell.is-free::before { background-image: url("/images/casino/bingo/free.webp"); inset: 6%; opacity: 1; }
 @keyframes casDaub { from { transform: scale(1.35); } to { transform: none; } }
 
 /* The balls, in the order they came out. They wrap and keep going — forty of them is a lot, and the point
    is the accumulating pile, not any one of them. */
-.cas-balls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; min-height: 26px; align-items: center; }
-.cas-ball { min-width: 22px; padding: 2px 5px; border-radius: 999px; text-align: center;
-    font-size: 10px; font-weight: 800; color: #98a0aa;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); }
-/* The one that just came out. It is bigger and gold for exactly one ball's worth of time. */
-.cas-ball.is-new { color: #0e1116; background: linear-gradient(180deg, color-mix(in srgb, var(--acc, #ffd75e) 46%, #fff), var(--acc, #ffd75e));
-    border-color: color-mix(in srgb, var(--acc, #ffd75e) 70%, transparent); animation: casBall .2s cubic-bezier(.2,1.6,.4,1) both; }
-@keyframes casBall { from { transform: scale(1.5); } to { transform: none; } }
+/* ── FORTY BALLS, THREE ROWS ──
+   Unbounded, this grew to four and five rows of chips as the draw went on, and every row it grew pushed the
+   card further up the screen while you were watching it. Capped at three with its own scroll: the ones that
+   matter are the newest, the rest are history you can flick back through, and the hall stops changing height
+   under a card you are reading. */
+.cas-balls { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 10px; min-height: 30px; align-items: center;
+    max-height: 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* ── A BALL, NOT A CHIP ──
+   These were rounded rectangles with a number in them. The sprite is the ball and the number is set on its
+   blank ivory face here — `place-items: center` puts it on the face because the face is drawn centred, which
+   is the one thing the generator's prompt is emphatic about. Background rather than a ::before, because a
+   positioned pseudo-element paints OVER its parent's own text and the number would be behind the ball. */
+.cas-ball { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center;
+    background: var(--ball) center / contain no-repeat;
+    font-size: 9.5px; font-weight: 900; color: #2b1f12; letter-spacing: -.02em;
+    border: 0; padding: 0; }
+.cas-ball.is-b { --ball: url("/images/casino/bingo/ball-b.webp"); }
+.cas-ball.is-i { --ball: url("/images/casino/bingo/ball-i.webp"); }
+.cas-ball.is-n { --ball: url("/images/casino/bingo/ball-n.webp"); }
+.cas-ball.is-g { --ball: url("/images/casino/bingo/ball-g.webp"); }
+.cas-ball.is-o { --ball: url("/images/casino/bingo/ball-o.webp"); }
+/* The newest one is the loud one — it grows and lights rather than changing colour, because its colour is
+   now which column it came from and that is information. */
+.cas-ball.is-new { transform: scale(1.16); filter: drop-shadow(0 0 7px rgba(255,215,94,.85));
+    animation: casBallIn .34s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes casBallIn { from { transform: scale(.4) rotate(-25deg); opacity: 0; }
+    to { transform: scale(1.16) rotate(0); opacity: 1; } }
 .cas-balls-idle { font-size: 11px; color: #98a0aa; }
 
 /* ── TWO HANDS ───────────────────────────────────────────────────────────────────────────────────────
@@ -22318,7 +22361,10 @@ body.cas-seated .social-fab { display: none; }
    (`.cas-bcell` is `overflow: hidden`), sits along the bottom edge where a flame belongs, and the licking
    is done by scaling it rather than by growing past the tile. */
 /* The digit, lifted over the flame. See the note in CasinoClient. */
+/* Above the blot AND above the flame. The shadow is what keeps it legible once there is a saturated
+   magenta mark behind it — without it a daubed 47 is a smear. */
 .cas-bnum { position: relative; z-index: 1; font: inherit; color: inherit; }
+.cas-bcell.is-hit .cas-bnum { text-shadow: 0 1px 2px rgba(40,0,25,.85), 0 0 6px rgba(40,0,25,.6); }
 .cas-flame { position: absolute; left: 8%; right: 8%; bottom: 0; height: 62%; pointer-events: none; z-index: 0;
     transform-origin: 50% 100%;
     background: radial-gradient(ellipse at 50% 100%, rgba(255,236,190,.95) 0%, rgba(255,150,50,.7) 38%, transparent 70%);

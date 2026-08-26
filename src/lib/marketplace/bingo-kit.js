@@ -30,6 +30,42 @@ export const DRAWN = 40;
 /** Five columns of fifteen, the way a bingo card has always been laid out: B is 1-15, I is 16-30, and so on. */
 export const COLUMNS = ["B", "I", "N", "G", "O"];
 export const PER_COLUMN = 15;
+/** Which letter a called number belongs under. The card knows from its column; the ball strip does not. */
+export const letterFor = (n) => COLUMNS[Math.min(4, Math.floor((Math.max(1, n) - 1) / PER_COLUMN))];
+
+// ── WHAT THE CALLER SAYS ─────────────────────────────────────────────────────────────────────────────────────
+// Luke: "bingo needs a lot more generated sprites and flavor."
+//
+// A real bingo hall has never just read the number out, and the nicknames are the single most recognisable
+// thing about the game — most people who have never played one can still tell you what two little ducks is.
+// It is free flavour in the truest sense: it costs one line of text per ball on a line the screen was already
+// drawing, and it turns forty numbers being announced into somebody announcing them.
+//
+// TRADITIONAL WHERE THERE IS A TRADITION, and kept clean where the traditional call is a bit blue — this is a
+// card shop's game and the room is all ages. Where the old call was suggestive it has been swapped for another
+// real one rather than for something invented, so the set still sounds like a bingo hall.
+//
+// The number is printed after whatever is in here, the way a caller does it — "legs eleven, eleven" — so these
+// are nicknames only and none of them needs to end in its own digits.
+export const CALLS = [null,
+    "On its own", "One little duck", "Cup of tea", "Knock at the door", "Man alive",
+    "Half a dozen", "Lucky seven", "Garden gate", "Doctor's orders", "The Den's own",
+    "Legs eleven", "One dozen", "Unlucky for some", "The valentine", "Young and keen",
+    "Sweet sixteen", "Dancing queen", "Coming of age", "Goodbye teens", "One score",
+    "Key of the door", "Two little ducks", "Thee and me", "Two dozen", "Duck and dive",
+    "Pick and mix", "Gateway to heaven", "In a state", "Rise and shine", "Burlington Bertie",
+    "Get up and run", "Buckle my shoe", "All the threes", "Ask for more", "Jump and jive",
+    "Three dozen", "A flea in heaven", "Christmas cake", "Those famous steps", "Life begins",
+    "Time for fun", "Winnie the Pooh", "Down on your knees", "All the fours", "Halfway there",
+    "Up to tricks", "Four and seven", "Four dozen", "On the beat", "Half a century",
+    "Tweak of the thumb", "Deck of cards", "Stuck in the tree", "Clean the floor", "All the fives",
+    "Shotgun", "Heinz varieties", "Make them wait", "The Brighton line", "Five dozen",
+    "Baker's bun", "Tickety-boo", "Tickle me", "Almost retired", "Retirement age",
+    "Clickety click", "Stairway to heaven", "Saving grace", "Same both ways", "Three score and ten",
+    "Bang on the drum", "Six dozen", "Queen bee", "Hit the floor", "Strive and strive",
+];
+/** The caller's name for a ball. Falls back to nothing rather than to a wrong one. */
+export const callFor = (n) => CALLS[Number(n)] || null;
 
 /** A deterministic generator from one integer. Same seed, same numbers, on every server that asks. */
 export function seeded(seed) {

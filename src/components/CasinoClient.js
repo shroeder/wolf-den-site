@@ -13,6 +13,7 @@ import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
+import { callFor, letterFor } from "@/lib/marketplace/bingo-kit.js";
 
 // ── NO REQUEST ON THIS FLOOR MAY HANG FOR EVER ───────────────────────────────────────────────────────────────
 // Every call below used to be a bare `fetch(...).catch(() => null)`, and a bare fetch has no timeout: on a
@@ -1218,6 +1219,21 @@ export default function CasinoClient({ initial }) {
     // Standing at the rope, on the same rule as standing at a cabinet.
     const vipNear = Math.abs(x - VIP_X) <= REACH;
 
+    // ── AND WHAT THE CALLER IS SAYING ────────────────────────────────────────────────────────────────────
+    // Derived from the same three things the board is drawn from, so he can never be a ball behind what is on
+    // the card. He announces while the draw runs, and the rest of the time he is doing what a caller does
+    // between games, which is selling the next card.
+    const lastBall = card && called > 0 ? card.drawn[called - 1] : null;
+    const callerLine = !card
+        ? "Eyes down whenever you are ready."
+        : dragon && busy
+            ? "Something is circling — heads down."
+            : busy && lastBall
+                ? `${callFor(lastBall) || "Number"} — ${lastBall}`
+                : card.won > 0
+                    ? `${card.label ? card.label[0].toUpperCase() + card.label.slice(1) : "A line"}. House pays out.`
+                    : "No line on that one. Another card?";
+
     // ── GOING IN ─────────────────────────────────────────────────────────────
     // The SERVER decides, every time, even though the button only renders for somebody the state already said
     // is allowed. That is not belt and braces for its own sake: the standing is derived from lifetime spend
@@ -1933,8 +1949,20 @@ export default function CasinoClient({ initial }) {
                                 gone with the shared round — see bingo-kit.js. What stands in the same space
                                 is what the game is actually about now: forty balls, a line gets your card
                                 back, and something might come over the roof. */}
+                            {/* ── THE CALLER ──────────────────────────────────────────────────
+                                This line used to be one fixed sentence explaining the rules, sitting over a
+                                game that then said nothing at all for forty balls. It is the caller now: the
+                                badger, and whatever he has just called. The rules it was carrying are on the
+                                pinned result line by the buy button, which is where somebody deciding whether
+                                to buy is actually looking.
+
+                                One line, one sprite, no extra height — which is the constraint that matters
+                                on this screen, because the card is already taller than a phone. */}
                             <div className="cas-hall-top">
-                                <span>Forty balls. A line gets your card back{card?.dragon ? " — and something is circling" : ""}.</span>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="cas-caller" src="/images/casino/bingo/caller.webp" alt=""
+                                    width={44} height={44} draggable="false" />
+                                <span className={lastBall && busy ? "is-calling" : ""}>{callerLine}</span>
                             </div>
 
                             <div className="cas-bhead" aria-hidden="true">
@@ -1965,7 +1993,7 @@ export default function CasinoClient({ initial }) {
                                                     A bare text node cannot take a z-index, and the flame
                                                     is absolutely positioned and later in the DOM, so it
                                                     would paint straight over the digit it is lighting. */}
-                                                <b className="cas-bnum">{card ? (n === 0 ? "★" : n) : ""}</b>
+                                                <b className="cas-bnum">{card && n !== 0 ? n : ""}</b>
                                                 {burning ? <i className="cas-flame" aria-hidden="true" /> : null}
                                             </span>
                                         );
@@ -2001,23 +2029,17 @@ export default function CasinoClient({ initial }) {
 
                             {/* The balls, in the order they came out. The newest one is the loud one. */}
                             <div className="cas-balls">
+                                {/* Real balls, in the five colours a bingo ball has always come in. The
+                                    sprite is blank and the number is set on it here — seventy-five numbered
+                                    balls cannot be drawn, and a ball with its number baked in could only
+                                    ever be called once. letterFor decides which of the five it is. */}
                                 {(card?.drawn || []).slice(0, called).map((n, i) => (
-                                    <span key={`${n}-${i}`} className={`cas-ball${i === called - 1 ? " is-new" : ""}`}>{n}</span>
+                                    <span key={`${n}-${i}`}
+                                        className={`cas-ball is-${letterFor(n).toLowerCase()}${i === called - 1 ? " is-new" : ""}`}>{n}</span>
                                 ))}
                                 {!card ? <span className="cas-balls-idle">Forty balls from seventy-five.</span> : null}
                             </div>
 
-                            <p className={`cas-result${card && !busy && card.won > 0 ? " is-win" : ""}`}>
-                                {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 1.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 200)}x`
-                                    : dragon && busy
-                                        ? (dragon.burnt?.length
-                                            ? `The dragon burns ${dragonLit} of ${dragon.burnt.length}…`
-                                            : "The dragon passes — every square was already yours.")
-                                        : busy ? `${called} of ${card.drawn.length} called…`
-                                            : card.label
-                                                ? `${card.label} — ${card.won > 0 ? `${money(card.won)} chips` : "no pay"}`
-                                                : "Not this time."}
-                            </p>
                         </div>
                     ) : null}
 
@@ -2151,6 +2173,34 @@ export default function CasinoClient({ initial }) {
                         One machine, one button. */}
                     {at.live && !SLOTS5[at.id] && at.id !== "store" ? (
                         <div className="cas-controls">
+                            {/* ── WHAT THE CARD DID, WHERE YOU CAN SEE IT ─────────────────────────────
+                                Luke: "win amount hidden."
+
+                                It was the last line inside .cas-hall, which is the one place on this screen
+                                it could not survive. The controls are `position: sticky; bottom: 0` with an
+                                opaque gradient, and a bingo card is taller than a phone — so the line
+                                announcing what you just won sat in the strip of page that the controls are
+                                permanently parked over. You won, and the screen told the underside of a
+                                button about it.
+
+                                It belongs with the controls anyway. "Two lines pays 1.5x", "31 of 40
+                                called…" and "Four corners — 2,500 chips" are all answers about the card you
+                                are buying or the one you just bought, and the buy button is where that
+                                conversation happens. Pinned, it is legible from the first ball to the last
+                                without scrolling away from the card to read it. */}
+                            {at.id === "bingo" ? (
+                                <p className={`cas-result is-pinned${card && !busy && card.won > 0 ? " is-win" : ""}`}>
+                                    {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 1.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 200)}x`
+                                        : dragon && busy
+                                            ? (dragon.burnt?.length
+                                                ? `The dragon burns ${dragonLit} of ${dragon.burnt.length}…`
+                                                : "The dragon passes — every square was already yours.")
+                                            : busy ? `${called} of ${card.drawn.length} called…`
+                                                : card.label
+                                                    ? `${card.label} — ${card.won > 0 ? `${money(card.won)} chips` : "no pay"}`
+                                                    : "Not this time."}
+                                </p>
+                            ) : null}
                             {/* The stake row goes away mid-hand. The bet is already placed and the chips are
                                 already gone — leaving four stake buttons live under a hand in progress asks
                                 a question that has no answer until the hand is over.
