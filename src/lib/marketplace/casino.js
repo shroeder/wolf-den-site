@@ -669,6 +669,19 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     meter.pending = hasBonus(m.id, "gamble") && won > 0 && !free ? won : 0;
     await saveMeter(buyerId, m.id, meter);
 
+    // Same shape as every other cabinet's line, so one query answers "what does the floor pay" across all of
+    // them rather than needing a special case for the oldest machine.
+    await trackActivity(buyerId, "casino_play", {
+        game: "slot", machine: m.id, bet: stake, wonChips: won,
+        multiple: stake ? Number((won / stake).toFixed(3)) : 0,
+        features: [
+            ...(free ? ["free"] : []), ...(nudged ? ["nudge"] : []), ...(onHouse ? ["on_house"] : []),
+            ...(potWon > 0 ? ["pot"] : []), ...(pet ? ["pet"] : []), ...(prize ? ["prize"] : []),
+        ],
+        jackpot: reels.every((r) => r === m.symbols[0].id),
+        streak: meter.streak || 0,
+    }).catch(() => {});
+
     return {
         ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, pet, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
@@ -926,6 +939,9 @@ export async function gambleWin(buyerId, { machine } = {}) {
     // and the variance stops being anything the floor priced.
     meter.pending = 0;
     await saveMeter(buyerId, m.id, meter);
+    await trackActivity(buyerId, "casino_gamble", {
+        machine: m.id, staked: stake, won: Boolean(won), payout: won ? stake * 2 : 0,
+    }).catch(() => {});
     return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, gold };
 }
 

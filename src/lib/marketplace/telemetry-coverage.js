@@ -50,7 +50,7 @@ const SYSTEMS = [
     { key: "stockade", label: "The Stockade", area: "Town", events: ["stockade_act", "stockade_release"] },
 
     // ── CASINO ───────────────────────────────────────────────────────────────────────────────────────────
-    { key: "casino", label: "The floor", area: "Casino", events: ["casino_play", "casino_prize", "casino_buy"] },
+    { key: "casino", label: "The floor", area: "Casino", events: ["casino_play", "casino_prize", "casino_buy", "casino_gamble"] },
     { key: "casino_vip", label: "VIP lounge", area: "Casino", events: ["casino_vip_enter"] },
     { key: "casino_perks", label: "Casino perks", area: "Casino", events: ["casino_perk"] },
     { key: "casino_rounds", label: "Casino side bets", area: "Casino", events: ["casino_bet"] },

@@ -91,6 +91,16 @@ export const PERK_META = {
 const PET_ENSHRINED_LEVEL = 6;
 
 export const PET_PERKS = {
+    // ── SABLE'S THREE ─────────────────────────────────────────────────────────────────────────────────────
+    // The VIP lounge's own pets. Named for what the lounge is: money that finds you, luck you did not earn,
+    // and somebody at the end of the bar who notices everything. Keys chosen to match each one's activeStat
+    // so the shelf card and the perk agree — a pet advertised as "gold find" whose ability was about crits
+    // would be a third version of the same bug.
+    house_ferret: { name: "Under the Floorboards", key: "gold_find" },
+    velvet_lynx: { name: "Never Asked to Leave", key: "fortune" },
+    midnight_crane: { name: "Misses Nothing", key: "xp_gain" },
+
+
     // ── The twenty that fell through ──────────────────────────────────────────────────────────────────────
     // These had NO entry here, so petPerk() fell back to { name: "Companion", key: activeStat || "fortune" }.
     // A mythic fishing pet whose signature ability was called "Companion". Worse for the kitchen five: their
