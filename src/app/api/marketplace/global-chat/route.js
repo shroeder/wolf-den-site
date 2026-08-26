@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getGlobalChat, markChannelSeen, markGlobalChatSeen, sendTownChat } from "@/lib/marketplace/town.js";
+import { getGlobalChat, markChannelSeen, markGlobalChatSeen, sendTownChat, channelRoster } from "@/lib/marketplace/town.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -19,7 +19,13 @@ export async function GET(request) {
             // comes back empty rather than as an error, because "this room exists and you may not see
             // it" is itself a thing worth not telling people.
             const channel = new URL(request.url).searchParams.get("channel") || "global";
-            const messages = await getGlobalChat(buyer?.id || null, 40, channel);
+            // The feed and the rail are one request. They are always shown together and both are already
+            // gated on the same authorisation, so a second endpoint would be a second round trip and a
+            // second place to get the gate wrong.
+            const [messages, roster] = await Promise.all([
+                getGlobalChat(buyer?.id || null, 40, channel),
+                channelRoster(buyer?.id || null, channel).catch(() => []),
+            ]);
             // Which rooms this member can see, so the hub knows which tabs to draw. Cheap, and it has to
             // come from the same place the gate does or the tabs and the door disagree.
             let channels = ["global"];
@@ -38,7 +44,7 @@ export async function GET(request) {
                 after(() => markChannelSeen(buyer.id, channel));
                 if (channel === "global") after(() => markGlobalChatSeen(buyer.id));
             }
-            return NextResponse.json({ ok: true, authenticated: Boolean(buyer), messages, channels, role, channel }, { headers: { "Cache-Control": "no-store" } });
+            return NextResponse.json({ ok: true, authenticated: Boolean(buyer), messages, roster, channels, role, channel }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.global_chat.list.failure" });
         }

@@ -747,6 +747,84 @@ export async function channelUnread(buyerId, channels = ["global", "announce"]) 
 }
 
 /** Stamp one room as read. */
+// ── WHO IS IN THIS ROOM ────────────────────────────────────────────────────────────
+// Luke: "in a chat I'd like to see who's in the channel and who's online that's in that channel, on the
+// right in a bar, with their avatar sprite, name, and role."
+//
+// "IN THE CHANNEL" MEANS TWO DIFFERENT THINGS and the query has to respect that:
+//
+//   THE PRIVATE ROOMS (vip, staff) have an exact membership list already — mkt_channel_member, written by
+//   joinedAt the first time somebody opens the room. That IS the roster, so it is used directly.
+//
+//   THE OPEN ROOMS (global, announce) have no membership: every member of the Den is in them. A list of
+//   everybody is not a rail, it is a phone book. So the roster is the people who are actually PRESENT to it
+//   — online right now, or having said something here in the last fortnight. That is the question the rail
+//   is really being asked: who might answer me.
+//
+// ONLINE IS THE SAME 90-SECOND WINDOW THE PLAZA USES. One definition of "here" in the whole game; a rail
+// that called somebody online while the plaza did not would be two answers to one question.
+export async function channelRoster(buyerId, channel = "global") {
+    const chan = ["global", "announce", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const gated = chan === "vip" || chan === "staff";
+
+    // AUTHORISED SERVER-SIDE, against the earned list rather than the tab that was asked for — the same rule
+    // getGlobalChat applies, because a roster is as much a leak as a transcript. Knowing who is in the staff
+    // room is not public information.
+    if (gated) {
+        if (!buyerId) return [];
+        const { standingFor, channelsFor } = await import("@/lib/marketplace/roles.js");
+        const { roles } = await standingFor(buyerId);
+        if (!channelsFor(buyerId, roles).includes(chan)) return [];
+    }
+
+    const sql = gated
+        ? `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.role, b.xp,
+                  o.seen, s.said
+             FROM mkt_channel_member m
+             JOIN mkt_buyer b ON b.id = m.buyer_id
+             LEFT JOIN (SELECT v.buyer_id, MAX(v.last_seen) AS seen FROM mkt_visitor v
+                         WHERE v.buyer_id IS NOT NULL AND v.last_seen > NOW() - $2::interval
+                         GROUP BY v.buyer_id) o ON o.buyer_id = b.id
+             LEFT JOIN (SELECT c.buyer_id, MAX(c.created_at) AS said FROM mkt_town_chat c
+                         WHERE c.channel = $1 GROUP BY c.buyer_id) s ON s.buyer_id = b.id
+            WHERE m.channel = $1
+            ORDER BY (o.seen IS NOT NULL) DESC, o.seen DESC NULLS LAST, s.said DESC NULLS LAST,
+                     LOWER(COALESCE(b.display_name, b.alias, '')) ASC
+            LIMIT 80`
+        : `WITH online AS (
+                SELECT v.buyer_id, MAX(v.last_seen) AS seen FROM mkt_visitor v
+                 WHERE v.buyer_id IS NOT NULL AND v.last_seen > NOW() - $2::interval
+                 GROUP BY v.buyer_id),
+              spoke AS (
+                SELECT c.buyer_id, MAX(c.created_at) AS said FROM mkt_town_chat c
+                 WHERE c.channel = $1 AND c.created_at > NOW() - INTERVAL '14 days'
+                 GROUP BY c.buyer_id)
+           SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.role, b.xp,
+                  o.seen, s.said
+             FROM mkt_buyer b
+             LEFT JOIN online o ON o.buyer_id = b.id
+             LEFT JOIN spoke  s ON s.buyer_id = b.id
+            WHERE o.buyer_id IS NOT NULL OR s.buyer_id IS NOT NULL
+            ORDER BY (o.seen IS NOT NULL) DESC, o.seen DESC NULLS LAST, s.said DESC NULLS LAST
+            LIMIT 80`;
+
+    const rows = await db.query(sql, [chan, ONLINE_WINDOW]).catch(() => []);
+    return rows.map((r) => ({
+        id: r.id,
+        name: r.display_name || r.alias || "A member",
+        alias: r.alias || null,
+        sprite: r.avatar_sprite_url || null,
+        flip: Boolean(r.avatar_sprite_flip),
+        // ── THE SAME BADGE THE MESSAGES WEAR ─────────────────────────────────────────────
+        // chipFor is the one rule for what somebody is called — it validates the stored choice against what
+        // the row can actually prove and falls back to the XP rank, which is why the plaza shows OWNER and
+        // STAFF beside LEGEND and ALPHA. Called here rather than reimplemented, so a name in the rail and
+        // the same name on a message three lines away can never disagree. Returns { name, tone, glow }.
+        role: chipFor(r.id, r.role, Number(r.xp) || 0),
+        online: r.seen != null,
+    }));
+}
+
 export async function markChannelSeen(buyerId, channel) {
     if (!buyerId) return;
     await db.query(

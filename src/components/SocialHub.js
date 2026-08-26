@@ -664,8 +664,35 @@ function heroInner(m) {
 // at its own new chat would have split the VIP conversation across two places and left neither worth reading,
 // and copying this component would have meant two composers, two poll loops and two ideas about the join
 // window. One chat, rendered wherever the room is.
+// One name in the rail. Sprite, name, and the badge under it — a role if they wear one, otherwise the XP
+// rank, because almost nobody sets a role and a blank column beside every name is worse than no column.
+function RailMember({ m }) {
+    return (
+        <li className={`social-rail-m${m.online ? " is-on" : ""}`}>
+            <span className="social-rail-av">
+                {m.sprite
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={m.sprite} alt="" draggable="false"
+                        style={m.flip ? { transform: "scaleX(-1)" } : undefined} />
+                    : <i aria-hidden="true" />}
+                {/* The dot is on the AVATAR rather than beside the name: it is a property of the person,
+                    and putting it on the portrait keeps the text column a clean two lines. */}
+                {m.online ? <b className="social-rail-dot" aria-label="online" /> : null}
+            </span>
+            <span className="social-rail-who">
+                <b>{m.name}</b>
+                {m.role ? (
+                    <span className={`gchat-role${m.role.glow ? " is-earned" : ""}`}
+                        style={{ "--role": m.role.tone }}>{m.role.name}</span>
+                ) : null}
+            </span>
+        </li>
+    );
+}
+
 export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
     const [messages, setMessages] = useState(null);
+    const [roster, setRoster] = useState([]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [note, setNote] = useState("");   // why the last message was refused
@@ -679,6 +706,8 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.messages) setMessages(d.messages);
         else setMessages((m) => (m === null ? [] : m));
+        // Rides in with the feed rather than taking its own endpoint — see the note on the route.
+        if (Array.isArray(d?.roster)) setRoster(d.roster);
         // The rooms this member can see come back with the feed rather than from a second endpoint — the hub
         // needs them to decide which tabs exist, and they are already computed to answer this request.
         if (d?.channels) onChannels?.(d.channels);
@@ -736,9 +765,30 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
         setSending(false);
     }
 
+    // ONLINE FIRST, and counted so the heading can say how many rather than making it a thing you count.
+    // The server already sorted them; this only needs the split for the two sub-headings.
+    const here = roster.filter((m) => m.online);
+    const away = roster.filter((m) => !m.online);
+
     return (
-        <div className="social-global">
+        <div className="social-global has-rail">
             {note ? <p className="social-note" role="status">{note}</p> : null}
+            {roster.length ? (
+                <aside className="social-rail" aria-label="Who is in this room">
+                    <h5 className="social-rail-h">
+                        Here now <b>{here.length}</b>
+                    </h5>
+                    <ul className="social-rail-list">
+                        {here.map((m) => <RailMember key={m.id} m={m} />)}
+                        {away.length ? (
+                            <li className="social-rail-split" aria-hidden="true">
+                                <span>Also in this room</span>
+                            </li>
+                        ) : null}
+                        {away.map((m) => <RailMember key={m.id} m={m} />)}
+                    </ul>
+                </aside>
+            ) : null}
             <div className="social-global-feed">
                 {messages === null ? (
                     <p className="muted social-empty">Loading the plaza…</p>
@@ -806,6 +856,17 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                 )}
                 <div ref={endRef} />
             </div>
+
+            {/* ── WHO IS IN HERE ───────────────────────────────────────────────────
+                Luke: "who's in the channel and who's online that's in that channel, on the right in a bar,
+                with their avatar sprite, name, and role."
+
+                Two groups under one heading rather than two lists: everybody in the rail is in the room, and
+                the only thing that separates them is whether they are here right now. A second boxed list
+                would imply they were two different kinds of membership.
+
+                ON A PHONE IT GOES UNDER THE FEED, not beside it. A 150px rail beside a chat column on a
+                375px screen leaves 200px for the conversation, which is the wrong thing to sacrifice. */}
             <form className="social-global-composer" onSubmit={send}>
                 <input
                     value={input}
