@@ -1682,14 +1682,13 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
-    return settle(buyerId, b, row);
-    // Hands back the board and kit it already built rather than making getArenaState rebuild both — see the
-    // note on its `pre` parameter. This is the press that was timing out.
-    // THE WHOLE STATE, not just the bout — which is what every other action in this file returns, and what the
-    // fight renderer actually needs. It draws your own fighter from `me` (sprite, element, the card), so a
-    // response carrying only `bout` could not mount it, and the town had to bounce the player to
-    // /marketplace/arena to get a page that had `me` on it. That bounce WAS the bug. The plaza mounts the same
-    // renderer over itself now and hands it this.
+    // ── THE WHOLE STATE, NOT JUST THE BOUT ───────────────────────────────────────────────────────────────
+    // The fight renderer draws YOUR fighter from `me` — the sprite, the element, the name — and `settle` on a
+    // bout that has only just started returns { ok, unlocked, partial, bout } with no `me` in it at all. So
+    // the fighter in your own corner came up as an empty circle with no name over it.
+    //
+    // This return was already written, directly below a `return settle(...)` that was never removed, so it
+    // has never once run. Unreachable code that looks like the fix is worse than no fix: it reads as solved.
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -1731,7 +1730,10 @@ export async function startFishingBout(buyerId, monsterId) {
         interactive: interactiveFor(buyerId),
     });
     await saveBout(buyerId, b);
-    return settle(buyerId, b, row);
+    // The whole state, for the reason this function's own comment gives above and startTownBout's does too:
+    // without `me` the renderer has no sprite and no name for the player, and draws the ar-noface fallback —
+    // a grey disc on the deck where you are supposed to be. Luke: "cant see myself in ship encounter."
+    return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
 export async function startBout(buyerId, targetId = null) {
