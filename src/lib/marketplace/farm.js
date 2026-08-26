@@ -286,6 +286,9 @@ async function farmMineBits(buyerId, mine = true) {
         db.queryOne(
             `SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc,
                     (pig_day IS DISTINCT FROM ${DAY}) AS pig_unclaimed,
+                    -- The hog turned him around today and that second visit is still unspent. Without this
+                    -- the pig vanished the instant the first was claimed, and the perk could never fire.
+                    (pig_again_day = ${DAY} AND pig_second_day IS DISTINCT FROM ${DAY}) AS pig_again,
                     ${DAY}::text AS today,
                     EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'America/Chicago'))
                       + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE 'America/Chicago')) / 60.0 AS local_hour
@@ -324,9 +327,16 @@ async function farmMineBits(buyerId, mine = true) {
     const arrived = wallet
         ? Number(wallet.local_hour) >= pigHourFor(buyerId, wallet.today)
         : false;
+    // ── AND A SECOND VISIT PUTS HIM BACK ON THE FARM ─────────────────────────────────────────────────
+    // A turned-around pig does NOT wait for the arrival hour again — that hour is about when he first shows
+    // up, and making the member wait a second unknowable stretch for a bonus they already earned would read
+    // as the perk not working. He comes back the same day, once, and this is what says so.
+    const again = Boolean(wallet?.pig_again);
     return {
         treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting,
-        pigAvailable: Boolean(wallet?.pig_unclaimed) && arrived,
+        pigAvailable: (Boolean(wallet?.pig_unclaimed) && arrived) || again,
+        // The client says something different for a return visit, so it needs to know which one this is.
+        pigSecond: again && !wallet?.pig_unclaimed,
     };
 }
 
@@ -345,21 +355,34 @@ export async function claimPig(buyerId) {
         return { ok: false, error: "no_pig" };
     }
     const claim = await db.queryOne(`UPDATE mkt_buyer SET pig_day = ${DAY} WHERE id = $1 AND pig_day IS DISTINCT FROM ${DAY} RETURNING id`, [buyerId]).catch(() => null);
-    if (!claim) {
-        // Truffle Hog: a companion can bring the pig back for ONE more visit the same day. Tracked on its own
-        // column so it can't be re-rolled by retrying the request — the second claim is spent the same way the
-        // first is, atomically.
-        let second = null;
+
+    // ── THE HOG DECIDES AT THE FIRST CLAIM, NOT AT THE SECOND ────────────────────────────────────────
+    // This roll used to live in the `!claim` branch below — i.e. it only ran if you asked to claim a pig you
+    // had already claimed, which the client has no way to do, because a claimed pig is not on the farm any
+    // more. So it was a branch nothing could reach: 54 members had claimed a first pig and not one had ever
+    // been given a second.
+    //
+    // Rolled here, the moment the first is banked, and written down. pigAvailable reads that column and puts
+    // him back on the farm, which is the whole of what was missing.
+    let turnedAround = false;
+    if (claim) {
         try {
             const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
             const th = await getPetSystemPerk(buyerId, "truffle_hog");
             if (th > 0 && Math.random() < th / 100) {
-                second = await db.queryOne(
-                    `UPDATE mkt_buyer SET pig_second_day = ${DAY} WHERE id = $1 AND pig_second_day IS DISTINCT FROM ${DAY} RETURNING id`,
-                    [buyerId]
-                ).catch(() => null);
+                await db.query(`UPDATE mkt_buyer SET pig_again_day = ${DAY} WHERE id = $1`, [buyerId]);
+                turnedAround = true;
             }
         } catch { /* no companion, no second visit */ }
+    } else {
+        // Not the first claim. It is only allowed at all if the hog turned him around today, and it is spent
+        // atomically on its own column so retrying the request cannot pay it twice.
+        const second = await db.queryOne(
+            `UPDATE mkt_buyer SET pig_second_day = ${DAY}
+              WHERE id = $1 AND pig_again_day = ${DAY} AND pig_second_day IS DISTINCT FROM ${DAY}
+              RETURNING id`,
+            [buyerId]
+        ).catch(() => null);
         if (!second) return { ok: false, error: "already_claimed" };
     }
     const gold = mint(PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1), "loot_pig");
@@ -384,7 +407,9 @@ export async function claimPig(buyerId) {
     }
     await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null, pet: pet?.name || null }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // Pig Whisperer / Pig Tycoon
-    return { ok: true, gold, goldAfter: paid?.gold ?? null, item, pet };
+    // `again` tells the screen the hog turned him around, so the moment can be announced when it is earned
+    // rather than leaving the member to notice a pig they were not expecting.
+    return { ok: true, gold, goldAfter: paid?.gold ?? null, item, pet, again: turnedAround };
 }
 
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).

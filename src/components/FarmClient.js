@@ -318,8 +318,11 @@ export default function FarmClient({ initial, viewingAlias }) {
     // first, and once the arrival time is the surprise, a roll that sometimes eats him as well just reads as
     // the game being arbitrary — you cannot learn a rule that fails three visits in ten for no reason. If
     // he is on the farm, you see him.
+    // Reads the LIVE farm state, not `initial`. It used to key off the mount payload, which never changes —
+    // so the second visit the Truffle Hog turns around had nowhere to appear even once the server offered it,
+    // and the pigAvailable the claim handler sets was read by nothing at all.
     useEffect(() => {
-        if (!initial.mine || !initial.pigAvailable) return undefined;
+        if (!farm?.mine || !farm?.pigAvailable) return undefined;
         const t = setTimeout(() => {
             setPig("running");
             setPigToast(true);
@@ -328,7 +331,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             setTimeout(() => setPigToast(false), 4200);
         }, 2500 + Math.random() * 5000);
         return () => clearTimeout(t);
-    }, [initial.mine, initial.pigAvailable]);
+    }, [farm?.mine, farm?.pigAvailable]);
     // Kill the pig chase-music if we unmount mid-rampage.
     useEffect(() => () => SFX.stopPigMusic(), []);
     // Prime the audio context on the visitor's first interaction (browsers gate Web Audio behind a gesture).
@@ -493,6 +496,11 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [busy, post]);
 
     // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
+    // ── A REFUSED CLAIM USED TO BE COMPLETELY SILENT ─────────────────────────────────────────────────
+    // `if (r?.ok)` with no else: the pig ran the length of the farm, vanished, and nothing happened — no
+    // reward, no message, no reason. Members reported exactly that ("the second time he comes around you
+    // don't actually get anything"), and it is also what a stale tab looks like when the pig was already
+    // claimed on another device. Whatever the cause, the screen has to say something.
     const onPigFinish = useCallback(async () => {
         setPig(null);
         SFX.stopPigMusic();
@@ -500,8 +508,24 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) {
             setPigResult(r);
             SFX.fanfare();
-            setFarm((f) => ({ ...f, pigAvailable: false, wallet: f.wallet && r.goldAfter != null ? { ...f.wallet, gold: r.goldAfter } : f.wallet }));
+            // `again` means the Truffle Hog turned him around — clearing pigAvailable here and letting the
+            // next state read put him back would lose the moment, so it stays true and the effect above
+            // stages a second entrance off the live state.
+            setFarm((f) => ({
+                ...f,
+                pigAvailable: Boolean(r.again),
+                pigSecond: Boolean(r.again),
+                wallet: f.wallet && r.goldAfter != null ? { ...f.wallet, gold: r.goldAfter } : f.wallet,
+            }));
+            return;
         }
+        setFarm((f) => ({ ...f, pigAvailable: false, pigSecond: false }));
+        setPigResult({
+            missed: true,
+            why: r?.error === "already_claimed"
+                ? "You have already caught him today. He is done until tomorrow."
+                : "He got away this time — give it a moment and check back.",
+        });
     }, [post]);
 
     // Feed a treat (consumable) to a specific pet.
@@ -1666,12 +1690,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                             {PIG_BURST.map((b, i) => (
                                 <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}>🪙</span>
                             ))}
-                            <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>🐷👑</div>
-                            <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>The Wild Loot Pig!</div>
-                            <div className="muted" style={{ position: "relative", fontSize: 13, zIndex: 2 }}>He rampaged through and left this behind:</div>
+                            <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>{pigResult.missed ? "🐷💨" : "🐷👑"}</div>
+                            <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>{pigResult.missed ? "He slipped away" : "The Wild Loot Pig!"}</div>
+                            <div className="muted" style={{ position: "relative", fontSize: 13, zIndex: 2 }}>{pigResult.missed ? pigResult.why : "He rampaged through and left this behind:"}</div>
                         </div>
                         <div style={{ position: "relative", padding: "4px 18px 20px", zIndex: 2 }}>
+                            {/* Nothing below this belongs on a miss — a "+0 gold" line reads as a reward of
+                                nothing rather than as an explanation. */}
+                            {pigResult.missed ? null : (
                             <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(pigResult.gold || 0).toLocaleString()} 🪙</div>
+                            )}
                             {pigResult.item ? (
                                 <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[pigResult.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
                                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>✨ Rare drop{pigResult.item.isNew ? " · NEW" : ""}!</div>
