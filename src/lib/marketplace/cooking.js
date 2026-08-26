@@ -420,7 +420,10 @@ export { RECIPES, MASTER_RECIPES, recipeById, recipeBookFor };
 // the volume — the audited ~1.9 recipes per member per week is untouched, so nothing about how often a recipe
 // appears has moved. What shifts is which one you get. It matters most inside the upper bands, where a source
 // that can teach tiers 3-5 now lands on tier 3 about 63% of the time instead of 56%.
-const DROP_WEIGHT = { 1: 46, 2: 32, 3: 20, 4: 9, 5: 3 };
+// Tier 6 is rarer than Legendary by a wide margin. It has to be: there are eight master pages against a
+// hundred-odd ordinary ones, they are only in range from the top chest, and the whole point of the book is
+// that finishing it is a long job rather than a purchase.
+const DROP_WEIGHT = { 1: 46, 2: 32, 3: 20, 4: 9, 5: 3, 6: 1 };
 
 // ── WHERE RECIPES COME FROM ──────────────────────────────────────────────────────────────────────────────────
 //
@@ -459,7 +462,12 @@ export const RECIPE_BANDS = {
     chest_wooden: { min: 1, max: 2 },
     chest_iron:   { min: 2, max: 3 },
     chest_gold:   { min: 2, max: 3 },
-    chest_high:   { min: 3, max: 5 },   // mythic and above
+    // ── THE ONLY BAND THAT REACHES THE MASTER TIER ───────────────────────────────────────────────────
+    // 6 rather than 5, and it is not a gate being loosened: the BOOK decides what is in range, so for
+    // everybody who has not bought the Master's Book there is no tier 6 in their book and this reads
+    // exactly as 3-5 always did. For an owner it is the one place master pages come from — the top chest,
+    // and Sable's page behind the rope, which draws from this same band.
+    chest_high:   { min: 3, max: 6 },   // mythic and above
     seam:         { min: 1, max: 3 },   // the mine's bag — a page pressed in the rock
     seam_deep:    { min: 3, max: 4 },   // a rich seam
     dig:          { min: 2, max: 3 },
@@ -568,13 +576,17 @@ export async function recipeProgress(buyerId) {
 export async function hasUnknownRecipe(buyerId, band = null) {
     if (!buyerId) return false;
     const known = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    // Against the member's OWN book, for the same reason the roll is: an owner who knows every ordinary page
+    // in a band still has master pages to find in it, and this answering "no" would close the shop on them.
+    const master = await hasUnlock(buyerId, "recipe_master").catch(() => false);
+    const BOOK_FOR = recipeBookFor(master);
     // ── ASK ABOUT THE TIERS THE SOURCE CAN ACTUALLY TEACH ────────────────────────────────────────────────
     // Counting the WHOLE book meant the shop stayed open, and charging, long after it had run out of anything
     // it was allowed to hand over — you would pay 2,500 laurels for a roll that could only fail.
     const def = band ? RECIPE_BANDS[band] : null;
-    if (!def) return known.length < RECIPES.length;
+    if (!def) return known.length < BOOK_FOR.length;
     const have = new Set((known || []).map((r) => r.recipe_id));
-    return RECIPES.some((r) => r.tier >= def.min && r.tier <= def.max && !have.has(r.id));
+    return BOOK_FOR.some((r) => r.tier >= def.min && r.tier <= def.max && !have.has(r.id));
 }
 
 /**
@@ -618,9 +630,15 @@ export async function recipeLuck(buyerId) {
 // Implemented as a WEIGHT multiplier on the existing tier weights, so the tier bands, the already-known filter
 // and the strict fallback all keep working exactly as they did.
 const FAVOUR_MULT = 6;
-export function rollRecipe(known = [], { min = 1, max = 5, strict = false, favour = null } = {}) {
+export function rollRecipe(known = [], { min = 1, max = 5, strict = false, favour = null, book = RECIPES } = {}) {
     const have = new Set(known);
-    const all = RECIPES.filter((r) => !have.has(r.id));
+    // ── THE BOOK IS PASSED IN, NOT ASSUMED ───────────────────────────────────────────────────────────────
+    // This read RECIPES directly, which is the ordinary book — tier 6 was not in it, so no source in the
+    // game could ever roll a master page and the only way to hold one was the mass-teach that used to fire
+    // on purchase. Handing the book in is what lets the Master's Book be an UNLOCK rather than a delivery:
+    // an owner's book has tier 6 in it and everybody else's does not, so the same roll, from the same
+    // sources, quietly reaches further for the people who bought the door.
+    const all = book.filter((r) => !have.has(r.id));
     if (!all.length) return null;
     const banded = all.filter((r) => r.tier >= min && r.tier <= max);
     // ── `strict` REFUSES RATHER THAN WIDENS ──────────────────────────────────────────────────────────────
@@ -900,7 +918,11 @@ export async function learnRecipe(buyerId, recipeId = null, band = undefined, so
     if (!buyerId) return null;
     const knownRows = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const known = knownRows.map((r) => r.recipe_id);
-    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, band);
+    // Which book this member is rolling out of, read at the moment of the roll rather than passed in by the
+    // caller — every source in the game learns recipes through here, and a gate each of them had to remember
+    // to apply is a gate one of them would forget.
+    const master = await hasUnlock(buyerId, "recipe_master").catch(() => false);
+    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, { ...(band || {}), book: recipeBookFor(master) });
     if (!rec || known.includes(rec.id)) return null;
     // ── AND WHERE IT CAME FROM ───────────────────────────────────────────────────────────────────────────
     // The reveal is site-wide and fires off a poll, so it can land a beat after the thing that dropped it —
@@ -1667,16 +1689,17 @@ export async function getMemberRecipeBook(viewerId, ownerId) {
 //
 // ON CONFLICT DO NOTHING so re-running it is free — the perk grant and this call are separate writes and
 // there is no transaction to bind them (neon HTTP has none), so this has to be safe to repeat.
-export async function teachMasterBook(buyerId) {
-    if (!buyerId) return 0;
-    let n = 0;
-    for (const r of MASTER_RECIPES) {
-        const row = await db.queryOne(
-            `INSERT INTO mkt_recipe_known (buyer_id, recipe_id) VALUES ($1, $2)
-             ON CONFLICT DO NOTHING RETURNING recipe_id`,
-            [buyerId, r.id],
-        ).catch(() => null);
-        if (row) n += 1;
-    }
-    return n;
-}
+// ── THE MASTER'S BOOK IS A DOOR, NOT A DELIVERY ──────────────────────────────────────────────────────────────
+// This used to INSERT every master recipe into the buyer's known list the moment they paid, which handed over
+// all eight pages at once and fired eight "recipe found" cards back to back. Luke, having bought it: "this
+// should not give you all the recipes, it simply unlocks the ability to find them and see them... buying this
+// does not give you any recipes."
+//
+// He is right and it is the difference between an unlock and a purchase. The perk row is the whole product:
+// it puts tier 6 into recipeBookFor, which is what every roll in the game now draws from and what every
+// recipe count is measured against — so an owner starts at nought out of eight and finds them the way every
+// other page in the book is found. Somebody who has not bought it cannot roll one, cannot see one, and cannot
+// tell from any screen in the game that the tier is there at all.
+//
+// Nothing calls this any more and nothing should. It is left as a comment rather than a function because a
+// function that grants a whole tier is exactly the kind of thing that gets called again by accident.

@@ -203,16 +203,15 @@ async function grant(buyerId, item) {
         case "unlock": {
             const level = await grantCasinoPerk(buyerId, item.ref);
             if (!(Number(level) > 0)) return false;
-            // ── AND SOME UNLOCKS HAVE TO HAND SOMETHING OVER ─────────────────────────────────────────
-            // Three of the four are pure gates: the golden wheel, the deep water and the Long Road are all
-            // read from the perk row at the moment they matter, so owning the row IS the feature. The
-            // Master's Book is not — nothing in the game is allowed to teach tier 6 (see RECIPE_BANDS), so
-            // buying it has to write the pages. Deliberately AFTER the perk row and safe to repeat: there is
-            // no transaction here (neon HTTP has none), so the two writes have to be independently correct.
-            if (item.ref === "recipe_master") {
-                const { teachMasterBook } = await import("@/lib/marketplace/cooking.js");
-                await teachMasterBook(buyerId).catch(() => {});
-            }
+            // ── AND ALL FOUR ARE PURE GATES ──────────────────────────────────────────────────────────
+            // The golden wheel, the deep water and the Long Road are read from the perk row at the moment
+            // they matter, so owning the row IS the feature. The Master's Book used to be the exception: tier
+            // 6 was outside every band, so buying the book had to write all eight pages itself.
+            //
+            // That was the wrong shape and it is gone. chest_high reaches tier 6 now and rollRecipe draws
+            // from recipeBookFor(master), so an owner FINDS master pages the way every other page is found
+            // and a non-owner cannot roll one, see one, or tell the tier exists. The perk row is the whole
+            // product for all four, and this case grants nothing but the row.
             return true;
         }
         case "consumables": {
