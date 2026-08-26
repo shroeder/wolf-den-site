@@ -78,8 +78,29 @@ function settle(ring) {
 // shielding outruns it for long. It is deliberately a share of MAXIMUM health rather than current: a fighter
 // cannot duck it by being nearly dead, and it cannot stall out asymptotically the way a share of current
 // health would.
-export const FEVER_AT = 45;
-export const FEVER_PER_BEAT = 0.012;
+// ── AND THE PIT HAD TO CLOSE SOONER, BECAUSE THE MIRROR STOPPED ENDING ───────────────────────────────────────
+// Measured the day after the combat rework shipped. Almost everything moved the right way: the Warden's 85%
+// over the Reaver is gone, and ordinary bouts came down from the high twenties to 11-16 rounds, which is the
+// target. One pairing went the other way, hard — warden against warden went from 35 rounds to SEVENTY-NINE.
+//
+// It is my own change that did it. Stuns stopped queueing (Math.min(1, ...) instead of +=) and a denied beat
+// now buys a beat of immunity, which together mean two Wardens can no longer take turns away from each other
+// at all. Both sides hold a guard they refresh every swing, neither can chain a denial to break the pattern,
+// and the fight becomes two walls. That is exactly the loop this fever exists to end — it just started far
+// too late to catch it: nothing at all happened until beat 45, and the grind from 45 to 80 is the number
+// above.
+//
+// 28 and 1.8%. A bout that finishes in the low twenties — which is now nearly all of them — still never sees
+// the pit at all, so nothing that is working gets touched. A thirty-round fight feels a nudge on its last
+// beats. A mirror that would have run to eighty now ends in the forties.
+//
+// The old warning still stands and is the reason this is a nudge rather than a hammer: this mechanic was
+// removed once for taking the fight off the player and punishing the Warden hardest, whose whole win
+// condition is outlasting. It has to end a stall without deciding a fight.
+//
+// SMALL SAMPLE. Four warden mirrors in twenty hours, nineteen in forty-eight. Re-measure before trusting it.
+export const FEVER_AT = 28;
+export const FEVER_PER_BEAT = 0.018;
 
 function fever(ring) {
     if (ring.beat < FEVER_AT) return;
