@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { STAT_META } from "@/lib/marketplace/items.js";
 
 // ── WHAT CHIPS BUY THAT DOES NOT GO AWAY ─────────────────────────────────────────────────────────────────────
 // Luke: "let's allow buying permanent upgrades to core stats... starts at 250, cost goes up by 250 each time,
@@ -27,7 +28,7 @@ import { db } from "@/lib/db";
 // only, not crit chance or power." items.js already draws that exact line ("THE FOUR YOU BUILD" against "THE
 // CRITS"), which is the right one: the four are linear and always useful, and the crits multiply everything
 // else, so an infinite track on one of those compounds against every other source in the game.
-// ── AND EACH ONE IS CALLED AFTER THE STAT IT BUYS ────────────────────────────────────────────────────────────
+// ── AND EACH ONE IS CALLED AFTER THE STAT IT BUYS, BY THE TABLE THAT NAMES IT ────────────────────────────────
 // Luke: "just list the stat it upgrades, you are confusing me because it's not the stat name and description."
 //
 // They were Whetstone, Constitution, Bulwark and Bloodrush — four invented names for four stats that already
@@ -35,18 +36,30 @@ import { db } from "@/lib/db";
 // answered the only question a buyer has, which is "what does this raise". The flavour was costing more than
 // it was worth, so the title is the stat and the sentence under it says what that stat does.
 //
-// The art keeps its old filename: it is the same drawing, and renaming four webps to rename four labels is a
-// migration for nothing.
-export const STAT_TRACKS = [
-    { perk: "might", stat: "might", art: "/images/casino/perks/whetstone.webp", name: "Might", per: 1,
-        blurb: "Multiplies your weapon's damage. The whole of what you hit for." },
-    { perk: "vitality", stat: "vitality", art: "/images/casino/perks/constitution.webp", name: "Vitality", per: 1,
-        blurb: "How much punishment you can take before somebody takes it off you." },
-    { perk: "tenacity", stat: "tenacity", art: "/images/casino/perks/bulwark.webp", name: "Tenacity", per: 1,
-        blurb: "Multiplies the armour you are wearing. 500 tenacity doubles it." },
-    { perk: "ferocity", stat: "ferocity", art: "/images/casino/perks/bloodrush.webp", name: "Ferocity", per: 1,
-        blurb: "Chance to take another turn immediately. One percent for every five points." },
-];
+// AND BOTH ARE READ, NOT RETYPED. Luke, next: "are those descriptions of what stats do accurate?" They were —
+// I checked all four against the engine — but only because they had been copied correctly, and a copy is only
+// ever accurate until somebody retunes the thing it describes. STAT_META in items.js is where the game says
+// what a stat does; every other screen that prints a stat reads it from there, and now so does this one. The
+// four sentences it hands back are true of this code today:
+//
+//   MIGHT      swingFrom() = (weapon base / divisor) x (might / MIGHT_MAX) x DAMAGE_MAX — arena-kit.js.
+//              A pure multiplier on the weapon, which is what "the whole of what you hit for" means.
+//   VITALITY   healthFrom() = HEALTH_BASE + (vitality / VITALITY_MAX) x HEALTH_MAX — 200 + 10 a point.
+//   TENACITY   armor x (1 + tenacity / 500) in arena.js, so 500 does double the plate exactly as stated.
+//   FEROCITY   speedOf() adds ferocity / FEROCITY_PER_SPEED (500) to attack speed and extraTurnFrom() reads
+//              that straight off as a chance — 5 points is 1%, and it stops at EXTRA_TURN_MAX (50%).
+//
+// The art keeps its old filenames: they are the same four drawings, and renaming four webps to rename four
+// labels is a migration for nothing.
+const TRACK_ART = { might: "whetstone", vitality: "constitution", tenacity: "bulwark", ferocity: "bloodrush" };
+export const STAT_TRACKS = ["might", "vitality", "tenacity", "ferocity"].map((stat) => ({
+    perk: stat,
+    stat,
+    art: `/images/casino/perks/${TRACK_ART[stat]}.webp`,
+    name: STAT_META[stat].label,
+    blurb: STAT_META[stat].desc,
+    per: 1,
+}));
 
 // ── THE PRICE LADDER ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "make it 500 and it goes up 500 each time." 500 for the first, +500 every time, for ever. LINEAR
@@ -68,15 +81,29 @@ export const statCost = (level = 0) => STAT_STEP * (Math.max(0, Math.floor(level
 
 // ── THE FIVE DOORS ───────────────────────────────────────────────────────────────────────────────────────────
 // One-off, and each one opens a body of content that does not exist for anybody who has not bought it.
+// ── AND EACH ONE SAYS WHAT IT UNLOCKS ────────────────────────────────────────────────────────────────────────
+// Two problems with the copy these carried, both Luke's.
+//
+// THE FIRST: "not clear it unlocks vs gives, especially for recipes. I'd prefer telling them it unlocks a new
+// tier." Every line described the CONTENTS — "a tier of recipes above anything the kitchen has now" — which
+// reads like a bundle of recipes you are handed. It is not: it is a permanent unlock that puts a new tier in
+// a feature you already use, and which tier it opens is the thing worth knowing before you spend a hundred
+// thousand chips. So each one now begins with the verb.
+//
+// THE SECOND: "you are leaking our old convo in these descriptions." They were written out of the planning
+// conversation and still had its numbers in them — six fish, a hundred rungs, ten houses — counts that came
+// from deciding what to build rather than from playing it. That is both a leak of how the sausage is made and
+// a promise the code has to keep for ever. Member-facing copy says what the unlock DOES; what is actually
+// behind it is found by opening it.
 export const UNLOCKS = [
     { perk: "wheel_gold", art: "/images/casino/perks/wheel-gold.webp", price: 20000, name: "The Golden Wheel",
-        blurb: "The daily wheel, recut. Nothing on it is small." },
+        blurb: "Unlocks a higher tier of the daily wheel — richer prizes on every slice of it." },
     { perk: "fish_deep", art: "/images/casino/perks/charts.webp", price: 15000, name: "The Deep Water Charts",
-        blurb: "Six fish that are not in any water you can currently reach." },
+        blurb: "Unlocks a new tier of fishing water, and the species that only live down there." },
     { perk: "recipe_master", art: "/images/casino/perks/book.webp", price: 25000, name: "The Master's Book",
-        blurb: "A tier of recipes above anything the kitchen has now." },
+        blurb: "Unlocks a new tier of recipes in your kitchen, above anything it can cook today." },
     { perk: "road_long", art: "/images/casino/perks/road.webp", price: 100000, name: "The Long Road",
-        blurb: "A hundred more rungs, and ten houses nobody has fought." },
+        blurb: "Unlocks a new stretch of the Road, and the houses waiting further up it." },
 ];
 
 export const unlockByPerk = (perk) => UNLOCKS.find((u) => u.perk === perk) || null;

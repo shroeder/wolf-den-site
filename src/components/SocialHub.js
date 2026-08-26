@@ -17,6 +17,8 @@ import NoticeBody from "@/components/NoticeBody";
 // A chat should follow new messages while you are watching the newest ones, and hold still the moment you go
 // looking for something. So: only scroll if the reader is already parked near the end.
 const PINNED_SLACK_PX = 140;
+// Where the fold state lives. One key for every room: the rail is the same furniture in all four.
+const RAIL_KEY = "wd.social.rail";
 function scrollToEndIfPinned(endRef, force = false) {
     const end = endRef.current;
     if (!end) return;
@@ -28,7 +30,13 @@ function scrollToEndIfPinned(endRef, force = false) {
         if ((oy === "auto" || oy === "scroll") && box.scrollHeight > box.clientHeight + 4) break;
         box = box.parentElement;
     }
-    if (!box || box === document.body) { end.scrollIntoView({ block: "end" }); return; }
+    // ── AND IF THERE IS NO SCROLL BOX, DO NOTHING ────────────────────────────────────────────────────
+    // This used to fall through to `end.scrollIntoView()`, which scrolls EVERY scrollable ancestor — up to
+    // and including the document. Wherever this thread is rendered outside its own scroll box, that turned a
+    // routine poll into the page yanking itself to the bottom on a timer. The VIP lounge embedded the feed
+    // and was unusable for exactly this reason. A feed with no box of its own has nothing it is entitled to
+    // scroll, and the honest answer is to leave the page where the reader put it.
+    if (!box || box === document.body) return;
     const gap = box.scrollHeight - box.scrollTop - box.clientHeight;
     if (force || gap <= PINNED_SLACK_PX) end.scrollIntoView({ block: "end" });
 }
@@ -693,6 +701,22 @@ function RailMember({ m }) {
 export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) {
     const [messages, setMessages] = useState(null);
     const [roster, setRoster] = useState([]);
+    // ── AND THE ROSTER FOLDS AWAY ────────────────────────────────────────────────────────────────────────
+    // Luke: "make it so chat can collapse the user list."
+    //
+    // The rail costs 76px of a 375px screen, which is the right trade while you are working out who to talk
+    // to and the wrong one while you are reading a long message. Remembered in localStorage rather than reset
+    // per visit: whether you want the room listed is a preference about how you read chat, not a thing about
+    // this particular room, so being asked again every time you open the hub would be the app forgetting
+    // something you already told it.
+    const [railOpen, setRailOpen] = useState(true);
+    useEffect(() => {
+        try { setRailOpen(window.localStorage.getItem(RAIL_KEY) !== "0"); } catch { /* private mode */ }
+    }, []);
+    const foldRail = useCallback((next) => {
+        setRailOpen(next);
+        try { window.localStorage.setItem(RAIL_KEY, next ? "1" : "0"); } catch { /* private mode */ }
+    }, []);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [note, setNote] = useState("");   // why the last message was refused
@@ -783,11 +807,22 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     // nothing. It was unconditional while the phone layout ignored the grid; now that the grid is the layout
     // at every width, it has to mean what it says.
     return (
-        <div className={`social-global${roster.length ? " has-rail" : ""}`}>
+        <div className={`social-global${roster.length && railOpen ? " has-rail" : ""}`}>
             {note ? <p className="social-note" role="status">{note}</p> : null}
-            {roster.length ? (
+            {roster.length && !railOpen ? (
+                // Folded: a chip rather than a sliver of rail. It says how many are here, because that is the
+                // one thing the rail was telling you that you still want when it is shut.
+                <button type="button" className="social-rail-show" onClick={() => foldRail(true)}
+                    aria-label="Show who is in this room">
+                    <span className="social-rail-chev" aria-hidden="true">‹</span>
+                    <b>{here.length}</b> here<i>{roster.length > here.length ? ` · ${roster.length} in room` : ""}</i>
+                </button>
+            ) : null}
+            {roster.length && railOpen ? (
                 <aside className="social-rail" aria-label="Who is in this room">
                     <h5 className="social-rail-h">
+                        <button type="button" className="social-rail-fold" onClick={() => foldRail(false)}
+                            aria-label="Hide who is in this room">›</button>
                         Here now <b>{here.length}</b>
                     </h5>
                     <ul className="social-rail-list">

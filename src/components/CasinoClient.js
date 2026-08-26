@@ -1360,10 +1360,20 @@ export default function CasinoClient({ initial }) {
                     aria-label={st?.vip?.allowed ? "The VIP lounge" : "The VIP lounge \u2014 members only"}
                     onClick={() => {
                         if (draggedJustNow()) return;
-                        // Walk over first, go in second \u2014 the same two-step every cabinet on this floor
-                        // uses, so the rope is not a special case you have to learn.
+                        // ── ONE TAP, NOT TWO ─────────────────────────────────────────────────────
+                        // Luke: "for some reason I have to click multiple times to get into the vip room."
+                        //
+                        // The rope used to take the same two taps as a cabinet — walk over, then go in. That
+                        // is right for a machine, where the first tap is you deciding to look at it and the
+                        // second is you sitting down at it. A door is not a machine: nobody walks up to a
+                        // door in order to stand next to it. Worse, the walk is animated, so the second tap
+                        // landed before `vipNear` was true and was spent walking again.
+                        //
+                        // A member gets the walk and the door in one tap. Somebody who is not a member still
+                        // has to be standing there to be told no, because "members only" is an answer about
+                        // the rope in front of you rather than a label on a distant arch.
+                        if (st?.vip?.allowed) { setX(VIP_X); enterVip(); return; }
                         if (!vipNear) { setX(VIP_X); return; }
-                        if (st?.vip?.allowed) { enterVip(); return; }
                         setErr("Members only. The rope stays where it is.");
                     }}>
                     {/* Inside the arch. The people are real \u2014 their own avatars, at their own positions in

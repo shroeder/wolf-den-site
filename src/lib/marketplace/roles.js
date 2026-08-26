@@ -142,6 +142,50 @@ export function channelsFor(buyerId, roles = []) {
 }
 
 /**
+ * Every member who BELONGS in a private room — whether or not they have ever opened it.
+ *
+ * ── QUALIFYING IS THE MEMBERSHIP; THE ROW IS ONLY A VISIT ────────────────────────────────────────────────────
+ * Luke, of the VIP rail: "the list should also show everyone in that group not online."
+ *
+ * The rail was built from `mkt_channel_member`, and that table is written by `joinedAt` the first time somebody
+ * OPENS the room. So it is a list of people who have been in, not a list of people who are in it — and on the
+ * live site those differ badly: four members had cleared the VIP threshold in the shop and never tapped the
+ * tab, so a room with six members drew two. Somebody looking at that rail would reasonably conclude the perk
+ * they had paid seven hundred dollars for had nobody in it.
+ *
+ * So membership is COMPUTED, from the same three facts `standingFor` builds the roles out of — the owner list,
+ * the staff list, and the spend threshold. `channelsFor` above is what decides who may open which door; this
+ * has to agree with it exactly or the rail and the gate describe two different rooms.
+ *
+ * The OPEN rooms get null rather than a list: every member of the Den is in the plaza, and a rail of everybody
+ * is a phone book, not a roster. channelRoster keeps its own rule for those — see the note there.
+ */
+export async function channelMemberIds(channel) {
+    const chan = String(channel || "");
+    if (chan !== "vip" && chan !== "staff") return null;
+    const { houseBuyerIds } = await import("@/lib/marketplace/owner.js");
+    const house = houseBuyerIds();
+    // The back room is the two lists and nothing else — there is no way to spend your way into it.
+    if (chan === "staff") return house;
+    // ── AND VIP IS THE HOUSE PLUS EVERYBODY OVER THE LINE ────────────────────────────────────────────────
+    // The same two sources standingFor adds up, in one pass over the membership instead of one query each:
+    // the in-store purchase events (falling back to dividing the XP back out for the 48 rows that predate the
+    // amount stamp — see the note in standingFor) and the paid online credit purchases.
+    const rows = await db.query(
+        `SELECT b.id
+           FROM mkt_buyer b
+           LEFT JOIN (SELECT buyer_id,
+                             SUM(COALESCE((meta->>'amountCents')::numeric, points * 100.0 / ${SPEND_XP_PER_DOLLAR})) AS c
+                        FROM mkt_xp_event WHERE action = 'purchase_spend' GROUP BY buyer_id) s ON s.buyer_id = b.id
+           LEFT JOIN (SELECT buyer_id, SUM(amount_cents) AS c
+                        FROM mkt_credit_purchase WHERE status = 'paid' GROUP BY buyer_id) o ON o.buyer_id = b.id
+          WHERE COALESCE(s.c, 0) + COALESCE(o.c, 0) >= $1`,
+        [VIP_CENTS],
+    ).catch(() => []);
+    return [...new Set([...house, ...(rows || []).map((r) => String(r.id))])];
+}
+
+/**
  * When this member joined this channel, creating the row the first time they qualify.
  *
  * ── AND YOU ONLY SEE WHAT WAS SAID AFTER YOU ARRIVED ─────────────────────────────────────────────────────────

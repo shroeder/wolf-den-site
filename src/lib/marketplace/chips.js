@@ -71,16 +71,27 @@ export const CHIP_STORE = [
     //
     // Repeatable, deliberately: `once` is right for a decoration you either own or do not, and wrong for a
     // chest, which is the whole reason to come back.
+    // ── AND A CHEST IS SOLD ON WHAT IT IS, NOT ON WHAT IS IN IT ──────────────────────────────────────
+    // Luke: "don't tell the user what's in these, just add flavour and hype, not revealing details."
+    //
+    // Every line here used to be a spec. "The first chest that can hand you an ascendant piece at all" and
+    // "a one percent tail on the rarest tier" are the drop table read aloud — they turn a locked box into a
+    // row in a paytable, and they spoil the only thing a chest has going for it, which is not knowing.
+    //
+    // The odds are still available and still exact: tap the chest and the inspect card lists every rarity
+    // and its real percentage, generated from CHEST_TIERS rather than typed. That is the right place for a
+    // number — asked for, on the way to spending, off the same table the roll uses. The shelf gets to be
+    // the shelf.
     { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 20000,
-        blurb: "Legendaries are ordinary in here. Mythics are not." },
+        blurb: "Cold to the touch, and something inside it shifts when you turn it over." },
     { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 75000,
-        blurb: "The first chest that can hand you an ascendant piece at all." },
+        blurb: "It came in alight and it has not gone out. The counter keeps this one on stone." },
     { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 500000,
-        blurb: "Nothing below it opens this often onto the eternal tier." },
+        blurb: "There is no keyhole anywhere on it. It opens for whoever pays, and for nobody else." },
     { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 1000000,
-        blurb: "One of only two chests that can hold a celestial piece." },
+        blurb: "The house keeps this one back from the lamps. It has never needed them." },
     { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 10000000,
-        blurb: "The rarest object on the floor. A one percent tail on the rarest tier in the game." },
+        blurb: "Older than the room it is standing in. The floor has never had more than one." },
 ];
 // ── AND THE VENDOR BEHIND THE ROPE ─────────────────────────────────────────────────────
 // Luke: "a VIP only vendor next to the bartender — he has a secret list of things that you can only get from
@@ -262,8 +273,8 @@ async function detailFor(item) {
             return {
                 art: u.art || null,
                 blurb: u.blurb,
-                lines: [{ label: "Bought", value: "Once, and it never expires" }],
-                foot: "Nothing in the game hints at what is behind this until it is open.",
+                lines: [{ label: "Unlocks", value: "A new tier, permanently" }],
+                foot: "This is an unlock rather than an item. Once it is open it stays open, on every account you play from.",
             };
         }
         case "gems": {
@@ -441,7 +452,14 @@ export async function chipShelf(buyerId, { vip = false, shelf = null } = {}) {
             ...(details[n] || {}),
             // The shelf's own blurb wins over the catalogue's — it is written for this counter.
             blurb: i.blurb,
-            detail: details[n]?.blurb || null,
+            // ── AND THE KICKER IS ONLY DRAWN WHEN IT ADDS SOMETHING ──────────────────────────────
+            // `detail` is the line the inspect card sets in small caps above the description, and it comes
+            // from whichever feature owns the thing. For a gem or a decoration that is a second, different
+            // sentence and worth having. For a stat track or a door it is the SAME sentence the shelf
+            // already wrote, so the card printed one line of copy twice — once shouted, once not. Luke:
+            // "redundant descriptions". Compared rather than special-cased per kind, so a future catalogue
+            // that happens to agree with its feature is quiet too.
+            detail: details[n]?.blurb && details[n].blurb !== i.blurb ? details[n].blurb : null,
         })),
     };
 }

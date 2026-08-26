@@ -770,24 +770,31 @@ export async function channelRoster(buyerId, channel = "global") {
     // AUTHORISED SERVER-SIDE, against the earned list rather than the tab that was asked for — the same rule
     // getGlobalChat applies, because a roster is as much a leak as a transcript. Knowing who is in the staff
     // room is not public information.
+    // ── WHO IS IN A PRIVATE ROOM IS COMPUTED, NOT REMEMBERED ─────────────────────────────────────────────
+    // This used to read `mkt_channel_member`, which is written the first time somebody OPENS a room — so it
+    // listed people who had VISITED rather than people who BELONG, and four members who had cleared the VIP
+    // threshold in the shop but never tapped the tab were missing from their own room. `channelMemberIds`
+    // answers it from the same facts the door is gated on, so the rail and the gate cannot disagree.
+    let members = null;
     if (gated) {
         if (!buyerId) return [];
-        const { standingFor, channelsFor } = await import("@/lib/marketplace/roles.js");
+        const { standingFor, channelsFor, channelMemberIds } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);
         if (!channelsFor(buyerId, roles).includes(chan)) return [];
+        members = await channelMemberIds(chan);
+        if (!members?.length) return [];
     }
 
     const sql = gated
         ? `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.role, b.xp,
                   o.seen, s.said
-             FROM mkt_channel_member m
-             JOIN mkt_buyer b ON b.id = m.buyer_id
+             FROM mkt_buyer b
              LEFT JOIN (SELECT v.buyer_id, MAX(v.last_seen) AS seen FROM mkt_visitor v
                          WHERE v.buyer_id IS NOT NULL AND v.last_seen > NOW() - $2::interval
                          GROUP BY v.buyer_id) o ON o.buyer_id = b.id
              LEFT JOIN (SELECT c.buyer_id, MAX(c.created_at) AS said FROM mkt_town_chat c
                          WHERE c.channel = $1 GROUP BY c.buyer_id) s ON s.buyer_id = b.id
-            WHERE m.channel = $1
+            WHERE b.id = ANY($3::uuid[])
             ORDER BY (o.seen IS NOT NULL) DESC, o.seen DESC NULLS LAST, s.said DESC NULLS LAST,
                      LOWER(COALESCE(b.display_name, b.alias, '')) ASC
             LIMIT 80`

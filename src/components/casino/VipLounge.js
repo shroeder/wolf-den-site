@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 import ChipStore from "@/components/casino/ChipStore.js";
-import { GlobalChatTab } from "@/components/SocialHub";
 
 // ── BEHIND THE ROPE ──────────────────────────────────────────────────────────────────────────────────────────
 // The room a VIP walks into.
@@ -194,6 +193,25 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
 
     const mine = (st?.notes || []).find((n) => n.mine) || null;
 
+    // ── TALKING TO SOMEBODY IS A MODAL, NOT MORE PAGE ────────────────────────────────────────────────────
+    // Luke, of Rolf: "this is a scrolling nightmare. just make it show his face zoomed up in a modal with his
+    // dialog" — and then of the vendor: "same with Sable, have it be a modal."
+    //
+    // Both panels used to be appended UNDER the room, so talking to somebody put what they said below the
+    // fold: you tapped a button, nothing appeared to happen, and the answer was a scroll away past a lounge,
+    // a button and a chat window. Sable was worse, because the thing she opens is a whole shop.
+    //
+    // A modal is the honest shape for it. A conversation is exclusive — you are talking to one of them, the
+    // room is not going anywhere — and it costs no layout: the page does not grow, so nothing below moves and
+    // there is nothing to scroll past to get back.
+    const closeTalk = useCallback(() => { setOpen(null); }, []);
+    useEffect(() => {
+        if (!talking) return undefined;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, [talking]);
+
     return (
         <div className="vip">
             <header className="vip-top">
@@ -273,9 +291,21 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
             </div>
 
             {/* ── THE BARTENDER ───────────────────────────────────────────────────────────────────────
-                One true thing about how the game works, and the noticeboard he is holding for the room. */}
+                One true thing about how the game works, and the noticeboard he is holding for the room.
+
+                THE FACE IS THE HEADER. The same full-body sprite that stands at the bar, scaled up and
+                cropped to the head by `--fz`/`--fy` — see .vip-face. Two numbers per character rather than a
+                second set of portrait art: it is the same drawing, so a re-roll of the sprite carries. */}
             {talking === "bartender" ? (
-                <div className="vip-panel">
+                <div className="vip-scrim" role="dialog" aria-modal="true" aria-label="Rolf, the bartender"
+                    onClick={closeTalk}>
+                  <div className="vip-modal" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="vip-x" onClick={closeTalk} aria-label="Close">✕</button>
+                    <div className="vip-face" style={{ "--fz": "360%", "--fy": "3%" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/casino/vip-bartender.webp" alt="" draggable="false" />
+                    </div>
+                    <div className="vip-modal-body">
                     <h4>Rolf leans in</h4>
                     <p className="vip-said">{saying || st?.bartender?.text || "…"}</p>
 
@@ -308,6 +338,8 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                             </button>
                         ) : null}
                     </div>
+                    </div>
+                  </div>
                 </div>
             ) : null}
 
@@ -315,19 +347,34 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                 The Counter's own component, handed the VIP list. Not a second shop screen: the buying, the
                 affording, the inspect card and the receipt are all solved once, over there. */}
             {talking === "vendor" ? (
-                <div className="vip-panel">
-                    <h4>Sable opens the case</h4>
-                    <p className="vip-said">Three of them. Nobody out on the floor can have these.</p>
-                    <ChipStore chips={chips} onBuy={buy} onRefresh={shelf} />
+                <div className="vip-scrim" role="dialog" aria-modal="true" aria-label="Sable, the vendor"
+                    onClick={closeTalk}>
+                  <div className="vip-modal is-shop" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="vip-x" onClick={closeTalk} aria-label="Close">✕</button>
+                    <div className="vip-face" style={{ "--fz": "255%", "--fy": "-4%" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/casino/vip-vendor.webp" alt="" draggable="false" />
+                    </div>
+                    <div className="vip-modal-body">
+                        <h4>Sable opens the case</h4>
+                        <p className="vip-said">Three of them. Nobody out on the floor can have these.</p>
+                        <ChipStore chips={chips} onBuy={buy} onRefresh={shelf} />
+                    </div>
+                  </div>
                 </div>
             ) : null}
 
-            {/* ── THE VIP CHAT ────────────────────────────────────────────────────────────────────────
-                The channel that already existed, shown in the room it belongs to. A NEW channel would have
-                split the VIP conversation across two places and left neither worth reading. */}
-            <div className="vip-chat">
-                <GlobalChatTab open channel="vip" />
-            </div>
+            {/* ── AND THE CHAT IS NOT DOWN HERE ───────────────────────────────────────────────────────
+                Luke: "remove the chat at the bottom, fix it so the camera doesnt snap to in here."
+
+                Those are one bug, not two. The VIP channel was embedded under the room, and a chat feed
+                scrolls itself to its newest message — which, for a feed that is not itself a scroll box,
+                means scrollIntoView walking up to the PAGE and dragging the whole lounge down to the bottom
+                every twelve seconds. You could not stand still in the room while it was on screen.
+
+                Nothing is lost: it is the same VIP room in the Social hub, which is where members already
+                read it, and a channel shown in two places was always going to be read in one of them. The
+                scrollIntoView that did the dragging is fixed at its source too — see scrollToEndIfPinned. */}
         </div>
     );
 }

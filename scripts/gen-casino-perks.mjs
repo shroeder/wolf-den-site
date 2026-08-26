@@ -87,13 +87,27 @@ const JOBS = {
     // ── THE FOUR DOORS ───────────────────────────────────────────────────────────
     // Each is the KEY to a thing, not the thing. A miniature prize wheel would just be the wheel screen
     // shrunk; a golden wheel TOKEN is something you buy and carry to it.
+    // ── AND THE WHEEL IS A WHEEL AGAIN ───────────────────────────────────────────
+    // Luke: "that sprite needs a rework." The first pass asked for a TOKEN struck with a wheel on its face,
+    // on the reasoning that a door should be the key rather than the thing. The reasoning was fine and the
+    // picture was not: struck relief on a coin is shallow by definition, so it came back as a flat gold disc
+    // with some spokes scratched into it, and at 46px it read as a cart wheel — the one object in the set
+    // with no colour of its own and no idea what it was for.
+    //
+    // So it is the wheel itself, three-quarters on and standing, which is a silhouette rather than a circle.
+    // The jewelled segments give it the colour the disc never had, and the pointer at the top is what says
+    // "prize wheel" instantly at any size.
     "wheel-gold": {
         dir: PERKS, file: "wheel-gold", ext: "webp",
         prompt: housePrompt(
-            "A heavy solid-gold casino token the size of a coaster, struck with the spoked outline of a "
-            + "prize wheel on its face, its rim milled and set with tiny warm-glowing bulbs, resting at a "
-            + "slight angle and catching the light.",
-            { framing: "sprite", extra: `${SMALL} Rich gold with warm bulb glow. No lettering or numerals of any kind.` }),
+            "An ornate golden fortune wheel standing upright on a short gilded base, seen three-quarters "
+            + "on so its face is an oval rather than a flat circle. Its face is divided into wedges of deep "
+            + "ruby, sapphire and emerald enamel between raised gold spokes, its outer rim is set with small "
+            + "warm-glowing bulbs, and a gold pointer sits at the very top of the rim. A few loose sparks "
+            + "come off the rim as though it has just been spun.",
+            { framing: "sprite", extra: `${SMALL} Rich gold with jewelled ruby, sapphire and emerald wedges `
+                + "and a warm bulb glow. The wedges must be plain colour: no lettering, numerals, symbols or "
+                + "prize icons anywhere on the wheel." }),
     },
     charts: {
         dir: PERKS, file: "charts", ext: "webp",

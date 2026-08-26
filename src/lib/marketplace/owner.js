@@ -46,6 +46,15 @@ export function isHouse(buyerId) {
     return isOwner(buyerId) || (Boolean(buyerId) && STAFF_BUYER_IDS.has(String(buyerId)));
 }
 
+// ── AND THE SAME TWO LISTS, ENUMERATED ───────────────────────────────────────────────────────────────────────
+// `isOwner`/`isStaff` answer "is this person one" and the private-room roster needs "who are they all" — you
+// cannot build a list of the staff room's members out of a predicate. Handed back as fresh arrays rather than
+// the Sets themselves, because a caller that can `.add()` to one of these is a caller that can grant itself
+// the owner gate at runtime.
+export function houseBuyerIds() {
+    return [...OWNER_BUYER_IDS, ...STAFF_BUYER_IDS];
+}
+
 // ── BARRED FROM THE REAL-WORLD PRIZES, AND NOT TOLD ──────────────────────────────────────────────────────────
 // A separate list from the house one, and it has to be separate for two reasons.
 //

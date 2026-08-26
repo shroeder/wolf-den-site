@@ -6945,6 +6945,22 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .social-rail-h { margin: 0 0 6px; font-size: 8.5px; font-weight: 900; letter-spacing: .08em;
     text-transform: uppercase; color: #6f7a87; text-align: center; }
 .social-rail-h b { color: #5affaf; font-variant-numeric: tabular-nums; }
+/* The fold sits IN the heading rather than beside it: the heading is already a full-width row of nothing but
+   two words, so the control costs no height at all. */
+.social-rail-fold { float: right; margin: -2px -2px 0 0; width: 18px; height: 18px; padding: 0; border: 0;
+    border-radius: 6px; background: rgba(255,255,255,.06); color: #8f98a3; font-size: 13px; line-height: 16px;
+    cursor: pointer; }
+.social-rail-fold:hover { background: rgba(255,255,255,.12); color: #eaf1f8; }
+/* Folded, it is a chip above the conversation. Full width and left-aligned so it reads as a thing you can
+   open rather than a label. */
+.social-rail-show { display: flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px 4px 6px;
+    border-radius: 999px; border: 1px solid #232c38; background: #141a23; color: #8f98a3;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.social-rail-show:hover { border-color: #2c5a45; color: #cfd8e3; }
+.social-rail-show b { color: #5affaf; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.social-rail-show i { font-style: normal; color: #4d5663; text-transform: none; letter-spacing: 0; }
+.social-rail-chev { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px;
+    background: rgba(255,255,255,.06); color: #8f98a3; font-size: 12px; line-height: 1; }
 .social-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 /* STACKED on a phone: 76px is not enough for a portrait BESIDE two lines of text, and shrinking the text to
    make it fit is how you get a rail of ellipses. */
@@ -22519,15 +22535,41 @@ body.cas-seated .social-fab { display: none; }
     box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 .vip-talk:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
 
-.vip-panel { display: grid; gap: 10px; padding: 12px; border-radius: 14px;
-    background: linear-gradient(180deg, rgba(180,90,255,.10), rgba(0,0,0,.35));
-    border: 1px solid rgba(180,90,255,.28);
+/* ── TALKING TO SOMEBODY ─────────────────────────────────────────────────────────────
+   Fixed, not appended. The whole reason these are modals is that the lounge stopped growing a screenful of
+   page every time you said hello to the barman — so the one thing this must not do is participate in the
+   page's layout. */
+.vip-scrim { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 14px;
+    background: rgba(6,4,10,.78); backdrop-filter: blur(3px); }
+.vip-modal { position: relative; width: min(100%, 400px); max-height: min(88vh, 720px); overflow: hidden;
+    display: flex; flex-direction: column; border-radius: 16px; border: 1px solid rgba(190,150,255,.34);
+    background: linear-gradient(180deg, #1a1226, #120c1c); box-shadow: 0 24px 60px rgba(0,0,0,.7);
     animation: vipIn .42s cubic-bezier(.2,1.3,.4,1) both; }
+.vip-x { position: absolute; top: 8px; right: 8px; z-index: 2; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(10,7,16,.72); color: #e6d2ff; font-size: 14px;
+    line-height: 1; cursor: pointer; }
+/* ── THE FACE ──
+   The SAME full-body sprite that stands at the bar, blown up and slid until the head fills the frame. `--fz`
+   is the sprite's height as a multiple of this box and `--fy` nudges it; the two numbers are set per
+   character on the element, because Rolf's head is the top fifth of his drawing and Sable's is the top third.
+   Cropping the art we have beats commissioning two portraits that would then have to be re-rolled in step
+   with it. */
+.vip-face { position: relative; flex: 0 0 auto; height: clamp(126px, 34vw, 168px); overflow: hidden;
+    background: radial-gradient(120% 90% at 50% 20%, #33244a, #150e22 70%); }
+.vip-face img { position: absolute; left: 50%; top: var(--fy, 0%); height: var(--fz, 300%); width: auto;
+    transform: translateX(-50%); image-rendering: auto; }
+/* A wash at the bottom so the crop does not end on a hard line across somebody's chest. */
+.vip-face::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46%; pointer-events: none;
+    background: linear-gradient(180deg, transparent, #150e22); }
+.vip-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    display: grid; gap: 10px; padding: 12px 14px 16px; align-content: start; }
+.vip-modal-body h4 { margin: 0; font-family: var(--font-display); font-size: 15px; color: #e6d2ff; }
+.vip-modal-body h5 { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .14em;
+    text-transform: uppercase; color: #b39ddb; }
+/* Sable is holding a shop, so hers gets the height. */
+.vip-modal.is-shop { max-height: min(92vh, 860px); }
+/* The rise the old inline panel used, kept for the modal — it now lifts the whole card off the scrim. */
 @keyframes vipIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
-.vip-panel h4 { margin: 0; font-family: var(--font-display); font-size: 14px; color: #e6d2ff;
-    letter-spacing: .04em; }
-.vip-panel h5 { margin: 0; font-size: 10px; font-weight: 900; letter-spacing: .14em;
-    text-transform: uppercase; color: #9b86bd; }
 /* What the bartender says. Bigger than body text and set apart, because it is the one thing on this screen
    nobody outside the room is ever told. */
 .vip-said { margin: 0; font-size: 13.5px; line-height: 1.5; color: #f0e6ff;
@@ -22553,4 +22595,3 @@ body.cas-seated .social-fab { display: none; }
 .vip-take { justify-self: start; -webkit-appearance: none; appearance: none; border: 0; background: none;
     cursor: pointer; font-size: 11px; color: #b48fe0; text-decoration: underline; padding: 2px; }
 
-.vip-chat { border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
