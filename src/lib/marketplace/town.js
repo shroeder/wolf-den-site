@@ -152,6 +152,10 @@ const EVENT_STATUS = {
     pet_farm: "🐾 petting pets", pet_other: "🐾 visiting a farm", feed_other: "🐾 feeding pets", loot_pig: "🐷 chasing the loot pig",
     trade: "🤝 trading", bounty_post: "🎯 posting a bounty", bounty_win: "🎯 claiming a bounty",
     buy_consumable: "🛒 shopping", use_consumable: "🧪 using an item", buy_pet: "🐾 adopting a pet",
+    // An event with no path beats a path with no event, and these were falling all the way through to the
+    // default: `mining_upgrade` in particular is somebody down the mine reading as "around town".
+    mining_upgrade: "⛏️ working the seam", casino_play: "🎰 at the machines", casino_bet: "🎰 at the tables",
+    casino_buy: "🎰 at the Counter", arena_win: "⚔️ in the ring", cook_dish: "🍳 cooking",
 };
 const PATH_STATUS = [
     // The Town itself was missing, so EVERYONE standing in the plaza fell through to "around town" — the single
@@ -167,6 +171,31 @@ const PATH_STATUS = [
     ["/marketplace/sets", "🛡️ tuning their loadout"],
     ["/marketplace/inventory", "🛡️ sorting gear"],
     ["/marketplace/trade", "🤝 trading"],
+    // ── TWELVE ROOMS WERE MISSING AND EVERY ONE OF THEM READ AS "AROUND TOWN" ────────────────────────────
+    // The default exists for somebody genuinely between things. It was instead catching most of the game:
+    // two hours of real traffic had members in the casino, the mine, the arena, the kitchen, the dungeons
+    // and the market, and the plaza said all of them were loitering. The roster is the one place the Den
+    // sees each other, and "around town" on somebody who is plainly busy makes it look like nobody plays.
+    //
+    // Order matters — `find` takes the FIRST prefix that matches, so anything sharing a stem with an entry
+    // above has to sit above it too. Nothing here does today; keep it that way when adding rooms.
+    ["/marketplace/casino", "🎰 on the casino floor"],
+    ["/marketplace/mining", "⛏️ down the mine"],
+    ["/marketplace/arena", "⚔️ in the arena"],
+    ["/marketplace/dungeons", "🗝️ deep in a dungeon"],
+    ["/marketplace/cooking", "🍳 in the kitchen"],
+    ["/marketplace/jeweller", "💎 at the jeweller"],
+    ["/marketplace/market", "🏪 browsing the Market"],
+    ["/marketplace/auction", "🔨 at the auction"],
+    ["/marketplace/fishing", "🎣 fishing"],
+    ["/marketplace/quests", "📜 checking quests"],
+    ["/marketplace/leaderboard", "🏆 reading the standings"],
+    ["/marketplace/compendium", "📖 in the compendium"],
+    ["/marketplace/creations", "🎨 making something"],
+    ["/marketplace/badges", "🎖️ admiring their badges"],
+    ["/marketplace/bounties", "🎯 at the bounty board"],
+    ["/marketplace/profile", "🐺 looking themselves over"],
+    ["/marketplace/customize", "✂️ changing their look"],
 ];
 function statusFor(event, path) {
     if (event && EVENT_STATUS[event]) return EVENT_STATUS[event];
