@@ -156,7 +156,15 @@ const WALK_PER_SEC = 26;
 
 // How far behind the card before it each card lands, and the interval the deal's sounds are fired on. One
 // number, because the two drifting apart is the whole way this reads as broken.
-const DEAL_MS = 145;
+// ── HOW LONG A CARD TAKES TO COME OUT ────────────────────────────────────────────────────────────────────────
+// Luke: "the dealership happens like instantly, I'd like to see each card come out one by one instead."
+//
+// 145ms was the gap between one card leaving the shoe and the next, against a .3s flight — so the second card
+// was airborne before the first had landed and four of them were over in about half a second. It read as the
+// hand appearing rather than as a hand being dealt. At 300 each card lands before the next one starts, which
+// is the whole difference: you can watch them arrive one at a time and an initial deal takes about the second
+// and a bit a real one does.
+const DEAL_MS = 300;
 
 // ── WHAT ELSE IS IN THE ROOM ────────────────────────────────────────────────────────────────────────────
 // Nine cabinets in a row is a shop display. What makes it a FLOOR is the stuff between them that nobody can
@@ -1172,14 +1180,37 @@ export default function CasinoClient({ initial }) {
     // One flat index across the dealer and every hand, so a card knows how far behind the one before it it
     // should land without any part of the layout having to count for itself. A split just adds more cards to
     // the end of the same list.
+    // ── AND IN THE ORDER A TABLE ACTUALLY DEALS ──────────────────────────────────────────────────────────
+    // This numbered every dealer card first, then the hole, then your hand — so the deal ran dealer, dealer,
+    // you, you. No table on earth deals that way round. A real one goes across the table and back: your
+    // first card, the dealer's up card, your second, the dealer's hole.
+    //
+    // These indices decide ANIMATION DELAY and nothing else — the layout is untouched by them — so dealing
+    // them out in rounds costs nothing structurally and is what makes the stagger read as a deal rather than
+    // as a list filling in. It generalises to splits for free: a round hands one card to every hand in play
+    // before the dealer takes one, which is also what a table does.
+    //
+    // A hit only ever appends to the end of its own hand, so the round it lands in is past everything already
+    // on the felt and it still gets the highest index — which is what the seen-count stagger below relies on.
     const bjView = useMemo(() => {
         if (!hand) return null;
         const dealer = hand.dealer || [];
         const hands = hand.hands || [];
+        // The dealer's cards in dealt order, with the face-down one in its real position: it is the SECOND
+        // card off the shoe, not an afterthought following the visible ones.
+        const dealerSeq = [...dealer.map((_, k) => k), ...(hand.dealerHidden ? [-1] : [])];
+        const dealerAt = dealer.map(() => 0);
+        const handsAt = hands.map((h) => (h.cards || []).map(() => 0));
+        let holeAt = -1;
         let i = 0;
-        const dealerAt = dealer.map(() => i++);
-        const holeAt = hand.dealerHidden ? i++ : -1;
-        const handsAt = hands.map((h) => (h.cards || []).map(() => i++));
+        const rounds = Math.max(dealerSeq.length, ...hands.map((h) => (h.cards || []).length), 0);
+        for (let r = 0; r < rounds; r += 1) {
+            hands.forEach((h, hi) => { if (r < (h.cards || []).length) handsAt[hi][r] = i++; });
+            if (r < dealerSeq.length) {
+                if (dealerSeq[r] === -1) holeAt = i++;
+                else dealerAt[dealerSeq[r]] = i++;
+            }
+        }
         return { total: i, dealerAt, holeAt, handsAt };
     }, [hand]);
 
