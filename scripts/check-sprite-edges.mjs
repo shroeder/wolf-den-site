@@ -41,7 +41,19 @@ const SPRITE_DIRS = [
 // stopped short of its own edges would show a seam. Listed by name rather than guessed at from the filename,
 // so adding one is a decision somebody made rather than a pattern that quietly swallowed a real sprite.
 const FULL_BLEED = new Set([
+    // Backgrounds and room art — a room that stops short of its own edge shows a seam.
     "room.webp", "hall.webp", "vip-room.webp", "fs-window.webp", "harvest-barn.webp",
+    // ── AND THESE, EACH LOOKED AT ON A CONTACT SHEET ─────────────────────────────────────────────
+    // The gate can tell you art touches its frame. It cannot tell you whether that is wrong. Every entry
+    // below was judged by eye and carries the reason, so the list stays a set of decisions rather than a
+    // place to bury a failure.
+    "decor_lamp.webp",           // hangs by a chain that runs off the top on purpose
+    "thf-lantern.webp",          // hangs by a chain that runs off the top on purpose
+    "vip-sign.webp",             // hangs from two chains that run off the top on purpose
+    "harvest-sheaf.webp",        // a framed tile — the frame IS the edge
+    "thf-corner.webp",           // a corner flourish, anchored to the corner by design
+    "skill-extraStrikes.webp",   // icon on a painted background, no transparency to trim
+    "skill-warbanner.webp",      // icon on a painted background, no transparency to trim
 ]);
 const FULL_BLEED_HINT = /(^|[-_])(bg|room|mast|wall|floor|backdrop|scene|banner)([-_]|\.)/i;
 
