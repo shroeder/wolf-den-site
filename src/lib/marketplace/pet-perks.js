@@ -542,6 +542,32 @@ export const SYSTEM_PERK_KEYS = new Set([
  *   THE LONG TABLE       the menagerie ceiling is half again as high
  * All three are conditional — take the gear off and the pack is ordinary again.
  */
+// ── AND A CEILING ON THE COMBAT TOTALS ───────────────────────────────────────────────────────────────────────
+// The procs are capped (PROC_CAP), the system perks are capped (SYSTEM_PERK_CAP) and the farm/sea passives are
+// capped (SYSTEM_PASSIVE_CAP). The COMBAT passives were the one pool with no ceiling at all, and they are the
+// pool that stacks across every pet you own — so the reward for owning everything was unbounded.
+//
+// Measured before choosing the numbers. A complete collection at Lv5 reached +188 might and +268 crit power,
+// and those two multiply in manualStatMultiplier:
+//
+//     1 + 188/100  =  2.88   ×   ((1−0.9) + 0.9 × (2.5 + 268/100)) / 1.375  =  3.46   ≈  10× manual damage
+//
+// Ten times, from collecting rather than from playing well, and arriving quietly as pets level.
+//
+// NOBODY LOSES ANYTHING TODAY. The largest real menagerie in the Den is 57 pets at low level and totals +14
+// might, +50 ferocity, +41 crit power — every one of them far under these numbers. The caps bind only on a
+// collection nobody has yet, which is the only honest time to add one: after that, somebody has to be told
+// their pets got worse.
+//
+// The shape they leave: a complete Lv5 collection is worth roughly 3.8× manual damage instead of 10×, which
+// is still a very large reward for finishing the set.
+export const MENAGERIE_STAT_CAP = {
+    might: 60, crit_power: 100, crit_chance: 65, ferocity: 90,
+    pierce: 50, vitality: 45, tenacity: 40,
+    // extra_strike is already a chance clamped to 1 elsewhere, and fortune is raffle tickets — a currency
+    // with its own daily sink rather than a damage multiplier. Neither is capped here.
+};
+
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null, lingeringPet = null) {
     // `add()` drops anything not already a key here, so tenacity has to be seeded or the six pets
     // carrying it would read beautifully on the card and grant nothing.
@@ -592,6 +618,13 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     if (aura > 0) {
         for (const k of Object.keys(stats)) stats[k] = Math.round(stats[k] * (1 + aura));
         for (const k of Object.keys(economy)) economy[k] = Math.round(economy[k] * (1 + aura));
+    }
+    // ── AND THE OWNED TOTAL STOPS HERE ───────────────────────────────────────────────────────────────
+    // See MENAGERIE_STAT_CAP. Applied after the aura, because the aura is part of what the collection is
+    // worth, and before the equipped active below, because that is one pet's signature rather than a
+    // reward for owning everything — capping it would punish levelling the pet you actually carry.
+    for (const [k, hi] of Object.entries(MENAGERIE_STAT_CAP)) {
+        if (stats[k] > hi) stats[k] = hi;
     }
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
     // pet. Proc magnitudes scale too (chances capped so they stay sane).
