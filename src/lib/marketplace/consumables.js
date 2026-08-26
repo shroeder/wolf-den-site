@@ -163,16 +163,48 @@ const SHOP_ORDER = [
 
 // --- Boss-fight hooks (read by boss.js) -------------------------------------------------------------
 
+// ── THE STRONGEST BREW WINS. THEY DO NOT STACK. ──────────────────────────────────────────────────────────────
+// This MULTIPLIED every active damage boost together, with no ceiling of its own. Four Berserker's Brews is
+// therefore not double damage, it is 2^4 — SIXTEEN times — and that is not a hypothetical: at the time of
+// writing one member was sitting on exactly that and topping the Hall of Heroes with 16.8 million damage
+// against a second place of 9.1 million and a fourth place of 1.6 million. Luke: "we can't have people doing
+// this much damage and it's surely because of the consumables."
+//
+// It is, and it is not the supply. I audited every source — chests (mythic through celestial), the daily
+// wheel, the mine, sailing's shop and its landing loot, encounters, and the gold shop — and counted what
+// actually gets drunk: three to eight damage potions a day across the whole membership, with twenty-one held
+// in total. That is a trickle. The bug was never how many people had; it was that having four made them
+// sixteen times stronger instead of twice.
+//
+// So the rule is the one every game with a buff bar already uses and every player already expects: the
+// STRONGEST one applies and the rest wait their turn. A Bottled Fury (x3) beats a Berserker's Brew (x2);
+// drinking a second Brew while the first is running does nothing but waste it. It cannot be stacked, it
+// cannot be hoarded into a burst, and it is still worth exactly what the label says.
+//
+// The label is what it says on the bottle, so no potion is being nerfed — only the multiplication between
+// them, which nothing ever promised and nobody could see coming.
 export async function memberDamageMult(buyerId) {
     if (!buyerId) return 1;
     const rows = await db.query(`SELECT magnitude FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'damage' AND expires_at > NOW()`, [buyerId]).catch(() => []);
-    return rows.reduce((m, r) => m * (Number(r.magnitude) || 1), 1);
+    return rows.reduce((m, r) => Math.max(m, Number(r.magnitude) || 1), 1);
 }
+
+// ── AND THERE IS A LIMIT TO HOW MANY TIMES A DAY YOU CAN SWING ───────────────────────────────────────────────
+// Strikes DO add up — that is the right shape for them, and unlike the damage multiplier it is linear, so ten
+// vials is ten times one vial rather than a thousand. But it had no ceiling at all, and the supply here is a
+// real flood where the damage potions were a trickle: 141 Adrenaline Vials held across 26 members, and 64 to
+// 77 strike boosts drunk on a busy day. Nothing stopped somebody drinking twenty of them and taking forty
+// extra swings at a boss sized for one.
+//
+// Eight is deliberately generous — it is four Second Winds, or a whole day of wheel drops — and it is a cap on
+// the POTION contribution only. Gear, pets, signatures and set capstones are untouched and still add on top,
+// because those are things a member built rather than things they stockpiled.
+export const MAX_POTION_STRIKES = 8;
 
 export async function memberBonusStrikes(buyerId) {
     if (!buyerId) return 0;
     const row = await db.queryOne(`SELECT COALESCE(SUM(magnitude), 0)::int AS n FROM mkt_user_boost WHERE buyer_id = $1 AND kind = 'strikes' AND expires_at > NOW()`, [buyerId]).catch(() => null);
-    return row?.n || 0;
+    return Math.min(MAX_POTION_STRIKES, row?.n || 0);
 }
 
 export async function activeBoosts(buyerId) {
@@ -186,9 +218,23 @@ export async function activeBoosts(buyerId) {
         if (r.kind === "strikes") { strikeTotal += Number(r.magnitude) || 0; strikeExpiry = r.expires_at; }
         else if (r.kind === "damage") { const m = Number(r.magnitude); const cur = damage.get(m) || { count: 0, expiresAt: r.expires_at }; cur.count += 1; cur.expiresAt = r.expires_at; damage.set(m, cur); }
     }
+    // ── AND IT SAYS WHAT IS ACTUALLY APPLYING ────────────────────────────────────────────────────────────
+    // This used to print "2× damage (×4)" for four brews, which read as eight — or as sixteen, which is what
+    // it really was. Now that only the strongest applies, the badge names the one that is doing the work and
+    // says plainly that the others are queued behind it. Same for strikes past the cap: a member who drank
+    // twelve vials should be told that eight of them count, not left to work it out from a swing counter.
+    const applied = Math.max(1, ...[...damage.keys()]);
     const out = [];
-    if (strikeTotal > 0) out.push({ kind: "strikes", magnitude: strikeTotal, expiresAt: strikeExpiry, label: `+${strikeTotal} attacks today` });
-    for (const [m, info] of damage) out.push({ kind: "damage", magnitude: m, expiresAt: info.expiresAt, label: `${m}× damage${info.count > 1 ? ` (×${info.count})` : ""}` });
+    if (strikeTotal > 0) {
+        const kept = Math.min(MAX_POTION_STRIKES, strikeTotal);
+        out.push({ kind: "strikes", magnitude: kept, expiresAt: strikeExpiry,
+            label: `+${kept} attacks today${strikeTotal > kept ? ` (${strikeTotal - kept} over the daily limit)` : ""}` });
+    }
+    for (const [m, info] of damage) {
+        const isTop = m === applied;
+        out.push({ kind: "damage", magnitude: m, expiresAt: info.expiresAt,
+            label: `${m}× damage${isTop ? "" : " (waiting — a stronger one is running)"}${info.count > 1 && isTop ? ` — ${info.count} bottles, only the strongest applies` : ""}` });
+    }
     return out;
 }
 
