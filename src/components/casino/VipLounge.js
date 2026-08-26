@@ -29,9 +29,29 @@ import ChipStore from "@/components/casino/ChipStore.js";
 // Everything else is still borrowed rather than rebuilt: the `vip` chat channel, `mkt_town_presence` for who
 // else is here, and the Counter's own ChipStore for the vendor.
 
-const POST = (body) => fetch("/api/marketplace/casino", {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-}).then((r) => r.json()).catch(() => null);
+// ── AND THE LOUNGE MAY NOT HANG EITHER ───────────────────────────────────────────────────────────────────────
+// The same bare fetch the casino floor used to use, with the same missing timeout. I wrote a whole commit
+// about that on the floor — a phone that walks behind a wall mid-request leaves a promise that never settles —
+// and left this file on the old pattern, which is exactly how a class of bug survives being fixed.
+//
+// It matters more here than it looks. Sable’s shelf blanks itself while it loads, so an unsettled request
+// leaves "Opening the case..." on screen for ever, and Rolf’s state call is what fills his dialog.
+const VIP_TIMEOUT_MS = 15000;
+const POST = async (body) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), VIP_TIMEOUT_MS);
+    try {
+        const r = await fetch("/api/marketplace/casino", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify(body), signal: ctl.signal,
+        });
+        return await r.json();
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(t);
+    }
+};
 
 // Where the two you can talk to stand, across the world. The bar is at the right-hand end of the painting, so
 // they stand at it and you walk the room to reach them.
