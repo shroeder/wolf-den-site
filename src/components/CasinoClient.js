@@ -1569,6 +1569,8 @@ export default function CasinoClient({ initial }) {
                         In FRONT of the rope and the arch, because he is the rule rather than a decoration
                         on it. He steps aside once you are allowed in — see .cas-vipdoor.is-open — which is
                         the whole of the animation and the only feedback the door needs to give. */}
+                    {/* The light he is standing in, under him and over the carpet — see .cas-bouncer-pool. */}
+                    <span className="cas-bouncer-pool" aria-hidden="true" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="cas-bouncer" src="/images/casino/vip-bouncer.webp" alt="" draggable="false" />
                     <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members, or a pass") : "The Lounge"}</b>

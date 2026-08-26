@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { Cas } from "@/components/casino/casino-audio.js";
 import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 
@@ -34,16 +34,39 @@ export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
     // time — a flag would already be true and change nothing.
     const [reload, setReload] = useState(0);
 
-    // Refetched per tab. The server prices a stat track from the level the member holds RIGHT NOW, so a
-    // shelf cached across a purchase would quote the old price — see basePriceFor.
+    // ── A TAB YOU HAVE ALREADY SEEN DOES NOT LOAD AGAIN ──────────────────────────────────────────────────
+    // Luke: "why do the tabs have to load? no other tabs load in the site." They did because every switch
+    // called setShelf(null) first — throwing away a shelf that was already on screen and correct — and then
+    // waited on a request. Three tabs meant three waits, every time, for lists that had not changed.
+    //
+    // Cached per tab in a ref, so the second visit is instant. The request still goes out; what changed is
+    // that the OLD shelf stays on screen until the new one lands, which is the difference between a tab that
+    // loads and a tab that just works.
+    //
+    // WHY IT STILL REFETCHES AT ALL: the server prices a stat track from the level the member holds RIGHT
+    // NOW (see basePriceFor), and buying anything moves the chip balance every shelf prints. A cache that
+    // never revalidated would quote yesterday's price — so it revalidates always, and blanks never.
+    const cache = useRef({});
     useEffect(() => {
         let live = true;
-        setShelf(null);
+        const key = single ? "single" : tab;
+        // Show what we had immediately. Only a tab nobody has opened yet gets the loading line.
+        setShelf(cache.current[key] ?? null);
         onRefresh(single ? null : (tab === "chest" ? null : tab))
-            .then((r) => { if (live) setShelf(r || { items: [], failed: true }); })
-            .catch(() => { if (live) setShelf({ items: [], failed: true }); });
+            .then((r) => {
+                const next = r || { items: [], failed: true };
+                cache.current[key] = next;
+                if (live) setShelf(next);
+            })
+            .catch(() => {
+                // A failed revalidation must not wipe a shelf that is already correct on screen.
+                if (live && !cache.current[key]) setShelf({ items: [], failed: true });
+            });
         return () => { live = false; };
     }, [onRefresh, tab, reload, single]);
+
+    // A purchase changes the balance and can change a price, so the whole cache goes when `reload` moves.
+    useEffect(() => { cache.current = {}; }, [reload]);
 
     const buy = useCallback(async (item) => {
         if (busy || item.owned || !item.afford) return;
