@@ -206,7 +206,11 @@ const ACCENT = {
     slot4: "#7fe0a0",       // The Menagerie — the green of its reels
     slot5: "#cdd9ff",       // The Vault — blued steel
     keno: "#67e3d0",        // the lamps on the ticket board
-    bingo: "#ff9ec0",       // the caller's baize is green, so the card is not
+    // Luke: "don't use hot pink please, for the love of God." It was #ff9ec0, which put a hot pink on the
+    // B-I-N-G-O heading, the hall's title and every winning line. Cool blue instead — it is the one hue not
+    // already spoken for on this card: gold is the free square, green is a line and a near miss, and violet
+    // is the pattern of the day.
+    bingo: "#8ab4ff",
     blackjack: "#6fd39a",   // felt
 };
 
@@ -335,11 +339,6 @@ const KENO_BALL_MS = 260;
 // reason: the game is made of being one away, and it used to spend that moment at exactly the pace of the
 // third irrelevant ball.
 const KENO_LAST_PAUSE = 950;
-// Keno runs 1-40 and the ball sprites were drawn for bingo's five columns, so eight numbers share each
-// colour. Reused deliberately: a ball is a ball, and a second set of five would be the same five drawings
-// with a different filename.
-const KENO_BALL_ART = ["b", "i", "n", "g", "o"];
-const kenoBallArt = (n) => KENO_BALL_ART[Math.min(4, Math.floor((Math.max(1, n) - 1) / 8))];
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
@@ -1825,7 +1824,7 @@ export default function CasinoClient({ initial }) {
                                         const isGold = out && keno?.goldIdx === i;
                                         return (
                                             <span key={i}
-                                                className={`cas-kball${out ? ` is-out is-${kenoBallArt(n)}` : ""}${mine ? " is-mine" : ""}${isGold ? " is-gold" : ""}${out && i === kenoOut - 1 ? " is-new" : ""}`}>
+                                                className={`cas-kball${out ? " is-out" : ""}${mine ? " is-mine" : ""}${isGold ? " is-gold" : ""}${out && i === kenoOut - 1 ? " is-new" : ""}`}>
                                                 {out ? n : ""}
                                             </span>
                                         );

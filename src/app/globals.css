@@ -6925,7 +6925,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
    So it is a rail at EVERY width now. The width it costs on a phone is bought back by dropping the pill and
    stacking the row — portrait, name, role, one under the other — which fits in 76px. */
-.social-global.has-rail { display: grid; grid-template-columns: minmax(0, 1fr) 76px;
+.social-global.has-rail { display: grid; grid-template-columns: minmax(0, 1fr) 64px;
     grid-template-areas: "note note" "feed rail" "composer rail"; align-content: start; column-gap: 10px; }
 /* The rail is FIRST in the DOM so a screen reader meets the room before the conversation; named grid areas
    put it back on the right without moving the markup, and keep the feed and the composer in one column. */
@@ -6941,50 +6941,46 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Sticky at 0 rather than at the body's padding — that inset was the gap. */
 .social-rail { grid-area: rail; align-self: start; position: sticky; top: 0; z-index: 2;
     max-height: min(62vh, 540px); overflow-y: auto; overscroll-behavior: contain;
-    padding: 2px 0 6px 8px; border-left: 1px solid #1b232e; scrollbar-width: thin; }
-.social-rail-h { margin: 0 0 6px; font-size: 8.5px; font-weight: 900; letter-spacing: .08em;
-    text-transform: uppercase; color: #6f7a87; text-align: center; }
-.social-rail-h b { color: #5affaf; font-variant-numeric: tabular-nums; }
-/* The fold sits IN the heading rather than beside it: the heading is already a full-width row of nothing but
-   two words, so the control costs no height at all. */
-.social-rail-fold { float: right; margin: -2px -2px 0 0; width: 18px; height: 18px; padding: 0; border: 0;
-    border-radius: 6px; background: rgba(255,255,255,.06); color: #8f98a3; font-size: 13px; line-height: 16px;
+    padding: 2px 0 6px 6px; border-left: 1px solid #1b232e; scrollbar-width: thin; }
+/* ── THE WHOLE HEADING IS THE FOLD ──
+   It was an 18px glyph floated into the corner of a label. The label was already a full-width row carrying
+   two words, so making the row itself the button costs nothing and turns an 18px target into a 26px one. */
+.social-rail-h { display: flex; align-items: center; justify-content: center; gap: 3px; width: 100%;
+    min-height: 26px; margin: 0 0 5px; padding: 0; border: 0; border-radius: 7px; cursor: pointer;
+    background: rgba(255,255,255,.05); font-size: 8.5px; font-weight: 900; letter-spacing: .06em;
+    text-transform: uppercase; color: #8f98a3; }
+.social-rail-h:hover { background: rgba(255,255,255,.11); color: #eaf1f8; }
+.social-rail-h b { color: #5affaf; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.social-rail-h i { font-style: normal; font-size: 12px; color: #6f7a87; margin-left: 1px; }
+/* ── AND THE WAY BACK IS A BAR, NOT A CHIP ──
+   Full width and 30px tall, above the conversation, rendered whenever the rail is folded — including when
+   the roster is empty, which is the case that used to lose it for good. */
+.social-rail-show { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+    min-height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid #232c38; background: #141a23;
+    color: #8f98a3; font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
     cursor: pointer; }
-.social-rail-fold:hover { background: rgba(255,255,255,.12); color: #eaf1f8; }
-/* Folded, it is a chip above the conversation. Full width and left-aligned so it reads as a thing you can
-   open rather than a label. */
-.social-rail-show { display: flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px 4px 6px;
-    border-radius: 999px; border: 1px solid #232c38; background: #141a23; color: #8f98a3;
-    font-size: 10.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .social-rail-show:hover { border-color: #2c5a45; color: #cfd8e3; }
-.social-rail-show b { color: #5affaf; font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.social-rail-show i { font-style: normal; color: #4d5663; text-transform: none; letter-spacing: 0; }
-.social-rail-chev { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 5px;
-    background: rgba(255,255,255,.06); color: #8f98a3; font-size: 12px; line-height: 1; }
-.social-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-/* STACKED on a phone: 76px is not enough for a portrait BESIDE two lines of text, and shrinking the text to
-   make it fit is how you get a rail of ellipses. */
-.social-rail-m { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; border-radius: 9px; }
+.social-rail-show b { color: #5affaf; font-size: 12px; font-variant-numeric: tabular-nums; }
+.social-rail-chev { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px;
+    background: rgba(255,255,255,.07); color: #8f98a3; font-size: 12px; line-height: 1; }
+.social-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+/* STACKED, and as short as two things can be stacked: a portrait and a name. The role used to be a third
+   line in a pill — see the note on RailMember for why it is the portrait's ring instead. */
+.social-rail-m { display: grid; justify-items: center; gap: 1px; padding: 2px 1px; border-radius: 8px; }
 .social-rail-m.is-on { background: #101a17; }
-.social-rail-av { position: relative; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
-    overflow: hidden; background: #1d2531; display: grid; place-items: center; }
+/* The ring IS the role. --role is set per member from the same chipFor the messages use, and falls back to
+   a plain edge for somebody whose only standing is their rank. */
+.social-rail-av { position: relative; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+    overflow: hidden; background: #1d2531; display: grid; place-items: center;
+    box-shadow: 0 0 0 1.5px var(--role, rgba(255,255,255,.14)); }
 .social-rail-av img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 /* The dot rides on the portrait, so the text below it stays two clean lines. Ringed in the panel's own
    background so it reads as sitting ON the avatar rather than punched through it. */
 .social-rail-dot { position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%;
     background: #5affaf; box-shadow: 0 0 0 2px #0e131a, 0 0 5px rgba(90,255,175,.8); }
 .social-rail-who { display: grid; gap: 1px; min-width: 0; justify-items: center; text-align: center; }
-.social-rail-who b { font-size: 9.5px; line-height: 1.25; color: #eaf1f8; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
-.social-rail-who i { font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .05em;
-    text-transform: uppercase; color: #6f7a87; }
-/* A ROLE is not a rank you can grind to, so it must not look like one. */
-.social-rail-who i.is-role { color: #ffd75e; }
-/* The badge is the SAME component the messages use — same rule, same colours — but a message header has a
-   whole row to itself and a rail cell has 76px. Scaled down here rather than forked, so a retune of the
-   badge still reaches both. */
-.social-rail .gchat-role { font-size: 7px; padding: 0 4px; border-radius: 999px; line-height: 1.6;
-    max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.social-rail-who b { font-size: 8.5px; line-height: 1.2; color: #cfd8e3; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 58px; }
 /* The divider between "here now" and "also in this room" is a rule with a word on it, not a row of its own —
    at this width a centred caption would wrap. */
 .social-rail-split { display: grid; place-items: center; padding: 6px 0 2px; }
@@ -6994,24 +6990,20 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @media (min-width: 720px) {
     /* WIDE: the same rail, given room to lay each member out as a row again — portrait beside the name, the
        way the messages below it are built. */
-    .social-global.has-rail { grid-template-columns: minmax(0, 1fr) 190px; column-gap: 14px; }
+    .social-global.has-rail { grid-template-columns: minmax(0, 1fr) 180px; column-gap: 14px; }
     .social-global.has-rail > .social-rail { top: 8px; max-height: min(70vh, 620px); padding: 0 0 0 12px;
         border-left: 1px solid #232c38; }
-    .social-global.has-rail .social-rail-h { text-align: left; font-size: 10.5px; letter-spacing: .12em; }
+    .social-global.has-rail .social-rail-h { justify-content: flex-start; padding: 0 8px; font-size: 10.5px; letter-spacing: .1em; }
     .social-global.has-rail .social-rail-list { gap: 3px; }
     .social-global.has-rail .social-rail-m { grid-auto-flow: column; grid-template-columns: auto minmax(0, 1fr);
         justify-items: start; align-items: center; gap: 7px; width: 100%; padding: 4px 6px; }
     .social-global.has-rail .social-rail-m:hover { background: #141a23; }
     .social-global.has-rail .social-rail-m.is-on { background: transparent; }
     .social-global.has-rail .social-rail-m.is-on:hover { background: #131e1a; }
-    .social-global.has-rail .social-rail-av { width: 28px; height: 28px; }
+    .social-global.has-rail .social-rail-av { width: 26px; height: 26px; }
     .social-global.has-rail .social-rail-dot { width: 9px; height: 9px; }
     .social-global.has-rail .social-rail-who { justify-items: start; text-align: left; gap: 0; }
-    .social-global.has-rail .social-rail-who b { font-size: 12px; max-width: 120px; }
-    .social-global.has-rail .social-rail-who i { font-size: 9.5px; letter-spacing: .06em; }
-    .social-global.has-rail .social-rail .gchat-role,
-    .social-global.has-rail .gchat-role { font-size: 8.5px; padding: 1px 6px; line-height: 1.5;
-        justify-self: start; max-width: 120px; }
+    .social-global.has-rail .social-rail-who b { font-size: 11.5px; max-width: 116px; }
     .social-global.has-rail .social-rail-split { justify-items: start; place-items: center start; padding: 9px 6px 3px; }
     .social-global.has-rail .social-rail-split span { font-size: 9.5px; letter-spacing: .08em; }
 }
@@ -17579,7 +17571,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Luke, twice: "extend the animation frame vertically so we can see more" and then "make the play area
    taller so I can see more of it." 58vh -> 68vh. Every object in the room is a fraction OF --room, so
    the whole scene grows together rather than the cabinets staying put in a taller box. */
-.cas-roomwrap { position: relative; --room: clamp(210px, 68vh, 680px); }
+/* ── HOW TALL THE ROOM IS ──
+   Luke: "is it possible to make the animation area taller?" It is, and it was the smaller of the two numbers
+   below doing the damage — see the short-screen rule. The room is where every animation on this floor
+   happens: the walk, the cabinets lighting as you pass, the rope, the people. Everything under it is a list
+   that can be scrolled to. */
+.cas-roomwrap { position: relative; --room: clamp(240px, 76vh, 760px); }
 /* ── EXCEPT ON A SHORT PHONE ───────────────────────────────────────────────────────
    Taking the room to 58vh is what Luke asked for — "extend the animation frame vertically so we can see more
    and it's more immersive" — and on a 667px-tall phone it pushed the cabinets off the bottom of the screen.
@@ -17588,7 +17585,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    58vh is a bigger room only when there IS more room. Below 700px of viewport the fixed chrome above the
    floor (site header, purse, nav) is most of the screen, so the fraction has to come down or the room grows
    into space that does not exist. Every phone Luke has shot this on is over 700 and keeps the taller frame. */
-@media (max-height: 700px) { .cas-roomwrap { --room: clamp(200px, 44vh, 300px); } }
+/* A phone in portrait is 700-ish CSS pixels tall, so this rule — not the one above — is what almost every
+   member actually gets, and 44vh capped at 300px was giving the room less than half the screen while the
+   bounties list underneath had all it wanted. 56vh and a 400px cap. */
+@media (max-height: 700px) { .cas-roomwrap { --room: clamp(230px, 56vh, 400px); } }
 .cas-room { position: relative; height: var(--room); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
@@ -18301,9 +18301,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid rgba(255,255,255,.06); }
 /* The caller and his line, on one row. He is 44px and the line is one line, so this costs the eight pixels
    the old sentence cost and buys somebody to be saying it. */
-.cas-hall-top { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
-    text-align: left; font-size: 11.5px; color: #cfe3f0; margin-bottom: 8px; }
-.cas-caller { flex: 0 0 auto; width: 44px; height: 44px; object-fit: contain;
+.cas-hall-top { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px;
+    text-align: left; font-size: 11.5px; color: #cfe3f0; margin-bottom: 5px; }
+.cas-caller { flex: 0 0 auto; width: 34px; height: 34px; object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); }
 /* A call arrives; it does not fade in. The key restarts per ball because the span's text changes, and the
    animation is on the span rather than the row so the badger does not bounce every four seconds. */
@@ -18334,8 +18334,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    texture over it at a third opacity — enough to see the uneven edge and the spatter, not enough to be a
    ball. Same sprite, a quarter of the volume. */
 .cas-bcell.is-hit { color: #fff;
-    background: linear-gradient(180deg, #f0479a, #c31f74);
-    border-color: #ff7ec0; box-shadow: 0 0 12px rgba(240,71,154,.35) inset;
+    background: linear-gradient(180deg, #3f76e8, #1e3f9e);
+    border-color: #7aa6ff; box-shadow: 0 0 12px rgba(63,118,232,.35) inset;
     animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
 /* The free square is ALWAYS marked — that is what free means — so it must not be styled as though it is
    waiting for a ball. This rule sat AFTER .is-hit and overrode its background, so the one cell on the card
@@ -18369,7 +18369,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    matter are the newest, the rest are history you can flick back through, and the hall stops changing height
    under a card you are reading. */
 /* The cage sits to the left of the pile it is producing, and the pile takes what is left. */
-.cas-balls-wrap { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.cas-balls-wrap { display: flex; align-items: flex-start; gap: 8px; margin-top: 7px; }
 .cas-cage { flex: 0 0 auto; width: 52px; height: 52px; object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); transform-origin: 50% 78%; }
 /* It rocks rather than spins: the sprite is a three-quarter view, so rotating it through 360 degrees would
@@ -18379,7 +18379,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @media (prefers-reduced-motion: reduce) { .cas-cage.is-turning { animation: none; } }
 .cas-balls { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; min-height: 30px;
     align-items: flex-start; align-content: flex-start;
-    max-height: 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+    max-height: 64px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 /* ── A BALL, NOT A CHIP ──
    These were rounded rectangles with a number in them. The sprite is the ball and the number is set on its
    blank ivory face here — `place-items: center` puts it on the face because the face is drawn centred, which
@@ -18617,7 +18617,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    its slack; anything that is already taller than the screen has no slack to be centred in.
    And a floor of clearance under it, so the last row of the card can always be scrolled clear of the
    controls rather than stopping exactly behind them. */
-.cas-stage .cas-hall { padding-bottom: 8px; }
+/* ── AND IT HAS TO CLEAR THE CONTROLS ──
+   Anchoring the hall to the top fixed it being SHOVED under the sticky controls, and left the other half:
+   the card is still taller than the space above them, so the last row sits behind a bar that is pinned and
+   opaque. Two things together —
+     the hall is trimmed (see below): the caller row, the pattern banner and the ball strip each give up a
+     few pixels, which is about a row and a half of card between them;
+     and it carries a floor of clearance the height of the controls, so whatever is left over can always be
+     scrolled properly clear of them rather than stopping exactly behind them. */
+.cas-stage .cas-hall { padding-bottom: 132px; }
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
@@ -22336,31 +22344,32 @@ body.cas-seated .social-fab { display: none; }
 .cas-kball { aspect-ratio: 1; border-radius: 999px; display: grid; place-items: center;
     font-size: 11px; font-weight: 900; font-variant-numeric: tabular-nums; color: #6b7683;
     background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.09); }
-/* ── A BALL THAT CAME OUT IS A BALL ──
-   The drawn ones were a CSS gradient sphere. They are the drawn sprites now — the same five the bingo hall
-   uses, eight of keno's forty numbers to each colour — so the two games on this floor are visibly playing
-   with the same equipment. The number sits on the sprite's blank ivory face, which is why the face was drawn
-   centred and empty in the first place. */
-.cas-kball.is-out { color: #2b1f12; border: 0; background: var(--ball) center / contain no-repeat;
-    box-shadow: none; }
-.cas-kball.is-b { --ball: url("/images/casino/bingo/ball-b.webp"); }
-.cas-kball.is-i { --ball: url("/images/casino/bingo/ball-i.webp"); }
-.cas-kball.is-n { --ball: url("/images/casino/bingo/ball-n.webp"); }
-.cas-kball.is-g { --ball: url("/images/casino/bingo/ball-g.webp"); }
-.cas-kball.is-o { --ball: url("/images/casino/bingo/ball-o.webp"); }
-/* One of yours. It keeps its own colour — that is which part of the board it came from and it is worth
-   knowing — and gets a ring and a glow instead, so "mine" reads as a state rather than as a sixth colour. */
-.cas-kball.is-mine { border-radius: 999px;
-    box-shadow: 0 0 0 2px #ffd75e, 0 0 14px rgba(255,200,90,.85); }
+/* ── A BALL IS A COLOUR, NOT A PICTURE ──
+   I put the bingo hall's painted ball sprites in here, in five colours keyed to which eighth of the board a
+   number came from. Luke: "these balls look terrible, can you change them back to just a normal colour
+   again please." He is right and the reason is size: those sprites are read at 56px on a bingo card and
+   these slots are 26px, so a painted sphere with an ivory face and a highlight becomes four pixels of face
+   under a two-digit number. It was mud with a number on it.
+   Back to the gradient sphere, which was built for this size and is the same one the hopper always had. The
+   colour-by-band idea goes with it: it was never information anybody asked for. */
+.cas-kball.is-out { color: #dce8f4;
+    background: radial-gradient(circle at 50% 32%, #55637a, #262e3a); border: 1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.5); }
+/* One of yours. The only lit thing on the rail. */
+.cas-kball.is-mine { color: #2a1c05;
+    background: radial-gradient(circle at 50% 30%, #fff0bb, #f0c04e 52%, #c9932c);
+    border-color: rgba(255,231,160,.7);
+    box-shadow: 0 0 14px rgba(255,200,90,.9), inset 0 1px 0 rgba(255,255,255,.55); }
 /* ── AND THE GOLDEN BALL ──
-   Gold from the moment it lands, whoever it belongs to — see the note on the hopper. It outranks the is-mine rule
-   because a gold ball that is also yours is the best thing that can happen on this machine and must not be
-   drawn as merely one of yours. */
-.cas-kball.is-gold { border-radius: 999px;
-    background-image: url("/images/casino/bingo/ball-o.webp");
-    filter: brightness(1.25) saturate(1.5) drop-shadow(0 0 8px rgba(255,215,94,.95));
-    box-shadow: 0 0 0 2px #fff3c4, 0 0 20px rgba(255,215,94,.9); }
-.cas-kball.is-gold.is-mine { box-shadow: 0 0 0 2px #fff, 0 0 26px rgba(255,215,94,1); }
+   Gold from the moment it lands, whoever it belongs to, so a draw with one in it has a "whose is that" in it
+   before anybody knows. Brighter and ringed rather than a different picture — at this size a ring is the
+   only difference that survives. It outranks the is-mine rule, because a gold ball that is also yours is the
+   best thing this machine does and must not be drawn as merely one of yours. */
+.cas-kball.is-gold { color: #3a2500;
+    background: radial-gradient(circle at 50% 28%, #fffbe8, #ffd75e 46%, #d99a17);
+    border: 1px solid #fff3c4;
+    box-shadow: 0 0 0 2px rgba(255,243,196,.9), 0 0 22px rgba(255,215,94,.95); }
+.cas-kball.is-gold.is-mine { box-shadow: 0 0 0 2px #fff, 0 0 28px rgba(255,215,94,1); }
 /* ── IT DROPS IN ──
    Luke: "ideally we get to see the balls drop into place." It used to pop into existence at 40% scale from
    twelve pixels up, which is a fade with extra steps. It falls from properly outside the hopper now, lands
@@ -22468,7 +22477,7 @@ body.cas-seated .social-fab { display: none; }
 /* Above the blot AND above the flame. The shadow is what keeps it legible once there is a saturated
    magenta mark behind it — without it a daubed 47 is a smear. */
 .cas-bnum { position: relative; z-index: 1; font: inherit; color: inherit; }
-.cas-bcell.is-hit .cas-bnum { text-shadow: 0 1px 2px rgba(70,0,40,.9); }
+.cas-bcell.is-hit .cas-bnum { text-shadow: 0 1px 2px rgba(0,14,50,.9); }
 .cas-flame { position: absolute; left: 8%; right: 8%; bottom: 0; height: 62%; pointer-events: none; z-index: 0;
     transform-origin: 50% 100%;
     background: radial-gradient(ellipse at 50% 100%, rgba(255,236,190,.95) 0%, rgba(255,150,50,.7) 38%, transparent 70%);
@@ -22769,7 +22778,7 @@ body.cas-seated .social-fab { display: none; }
    A row above the card: the shape, its name, and what it is worth at the stake you have selected. The shape
    is drawn because a shape is what you are looking for — "the middle row and the middle column" is a sentence
    you have to assemble before you can start watching for it. */
-.cas-bpat { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 7px 10px;
+.cas-bpat { display: flex; align-items: center; gap: 9px; margin: 0 0 5px; padding: 5px 9px;
     border-radius: 11px; border: 1px solid rgba(190,140,255,.28);
     background: linear-gradient(180deg, rgba(190,140,255,.12), rgba(0,0,0,.28)); }
 .cas-bpat-grid { flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 6px); gap: 2px; }

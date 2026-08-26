@@ -674,10 +674,20 @@ function heroInner(m) {
 // window. One chat, rendered wherever the room is.
 // One name in the rail. Sprite, name, and the badge under it — a role if they wear one, otherwise the XP
 // rank, because almost nobody sets a role and a blank column beside every name is worse than no column.
+// ── ONE MEMBER, IN AS LITTLE ROOM AS THAT TAKES ──────────────────────────────────────────────────────────────
+// Luke: "the list of members should be way more concise, you shouldn't take up so much room."
+//
+// Each row was a 26px portrait over a name over a role CHIP — three stacked things, about 52px of height
+// each, in a 76px column. The chip was the expensive one: a second line of text, in a pill, repeating
+// something the portrait could carry on its own.
+//
+// So the role is the RING now. Same colour, same source (chipFor decides it, here as everywhere), drawn as
+// the border of the portrait instead of as a label under it. The row is a portrait and a name, and it costs
+// a little over half what it did.
 function RailMember({ m }) {
     return (
-        <li className={`social-rail-m${m.online ? " is-on" : ""}`}>
-            <span className="social-rail-av">
+        <li className={`social-rail-m${m.online ? " is-on" : ""}`} title={m.role ? `${m.name} — ${m.role.name}` : m.name}>
+            <span className="social-rail-av" style={m.role?.tone ? { "--role": m.role.tone } : undefined}>
                 {m.sprite
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={m.sprite} alt="" draggable="false"
@@ -689,10 +699,6 @@ function RailMember({ m }) {
             </span>
             <span className="social-rail-who">
                 <b>{m.name}</b>
-                {m.role ? (
-                    <span className={`gchat-role${m.role.glow ? " is-earned" : ""}`}
-                        style={{ "--role": m.role.tone }}>{m.role.name}</span>
-                ) : null}
             </span>
         </li>
     );
@@ -809,22 +815,33 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     return (
         <div className={`social-global${roster.length && railOpen ? " has-rail" : ""}`}>
             {note ? <p className="social-note" role="status">{note}</p> : null}
-            {roster.length && !railOpen ? (
-                // Folded: a chip rather than a sliver of rail. It says how many are here, because that is the
-                // one thing the rail was telling you that you still want when it is shut.
-                <button type="button" className="social-rail-show" onClick={() => foldRail(true)}
-                    aria-label="Show who is in this room">
+            {/* ── AND YOU CAN ALWAYS GET IT BACK ──────────────────────────────────────────────────
+                Luke: "I collapse the user list and I can't get it back, also collapsing it it's like the
+                smallest button on the page."
+
+                Both halves of that were the same mistake: the control was an 18px glyph tucked into the
+                corner of a heading, and the way BACK was conditional on `roster.length`. So a fold that
+                landed while the roster happened to be empty — a quiet room, a slow first poll, a room you
+                had only just opened — left no way back at all, and the preference is remembered, so it
+                stayed gone on every future visit too.
+
+                The restore bar is now unconditional. It renders whenever the rail is folded, whatever the
+                roster says, because a control that puts something away must always be able to fetch it. And
+                both controls are full-width bars rather than glyphs. */}
+            {!railOpen ? (
+                <button type="button" className="social-rail-show" onClick={() => foldRail(true)}>
                     <span className="social-rail-chev" aria-hidden="true">‹</span>
-                    <b>{here.length}</b> here<i>{roster.length > here.length ? ` · ${roster.length} in room` : ""}</i>
+                    {roster.length ? <><b>{here.length}</b> here</> : "Who is in this room"}
                 </button>
             ) : null}
             {roster.length && railOpen ? (
                 <aside className="social-rail" aria-label="Who is in this room">
-                    <h5 className="social-rail-h">
-                        <button type="button" className="social-rail-fold" onClick={() => foldRail(false)}
-                            aria-label="Hide who is in this room">›</button>
-                        Here now <b>{here.length}</b>
-                    </h5>
+                    {/* The whole heading is the fold. It was already a full-width row carrying two words, so
+                        making it the control costs nothing and gives it a 26px target instead of an 18px one. */}
+                    <button type="button" className="social-rail-h" onClick={() => foldRail(false)}
+                        aria-label="Hide who is in this room">
+                        <b>{here.length}</b> here <i aria-hidden="true">›</i>
+                    </button>
                     <ul className="social-rail-list">
                         {here.map((m) => <RailMember key={m.id} m={m} />)}
                         {away.length ? (
