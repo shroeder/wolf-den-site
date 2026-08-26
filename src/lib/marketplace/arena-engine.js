@@ -13,8 +13,9 @@
 //
 // The rule for this file: if it touches the database, the session, or the clock, it does not belong here.
 import {
-    BLEED_MAX_STACKS, BLEED_PER_TURN, BLEED_TICK_CAP, BLEED_TURNS, BLEED_TURNS_CAP, COUNTER_POWER,
-    REND_PER_TURN, REND_TICK_CAP, REND_TURNS, REND_TURNS_CAP,
+    BLEED_MAX_STACKS, BLEED_PER_TURN, BLEED_TICK_CAP, BLEED_TURNS, BLEED_TURNS_CAP, CHILL_CAP,
+    CONTROL_IMMUNE_TURNS, COUNTER_POWER, REND_PER_TURN, REND_TICK_CAP, REND_TURNS, REND_TURNS_CAP,
+    SHIELD_DECAY,
 } from "@/lib/marketplace/arena-kit.js";
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
@@ -391,6 +392,8 @@ export const sideOf = (f) => ({
         soulfire: Math.max(0, Number(f.soulfire) || 0),
         cataclysm: Math.max(0, Math.min(1, Number(f.cataclysm) || 0)),
         shield: 0,
+        // Beats of immunity to losing a turn. Set when a beat is taken off you; see the denial roll.
+        controlImmune: 0,
         banked: 0,
         burnLeft: 0,
         burnPer: 0,
@@ -520,7 +523,10 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         let hasted = false;
         let bled = false;
         let wild = null;
-        if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned += 1; stunned = true; }
+        // CAPPED AT ONE. This was `+= 1`, so two landed stuns queued two lost beats and a stun build could
+        // bank them faster than they were spent — the lock the immunity rule below exists to end, arriving by
+        // a second route. One pending beat, however many times you land it.
+        if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned = Math.min(1, def.stunned + 1); stunned = true; }
         // HASTE IS ONE TURN, GRANTED. It used to be five swings at double rate, which needed a clock to be
         // five swings faster THAN. A turn you are handed on the spot is the same idea a player can watch.
         if (att.haste > 0 && rng() < att.haste) { att.bonusTurns += 1; hasted = true; }
@@ -644,6 +650,13 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         // it always has, which is what makes rend and burn worth carrying.
         const firstTurn = att.swingsTaken === 0;
 
+        // ── THE GUARD DROPS A LITTLE ─────────────────────────────────────────────────────────────────
+        // Before anything else on your beat, and before the refill further down, so a fighter who tops it up
+        // every swing settles below the cap instead of living at it. See SHIELD_DECAY.
+        if (!firstTurn && att.shield > 0) {
+            att.shield = Math.max(0, Math.round(att.shield * (1 - SHIELD_DECAY)));
+        }
+
         // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
         // not stop you bleeding — and it can kill, which is the whole point of a wound.
         if (!firstTurn && att.bleedLeft > 0) {
@@ -671,25 +684,26 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
             log.push({ t, who, burnTick: true, dmg: tick, meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             if (att.hp <= 0) return false;
         }
-        if (att.stunned > 0) {
-            // Ticks down either way, so a freeze always expires on the schedule it promised — it just
-            // cannot take two turns back to back.
-            att.stunned -= 1;
-            if (!owed) {
+        // ── ONE ROLL FOR LOSING A BEAT, AND NEVER TWICE RUNNING ──────────────────────────────────────
+        // A queued freeze and the chill roll were two separate gates in a row. Either could take the beat, so
+        // a fighter carrying both faced them one after the other, every beat, for twenty-five rounds. They
+        // are one question now — "do I act?" — asked once, and answered no at most every other beat.
+        //
+        // The stun ALWAYS ticks down, immune or not, so a freeze still expires on the schedule it promised
+        // rather than being banked while you shrug it off.
+        const frozen = att.stunned > 0;
+        if (frozen) att.stunned -= 1;
+        if (att.controlImmune > 0) {
+            // You were taken off the board last beat. Whatever is on you now, you get to swing through it.
+            att.controlImmune -= 1;
+        } else if (!owed) {
+            const denied = frozen || (att.skipChance > 0 && rng() < att.skipChance);
+            if (denied) {
+                att.controlImmune = CONTROL_IMMUNE_TURNS;
                 att.lostLast = true;
-                log.push({ t, who, stunnedSkip: true, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
+                log.push({ t, who, stunnedSkip: frozen, chilledSkip: !frozen, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
                 return false;
             }
-        }
-        // ── CHILLED: THE TURN THAT DOES NOT HAPPEN ───────────────────────────────────────────────────
-        // Chill used to multiply the other fighter's clock, which was the most invisible effect in the
-        // game — a permanent 12% that never once produced a sentence. Rolled per turn it does the same
-        // work and says so out loud. Rolled AFTER the stun check so the two never both fire on one turn
-        // and print two reasons for one lost beat.
-        if (!owed && att.skipChance > 0 && rng() < att.skipChance) {
-            att.lostLast = true;
-            log.push({ t, who, chilledSkip: true, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
-            return false;
         }
         // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
         if (att.regen > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(att.maxHp * att.regen));
@@ -734,8 +748,8 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     B.shield += Math.round(B.maxHp * B.ward);
     // CHILL is a share of the OTHER fighter's turns that simply do not happen. Applied once, at the bell,
     // because it lasts the bout — it is a condition they are under, not a status they can shake.
-    if (A.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + A.chill);
-    if (B.chill > 0) A.skipChance = Math.min(0.6, A.skipChance + B.chill);
+    if (A.chill > 0) B.skipChance = Math.min(CHILL_CAP, B.skipChance + A.chill);
+    if (B.chill > 0) A.skipChance = Math.min(CHILL_CAP, A.skipChance + B.chill);
     const log = [];
     let t = 0;
     let swings = 0;

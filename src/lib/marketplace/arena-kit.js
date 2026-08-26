@@ -159,12 +159,24 @@ const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 // banks a shield that eats SWINGS, and a wound does not care. This is the whole reason the Reaver owns it —
 // see the tick in arena.js, which subtracts from health directly and never touches `shield`.
 export const BLEED_PER_TURN = 0.035;   // of their MAX health, per stack, per turn
-export const BLEED_TURNS = 3;
+// ── LONGER THAN THE COOLDOWN, OR IT CANNOT BE BUILT ──────────────────────────────────────────────────────────
+// Luke: "bleed and burn are super underpowered because they decay immediately, so you can't build it up or
+// make any builds off of building it up."
+//
+// He is describing arithmetic rather than a feeling. Stacks arrive one cast at a time on a THREE-turn
+// cooldown and used to last THREE turns — so the first stack expired on the exact beat the second landed and
+// the total never moved off one. Every node in either tree that reads "another stack" was buying nothing.
+//
+// Five against a cooldown of three is the whole fix: two stacks overlap for two turns, three for one, and a
+// build that commits to it is finally worth committing to. The per-turn ceilings below are untouched, so this
+// cannot run away the way an uncapped burn once did — it just lets a fighter reach that ceiling by playing
+// for it instead of never reaching it at all.
+export const BLEED_TURNS = 5;
 export const BLEED_MAX_STACKS = 3;
 export const BLEED_TICK_CAP = 0.16;    // whatever the stacks, one turn of bleeding cannot exceed this
-export const BLEED_TURNS_CAP = 5;
+export const BLEED_TURNS_CAP = 8;
 
-export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
+export const REND_TURNS = 5;        // arena.js: bleed ticks this many of their beats — see BLEED_TURNS
 // ── THE BURN, REBUILT SO INVESTING IN IT MEANS SOMETHING ─────────────────────────────────────────────────────
 // `rendTick` used to be ADDED to this: Runebrand read "+0.6% harder per rank", which sounds like nothing and
 // very nearly was — four ranks moved a tick from 4.5% to 6.9% of their health. Luke: "should be like 30
@@ -192,7 +204,7 @@ export const REND_TICK_CAP = 0.20;
 // And a ceiling on how LONG. Slow Burn buys turns rather than a second copy of "harder", which is what its
 // name has always said; without a cap four ranks would take a burn to seven of their beats and the class
 // would win by waiting.
-export const REND_TURNS_CAP = 5;
+export const REND_TURNS_CAP = 8;
 // THE STACK CAP IS GONE (Luke, 2026-08-16: "is there a cap at 3 fire sticks? if so remove that"). Stacks build
 // as long as you keep casting. The 83.8%-win runaway this cap was written for had NO per-turn ceiling either —
 // REND_TICK_CAP above is what actually holds the line now, so extra stacks reach the ceiling faster instead of
@@ -228,6 +240,24 @@ export const GUARD_DISABLE_TURNS = 3;
 //      acts through, which is the shape of every deadlock this file has already been fixed for.
 export const FREEZE_CHANCE = 0.18;
 export const FREEZE_TURNS = 1;
+// ── AND YOU CANNOT BE TAKEN OFF THE BOARD TWICE RUNNING ──────────────────────────────────────────────────────
+// Luke: "combat has kind of devolved into who gets more extra turns and who can freeze the most, which makes
+// all of their builds pretty much worthless."
+//
+// There were THREE independent ways to lose a beat and they were rolled separately, every beat, for the whole
+// of a 25-round fight: a queued freeze, the stun stat on a landed blow, and a permanent per-turn chill
+// roll that could reach 60%. Each one alone is a mechanic; three of them compounding is a lock, and against a
+// lock nothing else on your character is doing anything — which is exactly the complaint.
+//
+// One roll now, and one beat of immunity after it lands. You can still be frozen, and it still costs you the
+// turn it always did; what you cannot be is frozen on the turn after that. The counter-play is restored
+// without deleting the mechanic: a control build still opens the window it was built to open, and the fighter
+// on the receiving end still gets to play the game in between.
+export const CONTROL_IMMUNE_TURNS = 1;
+// The permanent per-beat chill roll. 0.6 was a coin flip on losing your turn, for ever, from one stat — the
+// single largest source of "my build did nothing". It is a nudge now, and the immunity above bounds the worst
+// case regardless.
+export const CHILL_CAP = 0.25;
 export const SUNDER_CUT = 0.4;      // of their guard, removed
 export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.
@@ -237,6 +267,21 @@ export const RIPOSTE_SHARE = 0.3;   // of their landed blow, sent back at them
 // own — 86.5% in simulation, the strongest kit in the game by a distance, for the least thought. Soaking is
 // capped as a fraction of your own health, so stacking wards has a ceiling and the fifth one is wasted.
 export const SHIELD_CAP = 0.45;     // of your max health, total, at any moment
+// ── AND A SHIELD IS A MOMENT, NOT A SECOND HEALTH BAR ────────────────────────────────────────────────────────
+// A shield only ever went down by absorbing a blow. Nothing else touched it — so a Warden refilling on every
+// one of its own swings sat permanently at the cap, which is 45% extra health that regenerates and never
+// expires. Healing cannot do that at any investment: regen is a share of max health and STOPS at max health,
+// while a shield stacks on top of it. Luke: "shielding, because it doesn't decay, is basically way better than
+// healing will ever be."
+//
+// It sheds a quarter of itself at the start of every one of your beats. That does not make a ward weak — the
+// blow you raised it for is usually the very next one — it makes it a thing you TIME. Bank one and sit on it
+// for five rounds and there is nothing left; the fighter who refills it every swing settles at an equilibrium
+// below the cap instead of living at it.
+//
+// This is also the biggest lever on how LONG a fight is, which is the root of everything else wrong in here:
+// a 25-round bout is one where every per-round effect (freeze, chill, extra turns) beats every per-hit one.
+export const SHIELD_DECAY = 0.25;   // of the shield you are holding, at the start of each of your beats
 
 // ── THE FREE KINDS ── the defensive pair costs you no beat, on EITHER side of the exchange: the effect lands,
 // the cooldown starts, and your turn is still yours to swing with.
