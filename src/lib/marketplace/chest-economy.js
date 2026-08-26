@@ -92,23 +92,34 @@ export async function getChestEconomy({ days = 30 } = {}) {
         .sort((a, b) => (b.earned + b.spent) - (a.earned + a.spent));
 
     // ── THE DAILY SERIES, AND THE SUPPLY CURVE ───────────────────────────────────────────────────────────
-    // Walked BACKWARDS from the supply we can actually measure. Today's pile is known; yesterday's was
-    // today's, minus what was minted today, plus what was burned today. That keeps the right-hand end of the
-    // inflation curve anchored to a real number instead of to a reconstruction — the left-hand end is the
-    // approximate one, and it is approximate only for the days before opens were being recorded.
+    // The mint and burn lines are straight counts and always honest. The SUPPLY curve is not something this
+    // can compute for a day before opens were being recorded, and the first attempt proved it: walking
+    // backwards from today's real pile and subtracting only the grants drove the line to MINUS 6,893, because
+    // for those days it believed nobody had ever opened anything.
+    //
+    // A negative pile is not an approximation, it is a wrong answer drawn confidently. So the curve exists
+    // only over the stretch where both halves of the ledger are real — from the first recorded open onward —
+    // and is null before that. The screen draws nothing there and says why, which is the honest shape of
+    // "we did not measure this yet".
+    //
+    // Within that stretch it is still walked BACKWARDS from the pile we can actually measure, so the
+    // right-hand end is anchored to a real number rather than to a reconstruction.
     const mintByDay = new Map((grantDaily || []).map((r) => [r.day, Number(r.n) || 0]));
     const burnByDay = new Map((openDaily || []).map((r) => [r.day, Number(r.n) || 0]));
     // `dayKeys`, not `days` — that name is already the window size on this function, and two meanings
     // for one short name in one scope is how the wrong one gets used.
     const dayKeys = [...new Set([...mintByDay.keys(), ...burnByDay.keys()])].sort();
     const supplyNow = Number(stock?.n) || 0;
+    const firstOpenDay = (openDaily || [])[0]?.day || null;
     const daily = [];
     let running = supplyNow;
     for (let i = dayKeys.length - 1; i >= 0; i -= 1) {
         const date = dayKeys[i];
         const minted = mintByDay.get(date) || 0;
         const burned = burnByDay.get(date) || 0;
-        daily.unshift({ date, minted, burned, net: minted - burned, supply: running });
+        // Only days at or after the first recorded open carry a supply figure.
+        const known = firstOpenDay != null && date >= firstOpenDay;
+        daily.unshift({ date, minted, burned, net: minted - burned, supply: known ? Math.max(0, running) : null });
         running = running - minted + burned;
     }
 
@@ -122,7 +133,11 @@ export async function getChestEconomy({ days = 30 } = {}) {
         supply: supplyNow,                     // chests sitting unopened right now — measured
         holders: Number(holders?.n) || 0,
         windowMinted, windowBurned, windowNet: windowMinted - windowBurned,
-        inflation: daily.length ? daily[daily.length - 1].supply - (daily[0].supply - daily[0].net) : 0,
+        // Only meaningful over the measured stretch; zero until there is one.
+        inflation: (() => {
+            const known = daily.filter((x) => x.supply != null);
+            return known.length ? known[known.length - 1].supply - (known[0].supply - known[0].net) : 0;
+        })(),
         daily,                                 // [{ date, minted, burned, net, supply }]
         bySource,                              // [{ source, label, earned, spent, net, n, tiers }]
         byTier: [...byTierMap.entries()].map(([tier, total]) => ({ tier, total })).sort((a, b) => tierRank(a.tier) - tierRank(b.tier)),
