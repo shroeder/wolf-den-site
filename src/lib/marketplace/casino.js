@@ -725,13 +725,9 @@ export function perkPhrase(k = {}) {
     return "Works the floor";
 }
 
-/** A dropped pet, told what it does. maybeGrantCasinoPet is shared with every other pet source, so the
- *  casino-specific half is added here rather than bent into the generic granter. */
-export const withCasinoPerk = (pet) => {
-    if (!pet) return null;
-    const def = CASINO_PETS.find((p) => p.id === pet.id);
-    return { ...pet, perk: perkPhrase(def?.casinoPerk) };
-};
+// withCasinoPerk lived here: it decorated a DROPPED pet with what its casino perk does. The five are bought
+// at the Counter now, so nothing drops one and nothing called it. perkPhrase survives just below, because the
+// floor rail still uses it to say what a pet you already own is doing for you.
 
 /** Everything the pets in a member's collection add up to. Owned, not equipped: these are not combat pets
  *  and making somebody re-equip to use the casino would be a rule nobody would guess. */

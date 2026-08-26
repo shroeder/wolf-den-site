@@ -137,23 +137,16 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
 //
 // Rarest first, so a double hit gives the scarcer pet. Same shape as the raid pets above, for the same
 // reason: one way to grant a pet, not two.
-// ── THE FIVE ARE NOT A DROP ANY MORE ─────────────────────────────────────────────────────────────────────────
-// This rolled on every play of every machine, at absolute odds between 1 in 455 and 1 in 5,556, and it is
-// gone. Luke: "we don't do bolt-on rolls like this."
+// ── THE CASINO FIVE USED TO DROP FROM HERE. THEY ARE BOUGHT NOW. ─────────────────────────────────────────────
+// maybeGrantCasinoPet lived here and rolled on every play of every machine, at absolute odds between 1 in 455
+// and 1 in 5,556. Luke: "we don't do bolt-on rolls like this." The table agreed with him before he said it —
+// 145 recorded plays and not one of the five had ever dropped for anybody.
 //
-// The evidence was already in the table when he said it: 145 recorded plays, and not one of the five had ever
-// dropped for anybody. A chase with no visible end is a rumour rather than a chase, and it made the pets a
-// property of how long somebody had been at the machines rather than something they could decide to want.
+// They are 50,000 chips each on the Counter now (CHIP_STORE in chips.js), and they keep their casinoPerk, so
+// buying one still buys a slightly kinder floor. Deleted rather than stubbed: a function that returns null for
+// ever is a trap for whoever next goes looking for where casino pets come from.
 //
-// They are 50,000 chips each on the Counter now — see CHIP_STORE in chips.js. Nothing else about them changed:
-// they keep their casinoPerk, and buying one still buys a slightly kinder floor.
-//
-// The function is kept as a no-op rather than deleted because three call sites in casino.js pass its result
-// straight into withCasinoPerk() and on into their responses; a stub keeps that shape honest while the callers
-// come out, and `null` is exactly what those callers already handle on a miss.
-export async function maybeGrantCasinoPet() {
-    return null;
-}
+// The other maybeGrant* functions below are untouched — raid, sea-fight and chest pets still drop.
 
 // EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a genuine prestige trophy.
 // Each pet has its own ABSOLUTE per-raid-completion drop chance (`raidChance`), tuned to be exceedingly rare:

@@ -6,8 +6,7 @@ import {
     BINGO_PAYS, DRAWN, DRAGON_CHANCE, burntOf, dragonFor, drawFor, makeCard, patternAward, patternFor, scoreCard,
 } from "@/lib/marketplace/bingo-kit.js";
 import { storeDay, weekdayOf } from "@/lib/marketplace/store-day.js";
-import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "@/lib/marketplace/casino.js";
-import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
+import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 // Gold in, chips out — see the long note in blackjack.js. The stake is still gold because gold staked is what
 // chips are made of; the payout is chips because chips are what this floor pays.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
@@ -140,7 +139,6 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // counts as the jackpot for the prize shelf.
     const prize = await rollCasinoPrize(buyerId, { jackpot: score.lines.length >= 6, perks });
     await tickCasinoQuests(buyerId, "bingo", won);
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
 
     return {
         ok: true,
@@ -173,7 +171,6 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         chips,
         gold: paid.gold,
         prize,
-        pet,
         onHouse,
     };
 }

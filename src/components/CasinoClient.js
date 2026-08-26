@@ -515,7 +515,6 @@ export default function CasinoClient({ initial }) {
     // What the pets did on this play, and the pet itself if one turned up. Separate from `prize` because a
     // pet arriving is a different size of moment than a chest and must not quietly replace one.
     const [note, setNote] = useState(null);
-    const [wonPet, setWonPet] = useState(null);
     // The one machine with a hand in progress. It comes down from the server on load, so closing the tab
     // mid-hand is not a way to lose a stake — nor a way to walk out of one.
     const [hand, setHand] = useState(initial?.blackjack?.hand || null);
@@ -784,17 +783,9 @@ export default function CasinoClient({ initial }) {
         if (r.onHouse) setNote({ kind: "house", text: "On the house — your stake came back." });
         else if (r.refund > 0) setNote({ kind: "refund", text: `The Croupier's Cat pushes ${money(r.refund)} back.` });
         else setNote(null);
-        // The loud one. A casino pet is a 1-in-hundreds-to-thousands event and the rarest is 1 in 5,556, so
-        // it gets the room: its own banner, held until you walk away or play again, and the perk strip
-        // updates underneath it so the thing it BOUGHT you is visible in the same breath.
-        if (r.pet) {
-            setWonPet(r.pet);
-            Sfx.crit(1); Haptic.crit();
-            setSt((prev) => ({
-                ...prev,
-                perks: { ...(prev?.perks || {}), pets: [...(prev?.perks?.pets || []), { id: r.pet.id, name: r.pet.name }] },
-            }));
-        }
+        // THE PET BANNER USED TO LIVE HERE. `r.pet` was one of the five arriving off a play at 1-in-455 to
+        // 1-in-5,556; they are 50,000 chips at the Counter now and nothing sends that key any more. Removed
+        // rather than left dormant — a handler for an event that can never happen reads as a working feature.
     }, []);
 
     // ── THE FIVE-REEL MACHINE'S OWN SPIN ────────────────────────────────────────────────────────────────
@@ -832,7 +823,7 @@ export default function CasinoClient({ initial }) {
     const pull = useCallback(async () => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setWonPet(null); setFx(null);
+        setBusy(true); setErr(null); setFlash(null); setLanded(0); setPrize(null); setNote(null); setFx(null);
         setTease(false); setBurst(null);
         // A handle, not a click: a spring, a body, and the reels coming up to speed underneath. It runs for
         // about as long as the request does, so a machine never sits silent waiting for the network.
@@ -948,7 +939,7 @@ export default function CasinoClient({ initial }) {
     const play = useCallback(async (body, onResult) => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
+        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null);
         setBurst(null); setKenoOut(0);
         // Chips going down on the felt, not a UI blip.
         Cas.chips();
@@ -1026,7 +1017,7 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null); setFlash(null);
-        if (action === "bj_deal") { setPrize(null); setNote(null); setWonPet(null); setBurst(null); }
+        if (action === "bj_deal") { setPrize(null); setNote(null); setBurst(null); }
         // Chips down, then the shoe. The cards themselves are voiced by the reveal effect, on the same clock
         // the animation uses — firing one here as well would sound a card that is not on the felt yet.
         if (action === "bj_deal") { Cas.chips(); timers.current.push(setTimeout(() => Cas.shoe(), 140)); }
@@ -1098,7 +1089,7 @@ export default function CasinoClient({ initial }) {
     const buyCard = useCallback(async (force) => {
         if (busy) return;
         unlock();
-        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
+        setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null);
         setCard(null); setCalled(0); setBurst(null); setDragon(null); setDragonLit(0);
         Cas.chips();
         const r = await casPost({ action: "bingo", bet, force: force || undefined });
@@ -2364,18 +2355,6 @@ export default function CasinoClient({ initial }) {
                         Shared by every machine, because a prize is a prize wherever it came from — and it
                         sits ABOVE the stake row so it is the last thing you read before deciding to go
                         again. That placement is the whole reason it is worth showing. */}
-                    {/* ── THE PET TURNED UP ───────────────────────────────────────────────────────────
-                        The rarest thing on this floor: 1 in 455 plays at the kindest and 1 in 5,556 at the
-                        worst. It gets its own banner above everything else, and it says what the pet DOES —
-                        a prestige drop whose effect you have to go and look up is a drop that lands flat. */}
-                    {wonPet ? (
-                        <div className="cas-newpet">
-                            <b>{wonPet.name}</b>
-                            <em>{wonPet.hint || "Joins your collection"}</em>
-                            <i>{wonPet.perk || "works the floor from now on"}</i>
-                        </div>
-                    ) : null}
-
                     {/* The quiet ones — a free play, a refund. One line, no ceremony. */}
                     {note ? <p className={`cas-note is-${note.kind}`}>{note.text}</p> : null}
 

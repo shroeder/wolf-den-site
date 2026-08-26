@@ -7,7 +7,7 @@ import {
 } from "@/lib/marketplace/blackjack-kit.js";
 // The table is a machine on the same floor, so it pays into the same three things every other machine does.
 // Imported one way only: casino.js knows nothing about blackjack, which keeps the cycle from ever existing.
-import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "@/lib/marketplace/casino.js";
+import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 // ── THE TABLE PAYS CHIPS ─────────────────────────────────────────────────────────────────────────────────────
 // Luke: "convert blackjack, keno and bingo to give out chips, not gold."
 //
@@ -20,7 +20,6 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "
 // The stake is still taken in GOLD, deliberately. That is the mint: gold staked is what chips are made of, and
 // a table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
-import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -168,16 +167,16 @@ async function settleAll(buyerId, row, dealerCards, hands) {
 
     const shape = done || { ...row, status: "done", dealer: dealerCards, hands: finished, outcome, won, rake };
 
-    // The rest of the floor's furniture: bounties tick, a prize can land, and the five pets are in play here
+    // The rest of the floor's furniture: bounties tick and a prize can land. The five pets are NOT in play
+    // here any more — they are bought at the Counter, not dropped (see chips.js CHIP_STORE).
     // exactly as they are at every other machine. A hand of blackjack is one play — a hit is not, and neither
     // is the second half of a split — which is why this lives in settlement and not in the action handlers.
     const perks = await casinoPerks(buyerId);
     await tickCasinoQuests(buyerId, "blackjack", won);
     // A natural twenty-one is this table's jackpot: it is the rarest good outcome and the one worth a prize.
     const prize = await rollCasinoPrize(buyerId, { jackpot: results.some((r) => r.outcome === "blackjack"), perks });
-    const pet = withCasinoPerk(await maybeGrantCasinoPet(buyerId).catch(() => null));
 
-    return { hand: publicView(shape, { reveal: true }), gold, chips, won, wonGold, outcome, prize, pet };
+    return { hand: publicView(shape, { reveal: true }), gold, chips, won, wonGold, outcome, prize };
 }
 
 /**
@@ -196,7 +195,7 @@ async function advance(buyerId, row, hands, active) {
     const alive = hands.some((h) => !handValue(h.cards).bust);
     const dealer = alive ? playDealer(parse(row.dealer, []), shoe) : parse(row.dealer, []);
     const s = await settleAll(buyerId, row, dealer, hands);
-    return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
+    return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
 }
 
 /** Take one stake. Returns the new balance, or null if it could not be paid. */
@@ -248,7 +247,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // A natural on either side ends it immediately — there is no turn to take.
     if (isBlackjack(player) || isBlackjack(dealer)) {
         const s = await settleAll(buyerId, row, dealer, hands);
-        return { ok: true, natural: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
+        return { ok: true, natural: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     return { ok: true, gold: paid.gold, hand: publicView(row), bet: stake };
 }
@@ -353,7 +352,7 @@ export async function splitBlackjack(buyerId) {
         const shoeNow = parse(saved.shoe, []);
         const dealer = playDealer(parse(saved.dealer, []), shoeNow);
         const s = await settleAll(buyerId, saved, dealer, split);
-        return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize, pet: s.pet };
+        return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake * 2, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
     return { ok: true, hand: publicView(saved) };
 }
