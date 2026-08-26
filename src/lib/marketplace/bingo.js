@@ -3,8 +3,9 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import {
-    BINGO_PAYS, DRAWN, DRAGON_CHANCE, burntOf, dragonFor, drawFor, makeCard, scoreCard,
+    BINGO_PAYS, DRAWN, DRAGON_CHANCE, burntOf, dragonFor, drawFor, makeCard, patternAward, patternFor, scoreCard,
 } from "@/lib/marketplace/bingo-kit.js";
+import { storeDay, weekdayOf } from "@/lib/marketplace/store-day.js";
 import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "@/lib/marketplace/casino.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 // Gold in, chips out — see the long note in blackjack.js. The stake is still gold because gold staked is what
@@ -45,12 +46,20 @@ const DRAW_SALT = 0x5730_1d;
  * on screen forever, which is exactly the kind of leftover that outlives the feature it belonged to.
  */
 export async function bingoState() {
+    // ── AND WHAT THE HALL IS PLAYING FOR TODAY ───────────────────────────────────────────────────────
+    // Resolved HERE and sent down whole, rather than letting the screen work it out. The shop's day flips at
+    // midnight Central and the server runs in UTC — a client deciding for itself what day it is would call a
+    // different pattern from the one the till pays for, every night between 7pm and midnight.
+    const { dayKey, resetInSecs } = storeDay();
+    const p = patternFor(weekdayOf(dayKey));
     return {
         balls: DRAWN,
         pays: BINGO_PAYS,
         dragonChance: DRAGON_CHANCE,
         cardMin: CARD_MIN,
         cardMax: CARD_MAX,
+        pattern: { id: p.id, name: p.name, blurb: p.blurb, cells: p.cells, pay: p.pay },
+        patternEndsIn: resetInSecs,
     };
 }
 
@@ -97,15 +106,25 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     const burnt = burntOf(dragon);
     const score = scoreCard(card, drawn, burnt);
 
+    // ── TODAY'S PATTERN, ON TOP ──────────────────────────────────────────────────────────────────────────
+    // Resolved from the shop's day at the moment the card is bought, so a card bought at 11:59 is scored
+    // against the pattern that was on screen when it was bought. It pays IN ADDITION to whatever lines the
+    // card made — the two are different achievements and a card that does both did both. The X contains two
+    // diagonals, so an X card is already being paid 1.5x for the lines before the pattern is added; that is
+    // correct and it is what makes the rare patterns feel like the event they are.
+    const today = patternFor(weekdayOf(storeDay().dayKey));
+    const patternHit = patternAward(card, drawn, burnt, today);
+
     // ── AND IT PAYS IN CHIPS ─────────────────────────────────────────────────────────────────────────────
     // `wonGold` is the paytable's own units — a multiple of what the card cost. The conversion happens once,
     // here, exactly as it does at every slot cabinet and now at the blackjack table.
-    const wonGold = Math.round(stake * score.mult);
+    const wonGold = Math.round(stake * (score.mult + patternHit.mult));
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
     let chips = null;
     if (won > 0) {
         chips = await moveChips(buyerId, won, "casino_bingo_win", {
-            meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length, wonGold, rate: CHIP_RATE },
+            meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
+            pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
         });
     }
     if (chips == null) chips = await chipBalance(buyerId);
@@ -113,7 +132,8 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         game: "bingo", bet: stake, wonChips: won,
         multiple: Number((score.mult || 0).toFixed(3)),
         // The dragon is the feature this game was built around, so its reach is the thing to watch.
-        features: burnt.length ? ["dragon"] : [], lines: score.lines.length, burnt: burnt.length,
+        features: [...(burnt.length ? ["dragon"] : []), ...(patternHit.hit ? [`pattern:${today.id}`] : [])],
+        lines: score.lines.length, burnt: burnt.length,
     }).catch(() => {});
 
     // Six lines or more is this game's rarest good thing — about one card in two thousand — so it is what
@@ -135,8 +155,17 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         // The winning lines, so the card can light them up rather than making somebody find them.
         lines: score.lines.map((l) => ({ kind: l.kind, i: l.i })),
         corners: score.corners,
+        // ── AND WHETHER TODAY'S PATTERN LANDED ───────────────────────────────────────────────────────
+        // Sent whole rather than as a boolean, because the card has to be able to light the shape it just
+        // completed and the result line has to be able to name it. `cells` is the same array the state
+        // handed out before the card was bought, so the screen never has to hold two ideas of what the
+        // pattern was — which matters at midnight, when the card is scored against the pattern it was sold
+        // under and the one on screen has already turned over.
+        pattern: patternHit.hit ? { id: today.id, name: today.name, cells: today.cells, pay: today.pay } : null,
+        patternMult: patternHit.mult,
         tier: score.tier,
         label: score.label,
+        // The card's own lines, WITHOUT the pattern folded in — `won` is the money and this is the story.
         mult: score.mult,
         bet: stake,
         won,

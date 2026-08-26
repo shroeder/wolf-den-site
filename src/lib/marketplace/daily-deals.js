@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { storeDay } from "@/lib/marketplace/store-day.js";
 import { ITEMS, itemById, describeStats } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -64,16 +65,11 @@ function shuffle(arr, rng) {
     return a;
 }
 
-// The store-timezone day key + seconds remaining until it flips (for the client countdown).
-function dayContext() {
-    const now = new Date();
-    const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).formatToParts(now);
-    const g = (t) => Number(parts.find((p) => p.type === t)?.value || 0);
-    const h = g("hour") % 24;
-    const secsUntilReset = (23 - h) * 3600 + (59 - g("minute")) * 60 + (60 - g("second"));
-    return { dayKey, resetInSecs: secsUntilReset, resetAt: new Date(now.getTime() + secsUntilReset * 1000).toISOString() };
-}
+// The store-timezone day key + seconds remaining until it flips (for the client countdown). This used to be
+// the only correct copy of that rule in the codebase; it lives in store-day.js now, because "what day is it in
+// Montgomery" is a fact about the shop rather than about deals, and bingo's pattern of the day needs the same
+// answer to the same question.
+const dayContext = storeDay;
 
 // Daily deals never put too-powerful gear on sale — cap the rarity of gear that can appear.
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity

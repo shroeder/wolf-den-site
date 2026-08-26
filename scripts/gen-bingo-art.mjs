@@ -71,6 +71,11 @@ const ball = (colour, tone) => ({
             + `anywhere else on the ball. Saturated ${tone} and clean ivory, nothing else in frame.` }),
 });
 
+// Every caller sprite shares this, so the moods stay the same badger — see the note on caller-edge.
+const CALLER_EXTRA = "Warm burgundy and brass against the badger's black-and-white striped head. It must read "
+    + "at 40 pixels tall: bold silhouette, no fine detail, no background, no text, no numbers, no bingo cards "
+    + "or balls in frame.";
+
 const JOBS = {
     // ── THE FIVE BALLS ───────────────────────────────────────────────────────────
     // The colours are the traditional ones — B blue, I red, N white, G green, O amber — because a bingo ball
@@ -120,6 +125,84 @@ const JOBS = {
             { framing: "sprite", extra: "Warm burgundy and brass against the badger's black-and-white striped "
                 + "head. It must read at 40 pixels tall: bold silhouette, no fine detail, no background, no "
                 + "text, no numbers, no bingo cards or balls in frame." }),
+    },
+
+    // ── AND THE CALLER HAS MORE THAN ONE FACE ────────────────────────────────────
+    // He is on screen for the whole draw saying different things, and one fixed expression under changing
+    // words reads as a cardboard cut-out with a speech bubble. Three states, which is the fewest that can
+    // tell the story the game actually has: he is calling, you are one square away, or it is over.
+    //
+    // Built off the SAME description as `caller` above, with only the pose and the face changed — a second
+    // prompt written fresh would come back as a different badger, and the swap would read as the hall
+    // changing staff mid-game.
+    "caller-edge": {
+        dir: DEST, file: "caller-edge", ext: "webp",
+        prompt: housePrompt(
+            "A stout badger in a burgundy waistcoat over a white shirt with the sleeves rolled up and small "
+            + "round spectacles, holding a brass microphone, leaning forward with his eyes wide and his free "
+            + "paw held up flat as though asking the room to wait. Shown from the waist up, facing slightly "
+            + "to the left.",
+            { framing: "sprite", extra: CALLER_EXTRA }),
+    },
+    "caller-sad": {
+        dir: DEST, file: "caller-sad", ext: "webp",
+        prompt: housePrompt(
+            "A stout badger in a burgundy waistcoat over a white shirt with the sleeves rolled up and small "
+            + "round spectacles, holding a brass microphone down at his side, shrugging with one paw turned "
+            + "palm-up and a rueful, sympathetic expression. Shown from the waist up, facing slightly to "
+            + "the left.",
+            { framing: "sprite", extra: CALLER_EXTRA }),
+    },
+    "caller-win": {
+        dir: DEST, file: "caller-win", ext: "webp",
+        prompt: housePrompt(
+            "A stout badger in a burgundy waistcoat over a white shirt with the sleeves rolled up and small "
+            + "round spectacles, delighted, both arms thrown up in celebration with the brass microphone in "
+            + "one raised paw. Shown from the waist up, facing slightly to the left.",
+            { framing: "sprite", extra: CALLER_EXTRA }),
+    },
+
+    // ── THE CAGE ─────────────────────────────────────────────────────────────────
+    // Where the balls come from. Right now they simply appear, which is the visual equivalent of the numbers
+    // being handed down from nowhere — every hall on earth has a thing that tumbles, and watching it is half
+    // of what people are doing between calls.
+    cage: {
+        dir: DEST, file: "cage", ext: "webp",
+        prompt: housePrompt(
+            "A brass-framed spherical bingo ball cage on a stand, seen three-quarters on, its wire globe "
+            + "half full of loose coloured balls, with a crank handle on the side and a short brass chute at "
+            + "the bottom front where a ball comes out.",
+            { framing: "sprite", extra: "Warm brass and dark wood with the balls in blue, red, green and amber "
+                + "inside it. It must read at 64 pixels wide: bold silhouette, the globe clearly separated "
+                + "from the stand, no fine wire detail, no text, no numbers on any ball, nothing else in frame." }),
+    },
+
+    // ── THE HALL ─────────────────────────────────────────────────────────────────
+    // The backdrop the card sits on. A scene rather than a sprite — this is the only one in the set that is
+    // allowed to touch its own edges, because it is the room.
+    hall: {
+        dir: DEST, file: "hall", ext: "webp",
+        prompt: housePrompt(
+            "The interior of a cosy old bingo hall seen from the back of the room: rows of long tables under "
+            + "warm hanging lamps, a low stage at the far end with a curtain behind it, dark green walls and "
+            + "a worn patterned carpet. Empty of people.",
+            { framing: "scene", extra: "Warm amber lamplight against deep green and dark wood, quiet and "
+                + "slightly hazy. It sits BEHIND a card of numbers and must never compete with it: low "
+                + "contrast, nothing bright in the middle of the frame, no text, no signage, no bingo cards "
+                + "or balls anywhere in it." }),
+    },
+
+    // ── THE DRAGON'S ARRIVAL ─────────────────────────────────────────────────────
+    // The pass is the best thing in this game and it currently begins with the dragon simply being there.
+    // Embers give it a beat to arrive in — thrown along the line it is about to burn, before it appears.
+    embers: {
+        dir: DEST, file: "embers", ext: "webp",
+        prompt: housePrompt(
+            "A drifting cluster of glowing orange and yellow embers and sparks of varying sizes, brightest "
+            + "in the middle and thinning out towards the edges, with faint wisps of smoke between them.",
+            { framing: "sprite", extra: "Hot orange and pale yellow against nothing. No fire, no flame shape, "
+                + "no object, no background — only the embers themselves, and they must stay legible when "
+                + "scattered across a grid of numbers at low opacity." }),
     },
 };
 

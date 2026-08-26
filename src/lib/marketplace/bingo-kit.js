@@ -284,3 +284,96 @@ export function scoreCard(card, drawn, burnt = []) {
     if (corners) return { mult: BINGO_PAYS.corners, label: "four corners", tier: "corners", lines, corners };
     return { mult: 0, label: null, tier: null, lines, corners };
 }
+
+// ── THE PATTERN OF THE DAY ───────────────────────────────────────────────────────────────────────────────────
+// A shape, announced before you buy, that pays ON TOP of whatever lines the card makes. One per weekday, so it
+// is a thing you can learn — Tuesday is the X — rather than a surprise you read after the fact.
+//
+// WHY THIS AND NOT A BIGGER PAYTABLE. Bingo's problem was never the money, it was the SHAPE of the money:
+// against 400,000 simulated cards, 49% of them do nothing at all and another 33% make exactly one line, which
+// pays your card back. Four cards in five end in "nothing happened" or "you are level". Raising the line pays
+// moves the average and does not touch that: the modal card is still a shrug. A second, different thing to be
+// watching for changes what you are doing during the forty balls, which is the actual complaint.
+//
+// ── AND EVERY ONE OF THEM IS PRICED THE SAME ─────────────────────────────────────────────────────────────────
+// Each pattern's `pay` is set so that its rate x its pay is about +3% of stake, measured against 300,000 real
+// cards through drawFor() and dragonFor() — so the day of the week never decides how good the game is, only
+// what you are looking for. Bingo goes from 99.8% to about 102.8%, which is a RAISE and deliberately so: chips
+// are one-way tickets and there is no path back to gold, so the ceiling protects nothing. check:bingo prints
+// the total with the pattern folded in.
+//
+// The rates below are the measured ones. They include the dragon, because the dragon is part of the game and
+// a pattern priced against a card without one would be priced against a card that does not exist.
+const AT = (col, row) => col * 5 + row;
+const ROW = (row) => [0, 1, 2, 3, 4].map((col) => AT(col, row));
+const COL = (col) => [0, 1, 2, 3, 4].map((row) => AT(col, row));
+
+export const PATTERNS = [
+    // Sunday
+    { id: "goblet", name: "The Goblet", blurb: "A cup, a stem and a foot.", pay: 5, rate: 0.0062,
+        cells: [AT(0, 0), AT(4, 0), AT(1, 1), AT(3, 1), AT(2, 2), AT(2, 3), AT(1, 4), AT(2, 4), AT(3, 4)] },
+    // Monday
+    { id: "sixpack", name: "The Six-Pack", blurb: "Two by three, top left.", pay: 1.25, rate: 0.0238,
+        cells: [AT(0, 0), AT(1, 0), AT(0, 1), AT(1, 1), AT(0, 2), AT(1, 2)] },
+    // Tuesday
+    { id: "x", name: "The X", blurb: "Both diagonals, corner to corner.", pay: 4, rate: 0.0071,
+        cells: [...new Set([...[0, 1, 2, 3, 4].map((i) => AT(i, i)), ...[0, 1, 2, 3, 4].map((i) => AT(4 - i, i))])] },
+    // Wednesday
+    { id: "kite", name: "The Kite", blurb: "A block in the corner and a tail to the far one.", pay: 1.25, rate: 0.0244,
+        cells: [AT(0, 0), AT(1, 0), AT(0, 1), AT(1, 1), AT(2, 2), AT(3, 3), AT(4, 4)] },
+    // Thursday
+    { id: "cross", name: "The Cross", blurb: "The middle row and the middle column.", pay: 4.5, rate: 0.0063,
+        cells: [...new Set([...COL(2), ...ROW(2)])] },
+    // Friday
+    { id: "diamond", name: "The Diamond", blurb: "Point to point, around the free square.", pay: 5, rate: 0.0062,
+        cells: [AT(2, 0), AT(1, 1), AT(3, 1), AT(0, 2), AT(4, 2), AT(1, 3), AT(3, 3), AT(2, 4)] },
+    // Saturday — the rare one, and it is on the day the shop is busiest.
+    { id: "toptail", name: "Top and Tail", blurb: "The whole top row and the whole bottom row.", pay: 15, rate: 0.0020,
+        cells: [...ROW(0), ...ROW(4)] },
+];
+
+/**
+ * Which pattern is up on a given store day key (`YYYY-MM-DD`).
+ *
+ * Keyed to the WEEKDAY rather than hashed, because the point is that it is learnable. The caller is handed the
+ * key rather than working the date out here — this module is shared with the browser, and a client deciding
+ * for itself what day it is in Montgomery is a client that disagrees with the till for five hours a night.
+ */
+export const patternFor = (weekday) => PATTERNS[((Number(weekday) || 0) % PATTERNS.length + PATTERNS.length) % PATTERNS.length];
+
+/** Whether a card completed a pattern, and what it is worth. Same `marked` rule the lines use. */
+export function patternAward(card, drawn, burnt = [], pattern = null) {
+    if (!pattern?.cells?.length) return { hit: false, mult: 0 };
+    const hits = new Set(drawn);
+    const fire = new Set(burnt);
+    const hit = pattern.cells.every((at) => marked(card[Math.floor(at / 5)][at % 5], hits, fire, at));
+    return { hit, mult: hit ? pattern.pay : 0 };
+}
+
+// ── AND WHAT YOU ARE ONE SQUARE AWAY FROM ────────────────────────────────────────────────────────────────────
+// Nothing on this screen ever told you that you were one number off a line. Forty balls came out and then it
+// was over — so the tension the game is entirely made of was happening in the maths and nowhere else. This is
+// what the screen needs to light: every line with exactly four of its five marked, and WHICH square is the
+// one still cold, so the card can point at it and the caller can say it out loud.
+//
+// Recomputed per ball on the client, which is cheap — twelve lines of five — and correct by construction,
+// because it uses the same `marked` predicate that decides what actually pays.
+export function nearLinesOf(card, drawn, burnt = []) {
+    const hits = new Set(drawn);
+    const fire = new Set(burnt);
+    const out = [];
+    const consider = (kind, i, at) => {
+        const cold = at.filter((k) => !marked(card[Math.floor(k / 5)][k % 5], hits, fire, k));
+        if (cold.length === 1) out.push({ kind, i, at, need: cold[0], number: card[Math.floor(cold[0] / 5)][cold[0] % 5] });
+    };
+    for (let row = 0; row < 5; row += 1) consider("row", row, ROW(row));
+    for (let col = 0; col < 5; col += 1) consider("col", col, COL(col));
+    consider("diag", 0, [0, 1, 2, 3, 4].map((i) => AT(i, i)));
+    consider("diag", 1, [0, 1, 2, 3, 4].map((i) => AT(4 - i, i)));
+    return out;
+}
+
+/** What a caller would call a line. Columns get their letter, because that is how a hall says it. */
+export const lineName = (l) => (l.kind === "row" ? `row ${l.i + 1}`
+    : l.kind === "col" ? `the ${COLUMNS[l.i]} column`
+        : "the diagonal");

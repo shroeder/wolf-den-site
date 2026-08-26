@@ -8,7 +8,8 @@
 //
 // Run:  node scripts/check-bingo.mjs   (or npm run check:bingo)
 import {
-    drawFor, makeCard, scoreCard, seeded, dragonFor, burntOf, BINGO_PAYS, BALLS, DRAWN, DRAGON_CHANCE,
+    drawFor, makeCard, scoreCard, seeded, dragonFor, burntOf, patternAward, BINGO_PAYS, BALLS, DRAWN,
+    DRAGON_CHANCE, PATTERNS,
 } from "../src/lib/marketplace/bingo-kit.js";
 import { CHIP_RATE } from "../src/lib/marketplace/chip-rate.js";
 
@@ -28,6 +29,12 @@ import { CHIP_RATE } from "../src/lib/marketplace/chip-rate.js";
 const CHIP_TARGET = 1.00;
 const CHIP_BAND = 0.04;
 
+// ── AND THE PATTERN OF THE DAY IS PART OF THE ANSWER ─────────────────────────────────────────────────────────
+// A bonus the till pays and the gate does not know about is a gate reporting a return the game does not have.
+// Every pattern is priced to add about the same, so the honest headline is the AVERAGE across the week — that
+// is what a member who plays every day actually gets — and each one is also printed on its own, because the
+// thing that would go wrong here is one day of the week being much better than the others.
+
 const CARDS = Number(process.env.CARDS || 2_000_000);
 const pct = (n) => `${(n * 100).toFixed(2)}%`;
 const problems = [];
@@ -43,6 +50,10 @@ let dragons = 0;
 let burntTotal = 0;
 const tally = {};
 const paidBy = {};
+// One counter per pattern, all seven scored against every card — cheaper than seven runs and it means each
+// pattern is measured against exactly the same cards, so the numbers can be compared to each other.
+const patPaid = Object.fromEntries(PATTERNS.map((p) => [p.id, 0]));
+const patHits = Object.fromEntries(PATTERNS.map((p) => [p.id, 0]));
 // A fresh draw every few thousand cards rather than one draw for all of them: a single draw would price the
 // game against one particular set of forty balls, and any quirk in that set would become the answer.
 let drawn = drawFor(1);
@@ -61,7 +72,13 @@ for (let i = 0; i < CARDS; i += 1) {
     // written out a second time here. A check script with its own copy of the paytable is a check script
     // that can agree with itself while disagreeing with the game.
     paidBy[key] = (paidBy[key] || 0) + s.mult;
+    for (const p of PATTERNS) {
+        const a = patternAward(card, drawn, burnt, p);
+        if (a.hit) { patHits[p.id] += 1; patPaid[p.id] += a.mult; }
+    }
 }
+const patRtp = Object.fromEntries(PATTERNS.map((p) => [p.id, patPaid[p.id] / CARDS]));
+const patAvg = PATTERNS.reduce((t, p) => t + patRtp[p.id], 0) / PATTERNS.length;
 const rtp = paid / CARDS;
 const rtpCold = paidNoDragon / CARDS;
 
@@ -72,9 +89,24 @@ console.log(`  pays         corners ${BINGO_PAYS.corners}x · a line ${BINGO_PAY
 console.log(`  cards dealt  ${CARDS.toLocaleString()} (SIMULATED, not enumerated)`);
 console.log(`  the dragon   ${pct(DRAGON_CHANCE)} of cards — one pass across a row, a column or a diagonal, burning only cold squares`);
 console.log(`  paid in      CHIPS at ${CHIP_RATE} per gold staked — the gold does not come back`);
-console.log(`  return       ${pct(rtp)}   target ${pct(CHIP_TARGET)} +/- ${pct(CHIP_BAND)}`);
-console.log(`    of which   ${pct(rtpCold)} from the card, ${pct(rtp - rtpCold)} from the dragon`);
+console.log(`  return       ${pct(rtp + patAvg)}   target ${pct(CHIP_TARGET)} +/- ${pct(CHIP_BAND)}`);
+console.log(`    of which   ${pct(rtpCold)} from the card, ${pct(rtp - rtpCold)} from the dragon, ${pct(patAvg)} from the pattern`);
 console.log(`  dragons      ${pct(dragons / CARDS)} of cards, ${(burntTotal / Math.max(1, dragons)).toFixed(2)} squares caught per pass`);
+
+console.log("\n  the pattern of the day (one per weekday, each priced to add the same)");
+for (const p of PATTERNS) {
+    const r = patHits[p.id] / CARDS;
+    console.log(`    ${p.name.padEnd(14)} ${String(p.cells.length).padStart(2)} squares  ${pct(r).padStart(7)}  1 in ${(r ? Math.round(1 / r) : 0).toLocaleString().padStart(7)}  x${String(p.pay).padEnd(5)} -> ${pct(patRtp[p.id])}`);
+}
+{
+    // The spread across the week is the thing that can actually go wrong here. One day paying twice what
+    // another does is a game that is only worth playing on Saturdays, and nothing else in this script would
+    // notice — the average would still land on target.
+    const vals = PATTERNS.map((p) => patRtp[p.id]);
+    const spread = Math.max(...vals) - Math.min(...vals);
+    console.log(`    spread across the week: ${pct(spread)}`);
+    if (spread > 0.015) problems.push(`the pattern of the day varies by ${pct(spread)} across the week — one day is a much better game than another`);
+}
 
 console.log("\n  how cards ended");
 let hitRate = 0;
@@ -86,11 +118,15 @@ for (const [k, n] of Object.entries(tally).sort((a, b) => b[1] - a[1])) {
 }
 console.log(`\n  hit rate     ${pct(hitRate)} of cards pay something`);
 
-if (rtp > CHIP_TARGET + CHIP_BAND) {
-    problems.push(`bingo returns ${pct(rtp)} in chips, above the ${pct(CHIP_TARGET + CHIP_BAND)} the floor is priced at — it mints chips faster than the slots`);
+// Judged on the TOTAL, pattern included — that is what the till pays out. rtp on its own is the card and
+// the dragon, and reporting a pass on a number the game does not hand anybody is the whole failure mode a
+// gate exists to prevent.
+const rtpAll = rtp + patAvg;
+if (rtpAll > CHIP_TARGET + CHIP_BAND) {
+    problems.push(`bingo returns ${pct(rtpAll)} in chips, above the ${pct(CHIP_TARGET + CHIP_BAND)} the floor is priced at — it mints chips faster than the slots`);
 }
-if (rtp < CHIP_TARGET - CHIP_BAND) {
-    problems.push(`bingo returns ${pct(rtp)} in chips, under the ${pct(CHIP_TARGET - CHIP_BAND)} the floor is priced at — it is a strictly worse slot machine`);
+if (rtpAll < CHIP_TARGET - CHIP_BAND) {
+    problems.push(`bingo returns ${pct(rtpAll)} in chips, under the ${pct(CHIP_TARGET - CHIP_BAND)} the floor is priced at — it is a strictly worse slot machine`);
 }
 // A card you buy and then watch do nothing four times in five is a card nobody buys twice.
 if (hitRate < 0.2) problems.push(`only ${pct(hitRate)} of cards pay anything — that is a game nobody buys twice`);
@@ -105,4 +141,4 @@ if (problems.length) {
     for (const p of problems) console.log(`  ✗ ${p}`);
     process.exit(1);
 }
-console.log(`\ncheck:bingo — a card returns ${pct(rtp)}. The house keeps ${pct(1 - rtp)}.`);
+console.log(`\ncheck:bingo — a card returns ${pct(rtpAll)} with the day pattern folded in. The house keeps ${pct(1 - rtpAll)}.`);

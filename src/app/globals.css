@@ -18275,7 +18275,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    The one game on this floor with other people in it: everybody who buys a card inside the same three
    minutes is playing the same forty numbers. The line at the top says so, because a shared draw that
    nobody is told about is just a draw. */
-.cas-hall { margin: 0 0 10px; }
+/* ── THE ROOM ─────────────────────────────────────────────────────────────────────────
+   The card used to be played against the same flat dark as everything else on the floor. It is a hall now —
+   lamps, long tables, a stage at the far end — behind two layers of scrim, because it is a BACKDROP and the
+   only thing on this screen that has to stay perfectly legible is a grid of two-digit numbers. Set as a
+   background rather than a pseudo-element on purpose: a background paints behind the element's own content
+   with no stacking games, and an absolutely positioned ::before would paint over the card. */
+.cas-hall { position: relative; margin: 0 0 10px; border-radius: 14px;
+    background-image: linear-gradient(rgba(11,8,15,.84), rgba(11,8,15,.93)),
+        url("/images/casino/bingo/hall.webp");
+    background-size: cover; background-position: center 38%;
+    border: 1px solid rgba(255,255,255,.06); }
 /* The caller and his line, on one row. He is 44px and the line is one line, so this costs the eight pixels
    the old sentence cost and buys somebody to be saying it. */
 .cas-hall-top { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px;
@@ -18330,7 +18340,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    card further up the screen while you were watching it. Capped at three with its own scroll: the ones that
    matter are the newest, the rest are history you can flick back through, and the hall stops changing height
    under a card you are reading. */
-.cas-balls { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 10px; min-height: 30px; align-items: center;
+/* The cage sits to the left of the pile it is producing, and the pile takes what is left. */
+.cas-balls-wrap { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.cas-cage { flex: 0 0 auto; width: 52px; height: 52px; object-fit: contain;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); transform-origin: 50% 78%; }
+/* It rocks rather than spins: the sprite is a three-quarter view, so rotating it through 360 degrees would
+   read as the whole cabinet tipping over. A rock is what a hand-cranked cage actually does. */
+.cas-cage.is-turning { animation: casCage 1.05s ease-in-out infinite; }
+@keyframes casCage { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .cas-cage.is-turning { animation: none; } }
+.cas-balls { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; min-height: 30px;
+    align-items: flex-start; align-content: flex-start;
     max-height: 96px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 /* ── A BALL, NOT A CHIP ──
    These were rounded rectangles with a number in them. The sprite is the ball and the number is set on its
@@ -22340,6 +22360,21 @@ body.cas-seated .social-fab { display: none; }
 }
 /* The card dims a shade while the pass is happening, so the fire is the brightest thing on it. */
 .cas-bcard.is-burning .cas-bcell:not(.is-burnt) { filter: brightness(.78); transition: filter .3s ease; }
+/* ── AND IT ARRIVES IN EMBERS ──
+   The pass is the best thing in this game and it used to begin with the dragon simply BEING there. Embers
+   drift across the whole card for the length of the flight — they are the thing that says something is
+   coming, before there is anything to see. Over the cells and under the dragon, at an opacity that cannot
+   compete with a number: this is weather, not an object. */
+.cas-bcard.is-burning::after { content: ""; position: absolute; inset: -6%; z-index: 4; pointer-events: none;
+    background: url("/images/casino/bingo/embers.webp") center / 120% auto no-repeat;
+    opacity: 0; animation: casEmbers 2.4s ease-out both; mix-blend-mode: screen; }
+@keyframes casEmbers {
+    0% { opacity: 0; transform: translateY(10%) scale(.9); }
+    22% { opacity: .55; }
+    70% { opacity: .35; }
+    100% { opacity: 0; transform: translateY(-14%) scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) { .cas-bcard.is-burning::after { animation: none; opacity: .3; } }
 
 /* ── A SQUARE THAT CAUGHT ───────────────────────────────────────────────
    It is marked exactly as a drawn square is, because it IS one — the fire is a second way to HAVE a
@@ -22641,3 +22676,44 @@ body.cas-seated .social-fab { display: none; }
 .vip-take { justify-self: start; -webkit-appearance: none; appearance: none; border: 0; background: none;
     cursor: pointer; font-size: 11px; color: #b48fe0; text-decoration: underline; padding: 2px; }
 
+
+/* ── ONE SQUARE AWAY ──────────────────────────────────────────────────────────────────
+   The square that would complete a line, on a line with four of its five already marked. It pulses rather
+   than simply lighting, because the thing it is saying is not "this is special", it is "this one, next ball,
+   any second now" — and a static highlight says the first. Ringed in the same green the finished line uses,
+   one step short of it, so the two read as the same story at different stages. */
+.cas-bcell.is-need { border-color: rgba(126,255,178,.7); color: #eaffef;
+    animation: casNeed 1.05s ease-in-out infinite; }
+@keyframes casNeed {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(126,255,178,.5); background: rgba(126,255,178,.06); }
+    50% { box-shadow: 0 0 0 3px rgba(126,255,178,.28), 0 0 14px rgba(126,255,178,.35); background: rgba(126,255,178,.14); }
+}
+/* A square today's pattern wants, before it has been marked. A tint and nothing more — this is context for
+   the squares you are watching, and it must never compete with the one that is one away. */
+.cas-bcell.is-pattern { background: rgba(190,140,255,.10); border-color: rgba(190,140,255,.3); }
+
+/* ── TODAY'S PATTERN ──────────────────────────────────────────────────────────────────
+   A row above the card: the shape, its name, and what it is worth at the stake you have selected. The shape
+   is drawn because a shape is what you are looking for — "the middle row and the middle column" is a sentence
+   you have to assemble before you can start watching for it. */
+.cas-bpat { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 7px 10px;
+    border-radius: 11px; border: 1px solid rgba(190,140,255,.28);
+    background: linear-gradient(180deg, rgba(190,140,255,.12), rgba(0,0,0,.28)); }
+.cas-bpat-grid { flex: 0 0 auto; display: grid; grid-template-columns: repeat(5, 6px); gap: 2px; }
+.cas-bpat-grid i { width: 6px; height: 6px; border-radius: 2px; background: rgba(255,255,255,.13); }
+.cas-bpat-grid i.is-on { background: #cfa4ff; box-shadow: 0 0 5px rgba(190,140,255,.7); }
+.cas-bpat-what { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
+.cas-bpat-what b { font-size: 12.5px; font-weight: 900; color: #e6d2ff; }
+.cas-bpat-what i { font-style: normal; font-size: 10.5px; color: #a690c4; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+.cas-bpat-pay { flex: 0 0 auto; font-size: 13px; font-weight: 900; color: #cfa4ff;
+    font-variant-numeric: tabular-nums; }
+/* It landed. The whole row goes gold and holds — this is one card in forty at best and it should not be
+   something you could scroll past. */
+.cas-bpat.is-won { border-color: rgba(255,215,94,.6);
+    background: linear-gradient(180deg, rgba(255,215,94,.2), rgba(0,0,0,.28));
+    animation: casPatWon .5s cubic-bezier(.2,1.4,.4,1) both; }
+.cas-bpat.is-won .cas-bpat-what b, .cas-bpat.is-won .cas-bpat-pay { color: #ffd75e; }
+.cas-bpat.is-won .cas-bpat-what i { color: #d9c188; }
+.cas-bpat.is-won .cas-bpat-grid i.is-on { background: #ffd75e; box-shadow: 0 0 7px rgba(255,215,94,.85); }
+@keyframes casPatWon { from { transform: scale(.94); opacity: .4; } to { transform: none; opacity: 1; } }

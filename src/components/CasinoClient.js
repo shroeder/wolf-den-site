@@ -13,7 +13,7 @@ import Slot5 from "@/components/casino/Slot5.js";
 import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
-import { callFor, letterFor } from "@/lib/marketplace/bingo-kit.js";
+import { callFor, letterFor, lineName, nearLinesOf } from "@/lib/marketplace/bingo-kit.js";
 import { chipsFor } from "@/lib/marketplace/chip-rate.js";
 
 // ── NO REQUEST ON THIS FLOOR MAY HANG FOR EVER ───────────────────────────────────────────────────────────────
@@ -1026,7 +1026,10 @@ export default function CasinoClient({ initial }) {
     // completed is a receipt.
     //
     // Nothing here can change the outcome, which is why the reveal is allowed to be pure presentation.
-    const BALL_MS = 85;
+    const BALL_MS = 120;
+    // The last five, and every ball drawn while a line is one square short. See the schedule below.
+    const LATE_EXTRA = 240;
+    const NEAR_EXTRA = 110;
     useEffect(() => {
         const id = setInterval(async () => {
             const r = await casFetch({ method: "GET" });
@@ -1067,22 +1070,43 @@ export default function CasinoClient({ initial }) {
         // one of them is how a currency conversion becomes invisible to the person it happened to.
         setSt((p) => ({ ...p, gold: r.gold, chips: r.chips }));
 
-        // Ball by ball. The last five are slowed down: by then you can see what you need, and the pause is
-        // where the game actually lives.
-        (r.drawn || []).forEach((_, i) => {
-            const late = i >= (r.drawn.length - 5);
-            const at = i * BALL_MS + (late ? (i - (r.drawn.length - 5)) * 220 : 0);
+        // ── BALL BY BALL, AND THE CARD SETS THE PACE ─────────────────────────────────────────────────
+        // Forty balls used to come out in three and a half seconds — twelve a second. Nothing on the strip
+        // could be read, the daubs were a shimmer rather than forty events, and there was no room at all for
+        // the room to react to any of them. The whole game happened faster than a person can look at it.
+        //
+        // Three speeds now, and the card chooses between them:
+        //
+        //   BALL_MS      the ordinary pace, slow enough that a ball landing on your card is a thing that
+        //                happened rather than part of a blur.
+        //   LATE_EXTRA   the last five, as before — by then you can see what you need.
+        //   NEAR_EXTRA   every ball drawn while ANY line is one square from complete. This is the one that
+        //                matters: the game is entirely made of being one number away, and it used to spend
+        //                that moment at exactly the same speed as the forty-third irrelevant ball.
+        //
+        // Precomputed rather than reactive, because the whole draw is already known here — the outcome was
+        // decided server-side before this ran — and a timer schedule that is laid out once cannot drift.
+        const seq = r.drawn || [];
+        const times = [];
+        let acc = 0;
+        for (let i = 0; i < seq.length; i += 1) {
+            times.push(acc);
+            // The dragon has not flown yet, so the near-miss is measured on the balls alone.
+            const near = nearLinesOf(r.card, seq.slice(0, i + 1), []).length > 0;
+            acc += BALL_MS + (i >= seq.length - 5 ? LATE_EXTRA : 0) + (near ? NEAR_EXTRA : 0);
+        }
+        seq.forEach((_, i) => {
+            const late = i >= seq.length - 5;
             timers.current.push(setTimeout(() => {
                 setCalled(i + 1);
                 // Each ball is pitched off its own NUMBER, so a draw is a different little melody every
-                // round rather than the same pop forty times. The last five are already slowed down; they
-                // also land harder, because by then you can see what you need.
-                Cas.ball(r.drawn[i] || i);
-                if ((r.card || []).flat?.().includes?.(r.drawn[i])) Cas.daub();
+                // round rather than the same pop forty times.
+                Cas.ball(seq[i] || i);
+                if ((r.card || []).flat?.().includes?.(seq[i])) Cas.daub();
                 if (late) Haptic.hit(0.2);
-            }, at));
+            }, times[i]));
         });
-        const balls = (r.drawn?.length || 0) * BALL_MS + 5 * 220 + 260;
+        const balls = acc + 260;
 
         // ── AND THEN THE DRAGON ──────────────────────────────────────────────────────────────────────
         // AFTER the draw, never during it, and the ordering is the whole feature. By the last ball the card
@@ -1220,20 +1244,55 @@ export default function CasinoClient({ initial }) {
     // Standing at the rope, on the same rule as standing at a cabinet.
     const vipNear = Math.abs(x - VIP_X) <= REACH;
 
+    // Today's pattern as a Set, so the card can ask 25 times per render without rebuilding an array each time.
+    const todayCells = useMemo(() => new Set(st?.bingo?.pattern?.cells || []), [st?.bingo?.pattern]);
+
+    // ── ONE SQUARE AWAY ──────────────────────────────────────────────────────────────────────────────────
+    // The single most important thing on this screen and it was not on it. A card that is one number from a
+    // line looks exactly like a card that is four numbers from one, so the tension the game is made of was
+    // happening entirely in the arithmetic. Recomputed per ball off the same predicate that decides what
+    // pays, so the square the card points at is the square that would actually complete the line.
+    const nearLines = useMemo(() => {
+        if (!card || called === 0) return [];
+        return nearLinesOf(card.card, card.drawn.slice(0, called), busy ? [] : (dragon?.burnt || []));
+    }, [card, called, busy, dragon]);
+    // The cells still cold on a line that is one away — these are what the card lights.
+    const needCells = useMemo(() => new Set(nearLines.map((l) => l.need)), [nearLines]);
+
     // ── AND WHAT THE CALLER IS SAYING ────────────────────────────────────────────────────────────────────
-    // Derived from the same three things the board is drawn from, so he can never be a ball behind what is on
-    // the card. He announces while the draw runs, and the rest of the time he is doing what a caller does
-    // between games, which is selling the next card.
-    const lastBall = card && called > 0 ? card.drawn[called - 1] : null;
+    // Derived from the same things the board is drawn from, so he can never be a ball behind what is on the
+    // card. He does NOT read out all forty — a caller who announces every ball at this pace is a strobe, and
+    // thirty of them are numbers you do not have. He speaks when something happened to YOUR card: a daub, a
+    // line coming within one, the dragon, the result. Between those he holds whatever he last said, which is
+    // what silence in a hall is actually for.
+    const lastHit = useMemo(() => {
+        if (!card || called === 0) return null;
+        const on = new Set(card.card.flat());
+        for (let i = called - 1; i >= 0; i -= 1) if (on.has(card.drawn[i])) return card.drawn[i];
+        return null;
+    }, [card, called]);
+    // ── AND A FACE FOR IT ────────────────────────────────────────────────────────────────────────────────
+    // Four sprites of the same badger. One expression under changing words reads as a cut-out with a speech
+    // bubble; the point of putting somebody in the room is that the room reacts. The order matters — being
+    // one square away outranks the dragon, because the dragon is about to resolve it either way.
+    const callerMood = !card ? "caller"
+        : busy && (nearLines.length || dragon) ? "caller-edge"
+            : busy ? "caller"
+                : card.won > 0 ? "caller-win"
+                    : "caller-sad";
     const callerLine = !card
         ? "Eyes down whenever you are ready."
         : dragon && busy
             ? "Something is circling — heads down."
-            : busy && lastBall
-                ? `${callFor(lastBall) || "Number"} — ${lastBall}`
-                : card.won > 0
-                    ? `${card.label ? card.label[0].toUpperCase() + card.label.slice(1) : "A line"}. House pays out.`
-                    : "No line on that one. Another card?";
+            : busy && nearLines.length
+                ? `One away on ${lineName(nearLines[0])}.`
+                : busy && lastHit
+                    ? `${callFor(lastHit) || "Number"} — ${lastHit}`
+                    : busy
+                        ? "Nothing for you yet."
+                        : card.won > 0
+                            ? `${card.label ? card.label[0].toUpperCase() + card.label.slice(1) : "A line"}. House pays out.`
+                            : "No line on that one. Another card?";
 
     // ── GOING IN ─────────────────────────────────────────────────────────────
     // The SERVER decides, every time, even though the button only renders for somebody the state already said
@@ -1978,10 +2037,39 @@ export default function CasinoClient({ initial }) {
                                 on this screen, because the card is already taller than a phone. */}
                             <div className="cas-hall-top">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="cas-caller" src="/images/casino/bingo/caller.webp" alt=""
+                                <img className="cas-caller" src={`/images/casino/bingo/${callerMood}.webp`} alt=""
                                     width={44} height={44} draggable="false" />
-                                <span className={lastBall && busy ? "is-calling" : ""}>{callerLine}</span>
+                                {/* Keyed on the line itself so the arrival animation restarts whenever he says something new —
+                                    which is now only when something happened to your card, not once a ball. */}
+                                <span key={callerLine} className={busy ? "is-calling" : ""}>{callerLine}</span>
                             </div>
+
+                            {/* ── TODAY'S PATTERN ─────────────────────────────────────────────
+                                Announced before the card is bought, with the shape drawn rather than
+                                described — "the middle row and the middle column" is a sentence you have to
+                                assemble, and a 5x5 of dots is the same information at a glance. The squares
+                                it covers are also tinted on the card itself, so during the draw you can see
+                                which of your numbers are the ones that matter today. */}
+                            {st?.bingo?.pattern ? (
+                                <div className={`cas-bpat${card?.pattern ? " is-won" : ""}`}>
+                                    <span className="cas-bpat-grid" aria-hidden="true">
+                                        {Array.from({ length: 25 }, (_, k) => {
+                                            // The mini grid reads left-to-right by ROW; cells are indexed by
+                                            // column. Transposed here rather than in the pattern table,
+                                            // because the table is what the scorer uses.
+                                            const col = k % 5; const row = Math.floor(k / 5);
+                                            return <i key={k} className={todayCells.has(col * 5 + row) ? "is-on" : ""} />;
+                                        })}
+                                    </span>
+                                    <span className="cas-bpat-what">
+                                        <b>{st.bingo.pattern.name}</b>
+                                        <i>{card?.pattern ? "You got it." : st.bingo.pattern.blurb}</i>
+                                    </span>
+                                    <span className="cas-bpat-pay">
+                                        +{money(chipsFor(Math.round(bet * st.bingo.pattern.pay), 1))}
+                                    </span>
+                                </div>
+                            ) : null}
 
                             <div className="cas-bhead" aria-hidden="true">
                                 {["B", "I", "N", "G", "O"].map((L) => <b key={L}>{L}</b>)}
@@ -2006,7 +2094,7 @@ export default function CasinoClient({ initial }) {
                                         ));
                                         return (
                                             <span key={`${row}-${col}`}
-                                                className={`cas-bcell${hit || burning ? " is-hit" : ""}${burning ? " is-burnt" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}`}>
+                                                className={`cas-bcell${hit || burning ? " is-hit" : ""}${burning ? " is-burnt" : ""}${won ? " is-line" : ""}${n === 0 ? " is-free" : ""}${needCells.has(col * 5 + row) ? " is-need" : ""}${todayCells.has(col * 5 + row) && !hit && !burning ? " is-pattern" : ""}`}>
                                                 {/* The number is wrapped so it can sit ABOVE the flame.
                                                     A bare text node cannot take a z-index, and the flame
                                                     is absolutely positioned and later in the DOM, so it
@@ -2045,7 +2133,16 @@ export default function CasinoClient({ initial }) {
                                 })() : null}
                             </div>
 
-                            {/* The balls, in the order they came out. The newest one is the loud one. */}
+                            {/* ── THE CAGE, AND WHAT HAS COME OUT OF IT ───────────────────────
+                                The balls used to materialise on a strip with nothing to have come from,
+                                which is the visual version of the numbers being handed down from nowhere.
+                                Every hall on earth has a thing that tumbles, and half of what people do
+                                between calls is watch it. It turns while the draw is running and stops when
+                                the draw does. */}
+                            <div className="cas-balls-wrap">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className={`cas-cage${busy ? " is-turning" : ""}`} alt=""
+                                    src="/images/casino/bingo/cage.webp" width={52} height={52} draggable="false" />
                             <div className="cas-balls">
                                 {/* Real balls, in the five colours a bingo ball has always come in. The
                                     sprite is blank and the number is set on it here — seventy-five numbered
@@ -2056,6 +2153,7 @@ export default function CasinoClient({ initial }) {
                                         className={`cas-ball is-${letterFor(n).toLowerCase()}${i === called - 1 ? " is-new" : ""}`}>{n}</span>
                                 ))}
                                 {!card ? <span className="cas-balls-idle">Forty balls from seventy-five.</span> : null}
+                            </div>
                             </div>
 
                         </div>
