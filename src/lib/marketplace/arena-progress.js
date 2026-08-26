@@ -13,6 +13,7 @@ import {
 } from "@/lib/marketplace/arena-skills.js";
 import { crateById, rollCrate } from "@/lib/marketplace/armoury.js";
 import { GEM_KINDS, gemId } from "@/lib/marketplace/gems.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── SPENDING WHAT THE ARENA PAYS ─────────────────────────────────────────────────────────────────────────────
 // Every mutation in here re-reads the row, re-derives what is legal from the SAME pure functions the screen
@@ -283,8 +284,13 @@ export async function buyArmoury(buyerId, id) {
     let got = { kind: won.kind, label: won.label, art: null };
     try {
         if (won.kind === "gold") {
-            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, won.n]).catch(() => null);
-            await logCoin(buyerId, won.n, "arena_armoury", { balanceAfter: g?.gold, meta: { crate: crate.id } });
+            // NOT written back onto `won` - it is a row of the shared crate.table built once by G(n), so
+            // assigning to it would halve every future roll of that crate too. Local, and the label
+            // rebuilt because G() bakes the amount into it.
+            const n = mint(won.n, "arena_armoury");
+            got.label = `${n.toLocaleString()} gold`;
+            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, n]).catch(() => null);
+            await logCoin(buyerId, n, "arena_armoury", { balanceAfter: g?.gold, meta: { crate: crate.id } });
             got.art = "/images/ui/coin.png";
         } else if (won.kind === "chest") {
             const { addChests, CHEST_TIERS } = await import("@/lib/marketplace/chests.js");

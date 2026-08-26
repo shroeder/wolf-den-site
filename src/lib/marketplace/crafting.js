@@ -232,9 +232,9 @@ export async function logForgeOpen(buyerId) {
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 const DAILY_FIELDS = new Set(["salvages", "enhances", "combines", "best_grade"]);
 const DAILIES = [
-    { key: "salvage3", label: "Salvage 3 pieces of gear", field: "salvages", need: 3, reward: { gold: 150 }, rewardLabel: "+150 🪙" },
+    { key: "salvage3", label: "Salvage 3 pieces of gear", field: "salvages", need: 3, reward: { gold: 75 }, rewardLabel: "+150 🪙" },
     { key: "enhance1", label: "Enhance a piece of gear", field: "enhances", need: 1, reward: { partTier: 2, partN: 2 }, rewardLabel: "+2 Iron Filings" },
-    { key: "perfect", label: "Land a Perfect+ strike", field: "best_grade", need: 3, reward: { gold: 250 }, rewardLabel: "+250 🪙" },
+    { key: "perfect", label: "Land a Perfect+ strike", field: "best_grade", need: 3, reward: { gold: 125 }, rewardLabel: "+250 🪙" },
 ];
 async function bumpDaily(buyerId, field, amount = 1) {
     if (!DAILY_FIELDS.has(field)) return;

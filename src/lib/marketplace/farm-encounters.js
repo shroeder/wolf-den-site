@@ -7,6 +7,7 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { PART_TIERS } from "@/lib/marketplace/crafting.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── HARVEST CRITTER ENCOUNTERS ────────────────────────────────────────────────────────────────────────────
 // A chance a friendly garden critter scurries over at harvest with a GIFT. Encounters are PURE UPSIDE — they
@@ -59,7 +60,7 @@ async function critterSprite(art) {
 
 // Actually grant a critter's reward (XP + gold + the one bonus). Returns the new gold balance.
 async function grantEncounterReward(buyerId, key, xp, gold, loot) {
-    const g = Math.max(0, Number(gold) || 0);
+    const g = mint(Math.max(0, Number(gold) || 0), "farm_encounter");
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
     await logCoin(buyerId, g, "farm_encounter", { balanceAfter: paid?.gold, meta: { creature: key } }).catch(() => {});
     if ((Number(xp) || 0) > 0) await awardXp(buyerId, "farm_encounter", { points: Math.max(0, Number(xp) || 0), gold: 0 }).catch(() => {});

@@ -335,7 +335,7 @@ export async function getMemberMetrics(buyerId) {
 // Exported as a pair because the celebration card states them, and a card that says 120 while the ledger
 // hands over 90 is worse than a card that says nothing.
 const BADGE_REWARD_XP = 120;
-const BADGE_REWARD_GOLD = 120;
+const BADGE_REWARD_GOLD = 60; // halved with the rest of the faucets — see gold-rate.js
 export const BADGE_REWARD = { xp: BADGE_REWARD_XP, gold: BADGE_REWARD_GOLD };
 async function rewardBadgeEarned(buyerId, slug) {
     // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
@@ -688,12 +688,12 @@ export async function getBadgeBonusTotals(buyerId) {
 // Chest rewards are capped at MYTHIC on purpose — the top two tiers (Ascendant/Eternal) are far too strong to
 // hand out for a badge count right now. The high milestones escalate the QUANTITY of mythic chests instead.
 export const BADGE_MILESTONES = [
-    { count: 10,  gold: 100,  chest: "wooden", chestCount: 1 },
-    { count: 25,  gold: 250,  chest: "iron",   chestCount: 1 },
-    { count: 50,  gold: 500,  chest: "gold",   chestCount: 1 },
-    { count: 100, gold: 1000, chest: "mythic", chestCount: 1 },
-    { count: 250, gold: 2500, chest: "mythic", chestCount: 2 },
-    { count: 500, gold: 5000, chest: "mythic", chestCount: 3 },
+    { count: 10,  gold: 50,  chest: "wooden", chestCount: 1 },
+    { count: 25,  gold: 125,  chest: "iron",   chestCount: 1 },
+    { count: 50,  gold: 250,  chest: "gold",   chestCount: 1 },
+    { count: 100, gold: 500, chest: "mythic", chestCount: 1 },
+    { count: 250, gold: 1250, chest: "mythic", chestCount: 2 },
+    { count: 500, gold: 2500, chest: "mythic", chestCount: 3 },
 ];
 const CHEST_LABEL = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic" };
 

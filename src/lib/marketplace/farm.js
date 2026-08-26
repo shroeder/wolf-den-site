@@ -24,6 +24,7 @@ import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting } from "@/lib/settings.js";
 import { powerRoll, hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
 const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
@@ -361,7 +362,7 @@ export async function claimPig(buyerId) {
         } catch { /* no companion, no second visit */ }
         if (!second) return { ok: false, error: "already_claimed" };
     }
-    const gold = PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1);
+    const gold = mint(PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1), "loot_pig");
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
     let item = null;

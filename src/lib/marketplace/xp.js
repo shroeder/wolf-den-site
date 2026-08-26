@@ -9,6 +9,7 @@ import { levelForXp } from "@/lib/marketplace/xp-curve.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -107,7 +108,7 @@ export async function memberHangoutMult(buyerId) {
 // the shop into a gold→XP arbitrage: 27,500 gold bought ~12,000 XP normally and 48,048 XP during a 4x, with no
 // cap or cooldown on how many you could buy back-to-back. The scroll IS the reward; it should not compound with
 // a buff meant for effort.
-export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false } = {}) {
+export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false, minted = false } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
     if (base <= 0) return null;
@@ -132,7 +133,18 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
     // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
     const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout;
-    const goldDelta = Math.max(0, Math.round(goldBase * goldMult));
+    // -- THE 50% MINT RATE, APPLIED ONCE, HERE --------------------------------------------------------------
+    // This line is the single choke point for every piece of gold the game hands out through XP: the default
+    // 1:1-with-points award that most callers take, and the explicit amounts the farm, the tavern, the shiny
+    // and the boss's cheer pass in. Nerfing it here rather than at thirty call sites is the whole point of
+    // gold-rate.js -- see the note there about why refunds and transfers are NOT in the same set.
+    //
+    // `minted` is the escape hatch for a caller that already sized its own reward AND logs its own ledger row
+    // (fishing does both). Without it that gold would be halved twice and the row would disagree with the
+    // balance. A caller passing `minted` is promising it already called mint().
+    const goldDelta = minted
+        ? Math.max(0, Math.round(goldBase * goldMult))
+        : mint(Math.max(0, Math.round(goldBase * goldMult)), "xp_accrual");
 
     // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it
     // (a plain COUNT-then-insert is racy: burst clicks all read "under cap" before any row commits). When a

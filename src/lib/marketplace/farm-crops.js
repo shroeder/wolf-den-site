@@ -19,6 +19,7 @@ import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/f
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { hasPower, oneIn, equippedPowers, claimPowerUse, powerRoll } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -245,9 +246,13 @@ async function rollHarvestReward(buyerId, rarity, luckyLevel = 0, bonusPromote =
     if (Math.random() < Math.min(0.35, 0.01 * luckyLevel + bonusPromote)) tier = Math.min(5, tier + 1);
     const pool = POOL_BY_TIER[tier] || POOL_BY_TIER[1];
     const pick = pool[Math.floor(Math.random() * pool.length)];
-    let label = pick.label;
+    // NOT written back onto `pick` - it is a row of the shared POOL_BY_TIER table, and assigning to it
+    // would halve the pool itself, again on every roll, for the life of the process.
+    const lootGold = pick.type === "gold" ? mint(pick.amount, "harvest_loot") : 0;
+    // The pool's label bakes the amount in, so it has to be rebuilt rather than reused.
+    let label = pick.type === "gold" ? `+${lootGold.toLocaleString()} \u{1FA99}` : pick.label;
     try {
-        if (pick.type === "gold") { await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, pick.amount]); await logCoin(buyerId, pick.amount, "harvest_loot"); }
+        if (pick.type === "gold") { await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, lootGold]); await logCoin(buyerId, lootGold, "harvest_loot"); }
         else if (pick.type === "xp") await awardXp(buyerId, "harvest", { points: pick.amount, gold: 0 });
         else if (pick.type === "treat") await grantConsumable(buyerId, pick.id, 1);
         else if (pick.type === "spin") await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens, 0) + $2 WHERE id = $1`, [buyerId, pick.n]);
@@ -451,7 +456,7 @@ export async function harvestPlot(buyerId, slot) {
     const xp = def?.xp || 0;
     // Town Greenhouse (community project) fattens the harvest for EVERY member, on top of personal gold-harvest buffs.
     const townB = await getTownBonuses(Date.now()).catch(() => ({}));
-    let gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100) * (1 + (townB?.farmYieldPct || 0) / 100));
+    let gold = mint(Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100) * (1 + (townB?.farmYieldPct || 0) / 100)), "harvest");
     // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold. (Read below, off the
     // owned list — the equipped loadout has nothing to do with a collection set any more.)
     let doubled = false;

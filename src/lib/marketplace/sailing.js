@@ -2020,6 +2020,7 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {
@@ -2424,6 +2425,7 @@ async function payFleetReward(buyerId, reward) {
         out.push({ kind: "doubloons", n: reward.doubloons });
     }
     if (reward.gold) {
+        reward.gold = mint(reward.gold, "ship_battle"); // written back so `out` reports the real figure
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, reward.gold]).catch(() => null);
         await logCoin(buyerId, reward.gold, "ship_battle", { balanceAfter: paid?.gold }).catch(() => {});
         out.push({ kind: "gold", n: reward.gold });
@@ -3525,7 +3527,7 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const bounty = seaEffects(await equippedSeaAffinity(buyerId)).goldBonus; // Bounty boosts merchant payout too
     const base = Math.max(MERCHANT_GOLD_FLOOR, Math.min(MERCHANT_GOLD_CEIL, Math.round(Number(collected) || 0)));
-    const gold = Math.round(base * (1 + bounty));
+    const gold = mint(Math.round(base * (1 + bounty)), "merchant_minigame");
     const perfect = Boolean(perfectFlag);
     // The pet is NOT tied to the minigame anymore (it unlocks on the 10th encounter, in rollMerchant). A perfect
     // run just earns the badge + the gold. Preserve any petGranted flag the offer already carries (10th meeting).

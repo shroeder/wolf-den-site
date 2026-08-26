@@ -14,6 +14,7 @@ import { setDepthCapstones } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { hasPower, equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -483,6 +484,7 @@ async function payHaul(buyerId, haul = [], powers = null) {
             await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
             paid.push(item);
         } else if (item.kind === "gold") {
+            item.n = mint(item.n, "mining"); // written back so the haul list shows what landed
             const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
             await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "descent" } }).catch(() => {});
             paid.push(item);
@@ -1275,7 +1277,7 @@ async function claimNode(buyerId, node, row, run = {}) {
         [buyerId, node.tier, ore]
     ).catch(() => {});
 
-    const gold = Math.round(o.gold * (1 + pct) * (1 + haulBonus));
+    const gold = mint(Math.round(o.gold * (1 + pct) * (1 + haulBonus)), "mining");
     const goldRow = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "mining", { balanceAfter: goldRow?.gold, meta: { kind: "seam", tier: node.tier } }).catch(() => {});
 

@@ -12,6 +12,7 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -467,8 +468,8 @@ export async function openChest(buyerId, tier) {
     // gear pool does, and they feed the Forge, which is where the gear he already owns gets better. Paid ON
     // TOP of the dust rather than instead of it, scaled by the CHEST's tier rather than by the rolled rarity,
     // because the chest is the thing that was earned.
-    let gold = DUST[rarity] || 25;
-    if (twinHinges) gold *= 2;
+    // Minted AFTER the Twin Hinges doubling so the perk still doubles what you actually get.
+    let gold = mint((DUST[rarity] || 25) * (twinHinges ? 2 : 1), "chest_reward");
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
     // Tier of part follows the chest, capped at the top of the ladder; the count follows it too, so a

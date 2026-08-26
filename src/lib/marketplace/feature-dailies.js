@@ -32,35 +32,35 @@ export const FEATURE_DAILIES = {
     // gains the XP, their farm gains the vote). Neither pays more PER ACTION — those awards were trimmed once
     // already for being 5.5% of all XP in the game — the pull is the bounty on top.
     farm: [
-        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
-        { key: "farm_plant2", label: "Plant 2 seeds", metric: "plant_seed", need: 2, reward: { gold: 90 }, rewardLabel: "+90 gold" },
-        { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { gold: 120 }, rewardLabel: "+120 gold" },
+        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 75 }, rewardLabel: "+75 gold" },
+        { key: "farm_plant2", label: "Plant 2 seeds", metric: "plant_seed", need: 2, reward: { gold: 45 }, rewardLabel: "+45 gold" },
+        { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { gold: 60 }, rewardLabel: "+60 gold" },
         // The chest moves to the visiting bounty rather than being minted twice: a full farm day still pays
         // exactly ONE chest, it is just no longer claimable without leaving your own patch. The petting one
         // pays the biggest gold on the card because it asks the most — you have to be on someone else's farm.
-        { key: "farm_rate2", label: "Rate 2 neighbours' farms", metric: "farm_rate", need: 2, reward: { gold: 200 }, rewardLabel: "+200 gold" },
-        { key: "farm_petother2", label: "Pet 2 of a neighbour's pets", metric: "pet_other", need: 2, reward: { gold: 200 }, rewardLabel: "+200 gold" },
+        { key: "farm_rate2", label: "Rate 2 neighbours' farms", metric: "farm_rate", need: 2, reward: { gold: 100 }, rewardLabel: "+100 gold" },
+        { key: "farm_petother2", label: "Pet 2 of a neighbour's pets", metric: "pet_other", need: 2, reward: { gold: 100 }, rewardLabel: "+100 gold" },
     ],
     sailing: [
-        { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
-        { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 140 }, rewardLabel: "+140 gold" },
+        { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 60 }, rewardLabel: "+60 gold" },
+        { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 70 }, rewardLabel: "+70 gold" },
         // ONE BOUNTY FOR ONE BUTTON. These were two — "Raid a passing ship" (raid_do) and "Fight the fleet"
         // (ship_battle) — from the days when the yard listed opponents and you picked one. It does not any
         // more: there is a single Battle button and matchOpponent decides whether you meet a fleet ship or a
         // rival captain. So one of the two ticked and the other did not, at random, and neither told you why.
         // `ship_battle` is bumped by BOTH paths now, and `sail_raid1` keeps its key so today's rows survive.
-        { key: "sail_raid1", label: "Win a ship battle", metric: "ship_battle", need: 1, reward: { gold: 220 }, rewardLabel: "+220 gold" },
+        { key: "sail_raid1", label: "Win a ship battle", metric: "ship_battle", need: 1, reward: { gold: 110 }, rewardLabel: "+110 gold" },
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
         // the one task you can finish without waiting on a four-hour timer.
-        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
+        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 55 }, rewardLabel: "+55 gold" },
     ],
     // The Kitchen's three. Deliberately one of each SHAPE so a day in the kitchen isn't three of the same
     // action: cook a few dishes (volume), prep ingredients (the chain that feeds them), and land a clean run
     // (skill at the timing bar).
     cooking: [
-        { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
-        { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
-        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { gold: 200 }, rewardLabel: "+200 gold" },
+        { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 75 }, rewardLabel: "+75 gold" },
+        { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 55 }, rewardLabel: "+55 gold" },
+        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { gold: 100 }, rewardLabel: "+100 gold" },
     ],
     // THE CASINO'S THREE. The floor is a gold SINK, which makes its bounties a different problem from every
     // other card here: paying people to gamble is paying them to lose, and a card that hands back more than
@@ -71,11 +71,11 @@ export const FEATURE_DAILIES = {
     // pays the least per unit of luck involved, because rewarding luck is how a bounty stops meaning
     // anything: you either got it or you did not, and nothing you chose changed it.
     casino: [
-        { key: "cas_play5", label: "Play 5 times on the floor", metric: "casino_play", need: 5, reward: { gold: 150 }, rewardLabel: "+150 gold" },
+        { key: "cas_play5", label: "Play 5 times on the floor", metric: "casino_play", need: 5, reward: { gold: 75 }, rewardLabel: "+75 gold" },
         // Was "take a spin on the wheel" until the wheel was removed. Keno is the shared round now, and it
         // is the same ask: put a ticket on a timed draw with other people rather than pull a lever alone.
-        { key: "cas_keno1", label: "Buy a keno ticket", metric: "casino_keno", need: 1, reward: { gold: 110 }, rewardLabel: "+110 gold" },
-        { key: "cas_win1", label: "Win on any machine", metric: "casino_win", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
+        { key: "cas_keno1", label: "Buy a keno ticket", metric: "casino_keno", need: 1, reward: { gold: 55 }, rewardLabel: "+55 gold" },
+        { key: "cas_win1", label: "Win on any machine", metric: "casino_win", need: 1, reward: { gold: 60 }, rewardLabel: "+60 gold" },
     ],
 };
 

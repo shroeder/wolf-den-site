@@ -19,6 +19,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 import { equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
@@ -98,8 +99,11 @@ function prizeDesc(p) {
 }
 
 // Progressive jackpot tuning (shared community pot).
-const JACKPOT_BASE = 5000;      // pot reseeds to this when won
-const JACKPOT_CONTRIB = 15;     // every spin adds this to the pot
+// HALVED with the rest of the faucets, but nerfed at the CONTRIBUTION rather than the payout: the wheel
+// shows the running pot on screen, so halving what it pays out would make that number a lie. The spins
+// that feed it are free, which is what makes the pot a mint rather than a player-funded pool.
+const JACKPOT_BASE = 2500;      // pot reseeds to this when won
+const JACKPOT_CONTRIB = 8;      // every spin adds this to the pot
 const MINI_JACKPOT_AMT = 2200;  // the fixed MINI JACKPOT wedge — must stay above the 1,000 rare wedge
 
 // TWENTY wedges — one prize each, shown on the wheel with real sprites. Regular prizes + four special wedges
@@ -402,7 +406,7 @@ async function grantPrize(buyerId, prize, opts = {}) {
         return { sprite, text: `MAJOR JACKPOT — ${won.toLocaleString()} gold!`, amount: won };
     }
     if (prize.kind === "gold") {
-        const amt = Math.round(prize.amount * hh * goldMult);
+        const amt = mint(Math.round(prize.amount * hh * goldMult), "spin_prize");
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
         await logCoin(buyerId, amt, "spin_prize", { meta: { prize: prize.label } }).catch(() => {});
         if (prize.mini) await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});

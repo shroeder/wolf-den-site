@@ -18,6 +18,7 @@ import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { checkTownRaidBadges } from "@/lib/marketplace/town-badges.js";
 import { maybeGrantRaidPet } from "@/lib/marketplace/pet-drops.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
@@ -674,7 +675,7 @@ async function resolveTownEvent(eventId, outcome) {
     const chieftainDown = waves >= CHIEFTAIN_WAVE;
     // 0 waves → participation only; each wave adds a slice; the Chieftain pays the full purse.
     const progress = chieftainDown ? 1 : Math.min(1, waves / CHIEFTAIN_WAVE);
-    const compGold = Math.round(RAID_MAX_GOLD * progress);
+    const compGold = mint(Math.round(RAID_MAX_GOLD * progress), "raid_complete");
     const compXp = Math.round(RAID_PARTICIPATION_XP * (0.35 + 0.65 * progress)); // showing up is always worth XP
 
     for (const h of hits) {
@@ -1017,7 +1018,7 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     const xpLeft = Math.max(0, DUEL_XP_BUDGET * budgetX - Number(xpSpent?.xp || 0));
     const cappedGold = coin > 0 && goldLeft <= 0;
     const cappedXp = xp > 0 && xpLeft <= 0;
-    coin = Math.min(coin, goldLeft);
+    coin = mint(Math.min(coin, goldLeft), "town_duel");
     xp = Math.min(xp, xpLeft);
 
     if (coin > 0) {

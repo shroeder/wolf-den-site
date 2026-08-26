@@ -17,75 +17,75 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // chosen deterministically from the date so every member sees the same quests, stable for the whole day.
 const QUEST_POOL = {
     rally: { icon: "GiCrossedSwords", variants: [
-        { label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 150 },
-        { label: "Hold the Line", desc: "Land 30 hits on a town raid", target: 30, gold: 280 },
+        { label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 75 },
+        { label: "Hold the Line", desc: "Land 30 hits on a town raid", target: 30, gold: 140 },
     ] },
     // NO CHAT QUEST. "Send 5 chats or emotes in town" paid 80 gold for five keystrokes and the Den chat filled
     // up with people posting the same wolf emoji five times in a row to clear it. A daily that rewards VOLUME of
     // talking buys spam, not conversation — there is no target number that doesn't. If social ever comes back it
     // has to reward something you can't grind (being replied to, being thanked), not message count.
     civic: { icon: "GiHammerNails", variants: [
-        { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100 },
-        { label: "Town Benefactor", desc: "Chip in to the plaza fund 3 times", target: 3, gold: 240 },
+        { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 50 },
+        { label: "Town Benefactor", desc: "Chip in to the plaza fund 3 times", target: 3, gold: 120 },
     ] },
     patron: { icon: "GiBeerStein", variants: [
-        { label: "Tavern Patron", desc: "Down your daily pint (or win a dice hand)", target: 1, gold: 60 },
-        { label: "Life of the Party", desc: "Enjoy the tavern 3 times today", target: 3, gold: 140 },
+        { label: "Tavern Patron", desc: "Down your daily pint (or win a dice hand)", target: 1, gold: 30 },
+        { label: "Life of the Party", desc: "Enjoy the tavern 3 times today", target: 3, gold: 70 },
     ] },
     well: { icon: "GiWaterSplash", variants: [
-        { label: "Make a Wish", desc: "Toss a coin in the Wishing Well", target: 1, gold: 70 },
+        { label: "Make a Wish", desc: "Toss a coin in the Wishing Well", target: 1, gold: 35 },
     ] },
     merchant: { icon: "GiSwapBag", variants: [
-        { label: "Window Shopping", desc: "Buy a chest from the Traveling Merchant", target: 1, gold: 90 },
+        { label: "Window Shopping", desc: "Buy a chest from the Traveling Merchant", target: 1, gold: 45 },
     ] },
     harvest: { icon: "GiWheat", variants: [
-        { label: "Bring in the Sheaves", desc: "Harvest 5 crops on your farm", target: 5, gold: 110 },
-        { label: "Full Barn", desc: "Harvest 12 crops on your farm", target: 12, gold: 220 },
+        { label: "Bring in the Sheaves", desc: "Harvest 5 crops on your farm", target: 5, gold: 55 },
+        { label: "Full Barn", desc: "Harvest 12 crops on your farm", target: 12, gold: 110 },
     ] },
     angler: { icon: "GiFishingHook", variants: [
-        { label: "Something for the Pot", desc: "Land 3 fish", target: 3, gold: 100 },
-        { label: "Full Creel", desc: "Land 8 fish", target: 8, gold: 210 },
+        { label: "Something for the Pot", desc: "Land 3 fish", target: 3, gold: 50 },
+        { label: "Full Creel", desc: "Land 8 fish", target: 8, gold: 105 },
     ] },
     // Digs are random PROCS during a voyage, not something you can decide to do — so these were written as if
     // they were. Across 207 member-days the best anyone has ever managed is 8, and the average is 1.6, which
     // made "dig 15" literally unachievable and "dig 6" a 95th-percentile day. Retuned to the real curve.
     voyage: { icon: "GiSailboat", variants: [
-        { label: "Weigh Anchor", desc: "Dig 2 times at sea", target: 2, gold: 120 },
-        { label: "Deep Water", desc: "Dig 5 times at sea", target: 5, gold: 250 },
+        { label: "Weigh Anchor", desc: "Dig 2 times at sea", target: 2, gold: 60 },
+        { label: "Deep Water", desc: "Dig 5 times at sea", target: 5, gold: 125 },
     ] },
     slayer: { icon: "GiBloodySword", variants: [
-        { label: "Blood on the Blade", desc: "Strike the weekly boss 3 times", target: 3, gold: 130 },
-        { label: "Boss Hunter", desc: "Strike the weekly boss 8 times", target: 8, gold: 260 },
+        { label: "Blood on the Blade", desc: "Strike the weekly boss 3 times", target: 3, gold: 65 },
+        { label: "Boss Hunter", desc: "Strike the weekly boss 8 times", target: 8, gold: 130 },
     ] },
     smith: { icon: "GiBlacksmith", variants: [
-        { label: "Sparks Fly", desc: "Salvage or enhance 2 items at the Forge", target: 2, gold: 120 },
+        { label: "Sparks Fly", desc: "Salvage or enhance 2 items at the Forge", target: 2, gold: 60 },
     ] },
     cook: { icon: "GiCookingPot", variants: [
-        { label: "Something on the Stove", desc: "Cook 2 dishes", target: 2, gold: 120 },
+        { label: "Something on the Stove", desc: "Cook 2 dishes", target: 2, gold: 60 },
     ] },
     beastfriend: { icon: "GiPawPrint", variants: [
-        { label: "Good Company", desc: "Feed or pet your pets 3 times", target: 3, gold: 100 },
+        { label: "Good Company", desc: "Feed or pet your pets 3 times", target: 3, gold: 50 },
     ] },
     // The mine's three verbs. The Quartermaster could not ask for any of them before — the whole feature was
     // invisible to both quest systems because mining.js never bumped a metric.
     delver: { icon: "GiLadder", variants: [
-        { label: "Into the Dark", desc: "Take 6 steps down the tunnel", target: 6, gold: 130 },
-        { label: "Bottom of the Shaft", desc: "Take 12 steps down the tunnel", target: 12, gold: 280 },
+        { label: "Into the Dark", desc: "Take 6 steps down the tunnel", target: 6, gold: 65 },
+        { label: "Bottom of the Shaft", desc: "Take 12 steps down the tunnel", target: 12, gold: 140 },
     ] },
     collier: { icon: "GiMining", variants: [
-        { label: "Swing a Pick", desc: "Crack open 2 seams", target: 2, gold: 120 },
-        { label: "Day at the Face", desc: "Crack open 5 seams", target: 5, gold: 250 },
+        { label: "Swing a Pick", desc: "Crack open 2 seams", target: 2, gold: 60 },
+        { label: "Day at the Face", desc: "Crack open 5 seams", target: 5, gold: 125 },
     ] },
     founder: { icon: "GiFlame", variants: [
-        { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 120 },
-        { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 240 },
+        { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 60 },
+        { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 120 },
     ] },
     delver_deep: { icon: "GiKeyLock", variants: [
-        { label: "Into the Dungeon", desc: "Clear 6 dungeon floors", target: 6, gold: 150 },
-        { label: "All the Way Down", desc: "Clear 15 dungeon floors", target: 15, gold: 300 },
+        { label: "Into the Dungeon", desc: "Clear 6 dungeon floors", target: 6, gold: 75 },
+        { label: "All the Way Down", desc: "Clear 15 dungeon floors", target: 15, gold: 150 },
     ] },
     hoarder: { icon: "GiChest", variants: [
-        { label: "Crack Them Open", desc: "Open 3 chests", target: 3, gold: 110 },
+        { label: "Crack Them Open", desc: "Open 3 chests", target: 3, gold: 55 },
     ] },
 };
 const ACTIVITY_KEYS = Object.keys(QUEST_POOL);
@@ -163,8 +163,11 @@ export async function claimTownQuest(buyerId, key) {
         [buyerId, key, q.target]
     ).catch(() => null);
     if (!claimed) return { ok: false, error: "not_ready" };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, q.gold]).catch(() => null);
-    await logCoin(buyerId, q.gold, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
+    // NOT minted here - the board shows each quest's gold on the card before you claim it, so the table
+    // itself is halved (see gold-rate.js for which sources are tuned where).
+    const qGold = q.gold;
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, qGold]).catch(() => null);
+    await logCoin(buyerId, qGold, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
     // The Pathfinder waits on this. Claiming a town quest had no activity event at all, so the guide step for it
     // was hung off `town_merchant` and `tavern_barkeep` — two names inherited from the old onboarding list that
     // NOTHING in the codebase has ever emitted — plus `buy_upgrade`, which is a sailing event.

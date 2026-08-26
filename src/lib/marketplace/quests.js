@@ -8,6 +8,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpFeatureDaily } from "@/lib/marketplace/feature-dailies.js";
 import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -144,7 +145,9 @@ async function insertQuests(buyerId, day, templates, headStart = false) {
         await db.query(
             `INSERT INTO mkt_daily_quest (buyer_id, day, quest_key, target, reward_gold, reward_chest, progress)
              VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (buyer_id, day, quest_key) DO NOTHING`,
-            [buyerId, day, t.key, t.target, t.gold || 0, t.chest || null, headStart ? 1 : 0]
+            // Minted HERE, at issue, not at claim: the row is what the card shows the member, so the stored
+            // figure has to be the one that gets paid. Minting at claim would promise N and hand over N/2.
+            [buyerId, day, t.key, t.target, mint(t.gold || 0, "quest_reward"), t.chest || null, headStart ? 1 : 0]
         ).catch(() => {});
     }
 }

@@ -16,19 +16,24 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantMissingBadge } from "@/lib/marketplace/badges.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { equippedPowers, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
 // payoff on day 7 (then the cycle repeats — so every 7th day is a jackpot).
 
+// HALVED IN THE TABLE, not at the credit, and deliberately so. Every row here carries a LABEL with the figure
+// written into it, and this is an authored table rather than a computed reward — so running it through mint()
+// would pay 30 while the screen promised 60. The same rule the paytables follow: a static table is tuned where
+// it is written. Figures below are the pre-nerf ones halved (60/120/200/260/320/900).
 const STREAK_REWARDS = [
+    { gold: 30, label: "30 gold", emoji: "🪙" },
     { gold: 60, label: "60 gold", emoji: "🪙" },
-    { gold: 120, label: "120 gold", emoji: "🪙" },
     { treat: "treat_snack", label: "a Hearty Snack (pet XP)", emoji: "🍖" },
-    { gold: 200, label: "200 gold", emoji: "🪙" },
-    { gold: 260, label: "260 gold", emoji: "🪙" },   // was an Iron chest — a check-in is a claim
-    { gold: 320, treat: "treat_toy", label: "320 gold + a Chew Toy", emoji: "🎁" },
-    { gold: 900, label: "900 gold", emoji: "🏆" }, // day-7. Was 480 + an Iron chest; a streak is a claim, so it pays coin.
+    { gold: 100, label: "100 gold", emoji: "🪙" },
+    { gold: 130, label: "130 gold", emoji: "🪙" },   // was an Iron chest — a check-in is a claim
+    { gold: 160, treat: "treat_toy", label: "160 gold + a Chew Toy", emoji: "🎁" },
+    { gold: 450, label: "450 gold", emoji: "🏆" }, // day-7. Was 480 + an Iron chest; a streak is a claim, so it pays coin.
 ];
 const rewardForStreak = (streak) => STREAK_REWARDS[((Math.max(1, streak) - 1) % 7)];
 
@@ -132,6 +137,7 @@ async function resolveLoginProcs(buyerId) {
     const out = [];
     for (const p of procs) {
         if (p.kind === "gold") {
+            p.amount = mint(p.amount, "checkin"); // written back so the line the member reads matches the credit
             await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, p.amount]).catch(() => {});
             await logCoin(buyerId, p.amount, "checkin", { meta: { proc: p.label } }).catch(() => {});
             out.push({ emoji: "🪙", text: `${p.label} found ${p.amount} gold!` });
@@ -195,8 +201,15 @@ export async function claimDailyCheckin(buyerId) {
     const reward = rewardForStreak(nextStreak);
     // Day's Double pays the whole check-in twice.
     const payMult = dailyPowers.has("day_s_double") ? 2 : 1;
-    if (reward.gold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, reward.gold * payMult]).catch(() => {});
-    if (reward.gold) await logCoin(buyerId, reward.gold, "checkin", { meta: { streak: nextStreak } }).catch(() => {});
+    // Day's Double is part of the payout, so it has to be part of the LEDGER ROW too. This used to credit
+    // `reward.gold * payMult` and log `reward.gold`, which under-reported every doubled check-in in the
+    // coin economy screen. One number now, computed once and used by both.
+    //
+    // A LOCAL, not a write-back: rewardForStreak returns an element of the shared STREAK_REWARDS table.
+    // NOT run through mint() — that table is already halved at source, and doing both would pay a quarter.
+    const paidGold = (reward.gold || 0) * payMult;
+    if (paidGold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, paidGold]).catch(() => {});
+    if (paidGold) await logCoin(buyerId, paidGold, "checkin", { meta: { streak: nextStreak, doubled: payMult > 1 } }).catch(() => {});
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
     if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }, { source: "daily_checkin", meta: { streak: nextStreak } }).catch(() => {});
     // ── THE COUNTING HOUSE ───────────────────────────────────────────────────────────────────────────────

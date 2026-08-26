@@ -12,6 +12,7 @@ import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 import { DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
 // Split out of delves.js purely for size: that file owns the run (start, state, strike, potion) and this one
@@ -427,7 +428,7 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     // Clearing pays a completion purse on top of what you carried out — the reason to risk the last floor.
     const bonusGold = cleared ? Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * 6) : 0;
     const bonusXp = cleared ? Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * 6) : 0;
-    const totalGold = gold + bonusGold;
+    const totalGold = mint(gold + bonusGold, "delve");
     const totalXp = xp + bonusXp;
 
     if (totalGold > 0) {

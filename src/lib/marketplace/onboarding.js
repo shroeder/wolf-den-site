@@ -23,24 +23,24 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 
 export const ONBOARDING_TASKS = [
     // Setup — client-claimed.
-    { key: "notifications", icon: "🔔", label: "Turn on notifications", desc: "Get pinged for boss fights, trades & rewards.", gold: 250, claim: "client" },
-    { key: "location", icon: "📍", label: "Enable location", desc: "Your farm & sailing match your real weather.", gold: 250, claim: "client" },
+    { key: "notifications", icon: "🔔", label: "Turn on notifications", desc: "Get pinged for boss fights, trades & rewards.", gold: 125, claim: "client" },
+    { key: "location", icon: "📍", label: "Enable location", desc: "Your farm & sailing match your real weather.", gold: 125, claim: "client" },
 
     // Learn the systems — each is the single action that makes the feature click.
-    { key: "first_plant", icon: "🌱", label: "Plant your first crop", desc: "The farm grows ingredients while you're away.", gold: 200, events: ["plant_seed"] },
-    { key: "first_harvest", icon: "🌾", label: "Harvest something", desc: "Ripe crops feed your kitchen and your pets.", gold: 200, events: ["harvest_crop"] },
-    { key: "first_cast", icon: "🎣", label: "Land a fish", desc: "The sea pays in gear, chests and the odd pet.", gold: 200, events: ["fish_caught"] },
-    { key: "first_voyage", icon: "⛵", label: "Take the boat out", desc: "Voyages dig up treasure you can't get ashore.", gold: 250, events: ["sail_voyage"] },
-    { key: "first_pet", icon: "🐾", label: "Equip a pet", desc: "Your companion fights beside you and earns while idle.", gold: 200, events: ["equip_pet"] },
-    { key: "first_boss", icon: "⚔️", label: "Strike the weekly boss", desc: "Everyone fights the same boss. Damage earns raffle tickets.", gold: 300, events: ["boss_attack"] },
-    { key: "first_forge", icon: "🔨", label: "Use the forge", desc: "Salvage gear into parts, hammer parts into better gear.", gold: 250, events: ["craft_salvage", "craft_enhance"] },
-    { key: "first_chest", icon: "🧰", label: "Open a chest", desc: "Chests are where most of your early gear comes from.", gold: 150, events: ["open_chest"] },
-    { key: "first_town", icon: "🏘️", label: "Visit the town", desc: "The plaza has a merchant, a tavern and other members' pets.", gold: 150, events: ["pet_other", "town_merchant", "tavern_barkeep", "stockade_act"] },
+    { key: "first_plant", icon: "🌱", label: "Plant your first crop", desc: "The farm grows ingredients while you're away.", gold: 100, events: ["plant_seed"] },
+    { key: "first_harvest", icon: "🌾", label: "Harvest something", desc: "Ripe crops feed your kitchen and your pets.", gold: 100, events: ["harvest_crop"] },
+    { key: "first_cast", icon: "🎣", label: "Land a fish", desc: "The sea pays in gear, chests and the odd pet.", gold: 100, events: ["fish_caught"] },
+    { key: "first_voyage", icon: "⛵", label: "Take the boat out", desc: "Voyages dig up treasure you can't get ashore.", gold: 125, events: ["sail_voyage"] },
+    { key: "first_pet", icon: "🐾", label: "Equip a pet", desc: "Your companion fights beside you and earns while idle.", gold: 100, events: ["equip_pet"] },
+    { key: "first_boss", icon: "⚔️", label: "Strike the weekly boss", desc: "Everyone fights the same boss. Damage earns raffle tickets.", gold: 150, events: ["boss_attack"] },
+    { key: "first_forge", icon: "🔨", label: "Use the forge", desc: "Salvage gear into parts, hammer parts into better gear.", gold: 125, events: ["craft_salvage", "craft_enhance"] },
+    { key: "first_chest", icon: "🧰", label: "Open a chest", desc: "Chests are where most of your early gear comes from.", gold: 75, events: ["open_chest"] },
+    { key: "first_town", icon: "🏘️", label: "Visit the town", desc: "The plaza has a merchant, a tavern and other members' pets.", gold: 75, events: ["pet_other", "town_merchant", "tavern_barkeep", "stockade_act"] },
 
     // The real shop.
-    { key: "first_checkin", icon: "📅", label: "Check in for the day", desc: "A daily streak pays more the longer you keep it.", gold: 200, events: ["daily_checkin"] },
-    { key: "wishlist", icon: "🔎", label: "Add a card to Looking For", desc: "We'll tell you when it lands in the case.", gold: 250, verify: "wishlist" },
-    { key: "in_store", icon: "🛒", label: "Buy something in store", desc: "Real purchases earn XP and gold here too.", gold: 500, verify: "purchase" },
+    { key: "first_checkin", icon: "📅", label: "Check in for the day", desc: "A daily streak pays more the longer you keep it.", gold: 100, events: ["daily_checkin"] },
+    { key: "wishlist", icon: "🔎", label: "Add a card to Looking For", desc: "We'll tell you when it lands in the case.", gold: 125, verify: "wishlist" },
+    { key: "in_store", icon: "🛒", label: "Buy something in store", desc: "Real purchases earn XP and gold here too.", gold: 250, verify: "purchase" },
 ];
 
 const TASK_BY_KEY = new Map(ONBOARDING_TASKS.map((t) => [t.key, t]));

@@ -1222,6 +1222,7 @@ const PROC_BOSSES = [
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as REWARD_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 // A boss is a ten-day fight for the whole pack. Its drops had only a CAP, no floor, so the roll could hand out
 // three commons — a week and a half of everyone's effort paying out in grey. There is now a floor as well:
 // rare (blue) at minimum, epic at most. `floorRarity` is a parameter rather than a constant so raising the bar
@@ -1466,6 +1467,7 @@ export async function attackBoss(buyerId) {
     await awardXp(buyerId, "boss_attack", { dedupeKey: `boss_attack:${hit?.id || `${boss.id}:${slot.n}`}` }).catch(() => {});
     // Signature rewards: Scholar XP + Prospector gold on this hit.
     if (onHit.xp > 0) await awardXp(buyerId, "signature_bonus", { points: onHit.xp, dedupeKey: `sigxp:${hit?.id}` }).catch(() => {});
+    onHit.gold = mint(onHit.gold, "boss_reward"); // the Prospector proc, halved with the rest of the faucets
     if (onHit.gold > 0) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, onHit.gold]).catch(() => {});
     if (onHit.gold > 0) await logCoin(buyerId, onHit.gold, "boss_reward", { meta: { boss: boss.name } }).catch(() => {});
     // Striking the boss is the single biggest thing anybody does in a day, so it carries the heaviest

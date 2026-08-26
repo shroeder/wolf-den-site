@@ -8,6 +8,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { hasPower, oneIn, equippedPowers, powerRoll } from "@/lib/marketplace/ascension-powers.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -236,7 +237,7 @@ export const FISH_MONSTERS = [
 export async function payFishingMonster(buyerId, monsterId, won) {
     const m = fishMonsterById(monsterId);
     if (!buyerId || !m || !won) return null;
-    const gold = 120 * m.tier;
+    const gold = mint(120 * m.tier, "fishing");
     const xp = 40 * m.tier;
     // One chest, at a tier the fight earned. The same ladder the dig and the treasure table use, so a Kraken
     // paying a gold chest means the same thing here as it does anywhere else.
@@ -1129,7 +1130,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     await addToPantry(buyerId, "fish", species.id, (await powerRoll(buyerId, "cellar_key", 3)) ? 2 : 1).catch(() => {});
 
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
-    await awardXp(buyerId, "sail_fish", { points: xp, gold }).catch(() => {});
+    // `minted` - this gold was sized by the caller above and is logged as "fishing" two lines down, so
+    // awardXp must not halve it a second time. See gold-rate.js.
+    await awardXp(buyerId, "sail_fish", { points: xp, gold, minted: true }).catch(() => {});
     await logCoin(buyerId, gold, "fishing", { meta: { species: species.id, cm, quality: q } }).catch(() => {});
 
     // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -1163,7 +1166,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
             [buyerId, sp.id, JSON.stringify({ n: (Number(was?.n) || 0) + 1, best: Math.max(size, Number(was?.best) || 0), firstAt: was?.firstAt || new Date().toISOString() })]
         ).catch(() => {});
         await addToPantry(buyerId, "fish", sp.id, 1).catch(() => {});
-        await awardXp(buyerId, "sail_fish", { points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold }).catch(() => {});
+        await awardXp(buyerId, "sail_fish", { points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold, minted: true }).catch(() => {});
         await logCoin(buyerId, bonusGold, "fishing", { meta: { species: sp.id, bonus: true } }).catch(() => {});
         extras.push({ kind: "fish", label: `${sp.name} — ${size}cm`, gold: bonusGold });
     }

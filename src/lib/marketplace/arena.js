@@ -39,6 +39,7 @@ import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
 import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
@@ -2180,7 +2181,7 @@ async function finishBout(buyerId, row, b, won) {
         && !(Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0));
     let reward = null;
     if (won) {
-        const gold = isPvp ? PVP_GOLD_MIN + Math.floor(Math.random() * (PVP_GOLD_MAX - PVP_GOLD_MIN + 1)) : arenaWinGold(theirPower);
+        const gold = mint(isPvp ? PVP_GOLD_MIN + Math.floor(Math.random() * (PVP_GOLD_MAX - PVP_GOLD_MIN + 1)) : arenaWinGold(theirPower), "arena_win");
         const xp = isPvp ? PVP_XP_MIN + Math.floor(Math.random() * (PVP_XP_MAX - PVP_XP_MIN + 1)) : arenaWinXp(theirPower);
         reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);

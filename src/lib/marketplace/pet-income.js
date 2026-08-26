@@ -5,6 +5,7 @@ import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
 import { GOLD_PER_POINT } from "@/lib/marketplace/pet-perks.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 
 // ===== Pet passive income =====
 // "Earner" pets carry xp_gain / gold_find affinity (and fortune → boss-raffle luck). Those used to be dead
@@ -44,7 +45,7 @@ export async function settlePetIncome(buyerId) {
     if (hours < 0.02) return { xp: 0, gold: 0 }; // <~1 min — nothing meaningful; leave the clock so fractions build
     const { xpPerHour, goldPerHour } = await petIncomeRate(buyerId);
     const xp = Math.floor(xpPerHour * hours);
-    const gold = Math.floor(goldPerHour * hours);
+    const gold = mint(Math.floor(goldPerHour * hours), "pet_income");
     if (xp <= 0 && gold <= 0) {
         // No earners → advance the clock so idle time doesn't bank against a future earner pet.
         await db.query(`UPDATE mkt_buyer SET pet_income_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});

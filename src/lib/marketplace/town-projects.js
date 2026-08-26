@@ -52,7 +52,9 @@ export const TOWN_PROJECTS = [
         id: "well", category: "civic", name: "The Wishing Well", emoji: "🪙", maxLevel: 10,
         desc: "Raise a wishing well in the square. Every member can toss a coin ONCE a day for a blessing of gold — and it grows richer each level.",
         baseCost: 1800, costMult: 1.8,
-        perk: (lvl) => ({ wellGold: 100 + lvl * 70, wellXp: lvl * 6 }),
+        // Halved with the rest of the faucets. Tuned in the formula rather than minted at the claim
+        // because the town blurb prints this number back at the member ("Daily wish: 240g").
+        perk: (lvl) => ({ wellGold: 50 + lvl * 35, wellXp: lvl * 6 }),
     },
 ];
 const PROJECT_BY_ID = Object.fromEntries(TOWN_PROJECTS.map((p) => [p.id, p]));
