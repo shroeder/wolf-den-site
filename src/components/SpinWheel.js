@@ -352,7 +352,7 @@ export default function SpinWheel() {
             </div>
 
             <div className={`cw-stage${spinning ? " is-spinning" : ""}`}>
-                <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}`}>
+                <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}${st?.wheel?.id === "wheel_gold" ? " is-gold" : ""}`}>
                     <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: phase === "lead" ? `transform ${LEAD_MS}ms linear` : phase === "land" ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
@@ -638,6 +638,13 @@ const CW_CSS = `
 .cw-ring { position: relative; width: 100%; height: 100%; }
 .cw-rotor { position: absolute; top: 50%; left: 50%; width: 82%; height: 82%; transform-origin: center; will-change: transform; }
 .cw-disc { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 8px 26px rgba(0,0,0,0.55); }
+/* THE GOLDEN WHEEL wears the same disc, lit differently. A second painting would be a second thing that has
+   to stay exactly 20 wedges forever (WHEEL_WEDGES is the contract between the array and the picture), so only
+   the light changes. The glow sits on .cw-disc rather than .cw-ring because the disc is the round element —
+   .cw-ring is a square box and a ring shadow on it would be a square halo. */
+.cw-ring.is-gold .cw-disc { filter: sepia(0.5) saturate(1.85) hue-rotate(-10deg) brightness(1.1) contrast(1.04);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.55), 0 0 0 3px #ffd75e, 0 0 30px rgba(255,215,94,0.55), 0 0 70px rgba(255,215,94,0.22); }
+.cw-ring.is-gold .cw-ico-img { filter: drop-shadow(0 0 4px rgba(255,215,94,0.7)); }
 .cw-icons { position: absolute; inset: 0; }
 .cw-ico { position: absolute; width: 9.5%; height: 9.5%; display: grid; place-items: center; border-radius: 50%;
     background: radial-gradient(circle, rgba(8,5,2,0.62) 48%, rgba(8,5,2,0) 74%); }

@@ -209,7 +209,9 @@ const WHEELS = [
 // "next wheel at level N" teaser — see the notes on both.
 const GOLD_WHEEL = {
     id: "wheel_gold", name: "The Golden Wheel", minLevel: 1, perk: "wheel_gold",
-    disc: "/images/spin/wheel-disc-gold.png",
+    // NO SEPARATE DISC PAINTING. WHEEL_WEDGES is the contract between this array and the picture, and a
+    // second disc would be a second thing that has to stay exactly 20 wedges forever. The client tints the
+    // one disc instead — same geometry, gold light. See .cw-ring.is-gold.
     prizes: [
         { label: "600 gold", sprite: "coins-small", weight: 11, kind: "gold", amount: 600 },
         { label: "Farm Decoration", sprite: "farm-deco", weight: 7, kind: "decoration" },
