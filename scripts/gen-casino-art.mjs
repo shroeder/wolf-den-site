@@ -59,10 +59,22 @@ const PUBLIC = path.join(process.cwd(), "public", "images", "casino");
 // of small coins" when the machine is fruit — lime star fruit, oranges, strawberries — and The Vault's showed
 // "a crown" when every symbol on it is a cut gem. You walk up to a cabinet and then sit at it, so the glass
 // is a promise about what you are about to see. Each one now shows its own top symbols.
+// ── AND THE WHOLE CABINET HAS TO BE INSIDE THE PICTURE ────────────────────────────────────────────────────────
+// Every one of the five shipped cabinets was AMPUTATED: the arched marquee ran off the top of the canvas and
+// came out sliced flat, which on the floor reads as a machine with its crown cut off. Luke sent two shots of
+// it. A contact sheet catches this in seconds and nothing else does -- on the floor each cabinet is about
+// ninety pixels tall and the flat top just looks like a design.
+//
+// The framing instruction is part of the SHARED clause rather than a note on one prompt, because the failure
+// was shared: same clause, same silhouette, same mistake five times.
+const FRAMING =
+    " The ENTIRE cabinet must be inside the frame with clear empty space above the marquee and below the "
+    + "plinth -- nothing touching or running off any edge of the image. Centred, whole, with room around it.";
+
 const CABINET =
     "A single free-standing fantasy arcade gambling cabinet seen straight on from the front, upright, taller "
     + "than it is wide, standing on a plinth, with a big glowing glass display of three reels filling the "
-    + "upper half, a lit arched marquee across the top and a button plate with a lever below.";
+    + "upper half, a lit arched marquee across the top and a button plate with a lever below." + FRAMING;
 
 // Gold on every one of them, because he asked for gold on every one of them — and because a gilded frame is
 // what makes a saturated body colour read as rich rather than as plastic. Said once so no cabinet forgets it.

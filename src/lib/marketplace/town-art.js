@@ -116,6 +116,19 @@ const ART_PROMPTS = {
     // shopfront with a coin sign): this is where members sell each other what they GREW and CAUGHT, so it is an
     // open-fronted produce market — the goods are the whole silhouette, and the goods are food.
     market: `A bustling open-air FARMERS MARKET hall — a low open-fronted timber market building with a wide striped canvas awning in green and cream stretched over the front, and beneath it long wooden counters piled high with fresh produce: baskets of orange carrots and red apples, sacks of golden grain, bunches of leafy greens, a crate of silvery FISH on crushed ice, wheels of cheese and hanging strings of onions and garlic. Wooden crates and barrels stacked at the sides, small hanging brass scales, a couple of woven baskets on the ground, warm and abundant and inviting. ${BUILDING_STYLE}`,
+    // THE CASINO. It was still falling through to the purple placeholder card with an OS slot-machine
+    // emoji on it -- in the middle of a painted street, which is exactly what the note on delves/arena above
+    // warns about. Luke: "generate the town sprite."
+    //
+    // Deliberately a BUILDING and not a cabinet: the floor inside is full of cabinets, and a door that looks
+    // like the thing behind it tells you nothing about where you are standing. What says casino from across a
+    // street is the frontage -- lights, a canopy, a way in.
+    casino: `A grand fantasy CASINO frontage -- a handsome stone-and-timber gambling hall with a wide arched
+        entrance under a scalloped crimson canopy, warm golden light spilling out of the doorway, a row of
+        round glowing bulbs framing the arch, a hanging sign shaped like a golden WOLF-HEAD COIN (no letters),
+        two small potted bay trees flanking the steps and a red carpet runner down them, tall narrow windows
+        glowing amber. Rich, inviting, a little grand. CRITICAL: absolutely NO letters, NO words, NO text
+        anywhere on it. ${BUILDING_STYLE}`.replace(/s+/g, " "),
     // Tavern action icons — a frothy pint + a clinking "round" toast (replace the 🍺/🍻 emoji on the barkeep).
     tavern_pint: `A single frothy wooden TANKARD brimming with golden ale under a thick foamy head, a couple of bubbles rising, warm and inviting. Painterly fantasy game-art, clean confident outlines and cel-shaded vibrant colors, a strong readable silhouette, centered. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha) — absolutely NO table, NO surface, NO scenery, NO drop shadow, NO white sticker rim, NO halo. Nothing but the tankard. No text, no logo, no watermark, no border.`,
     tavern_round: `TWO wooden beer TANKARDS clinking together in a cheerful toast, golden ale and foam splashing between them. Painterly fantasy game-art, clean confident outlines and cel-shaded vibrant colors, a strong readable silhouette, centered. ISOLATED as a clean cutout on a FULLY TRANSPARENT background (alpha) — absolutely NO table, NO surface, NO scenery, NO drop shadow, NO white sticker rim, NO halo. Nothing but the two tankards. No text, no logo, no watermark, no border.`,

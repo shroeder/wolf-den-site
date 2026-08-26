@@ -68,18 +68,62 @@ for (const cls of CLASSES) {
 }
 console.table(rows);
 
-// Class against class, which is what the Arena actually pairs.
-console.log("\nClass vs class, mid gear:");
+// ── CLASS AGAINST CLASS, INCLUDING AGAINST ITSELF ────────────────────────────────────────────────────────────
+// This skipped mirrors — `if (a.id === d.id) continue` — on the reasonable-sounding grounds that a class
+// against itself is 50% by symmetry and tells you nothing. The WIN RATE is 50% and tells you nothing. The
+// LENGTH is the whole story, and a mirror is where it goes wrong first: both fighters answer every question
+// the same way, so anything that lets a build refuse to lose compounds against a copy of itself.
+//
+// Warden against Warden ran to SEVENTY-NINE rounds in production against a design target of about ten, for a
+// day, and this simulator could not have caught it — it was the one pairing it refused to run. Mirrors are in
+// now, and every cell reports rounds beside the win rate.
+//
+// ROUNDS ARE THE COLUMN TO READ. A win rate that looks fine can sit on top of a fight nobody can watch.
+console.log("\nClass vs class, mid gear — mirrors included, and rounds are the column that matters:");
 const pvp = [];
 for (const a of CLASSES) {
     for (const d of CLASSES) {
-        if (a.id === d.id) continue;
         const me = fighter(a.id, GEAR.mid, fullTree(a.id));
         const foe = fighter(d.id, GEAR.mid, fullTree(d.id));
         let wins = 0;
-        for (let i = 0; i < RUNS; i += 1) if (bout(me, foe).won) wins += 1;
-        pvp.push({ attacker: a.name, defender: d.name, win: `${((wins / RUNS) * 100).toFixed(1)}%` });
+        let beats = 0;
+        let longest = 0;
+        for (let i = 0; i < RUNS; i += 1) {
+            const r = bout(me, foe);
+            if (r.won) wins += 1;
+            beats += r.beats;
+            if (r.beats > longest) longest = r.beats;
+        }
+        pvp.push({
+            attacker: a.name, defender: d.name,
+            win: `${((wins / RUNS) * 100).toFixed(1)}%`,
+            rounds: +(beats / RUNS).toFixed(1),
+            longest,
+            mirror: a.id === d.id ? "yes" : "",
+        });
     }
 }
 console.table(pvp);
+
+// ── AND A STALL IS A FAILURE, NOT A FOOTNOTE ─────────────────────────────────────────────────────────────────
+// Printing the number and moving on is how the last one survived a full day. Anything averaging past this is
+// called out by name, loudly enough to read in a scroll-back.
+// ── AND THE TEST IS RELATIVE, BECAUSE THE SCALE IS NOT FIXED ─────────────────────────────────────────────
+// A flat "30 rounds" threshold sounds decisive and is not: this table runs at MID gear, where two fighters
+// kill each other in about two rounds, while the production bouts it gets compared against are top-gear
+// members running twelve. An absolute number would either never fire here or fire constantly there.
+//
+// What actually identified the Warden stall was not its length but its length RELATIVE to every other cell
+// -- 79 rounds where the rest sat near 10. So that is the test: a pairing that takes two and a half times
+// the median is the outlier, whatever the median happens to be.
+const rounds = pvp.map((r) => r.rounds).sort((a, b) => a - b);
+const median = rounds[Math.floor(rounds.length / 2)] || 1;
+const STALL_AT = Math.max(median * 2.5, median + 3);
+const stalls = pvp.filter((r) => r.rounds >= STALL_AT);
+if (stalls.length) {
+    console.log(`\n!! ${stalls.length} pairing${stalls.length === 1 ? "" : "s"} run ${STALL_AT.toFixed(1)}+ rounds against a median of ${median} — that is a stall, not a long fight:`);
+    for (const r of stalls) console.log(`     ${r.attacker} vs ${r.defender}: ${r.rounds} rounds (longest ${r.longest})`);
+} else {
+    console.log(`\nNo pairing reaches ${STALL_AT.toFixed(1)} rounds (median ${median}). Longest cell: ${Math.max(...pvp.map((r) => r.rounds))}.`);
+}
 console.log(`\nBleed floor in play: ${BLEED_TURNS} turns minimum, imported not assumed.`);
