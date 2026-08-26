@@ -327,7 +327,19 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
 
 // How fast the keno hopper empties. Slower than bingo's forty because there are only ten of them and each
 // one matters four times as much — a ten-ball draw that is over in a second is a number appearing, not a draw.
-const KENO_BALL_MS = 230;
+const KENO_BALL_MS = 260;
+// ── AND THE TENTH BALL COMES OUT ON ITS OWN ──────────────────────────────────────────────────────────────────
+// Ten balls at an even pace is a progress bar. The tenth is the one that decides most tickets — you can see
+// by the ninth whether you are one short of a rung — so it gets a beat of silence in front of it and the
+// screen says what it is worth while nobody is breathing. Same trick as bingo's last five, and the same
+// reason: the game is made of being one away, and it used to spend that moment at exactly the pace of the
+// third irrelevant ball.
+const KENO_LAST_PAUSE = 950;
+// Keno runs 1-40 and the ball sprites were drawn for bingo's five columns, so eight numbers share each
+// colour. Reused deliberately: a ball is a ball, and a second set of five would be the same five drawings
+// with a different filename.
+const KENO_BALL_ART = ["b", "i", "n", "g", "o"];
+const kenoBallArt = (n) => KENO_BALL_ART[Math.min(4, Math.floor((Math.max(1, n) - 1) / 8))];
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
@@ -941,13 +953,18 @@ export default function CasinoClient({ initial }) {
         if (body.action === "keno" && Array.isArray(r.drawn)) {
             setKenoOut(0);
             const acc2 = ACCENT.keno;
+            const last = r.drawn.length - 1;
             r.drawn.forEach((n, i) => timers.current.push(setTimeout(() => {
                 setKenoOut(i + 1);
                 // Pitched off the ball's own number, so a draw is a little melody rather than the same pop
                 // ten times — and one of YOURS lands harder, because that is the whole feedback loop.
                 Cas.ball(n);
                 if ((r.picks || []).includes(n)) { Cas.daub(); Haptic.hit(0.35); }
-            }, i * KENO_BALL_MS)));
+                // The golden ball announces itself as it lands, whoever it belongs to. That is the whole
+                // point of it being visible before it is resolved.
+                if (i === r.goldIdx) { Cas.jackpot(); Haptic.crit(); }
+                if (i === last) Haptic.hit(0.5);
+            }, i * KENO_BALL_MS + (i === last ? KENO_LAST_PAUSE : 0))));
             timers.current.push(setTimeout(() => {
                 setBusy(false);
                 absorb(r);
@@ -958,7 +975,7 @@ export default function CasinoClient({ initial }) {
                     else { Cas.coins(0.35); Haptic.hit(0.6); throwBurst("coin", acc2); }
                     timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
                 } else Cas.lose();
-            }, r.drawn.length * KENO_BALL_MS + 320));
+            }, r.drawn.length * KENO_BALL_MS + KENO_LAST_PAUSE + 320));
             return;
         }
 
@@ -1243,6 +1260,20 @@ export default function CasinoClient({ initial }) {
 
     // Standing at the rope, on the same rule as standing at a cabinet.
     const vipNear = Math.abs(x - VIP_X) <= REACH;
+
+    // ── ONE BALL LEFT ────────────────────────────────────────────────────────────────────────────────────
+    // Non-null only in the gap before the tenth ball, and only when the next rung actually pays something —
+    // there is no drama in "one more for nothing". `chips` is what that next rung is worth at the selected
+    // stake, through the same conversion the till uses.
+    const kenoPending = useMemo(() => {
+        if (!keno || !busy) return null;
+        const total = keno.drawn?.length || 10;
+        if (kenoOut !== total - 1) return null;
+        const hits = (keno.picks || ticket).filter((n) => keno.drawn.slice(0, kenoOut).includes(n)).length;
+        const next = st?.keno?.pays?.[hits + 1];
+        if (!next) return null;
+        return { hits, chips: chipsFor(Math.round(bet * next), 1) };
+    }, [keno, busy, kenoOut, ticket, st?.keno?.pays, bet]);
 
     // Today's pattern as a Set, so the card can ask 25 times per render without rebuilding an array each time.
     const todayCells = useMemo(() => new Set(st?.bingo?.pattern?.cells || []), [st?.bingo?.pattern]);
@@ -1773,18 +1804,33 @@ export default function CasinoClient({ initial }) {
                                 reflow ten times while you are trying to read it, and so an empty hopper says
                                 "ten of these are coming" before the first one lands. A ball that is one of
                                 yours arrives gold and larger; that is the entire feedback loop of keno. */}
-                            <div className="cas-keno-hopper" aria-live="polite">
-                                {Array.from({ length: st?.keno?.drawn || 10 }, (_, i) => {
-                                    const n = keno?.drawn?.[i];
-                                    const out = keno ? i < kenoOut : false;
-                                    const mine = out && ticket.includes(n);
-                                    return (
-                                        <span key={i}
-                                            className={`cas-kball${out ? " is-out" : ""}${mine ? " is-mine" : ""}${out && i === kenoOut - 1 ? " is-new" : ""}`}>
-                                            {out ? n : ""}
-                                        </span>
-                                    );
-                                })}
+                            {/* ── THE CAGE AND THE TEN SLOTS ───────────────────────────────────
+                                The slots are drawn empty from the start, so the hopper is a row of ten
+                                waiting places rather than a list that grows — you can see how many are left
+                                to come, which is most of what makes a draw watchable. Each ball DROPS into
+                                its slot rather than appearing in it.
+
+                                The golden ball is gold from the moment it lands, before anybody knows whose
+                                it is. That is deliberate: a bonus that only announces itself once it has
+                                paid is a bonus nobody ever gets to hope for. */}
+                            <div className="cas-keno-draw">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className={`cas-cage${busy ? " is-turning" : ""}`} alt=""
+                                    src="/images/casino/bingo/cage.webp" width={52} height={52} draggable="false" />
+                                <div className="cas-keno-hopper" aria-live="polite">
+                                    {Array.from({ length: st?.keno?.drawn || 10 }, (_, i) => {
+                                        const n = keno?.drawn?.[i];
+                                        const out = keno ? i < kenoOut : false;
+                                        const mine = out && ticket.includes(n);
+                                        const isGold = out && keno?.goldIdx === i;
+                                        return (
+                                            <span key={i}
+                                                className={`cas-kball${out ? ` is-out is-${kenoBallArt(n)}` : ""}${mine ? " is-mine" : ""}${isGold ? " is-gold" : ""}${out && i === kenoOut - 1 ? " is-new" : ""}`}>
+                                                {out ? n : ""}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div className="cas-grid">
@@ -1837,11 +1883,19 @@ export default function CasinoClient({ initial }) {
                                 })}
                             </div>
 
-                            <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}`}>
+                            {/* ── AND WHAT IS RIDING ON THE LAST BALL ──────────────────────────
+                                While nine are down and the tenth is still in the cage, this says what the
+                                next rung is worth rather than counting balls at you. It is the only moment
+                                in a keno ticket where the outcome is genuinely in the air and the player can
+                                see exactly what it is worth — the screen used to spend it saying "9 of 10
+                                drawn…". */}
+                            <p className={`cas-result${keno?.won > 0 ? " is-win" : ""}${kenoPending ? " is-edge" : ""}`}>
                                 {keno && !busy
-                                    ? `${keno.hits.length} of 5 — ${keno.won > 0 ? `${money(keno.won)} chips` : "nothing"}`
-                                    : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
-                                        : `${ticket.length} of 5 picked`}
+                                    ? `${keno.hits.length} of 5${keno.goldMine ? ` · the golden ball doubled it` : ""} — ${keno.won > 0 ? `${money(keno.won)} chips` : "nothing"}`
+                                    : kenoPending
+                                        ? `${kenoPending.hits} of 5 · one more is ${money(kenoPending.chips)}`
+                                        : keno ? `${kenoOut} of ${keno.drawn.length} drawn…`
+                                            : `${ticket.length} of 5 picked`}
                             </p>
                         </div>
                     ) : null}

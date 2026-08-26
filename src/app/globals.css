@@ -17935,6 +17935,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* In the controls rather than in the game, so it cannot end up under them. Tighter margin because it is
    sitting directly on top of the stake row. */
 .cas-result.is-pinned { margin: 0 0 8px; }
+/* Nine down, one in the cage, and something real riding on it. Loud, because this is the only moment in a
+   keno ticket where the outcome is genuinely in the air. */
+.cas-result.is-edge { color: #ffe9a8; font-weight: 900; font-size: 13.5px;
+    animation: casEdge .9s ease-in-out infinite; }
+@keyframes casEdge { 0%, 100% { opacity: .72; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cas-result.is-edge { animation: none; opacity: 1; } }
 .cas-result.is-win { color: var(--acc, #ffd75e); font-weight: 900; font-size: 1.05rem;
     text-shadow: 0 0 18px color-mix(in srgb, var(--acc, #ffd75e) 50%, transparent); }
 
@@ -18282,9 +18288,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    background rather than a pseudo-element on purpose: a background paints behind the element's own content
    with no stacking games, and an absolutely positioned ::before would paint over the card. */
 .cas-hall { position: relative; margin: 0 0 10px; border-radius: 14px;
-    background-image: linear-gradient(rgba(11,8,15,.84), rgba(11,8,15,.93)),
+    /* ── THE ROOM, TURNED WAY DOWN ──
+       At .84 the hall was still legible THROUGH the card — lamps behind numbers, tables behind the ball
+       strip — and the whole screen went brown. Luke: "very muddy... needs more pop in the colors and
+       clarity, hard to tell what's going on." A backdrop that can be read is not a backdrop, it is a second
+       picture competing with the one that matters. Nearly opaque now, and desaturated with it: what is left
+       is the SHAPE of a room — the lamps, the vanishing point — under everything, which is all it was ever
+       supposed to contribute. */
+    background-image: linear-gradient(rgba(9,7,13,.94), rgba(9,7,13,.97)),
         url("/images/casino/bingo/hall.webp");
-    background-size: cover; background-position: center 38%;
+    background-size: cover; background-position: center 38%; background-blend-mode: normal, luminosity;
     border: 1px solid rgba(255,255,255,.06); }
 /* The caller and his line, on one row. He is 44px and the line is one line, so this costs the eight pixels
    the old sentence cost and buys somebody to be saying it. */
@@ -18300,37 +18313,52 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-bhead, .cas-bcard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
 .cas-bcard { margin-top: 5px; }
+/* A COLD SQUARE IS COLD. It was rgba(255,255,255,.04) over a lit backdrop, which is barely a square at all —
+   and the marked ones could not pop against it because there was nothing to pop against. Solid and dark, so
+   the card is a grid of black tiles and every mark on it is an event. */
 .cas-bcell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
     /* `relative` + `overflow: hidden` so the dragon's flame is drawn inside the square it set alight and
        cannot bleed onto its neighbours — see .cas-flame. */
     position: relative; overflow: hidden;
-    border-radius: 8px; font-size: 13px; font-weight: 800; color: #cbd3dc;
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 8px; font-size: 15px; font-weight: 900; color: #e8eef6;
+    background: #0c0a12; border: 1px solid rgba(255,255,255,0.10);
     transition: background .18s ease, color .18s ease, transform .18s ease; }
 /* A daub. It lands with a little pop, because the whole appeal of bingo is watching your own card fill in
    — a grid that arrives already completed is a receipt. */
-/* The CELL only tints now — the blot on top of it is the mark. It used to be a solid gold fill, and a
-   solid fill under a magenta blot is mud: two strong colours fighting over the same 56 pixels, with the
-   number caught in the middle of it. */
-.cas-bcell.is-hit { color: #fff; background: rgba(255,255,255,.06);
-    border-color: rgba(255,120,200,.45); animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
+/* ── A MARK, NOT A GUMBALL ──
+   Luke: "not a huge fan of the dauber." He is right and I had it backwards. The blot was drawn at full
+   opacity across the whole cell, so a daubed square read as a big pink sphere with a number balanced on it —
+   the sprite became the object and the number became decoration on it. On a card, the NUMBER is the thing;
+   the mark is something a hand did over the top of it.
+   So the cell itself carries the colour, bright and flat and unmistakable at a glance, and the blot is a
+   texture over it at a third opacity — enough to see the uneven edge and the spatter, not enough to be a
+   ball. Same sprite, a quarter of the volume. */
+.cas-bcell.is-hit { color: #fff;
+    background: linear-gradient(180deg, #f0479a, #c31f74);
+    border-color: #ff7ec0; box-shadow: 0 0 12px rgba(240,71,154,.35) inset;
+    animation: casDaub .22s cubic-bezier(.2,1.6,.4,1) both; }
 /* The free square is ALWAYS marked — that is what free means — so it must not be styled as though it is
    waiting for a ball. This rule sat AFTER .is-hit and overrode its background, so the one cell on the card
    that is marked before the game starts was the one cell that looked empty. Set the whole daubed look here
    rather than only the colour; a rule that wins on one property and loses on another is worse than either. */
-.cas-bcell.is-free, .cas-bcell.is-free.is-hit { color: #0e1116;
-    background: rgba(255,215,94,.10); border-color: rgba(255,215,94,.5); animation: none; }
+.cas-bcell.is-free, .cas-bcell.is-free.is-hit { color: #0e1116; box-shadow: none;
+    background: radial-gradient(120% 120% at 50% 20%, #3a2c10, #14100a);
+    border-color: rgba(255,215,94,.55); animation: none; }
 /* The line that paid, marked once the balls have stopped. */
-.cas-bcell.is-line { box-shadow: 0 0 0 2px rgba(126,255,178,0.75), 0 0 16px rgba(126,255,178,0.4); }
+/* Loud enough to win an argument with a daubed cell underneath it — a line is drawn ON a row of marks, so
+   its ring has to beat the mark's own glow rather than merely differ from it. */
+.cas-bcell.is-line { box-shadow: 0 0 0 2px #7effb2, 0 0 18px rgba(126,255,178,.6); z-index: 2; }
 /* ── AND THE MARK IS A MARK ──
    A daubed square was a solid gold fill, which reads as a lit cell rather than as a card somebody has been
    marking. The blot goes UNDER the number (.cas-bnum is z-index 1) and over the cell, so the digit stays
    legible through it — which is the whole difference between a daub and a redaction. */
-.cas-bcell.is-hit::before, .cas-bcell.is-free::before { content: ""; position: absolute; inset: 4%;
+.cas-bcell.is-hit::before, .cas-bcell.is-free::before { content: ""; position: absolute; inset: -2%;
     z-index: 0; background: url("/images/casino/bingo/daub.webp") center / contain no-repeat;
-    opacity: .92; pointer-events: none; }
-/* The middle square is marked before the game starts and it is the one square the house signs. */
-.cas-bcell.is-free::before { background-image: url("/images/casino/bingo/free.webp"); inset: 6%; opacity: 1; }
+    opacity: .34; mix-blend-mode: soft-light; pointer-events: none; }
+/* The middle square is marked before the game starts and it is the one square the house signs. The medallion
+   IS the content of that cell, so unlike the daub it is drawn full strength and full size. */
+.cas-bcell.is-free::before { background-image: url("/images/casino/bingo/free.webp"); inset: 6%; opacity: 1;
+    mix-blend-mode: normal; }
 @keyframes casDaub { from { transform: scale(1.35); } to { transform: none; } }
 
 /* The balls, in the order they came out. They wrap and keep going — forty of them is a lot, and the point
@@ -18580,7 +18608,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    .cas-controls under it, so the auto margin had nothing to share the slack with and shoved the whole shelf
    to the bottom — by exactly as much as the shortest tab was short. Four doors sat nearly two hundred pixels
    lower than five chests, which moved the tab bar you had just tapped out from under your thumb. */
-.cas-stage .cas-panel-head + .cs { margin-top: 0; }
+.cas-stage .cas-panel-head + .cs,
+.cas-stage .cas-panel-head + .cas-hall { margin-top: 0; }
+/* THE HALL IS THE SAME CASE AS THE SHELF, and it took me two goes to notice. A bingo card is five rows of
+   56px plus a caller, a pattern banner and a strip of called balls — comfortably taller than a phone — so the
+   auto margin above shoved all of it DOWN, and the bottom row of the card, the ball strip and the result all
+   ended up underneath controls that are sticky and opaque. Luke: "kind of overlap". A machine is centred in
+   its slack; anything that is already taller than the screen has no slack to be centred in.
+   And a floor of clearance under it, so the last row of the card can always be scrolled clear of the
+   controls rather than stopping exactly behind them. */
+.cas-stage .cas-hall { padding-bottom: 8px; }
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
@@ -22288,6 +22325,10 @@ body.cas-seated .social-fab { display: none; }
    would reflow ten times while you are trying to read it, and an empty hopper is what tells you ten of
    these are coming. A ball that is one of yours is gold and bigger — that is the entire feedback loop of
    keno and it is worth spending the loudest thing on the screen on. */
+/* The cage on the left, the ten slots taking what is left. Same cage sprite the bingo hall uses — it is the
+   same building and the same machine, and a second drawing of one would only be a way for them to disagree. */
+.cas-keno-draw { display: flex; align-items: center; gap: 8px; }
+.cas-keno-draw .cas-keno-hopper { flex: 1 1 auto; min-width: 0; }
 .cas-keno-hopper { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px;
     padding: 8px 7px; border-radius: 12px;
     background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.3));
@@ -22295,20 +22336,48 @@ body.cas-seated .social-fab { display: none; }
 .cas-kball { aspect-ratio: 1; border-radius: 999px; display: grid; place-items: center;
     font-size: 11px; font-weight: 900; font-variant-numeric: tabular-nums; color: #6b7683;
     background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.09); }
-.cas-kball.is-out { color: #dce8f4;
-    background: radial-gradient(circle at 50% 32%, #55637a, #262e3a); border: 1px solid rgba(255,255,255,.16);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 3px rgba(0,0,0,.5); }
-/* One of yours. The only lit thing on the rail. */
-.cas-kball.is-mine { color: #2a1c05;
-    background: radial-gradient(circle at 50% 30%, #fff0bb, #f0c04e 52%, #c9932c);
-    border-color: rgba(255,231,160,.7);
-    box-shadow: 0 0 14px rgba(255,200,90,.9), inset 0 1px 0 rgba(255,255,255,.55); }
-.cas-kball.is-new { animation: casBallDrop .34s cubic-bezier(.2,1.6,.4,1) both; }
+/* ── A BALL THAT CAME OUT IS A BALL ──
+   The drawn ones were a CSS gradient sphere. They are the drawn sprites now — the same five the bingo hall
+   uses, eight of keno's forty numbers to each colour — so the two games on this floor are visibly playing
+   with the same equipment. The number sits on the sprite's blank ivory face, which is why the face was drawn
+   centred and empty in the first place. */
+.cas-kball.is-out { color: #2b1f12; border: 0; background: var(--ball) center / contain no-repeat;
+    box-shadow: none; }
+.cas-kball.is-b { --ball: url("/images/casino/bingo/ball-b.webp"); }
+.cas-kball.is-i { --ball: url("/images/casino/bingo/ball-i.webp"); }
+.cas-kball.is-n { --ball: url("/images/casino/bingo/ball-n.webp"); }
+.cas-kball.is-g { --ball: url("/images/casino/bingo/ball-g.webp"); }
+.cas-kball.is-o { --ball: url("/images/casino/bingo/ball-o.webp"); }
+/* One of yours. It keeps its own colour — that is which part of the board it came from and it is worth
+   knowing — and gets a ring and a glow instead, so "mine" reads as a state rather than as a sixth colour. */
+.cas-kball.is-mine { border-radius: 999px;
+    box-shadow: 0 0 0 2px #ffd75e, 0 0 14px rgba(255,200,90,.85); }
+/* ── AND THE GOLDEN BALL ──
+   Gold from the moment it lands, whoever it belongs to — see the note on the hopper. It outranks the is-mine rule
+   because a gold ball that is also yours is the best thing that can happen on this machine and must not be
+   drawn as merely one of yours. */
+.cas-kball.is-gold { border-radius: 999px;
+    background-image: url("/images/casino/bingo/ball-o.webp");
+    filter: brightness(1.25) saturate(1.5) drop-shadow(0 0 8px rgba(255,215,94,.95));
+    box-shadow: 0 0 0 2px #fff3c4, 0 0 20px rgba(255,215,94,.9); }
+.cas-kball.is-gold.is-mine { box-shadow: 0 0 0 2px #fff, 0 0 26px rgba(255,215,94,1); }
+/* ── IT DROPS IN ──
+   Luke: "ideally we get to see the balls drop into place." It used to pop into existence at 40% scale from
+   twelve pixels up, which is a fade with extra steps. It falls from properly outside the hopper now, lands
+   short, and settles — three keyframes is the fewest that reads as WEIGHT rather than as an appearance. */
+.cas-kball.is-new { animation: casBallDrop .44s cubic-bezier(.3,1.1,.5,1) both; z-index: 2; }
 @keyframes casBallDrop {
-    0% { transform: translateY(-12px) scale(.4); opacity: 0; }
-    60% { transform: translateY(0) scale(1.22); opacity: 1; }
+    0%   { transform: translateY(-46px) scale(.72); opacity: 0; }
+    45%  { transform: translateY(0) scale(1.18); opacity: 1; }
+    68%  { transform: translateY(-7px) scale(.98); }
     100% { transform: none; opacity: 1; }
 }
+@media (prefers-reduced-motion: reduce) {
+    .cas-kball.is-new { animation: none; }
+}
+/* The empty slots the balls are falling into. Kept visible so the row is ten waiting places from the start
+   rather than a list that grows — how many are left to come is half of what makes a draw watchable. */
+.cas-kball:not(.is-out) { background: rgba(255,255,255,.03); }
 
 /* ── THE PAYTABLE, ON THE MACHINE ─────────────────────────────────────────
    Keno is unreadable without one — nobody has an instinct for what four-of-five is worth — and the rung
@@ -22399,7 +22468,7 @@ body.cas-seated .social-fab { display: none; }
 /* Above the blot AND above the flame. The shadow is what keeps it legible once there is a saturated
    magenta mark behind it — without it a daubed 47 is a smear. */
 .cas-bnum { position: relative; z-index: 1; font: inherit; color: inherit; }
-.cas-bcell.is-hit .cas-bnum { text-shadow: 0 1px 2px rgba(40,0,25,.85), 0 0 6px rgba(40,0,25,.6); }
+.cas-bcell.is-hit .cas-bnum { text-shadow: 0 1px 2px rgba(70,0,40,.9); }
 .cas-flame { position: absolute; left: 8%; right: 8%; bottom: 0; height: 62%; pointer-events: none; z-index: 0;
     transform-origin: 50% 100%;
     background: radial-gradient(ellipse at 50% 100%, rgba(255,236,190,.95) 0%, rgba(255,150,50,.7) 38%, transparent 70%);
@@ -22682,7 +22751,7 @@ body.cas-seated .social-fab { display: none; }
    than simply lighting, because the thing it is saying is not "this is special", it is "this one, next ball,
    any second now" — and a static highlight says the first. Ringed in the same green the finished line uses,
    one step short of it, so the two read as the same story at different stages. */
-.cas-bcell.is-need { border-color: rgba(126,255,178,.7); color: #eaffef;
+.cas-bcell.is-need { border-color: #7effb2; color: #eaffef; z-index: 2;
     animation: casNeed 1.05s ease-in-out infinite; }
 @keyframes casNeed {
     0%, 100% { box-shadow: 0 0 0 0 rgba(126,255,178,.5); background: rgba(126,255,178,.06); }
@@ -22690,7 +22759,11 @@ body.cas-seated .social-fab { display: none; }
 }
 /* A square today's pattern wants, before it has been marked. A tint and nothing more — this is context for
    the squares you are watching, and it must never compete with the one that is one away. */
-.cas-bcell.is-pattern { background: rgba(190,140,255,.10); border-color: rgba(190,140,255,.3); }
+/* An OUTLINE rather than a fill. A tint on eight or ten of the twenty-five cells, over a lit backdrop, was
+   most of what made the card hard to read — three different washes competing before a single ball had
+   dropped. The border says "today wants this one" without changing what colour the square is. */
+.cas-bcell.is-pattern { background: #0c0a12; border-color: rgba(190,140,255,.55);
+    box-shadow: 0 0 0 1px rgba(190,140,255,.18) inset; }
 
 /* ── TODAY'S PATTERN ──────────────────────────────────────────────────────────────────
    A row above the card: the shape, its name, and what it is worth at the stake you have selected. The shape

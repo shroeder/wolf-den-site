@@ -994,6 +994,34 @@ export const KENO_DRAWN = 10;
 // AVOID; the five slot cabinets return 97.6% to 108.5% and this now sits at 98.48%, in the middle of them.
 export const KENO_PAYS = { 0: 0, 1: 0, 2: 1, 3: 3, 4: 25, 5: 600 };
 
+// ── THE GOLDEN BALL ──────────────────────────────────────────────────────────────────────────────────────────
+// Keno's problem was never its return, it was the shape of it. Worked out exactly rather than simulated — the
+// draw is hypergeometric, so this is arithmetic — a ticket lands 0 or 1 hits 63.3% of the time and pays
+// nothing, and lands exactly 2 hits another 27.8% and pays 1x, which is your stake back. NINE TICKETS IN TEN
+// end in "nothing happened" or "you are level", and the whole draw was over in two and a third seconds.
+//
+// So: one draw in eight, one of the ten balls comes out GOLD. If it is one of your five, the ticket pays
+// double. Everything about it is chosen so that it can be seen rather than merely calculated —
+//
+//   IT IS VISIBLE BEFORE IT MATTERS. The gold ball is gold from the moment it drops, whoever it belongs to.
+//   One draw in eight has a "whose is that" in it, which is eight times as many moments as a bonus that only
+//   announces itself when it pays.
+//
+//   IT IS ONE RULE. "The gold ball doubles your ticket" needs no paytable and no explaining.
+//
+//   AND IT IS PRICED, NOT GUESSED. The gold ball is uniformly one of the ten drawn, so given k hits it is
+//   yours with probability k/10. Its contribution is therefore
+//       GOLD_BALL_CHANCE x (MULT - 1) x Σ_k P(k) x (k/10) x PAYS[k]
+//   which for these numbers is 0.125 x 1 x 0.33753 = +4.22%, taking keno from 98.48% to 102.70%. kenoRtp()
+//   below folds it in, so check:casino judges the number the till actually pays rather than the one the
+//   paytable used to imply.
+//
+// That lands keno beside bingo (102.8%) rather than four points under it, which is the thing check:casino
+// exists to protect: no cabinet on this floor should be the obvious one to sit at or the obvious one to walk
+// past.
+export const GOLD_BALL_CHANCE = 0.125;
+export const GOLD_BALL_MULT = 2;
+
 const choose = (n, k) => {
     if (k < 0 || k > n) return 0;
     let r = 1;
@@ -1009,7 +1037,24 @@ export function kenoChance(k) {
 export function kenoRtp() {
     let r = 0;
     for (let k = 0; k <= KENO_PICKS; k += 1) r += kenoChance(k) * (KENO_PAYS[k] || 0);
-    return r;
+    // ── AND THE GOLDEN BALL IS PART OF THE ANSWER ────────────────────────────────────────────────────
+    // A bonus the till pays and the gate does not know about is a gate reporting a return the game does not
+    // have. Exact, like the rest of this: the gold ball is uniformly one of the ten drawn, so given k of them
+    // are yours it is yours with probability k/10.
+    let gold = 0;
+    for (let k = 0; k <= KENO_PICKS; k += 1) {
+        gold += kenoChance(k) * (k / KENO_DRAWN) * (KENO_PAYS[k] || 0);
+    }
+    return r + GOLD_BALL_CHANCE * (GOLD_BALL_MULT - 1) * gold;
+}
+
+/** What the golden ball is worth on its own, so the gate can print it rather than implying it. */
+export function kenoGoldRtp() {
+    let gold = 0;
+    for (let k = 0; k <= KENO_PICKS; k += 1) {
+        gold += kenoChance(k) * (k / KENO_DRAWN) * (KENO_PAYS[k] || 0);
+    }
+    return GOLD_BALL_CHANCE * (GOLD_BALL_MULT - 1) * gold;
 }
 
 // ── ONE TICKET, ONE DRAW, RIGHT NOW ──────────────────────────────────────────────────────────────────────────
@@ -1066,9 +1111,17 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         }
     }
 
-    const { drawn } = rollKeno();
+    // `goldIdx`, not `gold` — this function already has a `gold` and it is the player s balance. Two
+    // different meanings for one short name in one scope is how the wrong one gets returned.
+    const { drawn, gold: goldIdx } = rollKeno();
     const hits = clean.filter((n) => drawn.includes(n));
-    const pays = KENO_PAYS[hits.length] || 0;
+    // ── AND WHOSE BALL WAS THE GOLD ONE ──────────────────────────────────────────────────────────────────
+    // Doubles the whole ticket when it is one of yours, and does nothing at all when it is not — including
+    // when it is nobody's, which is most of the time. A gold ball on a losing ticket doubles zero, which is
+    // the honest behaviour: this multiplies a win, it does not invent one.
+    const goldBall = goldIdx >= 0 ? drawn[goldIdx] : null;
+    const goldMine = goldBall != null && clean.includes(goldBall);
+    const pays = (KENO_PAYS[hits.length] || 0) * (goldMine ? GOLD_BALL_MULT : 1);
     // The paytable is in multiples of the stake — gold units. One conversion, here, like everywhere else.
     const wonGold = Math.round(stake * pays);
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
@@ -1113,6 +1166,12 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         bet: stake,
         picks: clean,
         drawn,
+        // The whole bonus, as the screen needs it: which INDEX of the ten came out gold — so it can be drawn
+        // gold as it drops, before anybody knows whose it is — the number itself, and whether it paid.
+        goldIdx,
+        goldBall,
+        goldMine,
+        goldMult: goldMine ? GOLD_BALL_MULT : 1,
         hits,
         pays,
         won,
@@ -1135,7 +1194,11 @@ const rollKeno = () => {
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return { drawn: pool.slice(0, KENO_DRAWN) };
+    // WHICH ball is gold is decided here, with the draw, so a single object carries the whole outcome and
+    // nothing downstream can disagree about it. -1 means no gold ball this time, which is seven draws in
+    // eight — a bonus that appears every round is wallpaper.
+    const gold = Math.random() < GOLD_BALL_CHANCE ? Math.floor(Math.random() * KENO_DRAWN) : -1;
+    return { drawn: pool.slice(0, KENO_DRAWN), gold };
 };
 
 function scoreKeno(choice, outcome, stake) {
