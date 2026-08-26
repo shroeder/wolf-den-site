@@ -2,8 +2,9 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import {
-    chipItem, moveChips, chipShelf, casinoTrophies, counterDiscount, pricedFor,
+    chipItem, moveChips, chipShelf, casinoTrophies, counterDiscount, pricedFor, basePriceFor,
 } from "@/lib/marketplace/chips.js";
+import { getCasinoPerks, grantCasinoPerk, revokeCasinoPerk } from "@/lib/marketplace/casino-perks.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -43,12 +44,21 @@ export async function buyWithChips(buyerId, itemId) {
     // number and this charges one, and they are the same number because they come out of the same two
     // functions given the same inputs — not because anybody passed a price along. A till that trusts a
     // price from the client is a till that charges whatever the client says.
-    const trophies = await casinoTrophies(buyerId);
-    const price = pricedFor(item.price, counterDiscount(trophies));
+    const [trophies, perks] = await Promise.all([casinoTrophies(buyerId), getCasinoPerks(buyerId)]);
+    // `basePriceFor` is what makes an INFINITE track safe to sell: a stat's price is a function of how many
+    // the member already has, read here at the moment of sale rather than taken from the screen. A stale tab
+    // quoting level 3's price gets charged level 4's, which is the direction that error has to fail in.
+    const price = pricedFor(basePriceFor(item, perks), counterDiscount(trophies));
 
     // ── ONCE MEANS ONCE ──────────────────────────────────────────────────────────────────────────────────
     // Checked here for the message, and enforced by a partial UNIQUE index in the migration for the truth —
     // two taps arriving together both pass this read, and only the index stops the second one.
+    // An UNLOCK is owned when its perk row exists, which is also the thing that gates the feature — so the
+    // receipt log cannot disagree with whether the door is open. Checked before the once-only receipt below,
+    // because for an unlock the perk IS the answer.
+    if (item.kind === "unlock" && (Number(perks[item.ref]) || 0) > 0) {
+        return { ok: false, error: "already_owned" };
+    }
     if (item.once) {
         const had = await db.queryOne(
             `SELECT 1 FROM mkt_chip_purchase WHERE buyer_id = $1 AND item_id = $2 AND once LIMIT 1`,
@@ -75,6 +85,9 @@ export async function buyWithChips(buyerId, itemId) {
 
     const granted = await grant(buyerId, item).catch(() => false);
     if (!granted) {
+        // A perk that half-landed would leave a level nobody paid for. Undone first, before the chips go
+        // back, so the two can never both be true.
+        if (item.kind === "stat" || item.kind === "unlock") await revokeCasinoPerk(buyerId, item.ref);
         // Put it back, and take the receipt with it — otherwise a once-only item is marked owned and was
         // never delivered, which is the worst outcome available and the hardest to notice.
         await moveChips(buyerId, price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
@@ -84,7 +97,10 @@ export async function buyWithChips(buyerId, itemId) {
 
     // The shelf that comes back is the one they are standing at — handing a VIP the Counter's list after
     // they bought a pet from the vendor would redraw the wrong room around them.
-    return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId, { vip: Boolean(item.vip) })) };
+    const back = item.kind === "stat" ? { shelf: "stat" }
+        : item.kind === "unlock" ? { shelf: "unlock" }
+            : { vip: Boolean(item.vip) };
+    return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId, back)) };
 }
 
 // ── DELIVERING THE GOODS ─────────────────────────────────────────────────────────────────────────────────────
@@ -153,6 +169,14 @@ async function grant(buyerId, item) {
                  ON CONFLICT DO NOTHING RETURNING ref`,
                 [buyerId, item.ref]);
             return Boolean(r);
+        }
+        // ── A PERMANENT THING ───────────────────────────────────────────────────
+        // Both kinds are one row in mkt_casino_perk — a stat track counts up for ever and an unlock stops at
+        // one. `grantCasinoPerk` returns the new level, so a null is a failed write and the chips go back.
+        case "stat":
+        case "unlock": {
+            const level = await grantCasinoPerk(buyerId, item.ref);
+            return Number(level) > 0;
         }
         case "consumables": {
             // `ref` is a list of consumable ids, because the House Pack is three things rather than one.

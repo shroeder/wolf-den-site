@@ -276,14 +276,23 @@ function drFromTenacity(currentDr, points = 0) {
 // measures a game nobody plays: badges by themselves out-weigh a full set, and leaving them out makes every
 // fighter look damage-starved against their own armour.
 export async function combatStats(buyerId, gearStats, ids) {
-    const [petBonus, badgeStats, { beastbondMult }] = await Promise.all([
+    const [petBonus, badgeStats, { beastbondMult }, casinoStats] = await Promise.all([
         import("@/lib/marketplace/pet-combat.js").then((m) => m.getPetCombatBonus(buyerId)).catch(() => ({ stats: {} })),
         import("@/lib/marketplace/badges.js").then((m) => m.getBadgePassives(buyerId)).catch(() => ({})),
         import("@/lib/marketplace/signatures.js"),
+        // ── AND A FOURTH SOURCE: WHAT WAS BOUGHT WITH CHIPS ──────────────────────────────────────────
+        // The four permanent stat tracks at the Counter (casino-perks.js). They join the loop below on the
+        // same terms as gear, pets and badges, which is exactly what the note under it promises: a stat
+        // added to the pool anywhere is carried by every source for free.
+        //
+        // Deliberately NOT multiplied by Beastbond — that is the pet signature and it multiplies the PET's
+        // share only. A bought stat is your own.
+        import("@/lib/marketplace/casino-perks.js").then((m) => m.casinoStatBonus(buyerId)).catch(() => ({})),
     ]);
     const bb = beastbondMult(ids);
     const ps = petBonus?.stats || {};
     const bs = badgeStats || {};
+    const cs = casinoStats || {};
     // ── ONE STAT ADDS TO ITSELF ──────────────────────────────────────────────────────────────────────────
     // A pet is an extension of you, not a creature with its own sheet: whatever stat a pet's card names is the
     // stat of yours it raises. The same for a badge. This used to be hand-written line by line and every line
@@ -297,13 +306,14 @@ export async function combatStats(buyerId, gearStats, ids) {
     // `bb` is Beastbond, which multiplies the PET's share only.
     const out = { ...gearStats };
     const KEYS = new Set([
-        ...Object.keys(gearStats || {}), ...Object.keys(ps), ...Object.keys(bs),
+        ...Object.keys(gearStats || {}), ...Object.keys(ps), ...Object.keys(bs), ...Object.keys(cs),
     ]);
     for (const k of KEYS) {
         const gear = Number(gearStats?.[k]) || 0;
         const pet = (Number(ps[k]) || 0) * bb;
         const badge = Number(bs[k]) || 0;
-        const total = gear + pet + badge;
+        const bought = Number(cs[k]) || 0;
+        const total = gear + pet + badge + bought;
         if (total) out[k] = total;
     }
     return out;

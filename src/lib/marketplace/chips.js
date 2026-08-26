@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { STAT_TRACKS, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
 
 // ── CHIPS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // The casino's own currency. You stake GOLD at a machine and the machine pays CHIPS; chips buy things at the
@@ -96,19 +97,45 @@ export const CHIP_STORE = [
 // Mythic chest is 10,500; the cheapest pet here is worth about four of them and the dearest about fourteen.
 // They pay nothing and do nothing — Luke, on wiring luck to them: "nevermind don't do the luck" — so what
 // they cost is entirely a statement about what they ARE, which is the last thing left to buy.
+// ── THE THREE UNIQUE PETS ───────────────────────────────────────────────────────
+// Luke: "you can buy unique pets, and inspect them before you buy. 20,000 chips for each."
+//
+// These were 40k/90k/150k behind the VIP rope. Repriced flat and moved onto the Counter, because a flat price
+// is what he asked for and because three pets at three prices implied a ladder between them that does not
+// exist — they are the same rarity of thing, and which one you want is taste rather than tier.
+//
+// INSPECTABLE: `kind: "pet"` resolves through detailFor() below, which reads the pet's real card — its
+// sprite, its rarity and what its passive actually does — so the inspect panel cannot drift from the pet.
 export const VIP_STORE = [
-    { id: "vip_ferret", kind: "pet", ref: "house_ferret", name: "The House Ferret", price: 40000, once: true, vip: true,
+    { id: "vip_ferret", kind: "pet", ref: "house_ferret", name: "The House Ferret", price: 20000, once: true, vip: true,
         blurb: "Knows which floorboard the chips roll under." },
-    { id: "vip_lynx", kind: "pet", ref: "velvet_lynx", name: "Velvet Lynx", price: 90000, once: true, vip: true,
+    { id: "vip_lynx", kind: "pet", ref: "velvet_lynx", name: "Velvet Lynx", price: 20000, once: true, vip: true,
         blurb: "Has never once been asked to leave." },
-    { id: "vip_crane", kind: "pet", ref: "midnight_crane", name: "Midnight Crane", price: 150000, once: true, vip: true,
+    { id: "vip_crane", kind: "pet", ref: "midnight_crane", name: "Midnight Crane", price: 20000, once: true, vip: true,
         blurb: "Stands at the end of the bar and misses nothing." },
 ];
+
+// ── THE PERMANENT SHELF ────────────────────────────────────────────────────────
+// DERIVED from casino-perks.js rather than typed out again. Those definitions already carry the name, the
+// blurb and the price; restating them here would be two lists to keep in step, and the one that drifts is
+// always the one the player is looking at.
+export const STAT_STORE = STAT_TRACKS.map((t) => ({
+    id: `stat_${t.perk}`, kind: "stat", ref: t.perk, name: t.name, blurb: t.blurb,
+    // Priced per member — see basePriceFor. The 0 is a placeholder the shelf never shows.
+    price: 0, stat: t.stat, per: t.per,
+}));
+
+export const UNLOCK_STORE = UNLOCKS.map((u) => ({
+    id: `unlock_${u.perk}`, kind: "unlock", ref: u.perk, name: u.name, blurb: u.blurb,
+    price: u.price, once: true,
+}));
 
 // Both shelves are looked up through one function, because `chipItem` is what buyWithChips validates against
 // and a second lookup table is how an item becomes purchasable from the wrong room.
 export const chipItem = (id) => CHIP_STORE.find((i) => i.id === id)
     || VIP_STORE.find((i) => i.id === id)
+    || STAT_STORE.find((i) => i.id === id)
+    || UNLOCK_STORE.find((i) => i.id === id)
     || null;
 
 // ── WHAT THE FLOOR'S OWN TROPHIES ARE WORTH AT THE COUNTER ────────────────────────────────
@@ -141,6 +168,17 @@ export function counterDiscount({ pets = 0, badges = 0 } = {}) {
 /** The price after the discount. One function, used by the shelf AND by the till — see the note in
  *  chip-store.js about what happens when a screen and a payment path each do their own arithmetic. */
 export const pricedFor = (price, discount) => Math.max(1, Math.round(Number(price) * (1 - (discount || 0))));
+
+// ── WHAT AN ITEM COSTS BEFORE THE DISCOUNT ───────────────────────────────────────────
+// Most items are a number in the list above. A STAT TRACK is not: it is 250 for the first level and 250 more
+// every time, for ever, so its price is a function of how many the member already has.
+//
+// This exists so the shelf and the till can ask the same question and get the same answer. The till does NOT
+// take a price from the client — it recomputes from the member's own level at the moment of sale, so a stale
+// screen quotes the old price and then gets charged the real one rather than the other way round.
+export const basePriceFor = (item, perks = {}) => (
+    item.kind === "stat" ? statCost(Number(perks[item.ref]) || 0) : Number(item.price) || 0
+);
 
 // ── THE LEDGER ───────────────────────────────────────────────────────────────────────────────────────────────
 /**
@@ -324,10 +362,15 @@ export async function casinoTrophies(buyerId) {
  * obvious alternative and it is the wrong one: a shelf whose job is to show you three things you cannot buy
  * exists to make you feel outside.
  */
-export async function chipShelf(buyerId, { vip = false } = {}) {
-    const list = vip ? VIP_STORE : CHIP_STORE;
-    const [balance, owned, trophies] = await Promise.all([
-        chipBalance(buyerId), ownedOnce(buyerId), casinoTrophies(buyerId),
+export async function chipShelf(buyerId, { vip = false, shelf = null } = {}) {
+    // `shelf` names which counter is asking. `vip` is kept for the vendor behind the rope, which was the
+    // first caller and is the one that must never show anything else.
+    const list = shelf === "stat" ? STAT_STORE
+        : shelf === "unlock" ? UNLOCK_STORE
+            : vip ? VIP_STORE : CHIP_STORE;
+    const { getCasinoPerks } = await import("@/lib/marketplace/casino-perks.js");
+    const [balance, owned, trophies, perks] = await Promise.all([
+        chipBalance(buyerId), ownedOnce(buyerId), casinoTrophies(buyerId), getCasinoPerks(buyerId),
     ]);
     const discount = counterDiscount(trophies);
     const details = await Promise.all(list.map((i) => detailFor(i).catch(() => null)));
@@ -343,15 +386,26 @@ export async function chipShelf(buyerId, { vip = false } = {}) {
         // already, 0.08 to 0.25, which is exactly when a hardcoded copy would have started quoting prices
         // three times too low.
         rate: CHIP_RATE,
+        // What the member already has, so the stat cards can show "level 7 -> 8" rather than a bare price and
+        // the unlock cards can show themselves as bought.
+        perks,
         items: list.map((i, n) => ({
             id: i.id, kind: i.kind, name: i.name, blurb: i.blurb,
+            // A stat track's level, and what the next point is worth. Absent on everything else.
+            level: i.kind === "stat" ? (Number(perks[i.ref]) || 0) : undefined,
+            per: i.kind === "stat" ? i.per : undefined,
+            stat: i.kind === "stat" ? i.stat : undefined,
             // `price` is what it COSTS THIS MEMBER, and `was` is the list price when the two differ. The till
             // recomputes the same number from the same function rather than trusting this one — see
             // buyWithChips. A screen and a payment path doing their own arithmetic is how somebody gets
             // charged a price they were never shown.
-            price: pricedFor(i.price, discount),
-            was: discount > 0 ? i.price : null,
-            once: Boolean(i.once), owned: owned.has(i.id), afford: balance >= pricedFor(i.price, discount),
+            price: pricedFor(basePriceFor(i, perks), discount),
+            was: discount > 0 ? basePriceFor(i, perks) : null,
+            once: Boolean(i.once),
+            // An UNLOCK is owned when the perk row exists, not when a receipt does — the perk is the thing
+            // that gates the feature, so it has to be the thing that says "you have this".
+            owned: i.kind === "unlock" ? (Number(perks[i.ref]) || 0) > 0 : owned.has(i.id),
+            afford: balance >= pricedFor(basePriceFor(i, perks), discount),
             ...(details[n] || {}),
             // The shelf's own blurb wins over the catalogue's — it is written for this counter.
             blurb: i.blurb,

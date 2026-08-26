@@ -7,8 +7,10 @@
 //
 // The first cut of that shelf invented EVERY id on it. This is the check that caught it.
 import {
-    CHIP_STORE, VIP_STORE, CHIP_RATE, DISCOUNT_MAX, counterDiscount, pricedFor,
+    CHIP_STORE, VIP_STORE, STAT_STORE, UNLOCK_STORE, CHIP_RATE, DISCOUNT_MAX, counterDiscount, pricedFor,
 } from "../src/lib/marketplace/chips.js";
+import { STAT_TRACKS, UNLOCKS, statCost } from "../src/lib/marketplace/casino-perks.js";
+import { STAT_META } from "../src/lib/marketplace/items.js";
 import { DECORATIONS } from "../src/lib/marketplace/decorations.js";
 import { GEMS } from "../src/lib/marketplace/gems.js";
 import { CONSUMABLES } from "../src/lib/marketplace/consumables.js";
@@ -29,10 +31,16 @@ const seen = new Set();
 // BOTH SHELVES. The VIP vendor is the same machinery behind a flag, and an item nobody can see is exactly
 // the item whose broken ref nobody would ever notice — it would sit there taking chips from the three people
 // allowed to reach it. Checked together so a shelf cannot be added without being checked.
-for (const item of [...CHIP_STORE, ...VIP_STORE]) {
+// ALL FOUR SHELVES. An item nobody can see is exactly the item whose broken ref nobody would notice — it
+// would sit there taking chips from the few people allowed to reach it. Checked together so a shelf cannot be
+// added without being checked.
+const statIds = new Set(STAT_TRACKS.map((t) => t.perk));
+const unlockIds = new Set(UNLOCKS.map((u) => u.perk));
+for (const item of [...CHIP_STORE, ...VIP_STORE, ...STAT_STORE, ...UNLOCK_STORE]) {
     if (seen.has(item.id)) problems.push(`two shelf entries share the id "${item.id}"`);
     seen.add(item.id);
-    if (!(item.price > 0)) problems.push(`${item.id} is priced at ${item.price}`);
+    // A stat track is priced per member (statCost), so a 0 here is correct rather than a mistake.
+    if (item.kind !== "stat" && !(item.price > 0)) problems.push(`${item.id} is priced at ${item.price}`);
 
     const miss = (what) => problems.push(`${item.id} ("${item.name}") names ${what}, which no catalog has — it would take the chips and deliver nothing`);
     switch (item.kind) {
@@ -46,6 +54,20 @@ for (const item of [...CHIP_STORE, ...VIP_STORE]) {
             break;
         }
         case "chest": if (!chests.has(item.ref)) miss(`chest tier "${item.ref}"`); break;
+        // A stat track has to name a real perk AND a real combat stat, because the two are different strings
+        // and only one of them is what combatStats sums.
+        case "stat": {
+            if (!statIds.has(item.ref)) miss(`stat track "${item.ref}"`);
+            const t = STAT_TRACKS.find((x) => x.perk === item.ref);
+            if (t && !STAT_META?.[t.stat]) miss(`combat stat "${t.stat}"`);
+            // The four he named, and deliberately not the crits — an infinite track on a multiplier
+            // compounds against every other source in the game.
+            if (t && ["crit_chance", "crit_power"].includes(t.stat)) {
+                problems.push(`${item.id} sells an infinite track on ${t.stat}, which multiplies everything else`);
+            }
+            break;
+        }
+        case "unlock": if (!unlockIds.has(item.ref)) miss(`unlock "${item.ref}"`); break;
         case "consumables": {
             if (!Array.isArray(item.ref)) { problems.push(`${item.id} must list its consumables`); break; }
             for (const c of item.ref) if (!cons.has(c)) miss(`consumable "${c}"`);
@@ -81,9 +103,29 @@ for (const item of [...CHIP_STORE, ...VIP_STORE]) {
 `);
 }
 
+// ── AND THE INFINITE LADDER STAYS HONEST ─────────────────────────────────────────────
+// The stat tracks have no ceiling, which is only safe because the price is LINEAR: the cost of the next point
+// has to rise exactly as fast as the number of points held. If somebody ever makes it flat it becomes the only
+// thing worth buying, and if they make it exponential the track becomes a lie past a certain level.
+{
+    const c1 = statCost(0);
+    const c10 = statCost(9);
+    const c100 = statCost(99);
+    if (c1 !== 250) problems.push(`the first stat point costs ${c1}, not 250`);
+    if (c10 !== c1 * 10 || c100 !== c1 * 100) {
+        problems.push(`the stat ladder is not linear: 1st ${c1}, 10th ${c10}, 100th ${c100}`);
+    }
+    // What a hundred points actually costs, so the number is on the page rather than in somebody's head.
+    let sum = 0;
+    for (let i = 0; i < 100; i += 1) sum += statCost(i);
+    console.log(`  stat tracks   ${STAT_TRACKS.map((t) => t.name).join(", ")} — +${STAT_TRACKS[0].per} a level`);
+    console.log(`                250 then +250 each; 100 levels is ${sum.toLocaleString()} chips for +${STAT_TRACKS[0].per * 100}
+`);
+}
+
 console.log(`  a chip is ${CHIP_RATE} per gold staked — so ${Math.round(1 / CHIP_RATE)} gold through a machine is 1 chip\n`);
 console.log(`  ${"item".padEnd(28)} ${"chips".padStart(6)}   ${"gold behind it".padStart(15)}`);
-for (const [where, list] of [["THE COUNTER", CHIP_STORE], ["BEHIND THE ROPE", VIP_STORE]]) {
+for (const [where, list] of [["THE COUNTER", CHIP_STORE], ["BEHIND THE ROPE", VIP_STORE], ["THE DOORS", UNLOCK_STORE]]) {
     console.log(`  ── ${where}`);
     for (const item of [...list].sort((a, b) => a.price - b.price)) {
         console.log(`  ${item.name.padEnd(28)} ${String(item.price).padStart(6)}   ${Math.round(item.price / CHIP_RATE).toLocaleString().padStart(15)}`);
@@ -95,5 +137,5 @@ if (problems.length) {
     for (const p of problems) console.log(`  ✗ ${p}`);
     process.exit(1);
 }
-console.log(`\ncheck:chips — all ${CHIP_STORE.length + VIP_STORE.length} items on the two shelves name something that exists.`);
+console.log(`\ncheck:chips — all ${CHIP_STORE.length + VIP_STORE.length + STAT_STORE.length + UNLOCK_STORE.length} items on the four shelves name something that exists.`);
 process.exit(0);
