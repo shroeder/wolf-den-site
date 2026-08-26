@@ -14,6 +14,7 @@ import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 import { callFor, letterFor } from "@/lib/marketplace/bingo-kit.js";
+import { chipsFor } from "@/lib/marketplace/chip-rate.js";
 
 // ── NO REQUEST ON THIS FLOOR MAY HANG FOR EVER ───────────────────────────────────────────────────────────────
 // Every call below used to be a bare `fetch(...).catch(() => null)`, and a bare fetch has no timeout: on a
@@ -1746,15 +1747,32 @@ export default function CasinoClient({ initial }) {
                                 The rung you are standing on lights as the balls land, so the ladder is being
                                 taught while it is being climbed rather than printed somewhere to be studied.
                                 Read off the server's own table — a hand-typed copy here is a paytable that
-                                lies the day somebody retunes the real one. */}
+                                lies the day somebody retunes the real one.
+
+                                ── AND IT QUOTES CHIPS, BECAUSE CHIPS ARE WHAT ARRIVE ──────────────────
+                                Luke: "keno lies, it should pay what it says it will, 2500 x 3 is 7500."
+
+                                He is right that it lied and the lie was in the label. This rung said "3x",
+                                you staked 2,500, and 1,875 landed — because the multiple is against the
+                                GOLD you staked and the machine pays CHIPS at CHIP_RATE. Every cabinet on
+                                this floor works that way; the slots simply never say "x" at you, so they
+                                never got the chance to contradict themselves.
+
+                                So the rung shows the number that will actually arrive, for the stake that
+                                is actually selected, computed with the SAME function the till pays with. It
+                                moves when you change your bet, which is also the first time this screen has
+                                told anybody that the stake buttons change what the ladder is worth. */}
                             <div className="cas-keno-pays">
                                 {[2, 3, 4, 5].map((k) => {
                                     const pays = st?.keno?.pays?.[k];
                                     if (!pays) return null;
                                     const here = Boolean(keno && !busy && keno.hits.length === k);
+                                    // Exactly what playKeno does: the multiple lands on the gold stake, and
+                                    // that gold is converted once. Mirrored step for step, not approximated.
+                                    const chips = chipsFor(Math.round(bet * pays), 1);
                                     return (
                                         <span key={k} className={`cas-keno-rung${here ? " is-here" : ""}`}>
-                                            <i>{k} of 5</i><b>{pays}x</b>
+                                            <i>{k} of 5</i><b>{money(chips)}</b>
                                         </span>
                                     );
                                 })}
@@ -2190,7 +2208,10 @@ export default function CasinoClient({ initial }) {
                                 without scrolling away from the card to read it. */}
                             {at.id === "bingo" ? (
                                 <p className={`cas-result is-pinned${card && !busy && card.won > 0 ? " is-win" : ""}`}>
-                                    {!card ? `Two lines pays ${st?.bingo?.pays?.[2] ?? 1.5}x · six pays ${money(st?.bingo?.pays?.[6] ?? 200)}x`
+                                    {/* Chips, for the stake that is selected — same reason as the keno
+                                        ladder above. "Six pays 200x" was true of the gold you put in and
+                                        had nothing to do with the number that lands in your chips. */}
+                                    {!card ? `A line pays ${money(chipsFor(Math.round(bet * (st?.bingo?.pays?.[1] ?? 1)), 1))} · six pays ${money(chipsFor(Math.round(bet * (st?.bingo?.pays?.[6] ?? 200)), 1))}`
                                         : dragon && busy
                                             ? (dragon.burnt?.length
                                                 ? `The dragon burns ${dragonLit} of ${dragon.burnt.length}…`

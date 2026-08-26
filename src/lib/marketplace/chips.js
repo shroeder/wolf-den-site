@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
 
 // ── CHIPS ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -9,29 +10,12 @@ import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/cas
 // at all — the short version is that paying gold forced every paytable to fight an RTP ceiling, and the
 // machines were unplayable as a result.
 //
-// THE ONE RATE. A chip is minted at CHIP_RATE per gold staked, and the machines return 1.00x of that on
-// average (check:slot5 enforces it), so a member who stakes 10,000 gold walks away with about 10,000 *
-// CHIP_RATE chips however the spins fell. Everything about what a chip is WORTH is then decided by the prices
-// below and nowhere else. Change this number and you have repriced the entire casino, which is the point:
-// there is exactly one lever.
-// 0.25 rather than 0.08, and the reason is RESOLUTION rather than generosity. At 0.08 a whole 1x win on a
-// 100-gold spin was 8 chips, so the entire machine was quantised in eighths — and the smallest paying line on
-// The Hunt, three doubloons, came to 0.4 chips and rounded to NOTHING. Caught by playing it on the live site:
-// "3 doubloon — 0 chips". A machine that draws a winning line across the screen and pays zero for it is
-// broken, whatever the maths says. Tripling the rate triples the store prices with it, so nothing about what
-// a chip BUYS has changed — only how finely a win can be expressed.
-export const CHIP_RATE = 0.25;
-
-// What a bet of `gold` mints. The machines' payouts are multiples of the bet and know nothing about chips;
-// the conversion happens once, here.
-//
-// AND ANYTHING THAT PAID AT ALL PAYS AT LEAST ONE CHIP. Rounding is not allowed to turn a win into a loss:
-// the line lit, the screen said it paid, and a zero underneath that is the machine contradicting itself.
-export const chipsFor = (gold, multiple) => {
-    const raw = gold * multiple * CHIP_RATE;
-    if (raw <= 0) return 0;
-    return Math.max(1, Math.round(raw));
-};
+// THE ONE RATE AND THE ONE CONVERSION now live in chip-rate.js, and are re-exported here so every existing
+// import of them still resolves against this file. They moved because they are a constant and a pure
+// function, and the two things that most need them are not the server: the SCREEN, which has to be able to
+// say what a paytable multiple is worth in the currency it will actually be paid in, and the GATES, which
+// are plain node scripts and were dying on `server-only` for the sake of one number. See the note there.
+export { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
 // Priced against the rate above, and REPRICED WITH IT: when the rate went 0.08 -> 0.25 every price here was

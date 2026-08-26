@@ -16,7 +16,7 @@ import {
     freshShoe, handValue, isBlackjack, playDealer, settleHand, basicStrategy, canSplit, pairValue,
     BLACKJACK_RAKE, DECKS, DEALER_STANDS_ON, BLACKJACK_PAYS,
 } from "../src/lib/marketplace/blackjack-kit.js";
-import { CHIP_RATE } from "../src/lib/marketplace/chips.js";
+import { CHIP_RATE } from "../src/lib/marketplace/chip-rate.js";
 
 // ── AND THIS TABLE IS NOT A GOLD GAME ANY MORE ───────────────────────────────────────────────────────────────
 // It used to be measured against RTP_CEILING, and the rake existed to hold it under that. Both are gone: the

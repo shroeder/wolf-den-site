@@ -10,7 +10,7 @@
 import {
     drawFor, makeCard, scoreCard, seeded, dragonFor, burntOf, BINGO_PAYS, BALLS, DRAWN, DRAGON_CHANCE,
 } from "../src/lib/marketplace/bingo-kit.js";
-import { CHIP_RATE } from "../src/lib/marketplace/chips.js";
+import { CHIP_RATE } from "../src/lib/marketplace/chip-rate.js";
 
 // ── THE QUESTION THIS SCRIPT ASKS HAS CHANGED ────────────────────────────────────────────────────────────────
 // It used to compare bingo against RTP_CEILING, which is the ceiling for a game that pays GOLD. Bingo pays
