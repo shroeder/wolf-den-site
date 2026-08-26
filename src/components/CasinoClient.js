@@ -340,13 +340,16 @@ function Reel({ art, machineId, symbols, result, spinning, index, won }) {
 // How fast the keno hopper empties. Slower than bingo's forty because there are only ten of them and each
 // one matters four times as much — a ten-ball draw that is over in a second is a number appearing, not a draw.
 const KENO_BALL_MS = 260;
-// ── AND THE TENTH BALL COMES OUT ON ITS OWN ──────────────────────────────────────────────────────────────────
-// Ten balls at an even pace is a progress bar. The tenth is the one that decides most tickets — you can see
-// by the ninth whether you are one short of a rung — so it gets a beat of silence in front of it and the
-// screen says what it is worth while nobody is breathing. Same trick as bingo's last five, and the same
-// reason: the game is made of being one away, and it used to spend that moment at exactly the pace of the
-// third irrelevant ball.
-const KENO_LAST_PAUSE = 950;
+// ── THE TENTH BALL USED TO BE HELD BACK. IT ISN'T ANY MORE ───────────────────────────────────────────────────
+// It got a beat of silence in front of it on the theory that the tenth ball decides most tickets, so the
+// moment of being one away was worth stretching. That theory is right about ONE ticket and wrong about the
+// twentieth: keno is a fast game people play in a rhythm, and a near-miss hold you did not ask for, on every
+// single ticket, stops being tension and becomes a wait.
+//
+// Luke: "you can remove the near miss delay on the last one since its annoying."
+//
+// Bingo keeps its late-ball stretch, and that is not inconsistent — a bingo card runs forty balls and earns
+// the slow ending. Ten balls at an even pace are over quickly enough not to need one.
 
 const money = (n) => Math.round(Number(n) || 0).toLocaleString();
 
@@ -375,6 +378,20 @@ const OUTCOME = {
     lose: "The house takes it.",
     bust: "Bust.",
     dealer_blackjack: "Dealer had blackjack.",
+};
+
+// ── WHO THE HAND WENT TO ─────────────────────────────────────────────────────────────────────────────────────
+// The felt named the outcome in a sentence and then did nothing with it: the winning cards looked exactly like
+// the losing ones and the stake sat in the betting spot whoever had just taken it. Luke: "we should highlight
+// the cards of who won and animate the chips to go one way or the other."
+//
+// Both halves read from this one map, so the cards that light up and the direction the chips travel can never
+// disagree — which they would within a month if the seat worked it out from h.outcome and the stack worked it
+// out from hand.won.
+const WON_BY = {
+    blackjack: "you", win: "you", dealer_bust: "you",
+    push: "push",
+    lose: "house", bust: "house", dealer_blackjack: "house",
 };
 
 // The same outcomes again, short — these label ONE hand of a split, where the full sentence would not fit
@@ -474,6 +491,28 @@ export default function CasinoClient({ initial }) {
     const [bjFlip, setBjFlip] = useState(false);
     // True once every card of this beat is on the felt. The totals wait for it — see the seat header.
     const [bjSettled, setBjSettled] = useState(true);
+
+    // ── HOW MUCH ROOM THE CONTROLS ACTUALLY TAKE ─────────────────────────────────────────────────────────
+    // The controls are sticky and opaque, so anything taller than the stage has to be able to scroll clear
+    // of them. The clearance under the bingo card was a hardcoded 132px, which was a guess and a short one:
+    // the bar is a result line, a row of bet chips, a full-width pull button, a safe-area inset and — for an
+    // owner — a debug row, and it changes height between machines and between states. The bottom row of the
+    // card stopped exactly behind it. Luke sent the shot: "make it fit."
+    //
+    // Measured instead of guessed, because the one number that has to be right here is one the CSS cannot
+    // know. Published as a custom property on the stage so the clearance is a plain CSS calc.
+    const ctlRef = useRef(null);
+    const stageRef = useRef(null);
+    useEffect(() => {
+        const el = ctlRef.current;
+        const stage = stageRef.current;
+        if (!el || !stage || typeof ResizeObserver === "undefined") return undefined;
+        const apply = () => stage.style.setProperty("--cas-ctl", `${Math.round(el.getBoundingClientRect().height)}px`);
+        apply();
+        const ro = new ResizeObserver(apply);
+        ro.observe(el);
+        return () => ro.disconnect();
+    });
     const bjSeen = useRef(0);
     const bjHidden = useRef(false);
     // What just came out of the machine — coins, shards, the pot. `id` only exists so a second burst REMOUNTS
@@ -971,7 +1010,7 @@ export default function CasinoClient({ initial }) {
                 // point of it being visible before it is resolved.
                 if (i === r.goldIdx) { Cas.jackpot(); Haptic.crit(); }
                 if (i === last) Haptic.hit(0.5);
-            }, i * KENO_BALL_MS + (i === last ? KENO_LAST_PAUSE : 0))));
+            }, i * KENO_BALL_MS)));
             timers.current.push(setTimeout(() => {
                 setBusy(false);
                 absorb(r);
@@ -982,7 +1021,7 @@ export default function CasinoClient({ initial }) {
                     else { Cas.coins(0.35); Haptic.hit(0.6); throwBurst("coin", acc2); }
                     timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
                 } else Cas.lose();
-            }, r.drawn.length * KENO_BALL_MS + KENO_LAST_PAUSE + 320));
+            }, r.drawn.length * KENO_BALL_MS + 320));
             return;
         }
 
@@ -1213,6 +1252,21 @@ export default function CasinoClient({ initial }) {
         }
         return { total: i, dealerAt, holeAt, handsAt };
     }, [hand]);
+
+    // ── WHICH WAY THE CHIPS GO ───────────────────────────────────────────────────────────────────────────
+    // Null until the hand is over AND the cards have finished landing — sliding the pot away while the dealer
+    // is still drawing would answer the hand before it has been played out, which is the same mistake as
+    // celebrating on the response instead of on the last ball.
+    //
+    // A SPLIT settles on the money rather than on an outcome, because there is no single outcome to read: two
+    // hands can go different ways. Net-positive means the chips come to you. (One hand pushing while the other
+    // loses returns the pushed stake and reads as a win by this rule — the per-hand labels above it still say
+    // what really happened, and it is the rarest board at this table.)
+    const bjPot = useMemo(() => {
+        if (!hand || hand.open || !bjSettled) return null;
+        if ((hand.hands?.length || 0) > 1) return hand.won > 0 ? "you" : "house";
+        return WON_BY[hand.hands?.[0]?.outcome || hand.outcome] || null;
+    }, [hand, bjSettled]);
 
     // Three of whatever this cabinet actually rolls, taken from the middle of its own symbol list so the
     // idle machine is neither promising a jackpot nor showing three blanks.
@@ -1685,7 +1739,7 @@ export default function CasinoClient({ initial }) {
                 one now puts it behind the whole screen. (The comment lives up here because a JSX comment
                 in an expression position is a parse error, which this file has now made twice.) */}
             {seated && at ? (
-                <div className={`cas-stage${at.live ? "" : " is-dark"}`}
+                <div ref={stageRef} className={`cas-stage${at.live ? "" : " is-dark"}`}
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e",
                         "--mast": `url(/images/casino/mast/${at.id}.webp)`,
                         "--room": `url(/images/casino/room/${at.id}.webp)` }}
@@ -2217,28 +2271,16 @@ export default function CasinoClient({ initial }) {
                                 })() : null}
                             </div>
 
-                            {/* ── THE CAGE, AND WHAT HAS COME OUT OF IT ───────────────────────
-                                The balls used to materialise on a strip with nothing to have come from,
-                                which is the visual version of the numbers being handed down from nowhere.
-                                Every hall on earth has a thing that tumbles, and half of what people do
-                                between calls is watch it. It turns while the draw is running and stops when
-                                the draw does. */}
-                            <div className="cas-balls-wrap">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className={`cas-cage${busy ? " is-turning" : ""}`} alt=""
-                                    src="/images/casino/bingo/cage.webp" width={52} height={52} draggable="false" />
-                            <div className="cas-balls">
-                                {/* Real balls, in the five colours a bingo ball has always come in. The
-                                    sprite is blank and the number is set on it here — seventy-five numbered
-                                    balls cannot be drawn, and a ball with its number baked in could only
-                                    ever be called once. letterFor decides which of the five it is. */}
-                                {(card?.drawn || []).slice(0, called).map((n, i) => (
-                                    <span key={`${n}-${i}`}
-                                        className={`cas-ball is-${letterFor(n).toLowerCase()}${i === called - 1 ? " is-new" : ""}`}>{n}</span>
-                                ))}
-                                {!card ? <span className="cas-balls-idle">Forty balls from seventy-five.</span> : null}
-                            </div>
-                            </div>
+                            {/* ── THE CAGE AND THE CALLED-BALL STRIP ARE GONE ─────────────────
+                                They were added to give the numbers somewhere to have come FROM, and on a
+                                phone they instead pushed the card up under the top bar and left a dead
+                                third of the screen below it — visible in the shot Luke sent: the top row
+                                of the card is cut off by the header while forty balls sit in the space
+                                underneath. The card IS the record of what has been called; a second copy
+                                of the same information cost the card its room.
+                                Luke: "remove the balls and sprite at the bottom."
+                                The keno hopper keeps its cage — that board has no card to read the draw
+                                off, so there the strip IS the game. */}
 
                         </div>
                     ) : null}
@@ -2263,7 +2305,10 @@ export default function CasinoClient({ initial }) {
                             </span>
                             <span className="cas-shoe" aria-hidden="true" />
 
-                            <div className="cas-seat">
+                            {/* The dealer's side is lit by the SAME map the player's is — see WON_BY. A table
+                                where only your win is marked is a table that quietly tells you the house
+                                never wins anything. */}
+                            <div className={`cas-seat${bjPot === "house" ? " is-won" : ""}${bjPot === "you" ? " is-lost" : ""}`}>
                                 <span className="cas-seat-who">Dealer{hand && !hand.dealerHidden && bjSettled ? ` · ${hand.dealerValue.total}` : ""}</span>
                                 <div className="cas-cards">
                                     {(hand?.dealer || []).map((c, i) => (
@@ -2282,8 +2327,10 @@ export default function CasinoClient({ initial }) {
                                 layout to keep in step with this one. The hand in play is the lit one; the
                                 other is dimmed rather than hidden, because knowing what is waiting is half
                                 of why you split. */}
+                            {/* Per HAND, not per player — a split can win one and lose the other, and one
+                                verdict painted across both would be a lie about half the table. */}
                             {(hand?.hands || [null]).map((h, i) => (
-                                <div key={i} className={`cas-seat is-you${h && hand.hands.length > 1 ? " is-multi" : ""}${h?.isActive ? " is-turn" : ""}${h?.outcome === "bust" ? " is-bust" : ""}${h?.outcome === "blackjack" ? " is-blackjack" : ""}`}>
+                                <div key={i} className={`cas-seat is-you${h && hand.hands.length > 1 ? " is-multi" : ""}${h?.isActive ? " is-turn" : ""}${h?.outcome === "bust" ? " is-bust" : ""}${h?.outcome === "blackjack" ? " is-blackjack" : ""}${bjSettled && !hand?.open && WON_BY[h?.outcome] === "you" ? " is-won" : ""}${bjSettled && !hand?.open && WON_BY[h?.outcome] === "house" ? " is-lost" : ""}`}>
                                     <span className="cas-seat-who">
                                         {hand?.hands?.length > 1 ? `Hand ${i + 1}` : "You"}
                                         {h && bjSettled ? ` · ${h.value.total}${h.value.soft && h.value.total <= 21 ? " soft" : ""}` : ""}
@@ -2305,7 +2352,11 @@ export default function CasinoClient({ initial }) {
                                 the one place on a blackjack table money never is. It sits in the betting
                                 spot now, as chips, and it doubles when you double — so the thing you stand
                                 to lose is on the felt in front of you rather than in the UI. */}
-                            <div className={`cas-spot${hand?.open ? " is-live" : ""}`} aria-hidden="true">
+                            {/* And when the hand is over the stack does not just sit there — it goes to
+                                whoever won it, up the felt to the dealer or down off the table to you. The
+                                pot moving is how a real table tells you who took it, and it says so before
+                                you have read a word of the line underneath. */}
+                            <div className={`cas-spot${hand?.open ? " is-live" : ""}${bjPot ? ` is-to-${bjPot}` : ""}`} aria-hidden="true">
                                 <span className="cas-spot-ring" />
                                 <span className="cas-stack">
                                     {[0, 1, 2].map((i) => <span key={i} className="cas-chip" style={{ "--i": i }} />)}
@@ -2321,7 +2372,7 @@ export default function CasinoClient({ initial }) {
                                     this, we don't want to rake anything." Both are gone because the rake is
                                     gone; what stands in its place is the thing that IS true now, which is
                                     that the table pays chips. */}
-                                {!hand ? "Blackjack pays 3:2. Dealer stands on all 17. The table takes no rake."
+                                {!hand ? "Blackjack pays 3:2. Dealer stands on all 17."
                                     : hand.open ? (hand.hands?.[hand.active]?.canSplit ? "Hit, stand, double, or split." : "Hit, stand, or double.")
                                         : hand.outcome === "split" ? "Both hands played."
                                             : OUTCOME[hand.outcome] || "Hand over."}
@@ -2372,7 +2423,7 @@ export default function CasinoClient({ initial }) {
                         there they both were, "Spin · 100" above and "Pull · 100" below, forty pixels apart.
                         One machine, one button. */}
                     {at.live && !SLOTS5[at.id] && at.id !== "store" ? (
-                        <div className="cas-controls">
+                        <div ref={ctlRef} className="cas-controls">
                             {/* ── WHAT THE CARD DID, WHERE YOU CAN SEE IT ─────────────────────────────
                                 Luke: "win amount hidden."
 

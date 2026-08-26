@@ -541,17 +541,33 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 // that was actually measured, and still lands the same 230ms after the reel truly rests.
                 if (k === REELS - 1) allDown((b?.ms ?? settle) + 230);
                 setLanded(k + 1);
+                // ── THE CLUNK BELONGS AT REST, NOT AT THE START OF THE BRAKE ─────────────────────────
+                // This timer fires when the reel BEGINS to settle. The settle itself is measured (see
+                // measureBrake) and runs anywhere from 220ms to 900ms depending where the loop was caught,
+                // so playing the stop here put the sound up to nine-tenths of a second before the reel
+                // actually came to rest — the reel was still visibly moving when you heard it land.
+                // Luke: "the slots sound of the reel stopping isnt synced with the real stopping."
+                //
+                // Same number the payout already waits on. The brake's length was measured for exactly
+                // this reason and the audio was the one thing still reading from the old constant.
+                const rest = b?.ms ?? settle;
+                const atRest = (fn) => timers.current.push(setTimeout(fn, rest));
                 if (!tease[k]) {
-                    Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
-                    Haptic.hit(k === REELS - 1 ? 0.5 : 0.3);
+                    atRest(() => {
+                        Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
+                        Haptic.hit(k === REELS - 1 ? 0.5 : 0.3);
+                    });
                     return;
                 }
                 // Did it come? Both answers are loud — a hold that resolves quietly either way was not a
                 // hold, it was a pause. The miss is deliberately short and soft though: most of them miss,
                 // and a machine that mourns every one of them is exhausting by the tenth.
+                //
+                // The TEASE clears now — that is the reel arriving, and the held symbol has to stop
+                // flashing the moment it does — but the verdict still lands with the reel.
                 setTease(null);
-                if (g[k].includes(tease[k])) { Cas.reelStop(k, 1); Haptic.crit(); }
-                else { Cas.nearMiss(); Haptic.hit(0.5); }
+                if (g[k].includes(tease[k])) atRest(() => { Cas.reelStop(k, 1); Haptic.crit(); });
+                else atRest(() => { Cas.nearMiss(); Haptic.hit(0.5); });
             }, at));
         }
     }, [teaseFor, measureBrake]);

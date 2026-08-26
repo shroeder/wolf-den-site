@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { ARCHETYPES, npcPower } from "@/lib/marketplace/arena-npc.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE SHARED SWARM ─────────────────────────────────────────────────────────────────────────────────────────
 // A skirmish raid is now a real, finite, SHARED roster of foes: 5 waves, then a chieftain, then it's over.
@@ -433,6 +434,7 @@ export async function strikeEnemy(buyerId, enemyId, damage) {
         `SELECT COUNT(*)::int AS n FROM mkt_town_enemy WHERE event_id = $1 AND wave = $2 AND died_at IS NULL`,
         [hit.event_id, hit.wave]
     ).catch(() => null);
+    if (killed) await trackActivity(buyerId, "swarm_kill", { kind: hit.kind, wave: Number(hit.wave), eventId: Number(hit.event_id) }).catch(() => {});
     return {
         ok: true, damage: dmg, killed,
         enemyId: Number(hit.id), kind: hit.kind, hp: Number(hit.hp), hpMax: Number(hit.hp_max),

@@ -19,6 +19,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { checkTownRaidBadges } from "@/lib/marketplace/town-badges.js";
 import { maybeGrantRaidPet } from "@/lib/marketplace/pet-drops.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
@@ -585,6 +586,7 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
             [eventId, buyerId, dmg]
         ).catch(() => null),
     ]);
+    if (Number(mine?.hits) === 1) await trackActivity(buyerId, "raid_join", { eventId, wave: Number(ev.meta?.wave) || 1 }).catch(() => {});
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     // The recipe moved into the duel's own loot roll below — one outcome, not a second roll on top.
     let hp = updated?.hp ?? ev.hp;

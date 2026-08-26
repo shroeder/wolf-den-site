@@ -14,6 +14,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { collectedIds } from "@/lib/marketplace/compendium.js";
 import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
 const parseBonus = (v) => (typeof v === "string" ? (() => { try { return JSON.parse(v); } catch { return {}; } })() : (v || {}));
@@ -323,6 +324,7 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
         `INSERT INTO mkt_auction (seller_id, item_id, price, fee, expires_at) VALUES ($1, $2, $3, $4, NOW() + ($5 || ' days')::interval) RETURNING id`,
         [buyerId, itemId, p, fee, String(d)]
     ).catch(() => null);
+    await trackActivity(buyerId, "auction_list", { itemId, price: p, fee, days: d, rarity: it.rarity }).catch(() => {});
     return { ok: true, id: Number(row?.id || 0), fee, gold: Number(paid.gold) };
 }
 
@@ -358,6 +360,8 @@ export async function buyAuctionListing(buyerId, listingId) {
     // Sale done → check both sides for newly-earned Auction badges.
     syncEarnedBadges(buyerId).catch(() => {});
     syncEarnedBadges(claim.seller_id).catch(() => {});
+    await trackActivity(buyerId, "auction_buy", { itemId: claim.item_id, price, rarity: it?.rarity || null, sellerId: claim.seller_id }).catch(() => {});
+    await trackActivity(claim.seller_id, "auction_sold", { itemId: claim.item_id, price, rarity: it?.rarity || null, buyerId }).catch(() => {});
     // Notify the SELLER their item sold (web push).
     (async () => {
         const b = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -380,5 +384,6 @@ export async function cancelAuctionListing(buyerId, listingId) {
     const row = await db.queryOne(`UPDATE mkt_auction SET status = 'cancelled' WHERE id = $1 AND seller_id = $2 AND status = 'active' RETURNING item_id`, [listingId, buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "gone" };
     await grantItem(buyerId, row.item_id, "auction_return").catch(() => {});
+    await trackActivity(buyerId, "auction_cancel", { itemId: row.item_id }).catch(() => {});
     return { ok: true };
 }

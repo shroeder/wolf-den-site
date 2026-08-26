@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Pet leveling (equipped pet only). Re-tuned 2026-07-21:
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
@@ -206,6 +207,7 @@ export async function levelUpEquippedPet(buyerId) {
             [buyerId, petId, targetXp]
         )
         .catch(() => {});
+    await trackActivity(buyerId, "pet_level_up", { petId, level: level + 1, rarity, equipped: true }).catch(() => {});
     return { ok: true, petId, level: level + 1, leveled: true };
 }
 
@@ -248,6 +250,7 @@ export async function levelUpPet(buyerId, petId) {
             [buyerId, petId, targetXp]
         )
         .catch(() => {});
+    await trackActivity(buyerId, "pet_level_up", { petId, level: level + 1, rarity, equipped: false }).catch(() => {});
     return { ok: true, petId, level: level + 1, leveled: true };
 }
 

@@ -18311,7 +18311,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-hall-top span.is-calling { animation: casCall .32s cubic-bezier(.2,1.5,.4,1) both; }
 @keyframes casCall { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-.cas-bhead, .cas-bcard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+/* ── FIVE SQUARES ACROSS, SIZED BY WHICHEVER RUNS OUT FIRST ───────────────────────────────────────────
+   The cells were square and the columns were 1fr, so a cell's height came entirely from the screen's WIDTH
+   — and on a phone that made a card 340px tall inside about 390px of stage, before the caller, the pattern
+   banner and the B-I-N-G-O header had taken their share. The bottom row had nowhere to be, so it went
+   under the sticky controls and the result line was drawn straight through the middle of it. Luke sent a
+   shot of exactly that, then: "make it fit."
+
+   --bcell is the cell size, capped by BOTH: 19vw keeps it square-ish against the width, 7.4vh stops five
+   rows from being taller than the room. The grid is centred at whatever that comes to, so a short screen
+   gets a slightly smaller card rather than a card that does not fit on it. */
+.cas-bhead, .cas-bcard { --bcell: min(19vw, clamp(30px, 7.4vh, 62px));
+    display: grid; grid-template-columns: repeat(5, var(--bcell)); gap: 5px; justify-content: center; }
 .cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
 .cas-bcard { margin-top: 5px; }
 /* A COLD SQUARE IS COLD. It was rgba(255,255,255,.04) over a lit backdrop, which is barely a square at all —
@@ -18626,7 +18637,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
      few pixels, which is about a row and a half of card between them;
      and it carries a floor of clearance the height of the controls, so whatever is left over can always be
      scrolled properly clear of them rather than stopping exactly behind them. */
-.cas-stage .cas-hall { padding-bottom: 132px; }
+/* 132px was a guess at how tall the controls are, and it was short: the bet chips, the pull button, the
+   result line and (for an owner) the debug row come to a good deal more than that, so the last row of the
+   card stopped exactly behind them instead of clearing them. Measured now — see the observer in
+   CasinoClient — with the old guess as the fallback for the first paint. */
+.cas-stage .cas-hall { padding-bottom: calc(var(--cas-ctl, 132px) + 14px); }
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
@@ -18818,6 +18833,61 @@ body.cas-seated .social-fab { display: none; }
     font-size: clamp(10px, 2vh, 13px); font-weight: 900; color: #2a1f10;
     font-variant-numeric: tabular-nums; text-shadow: 0 1px 0 rgba(255,255,255,0.4);
     transform: translateY(calc(clamp(3px, 0.6vh, 5px) * -1.6)); }
+
+/* ── WHO WON, DRAWN ON THE TABLE RATHER THAN WRITTEN UNDER IT ─────────────────────────────────────────
+   The hand settled and nothing on the felt changed: the winning cards looked exactly like the losing
+   ones, and the pot sat in the betting spot whoever had just taken it. The only thing that moved was a
+   sentence, at the bottom, in the smallest text on the screen. Luke: "we should highlight the cards of
+   who won and animate the chips to go one way or the other."
+
+   BOTH SIDES ARE MARKED. A table that lights only your win is a table quietly implying the house never
+   takes anything, and the losing hand going grey is what makes the winning one read as won — a glow with
+   nothing to be brighter than is just a card with a border. */
+.cas-seat.is-won .cas-card {
+    animation: casWonCard .5s cubic-bezier(.2,1.4,.4,1) both;
+    box-shadow: 0 0 0 2px rgba(255,224,140,.9), 0 0 22px rgba(255,205,90,.5), 0 6px 14px rgba(0,0,0,.45); }
+/* Staggered off the deal order so the hand lights left to right like somebody reading it, rather than
+   every card flashing at once. --i is already set per card by the deal stagger. */
+.cas-seat.is-won .cas-cards > *:nth-child(2) { animation-delay: 60ms; }
+.cas-seat.is-won .cas-cards > *:nth-child(3) { animation-delay: 120ms; }
+.cas-seat.is-won .cas-cards > *:nth-child(4) { animation-delay: 180ms; }
+.cas-seat.is-won .cas-cards > *:nth-child(n+5) { animation-delay: 240ms; }
+.cas-seat.is-won .cas-seat-who { color: #ffe9b8; }
+@keyframes casWonCard {
+    0% { transform: translateY(0) scale(1); }
+    45% { transform: translateY(-7px) scale(1.045); }
+    100% { transform: translateY(-3px) scale(1.02); } }
+
+/* The loser does not get an effect of its own — it gets LESS. Grey and slightly sunk, which is what a
+   hand that is out of the game looks like on a real table. */
+.cas-seat.is-lost .cas-cards { transition: filter .34s ease, opacity .34s ease, transform .34s ease;
+    filter: grayscale(.7) brightness(.62); opacity: .78; transform: translateY(2px); }
+.cas-seat.is-lost .cas-seat-who { color: #9aa3ad; }
+
+/* ── AND THE POT TRAVELS ──────────────────────────────────────────────────────────────────────────────
+   Up the felt to the dealer, or down off the near edge to you. The distance is deliberately further than
+   the chips need to go: a stack that stops politely inside the table reads as a UI element sliding, and
+   one that leaves reads as money being taken. A push nudges and settles back, because a push is the one
+   result where nothing changes hands and the stack has to say so without going anywhere. */
+.cas-spot { --travel: clamp(150px, 32vh, 300px); }
+.cas-spot.is-to-house .cas-stack { animation: casPotUp .72s cubic-bezier(.4,0,.7,.3) both; }
+.cas-spot.is-to-you .cas-stack { animation: casPotDown .66s cubic-bezier(.4,0,.7,.3) both; }
+.cas-spot.is-to-push .cas-stack { animation: casPotStay .5s cubic-bezier(.3,1.3,.5,1) both; }
+/* The ring is the empty seat the chips left, so it dims with them rather than staying lit around nothing. */
+.cas-spot.is-to-house .cas-spot-ring, .cas-spot.is-to-you .cas-spot-ring {
+    transition: opacity .5s ease .18s; opacity: .25; }
+@keyframes casPotUp {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    18% { transform: translateY(6px) scale(1.06); opacity: 1; }
+    100% { transform: translateY(calc(var(--travel) * -1)) scale(.7); opacity: 0; } }
+@keyframes casPotDown {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    18% { transform: translateY(-6px) scale(1.08); opacity: 1; }
+    100% { transform: translateY(calc(var(--travel) * 0.55)) scale(.78); opacity: 0; } }
+@keyframes casPotStay {
+    0% { transform: translateY(0); }
+    40% { transform: translateY(-9px); }
+    100% { transform: translateY(0); } }
 
 
 /* ── A HERO WHO IS ACTUALLY WALKING ───────────────────────────────────────────────────────────────────

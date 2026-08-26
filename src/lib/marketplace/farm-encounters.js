@@ -8,6 +8,7 @@ import { grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { PART_TIERS } from "@/lib/marketplace/crafting.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── HARVEST CRITTER ENCOUNTERS ────────────────────────────────────────────────────────────────────────────
 // A chance a friendly garden critter scurries over at harvest with a GIFT. Encounters are PURE UPSIDE — they
@@ -109,6 +110,7 @@ export async function maybeStartEncounter(buyerId, { rarity = "common", wardChan
     // reward preview so the recap always shows exactly what landed.
     const grant = await grantEncounterReward(buyerId, key, c.xp, c.gold, loot);
     await db.query(`UPDATE mkt_buyer SET farm_encounter = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ key, xp: c.xp, gold: c.gold, loot, granted: true })]).catch(() => {});
+    await trackActivity(buyerId, "farm_encounter", { creature: key, xp: c.xp, gold: c.gold, loot: loot?.type || null, rarity, forced: Boolean(force) }).catch(() => {});
     return { key, name: c.name, emoji: c.emoji, sprite: await critterSprite(c.art), crop: seedId ? (SEEDS[seedId]?.name || null) : null, reward: { xp: c.xp, gold: c.gold, loot, goldAfter: grant.goldAfter } };
 }
 

@@ -7,6 +7,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { checkTavernBadges } from "@/lib/marketplace/town-badges.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, Number.isFinite(Number(v)) ? Number(v) : lo));
 
@@ -164,6 +165,7 @@ export async function gambitStart(buyerId, bet) {
          ON CONFLICT (buyer_id) DO UPDATE SET dice_active = TRUE, dice_state = $2::jsonb, updated_at = NOW()`,
         [buyerId, JSON.stringify(state)]
     );
+    await trackActivity(buyerId, "tavern_gambit_start", { bet: b, hand: scoreHand(dice).label }).catch(() => {});
     return { ok: true, bet: b, dice, hand: scoreHand(dice).label, gold: Number(paid.gold) };
 }
 
@@ -177,6 +179,7 @@ export async function gambitReroll(buyerId, hold) {
     const keep = Array.isArray(hold) ? hold : [false, false, false];
     const dice = st.dice.map((d, i) => (keep[i] ? d : d6()));
     await db.query(`UPDATE mkt_tavern SET dice_state = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify({ ...st, dice, rerolled: true })]);
+    await trackActivity(buyerId, "tavern_gambit_reroll", { held: keep.filter(Boolean).length, hand: scoreHand(dice).label }).catch(() => {});
     return { ok: true, dice, hand: scoreHand(dice).label };
 }
 
@@ -210,6 +213,7 @@ export async function gambitResolve(buyerId) {
         gold = Number(paid?.gold ?? 0);
     }
     if (outcome === "win") bumpTownQuest(buyerId, "patron", 1).catch(() => {});
+    await trackActivity(buyerId, "tavern_gambit", { outcome, bet, payout, jackpot, rerolled: Boolean(st.rerolled), hand: ph.label, gambler: gh.label }).catch(() => {});
     checkTavernBadges(buyerId).catch(() => {}); // Dice Devil / Dice King (hands played)
     return { ok: true, outcome, bet, payout, jackpot, player: { dice: playerDice, hand: ph.label }, gambler: { dice: gamblerDice, hand: gh.label }, gold };
 }
@@ -228,6 +232,7 @@ export async function claimDailyPint(buyerId) {
     await awardXp(buyerId, "tavern_pint", { points: PINT_XP, gold: PINT_GOLD, dedupeKey: `pint:${buyerId}:${Date.now()}` }).catch(() => {});
     bumpTownQuest(buyerId, "patron", 1).catch(() => {});
     const drinks = (await db.queryOne(`SELECT drinks FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null))?.drinks || 1;
+    await trackActivity(buyerId, "tavern_pint", { drinks, xp: PINT_XP, gold: PINT_GOLD }).catch(() => {});
     checkTavernBadges(buyerId).catch(() => {}); // Tavern Regular (pints downed)
     return { ok: true, drinks, xp: PINT_XP, gold: PINT_GOLD };
 }
@@ -255,5 +260,6 @@ export async function buyRound(buyerId) {
          ON CONFLICT (buyer_id) DO UPDATE SET rounds = COALESCE(mkt_tavern.rounds, 0) + 1, updated_at = NOW() RETURNING rounds`,
         [buyerId]
     ).catch(() => null);
+    await trackActivity(buyerId, "tavern_round", { recipients: rows.length, cost: ROUND_COST, rounds: row?.rounds || 1 }).catch(() => {});
     return { ok: true, recipients: rows.length, cost: ROUND_COST, hostXp: ROUND_HOST_XP, giftXp: ROUND_GIFT_XP, rounds: row?.rounds || 1, gold: Number(paid.gold) };
 }

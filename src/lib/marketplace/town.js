@@ -27,6 +27,7 @@ import { getSetting, setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
 import { chipFor } from "@/lib/marketplace/roles.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -695,6 +696,7 @@ export async function sendTownChat(buyerId, body, channel = "global") {
     }
 
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body, channel) VALUES ($1, $2, $3)`, [buyerId, text, chan]).catch(() => {});
+    await trackActivity(buyerId, "town_chat", { channel: chan, length: text.length }).catch(() => {});
     // Chatting pays NOTHING. It used to tick a "send 5 chats" daily, which turned the Den's global feed into
     // five identical wolf emoji from whoever wanted the 80 gold. See the note in town-quests.js.
     return { ok: true };

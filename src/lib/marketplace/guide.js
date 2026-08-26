@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { GUIDE_CHAPTERS, DONE_CHAPTER, DONE_STEP, SEEDED, chapterById } from "@/lib/marketplace/guide-chapters.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE PATHFINDER: PROGRESS ─────────────────────────────────────────────────────────────────────────────────
 // Steps are VERIFIED, never claimed. One pass over the member's distinct activity events plus three small
@@ -192,6 +193,7 @@ export async function claimGuideStep(buyerId, key) {
     ).catch(() => null);
     if (!paid) return { ok: false, error: "db" };
     await logCoin(buyerId, step.gold, "guide_step", { balanceAfter: paid.gold, meta: { key } }).catch(() => {});
+    await trackActivity(buyerId, "guide_step", { key, gold: step.gold }).catch(() => {});
     return { ok: true, gold: step.gold, ...(await getGuide(buyerId)) };
 }
 
@@ -214,5 +216,6 @@ export async function claimGuideChapter(buyerId, id) {
     if (!paid) return { ok: false, error: "claimed", ...(await getGuide(buyerId)) };
     await logCoin(buyerId, ch.reward.gold, "guide_chapter", { balanceAfter: paid.gold, meta: { chapter: id } }).catch(() => {});
     if (ch.reward.chest) await addChests(buyerId, { [ch.reward.chest]: 1 }, { source: "guide" }).catch(() => {});
+    await trackActivity(buyerId, "guide_chapter", { chapter: id, gold: ch.reward.gold, chest: ch.reward.chest || null }).catch(() => {});
     return { ok: true, gold: ch.reward.gold, chest: ch.reward.chest, ...(await getGuide(buyerId)) };
 }

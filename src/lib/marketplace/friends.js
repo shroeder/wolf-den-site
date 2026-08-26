@@ -6,6 +6,7 @@ import { awardOnce, levelForXp } from "@/lib/marketplace/xp.js";
 import { pickShowcaseBadges } from "@/lib/marketplace/badge-display.js";
 import { avatarImageUrl, sanitizeCosmetics } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Both people in a new friendship get a one-time "first friend" onboarding reward (deduped, so it
 // only ever fires for each once). Best-effort.
@@ -159,6 +160,7 @@ export async function sendFriendRequest(requesterId, addresseeId) {
             // The original requester (addresseeId) gets an "accepted" nudge.
             await notifyFriendAccepted(addresseeId, requesterId);
             await awardFirstFriend(requesterId, addresseeId);
+            await trackActivity(requesterId, "friend_accept", { otherId: addresseeId, viaRequest: true }).catch(() => {});
             return { ok: true, status: "friends" };
         }
         return { ok: true, status: "outgoing" }; // already pending from me
@@ -167,6 +169,7 @@ export async function sendFriendRequest(requesterId, addresseeId) {
         .query(`INSERT INTO mkt_friendship (requester_id, addressee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [requesterId, addresseeId])
         .catch(() => {});
     await notifyFriendRequest(addresseeId, requesterId);
+    await trackActivity(requesterId, "friend_request", { otherId: addresseeId }).catch(() => {});
     return { ok: true, status: "outgoing" };
 }
 
@@ -181,6 +184,7 @@ export async function respondToRequest(userId, requestId, accept) {
         if (rows.length > 0) {
             await notifyFriendAccepted(rows[0].requester_id, userId);
             await awardFirstFriend(userId, rows[0].requester_id);
+            await trackActivity(userId, "friend_accept", { otherId: rows[0].requester_id, viaRequest: false }).catch(() => {});
         }
         return { ok: rows.length > 0 };
     }

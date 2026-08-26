@@ -6,6 +6,7 @@ import { notifyNewDm } from "@/lib/marketplace/social-notify.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // User-to-user direct messages. Distinct from the buyer<->vendor mkt_thread system; both are surfaced
 // together in the unified inbox.
@@ -70,6 +71,7 @@ export async function postDmMessage(threadId, senderId, body, catalogProductId =
     // Best-effort push (always) + email (only when offline + first unread).
     await notifyNewDm(recipientId, senderId, threadId, text || "Shared a card", { firstUnread });
 
+    await trackActivity(senderId, "dm_sent", { threadId, length: text.length, card: Boolean(catalogProductId) }).catch(() => {});
     return { ok: true, messageId: rows[0]?.id || null, createdAt: rows[0]?.created_at || null };
 }
 
