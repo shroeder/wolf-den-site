@@ -1,12 +1,42 @@
 import "server-only";
 
 // ── THE MINT RATE ────────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "we need an across the board nerf on gold given out by 50 percent."
+// Luke: "we need an across the board nerf on gold given out by 50 percent." Then, the next day, twice: "did we
+// nerf all sources of coin today?" and "nerf."
 //
 // One number, one place. Every source that CREATES gold runs its reward through `mint()` on the way out, so the
 // whole economy's faucet is this constant and re-tuning it later is a one-line change rather than another sweep
-// of thirty features.
-export const GOLD_MINT_RATE = 0.5;
+// of thirty features. 91.4% of a day's minting goes through it — the rest is transfers, returns and casino
+// payouts, none of which may be rated (see MINT_REASONS below for why).
+//
+// ── 0.5 -> 0.4, AND WHAT THE LEDGER SAID FIRST ───────────────────────────────────────────────────────────────
+// Worth writing down because the measurement disagreed with the instruction and the instruction won, which is
+// the right outcome but only if the next person can see both halves.
+//
+//   30 days   minted 7,593,504   burned 7,150,941   net +442,563   sink  94.2%
+//    7 days   minted 2,084,881   burned 2,105,717   net  -20,836   sink 101.0%
+//    3 days   minted   898,955   burned   914,685   net  -15,730   sink 101.7%
+//    1 day    minted   235,541   burned   269,212   net  -33,671   sink 114.3%
+//
+// The 30-day figure is what the dashboard shows and it says the supply is inflating. It also straddles the
+// halving above. Every window since is already contracting, and the most recent is contracting hardest — so
+// on the three-day rule this codebase uses to judge a faucet, a further cut was not indicated. Luke's call
+// against that, and it is his to make: the number that matters to him is what a day's play is worth to a
+// member, not the aggregate.
+//
+// WHAT 0.4 DOES, on today's traffic: rated minting falls from 215,293 to 172,234 a day, total minting to
+// ~192,000 against ~269,000 burned — about -77,000 a day against a circulating supply of 393,318.
+//
+// THAT PROJECTS TO AN EMPTY ECONOMY IN FIVE DAYS, and it will not happen, for a reason worth being explicit
+// about: spending is bounded by holdings. As members run short they stop buying upgrades — and today's burn is
+// unusually upgrade-heavy (mining_upgrade 54k, upgrade 53k in one day, both one-time purchases people are
+// working through right now). Burn will fall to meet the faucet on its own. What a member will actually feel
+// is being poorer, which is what a nerf is.
+//
+// ⚠️ WATCH THE 1-DAY WINDOW rather than the 30-day one for the next few days. If supply keeps falling after
+// the upgrade rush finishes, this is the line to move back up. Do not judge it on the dashboard's default
+// 30-day view, which will keep showing the pre-halving era for another three weeks.
+export const GOLD_MINT_RATE = 0.4;
 
 // ── WHAT COUNTS AS "GIVEN OUT" ───────────────────────────────────────────────────────────────────────────────
 // Not every credit is a mint, and this distinction is the whole reason this file exists rather than a blanket
