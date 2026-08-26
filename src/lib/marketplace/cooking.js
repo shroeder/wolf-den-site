@@ -354,6 +354,13 @@ export const PREPS = {
     p_chilli:    { name: "Urchin Fire Oil",   rarity: "epic" },
     p_essence:   { name: "Star Essence",      rarity: "legendary" },
     p_leviathan: { name: "Leviathan Marrow",  rarity: "legendary" },
+    // ── THE MASTER'S TWO ───────────────────────────────────────────────────────────────────────────
+    // Made only by tier-6 preps, which only exist for somebody holding the Master's Book. They are in THIS
+    // table rather than a gated one because a pantry row has to be nameable: the gate is on learning the
+    // recipe that makes them, and an ingredient the kitchen cannot name is a blank line in your own pantry.
+    // They were missing entirely at first, which made every tier-6 dish uncookable in practice.
+    p_emberash:  { name: "Ember Ash",         rarity: "mythic" },
+    p_goldleaf:  { name: "Beaten Gold Leaf",  rarity: "mythic" },
 };
 export const prepMeta = (id) => PREPS[id] || null;
 

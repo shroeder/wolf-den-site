@@ -64,6 +64,37 @@ const ART = {
     // ── THE CROWN ── the last ten. They are not sport.
     crown: "A legendary champion in immaculate gold-filigreed plate armour, a closed helm with a narrow visor slit, a tattered banner-cape at the shoulder",
     "crown-champion": "The Old Wolf — the Den's greatest champion, a scarred veteran warlord in black and gold masterwork armour with a snarling wolf-head pauldron and a heavy fur mantle, one eye lost, utterly calm",
+    // ═══ THE LONG ROAD ═══ bought at the Counter. Past the Crown, out of the world.
+    // ── THE GATE ── something has been keeping this shut from the far side.
+    gate: "A gaunt doorward in pale blue-grey robes over iron scale, an iron key-ring hanging at the throat, eyes like a refusal",
+    "gate-champion": "The Gate Itself — a face of iron-banded pale timber and blue light, a vertical seam of glare splitting it down the middle, no eyes",
+    // ── THE WASTE ── nothing grows. Things still live.
+    waste: "A leathery salt-crusted wanderer in sun-bleached ochre wrappings and a wide ragged hat, lips cracked, eyes narrowed against glare",
+    "waste-champion": "The Waste Entire — a sun-bleached skull crowned in drifting ochre sand, jaw slack, dust streaming from the eye sockets",
+    // ── THE CHOIR ── they are certain, and they are armed.
+    choir: "A robed singer in bone-white and gold vestments, mouth open mid-note with warm gold light spilling from the throat",
+    "choir-champion": "The Choirmaster — a towering conductor with a white mane and ornate gold-trimmed vestments, gold light pouring from the open mouth, eyes closed",
+    // ── THE VAULT ── somebody sealed these in on purpose.
+    vault: "A pallid specimen in a grey containment harness with brass fittings and a numbered tag at the throat, colourless eyes far too wide",
+    "vault-champion": "The Accession — the face of a grey-blue vault door, brass dials set where the eyes should be, cold blue light at the seams",
+    // ── THE STORM ── weather that came looking for you.
+    storm: "A wind-scoured figure of blue-white spray in a streaming oilskin hood, hair horizontal, rain running off the jaw",
+    "storm-champion": "The Whole Sky — a face of blue-black thunderhead cloud with white lightning flickering behind the eyes, a crown of falling rain",
+    // ── THE HOLLOW ── they are the wanting.
+    hollow: "A thin violet-grey figure with sunken cheeks and a mouth that is a dark absence rather than a mouth, eyes two pits",
+    "hollow-champion": "The Hunger Itself — a violet-grey head that is mostly a yawning vertical void, the remains of a face framing the dark",
+    // ── THE ORRERY ── machinery that was told to keep going.
+    orrery: "A brass automaton head with copper plating and a small escapement wheel turning where one eye should be, violet enamel inlay",
+    "orrery-champion": "The Great Wheel — a brass orrery head ringed by concentric violet-enamelled bands turning slowly, a single lens for a face",
+    // ── THE LONG DARK ── the distance between everything.
+    dark: "A matte black silhouette of a head rimmed in cold slate blue frost, no features at all, faint blue starlight behind",
+    "dark-champion": "The Dark Entire — a void-black head so lightless it reads as a hole in the picture, cold blue starlight where a face should be",
+    // ── THE FIRST ── they were here before the road was.
+    first: "A weathered grey standing-stone head veined with deep green moss, a carved spiral where the face should be",
+    "first-champion": "The First of All — a colossal black primordial stone head veined in deep green light, a single deep spiral carved across it",
+    // ── THE SUN ── the end of the road, and it is bright.
+    sun: "A white-gold figure too bright to look at directly, features washed almost to nothing, gold light bleeding from the edges",
+    "sun-champion": "The Sun Itself — a titanic head of pure white-gold light in the rough shape of a helm, a blinding corona behind it, molten gold at the jaw",
 };
 
 async function generate(prompt) {

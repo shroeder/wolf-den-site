@@ -27,8 +27,16 @@ const BLOB_TOKEN = pick(env, "BLOB_READ_WRITE_TOKEN");
 if (!OPENAI_KEY?.startsWith("sk-")) throw new Error("bad OPENAI_API_KEY");
 const sql = neon(DB_URL);
 
-// Parsed straight out of cooking.js so this can never drift from the catalogue it's drawing.
-const src = fs.readFileSync("src/lib/marketplace/cooking.js", "utf8");
+// Parsed straight out of the catalogue so this can never drift from what it is drawing.
+//
+// TWO FILES, because the book moved and this did not follow it. The recipes were lifted out of cooking.js into
+// cooking-recipes.js (import cycle: consumables.js needs the list, cooking.js imports consumables.js) and this
+// generator kept reading cooking.js — which has ZERO R/P/B definitions in it now. It has been finding no
+// recipes at all ever since, and reporting success while doing it. cooking.js is still read for the PREP and
+// BAIT item tables, which do live there.
+const src = ["cooking-recipes.js", "cooking.js"]
+    .map((f) => fs.readFileSync(`src/lib/marketplace/${f}`, "utf8"))
+    .join("\n");
 // B() joins R and P here: twenty of the Kitchen's recipes are BAIT now, and a generator that only knew two
 // letters would have left every one of them with no art while reporting success.
 const RECIPES = [...src.matchAll(/^\s+([RPB])\("([a-z_0-9]+)",\s*"([^"]+)",\s*(\d)/gm)]
