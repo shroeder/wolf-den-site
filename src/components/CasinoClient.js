@@ -492,27 +492,6 @@ export default function CasinoClient({ initial }) {
     // True once every card of this beat is on the felt. The totals wait for it — see the seat header.
     const [bjSettled, setBjSettled] = useState(true);
 
-    // ── HOW MUCH ROOM THE CONTROLS ACTUALLY TAKE ─────────────────────────────────────────────────────────
-    // The controls are sticky and opaque, so anything taller than the stage has to be able to scroll clear
-    // of them. The clearance under the bingo card was a hardcoded 132px, which was a guess and a short one:
-    // the bar is a result line, a row of bet chips, a full-width pull button, a safe-area inset and — for an
-    // owner — a debug row, and it changes height between machines and between states. The bottom row of the
-    // card stopped exactly behind it. Luke sent the shot: "make it fit."
-    //
-    // Measured instead of guessed, because the one number that has to be right here is one the CSS cannot
-    // know. Published as a custom property on the stage so the clearance is a plain CSS calc.
-    const ctlRef = useRef(null);
-    const stageRef = useRef(null);
-    useEffect(() => {
-        const el = ctlRef.current;
-        const stage = stageRef.current;
-        if (!el || !stage || typeof ResizeObserver === "undefined") return undefined;
-        const apply = () => stage.style.setProperty("--cas-ctl", `${Math.round(el.getBoundingClientRect().height)}px`);
-        apply();
-        const ro = new ResizeObserver(apply);
-        ro.observe(el);
-        return () => ro.disconnect();
-    });
     const bjSeen = useRef(0);
     const bjHidden = useRef(false);
     // What just came out of the machine — coins, shards, the pot. `id` only exists so a second burst REMOUNTS
@@ -1739,7 +1718,7 @@ export default function CasinoClient({ initial }) {
                 one now puts it behind the whole screen. (The comment lives up here because a JSX comment
                 in an expression position is a parse error, which this file has now made twice.) */}
             {seated && at ? (
-                <div ref={stageRef} className={`cas-stage${at.live ? "" : " is-dark"}`}
+                <div className={`cas-stage${at.live ? "" : " is-dark"}`}
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e",
                         "--mast": `url(/images/casino/mast/${at.id}.webp)`,
                         "--room": `url(/images/casino/room/${at.id}.webp)` }}
@@ -2423,7 +2402,7 @@ export default function CasinoClient({ initial }) {
                         there they both were, "Spin · 100" above and "Pull · 100" below, forty pixels apart.
                         One machine, one button. */}
                     {at.live && !SLOTS5[at.id] && at.id !== "store" ? (
-                        <div ref={ctlRef} className="cas-controls">
+                        <div className="cas-controls">
                             {/* ── WHAT THE CARD DID, WHERE YOU CAN SEE IT ─────────────────────────────
                                 Luke: "win amount hidden."
 

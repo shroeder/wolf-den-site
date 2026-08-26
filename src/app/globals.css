@@ -18629,19 +18629,22 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    its slack; anything that is already taller than the screen has no slack to be centred in.
    And a floor of clearance under it, so the last row of the card can always be scrolled clear of the
    controls rather than stopping exactly behind them. */
-/* ── AND IT HAS TO CLEAR THE CONTROLS ──
-   Anchoring the hall to the top fixed it being SHOVED under the sticky controls, and left the other half:
-   the card is still taller than the space above them, so the last row sits behind a bar that is pinned and
-   opaque. Two things together —
-     the hall is trimmed (see below): the caller row, the pattern banner and the ball strip each give up a
-     few pixels, which is about a row and a half of card between them;
-     and it carries a floor of clearance the height of the controls, so whatever is left over can always be
-     scrolled properly clear of them rather than stopping exactly behind them. */
-/* 132px was a guess at how tall the controls are, and it was short: the bet chips, the pull button, the
-   result line and (for an owner) the debug row come to a good deal more than that, so the last row of the
-   card stopped exactly behind them instead of clearing them. Measured now — see the observer in
-   CasinoClient — with the old guess as the fallback for the first paint. */
-.cas-stage .cas-hall { padding-bottom: calc(var(--cas-ctl, 132px) + 14px); }
+/* ── AND THE CLEARANCE UNDER IT IS GONE, BECAUSE IT NO LONGER HAS ANYTHING TO CLEAR ──
+   There was a floor of padding here the full height of the controls — first a guessed 132px, then the real
+   measured number — so that a card taller than the screen could always be scrolled clear of the pinned bar
+   instead of stopping exactly behind it. That was the right patch for a hall that did not fit.
+
+   It fits now (see the cell cap above, measured on the live page), and the padding had turned into the
+   opposite bug: 213 pixels of nothing under a card that already ended above the bar, which made the panel
+   scroll on a screen where there was nothing to scroll to. Luke asked for it to fit; a page that fits and
+   still scrolls has not.
+
+   Nothing replaces it, and that is the point worth writing down: the controls bar is position: sticky, and
+   sticky elements stay in normal flow — the bar reserves its own height at the end of the column. Whatever
+   sits above it is already clear of it at the bottom of the scroll. The padding was only ever needed for
+   the MID-scroll state, which a hall that fits never has.
+
+   Measured after: 375x600 leaves 340px for the hall and it uses 330; 375x667 leaves 407 and it uses 352. */
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
