@@ -61,6 +61,30 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
         }
     }, [load, onUsed, reloadOnUse]);
 
+    // ── AND SPENDING ONE THAT IS ALREADY ON YOU ──────────────────────────────────────────────────────────
+    // Same shape as `use`, different verb: an active pill names an EFFECT rather than an item. Only pills the
+    // server marked with an action get a button, so this is never reachable for a pill that has none.
+    const spendActive = useCallback(async (a) => {
+        setBusy(a.kind);
+        setMsg(null);
+        const r = await fetch("/api/marketplace/consumables", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "active", effect: a.action }),
+        }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        setBusy(null);
+        if (d?.ok) {
+            setMsg({ ok: true, text: d.applied || "Done." });
+            await load();
+            onUsed?.(a.kind, d);
+            if (reloadOnUse) window.location.reload();
+        } else {
+            setMsg({ ok: false, text: d?.error === "nothing_growing"
+                ? "Nothing is growing that could use it."
+                : d?.error === "no_fertilizer" ? "None left in the shed." : "Couldn't use that." });
+        }
+    }, [load, onUsed, reloadOnUse]);
+
     if (!data) return null;
     const { stash = [], active = [] } = data;
     if (!stash.length && !active.length) return null;
@@ -80,7 +104,16 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
             {active.length ? (
                 <div className="cshelf-active">
                     {active.map((a) => (
-                        <span key={a.kind + a.label} className="cshelf-on"><i aria-hidden="true" />{a.label}</span>
+                        <span key={a.kind + a.label} className="cshelf-on"><i aria-hidden="true" />{a.label}
+                            {/* Most of these are read-outs — a boost with an hour left, a lure banked against
+                                the next dig — and they fire on their own, so a button would be a lie. The one
+                                that is a STOCK rather than a countdown gets one. */}
+                            {a.action ? (
+                                <button type="button" className="cshelf-on-go" disabled={busy === a.kind} onClick={() => spendActive(a)}>
+                                    {busy === a.kind ? "…" : (a.cta || "Use")}
+                                </button>
+                            ) : null}
+                        </span>
                     ))}
                 </div>
             ) : null}

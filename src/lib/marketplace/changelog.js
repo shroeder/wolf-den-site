@@ -12,6 +12,14 @@
 
 export const CHANGELOG = [
     {
+        key: "casino",
+        date: "2026-08-26",
+        tag: "new",
+        title: "The Casino is open",
+        blurb: "A room off the town square with five machines in it, and every one of them is a different game. THE HUNT runs a warren under the reels. THE HARVEST makes you build the round before it pays. THE DEEP holds every kraken it lands and adds a haul for every pearl. THE MENAGERIE turns the whole board into one giant animal. THE VAULT falls in on itself and pays again on the way down, and it keeps a gem room nobody has emptied yet. Away from the reels there is a blackjack table, a keno board and a bingo card, and every paytable in the house says what it pays before you stake a thing. What you stake comes back as CHIPS — not what you win, what you STAKE, so an unlucky hour is still an hour that bought something. The Counter at the back is the only place a chip is worth anything: it sells chests up to Primordial, and it sells five pets that exist nowhere else in the Den. There are eight badges on this floor and half of them are secret. And there is a rope at the back with a wolf in front of it who will tell you what it takes.",
+        href: "/marketplace/casino",
+    },
+    {
         key: "pet-ascension",
         date: "2026-08-10",
         tag: "new",

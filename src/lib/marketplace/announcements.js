@@ -12,6 +12,12 @@ import { db } from "@/lib/db";
 //                      three modals in front of somebody who just wanted to check their farm.
 //   NEW MEMBERS ARE  — someone who joined after an announcement went out never knew the old state, so telling
 //   ALREADY CAUGHT UP  them the Kitchen "just opened" is noise about a thing that has always been there.
+//   AND NEWS GOES     — the two rules above spare the new and nobody else, so the backlog stacked for anyone
+//   STALE               who was simply AWAY: 34 members were carrying two or more unseen cards, and coming back
+//                       from a fortnight off meant dismissing four modals over four page loads, each about a
+//                       thing that had been furniture for weeks. A launch is news for a week. After that a
+//                       returning member finds the Kitchen the way they find everything else — by walking past
+//                       the door. `expires_at` NULL means that default week (see migration 409).
 
 export async function getPendingAnnouncement(buyerId) {
     if (!buyerId) return null;
@@ -21,6 +27,7 @@ export async function getPendingAnnouncement(buyerId) {
            JOIN mkt_buyer b ON b.id = $1
           WHERE a.active = TRUE
             AND b.created_at < a.starts_at
+            AND NOW() < COALESCE(a.expires_at, a.starts_at + INTERVAL '7 days')
             AND NOT EXISTS (SELECT 1 FROM mkt_announcement_seen s WHERE s.buyer_id = $1 AND s.key = a.key)
           ORDER BY a.created_at DESC
           LIMIT 1`,

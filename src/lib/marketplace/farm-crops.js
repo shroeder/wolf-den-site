@@ -627,6 +627,71 @@ export async function applyFertilizer(buyerId, slot) {
     return { ok: true, garden: await getGarden(buyerId) };
 }
 
+// ── SPREAD IT ON EVERYTHING ───────────────────────────────────────────────────────────────────────────────────
+// Fertilizer arrives in crates and hauls -- five and twenty-five at a time -- and it is spent one plot at a
+// time, from a button that only exists on the plot itself. So holding 127 of it and wanting to use it meant
+// twelve taps down the farm, and the shed panel that says how much you have was the one place that could not
+// spend any of it.
+//
+// Same rules as applyFertilizer, applied to every plot at once: planted, still growing, not already fertilized.
+//
+// ── NO TRANSACTION, SO THE ORDER IS THE SAFETY ────────────────────────────────────────────────────────────────
+// neon() over HTTP has none, so this cannot decrement and update atomically. It decrements FIRST, conditionally
+// (`>= n`), which means a second request racing this one finds too little and takes fewer plots rather than the
+// same plots twice. Then it updates only the slots it named, guarded by the same conditions again -- and if
+// fewer rows come back than were paid for, the difference is handed straight back. Spending first and refunding
+// the shortfall can cost a member nothing; updating first and charging after can hand out free fertilizer.
+export async function fertilizeAll(buyerId) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    const [plots, me] = await Promise.all([
+        db.query(
+            `SELECT slot FROM mkt_farm_plot
+              WHERE buyer_id = $1 AND fertilized = FALSE AND ready_at > NOW() ORDER BY slot`,
+            [buyerId],
+        ).catch(() => []),
+        db.queryOne(`SELECT COALESCE(farm_fertilizer,0)::int AS n FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+    const eligible = (plots?.rows || plots || []).map((r) => Number(r.slot));
+    const stock = Number(me?.n) || 0;
+    if (!eligible.length) return { ok: false, error: "nothing_growing" };
+    if (stock <= 0) return { ok: false, error: "no_fertilizer" };
+
+    const want = eligible.slice(0, stock);
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET farm_fertilizer = farm_fertilizer - $2 WHERE id = $1 AND farm_fertilizer >= $2 RETURNING farm_fertilizer`,
+        [buyerId, want.length],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "no_fertilizer" };
+
+    // The cut is read ONCE for the whole spread rather than per plot. It is the same member, the same
+    // decorations and the same equipped pet across all of them -- reading it twelve times would be twelve
+    // identical answers and twelve round trips.
+    const buffs = await farmBonuses(buyerId).catch(() => null);
+    const cut = Math.min(0.85, FERTILIZER_CUT * (1 + (buffs?.fertPower || 0) / 100));
+    const done = await db.query(
+        `UPDATE mkt_farm_plot SET fertilized = TRUE,
+                ready_at = NOW() + (GREATEST(0, EXTRACT(EPOCH FROM (ready_at - NOW())) * $3) || ' seconds')::interval
+          WHERE buyer_id = $1 AND slot = ANY($2) AND fertilized = FALSE AND ready_at > NOW()
+          RETURNING slot`,
+        [buyerId, want, 1 - cut],
+    ).catch(() => []);
+    const n = (done?.rows || done || []).length;
+    if (n < want.length) {
+        await db.query(`UPDATE mkt_buyer SET farm_fertilizer = farm_fertilizer + $2 WHERE id = $1`, [buyerId, want.length - n]).catch(() => {});
+    }
+    if (!n) return { ok: false, error: "nothing_growing" };
+
+    // ONE activity event and ONE quest tick PER PLOT, because that is what happened. A member who fertilises
+    // twelve plots from the shed has fertilised twelve crops, and the daily quest that asks for three of them
+    // must not read this as one.
+    await Promise.all([
+        trackActivity(buyerId, "fertilize_crop", { slots: n, bulk: true }).catch(() => {}),
+        bumpQuestProgress(buyerId, "fertilize_crop", n).catch(() => {}),
+        syncEarnedBadges(buyerId).catch(() => {}),
+    ]);
+    return { ok: true, fertilized: n, left: Math.max(0, Number(paid.farm_fertilizer) + (want.length - n)), garden: await getGarden(buyerId) };
+}
+
 // Rain check: when the client reports it's raining on load, cut 30% off every growing crop's remaining time,
 // guarded so it can only help each plot once every RAIN_GUARD_HOURS.
 export async function applyRainBoost(buyerId) {

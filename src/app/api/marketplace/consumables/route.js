@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { buyConsumable, featureConsumables, listConsumables, useConsumable } from "@/lib/marketplace/consumables.js";
+import { buyConsumable, featureConsumables, listConsumables, useActiveEffect, useConsumable } from "@/lib/marketplace/consumables.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
 
@@ -31,7 +31,7 @@ export async function GET(request) {
     });
 }
 
-// POST — { id, action: "buy" | "use" }.
+// POST — { id, action: "buy" | "use" | "use_all" } or { action: "active", effect }.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/consumables", async ({ internalError }) => {
         try {
@@ -45,7 +45,12 @@ export async function POST(request) {
             // here rather than sent by the client: the stash has no pet picker, and letting a body name the
             // target would be a way to feed a pet you are not looking at.
             let res;
-            if (body?.action === "use_all") {
+            // "active" — spending an effect that is already ON you rather than an item in the stash. Only the
+            // farm's fertilizer answers to this today; the action name is checked inside useActiveEffect
+            // against a closed list, so a body naming anything else gets nothing.
+            if (body?.action === "active") {
+                res = await useActiveEffect(buyer.id, String(body?.effect || "").trim());
+            } else if (body?.action === "use_all") {
                 const { feedPetBulk } = await import("@/lib/marketplace/farm.js");
                 const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
                 res = me?.featured_collectible

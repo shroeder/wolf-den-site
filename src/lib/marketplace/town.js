@@ -118,9 +118,10 @@ export const GATED_BUILDINGS = [
     { id: "arena", emoji: "⚔️", label: "The Arena", href: "/marketplace/arena", x: 34, gate: "owner" },
     // No `gate` — the Market is public. (An entry WITHOUT it is shown to everybody, per the note above.)
     { id: "market", emoji: "🏪", label: "The Market", href: "/marketplace/market", x: 40 },
-    // The casino is being built. `gate: "owner"` is what keeps it off everybody else's street — see the note
-    // above: an entry WITHOUT it is shown to the whole Den.
-    { id: "casino", emoji: "🎰", label: "The Casino", href: "/marketplace/casino", x: 46, gate: "owner" },
+    // No `gate` — the Casino opened to the whole Den on 2026-08-26. The VIP lounge behind it keeps its own
+    // door (the bouncer reads the VIP role or a pass), which is a rope INSIDE a public room rather than a
+    // second gate on the street.
+    { id: "casino", emoji: "🎰", label: "The Casino", href: "/marketplace/casino", x: 46 },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.

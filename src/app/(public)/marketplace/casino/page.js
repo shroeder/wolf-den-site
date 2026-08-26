@@ -5,7 +5,6 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { bingoState } from "@/lib/marketplace/bingo.js";
 import { blackjackState } from "@/lib/marketplace/blackjack.js";
 import { getCasinoState } from "@/lib/marketplace/casino.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { vipShadows, vipStanding } from "@/lib/marketplace/vip.js";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +18,13 @@ export default async function CasinoPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/casino");
 
-    // Owner-gated while it is being built. The check is repeated on every API verb (see the route) — this one
-    // is for the RENDER, so somebody who guesses the address lands back in the town rather than on a room
-    // whose buttons all refuse. A hidden door is not a locked one.
-    if (!isOwner(buyer.id)) redirect("/marketplace/town");
+    // The floor is open to every member. The redirect that stood here while it was being built is gone, and
+    // so is the API's matching owner check — both had to go together, because a page that renders for
+    // everybody in front of an endpoint that answers nobody is a room full of buttons that all refuse.
+    //
+    // What did NOT go with them is the owner check on the machines' force-a-bonus buttons. That one is inside
+    // spinSlot5, it reads the buyer id rather than the request body, and it is the only thing standing
+    // between a member and a POST that says `force: "hoard"`. See casino-slot5-play.js.
 
     // A hand left open survives a refresh, which is the whole reason the table lives in a row: closing the
     // tab mid-hand must not be a way to lose a stake, and it must not be a way to escape one either.

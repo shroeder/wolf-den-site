@@ -145,11 +145,13 @@ if (process.env.SHOT_EVAL) {
 // page sits there closed — and the screenshot comes out looking entirely reasonable. So: click, look for what
 // the click was supposed to produce, click again. Nothing matching after the window is a hard failure rather
 // than a picture of the thing not open.
-if (CLICKS.length) {
-    await send("Runtime.enable");
-    const evaluate = async (expression) =>
-        (await send("Runtime.evaluate", { expression, returnByValue: true }))?.result?.value;
+await send("Runtime.enable");
+// Hoisted out of the click block below: SHOT_SCROLL needs it too, and it is a two-line wrapper around a CDP
+// call rather than anything the click sequence owns.
+const evaluate = async (expression) =>
+    (await send("Runtime.evaluate", { expression, returnByValue: true }))?.result?.value;
 
+if (CLICKS.length) {
     for (let step = 0; step < CLICKS.length; step += 1) {
         const sel = CLICKS[step];
         const last = step === CLICKS.length - 1;
@@ -184,6 +186,57 @@ if (CLICKS.length) {
     // a menu full of icons shot as a grid of blank tiles — the same "clean, empty, wrong picture" the settle
     // delay above exists to prevent, just moved behind the click.
     await sleep(2200);
+}
+
+// ── AND THE FIFTH TRAP: THE THING IS ON THE PAGE, JUST NOT ON THE SCREEN ─────────────────────────────────────
+// A long screen — the farm, the store, a settings page — puts most of what needs looking at below the fold, and
+// a 375-wide shot of the top of it is a picture of the header. Shooting a 4000px-tall "phone" instead is worse:
+// it is not a viewport any phone has, so nothing that depends on height (a sticky bar, a card that sizes to the
+// screen) lays out the way a member will see it.
+//
+// SHOT_SCROLL=<selector> keeps the real viewport and moves the page under it. It FAILS LOUDLY like the click
+// sequence does — a selector that matches nothing means the shot would have been of the wrong part of the page,
+// and a wrong picture that looks right is the thing this whole file exists to prevent.
+if (process.env.SHOT_SCROLL) {
+    const sel = process.env.SHOT_SCROLL;
+    // SCROLLING ONCE IS NOT ENOUGH, AND THE FIRST VERSION OF THIS SHIPPED A PICTURE OF THE HEADER. A panel
+    // that fetches its own data — the shed does — mounts after the scroll and reflows everything under it, and
+    // a late hydration pass can put the window back at the top. So: scroll, let the page settle, scroll again,
+    // and then CHECK. `place` is the element's real position at shutter time, and anything not inside the
+    // viewport is a failure rather than a screenshot of somewhere else.
+    let place = null;
+    for (let i = 0; i < 6; i += 1) {
+        place = await evaluate(`(() => {
+            const el = document.querySelector(${JSON.stringify(sel)});
+            if (!el) return null;
+            el.scrollIntoView({ block: "center", behavior: "instant" });
+            const r = el.getBoundingClientRect();
+            return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: Math.round(window.innerHeight) };
+        })()`);
+        if (place === null) break;
+        await sleep(500);
+        if (place.top >= 0 && place.bottom <= place.h) break;
+    }
+    if (!place) {
+        console.error(`shot.mjs: SHOT_SCROLL — ${sel} matched nothing, refusing to shoot the wrong part of the page`);
+        sock.close(); chrome.kill(); process.exit(1);
+    }
+    await sleep(900); // lazy images below the old fold have to arrive before the shutter
+    // ONE LAST SCROLL, AS LATE AS POSSIBLE. The wait above is exactly when a late-arriving sprite reflows the
+    // page out from under the scroll, so the position is re-taken here and then checked — the loop above gets
+    // the images loaded, this gets the element under the lens.
+    const settled = await evaluate(`(() => {
+        const el = document.querySelector(${JSON.stringify(sel)});
+        if (!el) return false;
+        el.scrollIntoView({ block: "center", behavior: "instant" });
+        const r = el.getBoundingClientRect();
+        return r.top < window.innerHeight && r.bottom > 0;
+    })()`);
+    if (!settled) {
+        console.error(`shot.mjs: SHOT_SCROLL — ${sel} would not stay in the viewport, refusing to shoot`);
+        sock.close(); chrome.kill(); process.exit(1);
+    }
+    await sleep(250);
 }
 
 const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });

@@ -43,6 +43,9 @@ const ART = {
     // A SHELF, not a trophy: the chapter is about the things you already own sitting there working for
     // you, which a single cup would read as a prize you have to go and win.
     "ch-shelf": E("a small wooden display shelf holding a row of medals, a ribboned badge and a glass dome over a tiny relic"),
+    // NOT dice and NOT a slot machine. Dice already mean the tavern game, and a cabinet drawn small
+    // enough for 44px loses the one thing that says casino. Chips and a card do it at any size.
+    "ch-casino": E("a neat stack of three round casino chips in red, cream and gold beside one face-down playing card with an ornate wolf-head back"),
     "ch-trade": E("two open hands exchanging a gold coin above a small balance scale"),
     "ch-store": E("a paper shopping bag with a trading card and a gold coin peeking out of the top"),
 };

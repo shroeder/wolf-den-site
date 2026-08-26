@@ -425,11 +425,13 @@ export const BADGE_BONUSES = {
     // reaches two million without the member ever being rich.
     casino_first_pull: C(1), casino_regular: C(2),
     casino_high_roller: C(3), casino_whale: C(4, 0, 2),
-    // The three secrets are luck, not grind, so they pay in crit rather than raw Might — a nod to the hit
+    // The two secrets are luck, not grind, so they pay in crit rather than raw Might — a nod to the hit
     // rather than a wage for the hours.
-    // A NINTH casino badge lives in migration 391 and was missed by the eight above -- found by check:rewards
-    // reading the migrations rather than the list I happened to be looking at.
-    casino_three_wolves: C(1, 3), casino_perfect: C(1, 0, 3), casino_called_it: C(1, 2),
+    // There was a THIRD, `casino_called_it`, for naming a pocket on the wheel. It was added here because
+    // check:rewards read migration 391 and found a badge paying nothing — correctly, except that the wheel
+    // had been taken off the floor and its badge deleted with it, which the migrations had never recorded.
+    // Migration 410 says so now, so the gate retires it the same way it retires every other one.
+    casino_three_wolves: C(1, 3), casino_perfect: C(1, 0, 3),
     // The longest two on the floor: every exclusive pet, and the door behind the rope.
     casino_the_five: C(4, 2, 2), casino_vip_room: C(2),
     // ── Bounties → power ──

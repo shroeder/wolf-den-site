@@ -23,13 +23,15 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// ── OWNER ONLY, AND ENFORCED HERE ────────────────────────────────────────────────────────────────────────────
-// The town door is hidden for everybody else (GATED_BUILDINGS, gate: "owner"), but a hidden link is not a
-// gate — the address is guessable and this endpoint moves GOLD. So the check lives on the server, on every
-// verb, and the page does it again for the render. A door that is only closed on the screen is not closed.
+// ── MEMBERS ONLY, AND ENFORCED HERE ──────────────────────────────────────────────────────────────────────────
+// This was owner-only for the whole build. It is a members-only door now (2026-08-26) and the check still
+// lives on the server, on every verb, because the endpoint moves GOLD and a signed-out POST must not reach it.
+//
+// `isOwner` is still imported and still used further down — the dragon trigger reads it, and so does
+// spinSlot5. Those are the owner's test controls, not the door, and opening the floor does not open them.
 const gate = async () => {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    if (!buyer || !isOwner(buyer.id)) return null;
+    if (!buyer) return null;
     return buyer;
 };
 

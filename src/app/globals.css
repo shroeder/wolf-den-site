@@ -21610,6 +21610,17 @@ body.cas-seated .social-fab { display: none; }
     border: 1px solid rgba(126,213,126,0.32); }
 .cshelf-on i { width: 6px; height: 6px; border-radius: 50%; background: #8fe0a4; flex: none;
     box-shadow: 0 0 6px rgba(143,224,164,0.9); }
+/* The pill that can be SPENT. Sits inside its own pill rather than beside it, so the count and the button
+   that spends it read as one control — and it has to look pressable at 0.66rem, hence the solid fill against
+   the pill's translucent one. Padding on the right of .cshelf-on would push it off the edge, so the pill's
+   own right padding comes off when a button is present. */
+.cshelf-on:has(.cshelf-on-go) { padding-right: 3px; }
+.cshelf-on-go { margin-left: 3px; padding: 3px 9px; border-radius: 999px; border: 0; cursor: pointer;
+    font-family: inherit; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.01em;
+    color: #10240f; background: linear-gradient(180deg,#b6f0bb,#7ed57e); }
+.cshelf-on-go:disabled { opacity: 0.55; cursor: default; }
+.cshelf-on-go:active { transform: translateY(1px); }
+@media (hover: hover) { .cshelf-on-go:hover { filter: brightness(1.08); } }
 
 .cshelf-grid { display: grid; gap: 6px; }
 .cshelf-item { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 9px;

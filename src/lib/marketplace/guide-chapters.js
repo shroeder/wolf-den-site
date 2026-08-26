@@ -179,6 +179,22 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 350, chest: "gold" },
     },
     {
+        // THREE STEPS AND NONE OF THEM IS "WIN". Every other chapter asks you to succeed at something; a
+        // chapter that pays for a win on a machine is the game telling a member that luck is progress, and
+        // the one member who does not get lucky is stuck on it forever. All three tick on TAKING PART.
+        //
+        // The gold this pays is also the answer to a launch-day problem: chips are minted by staking, so on
+        // day one the Counter is a shelf nobody can reach. 500 gold walked into the room is a first stake.
+        id: "casino", name: "The Casino", minLevel: 10, tint: "#c0567a", icon: "/images/guide/ch-casino.webp",
+        blurb: "Five machines, three tables, and a counter that only takes chips.",
+        steps: [
+            { key: "casino_play", label: "Pull a machine", why: "Five cabinets and every one is a different game underneath — a warren, a threshing floor, a kraken hold, a giant animal, a vault that falls in on itself. Whatever you stake comes back as chips regardless of how the spins fell, so a bad run still buys something.", href: "/marketplace/casino", cta: "Walk in", gold: 125, events: ["casino_play"] },
+            { key: "casino_table", label: "Sit at a table", why: "Blackjack, keno and bingo are away from the reels and they pay exactly the multiple printed on the felt — three-to-two is three-to-two, and five of five on a ticket is five of five. Nothing here is quietly worth less than it says.", href: "/marketplace/casino", cta: "Take a seat", gold: 175, events: ["casino_bet"] },
+            { key: "casino_counter", label: "Spend at the Counter", why: "The only place a chip is worth anything. Chests up to Primordial, five pets that exist nowhere else in the Den, and a few things that change how the floor treats you. Chips buy nothing outside this room, so there is no reason to sit on them.", href: "/marketplace/casino", cta: "See the shelf", gold: 200, events: ["casino_buy"] },
+        ],
+        reward: { gold: 350, chest: "gold" },
+    },
+    {
         id: "trade", name: "Trading", minLevel: 12, tint: "#7defd0", icon: "/images/guide/ch-trade.webp",
         blurb: "Members trade gear and pets directly.",
         steps: [

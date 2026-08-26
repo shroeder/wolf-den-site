@@ -311,10 +311,36 @@ export async function featureConsumables(buyerId, feature) {
     }
     if (f === "farm") {
         const r = await db.queryOne(`SELECT COALESCE(farm_harvest_luck,0)::int AS luck, COALESCE(farm_fertilizer,0)::int AS fert FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-        if (r?.luck > 0) active.push({ kind: "farm_harvest_luck", label: `${r.luck} charmed harvest${r.luck === 1 ? "" : "es"} left` });
-        if (r?.fert > 0) active.push({ kind: "farm_fertilizer", label: `${r.fert} fertilizer in stock` });
+        // Charmed harvests carry NO action on purpose — they are spent by the next harvest, whichever crop
+        // that turns out to be, so there is nothing here to press. The pill is a count, and it says so.
+        if (r?.luck > 0) active.push({ kind: "farm_harvest_luck", label: `${r.luck} charmed harvest${r.luck === 1 ? "" : "s"} left` });
+        // Fertilizer DOES have one. It is spent a plot at a time from a button on the plot, so a shed holding
+        // 127 of it was the one place in the game that could tell you what you had and not let you use any.
+        if (r?.fert > 0) active.push({ kind: "farm_fertilizer", label: `${r.fert} fertilizer in stock`, action: "fertilize_all", cta: "Spread it" });
     }
     return { feature: f, stash, active };
+}
+
+// ── SPENDING WHAT IS ALREADY RUNNING ─────────────────────────────────────────────────────────────────────────
+// An `active` pill is normally a read-out: a boost with an hour left, a lure banked against the next dig. Those
+// have no button because there is nothing a tap could do — they fire on their own, on the next thing you do.
+//
+// Fertilizer is the exception. It sits as a COUNT on your farm rather than as a charge on a crop, and the only
+// thing that spends it is a button on an individual plot. So the shed could report 127 of it and offer no way
+// to use one, which is the complaint this answers.
+//
+// Dispatched by `kind` here rather than by the shelf calling a farm endpoint directly, because the shelf is
+// generic — it is mounted on six screens and must not learn what a plot is. The list is deliberately closed:
+// an action nobody authored is not an action.
+export async function useActiveEffect(buyerId, action) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    if (action === "fertilize_all") {
+        const { fertilizeAll } = await import("@/lib/marketplace/farm-crops.js");
+        const r = await fertilizeAll(buyerId);
+        if (!r.ok) return r;
+        return { ...r, applied: `Fertilizer on ${r.fertilized} ${r.fertilized === 1 ? "crop" : "crops"} — ${r.left} left in the shed.` };
+    }
+    return { ok: false, error: "unknown_action" };
 }
 
 // --- Stash + shop -----------------------------------------------------------------------------------
