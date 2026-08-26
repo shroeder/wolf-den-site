@@ -3,6 +3,20 @@ import "server-only";
 import { db } from "@/lib/db";
 import { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
+import { GEM_KINDS, GEM_TIERS, gemId } from "@/lib/marketplace/gems.js";
+
+// The middle rung, one stone of each kind, for the VIP case below. Derived so the names and the ids can never
+// drift from the gem table that actually grants them.
+const POLISHED = GEM_TIERS.find((t) => t.tier === 3);
+const VIP_GEMS = GEM_KINDS.map((k) => ({
+    id: `vip_gem_${k.id}`,
+    kind: "gems",
+    ref: gemId(k.id, 3),
+    name: `${POLISHED?.name || "Polished"} ${k.name}`,
+    price: 35000,
+    vip: true,
+    blurb: k.blurb,
+}));
 
 // ── CHIPS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // The casino's own currency. You stake GOLD at a machine and the machine pays CHIPS; chips buy things at the
@@ -101,6 +115,25 @@ export const CHIP_STORE = [
 //
 // INSPECTABLE: `kind: "pet"` resolves through detailFor() below, which reads the pet's real card — its
 // sprite, its rarity and what its passive actually does — so the inspect panel cannot drift from the pet.
+// ── AND WHAT IS ACTUALLY IN THE CASE ─────────────────────────────────────────────────────────────────────────
+// Luke: "I believe this guy is supposed to offer exclusive pets and other rewards like tier 3 gems and ability
+// to roll high level recipes."
+//
+// It held three pets and nothing else, all of them `once` — so a VIP who had bought all three walked up to a
+// vendor with an empty case for ever after. A room you paid to get into that runs out of reasons to visit is
+// a room you visit once.
+//
+// Three kinds of thing now, and the split is deliberate:
+//
+//   THE PETS are the trophies. Once each, never anywhere else on the floor, and the reason to come the first
+//   three times.
+//   THE GEMS are the reason to come back. Polished is the middle rung of five, which is the right one to sell:
+//   high enough to be worth the walk, not so high that the Jewelcutter's top tiers stop being something you
+//   have to find. Repeatable, because gear has a lot of sockets.
+//   THE PAGE is the rarest thing here and the only one that is a ROLL rather than a purchase. It comes out of
+//   the band that mythic chests draw from, so it is a real shot at the top of the book — and the till refuses
+//   to sell it to anybody who has already learned everything in that band, because charging for a book
+//   somebody has finished is theft with a receipt.
 export const VIP_STORE = [
     { id: "vip_ferret", kind: "pet", ref: "house_ferret", name: "The House Ferret", price: 20000, once: true, vip: true,
         blurb: "Knows which floorboard the chips roll under." },
@@ -108,6 +141,13 @@ export const VIP_STORE = [
         blurb: "Has never once been asked to leave." },
     { id: "vip_crane", kind: "pet", ref: "midnight_crane", name: "Midnight Crane", price: 20000, once: true, vip: true,
         blurb: "Stands at the end of the bar and misses nothing." },
+
+    // The five Polished stones, one per kind. Built from GEM_KINDS rather than typed out, so a retune of the
+    // gem table moves the case with it and a sixth kind cannot be quietly missed off the shelf.
+    ...VIP_GEMS,
+
+    { id: "vip_page", kind: "recipe", ref: "chest_high", name: "A Page From The Back", price: 60000, vip: true,
+        blurb: "Sable will not say where she gets them. She will say they are not from the kitchen." },
 ];
 
 // ── THE PERMANENT SHELF ────────────────────────────────────────────────────────
@@ -259,6 +299,22 @@ async function detailFor(item) {
                 blurb: u.blurb,
                 lines: [{ label: "Unlocks", value: "A new tier, permanently" }],
                 foot: "This is an unlock rather than an item. Once it is open it stays open, on every account you play from.",
+            };
+        }
+        // ── A PAGE ───────────────────────────────────────────────────────────────────
+        // The only thing on any shelf that is a ROLL. It cannot list what you will get, because nobody knows
+        // yet — so it says the band it draws from and what that band contains, which is the honest version
+        // of a card for a thing that has not been decided.
+        case "recipe": {
+            const { RECIPE_BANDS } = await import("@/lib/marketplace/cooking.js");
+            const b = RECIPE_BANDS[item.ref];
+            if (!b) return null;
+            return {
+                lines: [
+                    { label: "What it is", value: `One recipe you do not know yet, tier ${b.min} to ${b.max}` },
+                    { label: "Where it draws from", value: "The same band a mythic chest does" },
+                ],
+                foot: "Rolled when you buy it, from the pages you are still missing. Sable will not sell you one if there is nothing left in the band she could give you.",
             };
         }
         case "gems": {

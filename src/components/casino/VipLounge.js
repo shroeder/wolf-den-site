@@ -383,7 +383,7 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                     <div className="vip-modal-body">
                         <h4>Sable opens the case</h4>
                         <p className="vip-said">Three of them. Nobody out on the floor can have these.</p>
-                        <ChipStore chips={chips} onBuy={buy} onRefresh={shelf} />
+                        <ChipStore chips={chips} onBuy={buy} onRefresh={shelf} single />
                     </div>
                   </div>
                 </div>

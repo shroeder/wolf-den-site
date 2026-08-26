@@ -60,6 +60,15 @@ export async function buyWithChips(buyerId, itemId) {
     if (item.kind === "unlock" && (Number(perks[item.ref]) || 0) > 0) {
         return { ok: false, error: "already_owned" };
     }
+    // ── AND A ROLL IS NOT SOLD WHEN THERE IS NOTHING LEFT TO ROLL ────────────────────────────────────────
+    // A page draws from a BAND, and a member who already knows every recipe in that band can only ever buy a
+    // failure. The grant would return false and the till would refund correctly — but "that didn't go
+    // through" is the wrong thing to tell somebody whose only problem is that they have finished the book.
+    if (item.kind === "recipe") {
+        const { hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
+        const left = await hasUnknownRecipe(buyerId, item.ref).catch(() => false);
+        if (!left) return { ok: false, error: "nothing_left" };
+    }
     if (item.once) {
         const had = await db.queryOne(
             `SELECT 1 FROM mkt_chip_purchase WHERE buyer_id = $1 AND item_id = $2 AND once LIMIT 1`,
@@ -129,6 +138,17 @@ async function grant(buyerId, item) {
                  VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
                 [buyerId, cat, item.ref]);
             return r !== null && r !== undefined;
+        }
+        // ── A PAGE, ROLLED AT THE COUNTER ────────────────────────────────────────────
+        // The only thing on any shelf that is decided at the moment of sale. It returns false rather than
+        // throwing when there is nothing left to teach, which is all it has to do — buyWithChips refunds the
+        // chips and deletes the receipt on a grant that comes back false, so the "paid for a book they had
+        // already finished" case is already covered by the path every other kind uses. There is a nicer
+        // refusal in front of it too, before any money moves, purely so the member gets told WHY.
+        case "recipe": {
+            const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+            const got = await grantRecipeReward(buyerId, item.ref).catch(() => null);
+            return Boolean(got);
         }
         // Forge parts are per TIER, so `ref` is [tier, count] rather than a bare number — a "handful of
         // parts" with no tier is not a thing the forge can hold.

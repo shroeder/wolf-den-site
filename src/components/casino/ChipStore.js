@@ -14,7 +14,7 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 // gold is what a member already thinks in, so it is printed under every price. It is not a second currency
 // being asked for; it is the same number in a unit you can feel.
 
-export default function ChipStore({ chips, onBuy, onRefresh }) {
+export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
     const [shelf, setShelf] = useState(null);
     const [busy, setBusy] = useState(null);
     const [said, setSaid] = useState(null);
@@ -25,6 +25,10 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
     // what the rest of the game contains. Three tabs rather than one long shelf, because those are three
     // different decisions and a member scrolling past a 100,000-chip door to find a 10,500-chip chest is
     // being asked to compare things that have nothing to do with each other.
+    // ── ONE CASE, OR THREE TABS ──────────────────────────────────────────────────────
+    // The Counter sells three different kinds of decision and splits them. Sable sells ONE curated case, and
+    // she was being drawn with the Counter's tab bar over it — three tabs that all fetched the same VIP list,
+    // so switching them appeared to do nothing at all. `single` drops the tabs and asks once.
     const [tab, setTab] = useState("chest");
     // Bumped by "Try again". A counter rather than a boolean, so a second failure re-runs the effect a second
     // time — a flag would already be true and change nothing.
@@ -35,11 +39,11 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
     useEffect(() => {
         let live = true;
         setShelf(null);
-        onRefresh(tab === "chest" ? null : tab)
+        onRefresh(single ? null : (tab === "chest" ? null : tab))
             .then((r) => { if (live) setShelf(r || { items: [], failed: true }); })
             .catch(() => { if (live) setShelf({ items: [], failed: true }); });
         return () => { live = false; };
-    }, [onRefresh, tab, reload]);
+    }, [onRefresh, tab, reload, single]);
 
     const buy = useCallback(async (item) => {
         if (busy || item.owned || !item.afford) return;
@@ -57,6 +61,10 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
         } else {
             setSaid({ good: false, text: r?.error === "not_enough_chips" ? "Not enough chips for that."
                 : r?.error === "already_owned" ? "You already have that one."
+                // Not a failure — the opposite. They have finished the band this page draws from, and being
+                // told "that did not go through" for that is the machine blaming you for being good at it.
+                : r?.error === "nothing_left" ? "Nothing left in there you do not already know."
+                : r?.error === "not_vip" ? "That one is behind the rope."
                 : "That didn't go through." });
             Cas.lose();
         }
@@ -78,6 +86,7 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
             </div>
             <p className="cs-intro">Won at the machines. Good here and nowhere else.</p>
 
+            {single ? null : (
             <div className="cs-tabs" role="tablist">
                 {[["chest", "Chests"], ["stat", "Training"], ["unlock", "The Doors"]].map(([id, label]) => (
                     <button key={id} type="button" role="tab" aria-selected={tab === id}
@@ -87,6 +96,7 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                     </button>
                 ))}
             </div>
+            )}
 
             {said ? <p className={`cs-said${said.good ? " is-good" : ""}`}>{said.text}</p> : null}
 

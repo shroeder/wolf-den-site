@@ -50,52 +50,75 @@ export async function vipStanding(buyerId) {
     return { vip, roles, spentCents: standing?.spentCents || 0 };
 }
 
-// ── WHAT THE BARTENDER KNOWS ─────────────────────────────────────────────────────────────────────────────────
+// ── WHAT THE BARTENDER TALKS ABOUT ───────────────────────────────────────────────────────────────────────────
 // Luke: "he tells you secret things that only VIPs get to know about, like mechanics of the game that people
 // might know about."
 //
-// The hard part is that this must be TRUE. A bartender who invents flavour is a bartender nobody talks to
-// twice, and worse, one who says something wrong about the odds is the house lying to its best customers. So
-// every line below is a real, checkable fact about a system in this game, taken from the file that owns it,
-// and each one names where it comes from so it can be re-checked when that system moves.
+// ── AND THEN: "THE BARTENDER IS LEAKING INTERNAL DETAILS" ────────────────────────────────────────────────────
+// He was, badly, and it is worth writing down how because the first version was built on a rule that sounded
+// right. That rule was: every line must be a TRUE, checkable fact about a real system, taken from the file
+// that owns it. The reasoning was that a bartender who invents things is one nobody talks to twice.
 //
-// They are things a careful player COULD work out and almost certainly has not: none of them is a secret in
-// the sense of being hidden, and none of them is an exploit. That is the right register for a room you got
-// into by spending money in a card shop — you are being told how the machine thinks, not handed an edge.
+// What it produced was a man reading out our own source code. The worst of them told VIPs that "the build
+// refuses to ship if the best machine pays more than eight points over the worst" — which is check:slot5, a
+// script, described to a customer as though it were a fact about the world. Others leaked development
+// history: keno "used to pay half", the table takes no rake "any more". A member has no idea what the game
+// used to do and should not be told; that is a changelog, and it is ours.
+//
+// THE RULE NOW IS THE OPPOSITE ONE. Rolf talks about the DEN — the building, the town, the people in it, the
+// things he has watched happen over the bar. None of it is checkable because none of it is a claim about a
+// system: there is no number in here to go stale, no odds to get wrong, and nothing that stops being true
+// when somebody retunes a paytable. Flavour cannot rot.
+//
+// If a member wants to know what a machine pays, the machine says so on its own face — the keno ladder and
+// the bingo pattern banner both print real chips at the real stake. That is where a number belongs: on the
+// thing it describes, at the moment you are deciding. Not in a story.
+//
+// ── AND HE KNOWS WHOSE ROOM THIS IS ──────────────────────────────────────────────────────────────────────────
+// Luke: "be very respectful of the VIP's status." Every line is written to somebody who belongs here. He is
+// warm rather than deferential — a good bartender is not a servant — but nothing in here is ever a sales
+// pitch, a nudge to play, or a hint that the rope was a close-run thing. Two of them say outright that
+// nobody is checking anything at that door, because the nicest thing this room can do is stop being a test
+// the moment you are inside it.
 const BARTENDER = [
-    // casino-slot5.js — DEEP.free, and the sweep in check:slot5.
-    { id: "deep_pearls", text: "The Deep's pearls only ever land on the two outside reels, and only during the "
-        + "free round. Four and a half of them a round, on average — so a round that ends on ×6 was a good one, "
-        + "not a lucky one." },
-    // casino-slot5.js — DEEP.strips: wolf is weighted 0 on reels 1 and 5.
-    { id: "deep_wilds", text: "A kraken can never land on the first or the last reel of The Deep. That is what "
-        + "makes five of them impossible and the top line worth what it is." },
-    // bingo-kit.js — DRAGON_CHANCE and dragonFor.
-    { id: "bingo_dragon", text: "The dragon comes to about one bingo card in eight, and it only ever burns "
-        + "squares you did not already have. If it flies over a line you had four of, it is burning the one you "
-        + "needed." },
-    // bingo-kit.js — BINGO_PAYS[1] = 1.
-    { id: "bingo_line", text: "One line on a bingo card pays exactly what the card cost. That is not a "
-        + "consolation, it is the rule the whole paytable is built around — you got the line, you are level." },
-    // casino.js — KENO_PAYS[2] = 1.
-    { id: "keno_two", text: "Two of five on a keno ticket gets your ticket back now. It used to pay half, which "
-        + "meant the commonest thing that happens to a winning ticket was still losing money." },
-    // blackjack-kit.js — BLACKJACK_RAKE = 0, dealer stands on all 17.
-    { id: "bj_rake", text: "The table takes no rake at all any more, and the dealer stands on every 17 "
-        + "including a soft one. Played properly that is the best return on the floor." },
-    // chips.js — CHIP_RATE, and the fact chips are minted on the STAKE.
-    { id: "chip_rate", text: "Chips are minted on what you STAKE, not on what you lose. Which means a long "
-        + "session at a machine that broke even still filled your pocket — the two numbers are not related." },
-    // casino.js — PRIZE_SHELF / rollCasinoPrize, and the note that prizes sit on top of the return.
-    { id: "prizes", text: "The prizes that fall off the floor are not counted in any machine's return. They sit "
-        + "on top of it. Nobody balancing the odds has ever had to pay for them." },
-    // collectibles.js — the casino five, casinoChance.
-    { id: "pets", text: "Five pets exist that only the casino floor can drop, and the rarest is one play in "
-        + "five and a half thousand. There is no way to hurry it. There is only turning up." },
-    // casino-slot5.js — check:slot5's spread rule.
-    { id: "no_smart_pick", text: "None of the machines out there is the smart pick. The build refuses to ship "
-        + "if the best one pays more than eight points over the worst — what differs is how it FEELS, not what "
-        + "it pays." },
+    { id: "rope", text: "That rope by the door is older than the floor it stands on. It came out of the first "
+        + "shop, where it hung across a doorway to a stockroom — and people still asked what was behind it." },
+    { id: "no_check", text: "You will have noticed nobody checks anything at that rope. Nobody needs to. The "
+        + "floor knows who you are before you have finished crossing it, and so do I." },
+    { id: "tab", text: "Your tab in here does not exist. I am told that is a very old joke and I am required "
+        + "to keep making it. Order what you like." },
+    { id: "glasses", text: "Every glass behind this bar is a different shape and not one of them was bought. "
+        + "Members left them. Nobody has ever told me which is whose, and I have never once got it wrong." },
+    { id: "lamps", text: "The lamps in here are set lower than the ones on the floor, and that is deliberate. "
+        + "Out there the light is for the machines. In here it is for the company." },
+    { id: "sable", text: "Sable will tell you she keeps the good case shut because of the draught. She keeps "
+        + "it shut because she likes the moment it opens." },
+    { id: "wolves", text: "There were wolves in this valley a long time before there was a town, and the town "
+        + "is named for a den nobody has ever actually found. The Den keeps the name and lets the argument run." },
+    { id: "arbiter", text: "The Arbiter does not sleep, does not blink, and has never once raised its voice. I "
+        + "watched it settle a row over a trade in four words. I have been trying to learn that for years." },
+    { id: "road", text: "Everyone who has been far up the Long Road says the same thing — the further you go, "
+        + "the quieter the houses get. Nobody has told me what is at the end of it. I stopped asking." },
+    { id: "sea", text: "The old sailors drink in here when the weather turns. They will not tell you where the "
+        + "good water is, but they will happily tell you where it is not, which is nearly the same thing said "
+        + "politely." },
+    { id: "forge", text: "The Forge runs hot day and night and nobody has ever seen the smith eat. Somebody "
+        + "once suggested the fire does it for him. Nobody has suggested it twice." },
+    { id: "farm", text: "Half the members with a farm out there started with one animal they fully intended to "
+        + "sell on. I have yet to meet one who did." },
+    { id: "dragon", text: "The thing that comes over the bingo hall is not the shop's, and the shop has never "
+        + "pretended otherwise. It arrives when it arrives. We keep the roof in good repair and we do not "
+        + "discuss it." },
+    { id: "stockade", text: "The stockade in the square stands empty most weeks and the Den would rather keep "
+        + "it that way. It is not there to be used. It is there to be seen." },
+    { id: "board", text: "The board behind me has had the same nail in it for years. It has held apologies, "
+        + "directions, one proposal of marriage and a very great deal of nonsense. Yours is welcome among them." },
+    { id: "trophies", text: "The trophy room is arranged by who won each thing rather than by what it is "
+        + "worth. That caused an enormous argument at the time, and the member who suggested it was right." },
+    { id: "quiet", text: "The best hour in here is the one after the shop shuts. The floor goes quiet, the "
+        + "lamps stay on, and whoever is left stops playing and starts talking." },
+    { id: "seat", text: "That seat you are in belonged to a member who came every Friday for six years and "
+        + "never once played a machine. He came for the room. I have always thought he had the right of it." },
 ];
 
 /** One line, chosen by the clock rather than at random, so the bartender is not a slot machine of his own. */
