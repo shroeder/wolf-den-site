@@ -82,14 +82,39 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
         return () => clearInterval(id);
     }, [goal]);
 
-    // ── THE CAMERA FOLLOWS YOU ───────────────────────────────────────────────────────────────────────────
-    // The world is wider than the window, so the window scrolls to keep you near the middle of it. scrollLeft
-    // on the room rather than a transform on the world, because a transform fights the drag-to-look below.
+    // ── THE CAMERA DOES NOT FOLLOW YOU ───────────────────────────────────────────────────────────────────
+    // Luke: "inside the lounge the camera still snaps to the player like every time he moves a pixel — I'd
+    // rather the camera didn't do that and I can just drag it around freely."
+    //
+    // It used to re-centre on every change to `x`, and `x` is ticked by the walk loop on a timer — so the
+    // room scrolled on every step of every walk, and any drag you made was stomped on the next tick a few
+    // milliseconds later. The camera was not following you so much as competing with you for it.
+    //
+    // Now it points at you ONCE, when you walk in, and after that the view is yours. That is safe here in a
+    // way it would not be in a scrolling platformer, because in this room you move by TAPPING THE FLOOR you
+    // want to stand on — the destination is something you picked out of what is already on screen, so
+    // walking cannot take you anywhere you were not already looking. The only way to lose yourself is to
+    // deliberately drag the room away from you, and undoing that is a drag back.
+    //
+    // A ref rather than state: centring must not itself cause a render, and it has to survive every one.
+    const centred = useRef(false);
     useEffect(() => {
+        if (centred.current) return undefined;
         const el = roomRef.current;
-        if (!el) return;
-        el.scrollTo({ left: (el.scrollWidth * x) / 100 - el.clientWidth / 2, behavior: "auto" });
-    }, [x]);
+        if (!el) return undefined;
+        // On the first pass the room may not have been laid out yet, in which case there is nothing to
+        // scroll and scrollTo would silently do nothing. Try again after a frame rather than assuming.
+        const aim = () => {
+            const box = roomRef.current;
+            if (!box || box.scrollWidth <= box.clientWidth) return false;
+            box.scrollTo({ left: (box.scrollWidth * xRef.current) / 100 - box.clientWidth / 2, behavior: "auto" });
+            centred.current = true;
+            return true;
+        };
+        if (aim()) return undefined;
+        const id = requestAnimationFrame(aim);
+        return () => cancelAnimationFrame(id);
+    }, []);
 
     // ── DRAG TO LOOK ─────────────────────────────────────────────────────────────────────────────────────
     // Touch gets this from the native scroller; a mouse does not, so it drives scrollLeft by hand. Capture is
