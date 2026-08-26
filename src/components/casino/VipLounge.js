@@ -55,11 +55,16 @@ const POST = async (body) => {
 
 // Where the two you can talk to stand, across the world. The bar is at the right-hand end of the painting, so
 // they stand at it and you walk the room to reach them.
-const BARTENDER_X = 74;
+//
+// PUSHED APART. They were 13 apart and their sprites overlapped at that distance — Sable's shoulder sat behind
+// Rolf's arm, which reads as one two-headed person rather than two people at a bar. 20 clears them both, and
+// Rolf slides left rather than Sable sliding right because the bar she is standing at is at the right-hand end
+// of the painting and she belongs against it.
+const BARTENDER_X = 67;
 const VENDOR_X = 87;
-// Close enough to talk. The floor uses 5 against cabinets spaced 9; these two are 13 apart, so 6 keeps the
-// same feel without their reaches touching.
-const REACH = 6;
+// Close enough to talk. The floor uses 5 against cabinets spaced 9; these two are 20 apart now, so 8 keeps a
+// generous reach without the two ranges touching (they would need to be 10 apart to overlap).
+const REACH = 8;
 
 // ── THE SAME WALK AS THE FLOOR, WHICH IS THE WRONG WALK FOR THIS ROOM ────────────────────────────────────────
 // Matching the casino floor's speed was the obvious call and it reads badly here. The floor is seven rooms
@@ -311,7 +316,7 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                         {/* The two you can talk to, standing at the bar. Buttons, because everything you can
                             interact with in this building is a button with its own hit area. */}
                         <button type="button"
-                            className={`vip-npc${near === "bartender" ? " is-near" : ""}`}
+                            className={`vip-npc is-rolf${near === "bartender" ? " is-near" : ""}`}
                             style={{ left: `${BARTENDER_X}%` }}
                             aria-label="Rolf, the bartender"
                             onClick={() => { if (draggedJustNow()) return; walkTo(BARTENDER_X); }}>
@@ -320,7 +325,7 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                             <b>Rolf</b>
                         </button>
                         <button type="button"
-                            className={`vip-npc${near === "vendor" ? " is-near" : ""}`}
+                            className={`vip-npc is-sable${near === "vendor" ? " is-near" : ""}`}
                             style={{ left: `${VENDOR_X}%` }}
                             aria-label="Sable, the vendor"
                             onClick={() => { if (draggedJustNow()) return; walkTo(VENDOR_X); }}>

@@ -25,12 +25,19 @@ const JOBS = {
     "vip-bouncer": {
         file: "public/images/casino/vip-bouncer.webp", size: 384,
         prompt: housePrompt(
+            // A WOLF, not a bull. Luke: "make him a wolf like the other 2" -- Rolf behind the bar and the
+            // doorman are the same establishment, and a bull among wolves read as a guest who works there.
             "A broad, calm fantasy casino DOORMAN standing squarely at rest, seen straight on from the front: "
-            + "a heavyset anthropomorphic bull in a well-cut dark burgundy dinner jacket with gold trim, a black "
-            + "bow tie, one brass earring, arms folded across his chest, a small velvet rope clip on his lapel. "
+            // First wolf roll came back brown and shaggy and read as a boar. The species cues have to be
+            // explicit and the colour has to match Rolf behind the bar, or "wolf" is a suggestion.
+            + "a heavyset anthropomorphic TIMBER WOLF -- clearly a WOLF: a long tapered canine muzzle with a "
+            + "black nose, tall pointed triangular ears, and short SILVER-GREY fur with a paler muzzle and "
+            + "chest, exactly the colouring of a grey timber wolf. In a well-cut dark "
+            + "burgundy dinner jacket with gold trim, a black bow tie, one brass earring, arms folded across "
+            + "his chest, a small velvet rope clip on his lapel. "
             + "Unbothered rather than aggressive — the expression of somebody who has heard every excuse and is "
             + "not going to hear a new one tonight. Warm lamplight from one side. He is drawn SMALL in the "
-            + "frame: his HORNS and the top of his head must have a wide band of empty space above them, and his "
+            + "frame: his EARS and the top of his head must have a wide band of empty space above them, and his "
             + "shoes a wide band below."
             + FRAMING,
         ),
@@ -48,6 +55,7 @@ const JOBS = {
 };
 
 for (const [key, job] of Object.entries(JOBS)) {
+    if (process.env.ONLY && key !== process.env.ONLY) continue;
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI}` },

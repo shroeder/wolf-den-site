@@ -22670,7 +22670,7 @@ body.cas-seated .social-fab { display: none; }
    LIT BY THE ROOM HE IS IN. The lounge is all warm brass and lamplight and he was rendered flat, which
    made him look pasted on. A warm pool at his feet (the same trick every cabinet uses) plus a small lift
    in brightness and warmth ties him to the light in the picture. */
-.cas-bouncer { position: absolute; left: -2%; bottom: 0; z-index: 5; pointer-events: none;
+.cas-bouncer { position: absolute; left: -2%; bottom: -13%; z-index: 5; pointer-events: none;
     width: calc(var(--room) * 0.46); height: auto; object-fit: contain;
     filter: drop-shadow(0 8px 14px rgba(0,0,0,0.62))
         drop-shadow(0 0 16px rgba(255,196,104,0.28))
@@ -22685,7 +22685,7 @@ body.cas-seated .social-fab { display: none; }
 
 /* The light he is standing in, on the carpet. Same pseudo-element the cabinets use, same reason: a lit
    figure with no pool under it is a cutout on a photograph. */
-.cas-bouncer-pool { position: absolute; z-index: 4; left: 6%; bottom: -2%;
+.cas-bouncer-pool { position: absolute; z-index: 4; left: 6%; bottom: -14%;
     width: calc(var(--room) * 0.34); height: calc(var(--room) * 0.07);
     transform: translateX(-50%); pointer-events: none; mix-blend-mode: screen;
     background: radial-gradient(50% 50% at 50% 50%, rgba(255,196,104,0.34), transparent 72%); }
@@ -22711,7 +22711,7 @@ body.cas-seated .social-fab { display: none; }
     .cas-bouncer { transition: none; animation: none; }
 }
 
-.cas-viprope { position: absolute; z-index: 4; left: 50%; bottom: -6%; width: 106%; height: auto;
+.cas-viprope { position: absolute; z-index: 4; left: 50%; bottom: -14%; width: 106%; height: auto;
     transform: translateX(-50%); display: block;
     filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
 
@@ -22769,10 +22769,20 @@ body.cas-seated .social-fab { display: none; }
    Standing ON the floor, full length, a little taller than the hero because they are the adults behind the
    counter. They were 0.34 of the room and drawn as torso-only crops, which is how they ended up reading as
    two enormous floating busts — see the note in VipLounge. */
-.vip-npc { position: absolute; bottom: 4%; transform: translateX(-50%); z-index: 3;
+/* ── DOWN ONTO THE RUG ────────────────────────────────────────────────────────────────────────────────
+   4% left them hovering. 0 puts them on the same ground line the player walks on (.vip-you, 3%), which is
+   where two people standing in a room should be.
+
+   AND SABLE NEEDS HER OWN NUMBER, because the two sprites are not padded alike: Rolf's feet sit exactly on
+   the bottom edge of his canvas and Sable has 4% of empty rows under hers (measured, not guessed — it came
+   from shrinking her to clear the sprite-edge gate). A single `bottom` for both would stand one of them on
+   the floor and float the other by exactly that 4%. */
+.vip-npc { position: absolute; bottom: 0%; transform: translateX(-50%); z-index: 3;
     width: calc(var(--vroom) * 0.34); display: grid; justify-items: center; gap: 1px;
     -webkit-appearance: none; appearance: none; border: 0; background: none; padding: 0;
     font: inherit; color: inherit; cursor: pointer; }
+/* Cancels the empty band under her figure so she stands where Rolf stands. */
+.vip-npc.is-sable { bottom: -4%; }
 .vip-npc img { display: block; width: 100%; height: auto;
     filter: drop-shadow(0 8px 12px rgba(0,0,0,.65)); }
 .vip-npc b { font-size: 9.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
