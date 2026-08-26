@@ -49,12 +49,26 @@ const SOURCE_LABEL = {
 // A scannable, self-explaining group for the menagerie summary: a labeled header + one row per bonus, each
 // with an accent icon badge, the value, the stat name, and a plain-English one-liner of what it actually does
 // (so the meaning reads inline instead of hiding in a tooltip / collapsed accordion).
+// ── SHUT BY DEFAULT ──────────────────────────────────────────────────────────────────────────────────────────
+// Between them these two groups are a dozen rows of stats, and they sat open above the filter chips — so the
+// pets page opened on a wall of numbers and the pets themselves were a full screen of scrolling away. Luke,
+// with two screenshots of exactly that: "can we have these sections collapsed by default."
+//
+// The numbers still matter, which is why the header keeps the headline: the group says how many rows are
+// folded into it, so a shut group is a summary rather than a hidden thing. Opening one is one tap and the
+// page remembers nothing — this is a reference you check occasionally, not a mode you live in.
 function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
+    const [open, setOpen] = useState(false);
     if (!tiles.length) return null;
     return (
-        <div className="petsum-group" style={{ "--acc": accent }}>
-            <div className="petsum-ghead"><b>{title}</b><small>{sub}</small></div>
-            {tiles.map((t) => (
+        <div className={`petsum-group${open ? " is-open" : ""}`} style={{ "--acc": accent }}>
+            <button type="button" className="petsum-ghead" onClick={() => setOpen((v) => !v)}
+                aria-expanded={open} aria-label={`${title} — ${open ? "hide" : "show"} ${tiles.length} ${tiles.length === 1 ? "row" : "rows"}`}>
+                <b>{title}</b>
+                <small>{open ? sub : `${tiles.length} ${tiles.length === 1 ? "bonus" : "bonuses"} · tap to show`}</small>
+                <i className="petsum-caret" aria-hidden="true" />
+            </button>
+            {open ? tiles.map((t) => (
                 <div key={t.key} className="petsum-row">
                     <span className="petsum-ico" aria-hidden="true">
                         {t.sprite ? (
@@ -65,17 +79,32 @@ function MenagerieGroup({ title, sub, tiles, accent = "#ffd75e" }) {
                     <span className="petsum-val">{t.value}</span>
                     <span className="petsum-body"><b>{t.label}</b>{t.desc ? <small>{t.desc}</small> : null}</span>
                 </div>
-            ))}
+            )) : null}
         </div>
     );
 }
 
 const PET_SUMMARY_CSS = `
 .petsum-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+/* The caret and the focus ring for the header button; the header's own layout lives in the single
+   .petsum-ghead rule below, which is the one that was already here. */
+.petsum-ghead:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; border-radius: 6px; }
+.petsum-caret { margin-left: auto; width: 0; height: 0; flex: none; align-self: center;
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 6px solid color-mix(in srgb, var(--acc) 75%, transparent);
+    transition: transform 160ms ease; }
+.petsum-group.is-open .petsum-caret { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .petsum-caret { transition: none; } }
+/* A shut group is a bar, not a box with nothing in it. */
+.petsum-group:not(.is-open) { padding-bottom: 11px; }
 .petsum-group { --acc: #ffd75e; border-radius: 14px; padding: 11px 12px 7px;
     background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 9%, transparent), rgba(255,255,255,0.015));
     border: 1px solid color-mix(in srgb, var(--acc) 30%, transparent); }
-.petsum-ghead { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; flex-wrap: wrap; }
+/* A real <button> since the groups collapse — stripped of the chrome a button inherits, keeping exactly the
+   layout it had as a div, plus a pointer and full width so the whole bar is the hit area. */
+.petsum-ghead { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; flex-wrap: wrap;
+    width: 100%; background: none; border: 0; padding: 0; text-align: left; cursor: pointer;
+    color: inherit; font: inherit; }
 .petsum-ghead b { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: var(--acc); }
 .petsum-ghead small { font-size: 0.66rem; color: #9aa2ab; }
 .petsum-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; transition: background .12s ease; }
