@@ -1718,7 +1718,7 @@ export default function CasinoClient({ initial }) {
                 one now puts it behind the whole screen. (The comment lives up here because a JSX comment
                 in an expression position is a parse error, which this file has now made twice.) */}
             {seated && at ? (
-                <div className={`cas-stage${at.live ? "" : " is-dark"}`}
+                <div className={`cas-stage${at.live ? "" : " is-dark"}${flash ? ` is-${flash}` : ""}`}
                     style={{ "--acc": ACCENT[at.id] || "#ffd75e",
                         "--mast": `url(/images/casino/mast/${at.id}.webp)`,
                         "--room": `url(/images/casino/room/${at.id}.webp)` }}

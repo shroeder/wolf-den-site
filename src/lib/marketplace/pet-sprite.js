@@ -274,9 +274,19 @@ export async function generatePetSpriteLevel(petId, level) {
     if (!url) {
         url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true, meta });
     }
+    // ── THE CONFLICT TARGET IS THREE COLUMNS, NOT TWO ────────────────────────────────────────────────
+    // The primary key on this table is (pet_id, level, VARIANT) -- variant arrived later and this upsert was
+    // never moved with it. Postgres does not treat a conflict target as a prefix: naming two of the three
+    // columns is not "close enough", it is error 42P10, "there is no unique or exclusion constraint matching
+    // the ON CONFLICT specification", and this one has no .catch() so it threw. Every attempt to generate an
+    // evolved pet sprite has been failing outright.
+    //
+    // Found by a generator script hitting the same wall while drawing Sable’s three new pets. It is the same
+    // shape as the bug that quietly lost two weeks of writes elsewhere in this repo -- there the .catch() hid
+    // it, here it was loud, and nobody had run it since variant landed.
     await db.query(
         `INSERT INTO mkt_pet_sprite_level (pet_id, level, url, updated_at) VALUES ($1, $2, $3, NOW())
-         ON CONFLICT (pet_id, level) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,
+         ON CONFLICT (pet_id, level, variant) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,
         [petId, lv, url]
     );
     return url;

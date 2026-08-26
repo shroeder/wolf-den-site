@@ -301,6 +301,29 @@ async function detailFor(item) {
                 foot: "This is an unlock rather than an item. Once it is open it stays open, on every account you play from.",
             };
         }
+        // ── A PET ─────────────────────────────────────────────────────────────────────
+        // Reads the real collectible rather than restating it here: the rarity, the hint and the farm stat
+        // are already written once in collectibles.js and a second copy on the shelf is a second thing to
+        // keep in step. The sprite comes from mkt_pet_sprite, the same table the farm and the arena draw it
+        // from, so a re-roll of the art carries here without anybody remembering to update a shelf.
+        case "pet": {
+            const [{ collectibleById }, { RARITY_META }] = await Promise.all([
+                import("@/lib/marketplace/collectibles.js"),
+                import("@/lib/marketplace/rarity.js"),
+            ]);
+            const c = collectibleById(item.ref);
+            if (!c) return null;
+            const sprite = await db.queryOne(`SELECT url FROM mkt_pet_sprite WHERE pet_id = $1`, [item.ref]).catch(() => null);
+            const lines = [{ label: "Rarity", value: RARITY_META?.[c.rarity]?.label || c.rarity, tone: RARITY_META?.[c.rarity]?.color || null }];
+            if (c.activeStat) lines.push({ label: "While it is out", value: statLabel(c.activeStat) });
+            return {
+                art: sprite?.url || null,
+                tone: c.color || null,
+                blurb: c.hint ? `${c.hint}.` : null,
+                lines,
+                foot: "Yours for good once bought. Equip it on the farm to have it follow you.",
+            };
+        }
         // ── A PAGE ───────────────────────────────────────────────────────────────────
         // The only thing on any shelf that is a ROLL. It cannot list what you will get, because nobody knows
         // yet — so it says the band it draws from and what that band contains, which is the honest version
@@ -310,6 +333,7 @@ async function detailFor(item) {
             const b = RECIPE_BANDS[item.ref];
             if (!b) return null;
             return {
+                art: "/images/casino/vip-page.webp",
                 lines: [
                     { label: "What it is", value: `One recipe you do not know yet, tier ${b.min} to ${b.max}` },
                     { label: "Where it draws from", value: "The same band a mythic chest does" },

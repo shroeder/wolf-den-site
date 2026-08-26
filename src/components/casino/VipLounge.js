@@ -61,9 +61,15 @@ const VENDOR_X = 87;
 // same feel without their reaches touching.
 const REACH = 6;
 
-// The same walk the casino floor runs, at the same speed, so the two rooms move identically.
-const WALK_PER_SEC = 26;
-const WALK_TICK_MS = 62;
+// ── THE SAME WALK AS THE FLOOR, WHICH IS THE WRONG WALK FOR THIS ROOM ────────────────────────────────────────
+// Matching the casino floor's speed was the obvious call and it reads badly here. The floor is seven rooms
+// wide and you cross it at a stroll; the lounge is ONE room, thirteen percent between the two people in it,
+// and at 26%/sec crossing it takes half a second per step and feels like wading. Luke: "he moves super slow
+// as well." Same number, different room, different answer.
+const WALK_PER_SEC = 46;
+// And a tighter tick, because the step SIZE is speed x tick — at 62ms a faster walk just means bigger jumps,
+// which is a sprite teleporting rather than a person moving.
+const WALK_TICK_MS = 40;
 
 export default function VipLounge({ state, chips, me, onClose, onChips }) {
     const [st, setSt] = useState(state || null);
@@ -201,6 +207,25 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
     // `near` changes — that version has one frame in which the two disagree.
     const talking = open && open === near ? open : null;
 
+    // ── ARRIVING IS THE INTERACTION ──────────────────────────────────────────────────────────────────────
+    // There was a full-width yellow button under the room that said "See what Sable has", and it was the only
+    // way to open either of them. Luke: "should be push to interact, no yellow button to interact with the
+    // npcs." He is right, and the button was worse than redundant — you had already tapped Sable to walk to
+    // her, so the game made you tap the same intention twice, the second time somewhere else on the screen.
+    //
+    // Reaching somebody opens them. The guard is that it fires on ARRIVAL and not while you stand there:
+    // without it, closing the modal while still in reach would reopen it on the next render and the X would
+    // do nothing. `left` remembers who you have already been handed, and only clears once you walk off.
+    const left = useRef(null);
+    useEffect(() => {
+        if (!near) { left.current = null; return; }
+        if (left.current === near) return;
+        left.current = near;
+        talk();
+        // talk is stable per `near`, and re-running this on a new identity of it would reopen the modal.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [near]);
+
     const talk = useCallback(async () => {
         unlock();
         Cas.chips?.();
@@ -316,7 +341,13 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                             </div>
                         ))}
 
-                        <div className="vip-you" style={{ left: `${x}%`, "--face": facing }}>
+                        {/* ── AND HE ACTUALLY WALKS ────────────────────────────────────────────────
+                            The stride animation existed and was hung on .cas-you.is-walking, which is the
+                            CASINO FLOOR's hero. This room has its own element and never carried the class,
+                            so the sprite slid across the rug perfectly level the whole time — a hero on a
+                            conveyor belt, which is the exact thing the animation was written to stop.
+                            Luke: "no walking animation on the hero in the vip." */}
+                        <div className={`vip-you${goal != null ? " is-walking" : ""}`} style={{ left: `${x}%`, "--face": facing }}>
                             {me?.sprite
                                 // eslint-disable-next-line @next/next/no-img-element
                                 ? <img src={me.sprite} alt="" draggable="false" />
@@ -326,13 +357,14 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                 </div>
             </div>
 
-            {/* What is within reach. One button, in one place, whatever you are stood at. */}
+            {/* Where the button was. It is a caption now: walking up to somebody is what opens them, so a
+                control here would be a second way to do a thing you have already done. It still says who you
+                are stood with, because a modal you can dismiss needs something to tell you it is reachable
+                again without making you walk away and back. */}
             <div className="vip-act">
-                {near ? (
-                    <button type="button" className="vip-talk" onClick={talk}>
-                        {near === "bartender" ? "Talk to Rolf" : "See what Sable has"}
-                    </button>
-                ) : <span>Tap the floor to walk · the bar is to your right</span>}
+                <span>{near === "bartender" ? "Rolf is pouring · step away to leave the bar"
+                    : near === "vendor" ? "Sable has the case open · step away to close it"
+                        : "Tap the floor to walk · the bar is to your right"}</span>
             </div>
 
             {/* ── THE BARTENDER ───────────────────────────────────────────────────────────────────────

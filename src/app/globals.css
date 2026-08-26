@@ -17976,6 +17976,27 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-reels.is-big { animation: casShake .42s ease-in-out 2; }
 @keyframes casShake { 0%,100% { transform: none; } 25% { transform: translateX(-4px) rotate(-.4deg); }
     75% { transform: translateX(4px) rotate(.4deg); } }
+
+/* ── AND THE WHOLE ROOM ON A BIG ONE ──────────────────────────────────────────────────────────────────
+   The rule above shakes the three-reel machine's REEL BOX. It is the only shake in the casino, which meant
+   bingo, keno, blackjack and all five cabinets paid a jackpot with the room dead still. Luke asked whether
+   the casino uses screen shake at all; it effectively did not.
+
+   Hung on the stage and driven by the same flash state every paying path already sets, so it covers every
+   machine at once instead of being wired up one cabinet at a time. An ordinary win gets a single short
+   bump; only a big one gets the shake, because a room that shakes at every win is a room that shakes.
+
+   SMALL AND SHORT ON PURPOSE. This is the whole screen, not a widget in the corner of it — four pixels for
+   two-fifths of a second reads as impact, and ten would read as a fault. Kept off the sticky controls'
+   own transform by animating the stage, which they are children of. */
+.cas-stage.is-win { animation: casRoomBump .34s cubic-bezier(.3,1.4,.5,1) both; }
+.cas-stage.is-big { animation: casRoomShake .42s ease-in-out 2; }
+@keyframes casRoomBump { 0%,100% { transform: none; } 40% { transform: translateY(-3px) scale(1.004); } }
+@keyframes casRoomShake {
+    0%,100% { transform: none; }
+    20% { transform: translate(-4px, 2px) rotate(-.35deg); }
+    50% { transform: translate(3px, -3px) rotate(.3deg); }
+    80% { transform: translate(-2px, 1px) rotate(-.15deg); } }
 .cas-pop { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
     font-family: var(--font-display); font-weight: 900; letter-spacing: .18em; color: #fff6cc;
     text-shadow: 0 3px 16px #000, 0 0 34px color-mix(in srgb, var(--acc, #ffd75e) 95%, transparent);
@@ -18375,13 +18396,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* The balls, in the order they came out. They wrap and keep going — forty of them is a lot, and the point
    is the accumulating pile, not any one of them. */
-/* ── FORTY BALLS, THREE ROWS ──
-   Unbounded, this grew to four and five rows of chips as the draw went on, and every row it grew pushed the
-   card further up the screen while you were watching it. Capped at three with its own scroll: the ones that
-   matter are the newest, the rest are history you can flick back through, and the hall stops changing height
-   under a card you are reading. */
-/* The cage sits to the left of the pile it is producing, and the pile takes what is left. */
-.cas-balls-wrap { display: flex; align-items: flex-start; gap: 8px; margin-top: 7px; }
+/* ── THE CAGE, WHICH KENO STILL TURNS ──
+   This used to head a block that also styled bingo's called-ball strip: a wrapper, a wrapping pile of ball
+   sprites, five colours and an arrival animation. The strip came out of the hall on Luke's word -- "remove
+   the balls and sprite at the bottom" -- and the card is the record of what has been called, so none of it
+   had anything left to style. Deleted rather than left lying about, which is this repo's rule and a scar:
+   a rule for an element that has changed shape is how a background wins an argument nobody remembers.
+
+   The cage survives because KENO still has one, and there the hopper IS the game -- that board has no card
+   to read the draw off. (public/images/casino/bingo/ball-{b,i,n,g,o}.webp are unreferenced now.) */
 .cas-cage { flex: 0 0 auto; width: 52px; height: 52px; object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); transform-origin: 50% 78%; }
 /* It rocks rather than spins: the sprite is a three-quarter view, so rotating it through 360 degrees would
@@ -18389,30 +18412,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-cage.is-turning { animation: casCage 1.05s ease-in-out infinite; }
 @keyframes casCage { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
 @media (prefers-reduced-motion: reduce) { .cas-cage.is-turning { animation: none; } }
-.cas-balls { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; min-height: 30px;
-    align-items: flex-start; align-content: flex-start;
-    max-height: 64px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-/* ── A BALL, NOT A CHIP ──
-   These were rounded rectangles with a number in them. The sprite is the ball and the number is set on its
-   blank ivory face here — `place-items: center` puts it on the face because the face is drawn centred, which
-   is the one thing the generator's prompt is emphatic about. Background rather than a ::before, because a
-   positioned pseudo-element paints OVER its parent's own text and the number would be behind the ball. */
-.cas-ball { width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center;
-    background: var(--ball) center / contain no-repeat;
-    font-size: 9.5px; font-weight: 900; color: #2b1f12; letter-spacing: -.02em;
-    border: 0; padding: 0; }
-.cas-ball.is-b { --ball: url("/images/casino/bingo/ball-b.webp"); }
-.cas-ball.is-i { --ball: url("/images/casino/bingo/ball-i.webp"); }
-.cas-ball.is-n { --ball: url("/images/casino/bingo/ball-n.webp"); }
-.cas-ball.is-g { --ball: url("/images/casino/bingo/ball-g.webp"); }
-.cas-ball.is-o { --ball: url("/images/casino/bingo/ball-o.webp"); }
-/* The newest one is the loud one — it grows and lights rather than changing colour, because its colour is
-   now which column it came from and that is information. */
-.cas-ball.is-new { transform: scale(1.16); filter: drop-shadow(0 0 7px rgba(255,215,94,.85));
-    animation: casBallIn .34s cubic-bezier(.2,1.5,.4,1) both; }
-@keyframes casBallIn { from { transform: scale(.4) rotate(-25deg); opacity: 0; }
-    to { transform: scale(1.16) rotate(0); opacity: 1; } }
-.cas-balls-idle { font-size: 11px; color: #98a0aa; }
 
 /* ── TWO HANDS ───────────────────────────────────────────────────────────────────────────────────────
    A split makes two hands played in order. The one in play is lit; the other is dimmed rather than
@@ -22749,6 +22748,9 @@ body.cas-seated .social-fab { display: none; }
     transition: left 62ms linear; }
 .vip-other { transform: translateX(-50%); opacity: .82; }
 .vip-you { transform: translateX(-50%) scaleX(var(--face, 1)); z-index: 4; }
+/* One small bob on the same clock as the footfalls, which is all it takes to stop reading as a slide. Shares
+   casStride with the casino floor's hero rather than declaring a second set of keyframes that would drift. */
+.vip-you.is-walking img, .vip-you.is-walking .vip-blank { animation: casStride 248ms ease-in-out infinite; }
 .vip-other img, .vip-you img, .vip-blank { display: block;
     width: calc(var(--vroom) * 0.282); height: calc(var(--vroom) * 0.282);
     object-fit: contain; object-position: bottom;

@@ -35,3 +35,4 @@ scripts/_*.html
 # Scratch for the screenshot/measurement rigs. NEVER commit -- a minted session token lives here.
 .e/
 .shots/
+.env.local.rig
