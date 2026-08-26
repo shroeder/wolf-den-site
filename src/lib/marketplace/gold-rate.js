@@ -79,8 +79,46 @@ const MINT_REASONS = new Set([
 // If those need tuning it is done in the paytable, where the gate can see it, and it is measured on the net.
 // See the memory note: nerf by daily total, not per event.
 
+// ── AND THE BIGGEST NINE PAY HALF AGAIN ──────────────────────────────────────────────────────────────────────
+// Luke, looking at the by-source panel: "can you nerf the top 10 sources by half."
+//
+// Measured off the ledger rather than off the screenshot, so the list is what the ledger actually says rather
+// than what fitted on a phone. Over thirty days these are the top ten faucets, and the top TEN are 65.5% of
+// all minting — 4,975,023 of 7,594,142:
+//
+//     arena_win        953,417        farm_encounter    317,405
+//     harvest          785,486        tavern_gambit_win 306,422   <- NOT in this set, see below
+//     delve            645,418        farm_daily        294,290
+//     spin_prize       627,273        sailing_daily     252,490
+//     xp_accrual       542,897        quest_reward      249,925
+//
+// A SECOND FACTOR RATHER THAN A SECOND RATE. GOLD_MINT_RATE stays the floor under everything and this is a
+// multiplier on top of it for the named few, so there is still one global lever and one explicit list of
+// exceptions. The alternative — moving the global rate far enough to fix the top of the list — would drag
+// every small earner down with it, and the small earners are not the problem.
+//
+// Effective rate for anything in here is GOLD_MINT_RATE x 0.5, which today is 0.2.
+const HEAVY_FAUCET_FACTOR = 0.5;
+const HEAVY_FAUCETS = new Set([
+    "arena_win", "harvest", "delve", "spin_prize", "xp_accrual",
+    "farm_encounter", "farm_daily", "sailing_daily", "quest_reward",
+]);
+
+// ── WHY THE TAVERN GAMBIT IS NOT IN THAT SET, THOUGH IT IS IN THE TOP TEN ────────────────────────────────────
+// It is a GAMBLING PAYOUT and the same argument as the casino applies (see the note above MINT_REASONS). Over
+// the same thirty days it paid out 306,422 against 247,000 staked — so as a faucet it is worth its NET, which
+// is 59,422, or 0.8% of all minting. Halving the payout does not halve a faucet, it halves the return: 153,000
+// paid against 247,000 staked is an RTP of 62%, which is not a nerf, it is a rigged table.
+//
+// It is also why it was never in MINT_REASONS to begin with, so nothing here is being carved out — it was
+// already outside the faucet machinery. If the gambit needs tuning it is done in its own paytable and judged
+// on the net, which is the rule this file already states for the casino.
+
 /** Is this reason a faucet? Exported so a test — or the coin-economy screen — can ask without re-listing. */
 export const mints = (reason) => MINT_REASONS.has(reason);
+
+/** Is this one of the named heavy faucets that pays half again? Exported for the same reason as `mints`. */
+export const heavy = (reason) => HEAVY_FAUCETS.has(reason);
 
 /**
  * Size a reward on its way out.
@@ -94,5 +132,7 @@ export function mint(amount, reason) {
     const n = Number(amount) || 0;
     if (!n || !MINT_REASONS.has(reason)) return n;
     if (n < 0) return n; // a negative is a spend that got mislabelled; leave it alone rather than double it
-    return Math.max(1, Math.round(n * GOLD_MINT_RATE));
+    // The named heavy faucets pay half again on top of the global rate — see HEAVY_FAUCETS.
+    const rate = GOLD_MINT_RATE * (HEAVY_FAUCETS.has(reason) ? HEAVY_FAUCET_FACTOR : 1);
+    return Math.max(1, Math.round(n * rate));
 }
