@@ -150,10 +150,55 @@ function stripFor(bag, land) {
     return [...Array.from({ length: 9 }, draw), ...land];
 }
 
+// ── WHAT THE RUN IS DOING, IN NUMBERS ────────────────────────────────────────────────────────────────────────
+// These MUST match `@keyframes s5Run` in globals.css (.33s, -9 cells to -3 cells = six cells a cycle). The
+// brake is derived from the run's own pace, so if that keyframe is ever retuned, retune these with it.
+const RUN_MS = 330;
+const RUN_CELLS = 6;
+// Milliseconds per pixel of travel, as a multiple of what the run would take. Higher = a gentler stop. See
+// the note in measureBrake for why this is above 1.
+const BRAKE = 1.45;
+
 export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
+    // ── THE STOP CONTINUES THE RUN, IT DOES NOT RESTART IT ───────────────────────────────────────────
+    // `s5Run` loops the strip between -9 and -3 cells; `s5Settle` used to start from a FIXED -3. The class
+    // flips on a timer, so whenever it flipped mid-loop the strip SNAPPED to -3 to begin settling. Traced on
+    // the real page: the last reel jumped 116.6px in a single frame against a ~31px run frame. That is a
+    // visible jolt on every reel of every spin, and it is what check:feel means by "it kicks, it does not
+    // brake".
+    //
+    // Two numbers, both measured rather than assumed:
+    //
+    //   --s5from   where the run actually was on the stopping frame. No jump, because the settle begins
+    //              exactly where the run left off.
+    //   --settle   how long to cover that distance. DERIVED, because the distance now varies from 3 to 9
+    //              cells depending on where the loop was caught — a fixed duration with a variable distance
+    //              is the same bug wearing a different hat.
+    const [brake, setBrake] = useState({});
+    const reelEls = useRef([]);
+    const measureBrake = useCallback((k) => {
+        const el = reelEls.current[k];
+        const strip = el?.querySelector(".s5-strip");
+        if (!strip) return null;
+        // FROM LAYOUT, not from --s5cell. getComputedStyle hands back the raw token stream for an
+        // UNREGISTERED custom property — --s5cell reads back as the literal string "clamp(46px, 17vw, 74px)"
+        // and parseFloat of that is NaN. Verified on the page. The reel is exactly three cells tall.
+        const cell = el.getBoundingClientRect().height / 3;
+        if (!(cell > 0)) return null;
+        const from = new DOMMatrixReadOnly(getComputedStyle(strip).transform).m42;
+        const dist = Math.abs(from);
+        if (!dist) return null;
+        const runPerMs = (RUN_CELLS * cell) / RUN_MS;
+        // BRAKE opens the stop BELOW the run rather than level with it. A stop that begins at exactly the
+        // running speed still reads as a kick, because the curve's opening slope multiplies the average and
+        // the average is what the duration sets. 1.45 puts the first instant of the settle at roughly
+        // seven-tenths of the run and every instant after it slower — which is what braking looks like.
+        const ms = Math.round((dist / runPerMs) * BRAKE);
+        return { from, ms: Math.max(220, Math.min(900, ms)) };
+    }, []);
     const [result, setResult] = useState(null);    // the whole server response
     const [showLine, setShowLine] = useState(-1);  // which winning line is being drawn
     // ── THE LOCK FOLLOWS THE CELEBRATION ─────────────────────────────────────────────────────────────────
@@ -439,7 +484,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const playGrid = useCallback((g, wins, opts) => {
         const { stopAt, settle, lineMs, onDone, onLanded } = opts;
         setGrid(g);
-        setLanded(0);
+        setLanded(0); setBrake({});
         setShowLine(-1);
         setActiveWins(wins);
         setTease(null);
@@ -458,6 +503,17 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
             landsAt.push(stopAt[k] + settle + extra);
         }
 
+        const allDown = (after) => timers.current.push(setTimeout(() => {
+            // The instant every reel is down and before any line is drawn — where a wild welds itself to
+            // the board, so the clamp reads as part of the landing rather than as part of the payout.
+            if (onLanded) onLanded();
+            if (!wins.length) { onDone(); return; }
+            wins.forEach((_, i) => {
+                timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * lineMs));
+            });
+            timers.current.push(setTimeout(() => { setShowLine(-1); onDone(); }, wins.length * lineMs));
+        }, after));
+
         for (let k = 0; k < REELS; k += 1) {
             const at = landsAt[k];
             // The hold begins when the PREVIOUS reel lands — the first moment the player can see they are one
@@ -472,6 +528,18 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 }, from));
             }
             timers.current.push(setTimeout(() => {
+                // MEASURED FIRST. This runs before React re-renders, so the strip is still mid-run and the
+                // transform is the live one — read it after the class flips and it is already the settle's.
+                const b = measureBrake(k);
+                if (b) setBrake((prev) => ({ ...prev, [k]: b }));
+                // ── AND THE PAYOUT WAITS FOR THE LAST REEL, NOT FOR A CONSTANT ───────────────────────
+                // The brake's LENGTH is derived now (see measureBrake), so it runs anywhere from 240ms to
+                // 900ms depending on where the loop was caught. The lines used to be drawn at a fixed
+                // offset from this timer, which was only correct while every settle was exactly 340ms —
+                // against a measured one they can start half a second before the last reel has stopped
+                // moving. So the whole "everything is down" beat is scheduled from HERE, off the number
+                // that was actually measured, and still lands the same 230ms after the reel truly rests.
+                if (k === REELS - 1) allDown((b?.ms ?? settle) + 230);
                 setLanded(k + 1);
                 if (!tease[k]) {
                     Cas.reelStop(k, k === REELS - 1 ? 0.85 : 0.4);
@@ -486,17 +554,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 else { Cas.nearMiss(); Haptic.hit(0.5); }
             }, at));
         }
-        timers.current.push(setTimeout(() => {
-            // The instant every reel is down and before any line is drawn — where a wild welds itself to
-            // the board, so the clamp reads as part of the landing rather than as part of the payout.
-            if (onLanded) onLanded();
-            if (!wins.length) { onDone(); return; }
-            wins.forEach((_, i) => {
-                timers.current.push(setTimeout(() => { setShowLine(i); Cas.coin(i % 5); }, i * lineMs));
-            });
-            timers.current.push(setTimeout(() => { setShowLine(-1); onDone(); }, wins.length * lineMs));
-        }, landsAt[REELS - 1] + 230));
-    }, [teaseFor]);
+    }, [teaseFor, measureBrake]);
 
     // ── PLAYING A CASCADE ────────────────────────────────────────────────────────────────────────────────
     // Press once and the machine argues with itself. Each break is four beats, and they are separately
@@ -561,7 +619,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
         if (busy || spinning) return;
         unlock();
         clearTimers();
-        setResult(null); setShowLine(-1); setCelebrating(false); setLanded(0);
+        setResult(null); setShowLine(-1); setCelebrating(false); setLanded(0); setBrake({});
         setFreeIdx(-1); setFreeWon(0);
         setChainAt(-1); setChainWon(0); setBreaking([]); setDropping([]);
         setPhase("spin"); setSpinning(true);
@@ -1045,7 +1103,11 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                         // nothing, it is on screen before anything lands, and it turns eight spins of "a
                         // thing sometimes flashes" into eight spins of watching two particular reels.
                         <div key={reel} className={`s5-reel${landed > reel ? " is-stop" : spinning || result ? " is-spin" : ""}${tease && tease.reel === reel ? " is-teasing" : ""}${inRound && plusReels.includes(reel) ? " is-collector" : ""}`}
-                            style={{ "--settle": `${phase === "free" ? FREE_SETTLE_MS : SETTLE_MS}ms` }}>
+                            ref={(el) => { reelEls.current[reel] = el; }}
+                            style={{
+                                "--settle": `${brake[reel]?.ms ?? (phase === "free" ? FREE_SETTLE_MS : SETTLE_MS)}ms`,
+                                ...(brake[reel] ? { "--s5from": `${brake[reel].from}px` } : null),
+                            }}>
                             <div className="s5-strip">
                                 {/* ── ONE STRIP, ALWAYS: NO SWAP AT THE END ───────────────────────────
                                     Luke, of the colossal cabinet and then of these: "a big part of the slot

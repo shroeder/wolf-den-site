@@ -18885,8 +18885,11 @@ body.cas-seated .social-fab { display: none; }
     to { transform: translateY(calc(var(--s5cell) * -3)); }
 }
 .s5-reel.is-stop .s5-strip { animation: s5Settle var(--settle, 420ms) cubic-bezier(.33,.4,.55,1) both; }
+/* `--s5from` is where the run ACTUALLY was on the frame this reel stopped, measured in Slot5.js. The fallback
+   is the old fixed start, for the one frame before the measurement lands. The easing is unchanged: the fault
+   was never the curve, it was starting the travel somewhere the strip was not. */
 @keyframes s5Settle {
-    from { transform: translateY(calc(var(--s5cell) * -3)); }
+    from { transform: translateY(var(--s5from, calc(var(--s5cell) * -3))); }
     to { transform: translateY(0); }
 }
 
