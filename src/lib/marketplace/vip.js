@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { standingFor } from "@/lib/marketplace/roles.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { checkText } from "@/lib/marketplace/text-filter.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE VIP LOUNGE ───────────────────────────────────────────────────────────────────────────────────────────
 // A room behind a rope at the near end of the casino floor. Luke described it in one long breath: a barrier
@@ -232,6 +233,7 @@ export async function enterVipLounge(buyerId) {
     const { vip, spentCents } = await vipStanding(buyerId);
     if (!vip) return { ok: false, error: "not_vip", spentCents };
     await grantEventBadge(buyerId, "casino_vip_room").catch(() => {});
+    await trackActivity(buyerId, "casino_vip_enter", { spentCents }).catch(() => {});
     return { ok: true, ...(await vipLoungeState(buyerId)) };
 }
 

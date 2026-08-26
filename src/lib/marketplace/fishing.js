@@ -1129,11 +1129,14 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // The Cellar Key: one landing in three puts a second copy of the fish on the pantry shelf.
     await addToPantry(buyerId, "fish", species.id, (await powerRoll(buyerId, "cellar_key", 3)) ? 2 : 1).catch(() => {});
 
-    // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
-    // `minted` - this gold was sized by the caller above and is logged as "fishing" two lines down, so
-    // awardXp must not halve it a second time. See gold-rate.js.
-    await awardXp(buyerId, "sail_fish", { points: xp, gold, minted: true }).catch(() => {});
-    await logCoin(buyerId, gold, "fishing", { meta: { species: species.id, cm, quality: q } }).catch(() => {});
+    // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything
+    // else. `minted` because the caller already sized it (gold-rate.js); `reason` so the one credit books
+    // ONE ledger row, under "fishing". This used to call logCoin as well, which counted the same coins
+    // twice - once here and once as xp_accrual - and made those two rows in the coin economy overlap.
+    await awardXp(buyerId, "sail_fish", {
+        points: xp, gold, minted: true,
+        reason: "fishing", coinMeta: { species: species.id, cm, quality: q },
+    }).catch(() => {});
 
     // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────
     const extras = [];
@@ -1166,8 +1169,10 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
             [buyerId, sp.id, JSON.stringify({ n: (Number(was?.n) || 0) + 1, best: Math.max(size, Number(was?.best) || 0), firstAt: was?.firstAt || new Date().toISOString() })]
         ).catch(() => {});
         await addToPantry(buyerId, "fish", sp.id, 1).catch(() => {});
-        await awardXp(buyerId, "sail_fish", { points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold, minted: true }).catch(() => {});
-        await logCoin(buyerId, bonusGold, "fishing", { meta: { species: sp.id, bonus: true } }).catch(() => {});
+        await awardXp(buyerId, "sail_fish", {
+            points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold, minted: true,
+            reason: "fishing", coinMeta: { species: sp.id, bonus: true },
+        }).catch(() => {});
         extras.push({ kind: "fish", label: `${sp.name} — ${size}cm`, gold: bonusGold });
     }
     if (bonusFish.length) await checkFishingBadges(buyerId).catch(() => {});

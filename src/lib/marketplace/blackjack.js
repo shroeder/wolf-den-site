@@ -21,6 +21,7 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests, withCasinoPerk } from "
 // a table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────────────
 // The rules and the maths live in blackjack-kit.js, which knows nothing about gold or the database. This file
@@ -140,6 +141,11 @@ async function settleAll(buyerId, row, dealerCards, hands) {
         });
     }
     if (chips == null) chips = await chipBalance(buyerId);
+    await trackActivity(buyerId, "casino_play", {
+        game: "blackjack", bet: row.stake, wonChips: back,
+        multiple: row.stake ? Number((backGold / row.stake).toFixed(3)) : 0,
+        features: results.map((r) => r.outcome), hands: hands.length,
+    }).catch(() => {});
     // The gold balance is unchanged by a settlement now — the stake left at the deal and nothing comes back in
     // gold — but the screen still shows both numbers in its header, so it is read once and handed along rather
     // than left stale from before the hand.

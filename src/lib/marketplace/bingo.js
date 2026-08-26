@@ -10,6 +10,7 @@ import { maybeGrantCasinoPet } from "@/lib/marketplace/pet-drops.js";
 // Gold in, chips out — see the long note in blackjack.js. The stake is still gold because gold staked is what
 // chips are made of; the payout is chips because chips are what this floor pays.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE BINGO HALL ───────────────────────────────────────────────────────────────────────────────────────────
 // The money half. The rules and the maths are in bingo-kit.js, which knows nothing about gold or chips — same
@@ -108,6 +109,12 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         });
     }
     if (chips == null) chips = await chipBalance(buyerId);
+    await trackActivity(buyerId, "casino_play", {
+        game: "bingo", bet: stake, wonChips: won,
+        multiple: Number((score.mult || 0).toFixed(3)),
+        // The dragon is the feature this game was built around, so its reach is the thing to watch.
+        features: burnt.length ? ["dragon"] : [], lines: score.lines.length, burnt: burnt.length,
+    }).catch(() => {});
 
     // Six lines or more is this game's rarest good thing — about one card in two thousand — so it is what
     // counts as the jackpot for the prize shelf.

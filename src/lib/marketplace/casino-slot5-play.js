@@ -7,6 +7,7 @@ import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL
 import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── PLAYING THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
 // Gold in, chips out, and the gold never comes back. That asymmetry is the whole design (see chips.js), and it
@@ -204,6 +205,20 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, locked: r.locked ? r.locked.total / stake : 0 },
         });
     }
+
+    // WHAT ACTUALLY HAPPENED ON THIS PULL. The features list is the part worth having: a cabinet's tune
+    // is mostly its feature rate, and until now the only way to know one was to read the paytable and
+    // hope. `forced` marks an owner test spin so the report can drop it.
+    const features = [];
+    if (r.free) features.push("free");
+    if (r.locked) features.push("locked");
+    if (r.winAgain) features.push("winagain"); // the row emptying, not r.fired - that field is the CLIENT shape
+    if (r.locked?.spins?.some((sp) => sp.retrigger)) features.push("retrigger");
+    await trackActivity(buyerId, "casino_play", {
+        game: "slot5", machine: m.id, bet: stake,
+        wonChips: won, multiple: Number((r.total / stake).toFixed(3)),
+        features, forced: Boolean(want),
+    }).catch(() => {});
 
     return {
         ok: true,

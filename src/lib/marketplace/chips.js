@@ -198,8 +198,10 @@ export async function moveChips(buyerId, delta, reason, { ref = null, meta = nul
             [buyerId, n, Math.abs(n)])
         : await db.queryOne(`UPDATE mkt_buyer SET chips = chips + $2 WHERE id = $1 RETURNING chips`, [buyerId, n]);
     if (!row) return null;
-    // Best-effort: a ledger write must never break the thing it is recording.
-    db.query(
+    // AWAITED, and still best-effort. Un-awaited it was a fire-and-forget write on Vercel, which tears the
+    // sandbox down the moment the handler returns - the row lands only if the fetch happens to finish
+    // first. The .catch keeps a ledger failure from breaking the move it is recording.
+    await db.query(
         `INSERT INTO mkt_chip_event (buyer_id, delta, balance_after, reason, ref, meta)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [buyerId, n, Number(row.chips), reason, ref, meta ? JSON.stringify(meta) : null]

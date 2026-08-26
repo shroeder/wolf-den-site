@@ -108,7 +108,7 @@ export async function memberHangoutMult(buyerId) {
 // the shop into a gold→XP arbitrage: 27,500 gold bought ~12,000 XP normally and 48,048 XP during a 4x, with no
 // cap or cooldown on how many you could buy back-to-back. The scroll IS the reward; it should not compound with
 // a buff meant for effort.
-export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false, minted = false } = {}) {
+export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false, minted = false, reason = null, coinMeta = null } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
     if (base <= 0) return null;
@@ -210,7 +210,11 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
             // untouched by it, so goldDelta is already the real figure.
             const ptsGot = Number(row.pts_got) || 0;
             ptsApplied = ptsGot;
-            if (goldDelta !== 0) await logCoin(buyerId, goldDelta, "xp_accrual", { meta: { action } }).catch(() => {});
+            // ONE ledger row per credit. `reason` lets a caller book this gold under its own name instead
+            // of xp_accrual; without it a caller that logged separately double-counted the same coins.
+            if (goldDelta !== 0) {
+                await logCoin(buyerId, goldDelta, reason || "xp_accrual", { meta: coinMeta || { action } }).catch(() => {});
+            }
             const newXp = Number(row.xp) || 0;
             const newLevel = levelForXp(newXp).level;
             const oldLevel = levelForXp(newXp - ptsGot).level;

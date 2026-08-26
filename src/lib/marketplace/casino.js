@@ -1078,6 +1078,12 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
             meta: { bet: stake, hits: hits.length, picks: clean, wonGold, rate: CHIP_RATE },
         });
     }
+    await trackActivity(buyerId, "casino_play", {
+        game: "keno", bet: stake, wonChips: won,
+        multiple: Number((pays || 0).toFixed(3)),
+        // How many numbers they picked is the one choice this game gives them, so it is worth keeping.
+        features: [], picks: clean.length, hits: hits.length,
+    }).catch(() => {});
 
     // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
     // Only on a LOSING ticket, only on the stake that actually lost, and only sometimes: REFUND_CHANCE

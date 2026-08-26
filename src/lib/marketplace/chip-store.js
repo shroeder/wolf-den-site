@@ -6,6 +6,7 @@ import {
 } from "@/lib/marketplace/chips.js";
 import { getCasinoPerks, grantCasinoPerk, revokeCasinoPerk } from "@/lib/marketplace/casino-perks.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE COUNTER ──────────────────────────────────────────────────────────────────────────────────────────────
 // Where chips turn into things. This is the half of the casino that decides what a chip is WORTH — the
@@ -100,6 +101,11 @@ export async function buyWithChips(buyerId, itemId) {
     const back = item.kind === "stat" ? { shelf: "stat" }
         : item.kind === "unlock" ? { shelf: "unlock" }
             : { vip: Boolean(item.vip) };
+    // What chips are actually SPENT on. The shelf now sells four different kinds of thing (chests, pets,
+    // permanent stats, feature unlocks) and which of them people buy is the whole question.
+    await trackActivity(buyerId, "casino_buy", {
+        item: item.id, kind: item.kind, ref: item.ref || null, price, vip: Boolean(item.vip),
+    }).catch(() => {});
     return { ok: true, bought: item.id, name: item.name, ...(await chipShelf(buyerId, back)) };
 }
 
