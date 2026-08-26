@@ -418,6 +418,20 @@ export const BADGE_BONUSES = {
     // sits ABOVE the gold ladder at every rung, and the gold ladder is compressed to match what it actually costs.
     big_spender: C(3), whale: C(5, 0, 2), high_roller_badge: C(7, 0, 4), legendary_spend: C(10, 3, 6),
     gold_hoarder: C(2), gilded: C(3), big_baller: C(4, 0, 2), one_percent: C(6, 0, 4),
+    // ── The casino floor → power ──────────────────────────────────────────────────────────────────────────
+    // These eight were the only badges in the game that paid nothing. They pay combat now, deliberately and
+    // not chips: the floor is a sink and a badge that improved the odds would fight it. Scaled UNDER the gold
+    // ladder because `casino_wagered` measures churn rather than wealth — the same purse cycled often enough
+    // reaches two million without the member ever being rich.
+    casino_first_pull: C(1), casino_regular: C(2),
+    casino_high_roller: C(3), casino_whale: C(4, 0, 2),
+    // The three secrets are luck, not grind, so they pay in crit rather than raw Might — a nod to the hit
+    // rather than a wage for the hours.
+    // A NINTH casino badge lives in migration 391 and was missed by the eight above -- found by check:rewards
+    // reading the migrations rather than the list I happened to be looking at.
+    casino_three_wolves: C(1, 3), casino_perfect: C(1, 0, 3), casino_called_it: C(1, 2),
+    // The longest two on the floor: every exclusive pet, and the door behind the rope.
+    casino_the_five: C(4, 2, 2), casino_vip_room: C(2),
     // ── Bounties → power ──
     bounty_poster: C(1), bounty_hunter: C(2), bounty_pro: C(3), bounty_legend: C(5, 3),
     // ── Trading → power / crit ──

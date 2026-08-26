@@ -24,6 +24,7 @@
     "check:seeds": "node scripts/check-seeds.mjs",
     "check:telemetry": "node scripts/check-telemetry.mjs",
     "check:sprite-edges": "node scripts/check-sprite-edges.mjs",
+    "check:rewards": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-rewards.mjs",
     "check:sim": "node scripts/check-sim-drift.mjs",
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",

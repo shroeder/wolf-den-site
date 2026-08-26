@@ -91,13 +91,39 @@ export const PERK_META = {
 const PET_ENSHRINED_LEVEL = 6;
 
 export const PET_PERKS = {
+    // ── THE CASINO'S FIVE ─────────────────────────────────────────────────────────────────────────────────
+    // These had no entry, so petPerk() handed all five the "Companion" fallback and three of them the same
+    // `fortune` key — the rarest pets on the floor, sharing one generic ability between them.
+    //
+    // Every key here was picked from the pairs NOT already taken at that pet's rarity, so none of them is a
+    // numeric duplicate of a pet that already exists. That check is the whole lesson from Sable's three.
+    copper_paw: { name: "Copper Luck", key: "gold_find" },
+    // Third key tried, and the first two failures are the lesson: town_haggle at epic was already exactly the
+    // Flamingo, and second_wind pays 1 at EVERY rarity so it twinned the Field Mouse the moment it was set.
+    // A flat key can never be made unique by rarity. Checked by brute force against the real resolver in the
+    // end, not against petPerkValue, which does not account for the clamping petPerk applies.
+    tallyman: { name: "Keeps the Book", key: "pack_visit" },
+    gilded_magpie: { name: "Magpie's Take", key: "chest_luck" },
+    // NOT extra_strike, however well the name fits: that key pays 1 at every single rarity, so every pet
+    // carrying it is a numeric twin of every other and no rarity can make it unique. crit_chance is free at
+    // legendary and is the same idea by another route -- the deal goes your way.
+    croupiers_cat: { name: "Deals You One More", key: "crit_chance" },
+    night_auditor: { name: "Counts What You Are Owed", key: "fortune" },
+
     // ── SABLE'S THREE ─────────────────────────────────────────────────────────────────────────────────────
     // The VIP lounge's own pets. Named for what the lounge is: money that finds you, luck you did not earn,
     // and somebody at the end of the bar who notices everything. Keys chosen to match each one's activeStat
     // so the shelf card and the perk agree — a pet advertised as "gold find" whose ability was about crits
     // would be a third version of the same bug.
-    house_ferret: { name: "Under the Floorboards", key: "gold_find" },
-    velvet_lynx: { name: "Never Asked to Leave", key: "fortune" },
+    // gold_find made it an exact copy of the Stormcrow -- same key, same base, same ceiling -- because the
+    // value comes from petPerkValue(rarity, key) and epic gold_find was already spoken for. chest_luck is
+    // free at epic and is nearer the point anyway: a ferret that knows which floorboard the chips roll under
+    // is not earning wages, it is finding things.
+    house_ferret: { name: "Under the Floorboards", key: "chest_luck" },
+    // fortune at legendary was already BOTH the Unicorn and the Spirit Fox, so this was the third copy of one
+    // number. town_haggle is free and is what never being asked to leave actually buys you: everyone gives
+    // you the better price.
+    velvet_lynx: { name: "Never Asked to Leave", key: "town_haggle" },
     midnight_crane: { name: "Misses Nothing", key: "xp_gain" },
 
 
