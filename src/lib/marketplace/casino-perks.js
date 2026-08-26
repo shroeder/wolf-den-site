@@ -105,6 +105,18 @@ export const UNLOCKS = [
         blurb: "Unlocks a new tier of recipes in your kitchen, above anything it can cook today." },
     { perk: "road_long", art: "/images/casino/perks/road.webp", price: 100000, name: "The Long Road",
         blurb: "Unlocks a new stretch of the Road, and the houses waiting further up it." },
+    // ── THE SECOND WAY PAST THE ROPE ─────────────────────────────────────────────────────────────────
+    // Luke: "if you have the VIP role, meaning you spent a bunch of money in real life, then you get in.
+    // Otherwise there should be a second way to get in, which is to pay one million chips."
+    //
+    // A PASS IS NOT THE ROLE, and the distinction is the whole design. The role is what a member spent real
+    // money to reach and it means that and only that — putting it behind a chip price would quietly rewrite
+    // what every VIP badge in the game stands for. The pass opens one door.
+    //
+    // A million chips, which is deliberately the largest price on any shelf: at the Counter's own ladder it
+    // sits above the Celestial chest and below the Primordial. The rope should still mean something.
+    { perk: "vip_pass", art: "/images/casino/perks/vip-pass.webp", price: 1000000, name: "A Pass Behind the Rope",
+        blurb: "The bouncer knows this card. It opens the lounge and it does not make you a VIP." },
 ];
 
 export const unlockByPerk = (perk) => UNLOCKS.find((u) => u.perk === perk) || null;

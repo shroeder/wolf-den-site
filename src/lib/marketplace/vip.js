@@ -5,6 +5,7 @@ import { standingFor } from "@/lib/marketplace/roles.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { checkText } from "@/lib/marketplace/text-filter.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
 // ── THE VIP LOUNGE ───────────────────────────────────────────────────────────────────────────────────────────
 // A room behind a rope at the near end of the casino floor. Luke described it in one long breath: a barrier
@@ -40,14 +41,20 @@ export const VIP_ZONE = "casino_vip";
  * "forever" means reading other members' messages after losing the standing that let you in.
  */
 export async function vipStanding(buyerId) {
-    if (!buyerId) return { vip: false, roles: [], spentCents: 0 };
+    if (!buyerId) return { vip: false, byRole: false, byPass: false, roles: [], spentCents: 0 };
     const standing = await standingFor(buyerId).catch(() => null);
     const roles = standing?.roles || [];
     // The same three keys `channelsFor` opens the vip channel to, and deliberately the same list rather than a
     // second opinion about who counts: the room and its chat disagreeing about who belongs would be the worst
     // possible bug here — somebody standing in a room they cannot hear, or hearing a room they cannot enter.
-    const vip = roles.some((r) => r.key === "vip" || r.key === "staff" || r.key === "owner");
-    return { vip, roles, spentCents: standing?.spentCents || 0 };
+    const byRole = roles.some((r) => r.key === "vip" || r.key === "staff" || r.key === "owner");
+    // ── AND THE SECOND WAY IN ────────────────────────────────────────────────────────────────────────
+    // A million chips at the Counter buys a pass. It opens the door and it is NOT the role: the role means
+    // real money spent and nothing else, and selling it for chips would rewrite what every VIP badge in the
+    // game stands for. `byRole` and `byPass` are kept apart so anything that wants to ask "is this a real
+    // VIP" still can — the room only asks whether you may come in.
+    const byPass = byRole ? false : await hasUnlock(buyerId, "vip_pass").catch(() => false);
+    return { vip: byRole || byPass, byRole, byPass, roles, spentCents: standing?.spentCents || 0 };
 }
 
 // ── WHAT THE BARTENDER TALKS ABOUT ───────────────────────────────────────────────────────────────────────────

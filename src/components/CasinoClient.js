@@ -1535,7 +1535,15 @@ export default function CasinoClient({ initial }) {
                         // the rope in front of you rather than a label on a distant arch.
                         if (st?.vip?.allowed) { setX(VIP_X); enterVip(); return; }
                         if (!vipNear) { setX(VIP_X); return; }
-                        setErr("Members only. The rope stays where it is.");
+                        // ── A ROPE CANNOT REFUSE YOU. A DOORMAN CAN. ─────────────────────────────
+                        // Luke: "there should be a bouncer in front of the door." The old line was
+                        // "Members only. The rope stays where it is." — furniture stating a rule, and it
+                        // told you nothing about what to do next.
+                        //
+                        // He names BOTH ways past him, because there are two and one of them is buyable:
+                        // the role is real money spent, and the pass is a million chips at the Counter. A
+                        // door that only says no is a dead end; this one is a price.
+                        setErr("The doorman does not move. \u201cMembers, or a pass. The Counter sells one \u2014 a million chips.\u201d");
                     }}>
                     {/* Inside the arch. The people are real \u2014 their own avatars, at their own positions in
                         the lounge \u2014 pushed back with a dark wash and a little scale so they read as being
@@ -1557,7 +1565,13 @@ export default function CasinoClient({ initial }) {
                     <img className="cas-vipsign" src="/images/casino/vip-sign.webp" alt="" draggable="false" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="cas-viprope" src="/images/casino/decor_rope.webp" alt="" draggable="false" />
-                    <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members only") : "The Lounge"}</b>
+                    {/* ── THE DOORMAN ─────────────────────────────────────────────────────────────────
+                        In FRONT of the rope and the arch, because he is the rule rather than a decoration
+                        on it. He steps aside once you are allowed in — see .cas-vipdoor.is-open — which is
+                        the whole of the animation and the only feedback the door needs to give. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="cas-bouncer" src="/images/casino/vip-bouncer.webp" alt="" draggable="false" />
+                    <b>{vipNear ? (st?.vip?.allowed ? "Go in" : "Members, or a pass") : "The Lounge"}</b>
                 </button>
 
                 {MACHINES.map((m) => (

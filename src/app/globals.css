@@ -22655,6 +22655,20 @@ body.cas-seated .social-fab { display: none; }
     filter: drop-shadow(0 0 14px rgba(255,190,90,.55)) drop-shadow(0 4px 8px rgba(0,0,0,.7)); }
 /* And the rope across the front. The floor's own decoration — it was already drawn, and a barrier is
    exactly what it is for. */
+/* ── THE DOORMAN ──────────────────────────────────────────────────────────────────────────────────────
+   He stands in front of the arch and the rope, at the near edge, sized off --room like every other object
+   on this floor so the whole scene scales together. Not a button: the whole door already is one, and a
+   second hit area inside it would let a tap land on the man and do nothing.
+
+   ON ENTRY HE STEPS ASIDE rather than vanishing — a doorman who disappears reads as a bug, and one who
+   moves reads as a decision. That slide is the only thing the open state animates. */
+.cas-bouncer { position: absolute; left: 4%; bottom: 0; z-index: 3; pointer-events: none;
+    width: calc(var(--room) * 0.30); height: auto; object-fit: contain;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55));
+    transition: transform 420ms cubic-bezier(.3,1,.4,1), opacity 420ms ease; }
+.cas-vipdoor.is-open .cas-bouncer { transform: translateX(-42%) scale(0.96); opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) { .cas-bouncer { transition: none; } }
+
 .cas-viprope { position: absolute; z-index: 4; left: 50%; bottom: -6%; width: 106%; height: auto;
     transform: translateX(-50%); display: block;
     filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
