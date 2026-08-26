@@ -114,7 +114,6 @@ export default function GameNav() {
     const [kitchen, setKitchen] = useState(false);
     // DISHES you could cook right now. Prep recipes are excluded on purpose: a prep makes an ingredient for
     // something else, so badging it would nag you toward busywork rather than toward the thing that pays.
-    const [dishesReady, setDishesReady] = useState(0);
     // The Mine is owner-gated while it's being built. Same contract as the Kitchen: ask the server, never guess,
     // and a non-owner simply has no Mine in the menu with nothing to see.
     const [mine, setMine] = useState(false);
@@ -152,17 +151,8 @@ export default function GameNav() {
     }, [pathname]);
 
     // The Market is PUBLIC, so unlike the Arena and the Mine its menu entry does not wait on a round trip —
-    // it rides `signedIn` like Town and Fishing. This fetch is only for the badge, and a failure just means
-    // no badge rather than no Market.
-    const [marketStalls, setMarketStalls] = useState(0);
-    useEffect(() => {
-        let dead = false;
-        fetch("/api/marketplace/market", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) setMarketStalls((d?.listings || []).filter((l) => !l.mine).length); })
-            .catch(() => { /* no badge, the entry is still there */ });
-        return () => { dead = true; };
-    }, [pathname]);
+    // THE MARKET FETCH IS GONE with the Market badge (see the note in badgeFor). It existed only to count
+    // other people's open stalls, and it cost a request on every navigation to do it.
 
     // The Jewelcutter, same contract as everything else under construction: ask the server, never guess. The
     // endpoint answers { unlocked: false } for anyone off the allow-list, so a non-owner simply has no bench in
@@ -213,12 +203,9 @@ export default function GameNav() {
                 if (dead) return;
                 if (d?.unlocked) {
                     setKitchen(true);
-                    // This response is the whole kitchen already — the badge count rides along for free rather
-                    // than costing a second request. Only DISHES you can actually make right now: a badge you
-                    // can't act on is the kind people learn to ignore. The old "and only if you have a cook
-                    // left today" half of that test is gone with the daily cap — having the ingredients IS the
-                    // whole condition now.
-                    setDishesReady((d.recipes || []).filter((x) => x.kind === "dish" && x.canCook).length);
+                    // The dish count that used to ride along here is gone: the Kitchen pill counts claimable
+                    // QUESTS now, not cookable dishes (see badgeFor). This response is still what tells the
+                    // menu the Kitchen exists at all.
                     return;
                 }
                 // A negative on the first go is retried once — the common cause is the session cookie not being
@@ -402,12 +389,21 @@ export default function GameNav() {
         if (href === "/marketplace/arena" && arenaFights > 0) return { badge: arenaFights, title: `${plural(arenaFights, "challenge")} left today` };
         if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
-        // The Kitchen only nags you about DISHES you have every ingredient for — preps just make ingredients
-        // for other recipes, and badging those would point you at the chore instead of the payoff.
-        // (not plural() — that would say "dishs")
-        if (href === "/marketplace/cooking" && dishesReady > 0) return { badge: dishesReady, title: `${dishesReady} dish${dishesReady === 1 ? "" : "es"} you can cook` };
-        // OTHER PEOPLE'S stalls only. Badging your own would nag you about something you did on purpose.
-        if (href === "/marketplace/market" && marketStalls > 0) return { badge: marketStalls, title: `${plural(marketStalls, "stall")} open in the market` };
+        // ── THE KITCHEN BADGES QUESTS, NOT COOKABLE DISHES ───────────────────────────────────────────
+        // It used to count every dish you had the ingredients for, which on a stocked farm is most of the
+        // book — the pill sat at ten and stayed there. A number that is always on is not a notification, it
+        // is decoration, and it trains you to stop reading every other pill in this menu.
+        //
+        // Luke: "only on cooking if we have quests to turn in." A claimable daily is something you finish by
+        // tapping it, and it goes away when you do. Same rule the Forge pill already follows.
+        if (href === "/marketplace/cooking" && (featureClaims.cooking || 0) > 0) {
+            return { badge: featureClaims.cooking, title: `${plural(featureClaims.cooking, "quest")} to claim` };
+        }
+        // ── AND THE MARKET DOES NOT BADGE AT ALL ─────────────────────────────────────────────────────
+        // It counted other people's open stalls, which is not something waiting on YOU — it is just how busy
+        // the market happens to be, and it read 17 while you had nothing to do there. Luke: "lets not showing
+        // badges on the market." Every other pill in this function counts something you can act on today;
+        // this one never could, so it is gone rather than retuned.
         return { badge: null, title: null };
     };
     const dotFor = (href) => href === "/marketplace/sailing" && sailAttn;

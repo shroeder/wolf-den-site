@@ -12,6 +12,7 @@ import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
+import ConsumableShelf from "@/components/ConsumableShelf";
 import CollectionPanel from "@/components/CollectionPanel";
 import TrophyRoom from "@/components/TrophyRoom";
 import Leaderboard from "@/components/Leaderboard";
@@ -1398,6 +1399,20 @@ export default function FarmClient({ initial, viewingAlias }) {
                             entire job is "what is there to do right now". Going to see somebody is the thing
                             you do AFTER you have looked at your own list, not before. */}
                         <FeatureDailies feature="farm" refreshKey={bountyTick} />
+                        {/* ── WHAT IS IN THE SHED ──────────────────────────────────────────────────
+                            Growth Tonics, Harvest Charms, fertilizer, seed packs, whistles — all spent on
+                            the farm above, and all of them used to live on a stash screen inside the store.
+                            Kaishiern asked for the shelf; Luke asked for it to sit above the neighbours,
+                            because things you can spend now outrank going to look at somebody else's farm.
+
+                            Only on YOUR farm — this whole block is behind `farm.mine` — since on somebody
+                            else's it would be offering to spend your things on their crops.
+
+                            A HARD RELOAD after a use, and deliberately. This component seeds every one of
+                            its useState calls from `initial`, so new server data does not reach it, and a
+                            Growth Tonic that takes 60% off your slowest crop has to move the timer you are
+                            looking at or it reads as having done nothing. */}
+                        <ConsumableShelf feature="farm" title="In your shed" reloadOnUse />
                         <NeighbourStrip
                             neighbours={farm.neighbours}
                             ratesLeft={farm.rating?.charge?.left ?? 0}
