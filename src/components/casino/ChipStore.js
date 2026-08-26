@@ -20,8 +20,23 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
     const [said, setSaid] = useState(null);
     // The thing being inspected, or null.
     const [open, setOpen] = useState(null);
+    // ── WHICH COUNTER ───────────────────────────────────────────────────────────────
+    // Chests are things you use up, the tracks are things you keep, and the doors are things that change
+    // what the rest of the game contains. Three tabs rather than one long shelf, because those are three
+    // different decisions and a member scrolling past a 100,000-chip door to find a 10,500-chip chest is
+    // being asked to compare things that have nothing to do with each other.
+    const [tab, setTab] = useState("chest");
 
-    useEffect(() => { onRefresh().then(setShelf).catch(() => setShelf({ items: [] })); }, [onRefresh]);
+    // Refetched per tab. The server prices a stat track from the level the member holds RIGHT NOW, so a
+    // shelf cached across a purchase would quote the old price — see basePriceFor.
+    useEffect(() => {
+        let live = true;
+        setShelf(null);
+        onRefresh(tab === "chest" ? null : tab)
+            .then((r) => { if (live) setShelf(r); })
+            .catch(() => { if (live) setShelf({ items: [] }); });
+        return () => { live = false; };
+    }, [onRefresh, tab]);
 
     const buy = useCallback(async (item) => {
         if (busy || item.owned || !item.afford) return;
@@ -30,6 +45,8 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
         const r = await onBuy(item.id);
         setBusy(null);
         if (r?.ok) {
+            // The server hands back the shelf the item came off, already repriced — a stat track that has
+            // just gone up a level costs 250 more than it did a moment ago.
             setShelf(r);
             setOpen(null);
             setSaid({ good: true, text: `${r.name} is yours.` });
@@ -51,6 +68,16 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                 <i>chips</i>
             </div>
             <p className="cs-intro">Won at the machines. Good here and nowhere else.</p>
+
+            <div className="cs-tabs" role="tablist">
+                {[["chest", "Chests"], ["stat", "Training"], ["unlock", "The Doors"]].map(([id, label]) => (
+                    <button key={id} type="button" role="tab" aria-selected={tab === id}
+                        className={`cs-tab${tab === id ? " is-on" : ""}`}
+                        onClick={() => { if (tab === id) return; unlock(); Cas.chips(); Haptic.hit(0.2); setSaid(null); setTab(id); }}>
+                        {label}
+                    </button>
+                ))}
+            </div>
 
             {said ? <p className={`cs-said${said.good ? " is-good" : ""}`}>{said.text}</p> : null}
 
@@ -77,6 +104,18 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                         <span className="cs-what">
                             <b>{item.name}</b>
                             <span>{item.blurb}</span>
+                            {/* A TRACK HAS NO END, so what it shows is where you ARE on it rather than a
+                                progress bar with nothing to fill. "Level 7 · +14 might" is the whole state:
+                                what you have bought, and what it is worth. */}
+                            {item.kind === "stat" ? (
+                                <i className="cs-lvl">
+                                    {item.level > 0
+                                        ? `Level ${item.level} · +${item.level * item.per} ${item.stat}`
+                                        : "Not started"}
+                                    {" → "}
+                                    <b>+{(item.level + 1) * item.per}</b>
+                                </i>
+                            ) : null}
                         </span>
                         {/* ── THE PRICE IS A NUMBER AND A CHIP ────────────────────────────────────
                             It used to print the GOLD behind every price on a second line — "14,000 gold
@@ -147,6 +186,7 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
                             {open.owned ? "You already have this"
                                 : !open.afford ? `${(open.price - (chips ?? shelf.balance ?? 0)).toLocaleString()} more chips needed`
                                 : busy === open.id ? "…"
+                                : open.kind === "stat" ? `Train — ${open.price.toLocaleString()} chips`
                                 : `Take it — ${open.price.toLocaleString()} chips`}
                         </button>
                     </div>

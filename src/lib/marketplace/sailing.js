@@ -1067,7 +1067,7 @@ function boardView(board) {
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
 // `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
 // function is synchronous on purpose.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = []) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = [], baitCookable = [], deepFish = false) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1238,7 +1238,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // The bait shelf rides with the fishing view, because the picker that spends one has to list what you
         // are carrying — and each entry carries its own tilt, so the number shown is the number applied.
         fishing: fishingUnlocked(buyerId || row?.buyer_id)
-            ? { ...fishingView(row, angling, status), baits, baitCookable }
+            ? { ...fishingView(row, angling, status, deepFish), baits, baitCookable }
             : null,
     };
 }
@@ -1691,6 +1691,8 @@ export async function getSailingState(buyerId, skyKey = null) {
     // ── AND WHAT YOU COULD MAKE WITHOUT LEAVING THE RAIL ─────────────────────────────────────────────────
     // An empty bait box and a pantry full of what bait is made of used to mean a trip to the Kitchen and back.
     // Same lazy import and the same reason as the shelf above it.
+    // One primary-key read; the compendium below is built from it.
+    const deepFish = await hasUnlock(buyerId, "fish_deep").catch(() => false);
     const baitCookable = await import("@/lib/marketplace/cooking.js")
         .then((m) => m.cookableNow(buyerId, new Set(["bait"])))
         .catch(() => []);
@@ -1702,7 +1704,7 @@ export async function getSailingState(buyerId, skyKey = null) {
         `SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]
     ).catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop, baits, baitCookable), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits, baitCookable, deepFish), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         hero: { art: heroRow?.avatar_sprite_url || null, flip: heroRow?.avatar_sprite_flip === true },
         // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
         chestsHeld: (() => {
@@ -2021,6 +2023,7 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {

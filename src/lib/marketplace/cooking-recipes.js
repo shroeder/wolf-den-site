@@ -131,4 +131,37 @@ export const RECIPES = [
     R("r_wolfs_table", "The Wolf's Table",   5, { p_smoked: 2, p_roe: 1, p_syrup: 1, goldenapple: 2 }, "The one the whole den turns up for."),
 ];
 
-export const recipeById = (id) => RECIPES.find((r) => r.id === id) || null;
+// ── THE MASTER'S BOOK · TIER 6 ─────────────────────────────────────────────────────
+// Eight pages that do not exist for anybody who has not bought the book (25,000 chips, at the Counter).
+//
+// SEPARATE FROM `RECIPES`, for the same reason the deep fish are separate from `FISH`: that list is the
+// denominator. It drives "you know 41 of 68", the per-tier split on the kitchen screen and the shop's
+// "nothing left to teach" check. Eight pages nobody can reach would sit in everybody's book as a permanent
+// gap with no way to fill it.
+//
+// AND NOTHING TEACHES THEM. Every source that hands out a recipe is bounded by RECIPE_BANDS, and the widest
+// band tops out at tier 5 — so there is no chest, seam, dig, cast, wheel, raid or boss that can produce one
+// of these by accident. Buying the book IS how you learn them, all eight at once. That is deliberate: at
+// 25,000 chips a drip-feed would be a second grind on top of the one already paid for.
+//
+// INGREDIENTS ARE ALL REACHABLE WITHOUT THE OTHER UNLOCKS. Tempting as it was to build these on the Deep
+// Water species, a member can own this book and not the charts, and a recipe you can never cook is worse
+// than no recipe at all.
+export const MASTER_RECIPES = [
+    P("k_ash",      "Bank the Ember Ash",   6, { p_chilli: 2, p_essence: 1 },                    "p_emberash",  "It has to go grey before it is any use."),
+    P("k_gilding",  "Beat the Gold Leaf",   6, { goldenapple: 4, p_syrup: 1 },                   "p_goldleaf",  "Thin enough to read through."),
+    R("r_ash_course",  "Ember Ash Course",     6, { p_emberash: 1, p_leviathan: 1, p_roe: 2 },       "Served on the coals it was cooked in."),
+    R("r_gilded_wolf", "The Gilded Wolf",      6, { p_goldleaf: 2, p_smoked: 3, p_wine: 2 },         "Nobody eats the first bite. They look at it."),
+    R("r_nine_seas",   "Nine Seas Service",    6, { fish_kraken: 1, fish_whale: 1, fish_narwhal: 1, p_brine: 3 }, "One course for every water anyone has charted."),
+    R("r_last_harvest","The Last Harvest",     6, { starfruit: 3, p_essence: 2, p_puree: 2, p_jam: 2 }, "Everything the year gave, on one board."),
+    R("r_masters_own", "The Master's Own",     6, { p_emberash: 1, p_goldleaf: 1, p_essence: 2, p_leviathan: 1 }, "The dish the book is named for."),
+    R("r_long_night",  "Feast of the Long Night", 6, { p_goldleaf: 1, p_wine: 3, p_syrup: 2, pumpkin: 4 }, "It is meant to take all night. That is the point."),
+];
+
+const BOOK = [...RECIPES, ...MASTER_RECIPES];
+// Resolves BOTH books. A member who owns a master page has it in mkt_recipe_known and needs it to render,
+// and a page nobody can cook is not protected by refusing to name it.
+export const recipeById = (id) => BOOK.find((r) => r.id === id) || null;
+
+/** The book this member can read. Owners see tier 6; nobody else can tell it exists. */
+export const recipeBookFor = (master) => (master ? BOOK : RECIPES);

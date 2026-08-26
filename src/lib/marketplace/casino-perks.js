@@ -28,13 +28,13 @@ import { db } from "@/lib/db";
 // CRITS"), which is the right one: the four are linear and always useful, and the crits multiply everything
 // else, so an infinite track on one of those compounds against every other source in the game.
 export const STAT_TRACKS = [
-    { perk: "might", stat: "might", name: "Whetstone", per: 2,
+    { perk: "might", stat: "might", art: "/images/casino/perks/whetstone.png", name: "Whetstone", per: 2,
         blurb: "Multiplies your weapon's damage. The whole of what you hit for." },
-    { perk: "vitality", stat: "vitality", name: "Constitution", per: 2,
+    { perk: "vitality", stat: "vitality", art: "/images/casino/perks/constitution.png", name: "Constitution", per: 2,
         blurb: "How much punishment you can take before somebody takes it off you." },
-    { perk: "tenacity", stat: "tenacity", name: "Bulwark", per: 2,
+    { perk: "tenacity", stat: "tenacity", art: "/images/casino/perks/bulwark.png", name: "Bulwark", per: 2,
         blurb: "Multiplies the armour you are wearing. 500 tenacity doubles it." },
-    { perk: "ferocity", stat: "ferocity", name: "Bloodrush", per: 2,
+    { perk: "ferocity", stat: "ferocity", art: "/images/casino/perks/bloodrush.png", name: "Bloodrush", per: 2,
         blurb: "Chance to take another turn immediately. One percent for every five points." },
 ];
 
@@ -53,13 +53,13 @@ export const statCost = (level = 0) => STAT_STEP * (Math.max(0, Math.floor(level
 // ── THE FIVE DOORS ───────────────────────────────────────────────────────────────────────────────────────────
 // One-off, and each one opens a body of content that does not exist for anybody who has not bought it.
 export const UNLOCKS = [
-    { perk: "wheel_gold", price: 20000, name: "The Golden Wheel",
+    { perk: "wheel_gold", art: "/images/casino/perks/wheel-gold.png", price: 20000, name: "The Golden Wheel",
         blurb: "The daily wheel, recut. Nothing on it is small." },
-    { perk: "fish_deep", price: 15000, name: "The Deep Water Charts",
+    { perk: "fish_deep", art: "/images/casino/perks/charts.png", price: 15000, name: "The Deep Water Charts",
         blurb: "Six fish that are not in any water you can currently reach." },
-    { perk: "recipe_master", price: 25000, name: "The Master's Book",
+    { perk: "recipe_master", art: "/images/casino/perks/book.png", price: 25000, name: "The Master's Book",
         blurb: "A tier of recipes above anything the kitchen has now." },
-    { perk: "road_long", price: 100000, name: "The Long Road",
+    { perk: "road_long", art: "/images/casino/perks/road.png", price: 100000, name: "The Long Road",
         blurb: "A hundred more rungs, and ten houses nobody has fought." },
 ];
 

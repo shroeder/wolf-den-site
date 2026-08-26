@@ -86,6 +86,75 @@ const HOUSES = [
         who: ["The First Champion", "The Undefeated", "The One Who Waited", "The Den's Own", "The Old Wolf",
             "The Long Winter", "The Last Word", "The Pack Entire", "THE ALPHA", "THE WOLF DEN ITSELF"],
     },
+    // ═══ THE LONG ROAD · RUNGS 101-200 ════════════════════════════════════════════════
+    // Ten houses that do not exist for anybody who has not bought The Long Road (100,000 chips, at the
+    // Counter). They are IN this array rather than a separate one — unlike the deep fish and the master
+    // recipes — because a rung is DERIVED from its number, and splitting the list would mean two versions of
+    // ladderFoe(). The gate is on the SIZE instead: ladderSize() decides how much of this road a member can
+    // see or walk, and every function that resolves a rung takes it. See the note on LADDER_SIZE.
+    //
+    // The first ten houses climb from a tavern yard to a throne room. These ten leave the world: the Crown is
+    // the last house with a door on it, and everything past rung 100 is what was on the other side.
+    {
+        key: "gate", name: "The Gate", blurb: "Something has been keeping this shut from the far side.",
+        tint: "#8fd0ff",
+        who: ["The Doorward", "Hinge", "Lintel", "The Turnkey's Widow", "What Leans On It",
+            "Sill", "The Second Bolt", "Keeper of the Latch", "The Long Hinge", "THE GATE ITSELF"],
+    },
+    {
+        key: "waste", name: "The Waste", blurb: "Nothing grows. Things still live.",
+        tint: "#c2a06a",
+        who: ["Saltwalker Ib", "The Thirst", "Glassfoot", "Nine Days Out", "The Cairn-Builder",
+            "Rust Mother", "What The Wind Left", "The Last Well", "Sanddrinker", "THE WASTE ENTIRE"],
+    },
+    {
+        key: "choir", name: "The Choir", blurb: "They are certain, and they are armed.",
+        tint: "#ffd98a",
+        who: ["Novice Ansel", "The Second Verse", "Censer-Bearer Ott", "She Who Holds The Note", "The Descant",
+            "Bell-Ringer Var", "The Silent Brother", "Cantor Imre", "The Hundredth Psalm", "THE CHOIRMASTER"],
+    },
+    {
+        key: "vault", name: "The Vault", blurb: "Somebody sealed these in on purpose.",
+        tint: "#9fb3c8",
+        who: ["Exhibit Four", "The Mislabelled", "What The Ledger Skips", "Case Nineteen", "The Quiet Room",
+            "Specimen Ninety", "The Curator's Regret", "Held Pending Review", "The Bottom Shelf", "THE ACCESSION"],
+    },
+    {
+        key: "storm", name: "The Storm", blurb: "Weather that came looking for you.",
+        tint: "#6bb8ff",
+        who: ["Squall", "The Barometer", "Nine-Mile Wind", "The Eye", "Hailbringer",
+            "What Rides The Front", "The Standing Wave", "Thunderhead", "The Last Dry Thing", "THE WHOLE SKY"],
+    },
+    {
+        key: "hollow", name: "The Hollow", blurb: "It is not that they want something. They are the wanting.",
+        tint: "#7d6a9c",
+        who: ["The Ache", "Second Helping", "What Was Left Of Rill", "The Open Mouth", "Never Enough",
+            "The Guest", "Hollow Cousin", "It Remembers Being Fed", "The Long Fast", "THE HUNGER ITSELF"],
+    },
+    {
+        key: "orrery", name: "The Orrery", blurb: "Machinery that was told to keep going.",
+        tint: "#b08aff",
+        who: ["Escapement", "The Third Gear", "Counterweight", "Mainspring Nine", "The Wound Thing",
+            "Detent", "What Still Ticks", "The Broken Tooth", "The Last Revolution", "THE GREAT WHEEL"],
+    },
+    {
+        key: "dark", name: "The Long Dark", blurb: "The distance between everything.",
+        tint: "#4a5570",
+        who: ["Parallax", "The Cold Between", "What Never Arrived", "Drift", "The Far Side Of It",
+            "Umbra", "The Unlit Mile", "Nothing In Particular", "The Long Fall", "THE DARK ENTIRE"],
+    },
+    {
+        key: "first", name: "The First", blurb: "They were here before the road was.",
+        tint: "#5ddc9a",
+        who: ["The Older Name", "What The Stone Copied", "Before The Yard", "The Original Wound", "Root Of It",
+            "The Elder Shape", "It Taught Us Fighting", "The First Grudge", "Oldest Standing", "THE FIRST OF ALL"],
+    },
+    {
+        key: "sun", name: "The Sun", blurb: "The end of the road, and it is bright.",
+        tint: "#ffe9b0",
+        who: ["Corona", "The Near Light", "What Casts No Shadow", "Noon Absolute", "The White Hour",
+            "Unblinking", "The Last Warmth", "It Does Not Set", "The Final Degree", "THE SUN ITSELF"],
+    },
 ];
 
 // ── THE CURVE ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -124,7 +193,22 @@ const HOUSES = [
 //
 // At 1.39% a rung, about 3% more gear is worth a rung: one upgraded piece moves you one or two fighters, every
 // time. Never nothing, never twenty. Crossing the back seventy is a year of upgrading, which is the intent.
+// ── HOW MUCH ROAD THERE IS ─────────────────────────────────────────────────────────
+// LADDER_SIZE is what EVERYBODY can walk. LADDER_MAX is what exists. The hundred rungs between them are The
+// Long Road, bought once for 100,000 chips, and until it is bought they are not merely hidden — they do not
+// resolve. Luke: "ensure it's hidden until unlock and doesn't allow anyone to get past 100 until it's
+// unlocked."
+//
+// TWO CONSTANTS RATHER THAN A FLAG, because the curve has to keep running past 100 for rungs 101-200 to have
+// sensible power at all: powerAt and ladderDr clamp to LADDER_MAX so the maths is continuous, and the GATE
+// lives in ladderSize() — the one function every caller asks how far this member may go. A ceiling enforced
+// in the maths would have made rung 101 a copy of rung 100; a ceiling enforced in the UI would have been no
+// ceiling at all.
 export const LADDER_SIZE = 100;
+export const LADDER_MAX = 200;
+
+/** How far THIS member's road runs. The single gate — see the note above. */
+export const ladderSize = (long = false) => (long ? LADDER_MAX : LADDER_SIZE);
 const FLOOR = 30;
 const KNEE = 30;         // where the newcomer's ramp hands over to the long haul
 const RAMP = 1.109;      // per-rung growth below the knee
@@ -143,14 +227,15 @@ const TAIL = 1.0139;     // per-rung growth above it — the number that decides
 // rising with the house — printed on their card like anyone's, so it is a number you can plan against rather
 // than a mystery in the damage.
 export const ladderDr = (rung) => {
-    const house = Math.floor((Math.max(1, Math.min(LADDER_SIZE, Math.round(rung))) - 1) / 10);
-    return Math.round((0.04 + house * 0.028) * 1000) / 1000;   // 4% in the Yard, 29% at the end
+    const house = Math.floor((Math.max(1, Math.min(LADDER_MAX, Math.round(rung))) - 1) / 10);
+    // 4% in the Yard, 29% at the Crown, and on up to 57% at the Sun.
+    return Math.round((0.04 + house * 0.028) * 1000) / 1000;
 };
 
 // One rate below the knee, another above it, and nothing else — no house step, no champion multiplier. Two
 // neighbouring rungs are always the same distance apart in percentage terms, which is the whole point.
 const powerAt = (rung) => {
-    const r = Math.max(1, Math.min(LADDER_SIZE, Math.round(rung)));
+    const r = Math.max(1, Math.min(LADDER_MAX, Math.round(rung)));
     const ramp = Math.pow(RAMP, Math.min(r, KNEE) - 1);
     const tail = Math.pow(TAIL, Math.max(0, r - KNEE));
     return Math.round(FLOOR * ramp * tail);
@@ -168,9 +253,12 @@ const isChampion = (rung) => rung % 10 === 0;
  */
 export function ladderReward(rung) {
     const laurels = Math.round(60 * Math.pow(1.055, rung - 1));
-    if (rung === LADDER_SIZE) return { laurels, chest: "primordial", label: `${laurels} laurels + a Primordial chest` };
+    // BOTH summits pay a Primordial. Rung 100 keeps the one it always paid — moving it to 200 would take
+    // something away from everyone who has already earned it — and rung 200 is worth no less.
+    if (rung === LADDER_SIZE || rung === LADDER_MAX) return { laurels, chest: "primordial", label: `${laurels} laurels + a Primordial chest` };
     if (isChampion(rung)) {
-        const chest = rung >= 80 ? "mythic" : rung >= 50 ? "gold" : rung >= 20 ? "iron" : "wooden";
+        const chest = rung >= 170 ? "celestial" : rung >= 140 ? "eternal" : rung >= 110 ? "ascendant"
+            : rung >= 80 ? "mythic" : rung >= 50 ? "gold" : rung >= 20 ? "iron" : "wooden";
         return { laurels, chest, label: `${laurels} laurels + a ${chest[0].toUpperCase()}${chest.slice(1)} chest` };
     }
     return { laurels, label: `${laurels} laurels` };
@@ -178,7 +266,7 @@ export function ladderReward(rung) {
 
 /** One rung, fully resolved. `rung` is 1-based and matches the id, so nothing has to be looked up twice. */
 export function ladderFoe(rung) {
-    const n = Math.max(1, Math.min(LADDER_SIZE, Math.round(rung)));
+    const n = Math.max(1, Math.min(LADDER_MAX, Math.round(rung)));
     const house = HOUSES[Math.floor((n - 1) / 10)];
     const within = ((n - 1) % 10);
     const champion = isChampion(n);
@@ -238,9 +326,17 @@ export function ladderFoe(rung) {
 }
 
 /** The whole ladder, for the screen. Cheap — it is pure arithmetic over a hundred entries. */
-export const LADDER = Array.from({ length: LADDER_SIZE }, (_, i) => ladderFoe(i + 1));
+// The whole road, resolved once. Callers must slice it to the member's own size rather than reading it
+// straight — see ladderFor(), which is the only thing that should ever be handed to a client.
+export const LADDER = Array.from({ length: LADDER_MAX }, (_, i) => ladderFoe(i + 1));
+
+/** The rungs this member may see. The slice IS the secrecy — nothing downstream filters. */
+export const ladderFor = (long = false) => LADDER.slice(0, ladderSize(long));
 
 /** The houses, for grouping the screen without it having to know the shape of a rung. */
+/** The houses this member may see. Ten, or twenty. */
+export const ladderHousesFor = (long = false) => LADDER_HOUSES.slice(0, long ? 20 : 10);
+
 export const LADDER_HOUSES = HOUSES.map((h, i) => ({
     key: h.key, name: h.name, blurb: h.blurb, tint: h.tint, from: i * 10 + 1, to: i * 10 + 10,
 }));
@@ -265,8 +361,12 @@ export const ladderRungOf = (target) =>
  * the frontier steps over anything already beaten, so someone holding 1, 2, 4, 10 is sent to 3, and then
  * straight to 5 because 4 is already down. Nobody re-fights a rung they have beaten, and nobody loses one.
  */
-export function nextRung(beaten) {
+// `size` is how far THIS member may walk — ladderSize(long). Returning 0 at the end of their road is what
+// stops rung 101: the challenge path refuses anything that is not exactly nextRung, so somebody who has
+// beaten all hundred and has not bought The Long Road can be offered nothing at all. Not greyed out on a
+// screen — unfightable on the server, which is the only place it counts.
+export function nextRung(beaten, size = LADDER_SIZE) {
     const done = beaten instanceof Set ? beaten : new Set((beaten || []).map(Number));
-    for (let n = 1; n <= LADDER_SIZE; n += 1) if (!done.has(n)) return n;
+    for (let n = 1; n <= size; n += 1) if (!done.has(n)) return n;
     return 0;
 }

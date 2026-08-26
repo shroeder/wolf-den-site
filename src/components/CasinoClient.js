@@ -748,10 +748,10 @@ export default function CasinoClient({ initial }) {
 
     // The shelf, and buying off it. Both go straight through to the server: the price is read from the
     // catalog there and `item` is only a key, so nothing this screen sends can change what anything costs.
-    const shelf = useCallback(async () => {
+    const shelf = useCallback(async (which = null) => {
         const r = await fetch("/api/marketplace/casino", {
             method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "chip_shelf" }),
+            body: JSON.stringify({ action: "chip_shelf", shelf: which }),
         }).then((x) => x.json()).catch(() => null);
         return r?.ok ? r : { items: [] };
     }, []);

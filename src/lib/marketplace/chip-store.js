@@ -182,7 +182,18 @@ async function grant(buyerId, item) {
         case "stat":
         case "unlock": {
             const level = await grantCasinoPerk(buyerId, item.ref);
-            return Number(level) > 0;
+            if (!(Number(level) > 0)) return false;
+            // ── AND SOME UNLOCKS HAVE TO HAND SOMETHING OVER ─────────────────────────────────────────
+            // Three of the four are pure gates: the golden wheel, the deep water and the Long Road are all
+            // read from the perk row at the moment they matter, so owning the row IS the feature. The
+            // Master's Book is not — nothing in the game is allowed to teach tier 6 (see RECIPE_BANDS), so
+            // buying it has to write the pages. Deliberately AFTER the perk row and safe to repeat: there is
+            // no transaction here (neon HTTP has none), so the two writes have to be independently correct.
+            if (item.ref === "recipe_master") {
+                const { teachMasterBook } = await import("@/lib/marketplace/cooking.js");
+                await teachMasterBook(buyerId).catch(() => {});
+            }
+            return true;
         }
         case "consumables": {
             // `ref` is a list of consumable ids, because the House Pack is three things rather than one.

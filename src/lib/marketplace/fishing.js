@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { baitById, spendFromPantry } from "@/lib/marketplace/cooking.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -124,9 +125,37 @@ export const FISH = [
     F("fish_tidewyrm", "Tidewyrm Hatchling", "🐲", "mythic", 0.05, [700, 8000], 320, 240),
 ];
 
-const BY_ID = new Map(FISH.map((f) => [f.id, f]));
+// ── THE DEEP WATER CHARTS ────────────────────────────────────────────────────────
+// Six species that do not exist for anybody who has not bought the charts (15,000 chips, at the Counter).
+//
+// A SEPARATE LIST, NOT SIX MORE ROWS IN `FISH`. That is the whole design and it is not tidiness — `FISH`
+// feeds the compendium, FISH_COUNT, the "caught them all" badge and the odds column. Appending to it would
+// put six fish nobody can catch into everybody's log and move the badge out of reach for every member who
+// has not paid. The gate is therefore additive: an owner rolls against FISH + DEEP_FISH, everyone else rolls
+// against FISH, and nothing anywhere filters a full list down for display.
+//
+// THE ODDS SIT ON TOP. Their weights total 9.1 against the base table's 100, so an owner sees a deep-water
+// fish about one cast in twelve; the ordinary table's internal balance is untouched, exactly as it was when
+// the ten new species were added. What you buy is MORE water, not better odds in the water you had.
+const DEEP_FISH = [
+    F("fish_lanternjaw", "Lanternjaw", "\u{1F41F}", "rare", 3.2, [4, 40], 30, 22),
+    F("fish_glassfin", "Glass Fin Ray", "\u{1F420}", "rare", 2.6, [8, 70], 38, 26),
+    F("fish_bonecrab", "Abyssal Bone Crab", "\u{1F980}", "epic", 1.8, [20, 180], 74, 48),
+    F("fish_gulper", "Black Gulper", "\u{1F41F}", "epic", 1.0, [60, 520], 120, 70),
+    F("fish_hadaloctopus", "Hadal Octopus", "\u{1F419}", "legendary", 0.4, [180, 1600], 240, 130),
+    F("fish_lightless", "The Lightless Thing", "\u{1F41A}", "mythic", 0.1, [900, 11000], 520, 300),
+];
+
+// Lookups resolve BOTH lists. A pantry row, a record on the board and a cooking ingredient all key off an id
+// that is already in the member's own data, so failing to resolve one would break an owner's kitchen rather
+// than protect anything. Rolling is what is gated, not naming.
+const ALL_FISH = [...FISH, ...DEEP_FISH];
+const BY_ID = new Map(ALL_FISH.map((f) => [f.id, f]));
 export const fishById = (id) => BY_ID.get(id) || null;
 export const FISH_COUNT = FISH.length;
+
+/** The table this member fishes. Owners get the deep water folded in; nobody else can see that it exists. */
+export const fishTableFor = (deep) => (deep ? ALL_FISH : FISH);
 
 const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"];
 const RARITY_RANK = Object.fromEntries(RARITY_ORDER.map((r, i) => [r, i]));
@@ -651,13 +680,14 @@ const castsAvailable = (row, angling, lineLevel) => castsPerDay(angling, lineLev
 // ── THE ROLL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Every species is in the water on every cast. Angling still tilts the odds toward the good stuff, because a
 // stat that does nothing is worse than no stat — but it can only ever bend the curve, never unlock a species.
-function rollSpecies(rareTilt = 0) {
-    // `rareTilt` already includes the Lure track — see castLine.
-    const weights = FISH.map((f) => f.odds * (f.rarity === "common" ? 1 : 1 + rareTilt));
+function rollSpecies(rareTilt = 0, deep = false) {
+    // `rareTilt` already includes the Lure track — see castLine. `deep` folds in the Deep Water Charts.
+    const table = fishTableFor(deep);
+    const weights = table.map((f) => f.odds * (f.rarity === "common" ? 1 : 1 + rareTilt));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
-    for (let i = 0; i < FISH.length; i++) { r -= weights[i]; if (r <= 0) return FISH[i]; }
-    return FISH[FISH.length - 1];
+    for (let i = 0; i < table.length; i++) { r -= weights[i]; if (r <= 0) return table[i]; }
+    return table[table.length - 1];
 }
 
 // ── HOW BIG IS IT? ───────────────────────────────────────────────────────────────────────────────────────────
@@ -759,7 +789,11 @@ export function castsFor(row, angling = 0) {
 // PURE function off the sailing row — no extra query, so this is free to include in every sailing state load.
 // `status` is the voyage status decorate() already computed. Fishing is offered at sea AND docked — the only
 // state that blocks it is `digging`, when you're ashore on the island with a shovel rather than on the boat.
-export function fishingView(row, angling = 0, status = "idle") {
+// `deep` — does this member hold the Deep Water Charts. Passed IN rather than read here because this
+// function is synchronous by design (see the note on decorate()). False for everybody who has not
+// bought them, which is what keeps the six deep species out of the log, out of the odds column and
+// out of the "species known" denominator.
+export function fishingView(row, angling = 0, status = "idle", deep = false) {
     const log = logOf(row);
     const lv = fishTrackLevels(row);
     const { max, used, bought } = castsFor(row, angling);
@@ -794,11 +828,16 @@ export function fishingView(row, angling = 0, status = "idle") {
         }),
         totalCaught: Number(row?.fish_caught) || 0,
         speciesKnown: caughtIds.length,
-        speciesTotal: FISH_COUNT,
+        // The denominator moves with the table. An owner is chasing 40 species, everyone else 34 — and a
+        // non-owner's "34 of 34" stays a real completion rather than silently becoming 34 of 40.
+        speciesTotal: fishTableFor(deep).length,
         // The full log, always — this is the actual reward, so it should never be a second round-trip. Every
-        // species shows its real odds now: with nothing gated there's no unlock to spoil, and "1 in 500" is a
-        // better hook than a vague hint about deeper water.
-        log: FISH.map((f) => {
+        // species shows its real odds, because within the water you can actually fish there is nothing to
+        // spoil, and "1 in 500" is a better hook than a vague hint about deeper water.
+        //
+        // BUILT FROM THE MEMBER'S OWN TABLE, not filtered from the full one. A filter is one forgotten call
+        // away from listing six fish nobody outside the Counter is supposed to know exist.
+        log: fishTableFor(deep).map((f) => {
             const e = log[f.id];
             return {
                 id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
@@ -880,11 +919,13 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
         + (baitUsed?.tilt || 0);
     if (castPowers.has("long_haul") && oneIn(4)) rareTilt += 2;        // two tiers rarer than it rolled
     if (castPowers.has("full_creel") && firstCastToday) rareTilt += 9; // the rarest thing in the water
-    let species = rollSpecies(rareTilt);
+    // Read once per cast rather than per roll — the retry loop below can roll eight times.
+    const deep = await hasUnlock(buyerId, "fish_deep").catch(() => false);
+    let species = rollSpecies(rareTilt, deep);
     // Cold Bait: the day's first cast cannot land a common. Re-rolled rather than promoted, so the fish is a
     // real one off the table instead of a common wearing another tier's name.
     if (castPowers.has("cold_bait") && firstCastToday) {
-        for (let i = 0; i < 8 && species.rarity === "common"; i += 1) species = rollSpecies(rareTilt + 3);
+        for (let i = 0; i < 8 && species.rarity === "common"; i += 1) species = rollSpecies(rareTilt + 3, deep);
     }
     // ── AND SOMETIMES IT IS NOT A FISH AT ALL ────────────────────────────────────────────────────────────
     // Rolled AFTER the species and the treasure, and it overrides both: a cast is one thing, the way treasure
@@ -1096,6 +1137,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // between adjacent bands averages across the table.
     let gold = Math.max(1, Math.round(species.gold * scale * nightMult));
     if (await powerRoll(buyerId, "fishmonger_s_standing_order", 3)) gold = Math.round(gold * 1.6);
+    // Minted LAST, after the scale, the night bonus and the Standing Order, so every multiplier still does
+    // what it says and only the final figure is halved. awardXp is told `minted` below because of this line.
+    gold = mint(gold, "fishing");
     const xp = Math.max(1, Math.round(species.xp * scale * nightMult));
 
     const log = (taken.fish_log && typeof taken.fish_log === "object") ? taken.fish_log : {};
@@ -1158,7 +1202,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     else if (castPowers.has("two_hooks") && oneIn(3)) bonusFish.push(species);
     for (const sp of bonusFish) {
         const size = round1((sp.lb[0] + sp.lb[1]) / 2);
-        const bonusGold = Math.max(1, Math.round(sp.gold * 0.7 * nightMult));
+        const bonusGold = mint(Math.max(1, Math.round(sp.gold * 0.7 * nightMult)), "fishing");
         const was = log[sp.id] || null;
         await db.query(
             `UPDATE mkt_sailing

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -187,6 +188,53 @@ const WHEELS = [
 //
 // A throw here fails the build rather than the player. If a 21st prize is genuinely wanted, the disc art has
 // to be repainted first — this constant is the contract between the array and the picture.
+// ── THE GOLDEN WHEEL ────────────────────────────────────────────────────────────
+// Bought once, for 20,000 chips, at the Counter. It REPLACES the ordinary wheel for the member who owns it —
+// it is not a second daily spin, and there is no way to choose between them, because a wheel you have to pick
+// is a decision nobody wants to make every morning.
+//
+// WHAT MAKES IT BETTER, and deliberately not "the same wheel with bigger numbers":
+//   - the floor is gone. The ordinary wheel's likeliest outcome is 250 gold; this one's is 600, and every
+//     wedge on it is something a maxed member would still be pleased to land on.
+//   - the CHESTS move up a tier each (wooden -> iron, gold stays, and a Mythic wedge appears).
+//   - the gems are cut deeper (t3-t4 against t1-t2).
+//   - two more RARE wedges than the ordinary wheel, so the tail is fatter rather than just taller.
+//
+// The gold wedges are roughly double the ordinary wheel's, which is the one place this deliberately runs
+// against the mint rate in gold-rate.js. That is the point of the purchase: it is paid for in chips, chips
+// are only minted by staking gold on a floor that nets NEGATIVE, and it costs 20,000 of them. Anyone who has
+// bought it has already fed the economy far more than this wheel gives back.
+//
+// PERK-GATED, not level-gated. `perk` on the wheel is what keeps it out of wheelForLevel and out of the
+// "next wheel at level N" teaser — see the notes on both.
+const GOLD_WHEEL = {
+    id: "wheel_gold", name: "The Golden Wheel", minLevel: 1, perk: "wheel_gold",
+    disc: "/images/spin/wheel-disc-gold.png",
+    prizes: [
+        { label: "600 gold", sprite: "coins-small", weight: 11, kind: "gold", amount: 600 },
+        { label: "Farm Decoration", sprite: "farm-deco", weight: 7, kind: "decoration" },
+        { label: "Adrenaline Vial", sprite: "potion-red", weight: 7, kind: "consumable", consumable: "pot_adrenaline", n: 2 },
+        { label: "Farm Seeds", sprite: "seed-pouch", weight: 7, kind: "seed", band: "spin", n: 5 },
+        { label: "1,200 gold", sprite: "coins-big", weight: 11, kind: "gold", amount: 1200 },
+        { label: "5 Fertilizer", sprite: "fertilizer", weight: 6, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
+        { label: "Deep Cut Gem", sprite: "/images/gems/emerald_t2.png", weight: 8, kind: "gem", minTier: 3, maxTier: 4 },
+        { label: "MINI WHEEL", sprite: "mini-wheel", weight: 7, tier: "bonus", kind: "mini_wheel" },
+        { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 7, kind: "parts" },
+        { label: "1,500 XP", sprite: "xp-orb", weight: 7, kind: "xp", amount: 1500 },
+        { label: "Berserker's Brew", sprite: "potion-brew", weight: 6, kind: "consumable", consumable: "pot_berserker", n: 1 },
+        { label: "Doubloons", sprite: "/images/sailing/doubloon.png", weight: 7, kind: "doubloons", min: 120, max: 260 },
+        { label: "Iron Chest", sprite: "chest-iron", weight: 9, rare: true, tier: "rare", kind: "chest", tierId: "iron" },
+        { label: "New Recipe", sprite: "recipe-scroll", weight: 4, rare: true, tier: "rare", kind: "recipe" },
+        { label: "BONUS GAME", sprite: "mystery-box", weight: 6, tier: "bonus", kind: "bonus_game" },
+        { label: "2,400 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 2400 },
+        { label: "Gold Chest", sprite: "chest-gold", weight: 5, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
+        { label: "Mythic Chest", sprite: "chest-mythic", weight: 3, rare: true, tier: "rare", kind: "chest", tierId: "mythic" },
+        { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT * 2 },
+        { label: "MAJOR JACKPOT", sprite: "gem-jackpot", weight: 2, rare: true, jackpot: true, tier: "jackpot", kind: "major_jackpot" },
+    ],
+};
+WHEELS.push(GOLD_WHEEL);
+
 export const WHEEL_WEDGES = 20;
 for (const w of WHEELS) {
     if (w.prizes.length !== WHEEL_WEDGES) {
@@ -258,10 +306,21 @@ const WHEEL_GEAR = ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", 
 const BONUS_DUPE_CHEST = "gold";
 const BOARD_ITEMS = 6; // distinct gear on the board (× 3 tiles each = 18 tiles → big, readable match-3)
 
+// LEVEL ONLY. A perk wheel is never reachable from here — it is bought, not grown into — and skipping it in
+// this loop is what stops it leaking into the six places that ask "which wheel does this member spin".
 function wheelForLevel(level) {
     let w = WHEELS[0];
-    for (const cand of WHEELS) if (level >= cand.minLevel) w = cand;
+    for (const cand of WHEELS) if (!cand.perk && level >= cand.minLevel) w = cand;
     return w;
+}
+
+// ── WHICH WHEEL THIS MEMBER ACTUALLY SPINS ───────────────────────────────────────────────
+// One extra primary-key read, on a path that already makes several. Every caller goes through this rather
+// than reading the perk itself, so "does this member have the golden wheel" has exactly one spelling and a
+// new caller cannot forget to ask.
+async function wheelForMember(buyerId, level) {
+    if (buyerId && await hasUnlock(buyerId, "wheel_gold").catch(() => false)) return GOLD_WHEEL;
+    return wheelForLevel(level);
 }
 
 // Generic weighted pick → the chosen list ITEM (not index).
@@ -564,12 +623,14 @@ export async function getSpinState(buyerId) {
         for (const i of (g.flipped || [])) revealed[i] = gearCard(g.board[i]);
         return { size: g.board.length, need: g.need || 3, roster: [...new Set(g.board)].map(gearCard), revealed };
     })();
-    const wheel = wheelForLevel(level);
+    const wheel = await wheelForMember(buyerId, level);
     const freeAvailable = asDay(row?.free_spin_day) !== today();
     // Extra-spin price escalates 1000, 2000, 3000… per store-day (resets at midnight Central).
     const boughtToday = asDay(row?.spin_buys_day) === today() ? (row?.spin_buys_count || 0) : 0;
     const tokenCost = nextSpinCost(boughtToday);
-    const next = WHEELS.find((w) => w.minLevel > level);
+    // `!w.perk` — without it this teaser would announce "The Golden Wheel at level 1" to everybody who
+    // does not own it, which is precisely the leak the unlock is supposed to prevent.
+    const next = WHEELS.find((w) => !w.perk && w.minLevel > level);
     return {
         signedIn: true,
         gold: row?.gold || 0,
@@ -593,7 +654,7 @@ export async function getSpinState(buyerId) {
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
-            return { id: wheel.id, name: wheel.name, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
+            return { id: wheel.id, name: wheel.name, disc: wheel.disc || null, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
         })(),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,
@@ -606,7 +667,7 @@ export async function getSpinState(buyerId) {
 async function pendingChoiceView(buyerId, fallbackWheel) {
     const pend = await pendingOf(buyerId);
     if (!pend) return null;
-    const wheel = wheelForLevel(pend.level) || fallbackWheel;
+    const wheel = (await wheelForMember(buyerId, pend.level)) || fallbackWheel;
     return {
         rerolled: pend.offered.length > 1,
         offered: pend.offered.map((i) => ({ index: i, label: wheel.prizes[i].label, ...previewPrize(wheel.prizes[i]) })),
@@ -661,7 +722,7 @@ export async function doSpin(buyerId) {
     const respinChance = setWheelRespinChance(owned);   // capstone: 0..0.5
     const lucky = luckChance > 0 && Math.random() * 100 < luckChance; // did the wheel set proc this spin?
     const level = levelForXp(row.xp).level;
-    const wheel = wheelForLevel(level);
+    const wheel = await wheelForMember(buyerId, level);
     const idx = pickIndex(wheel);
     const prize = wheel.prizes[idx];
     // Special wedges roll a sub-game; everything else is a direct grant.
@@ -722,7 +783,7 @@ export async function spinReroll(buyerId) {
     const pend = await pendingOf(buyerId);
     if (!pend) return { ok: false, error: "nothing_pending" };
     if (pend.offered.length > 1) return { ok: false, error: "already_rerolled" };
-    const wheel = wheelForLevel(pend.level);
+    const wheel = await wheelForMember(buyerId, pend.level);
     // A re-roll that lands on a sub-game wedge would resolve into a second interaction the member has not
     // chosen yet, so it is drawn again off the non-sub-game wedges. Bounded rather than looped: a wheel is
     // twenty wedges and this cannot spin forever on an unlucky table.
@@ -744,7 +805,7 @@ export async function spinKeep(buyerId, index) {
     if (!pend) return { ok: false, error: "nothing_pending" };
     const idx = Number(index);
     if (!pend.offered.includes(idx)) return { ok: false, error: "not_offered" };
-    const wheel = wheelForLevel(pend.level);
+    const wheel = await wheelForMember(buyerId, pend.level);
     // Cleared FIRST, guarded on the pending value still being there, so two taps cannot both pay out.
     const cleared = await db.queryOne(
         `UPDATE mkt_buyer SET spin_pending = NULL WHERE id = $1 AND spin_pending IS NOT NULL RETURNING id`, [buyerId]

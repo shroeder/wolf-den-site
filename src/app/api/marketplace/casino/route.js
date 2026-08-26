@@ -80,7 +80,15 @@ export async function POST(request) {
                 // never from the body; `item` is only a key.
                 // `vip: true` asks for the VENDOR's list instead of the Counter's. chipShelf refuses nothing
                 // by itself — the till is where a VIP item is gated — but the two rooms show two lists.
-                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id, { vip: b?.vip === true })) });
+                // `shelf` names WHICH counter: "stat" for the permanent upgrades, "unlock" for the four
+                // doors, otherwise the chest shelf. `vip` is kept for the vendor behind the rope, which was
+                // the first caller. An unknown value falls through to the ordinary Counter rather than
+                // erroring — a POST body is something anybody can write, and the worst a lie about it can
+                // buy is the shelf everyone can already see.
+                case "chip_shelf": return noStore({ ok: true, ...(await chipShelf(buyer.id, {
+                    vip: b?.vip === true,
+                    shelf: ["stat", "unlock"].includes(b?.shelf) ? b.shelf : null,
+                })) });
                 case "chip_buy": return noStore(await buyWithChips(buyer.id, String(b?.item || "")));
                 // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets

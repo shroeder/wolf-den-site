@@ -1,14 +1,15 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantConsumable, CONSUMABLES, DISH_PET_XP } from "@/lib/marketplace/consumables.js";
-import { RECIPES, recipeById } from "@/lib/marketplace/cooking-recipes.js";
+import { RECIPES, MASTER_RECIPES, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { SEEDS } from "@/lib/marketplace/farm-crops.js";
-import { FISH } from "@/lib/marketplace/fishing.js";
+import { FISH, fishById } from "@/lib/marketplace/fishing.js";
 import { COOK_ODDS_KEYS, collectibleById, petCookPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -187,6 +188,21 @@ export const TIERS = [
             // one costs about three weeks of doubloons or laurels. Which stone is rolled, because Light and
             // Dark are a real choice per pet and handing over a fixed one would quietly decide it for them.
             { kind: "stone" },
+            { kind: "chest", chestTier: "ascendant" },
+        ],
+    },
+    {
+        // ── THE MASTER'S LADDER ──────────────────────────────────────────────────────
+        // Only reachable by somebody holding the Master's Book, because nothing outside it cooks at tier 6.
+        // Its consolation rung is deliberately better than the Legendary ladder's PRIZE rung — the whole
+        // point of a bought tier is that its worst outcome beats the best one you had.
+        tier: 6, name: "Master", color: "#ff7a3d",
+        rewards: [
+            { kind: "parts", partTier: 5, min: 4, max: 6 },
+            { kind: "consumable", id: "treat_golden" },
+            { kind: "consumable", id: "farm_fertilizer_haul" },
+            { kind: "spin", n: 3 },
+            { kind: "chest", chestTier: "mythic" },
             { kind: "chest", chestTier: "ascendant" },
         ],
     },
@@ -388,7 +404,7 @@ export const baitById = (id) => BAITS[String(id || "")] || null;
 // The recipe book itself is pure data and lives in its own module so consumables.js can read it without
 // importing this one (see cooking-recipes.js). IMPORTED as well as re-exported: this file reads RECIPES and
 // recipeById in a dozen places, and `export ... from` alone re-exports without binding either name here.
-export { RECIPES, recipeById };
+export { RECIPES, MASTER_RECIPES, recipeById, recipeBookFor };
 
 
 // Where a recipe can drop from. Weighted by tier so the good ones stay rare.
@@ -513,15 +529,19 @@ export async function grantRecipeReward(buyerId, band, { strict = false, favour 
  * One query, counted in JS against the authored list, so the tier split cannot drift from RECIPES.
  */
 export async function recipeProgress(buyerId) {
-    const total = RECIPES.length;
-    const tiers = TIERS.map((t) => ({
+    // BUILT FROM THE MEMBER'S OWN BOOK. Tier 6 is not in anybody's denominator until they have bought it,
+    // so "34 of 34" stays a real completion instead of quietly becoming 34 of 42.
+    const master = buyerId ? await hasUnlock(buyerId, "recipe_master").catch(() => false) : false;
+    const book = recipeBookFor(master);
+    const total = book.length;
+    const tiers = TIERS.filter((t) => t.tier <= 5 || master).map((t) => ({
         tier: t.tier, name: t.name, color: t.color,
-        total: RECIPES.filter((r) => r.tier === t.tier).length, known: 0,
+        total: book.filter((r) => r.tier === t.tier).length, known: 0,
     }));
     if (!buyerId) return { known: 0, total, tiers };
     const rows = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const have = new Set(rows.map((r) => r.recipe_id));
-    for (const r of RECIPES) {
+    for (const r of book) {
         if (!have.has(r.id)) continue;
         const t = tiers.find((x) => x.tier === r.tier);
         if (t) t.known += 1;
@@ -616,7 +636,10 @@ export function rollRecipe(known = [], { min = 1, max = 5, strict = false, favou
 // needed drawing. `fallback` is a sprite path too: if a sprite row is ever missing the answer is still a piece
 // of our own art, not whatever glyph the player's phone happens to ship.
 const cropMeta = (ref) => SEEDS[ref] || null;
-const fishMeta = (ref) => FISH.find((f) => f.id === ref) || null;
+// fishById, not FISH.find — a Deep Water species is a real ingredient once its owner has landed it, and
+// failing to resolve one here would break that member's kitchen rather than protect anything. What is
+// gated is CATCHING them; naming one already sitting in your pantry is not a leak.
+const fishMeta = (ref) => fishById(ref) || null;
 export function ingredientMeta(ref, sprites = {}) {
     const pr = PREPS[ref];
     if (pr) return { ref, kind: "prep", name: pr.name, fallback: KIND_FALLBACK.prep, rarity: pr.rarity, sprite: sprites[ref] || null };
@@ -1629,4 +1652,24 @@ export async function getMemberRecipeBook(viewerId, ownerId) {
     }
     const tiers = [...byTier.values()].sort((a, b) => a.tier - b.tier);
     return { known: known.size, total: RECIPES.length, cooked: [...known.values()].reduce((n, v) => n + v, 0), tiers };
+}
+
+// ── BUYING THE BOOK TEACHES IT ───────────────────────────────────────────────────────
+// All eight pages, at once, because no other source is allowed to teach tier 6 (see RECIPE_BANDS) and a
+// 25,000-chip purchase that then made you grind for the pages would be two prices for one thing.
+//
+// ON CONFLICT DO NOTHING so re-running it is free — the perk grant and this call are separate writes and
+// there is no transaction to bind them (neon HTTP has none), so this has to be safe to repeat.
+export async function teachMasterBook(buyerId) {
+    if (!buyerId) return 0;
+    let n = 0;
+    for (const r of MASTER_RECIPES) {
+        const row = await db.queryOne(
+            `INSERT INTO mkt_recipe_known (buyer_id, recipe_id) VALUES ($1, $2)
+             ON CONFLICT DO NOTHING RETURNING recipe_id`,
+            [buyerId, r.id],
+        ).catch(() => null);
+        if (row) n += 1;
+    }
+    return n;
 }

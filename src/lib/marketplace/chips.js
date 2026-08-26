@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { STAT_TRACKS, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
+import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
 
 // ── CHIPS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // The casino's own currency. You stake GOLD at a machine and the machine pays CHIPS; chips buy things at the
@@ -120,13 +120,13 @@ export const VIP_STORE = [
 // blurb and the price; restating them here would be two lists to keep in step, and the one that drifts is
 // always the one the player is looking at.
 export const STAT_STORE = STAT_TRACKS.map((t) => ({
-    id: `stat_${t.perk}`, kind: "stat", ref: t.perk, name: t.name, blurb: t.blurb,
+    id: `stat_${t.perk}`, kind: "stat", ref: t.perk, name: t.name, blurb: t.blurb, art: t.art,
     // Priced per member — see basePriceFor. The 0 is a placeholder the shelf never shows.
     price: 0, stat: t.stat, per: t.per,
 }));
 
 export const UNLOCK_STORE = UNLOCKS.map((u) => ({
-    id: `unlock_${u.perk}`, kind: "unlock", ref: u.perk, name: u.name, blurb: u.blurb,
+    id: `unlock_${u.perk}`, kind: "unlock", ref: u.perk, name: u.name, blurb: u.blurb, art: u.art,
     price: u.price, once: true,
 }));
 
@@ -236,6 +236,36 @@ export async function ownedOnce(buyerId) {
 // the first time somebody retunes a gem, and it goes stale silently.
 async function detailFor(item) {
     switch (item.kind) {
+        // ── A PERMANENT POINT OF A STAT ──────────────────────────────────────────────────
+        // The numbers are read from STAT_TRACKS rather than typed here, so a retune moves the card with it.
+        case "stat": {
+            const t = STAT_TRACKS.find((x) => x.perk === item.ref);
+            if (!t) return null;
+            return {
+                art: t.art || null,
+                blurb: t.blurb,
+                lines: [
+                    { label: "Each purchase", value: `+${t.per} ${t.stat}` },
+                    { label: "First point", value: `${STAT_STEP.toLocaleString()} chips` },
+                    { label: "Every point after", value: `${STAT_STEP.toLocaleString()} more than the last` },
+                ],
+                foot: "Permanent, and it counts everywhere your gear does — the Arena, the Road, raids and ship battles. There is no ceiling.",
+            };
+        }
+        // ── A DOOR ──────────────────────────────────────────────────────────────────
+        // Deliberately vague about the CONTENTS. What is behind each of these is meant to be found rather
+        // than read off a shelf, and a card listing "six species, eight recipes, a hundred rungs" would hand
+        // over most of what was bought before the chips were spent.
+        case "unlock": {
+            const u = UNLOCKS.find((x) => x.perk === item.ref);
+            if (!u) return null;
+            return {
+                art: u.art || null,
+                blurb: u.blurb,
+                lines: [{ label: "Bought", value: "Once, and it never expires" }],
+                foot: "Nothing in the game hints at what is behind this until it is open.",
+            };
+        }
         case "gems": {
             const { GEMS } = await import("@/lib/marketplace/gems.js");
             const g = GEMS.find((x) => x.id === item.ref);

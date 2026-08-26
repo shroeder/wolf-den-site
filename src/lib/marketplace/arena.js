@@ -23,7 +23,9 @@ import {
     lossLaurels, vpFor, vpPreview,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
-import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr } from "@/lib/marketplace/arena-ladder.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr,
+    // Aliased: this file already has a local ladderFor() for the PvP gauntlet, and the two are unrelated.
+    ladderFor as roadFoes, ladderHousesFor as roadHouses, ladderSize } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -40,6 +42,7 @@ import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // instead of a hand-copied likeness of it. See arena-engine.js.
 import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
@@ -801,6 +804,11 @@ export async function getArenaState(buyerId, pre = {}) {
         pre.board ?? standings(),
         pre.kit ?? kitFor(buyerId),
     ]);
+    // ── HOW FAR THIS MEMBER'S ROAD RUNS ────────────────────────────────────────────────
+    // One primary-key read. Everything the ladder block below publishes — its size, its houses, its foes and
+    // the next rung — is cut to this, so a member without The Long Road is not sent the back hundred at all.
+    const roadLong = await hasUnlock(buyerId, "road_long").catch(() => false);
+    const roadSize = ladderSize(roadLong);
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
@@ -1000,17 +1008,20 @@ export async function getArenaState(buyerId, pre = {}) {
             // The road is walked in order, and `next` is the only rung that can be fought. Published so the
             // screen can lock the rest off the SAME rule the server refuses them by — a screen that computed
             // its own idea of "next" would be a second copy of the rule, and the copies would drift.
-            const next = nextRung(beaten);
+            const next = nextRung(beaten, roadSize);
             return {
-                size: LADDER_SIZE,
+                size: roadSize,
                 beaten: beaten.size,
                 next,
                 // Published off the SAME flag the challenge path refuses by, so the screen and the server can
                 // never disagree about whether the Road is walkable.
                 closed: !roadOpenFor(buyerId),
                 closedNote: "The Road is closed while the gear rebalance lands. Your rungs are safe — nothing you have beaten is going anywhere.",
-                houses: LADDER_HOUSES,
-                foes: LADDER.map((f) => ({
+                // SLICED, not filtered. ladderFor/ladderHousesFor hand back only the road this member
+                // owns, so the hundred rungs of The Long Road are not in the payload at all for
+                // somebody who has not bought it — there is nothing to reveal in a dev console.
+                houses: roadHouses(roadLong),
+                foes: roadFoes(roadLong).map((f) => ({
                     rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
                     archetypeName: f.archetypeName, tell: f.tell, power: f.power, color: f.color,
                     sprite: f.sprite, spriteFallback: f.spriteFallback, reward: f.reward, beaten: beaten.has(f.rung),
@@ -1790,14 +1801,17 @@ export async function startBout(buyerId, targetId = null) {
         if (!roadOpenFor(buyerId)) {
             return { ok: false, error: "road_closed", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
-        if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
+        if (rung < 1 || rung > LADDER_MAX) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         const beaten = new Set(row?.ladder_beaten || []);
         if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId, { board, kit: me })) };
         // ── IN ORDER, AND ENFORCED HERE ──────────────────────────────────────────────────────────────────
         // Refused on the SERVER, not merely greyed out on the screen: the target is a string in a POST body,
         // and `ladder:100` is as easy to send as `ladder:3`. The screen locks the same rungs (see the
         // `locked` flag in getArenaState) off this identical rule, so the two cannot drift.
-        if (rung !== nextRung(beaten)) {
+        // THE SIZE IS PART OF THE RULE. Somebody who has beaten all hundred and does not hold The Long Road
+        // gets nextRung() === 0 here, so no rung matches and rung 101 is not merely hidden, it is unfightable.
+        const canLong = await hasUnlock(buyerId, "road_long").catch(() => false);
+        if (rung !== nextRung(beaten, ladderSize(canLong))) {
             return { ok: false, error: "locked", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
         const f = ladderFoe(rung);
