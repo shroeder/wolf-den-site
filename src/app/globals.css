@@ -18321,7 +18321,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    --bcell is the cell size, capped by BOTH: 19vw keeps it square-ish against the width, 7.4vh stops five
    rows from being taller than the room. The grid is centred at whatever that comes to, so a short screen
    gets a slightly smaller card rather than a card that does not fit on it. */
-.cas-bhead, .cas-bcard { --bcell: min(19vw, clamp(30px, 7.4vh, 62px));
+.cas-bhead, .cas-bcard { --bcell: min(19vw, clamp(28px, 6.7vh, 62px));
     display: grid; grid-template-columns: repeat(5, var(--bcell)); gap: 5px; justify-content: center; }
 .cas-bhead b { text-align: center; font-size: 12px; font-weight: 900; letter-spacing: 0.1em; color: var(--acc, #ffd75e); }
 .cas-bcard { margin-top: 5px; }
@@ -22867,6 +22867,15 @@ body.cas-seated .social-fab { display: none; }
     background: linear-gradient(180deg, rgba(255,215,94,.2), rgba(0,0,0,.28));
     animation: casPatWon .5s cubic-bezier(.2,1.4,.4,1) both; }
 .cas-bpat.is-won .cas-bpat-what b, .cas-bpat.is-won .cas-bpat-pay { color: #ffd75e; }
+/* ── AND ON A SHORT PHONE IT GIVES BACK TEN PIXELS ────────────────────────────────────────────────────
+   A row of card is fifty pixels. The banner can afford four of them off its padding and a half-step off
+   the sentence under the name long before the card can afford to lose a row to the sticky controls. */
+@media (max-height: 700px) {
+    .cas-bpat { padding: 3px 8px; gap: 8px; margin-bottom: 4px; }
+    .cas-bpat-what i { font-size: 10px; }
+    .cas-hall-top { min-height: 30px; margin-bottom: 4px; }
+    .cas-caller { width: 30px; height: 30px; }
+}
 .cas-bpat.is-won .cas-bpat-what i { color: #d9c188; }
 .cas-bpat.is-won .cas-bpat-grid i.is-on { background: #ffd75e; box-shadow: 0 0 7px rgba(255,215,94,.85); }
 @keyframes casPatWon { from { transform: scale(.94); opacity: .4; } to { transform: none; opacity: 1; } }
