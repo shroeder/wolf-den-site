@@ -538,7 +538,7 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 // cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
 function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false,
     stunned = false, hasted = false, bleeding = false, bled = false,
-    burning = false, burnLeft = 0, frozen = false, frozenLeft = 0, chilled = 0, timer = null }) {
+    burning = false, burnLeft = 0, frozen = false, frozenLeft = 0, chilled = 0, timer = null, events = null }) {
     const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
         + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
         + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`
@@ -569,6 +569,21 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
             {timer ? (
                 <span className="ar-atb" aria-hidden="true">
                     <TurnTimer from={timer.from} to={timer.to} ms={timer.ms} foe={foe} />
+                </span>
+            ) : null}
+            {/* ── AND WHAT JUST HAPPENED TO THIS FIGHTER ──────────────────────────────────────────────────
+                Above their own head, never in the middle of the ring. Column-reverse so the newest sits at
+                the bottom, nearest the body it belongs to, and older ones rise away from it — which reads as
+                events floating off rather than a list being appended to. */}
+            {events?.length ? (
+                <span className="ar-heads" aria-hidden="true">
+                    {events.map((h, i) => (
+                        <b key={h.id} className={`ar-head is-${h.grade || "hit"}${h.crit ? " is-crit" : ""}`}
+                            style={{ "--i": i }}>
+                            {h.crit ? <i className="ar-head-crit">Critical</i> : null}
+                            {h.move}
+                        </b>
+                    ))}
                 </span>
             ) : null}
             {/* ── STUN ── the swirl sits ABOVE the head and the word sits above that. Both are on top of the
@@ -928,6 +943,19 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     // `pending` and `menu` are gone with the deck — there is no command to commit to and no submenu.
     const [clash, setClash] = useState(null);
+    // ── WHAT HAPPENED, OVER THE HEAD OF WHOEVER IT HAPPENED TO ───────────────────────────────────────────────
+    // The centre of the ring had THREE overlays on it — .ar-clash, .ar-verdict and .ar-grade, all of them
+    // `position:absolute; inset:0; place-items:center` — so the spark, the outcome and the move name were
+    // drawn on the identical rectangle. And `is-theirs`, the modifier that marks a blow as the OPPONENT's,
+    // only changed the text colour: your critical and their critical printed in the same place, at the same
+    // size, differing by hue. Which of you it happened to is the single most important thing about a combat
+    // event and it was the one thing the layout did not say.
+    //
+    // A LIST RATHER THAN ONE VALUE, because two things genuinely do happen at the same instant — a swing and
+    // the thorns that answer it share a millisecond. One slot means the second overprints the first; a queue
+    // stacks them, oldest on top, and both get read.
+    const [heads, setHeads] = useState([]);
+    const headId = useRef(0);
     // The counter's sentence, held back until the counter actually plays — see the .ar-beat line.
     const [counterHeld, setCounterHeld] = useState(false);
     const [err, setErr] = useState(null);
@@ -1653,16 +1681,36 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 again: Boolean(last.again),
             });
             setResultAt(Date.now());
+            // The same event, addressed to a fighter. Capped at three a side: past that they are stacking
+            // faster than anybody reads them, and the oldest is already gone from the screen's memory.
+            headId.current += 1;
+            const h = {
+                id: headId.current,
+                side: last.who === "you" ? "you" : "them",
+                move: last.burnTick ? "Burning"
+                    : last.bleedTick ? "Bleeding"
+                        : last.stunnedSkip ? "Stunned"
+                            : last.chilledSkip ? "Frozen stiff"
+                                : last.fever ? "The pit closes"
+                                    : last.guard ? "Guard up"
+                                        : last.ability || (last.who === "you" ? "Strike" : "Swing"),
+                crit, grade: crit ? "crit" : last.grade,
+                damage: Number(last.damage) || 0,
+            };
+            setHeads((q) => [...q, h].slice(-6));
         }
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
         const t = setTimeout(() => { setShake(0); setHitSide(null); }, 360);
         const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
+        // Each head clears on its own timer rather than the whole queue at once, or an event that arrived
+        // late gets cut short by the one before it.
+        const t4 = setTimeout(() => setHeads((q) => q.slice(1)), RESULT_MS + 120);
         const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
 
         // (The counter's bespoke choreography lived here. It was the first event to get its own moment, and
         // the queue below generalises exactly that — so keeping it meant two players firing one blow: two
         // sounds, two shakes. One player owns the beat now.)
-        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); };
+        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
     }, [bout]);
 
     // The end of a bout is its loudest moment, and it was a three-note blip.
@@ -2365,7 +2413,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             burning={Boolean(bout.burning)} burnLeft={bout.burnLeft || 0}
                             frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
                             chilled={bout.chilled || 0}
-                            timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs } : null} />
+                            timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs } : null}
+                            events={atbMode ? heads.filter((h) => h.side === "you").slice(-3) : null} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
@@ -2375,7 +2424,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             burning={Boolean(bout.foeBurning)} burnLeft={bout.foeBurnLeft || 0}
                             frozen={Boolean(bout.foeFrozen)} frozenLeft={bout.foeFrozenLeft || 0}
                             chilled={bout.foeChilled || 0}
-                            timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs } : null} />
+                            timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs } : null}
+                            events={atbMode ? heads.filter((h) => h.side === "them").slice(-3) : null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -2487,7 +2537,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         </div>
                     ) : null}
 
-                    {clash ? (
+                    {/* THE CENTRE CALLOUT IS THE CLASSIC RING'S. In timer mode the same information is over
+                        the head of whoever it happened to (see FighterBody's `events`), and drawing both
+                        would put the move name in two places at once — which is the collision this was
+                        supposed to fix, doubled. */}
+                    {clash && !atbMode ? (
                         <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}${clash.crit ? " is-crit" : ""}`}
                             aria-hidden="true">
                             {clash.crit ? <b className="ar-critword">Critical</b> : null}
@@ -4020,6 +4074,41 @@ function Styles() {
                through every lunge, recoil and knockdown rather than sitting still while the body moves away
                from it. Narrower than the body on purpose: a bar as wide as the sprite reads as a floor, and
                it has to read as a meter. */
+            /* ── EVENTS, OVER THE HEAD THEY BELONG TO ────────────────────────────────────────────────────
+               The whole point: which fighter an event happened to is said by WHERE it is, not by what colour
+               it is. Column-reverse puts the newest nearest the body and pushes older ones up and away.
+               Anchored to the top of .ar-fighter, which is the sprite's own box, so it tracks the body
+               through a lunge instead of hanging in the air where the body used to be. */
+            /* 88%, not 78%: at 78% the word landed ON the taller sprites — it cleared the foe's head and sat
+               across the player's crown, which is the collision this whole change is about, just moved from
+               the middle of the ring onto a face. The sprites are not all the same height inside their box,
+               so this clears the tallest of them rather than the average. */
+            .ar-heads { position: absolute; left: 50%; bottom: 88%; transform: translateX(-50%);
+                display: flex; flex-direction: column-reverse; align-items: center; gap: 3px;
+                width: 150%; z-index: 8; pointer-events: none; }
+            .ar-head { display: block; max-width: 100%; text-align: center;
+                font-size: 12.5px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase;
+                color: #fff; text-shadow: 0 2px 8px #000, 0 0 16px rgba(0,0,0,.9);
+                animation: arHeadUp .5s cubic-bezier(.2,1.35,.35,1) both; }
+            /* Older entries fade as they climb, so a stack of three does not read as three equally-live
+               things — only the bottom one just happened. */
+            .ar-head[style*="--i: 1"] { opacity: .68; font-size: 11px; }
+            .ar-head[style*="--i: 2"] { opacity: .42; font-size: 10px; }
+            .ar-head-crit { display: block; font-style: normal; font-size: 8.5px; letter-spacing: .28em;
+                color: #ffe9a8; }
+            .ar-head.is-crit { color: #fff6cc; font-size: 15px;
+                text-shadow: 0 2px 10px #000, 0 0 22px rgba(255,215,94,.9); }
+            .ar-head.is-block { color: #cfe0ff; }
+            .ar-head.is-burn { color: #ffb066; }
+            .ar-head.is-bleed { color: #ff8a92; }
+            .ar-head.is-stun { color: #ffe08a; }
+            .ar-head.is-guard { color: #a8d8ff; }
+            /* The foe's read cool and yours read warm — a second, quieter signal on top of the position,
+               for the glance that has not found the sprite yet. */
+            .ar-fighter.is-foe .ar-head { color: #cfe8ff; }
+            .ar-fighter.is-foe .ar-head.is-crit { color: #ffd0d6; }
+            @keyframes arHeadUp { from { opacity: 0; transform: translateY(10px) scale(.85) } }
+
             .ar-atb { position: absolute; left: 14%; right: 14%; bottom: 1%; z-index: 6; pointer-events: none; }
             .ar-atb .ar-timer { height: 9px; margin-top: 0;
                 background: rgba(6,4,10,0.72); border-color: rgba(0,0,0,0.55);

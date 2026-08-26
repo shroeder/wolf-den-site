@@ -185,7 +185,11 @@ if (CLICKS.length) {
     // Let the open animation land AND the newly-revealed images arrive. 800ms covered the animation only, so
     // a menu full of icons shot as a grid of blank tiles — the same "clean, empty, wrong picture" the settle
     // delay above exists to prevent, just moved behind the click.
-    await sleep(2200);
+    // ── SHOT_AFTER ── how long to wait after the last click, in ms.
+    // 2200 is right for a panel opening: the animation lands and the sprites arrive. It is WRONG for anything
+    // that expires — a combat callout lives about a second, so the default reliably photographs the moment
+    // after it. Override when the thing being shot is transient.
+    await sleep(Number(process.env.SHOT_AFTER) || 2200);
 }
 
 // ── AND THE FIFTH TRAP: THE THING IS ON THE PAGE, JUST NOT ON THE SCREEN ─────────────────────────────────────
