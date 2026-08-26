@@ -5,6 +5,7 @@ import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { atbOpenFor, bars as liveBars, tempoOf } from "@/lib/marketplace/arena-atb.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
@@ -129,6 +130,10 @@ export const COMBAT_OPEN = true;
 // and the screen plays it back as the transcript it always was.
 export const INTERACTIVE = true;
 export const interactiveFor = (buyerId) => INTERACTIVE || isOwner(buyerId);
+// ── AND WHETHER THIS FIGHT GETS A TIMER BAR ──────────────────────────────────────────────────────────────────
+// Owner-only while the mode is built. Same shape as the two flags above; the switch itself is ATB_OPEN in
+// arena-atb.js, so there is one place to flip and this is the one place that asks.
+export const atbFor = (buyerId) => atbOpenFor(buyerId, isOwner(buyerId));
 export const combatOpenFor = (buyerId) => COMBAT_OPEN || isOwner(buyerId);
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -378,6 +383,12 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // Quickblade lands in `perks.extra` and is added flat on top, which is the same arithmetic it did
         // when it was adding to a clock.
         extra: extraTurnFrom(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.extra || 0),
+        // ── AND THE RATE ITSELF, FOR A TIMER BOUT ────────────────────────────────────────────────────────
+        // The same weapon speed and the same Ferocity, kept as the rate rather than converted into the
+        // chance above. A timer bout paces off this; a classic bout ignores it entirely. Both numbers are
+        // built for every fighter because a bout is stamped with its mode at the bell, and this has to be
+        // in bout_json before the ring is opened. See arena-atb.js.
+        tempo: tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
@@ -1182,6 +1193,14 @@ function publicBout(b) {
         // has no `awaiting` and reads as null, which is exactly right —
         // that is a finished fight from before this shipped.
         awaiting: b.ring?.awaiting || null,
+        // ── AND WHICH FIGHT THIS IS ──────────────────────────────────────────────────────────────────────
+        // The screen has to know before it reads a single log line, because the two modes draw a different
+        // ring. Absent on every bout opened before the timer existed, which reads as classic — see the note
+        // in openBoutRing for why the mode is stamped once rather than re-asked.
+        mode: b.mode === "atb" ? "atb" : "classic",
+        // Both bars as they stand RIGHT NOW, so the screen has somewhere to start before the first event.
+        // Every log line carries its own copy for the moment it happened; this is the one for "now".
+        bars: b.ring?.atb ? liveBars(b.ring.atb, b.ring.now || 0) : null,
         // The deck, so the buttons exist. Only YOUR side: `b.foe.skills` stays server-side with their
         // cooldowns, because what the other fighter is holding is not the player's information.
         deck: (b.me?.deck || []).map((k) => ({
@@ -1440,7 +1459,7 @@ const TOWN_EDGE = 2;
 // A member id, as opposed to `ladder:12` or `town:<enemy>`. Used where a value is about to meet a uuid column.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {}, interactive = false } = {}) {
+function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {}, interactive = false, atb = false } = {}) {
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
         myPower, theirPower, npcTier, size,
@@ -1568,7 +1587,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
     // back. Both go through the same three functions in arena-engine, so the two cannot disagree about what
     // a swing is — that is the whole reason the ring was built on top of the auto-resolver rather than beside
     // it.
-    if (interactive) openBoutRing(bout);
+    if (interactive) openBoutRing(bout, { atb });
     else resolveAuto(bout);
     return bout;
 }
@@ -1582,8 +1601,14 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
 // transcript can say who did what. Nobody is on the other end of a defence, so without the skills it would
 // throw nothing but plain attacks for the length of the bout — which is exactly what Luke hit on a Road rung,
 // and see npcSkills for the half of it that was NPCs having no deck at all.
-function openBoutRing(b) {
-    b.ring = openRing(b.me, b.foe, { foeSkills: b.foe?.skills || {}, foeName: b.foe?.name || null });
+function openBoutRing(b, { atb = false } = {}) {
+    b.ring = openRing(b.me, b.foe, { foeSkills: b.foe?.skills || {}, foeName: b.foe?.name || null, atb });
+    // ── THE MODE IS STAMPED ON THE BOUT, ONCE, HERE ──────────────────────────────────────────────────────
+    // On the bout rather than only inside the ring, because the client reads `publicBout` and has to know
+    // which screen to draw before it looks at a single log line. A bout that predates the timer simply has
+    // no `mode` key and every path treats it as classic — which is what makes this safe to deploy while
+    // fights are in flight.
+    b.mode = atb ? "atb" : "classic";
     syncRing(b);
     return b;
 }
@@ -1677,6 +1702,7 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
         interactive: interactiveFor(buyerId),
+        atb: atbFor(buyerId),
         // `townEdge` is stamped alongside the rider so a bout can say whether it has already been scaled —
         // see the repair in resolveBeat, which is what rescues the fights that were open when this shipped.
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
@@ -1728,6 +1754,7 @@ export async function startFishingBout(buyerId, monsterId) {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
         interactive: interactiveFor(buyerId),
+        atb: atbFor(buyerId),
     });
     await saveBout(buyerId, b);
     // The whole state, for the reason this function's own comment gives above and startTownBout's does too:
@@ -1872,6 +1899,7 @@ export async function startBout(buyerId, targetId = null) {
         npcTier, size: board.length, myPower,
         extra: rung > 0 ? { ladder: { rung } } : {},
         interactive: interactiveFor(buyerId),
+        atb: atbFor(buyerId),
     });
     // The counter moves for an arena fight and stands still for a rung — the other half of the rule above.
     // Both columns are left completely alone on a Road bout: bumping `fights_day` while holding the count

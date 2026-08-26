@@ -4,6 +4,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { BASE_FILL_MS } from "@/lib/marketplace/arena-atb.js";
 import FightInput from "@/components/arena/FightInput";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { createPortal } from "react-dom";
@@ -370,7 +371,46 @@ function StatusRow({ list, side, onPick }) {
     );
 }
 
-function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null, bleed = null }) {
+// ── THE TURN TIMER ───────────────────────────────────────────────────────────────────────────────────────────
+// One per fighter, under their own health bar, in a bout opened in timer mode. It fills; when it is full that
+// fighter swings.
+//
+// IT INTERPOLATES BETWEEN TWO SERVER NUMBERS AND INVENTS NOTHING. `from` is where the bar stood on the line
+// that just played, `to` is where it stands on the line about to play, and the CSS transition covers the gap
+// over exactly the time the stepper is going to spend on it. The client therefore cannot disagree with the
+// blow underneath it, which is the failure that got the last clock removed — see the tombstone in
+// arena-atb.js. If you are ever tempted to compute the fill here from a rate and a wall clock, read that first.
+//
+// The four states are colour AND behaviour, because colour alone does not survive a glance: haste and chill
+// change how fast the bar moves, stun and freeze STOP it. A frozen bar that merely ran slowly would be
+// indistinguishable from a chilled one, and they mean opposite things.
+const TIMER_WORD = { haste: "2x", chill: "SLOW", stun: "STUNNED", freeze: "FROZEN" };
+function TurnTimer({ from, to, ms, foe = false }) {
+    const [w, setW] = useState(from?.fill ?? 0);
+    const state = to?.state || from?.state || null;
+    // Held bars do not travel: the whole point of a stun is that the bar is where it was. Snapping to `from`
+    // rather than easing to `to` keeps the halt readable even when the two happen to differ slightly.
+    const held = state === "stun" || state === "freeze";
+    useEffect(() => {
+        const target = held ? (from?.fill ?? 0) : (to?.fill ?? from?.fill ?? 0);
+        // Two frames, not one: a width set in the same paint as the transition property is applied jumps
+        // instead of animating, which turns every fill into a snap.
+        const id = requestAnimationFrame(() => requestAnimationFrame(() => setW(target)));
+        return () => cancelAnimationFrame(id);
+    }, [to, from, held]);
+    // A bar that just emptied must not slide backwards over half a second — it was spent, and the reset is
+    // the punctuation that says so.
+    const falling = (to?.fill ?? 0) < (from?.fill ?? 0);
+    return (
+        <span className={`ar-timer${state ? ` is-${state}` : ""}${foe ? " is-foe" : ""}`}>
+            <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, w)) * 100)}%`,
+                transitionDuration: `${falling ? 140 : Math.max(90, ms || 300)}ms` }} />
+            {state ? <b className="ar-timer-word">{TIMER_WORD[state] || ""}</b> : null}
+        </span>
+    );
+}
+
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null, bleed = null, atb = false }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
@@ -474,7 +514,14 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                     is no clock now — turns alternate — and the same weapon and Ferocity buy the chance to
                     take another turn on the spot instead. Same number, same gear decision, and this time it
                     is a thing you can watch happen rather than a rate you have to infer from the log. */}
-                {(f?.extra || 0) > 0 ? (
+                {/* ── AND WHERE IT WENT BACK TO ──────────────────────────────────────────────────────────
+                    In a timer bout there IS a clock again, so "% again" is not merely unhelpful — it is
+                    false. The chance to take another turn is switched off in that mode (see closeTurn), so
+                    printing it would advertise a mechanic the fight does not have. The same two inputs are
+                    showing, as the thing they now buy: how long this fighter takes to swing. */}
+                {atb ? (
+                    <i title="How long this fighter's turn timer takes to fill. Set by your weapon's attack speed and sharpened by Ferocity."><b>{(BASE_FILL_MS / Math.max(0.2, f?.tempo || 1) / 1000).toFixed(1)}s</b> a swing</i>
+                ) : (f?.extra || 0) > 0 ? (
                     <i title="Chance to take another turn immediately. Your weapon's attack speed above bare-handed, plus 1% for every 5 points of Ferocity, plus Quickblade."><b>{Math.round(f.extra * 100)}%</b> again</i>
                 ) : null}
             </span>
@@ -491,7 +538,7 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 // cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
 function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false,
     stunned = false, hasted = false, bleeding = false, bled = false,
-    burning = false, burnLeft = 0, frozen = false, frozenLeft = 0, chilled = 0 }) {
+    burning = false, burnLeft = 0, frozen = false, frozenLeft = 0, chilled = 0, timer = null }) {
     const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
         + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
         + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`
@@ -514,6 +561,16 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="ar-hero" src={f.sprite} alt="" draggable="false" />
             ) : <span className="ar-hero ar-noface" aria-hidden="true" />}
+            {/* ── THE TURN TIMER, AT THIS FIGHTER'S FEET ──────────────────────────────────────────────────
+                Luke: "atb bars under the hero sprites". It belongs on the BODY rather than up in the HUD,
+                because the bar is a thing this fighter is doing — the eye is on the sprites during a fight,
+                and a timer 300px above them is a timer nobody watches fill. Which is the entire mechanic.
+                Rendered last inside the body so it draws over the contact shadow rather than under it. */}
+            {timer ? (
+                <span className="ar-atb" aria-hidden="true">
+                    <TurnTimer from={timer.from} to={timer.to} ms={timer.ms} foe={foe} />
+                </span>
+            ) : null}
             {/* ── STUN ── the swirl sits ABOVE the head and the word sits above that. Both are on top of the
                 sprite, because the point of the state is that you can see at a glance this fighter is not
                 going to act. */}
@@ -1046,7 +1103,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const logAll = useMemo(() => {
         const src = Array.isArray(raw?.log) ? raw.log : [];
         const foeName = raw?.foe?.name || "They";
-        return src.map((e) => {
+        // In a timer bout `t` is milliseconds, so the gap to the line before is real elapsed fight time — the
+        // pacing the stepper uses and the window the bars fill across. Absent in a classic bout, where `t` is
+        // a turn counter and a "gap" of 1 would mean nothing.
+        const timed = raw?.mode === "atb";
+        return src.map((e, i) => {
+            const atbGap = timed && i > 0 ? Math.max(0, (Number(e.t) || 0) - (Number(src[i - 1]?.t) || 0)) : null;
             const mine = e.who === "me";
             const who = mine ? "you" : "them";
             const n = Number(e.dmg) || 0;
@@ -1067,14 +1129,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 const grade = e.cast || e.guard ? "guard"
                     : e.crit ? "crit" : e.blocked ? "block"
                         : e.burnTick ? "burn" : e.bleedTick ? "bleed" : e.stunnedSkip ? "stun" : "hit";
-                return { ...e, who, damage: n, grade };
+                return { ...e, atbGap, who, damage: n, grade };
             }
             if (e.bleedTick) {
-                return { ...e, who, damage: n, grade: "bleed",
+                return { ...e, atbGap, who, damage: n, grade: "bleed",
                     text: mine ? `You bleed — ${n.toLocaleString()}.` : `${foeName} bleeds — ${n.toLocaleString()}.` };
             }
             if (e.stunnedSkip) {
-                return { ...e, who, damage: 0, grade: "stun",
+                return { ...e, atbGap, who, damage: 0, grade: "stun",
                     text: mine ? "You are stunned — the swing is lost." : `${foeName} is stunned and cannot swing.` };
             }
             const hits = Number(e.hits) || 1;
@@ -1086,10 +1148,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             if (e.stunned) bits.push("stunned");
             if (e.hasted) bits.push("hasted");
             const tail = bits.length ? ` (${bits.join(", ")})` : "";
-            return { ...e, who, damage: n, grade: e.crit ? "crit" : (e.blocked ? "block" : "hit"),
+            return { ...e, atbGap, who, damage: n, grade: e.crit ? "crit" : (e.blocked ? "block" : "hit"),
                 text: `${head} — ${n.toLocaleString()}${tail}` };
         });
-    }, [raw?.log, raw?.foe?.name]);
+    }, [raw?.log, raw?.foe?.name, raw?.mode]);
     // ── WHAT COUNTS AS "A NEW FIGHT" ─────────────────────────────────────────────────────────────────────────
     // The log's LENGTH was in this key, and the log grows every time you take a turn — so every turn looked
     // like a brand new bout, the cursor reset to zero, and the entire fight replayed from the opening blow.
@@ -1240,6 +1302,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             : (line.stunnedSkip || line.chilledSkip) ? ALERT_MS.locked
                 : (line.burnTick || line.bleedTick) ? ALERT_MS.dot
                     : 0;
+        // ── UNDER THE TIMER, THE TRANSCRIPT CARRIES ITS OWN PACING ───────────────────────────────────
+        // `t` is milliseconds in a timer bout (see arena-ring.js), so the gap between two lines is how long
+        // the fight actually took between them — which is exactly how long the bars need to fill for. Made up
+        // pacing here would put the bar and the blow on different clocks, and a bar that arrives full after
+        // the swing it was supposed to predict is the old unreadable clock with extra steps.
+        //
+        // Clamped at both ends: 120ms so a burst of same-instant lines does not stall, and 4s so a slow bar
+        // never leaves the screen apparently frozen. Both clamps are cosmetic — the fight's own timeline is
+        // unchanged and the server does not care what the screen does with it.
+        if (line.atbGap != null) return hold + Math.max(120, Math.min(4000, line.atbGap));
         const chore = line.cast || line.guard || line.fever;
         const base = chore ? PLAY_CHORE_MS : PLAY_BLOW_MS;
         // Four or more still to come and the exchange is a run, not a beat: play it like one. A banner is
@@ -1269,6 +1341,24 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Is the ring still working through what it was handed? True from the moment a response arrives until
     // its last line has played. The deck reads this; see FightInput below.
     const playing = shown < logAll.length;
+
+    // ── WHERE THE TWO TIMER BARS ARE, RIGHT NOW ──────────────────────────────────────────────────────────────
+    // Between the line that just played and the one about to, which is precisely what the playback cursor
+    // means. The bar travels that gap over the same milliseconds the stepper is going to spend waiting, so
+    // the fill arrives full exactly as the swing it predicted lands.
+    //
+    // Nothing here computes a rate. `bars` is stamped on every log line by the server (arena-ring.js) and the
+    // only arithmetic on this side is "which two lines am I between" — see the warning in TurnTimer about why.
+    const atbMode = raw?.mode === "atb";
+    const barsPrev = atbMode ? (logAll[shown - 1]?.bars || null) : null;
+    // ── WHEN THE TRANSCRIPT RUNS OUT, "NEXT" IS NOW ──────────────────────────────────────────────────────────
+    // `raw.bars` is the live snapshot the server publishes for exactly this moment. Without it the bars froze
+    // on the last EVENT rather than the present: the foe swung at 1678ms with their bar full and mine at 0.64,
+    // playback finished, and the screen sat there showing their bar full and mine two-thirds — while the
+    // server knew mine had filled at 2628ms and it was my turn. The button said SWING and both bars
+    // contradicted it.
+    const barsNext = atbMode ? (logAll[shown]?.bars || raw?.bars || barsPrev) : null;
+    const barsMs = atbMode && logAll[shown] ? beatMs(logAll[shown], logAll.length - shown) : 300;
 
     // ── THE DECK DOES NOT DISAPPEAR OUT FROM UNDER A FIGHT STILL PLAYING ─────────────────────────────────
     // GrayKitsune, twice in one session: "suddenly all my skills vanish"; "the button just vanish and then
@@ -2197,16 +2287,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     <div className="ar-bars">
                         <span className="ar-barcol">
                             <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
-                                active={yourTurn} shield={bout.shield || 0}
+                                active={yourTurn} shield={bout.shield || 0} atb={atbMode}
                                 burn={bout.foeBleed || null} bleed={bout.foeGash || null} />
                             <StatusRow list={statusesFor(bout, "you")} side="you" onPick={(s) => setStatusPick({ kind: s.kind, side: "you" })} />
                         </span>
-                        <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
-                            {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
-                        </span>
+                        {/* Under the timer there is no "whose turn" — the bars ARE the answer, and a label
+                            claiming it is your turn while your bar is a third full contradicts them. */}
+                        {atbMode ? (
+                            <span className="ar-turnmark is-timer">{bout.over ? "—" : yourTurn ? "SWING" : " "}</span>
+                        ) : (
+                            <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
+                                {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
+                            </span>
+                        )}
                         <span className="ar-barcol is-foe">
                             <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                                foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0}
+                                foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} atb={atbMode}
                                 burn={bout.bleed || null} bleed={bout.gash || null} />
                             <StatusRow list={statusesFor(bout, "them")} side="them" onPick={(s) => setStatusPick({ kind: s.kind, side: "them" })} />
                         </span>
@@ -2268,7 +2364,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             bleeding={Boolean(bout.bleeding)} bled={Boolean(bout.bled)}
                             burning={Boolean(bout.burning)} burnLeft={bout.burnLeft || 0}
                             frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
-                            chilled={bout.chilled || 0} />
+                            chilled={bout.chilled || 0}
+                            timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs } : null} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
@@ -2277,7 +2374,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             bleeding={Boolean(bout.foeBleeding)} bled={Boolean(bout.foeBled)}
                             burning={Boolean(bout.foeBurning)} burnLeft={bout.foeBurnLeft || 0}
                             frozen={Boolean(bout.foeFrozen)} frozenLeft={bout.foeFrozenLeft || 0}
-                            chilled={bout.foeChilled || 0} />
+                            chilled={bout.foeChilled || 0}
+                            timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs } : null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -3910,6 +4008,62 @@ function Styles() {
                 background: rgba(8,6,10,0.7); border: 1px solid rgba(255,255,255,0.16); }
             .ar-turnmark.is-you { color: #ffd75e; border-color: rgba(255,215,94,.55); }
             .ar-turnmark.is-them { color: #6fd0ff; border-color: rgba(111,208,255,.5); }
+            .ar-turnmark.is-timer { color: #ffd75e; border-color: rgba(255,215,94,.5); min-width: 34px; text-align: center; }
+
+            /* ── THE TURN TIMER ──────────────────────────────────────────────────────────────────────────
+               Under the health bar, same width, deliberately shorter — it is the second most important thing
+               on that fighter, not the first. The four states are colour AND motion: haste and chill change
+               the fill's speed, stun and freeze stop it, and the barber-pole on a frozen bar is what says
+               "held" at a glance rather than "slow". */
+            /* ── AT THE FIGHTER'S FEET ───────────────────────────────────────────────────────────────────
+               Inside .ar-fighter, which is absolutely positioned in the stage — so this rides with the sprite
+               through every lunge, recoil and knockdown rather than sitting still while the body moves away
+               from it. Narrower than the body on purpose: a bar as wide as the sprite reads as a floor, and
+               it has to read as a meter. */
+            .ar-atb { position: absolute; left: 14%; right: 14%; bottom: 1%; z-index: 6; pointer-events: none; }
+            .ar-atb .ar-timer { height: 9px; margin-top: 0;
+                background: rgba(6,4,10,0.72); border-color: rgba(0,0,0,0.55);
+                box-shadow: 0 2px 6px rgba(0,0,0,.55); }
+            .ar-atb .ar-timer-word { font-size: 7px; }
+            /* A knocked-down fighter has no turn coming. */
+            .ar-fighter.is-down .ar-atb { opacity: 0; transition: opacity .25s ease; }
+
+            .ar-timer { position: relative; display: block; height: 7px; margin-top: 4px; border-radius: 999px;
+                overflow: hidden; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.10); }
+            .ar-timer-fill { display: block; height: 100%; width: 0; border-radius: 999px;
+                background: linear-gradient(90deg, #ffd75e, #ffb84d);
+                transition: width linear; will-change: width; }
+            .ar-timer.is-foe .ar-timer-fill { background: linear-gradient(90deg, #ff9a8f, #ff6f7d); }
+            .ar-timer-word { position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+                font-size: 6.5px; font-weight: 900; letter-spacing: .12em; line-height: 1;
+                text-shadow: 0 1px 3px #000; pointer-events: none; }
+
+            /* HASTE — green, and it is the one state that is GOOD, so it also glows. */
+            .ar-timer.is-haste { border-color: rgba(96,240,150,.55); box-shadow: 0 0 9px rgba(96,240,150,.35); }
+            .ar-timer.is-haste .ar-timer-fill { background: linear-gradient(90deg, #7ef0a8, #2fd47a); }
+            .ar-timer.is-haste .ar-timer-word { color: #b6f5cd; }
+
+            /* CHILL — a deeper, duller blue than freeze on purpose. These two are the pair most easily
+               confused and they mean different things: this one is a tax, that one is a stop. */
+            .ar-timer.is-chill { border-color: rgba(90,169,230,.55); }
+            .ar-timer.is-chill .ar-timer-fill { background: linear-gradient(90deg, #5aa9e6, #2b6f9e); }
+            .ar-timer.is-chill .ar-timer-word { color: #bfe0f7; }
+
+            /* FREEZE — pale ice, barber-poled and crawling, so a held bar never reads as a slow one. */
+            .ar-timer.is-freeze { border-color: rgba(143,216,255,.7); box-shadow: 0 0 10px rgba(143,216,255,.35); }
+            .ar-timer.is-freeze .ar-timer-fill {
+                background: repeating-linear-gradient(115deg, #bfeaff 0 6px, #6cc6ee 6px 12px);
+                background-size: 200% 100%; animation: arTimerIce 1.1s linear infinite; }
+            .ar-timer.is-freeze .ar-timer-word { color: #e2f6ff; }
+            @keyframes arTimerIce { to { background-position: -24px 0; } }
+
+            /* STUN — yellow, and it PULSES rather than travels: the bar is stopped, and a completely static
+               bar is indistinguishable from a bar that is merely slow to fill. */
+            .ar-timer.is-stun { border-color: rgba(232,179,58,.7); }
+            .ar-timer.is-stun .ar-timer-fill { background: linear-gradient(90deg, #ffe08a, #e8b33a);
+                animation: arTimerStun .55s ease-in-out infinite alternate; }
+            .ar-timer.is-stun .ar-timer-word { color: #ffeec2; }
+            @keyframes arTimerStun { from { opacity: .45 } to { opacity: 1 } }
 
             /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
             /* ── THE INTERRUPTION ────────────────────────────────────────────────────────────────────

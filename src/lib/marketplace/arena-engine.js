@@ -307,6 +307,10 @@ export const COMBAT_FIELDS = [
     "damage", "health", "critChance", "critMult", "dmgPct",
     // turn order: the chance to take another one, and the chance one of theirs never happens
     "extra", "skipChance",
+    // and how fast this fighter's timer bar fills, for a bout opened in that mode — see arena-atb.js. It is
+    // carried on every fighter rather than only on timer bouts, because a bout is stamped with its mode at
+    // the bell and this has to already be in bout_json by then.
+    "tempo",
     // mitigation and getting through it
     "armor", "pierce", "blockChance", "blockReduction", "blockStack", "blockStackMax",
     // the procs that come off affix points
@@ -410,6 +414,11 @@ export const sideOf = (f) => ({
         extra: Math.max(0, Math.min(EXTRA_TURN_MAX, Number(f.extra) || 0)),
         // And the chance one of THEIR turns simply does not happen — Chill, which used to slow their clock.
         skipChance: Math.max(0, Math.min(0.6, Number(f.skipChance) || 0)),
+        // ── AND THE SAME TWO INPUTS AGAIN, UNCONVERTED ───────────────────────────────────────────────────
+        // `extra` above is weapon speed and Ferocity folded into a go-again chance, which is lossy on
+        // purpose. The timer needs the rate itself rather than the chance it was turned into, so it rides
+        // along beside it. A fighter built without one falls back to bare-handed, same as the old clock did.
+        tempo: Math.max(0.2, Number(f.tempo) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
 });
