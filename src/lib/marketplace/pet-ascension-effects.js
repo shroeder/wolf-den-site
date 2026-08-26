@@ -42,6 +42,55 @@
 // uncapped stat perk gets a smaller one. GRAFT scales sit at 0.6–1.0 — a second trade learned late is rarely as
 // good as the one it was born with, and the handful at 1.0 are pets whose whole character is the second thing.
 export const ASCENSION_EFFECTS = {
+    // ── THE CASINO'S FIVE AND SABLE'S THREE ───────────────────────────────────────────────────────────────
+    // All eight were falling through to FALLBACK_EFFECT — the deliberately dull pair — and check:ascension
+    // was already failing on every one of them. Two were worse than dull: the Ferret and the Magpie both
+    // carry chest_luck, which is CAPPED at 20, so an amplify Darkstone would have been arithmetically
+    // identical to the Lightstone. The gate caught that too ("both stones do exactly the same thing — that is
+    // not a choice"), and it is right: a choice between two identical outcomes is a prompt, not a decision.
+    //
+    // So the capped pair get a GRAFT on both stones — widen rather than deepen, the same answer the Beach
+    // Crab already uses — and the six with headroom keep the usual shape: Lightstone teaches a second trade,
+    // Darkstone doubles down on the one it was born with.
+
+    // Bought at the Counter. Each already makes the FLOOR kinder; the stones are about everything else.
+    copper_paw: {
+        light: { name: "Pays Its Own Way", kind: "graft", key: "fortune", scale: 0.8, note: "It has been sleeping on the change tray for years. Some of it stuck." },
+        dark: { name: "Heavier Than It Looks", kind: "amplify", mult: 2 },
+    },
+    tallyman: {
+        light: { name: "Knows What You Are Owed", kind: "graft", key: "town_haggle", scale: 0.9, note: "Nobody argues with the man holding the book." },
+        dark: { name: "Counts Twice", kind: "amplify", mult: 2 },
+    },
+    gilded_magpie: {
+        // chest_luck caps at 20, so amplifying it is a no-op past Lv3. Both stones widen instead.
+        light: { name: "Everything That Shines", kind: "graft", key: "gold_find", scale: 1, note: "It never learned the difference between yours and its own." },
+        dark: { name: "The Whole Nest", kind: "graft", key: "beachcomber", scale: 0.9, note: "Chest luck is capped where it stands, so the Darkstone sends it further afield instead of deeper." },
+    },
+    croupiers_cat: {
+        light: { name: "Sits Where the Cards Land", kind: "graft", key: "first_hit", scale: 0.8, note: "It has watched every deal this room has ever made." },
+        dark: { name: "The House Cat Always Wins", kind: "amplify", mult: 1.8 },
+    },
+    night_auditor: {
+        light: { name: "Reconciled", kind: "graft", key: "xp_gain", scale: 0.9, note: "It works the hours nobody watches, and it learns in them." },
+        dark: { name: "The Books Are Never Wrong", kind: "amplify", mult: 2 },
+    },
+
+    // Sable's three, behind the rope. No casinoPerk — what a stone does to these is the whole of what they do.
+    house_ferret: {
+        // Same cap as the Magpie, same answer: two grafts, so the choice is a real one.
+        light: { name: "Under Every Floorboard", kind: "graft", key: "truffle_hog", scale: 0.8, note: "Whatever rolled under there, it knows." },
+        dark: { name: "The Whole Room", kind: "graft", key: "gold_find", scale: 0.9, note: "Chest luck is capped where it stands, so the Darkstone widens the hunt rather than deepening it." },
+    },
+    velvet_lynx: {
+        light: { name: "Everyone Knows the Lynx", kind: "graft", key: "fortune", scale: 0.9, note: "It has never once been asked to leave, and it has never once paid." },
+        dark: { name: "Never Asked to Leave", kind: "amplify", mult: 2 },
+    },
+    midnight_crane: {
+        light: { name: "Misses Nothing At All", kind: "graft", key: "crit_chance", scale: 0.8, note: "It stands at the end of the bar and it is always facing the room." },
+        dark: { name: "The Long Watch", kind: "amplify", mult: 2.2 },
+    },
+
     // ── THE LEVELLING PETS ───────────────────────────────────────────────────────────────────────────────────
     bunny: {
         light: { name: "Warren Cache", kind: "graft", key: "farm_seed", scale: 0.9, note: "Everything a rabbit digs, it digs twice." },

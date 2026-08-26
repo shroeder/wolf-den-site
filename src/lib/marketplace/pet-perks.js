@@ -122,11 +122,25 @@ export const PET_PERKS = {
     // value comes from petPerkValue(rarity, key) and epic gold_find was already spoken for. chest_luck is
     // free at epic and is nearer the point anyway: a ferret that knows which floorboard the chips roll under
     // is not earning wages, it is finding things.
-    // Third key for this one, and the second lesson: chest_luck is CAPPED at 20, so the Ferret stopped
-    // improving at Lv4 and levelling it past that did nothing at all. A capped ability is a worse prize than
-    // a duplicate one. truffle_hog is unique at epic, climbs all the way to 28 at Lv6, and is nearer the
-    // sentence on its card than either of the first two picks: it digs up what is under the floor.
-    house_ferret: { name: "Under the Floorboards", key: "truffle_hog" },
+    // ── AND BACK TO chest_luck, EYES OPEN ────────────────────────────────────────────────────────────
+    // Fourth key for this one. The trail is worth keeping because each step was wrong for a different reason:
+    //
+    //   gold_find    an exact copy of the Stormcrow — same key, same base, same ceiling.
+    //   chest_luck   unique, but CAPPED at 20, so it stopped improving at Lv4.
+    //   truffle_hog  unique and uncapped — and its sentence is "8% chance the LOOT PIG comes back", with a
+    //                pig icon, on a ferret. Luke saw the card: the mechanics were fine and it read as
+    //                nonsense. A pet's ability is text before it is a number.
+    //
+    // chest_luck says "+8% chance any chest you open rolls on the NEXT rarity up", with a chest icon, which
+    // is exactly what a ferret that knows which floorboard the chips roll under should do — and chests are
+    // what chips buy, so it is the right ability for something sold on a casino floor.
+    //
+    // THE CAP IS ACCEPTED, not overlooked. It climbs 8 → 12 → 16 → 20 and then holds from Lv4. That ceiling
+    // is a deliberate economy limit on rarity promotion (see PROC_CAP) and raising it to suit one pet would
+    // be tuning the chest table from the wrong end. Two of the eight casino pets share this key now — the
+    // Ferret at 8 and the Magpie at 12 — which is fine and rather fitting: they are both finders, and they
+    // are not numeric twins.
+    house_ferret: { name: "Under the Floorboards", key: "chest_luck" },
     // fortune at legendary was already BOTH the Unicorn and the Spirit Fox, so this was the third copy of one
     // number. town_haggle is free and is what never being asked to leave actually buys you: everyone gives
     // you the better price.
