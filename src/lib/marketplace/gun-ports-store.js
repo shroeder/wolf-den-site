@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { GUN_PORTS, gunPortsFor } from "@/lib/marketplace/gun-ports.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── SAVED GUN PLACEMENTS ─────────────────────────────────────────────────────────────────────────────────────
 // The DB half of gun-ports.js. Placements are authored on a phone against the real art (the gun lab), stored
@@ -105,6 +106,7 @@ export async function savePorts(art, ports, buyerId = null, flipped = false) {
                                          updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
         [String(art), JSON.stringify(clean), flip, buyerId]
     ).catch(() => {});
+    await trackActivity(buyerId, "ship_loadout", { art: String(art), ports: clean.length, flipped: flip }).catch(() => {});
     return { ok: true, art, ports: clean, flipped: flip };
 }
 

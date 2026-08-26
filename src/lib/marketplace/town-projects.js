@@ -6,6 +6,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── TOWN DEVELOPMENT ────────────────────────────────────────────────────────────────────────────────────────
 // A shared, community-funded upgrade catalog. Everyone pools gold into PROJECTS; each level costs more, grants a
@@ -173,6 +174,7 @@ export async function contributeToProject(buyerId, projectId, amount) {
         await db.query(`UPDATE mkt_town_project SET level = $2, gold_in = $3 WHERE project_id = $1`, [projectId, level, goldIn]).catch(() => {});
         invalidateTownBonuses();
     }
+    await trackActivity(buyerId, "town_contribute", { project: projectId, amount, level, leveledTo }).catch(() => {});
     return { ok: true, gold: Number(paid.gold), project: projectId, level, goldIn, leveledTo };
 }
 
@@ -204,5 +206,6 @@ export async function claimWishingWell(buyerId) {
     if (xp > 0) await awardXp(buyerId, "wishing_well", { points: xp, gold: 0 }).catch(() => {});
     checkWellBadges(buyerId).catch(() => {}); // Well Wisher / Fountain Faithful (daily claims)
     bumpTownQuest(buyerId, "well", 1).catch(() => {}); // "Make a Wish" town quest
+    await trackActivity(buyerId, "well_claim", { gold, xp }).catch(() => {});
     return { ok: true, gold, xp, goldAfter: paid?.gold ?? null };
 }

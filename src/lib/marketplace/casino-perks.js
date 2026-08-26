@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { STAT_META } from "@/lib/marketplace/items.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── WHAT CHIPS BUY THAT DOES NOT GO AWAY ─────────────────────────────────────────────────────────────────────
 // Luke: "let's allow buying permanent upgrades to core stats... starts at 250, cost goes up by 250 each time,
@@ -165,6 +166,7 @@ export async function grantCasinoPerk(buyerId, perk) {
          RETURNING level`,
         [buyerId, perk],
     ).catch(() => null);
+    if (row) await trackActivity(buyerId, "casino_perk", { perk, level: Number(row.level) }).catch(() => {});
     return row ? Number(row.level) : null;
 }
 

@@ -6,6 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // long note in blackjack.js: the stake is still gold because gold staked is what chips are MADE of, and a
 // table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE SHARED FLOOR ─────────────────────────────────────────────────────────────────────────────────────────
 // Keno and roulette are both played by everyone at once: one draw, one pocket, and every ticket in the window
@@ -84,6 +85,7 @@ export async function placeBet(buyerId, game, { stake, choice, reason }) {
         await logCoin(buyerId, stake, `${reason}_void`, { balanceAfter: back?.gold ?? null });
         return { ok: false, error: "bet_failed" };
     }
+    await trackActivity(buyerId, "casino_bet", { game, stake, choice, round }).catch(() => {});
     return { ok: true, id: String(row.id), round, gold: paid.gold, closesAt: roundEndsAt(game, round) };
 }
 

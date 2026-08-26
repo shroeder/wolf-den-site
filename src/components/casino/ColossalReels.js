@@ -36,6 +36,16 @@ const COL_STOP = 230;
 // winning tiles brighten on a board that is still moving — and that animation grew when the settle stopped
 // being a kick and became a brake (700ms on the tall board; see col5Settle).
 const SETTLE = 470;
+// ── HOW LONG A REEL TAKES TO ACTUALLY STOP ───────────────────────────────────────────────────────────────────
+// col5Settle runs for --settle-ms (700ms; see globals.css) from the moment .is-stop lands, and the clunk was
+// played at the START of it — so every reel on this cabinet announced itself a full seven-tenths of a second
+// before it came to rest. Same defect as the five-reel machine, and worse here because the number is fixed:
+// it was wrong by exactly 700ms every single time. Luke: "the slots sound of the reel stopping isnt synced
+// with the real stopping."
+//
+// It has to match the CSS. There is no way to derive it from here — the animation is declared over there —
+// so it is written down in both places and this comment is the second half of that bargain.
+const REST_MS = 700;
 const SEND_MS = 620;      // a wild column falling from the small board into the big one
 const LINE_MS = 620;      // one winning line lit
 const BONUS_MS = 2400;
@@ -158,16 +168,23 @@ export default function ColossalReels({ machineId, art, bet, data, onDone, onRea
             const got = inCol(board === "main" ? sp.main : sp.col, r);
             if (board === "main") setLanded(r + 1); else setColLanded(r + 1);
             seen += got;
-            if (!live) { Cas.reelStop(r, sound); return; }
+            // The reel is now BRAKING, not stopped. Everything that says "it landed" waits out the brake.
+            const atRest = (fn) => timers.current.push(setTimeout(fn, REST_MS));
+            if (!live) { atRest(() => Cas.reelStop(r, sound)); return; }
             // Both answers are loud. A hold that resolves quietly either way was a pause, not a hold — but
             // the miss stays short and soft, because most of them miss.
             setTease(null);
-            if (got) { Cas.reelStop(r, 1); Haptic.crit(); } else { Cas.nearMiss(); Haptic.hit(0.5); }
+            if (got) atRest(() => { Cas.reelStop(r, 1); Haptic.crit(); });
+            else atRest(() => { Cas.nearMiss(); Haptic.hit(0.5); });
         };
 
         for (let r = 0; r < REELS; r += 1) await landOne("main", r, MAIN_STOP, 0.4, r);
         for (let r = 0; r < REELS; r += 1) await landOne("col", r, COL_STOP, 0.6, REELS + r);
-        await wait(SETTLE);
+        // SETTLE alone (470ms) was shorter than the brake it was meant to be waiting out, so the transfer and
+        // the win lines began while the last reel was still moving — and now that the clunk lands at REST_MS,
+        // they would also have arrived before it. The pause is the brake plus a beat, same as the five-reel
+        // machine leaves 230ms between the last reel resting and the first line lighting.
+        await wait(REST_MS + 230);
 
         // ── THE TRANSFER ─────────────────────────────────────────────────────────────────────────────────
         // The one thing that crosses between the boards, and the reason to look at the small one at all. It

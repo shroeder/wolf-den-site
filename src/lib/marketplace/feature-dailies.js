@@ -14,6 +14,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── Per-feature daily quests (farm + sailing) ───────────────────────────────────────────────────────────────
 // A dedicated, always-present set of 3 daily bounties shown on each feature's own screen (like the Forge's).
@@ -148,5 +149,6 @@ export async function claimFeatureDaily(buyerId, feature, key) {
     if (t.reward.gold) { const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, t.reward.gold]).catch(() => null); await logCoin(buyerId, t.reward.gold, `${feature}_daily`, { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
     if (t.reward.chest) await addChests(buyerId, { [t.reward.chest]: 1 }, { source: "feature_daily", meta: { key: t.key } }).catch(() => {});
     await awardXp(buyerId, `${feature}_daily`, { points: 20, gold: 0 }).catch(() => {});
+    await trackActivity(buyerId, "feature_daily", { feature, key, gold: t.reward.gold || 0, chest: t.reward.chest || null }).catch(() => {});
     return { ok: true, reward: t.reward, dailies: await getFeatureDailies(buyerId, feature) };
 }

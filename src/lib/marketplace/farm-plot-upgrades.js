@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── PER-PLOT SPECIALIZATION ───────────────────────────────────────────────────────────────────────────────
 // Plots are permanent fixtures you invest GOLD into to specialize them. Each plot carries its own level in each
@@ -92,5 +93,6 @@ export async function upgradePlotTrack(buyerId, slot, key) {
     ).catch(() => {});
     // `goldAfter` is the balance-only key the farm client applies to the purse; `gold` is kept because
     // callers already read it, but it is the same number here and the client no longer trusts the name.
+    await trackActivity(buyerId, "plot_upgrade", { slot: s, track: key, to: level + 1 }).catch(() => {});
     return { ok: true, slot: s, key, level: level + 1, gold: Number(paid.gold), goldAfter: Number(paid.gold), attrs: next };
 }

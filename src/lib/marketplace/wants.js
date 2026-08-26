@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { sendWantAvailableEmail } from "@/lib/marketplace/email.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { createServerLogger } from "@/lib/server-logger";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Buyer "notify me when a vendor lists this" demand signals. Capture -> alert on first matching
 // listing -> aggregate into a vendor-facing "most wanted" shopping list.
@@ -66,6 +67,7 @@ export async function createWant({
     );
 
     wantsLogger.info("marketplace.want.created", { catalogProductId, hasMaxPrice: normalizedMax != null, qty });
+    await trackActivity(buyerId, "want_post", { catalogProductId, qty, maxPrice: normalizedMax }).catch(() => {});
 
     await sendAdminPush({
         title: "🔎 New buy order",

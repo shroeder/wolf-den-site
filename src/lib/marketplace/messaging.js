@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Buyer<->vendor messaging. As of the Phase 2 unification this is a FACADE over the shared member DM store
 // (mkt_dm_thread / mkt_dm_message): a "vendor thread" is a DM thread carrying vendor context (vendor_id +
@@ -127,6 +128,7 @@ export async function postMessage({ threadId, sender, body }) {
     // Sender has implicitly read up to their own message.
     const readCol = senderId === t.user_a ? "a_last_read_at" : "b_last_read_at";
     await db.query(`UPDATE mkt_dm_thread SET last_message_at = $2, ${readCol} = $2 WHERE id = $1`, [threadId, msg.created_at]);
+    await trackActivity(senderId, "vendor_message", { threadId, side: sender, length: text.length }).catch(() => {});
     return { id: msg.id, threadId, createdAt: msg.created_at };
 }
 

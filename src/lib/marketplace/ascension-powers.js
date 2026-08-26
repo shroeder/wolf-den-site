@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { itemById } from "@/lib/marketplace/items.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── ASCENSION POWERS ─────────────────────────────────────────────────────────────────────────────────────────
 // The 120 non-combat signature powers, one per top-tier item. See docs/signature-powers-120.md for how they were
@@ -232,6 +233,9 @@ export async function claimPowerUse(buyerId, key, perDay = 1) {
          RETURNING used`,
         [buyerId, key, Math.max(1, perDay)]
     ).catch(() => null);
+    // The CLAIM is logged, not the roll. powerRoll runs per swing and would flood the table to say nothing;
+    // a claim is the limited resource and the interesting one.
+    if (row) await trackActivity(buyerId, "power_use", { power: key, used: Number(row.used) || 1, per: "day" }).catch(() => {});
     return Boolean(row);
 }
 
@@ -258,6 +262,7 @@ export async function claimPowerUsePeriod(buyerId, key, period = "week", perPeri
          RETURNING used`,
         [buyerId, key, Math.max(1, perPeriod)]
     ).catch(() => null);
+    if (row) await trackActivity(buyerId, "power_use", { power: key, used: Number(row.used) || 1, per: period }).catch(() => {});
     return Boolean(row);
 }
 

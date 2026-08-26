@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ===== Referral loop =====
 // A member's public referral code IS their @handle (alias); the share link is /marketplace/play?ref=<handle>.
@@ -30,6 +31,7 @@ export async function attachReferrer(newBuyerId, refCode) {
     const referrerId = await resolveReferrer(refCode);
     if (!referrerId || referrerId === newBuyerId) return;
     await db.query(`UPDATE mkt_buyer SET referred_by = $2 WHERE id = $1 AND referred_by IS NULL`, [newBuyerId, referrerId]).catch(() => {});
+    await trackActivity(newBuyerId, "referral_attached", { referrerId }).catch(() => {});
 }
 
 // Grant the one-time both-sides referral reward. Idempotent: the reward slot is claimed atomically via
@@ -67,6 +69,7 @@ export async function maybeGrantReferral(newBuyerId) {
         tag: "referral",
     }).catch(() => {});
 
+    await trackActivity(newBuyerId, "referral_landed", { referrerId }).catch(() => {});
     return { referrerId, joinerId: newBuyerId };
 }
 

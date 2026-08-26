@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from "crypto";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── Store credit: a real dollar balance on the member's marketplace account (mkt_buyer.store_credit_cents),
 // bought online through Square. Buying it also grants coins. Double-entry: the column is the running total,
@@ -65,6 +66,7 @@ export async function addCredit(buyerId, cents, reason, ref = null, meta = null)
             [buyerId, delta, balance, reason, ref, meta ? JSON.stringify(meta) : null]
         )
         .catch(() => {});
+    await trackActivity(buyerId, "credit_add", { cents, reason }).catch(() => {});
     return balance;
 }
 
@@ -89,6 +91,7 @@ export async function spendCredit(buyerId, cents, reason, ref = null, meta = nul
             [buyerId, -amount, balance, reason, ref, meta ? JSON.stringify(meta) : null]
         )
         .catch(() => {});
+    await trackActivity(buyerId, "credit_spend", { cents, reason }).catch(() => {});
     return { ok: true, balanceCents: balance };
 }
 

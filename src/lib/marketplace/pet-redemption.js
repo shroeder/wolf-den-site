@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/marketplace/collectibles.js";
 import { PET_REAL_WORLD } from "@/lib/marketplace/pet-perks.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Real-world pet perks are redeemable in-store once per COOLDOWN period (monthly), staff-initiated from the
 // admin app, and logged in mkt_pet_redemption. Mirrors the charged-item redemption flow.
@@ -56,5 +57,6 @@ export async function redeemPetPerk(buyerId, petId, { by = "admin", note = null 
     const state = stateFromLast(last?.last_at);
     if (!state.available) return { ok: false, error: "on_cooldown", cooldownUntil: state.cooldownUntil };
     await db.query(`INSERT INTO mkt_pet_redemption (buyer_id, pet_id, reward_label, redeemed_by, note) VALUES ($1, $2, $3, $4, $5)`, [buyerId, petId, reward, by, note]).catch(() => {});
+    await trackActivity(buyerId, "pet_perk_redeem", { petId, reward, by }).catch(() => {});
     return { ok: true, reward };
 }

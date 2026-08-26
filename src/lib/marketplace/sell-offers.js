@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { notifyNewSellOffer } from "@/lib/marketplace/notify.js";
 import { createServerLogger } from "@/lib/server-logger";
 import { SITE_URL } from "@/lib/site";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Seller-side marketplace intake. A walk-in seller posts what they want to sell; we record it, ping
 // the marketplace (Discord), and email active vendors so they can reach out and make an offer. The
@@ -77,6 +78,7 @@ export async function createSellOffer({ name, email, phone, items, askingPrice, 
     );
 
     offersLogger.info("marketplace.sell_offer.created", { step: "created", offerId: row.id });
+    await trackActivity(buyerId, "sell_offer", { offerId: Number(row.id), askingPrice }).catch(() => {});
     return { id: row.id };
 }
 

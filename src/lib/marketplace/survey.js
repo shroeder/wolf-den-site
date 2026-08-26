@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE MEMBER SURVEY ────────────────────────────────────────────────────────────────────────────────────────
 // Which systems people actually LIKE. Telemetry already says what gets used, which is a different question — a
@@ -75,6 +76,7 @@ export async function saveResponse(buyerId, { favorite, least, wish } = {}) {
          ON CONFLICT (buyer_id, round) DO UPDATE SET favorite = $2, least = $3, wish = $4, updated_at = NOW()`,
         [buyerId, fav, lst, note || null, SURVEY_ROUND]
     ).catch(() => {});
+    await trackActivity(buyerId, "survey_answer", { round: SURVEY_ROUND, favorite: fav, least: lst, wrote: Boolean(note) }).catch(() => {});
     return { ok: true };
 }
 

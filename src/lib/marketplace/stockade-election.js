@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { placeInStockade, releaseFromStockade, getOccupant } from "@/lib/marketplace/stockade.js";
 import { checkText } from "@/lib/marketplace/text-filter.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE STOCKADE ELECTION ────────────────────────────────────────────────────────────────────────────────────
 // Jinxx's idea, more or less verbatim: "a fun little bit to nominate someone for being in display in the town
@@ -207,6 +208,7 @@ export async function nominate(viewerId, target, crime = null) {
         `INSERT INTO mkt_stockade_nominee (election_id, buyer_id, crime, nominated_by) VALUES ($1, $2, $3, $4)
          ON CONFLICT DO NOTHING`, [state.election.id, targetId, text, viewerId]
     ).catch(() => {});
+    await trackActivity(viewerId, "stockade_nominate", { election: state.election.id, targetId }).catch(() => {});
     return { ok: true, ...(await getElection(viewerId)) };
 }
 
@@ -221,6 +223,7 @@ export async function castVote(viewerId, nomineeId) {
          ON CONFLICT (election_id, voter_id) DO UPDATE SET nominee_id = EXCLUDED.nominee_id, created_at = NOW()`,
         [state.election.id, viewerId, nomineeId]
     ).catch(() => {});
+    await trackActivity(viewerId, "stockade_vote", { election: state.election.id, nomineeId }).catch(() => {});
     return { ok: true, ...(await getElection(viewerId)) };
 }
 

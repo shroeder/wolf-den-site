@@ -8,6 +8,7 @@ import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Placed decorations render at 66px BASE, but the scale slider goes to 2.5x - so a maxed-out decoration
 // wants ~165 CSS px, which is ~495 device pixels on a 3x phone. Storing 320 meant those were being
@@ -212,6 +213,7 @@ export async function startCustomDeco(buyerId, name, prompt) {
         [row.id, JSON.stringify(opts)]
     ).catch(() => {});
     const credits = free ? (await db.queryOne(`SELECT COALESCE(custom_deco_credits,0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null))?.c ?? 0 : paid.custom_deco_credits;
+    await trackActivity(buyerId, "deco_custom_start", { draftId: Number(row.id), free: Boolean(free) }).catch(() => {});
     return { ok: true, draft: { id: Number(row.id), name: nm, prompt: desc, attempts: 1, maxAttempts: MAX_ATTEMPTS, options: opts, status: "drafting", pendingNote: "" }, credits, free };
 }
 

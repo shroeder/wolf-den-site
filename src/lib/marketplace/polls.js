@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── ASKING THE DEN A DESIGN QUESTION ─────────────────────────────────────────────────────────────────────────
 // The member survey answers one fixed shape — favourite system, least favourite, one wish — and it is good at
@@ -172,6 +173,7 @@ export async function savePollAnswers(buyerId, pollId, answers = {}, note = null
         wrote += 1;
     }
     if (!wrote) return { ok: false, error: "empty" };
+    await trackActivity(buyerId, "poll_answer", { pollId, answered: wrote }).catch(() => {});
     return { ok: true, answered: wrote };
 }
 
