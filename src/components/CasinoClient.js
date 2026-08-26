@@ -14,6 +14,41 @@ import Paytable from "@/components/casino/Paytable.js";
 import ChipStore from "@/components/casino/ChipStore.js";
 import { LINES as SLOT5_LINES, SLOTS5 } from "@/lib/marketplace/casino-slot5.js";
 
+// ── NO REQUEST ON THIS FLOOR MAY HANG FOR EVER ───────────────────────────────────────────────────────────────
+// Every call below used to be a bare `fetch(...).catch(() => null)`, and a bare fetch has no timeout: on a
+// phone that walks behind a wall mid-request, the promise simply never settles. Nothing here is written to
+// survive that, and two screens fail in a way that looks like a broken feature rather than a lost packet:
+//
+//   THE COUNTER sets its shelf to null while it loads, so a request that never lands leaves "Opening the
+//   case…" on screen for ever. Luke: "I keep getting stuck in this view when I switch tabs."
+//
+//   THE FLOOR latches `busy` before its request and clears it after. One unsettled call and `busy` is stuck
+//   true, at which point every guarded action — the handle, the rope, a keno ticket — returns at its first
+//   line and the room is dead until a reload. Luke: "I cant enter the vip lounge now even though im an owner."
+//
+// An abort after fifteen seconds turns both into an ordinary failure, which the code already knows how to
+// show. Fifteen rather than five: a cold Neon connection behind a cold lambda is genuinely slow sometimes,
+// and cutting off a request that was going to succeed is its own bug.
+const CAS_TIMEOUT_MS = 15000;
+async function casFetch(init) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), CAS_TIMEOUT_MS);
+    try {
+        const r = await fetch("/api/marketplace/casino", { ...init, signal: ctl.signal });
+        return await r.json();
+    } catch {
+        // Null is what every caller already treats as "that didn't go through" — a timeout is not a new
+        // failure mode to teach them, it is the one they have.
+        return null;
+    } finally {
+        clearTimeout(t);
+    }
+}
+/** POST an action to the floor. Returns the parsed body, or null if it failed or timed out. */
+const casPost = (body) => casFetch({
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+});
+
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────
 // A room laid out like the tavern: you walk left and right along it, the other people in it are really there,
 // and the things you walk up to are MACHINES rather than people. Luke's brief, and the reason it is a room at
@@ -496,10 +531,7 @@ export default function CasinoClient({ initial }) {
     useEffect(() => { xRef.current = x; }, [x]);
     useEffect(() => {
         const id = setInterval(() => {
-            fetch("/api/marketplace/casino", {
-                method: "POST", headers: { "content-type": "application/json" },
-                body: JSON.stringify({ action: "move", x: xRef.current, y: 72, facing }),
-            }).catch(() => {});
+            casPost({ action: "move", x: xRef.current, y: 72, facing });
         }, 2500);
         return () => clearInterval(id);
     }, [facing]);
@@ -731,10 +763,7 @@ export default function CasinoClient({ initial }) {
     // response shape. Two games behind one verb is how a payout path gets confused about which table it is
     // paying from. Returns the raw response to the component, which does all the revealing.
     const spin5 = useCallback(async (offerId, force) => {
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "spin5", bet, machine: at?.id, offer: offerId, force: force || undefined }),
-        }).then((x) => x.json()).catch(() => null);
+        const r = await casPost({ action: "spin5", bet, machine: at?.id, offer: offerId, force: force || undefined });
         if (!r?.ok) {
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
                 : r?.error === "closed" ? "This machine is not open yet."
@@ -749,18 +778,14 @@ export default function CasinoClient({ initial }) {
     // The shelf, and buying off it. Both go straight through to the server: the price is read from the
     // catalog there and `item` is only a key, so nothing this screen sends can change what anything costs.
     const shelf = useCallback(async (which = null) => {
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "chip_shelf", shelf: which }),
-        }).then((x) => x.json()).catch(() => null);
-        return r?.ok ? r : { items: [] };
+        const r = await casPost({ action: "chip_shelf", shelf: which });
+        // `failed` rather than an empty shelf: "the counter has nothing on this tab" and "the counter did not
+        // answer" are different things, and only one of them is worth offering a retry for.
+        return r?.ok ? r : { items: [], failed: true };
     }, []);
 
     const buyChip = useCallback(async (item) => {
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "chip_buy", item }),
-        }).then((x) => x.json()).catch(() => null);
+        const r = await casPost({ action: "chip_buy", item });
         if (r?.ok) setSt((p) => (p ? { ...p, chips: r.balance } : p));
         return r || { ok: false };
     }, []);
@@ -778,10 +803,7 @@ export default function CasinoClient({ initial }) {
         // slow network simply spins for longer instead of freezing on the previous result.
         setSpinning(true);
 
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "spin", bet, machine: at.id }),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost({ action: "spin", bet, machine: at.id });
 
         if (!r?.ok) {
             setSpinning(false); setBusy(false);
@@ -891,10 +913,7 @@ export default function CasinoClient({ initial }) {
         setBurst(null); setKenoOut(0);
         // Chips going down on the felt, not a UI blip.
         Cas.chips();
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost(body);
         if (!r?.ok) {
             setBusy(false);
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
@@ -967,10 +986,7 @@ export default function CasinoClient({ initial }) {
         // Chips down, then the shoe. The cards themselves are voiced by the reveal effect, on the same clock
         // the animation uses — firing one here as well would sound a card that is not on the felt yet.
         if (action === "bj_deal") { Cas.chips(); timers.current.push(setTimeout(() => Cas.shoe(), 140)); }
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action, ...body }),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost({ action, ...body });
         setBusy(false);
         if (!r?.ok) {
             setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
@@ -1011,7 +1027,7 @@ export default function CasinoClient({ initial }) {
     const BALL_MS = 85;
     useEffect(() => {
         const id = setInterval(async () => {
-            const r = await fetch("/api/marketplace/casino").then((x2) => x2.json()).catch(() => null);
+            const r = await casFetch({ method: "GET" });
             // The rounds ride along on the poll that was already running for the other people in the room.
             // A shared game needs no channel of its own: the draw is something the floor learns
             // the next time it looks, which is at most six seconds and usually less.
@@ -1038,10 +1054,7 @@ export default function CasinoClient({ initial }) {
         setBusy(true); setErr(null); setFlash(null); setPrize(null); setNote(null); setWonPet(null);
         setCard(null); setCalled(0); setBurst(null); setDragon(null); setDragonLit(0);
         Cas.chips();
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "bingo", bet, force: force || undefined }),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost({ action: "bingo", bet, force: force || undefined });
         if (!r?.ok) {
             setBusy(false);
             setErr(r?.error === "no_gold" ? "Not enough gold for that card." : "That didn't go through.");
@@ -1190,10 +1203,7 @@ export default function CasinoClient({ initial }) {
         // A coin genuinely spinning in the air. The wobble is a detune that widens as it slows, which is
         // the one sound in the building that is a physical object rather than a machine.
         Cas.flip(700);
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "gamble", machine: at?.id }),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost({ action: "gamble", machine: at?.id });
         setBusy(false);
         if (!r?.ok) { setErr("That didn't go through."); return; }
         setSt((p) => ({ ...p, gold: r.gold }));
@@ -1218,10 +1228,7 @@ export default function CasinoClient({ initial }) {
         if (busy) return;
         unlock();
         setBusy(true); setErr(null);
-        const r = await fetch("/api/marketplace/casino", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "vip_enter" }),
-        }).then((x2) => x2.json()).catch(() => null);
+        const r = await casPost({ action: "vip_enter" });
         setBusy(false);
         if (!r?.ok) {
             setErr(r?.error === "not_vip" ? "The rope stays where it is." : "That didn't go through.");

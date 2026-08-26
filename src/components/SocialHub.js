@@ -711,9 +711,17 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
         // The rooms this member can see come back with the feed rather than from a second endpoint — the hub
         // needs them to decide which tabs exist, and they are already computed to answer this request.
         if (d?.channels) onChannels?.(d.channels);
-        // That GET marked the feed read server-side; clear the local count now instead of waiting up to 30s
-        // for the next unread poll to catch up. Only the global feed has an unread count.
-        if (d?.authenticated && channel === "global") onRead?.();
+        // ── READING A ROOM CLEARS THAT ROOM, NOT JUST THE PLAZA ──────────────────────────────────────
+        // This was gated on `channel === "global"`, and the server never has been: the GET stamps
+        // markChannelSeen for whichever room was asked for. So News, VIP and Staff were marked read in the
+        // database and left badged on screen — and because a badge is hidden while you STAND in its tab, it
+        // looked cleared until you switched away, at which point it came back. The only thing that ever
+        // took it off was "Mark all read", which is exactly what Luke described.
+        //
+        // Now every room clears its own count the moment its feed lands, which is the rule the plaza already
+        // had. The 30s unread poll would have corrected it eventually; a badge that outlives the thing it is
+        // counting for half a minute is still a badge that lies.
+        if (d?.authenticated) onRead?.();
     }, [onRead, channel, onChannels]);
 
     useEffect(() => {
@@ -771,7 +779,11 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     const away = roster.filter((m) => !m.online);
 
     return (
-        <div className="social-global has-rail">
+        {/* `has-rail` is what turns this into two columns, so it is conditional on there BEING a rail — an
+            empty roster with the class on would reserve the column and leave the conversation talking to a
+            76px strip of nothing. It was unconditional while the phone layout ignored the grid; now that the
+            grid is the layout at every width, it has to mean what it says. */}
+        <div className={`social-global${roster.length ? " has-rail" : ""}`}>
             {note ? <p className="social-note" role="status">{note}</p> : null}
             {roster.length ? (
                 <aside className="social-rail" aria-label="Who is in this room">

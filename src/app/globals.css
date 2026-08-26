@@ -6914,72 +6914,91 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    one you could not read — it showed through the composer half-faded, which reads as the chat jumping. */
 .social-global-feed { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; padding-bottom: 14px; }
 /* ── WHO IS IN THIS ROOM ────────────────────────────────────────────────────────────
-   PHONE FIRST, and on a phone the rail is NOT a rail. A 150px column beside the conversation on a 375px
-   screen leaves about 200px for the messages, which is the one thing on this screen that must not be made
-   narrower. So below 720px it collapses to a horizontal strip of faces that scrolls sideways above the
-   composer — the same information, costing one line instead of half the width.
+   Luke: "I was really hoping for a list of the players on the right side not across the top... I just want
+   it listed vertically not across the top."
 
-   The feed keeps its own scroll in both layouts; only the wide one puts the two side by side. */
-/* PHONE: one line, pinned. It sits above the feed and stays there while the conversation scrolls under it,
-   because the answer to "who can I talk to" should not require scrolling to the bottom of the room. */
-.social-rail { display: block; position: sticky; top: 0; z-index: 2; padding: 6px 0 7px;
-    background: #0e131a; border-bottom: 1px solid #1b232e; }
-.social-rail-h { margin: 0 0 6px; font-size: 10.5px; font-weight: 900; letter-spacing: .12em;
-    text-transform: uppercase; color: #6f7a87; }
+   It used to be a sideways strip of chips on a phone and a real rail only above 720px. Three things wrong
+   with the strip, all of them visible in one screenshot: the chips were pill-sized so three of them filled
+   the width and everyone after that hid behind a horizontal scroll nobody thinks to try; it cost a whole
+   line above the conversation; and being sticky at top:0 inside a body with 12px of padding, it left a 12px
+   band above itself that the newest message scrolled through — which reads as a gap, because it is one.
+
+   So it is a rail at EVERY width now. The width it costs on a phone is bought back by dropping the pill and
+   stacking the row — portrait, name, role, one under the other — which fits in 76px. */
+.social-global.has-rail { display: grid; grid-template-columns: minmax(0, 1fr) 76px;
+    grid-template-areas: "note note" "feed rail" "composer rail"; align-content: start; column-gap: 10px; }
+/* The rail is FIRST in the DOM so a screen reader meets the room before the conversation; named grid areas
+   put it back on the right without moving the markup, and keep the feed and the composer in one column. */
+/* A refused message belongs ABOVE the conversation it was refused from. Named into the template rather
+   than left to auto-placement: with every other child in an explicit area, a bare `grid-column: 1 / -1` gets
+   an implicit row AFTER them, which put the refusal under the composer. The row collapses to nothing on the
+   normal case where there is no note. */
+.social-global.has-rail > .social-note { grid-area: note; }
+.social-global.has-rail > .social-global-feed { grid-area: feed; }
+.social-global.has-rail > .social-global-composer { grid-area: composer; }
+/* NO BACKGROUND AND NO BOTTOM BORDER. The strip needed both because the conversation scrolled underneath it;
+   a column has nothing passing behind it, so the only edge it needs is the one dividing it from the feed.
+   Sticky at 0 rather than at the body's padding — that inset was the gap. */
+.social-rail { grid-area: rail; align-self: start; position: sticky; top: 0; z-index: 2;
+    max-height: min(62vh, 540px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 2px 0 6px 8px; border-left: 1px solid #1b232e; scrollbar-width: thin; }
+.social-rail-h { margin: 0 0 6px; font-size: 8.5px; font-weight: 900; letter-spacing: .08em;
+    text-transform: uppercase; color: #6f7a87; text-align: center; }
 .social-rail-h b { color: #5affaf; font-variant-numeric: tabular-nums; }
-.social-rail-list { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto;
-    -webkit-overflow-scrolling: touch; scrollbar-width: thin; padding-bottom: 4px; }
-.social-rail-m { flex: 0 0 auto; display: flex; align-items: center; gap: 7px; min-height: 36px;
-    padding: 4px 9px 4px 4px; border-radius: 999px; background: #141a23; border: 1px solid #232c38; }
-.social-rail-m.is-on { border-color: #2c5a45; background: #131e1a; }
-.social-rail-av { position: relative; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+.social-rail-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+/* STACKED on a phone: 76px is not enough for a portrait BESIDE two lines of text, and shrinking the text to
+   make it fit is how you get a rail of ellipses. */
+.social-rail-m { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; border-radius: 9px; }
+.social-rail-m.is-on { background: #101a17; }
+.social-rail-av { position: relative; flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
     overflow: hidden; background: #1d2531; display: grid; place-items: center; }
 .social-rail-av img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
-/* The dot rides on the portrait, so the text column stays two clean lines. Ringed in the card's own
+/* The dot rides on the portrait, so the text below it stays two clean lines. Ringed in the panel's own
    background so it reads as sitting ON the avatar rather than punched through it. */
-.social-rail-dot { position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%;
-    background: #5affaf; box-shadow: 0 0 0 2px #131e1a, 0 0 6px rgba(90,255,175,.8); }
-.social-rail-who { display: grid; gap: 0; min-width: 0; }
-.social-rail-who b { font-size: 12px; color: #eaf1f8; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; max-width: 108px; }
-.social-rail-who i { font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: .06em;
+.social-rail-dot { position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%;
+    background: #5affaf; box-shadow: 0 0 0 2px #0e131a, 0 0 5px rgba(90,255,175,.8); }
+.social-rail-who { display: grid; gap: 1px; min-width: 0; justify-items: center; text-align: center; }
+.social-rail-who b { font-size: 9.5px; line-height: 1.25; color: #eaf1f8; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 66px; }
+.social-rail-who i { font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .05em;
     text-transform: uppercase; color: #6f7a87; }
 /* A ROLE is not a rank you can grind to, so it must not look like one. */
 .social-rail-who i.is-role { color: #ffd75e; }
 /* The badge is the SAME component the messages use — same rule, same colours — but a message header has a
-   whole row to itself and a rail row has two short lines. Scaled down here rather than forked, so a retune of
-   the badge still reaches both. */
-.social-rail .gchat-role { font-size: 8.5px; padding: 1px 6px; border-radius: 999px; line-height: 1.5;
-    justify-self: start; }
-.social-rail-split { flex: 0 0 auto; display: grid; place-items: center; padding: 0 4px; }
-.social-rail-split span { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+   whole row to itself and a rail cell has 76px. Scaled down here rather than forked, so a retune of the
+   badge still reaches both. */
+.social-rail .gchat-role { font-size: 7px; padding: 0 4px; border-radius: 999px; line-height: 1.6;
+    max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The divider between "here now" and "also in this room" is a rule with a word on it, not a row of its own —
+   at this width a centred caption would wrap. */
+.social-rail-split { display: grid; place-items: center; padding: 6px 0 2px; }
+.social-rail-split span { font-size: 7.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
     color: #4d5663; white-space: nowrap; }
 
 @media (min-width: 720px) {
-    /* WIDE: the rail becomes a rail. The feed takes the remaining width and both scroll independently, so a
-       long roster cannot push the composer off the bottom of the conversation. */
-    .social-global.has-rail { display: grid; grid-template-columns: minmax(0, 1fr) 190px;
-        grid-template-areas: "feed rail" "composer rail"; align-content: start; column-gap: 14px; }
-    /* The rail is FIRST in the DOM so a phone reads it before the conversation; grid puts it back on the
-       right here without moving the markup. Named areas rather than `order`, because the feed and the
-       composer have to stay in one column together. */
-    .social-global.has-rail > .social-note { grid-column: 1 / -1; }
-    .social-global.has-rail > .social-global-feed { grid-area: feed; }
-    .social-global.has-rail > .social-global-composer { grid-area: composer; }
-    .social-global.has-rail > .social-rail { grid-area: rail; align-self: start; position: sticky; top: 8px;
-        max-height: min(70vh, 620px); overflow-y: auto; padding: 0 0 0 12px; background: transparent;
-        border-left: 1px solid #232c38; border-bottom: 0; border-right: 0; }
-    .social-global.has-rail .social-rail-list { flex-direction: column; overflow-x: visible; gap: 3px; }
-    .social-global.has-rail .social-rail-m { width: 100%; border: 0; background: transparent; border-radius: 9px;
-        padding: 4px 6px; }
+    /* WIDE: the same rail, given room to lay each member out as a row again — portrait beside the name, the
+       way the messages below it are built. */
+    .social-global.has-rail { grid-template-columns: minmax(0, 1fr) 190px; column-gap: 14px; }
+    .social-global.has-rail > .social-rail { top: 8px; max-height: min(70vh, 620px); padding: 0 0 0 12px;
+        border-left: 1px solid #232c38; }
+    .social-global.has-rail .social-rail-h { text-align: left; font-size: 10.5px; letter-spacing: .12em; }
+    .social-global.has-rail .social-rail-list { gap: 3px; }
+    .social-global.has-rail .social-rail-m { grid-auto-flow: column; grid-template-columns: auto minmax(0, 1fr);
+        justify-items: start; align-items: center; gap: 7px; width: 100%; padding: 4px 6px; }
     .social-global.has-rail .social-rail-m:hover { background: #141a23; }
     .social-global.has-rail .social-rail-m.is-on { background: transparent; }
     .social-global.has-rail .social-rail-m.is-on:hover { background: #131e1a; }
-    .social-global.has-rail .social-rail-dot { box-shadow: 0 0 0 2px #0e131a, 0 0 6px rgba(90,255,175,.8); }
-    .social-global.has-rail .social-rail-who b { max-width: 120px; }
-    .social-global.has-rail .social-rail-split { justify-items: start; padding: 9px 6px 3px; }
+    .social-global.has-rail .social-rail-av { width: 28px; height: 28px; }
+    .social-global.has-rail .social-rail-dot { width: 9px; height: 9px; }
+    .social-global.has-rail .social-rail-who { justify-items: start; text-align: left; gap: 0; }
+    .social-global.has-rail .social-rail-who b { font-size: 12px; max-width: 120px; }
+    .social-global.has-rail .social-rail-who i { font-size: 9.5px; letter-spacing: .06em; }
+    .social-global.has-rail .social-rail .gchat-role,
+    .social-global.has-rail .gchat-role { font-size: 8.5px; padding: 1px 6px; line-height: 1.5;
+        justify-self: start; max-width: 120px; }
+    .social-global.has-rail .social-rail-split { justify-items: start; place-items: center start; padding: 9px 6px 3px; }
+    .social-global.has-rail .social-rail-split span { font-size: 9.5px; letter-spacing: .08em; }
 }
-
 .social-global-composer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 2px; /* Opaque by 60% rather than 34%: the transparent stretch let the newest message read through the composer,
      which looked like the text was drifting rather than being covered. */
     background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 60%); }
@@ -18473,6 +18492,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    centres the game without measuring anything. On a machine with more in it than fits (bingo, blackjack)
    there is no slack, both margins collapse to zero, and this rule does nothing at all. */
 .cas-stage .cas-panel-head + * { margin-top: auto; }
+/* ── EXCEPT A SHELF, WHICH HANGS FROM THE TOP ──
+   Luke: "it shouldn't bump down the tabs and the whole content depending on the tab, it should always be
+   anchored to the top like it is for Chests."
+
+   The rule above centres a MACHINE in the slack, which is right for a machine: a slot is three reels and two
+   lines of text and it should sit in the middle of the room. The Counter is a scrolling list with no
+   .cas-controls under it, so the auto margin had nothing to share the slack with and shoved the whole shelf
+   to the bottom — by exactly as much as the shortest tab was short. Four doors sat nearly two hundred pixels
+   lower than five chests, which moved the tab bar you had just tapped out from under your thumb. */
+.cas-stage .cas-panel-head + .cs { margin-top: 0; }
 
 /* THE CONTROLS ARE PINNED. `margin-top: auto` pushes them to the bottom when the game is short, and the
    sticky keeps them on screen when it is not — so the button you are reaching for is in the same place
@@ -19188,6 +19217,12 @@ body.cas-seated .social-fab { display: none; }
    glow. It is the one thing in the room that is not a game, and it should read as furniture. */
 .cs { display: grid; gap: 10px; }
 .cs-wait { text-align: center; color: #8f98a3; font-size: 13px; padding: 18px 0; }
+/* A request that did not land is a thing you can do something about, so it gets a button rather than a
+   sentence. It stands where a row would, so it is styled like one. */
+.cs-retry { display: inline-block; margin-left: 8px; padding: 5px 12px; border-radius: 8px; font-size: 12.5px;
+    font-weight: 800; color: #ffd75e; background: rgba(255,215,94,.1);
+    border: 1px solid rgba(255,215,94,.34); cursor: pointer; }
+.cs-retry:active { background: rgba(255,215,94,.2); }
 .cs-head { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
 .cs-head b { font-family: var(--font-display); font-size: 2rem; color: #ffd75e; font-variant-numeric: tabular-nums; }
 .cs-head i { font-style: normal; font-size: 12px; color: #8f98a3; }

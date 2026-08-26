@@ -27,27 +27,43 @@ import { db } from "@/lib/db";
 // only, not crit chance or power." items.js already draws that exact line ("THE FOUR YOU BUILD" against "THE
 // CRITS"), which is the right one: the four are linear and always useful, and the crits multiply everything
 // else, so an infinite track on one of those compounds against every other source in the game.
+// ── AND EACH ONE IS CALLED AFTER THE STAT IT BUYS ────────────────────────────────────────────────────────────
+// Luke: "just list the stat it upgrades, you are confusing me because it's not the stat name and description."
+//
+// They were Whetstone, Constitution, Bulwark and Bloodrush — four invented names for four stats that already
+// have names, printed above four sentences that never said which stat was underneath. Nothing on the card
+// answered the only question a buyer has, which is "what does this raise". The flavour was costing more than
+// it was worth, so the title is the stat and the sentence under it says what that stat does.
+//
+// The art keeps its old filename: it is the same drawing, and renaming four webps to rename four labels is a
+// migration for nothing.
 export const STAT_TRACKS = [
-    { perk: "might", stat: "might", art: "/images/casino/perks/whetstone.webp", name: "Whetstone", per: 2,
+    { perk: "might", stat: "might", art: "/images/casino/perks/whetstone.webp", name: "Might", per: 1,
         blurb: "Multiplies your weapon's damage. The whole of what you hit for." },
-    { perk: "vitality", stat: "vitality", art: "/images/casino/perks/constitution.webp", name: "Constitution", per: 2,
+    { perk: "vitality", stat: "vitality", art: "/images/casino/perks/constitution.webp", name: "Vitality", per: 1,
         blurb: "How much punishment you can take before somebody takes it off you." },
-    { perk: "tenacity", stat: "tenacity", art: "/images/casino/perks/bulwark.webp", name: "Bulwark", per: 2,
+    { perk: "tenacity", stat: "tenacity", art: "/images/casino/perks/bulwark.webp", name: "Tenacity", per: 1,
         blurb: "Multiplies the armour you are wearing. 500 tenacity doubles it." },
-    { perk: "ferocity", stat: "ferocity", art: "/images/casino/perks/bloodrush.webp", name: "Bloodrush", per: 2,
+    { perk: "ferocity", stat: "ferocity", art: "/images/casino/perks/bloodrush.webp", name: "Ferocity", per: 1,
         blurb: "Chance to take another turn immediately. One percent for every five points." },
 ];
 
 // ── THE PRICE LADDER ─────────────────────────────────────────────────────────────────────────────────────────
-// 250 for the first, +250 every time, for ever. LINEAR growth against a linear benefit, which is what makes it
-// safe to leave uncapped: the tenth point costs 2,500 and the hundredth costs 25,000, so the cost of the NEXT
-// point rises exactly as fast as the number of points you have. A member who has bought a hundred has paid
-// 12.6 million chips for +200 of one stat, and the same again buys only +200 more.
+// Luke: "make it 500 and it goes up 500 each time." 500 for the first, +500 every time, for ever. LINEAR
+// growth against a linear benefit, which is what makes it safe to leave uncapped: the tenth point costs 5,000
+// and the hundredth costs 50,000, so the cost of the NEXT point rises exactly as fast as the number of points
+// you have. A member who has bought a hundred has paid 25.25 million chips for +100 of one stat, and the same
+// again buys only +100 more.
 //
 // That is the whole reason there is no ceiling. An exponential ladder would need one (it becomes unreachable
 // and the track is a lie); a flat one would need one (it becomes the only thing worth buying). Linear needs
 // nothing: it is self-limiting and it stays honest at every level.
-export const STAT_STEP = 250;
+//
+// PRICED AGAINST A POINT, NOT AGAINST A PURCHASE. The step doubled at the same time `per` halved from 2 to 1,
+// so a point of a stat costs four times what it did. That is deliberate: at 250 for +2 the four tracks were
+// the cheapest stats in the game by a wide margin — 644 of gear is the best-in-slot ceiling (see the note in
+// items.js) and 80,000 chips would have bought that much Might outright.
+export const STAT_STEP = 500;
 export const statCost = (level = 0) => STAT_STEP * (Math.max(0, Math.floor(level)) + 1);
 
 // ── THE FIVE DOORS ───────────────────────────────────────────────────────────────────────────────────────────

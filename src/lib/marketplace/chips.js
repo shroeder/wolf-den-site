@@ -71,15 +71,15 @@ export const CHIP_STORE = [
     //
     // Repeatable, deliberately: `once` is right for a decoration you either own or do not, and wrong for a
     // chest, which is the whole reason to come back.
-    { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 10500,
+    { id: "chest_mythic", kind: "chest", ref: "mythic", name: "Mythic Chest", price: 20000,
         blurb: "Legendaries are ordinary in here. Mythics are not." },
-    { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 27000,
+    { id: "chest_ascendant", kind: "chest", ref: "ascendant", name: "Ascendant Chest", price: 75000,
         blurb: "The first chest that can hand you an ascendant piece at all." },
-    { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 60000,
+    { id: "chest_eternal", kind: "chest", ref: "eternal", name: "Eternal Chest", price: 500000,
         blurb: "Nothing below it opens this often onto the eternal tier." },
-    { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 135000,
+    { id: "chest_celestial", kind: "chest", ref: "celestial", name: "Celestial Chest", price: 1000000,
         blurb: "One of only two chests that can hold a celestial piece." },
-    { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 300000,
+    { id: "chest_primordial", kind: "chest", ref: "primordial", name: "Primordial Chest", price: 10000000,
         blurb: "The rarest object on the floor. A one percent tail on the rarest tier in the game." },
 ];
 // ── AND THE VENDOR BEHIND THE ROPE ─────────────────────────────────────────────────────

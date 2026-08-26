@@ -26,6 +26,9 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
     // different decisions and a member scrolling past a 100,000-chip door to find a 10,500-chip chest is
     // being asked to compare things that have nothing to do with each other.
     const [tab, setTab] = useState("chest");
+    // Bumped by "Try again". A counter rather than a boolean, so a second failure re-runs the effect a second
+    // time — a flag would already be true and change nothing.
+    const [reload, setReload] = useState(0);
 
     // Refetched per tab. The server prices a stat track from the level the member holds RIGHT NOW, so a
     // shelf cached across a purchase would quote the old price — see basePriceFor.
@@ -33,10 +36,10 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
         let live = true;
         setShelf(null);
         onRefresh(tab === "chest" ? null : tab)
-            .then((r) => { if (live) setShelf(r); })
-            .catch(() => { if (live) setShelf({ items: [] }); });
+            .then((r) => { if (live) setShelf(r || { items: [], failed: true }); })
+            .catch(() => { if (live) setShelf({ items: [], failed: true }); });
         return () => { live = false; };
-    }, [onRefresh, tab]);
+    }, [onRefresh, tab, reload]);
 
     const buy = useCallback(async (item) => {
         if (busy || item.owned || !item.afford) return;
@@ -59,12 +62,18 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
         }
     }, [busy, onBuy]);
 
-    if (!shelf) return <p className="cs-wait">Opening the case…</p>;
-
+    // ── THE CHROME STAYS UP WHILE THE SHELF LOADS ────────────────────────────────────────────────────────
+    // This used to return the loading line INSTEAD of the whole component, which took the tab bar off screen
+    // with it — so a tab that was slow to answer left you looking at "Opening the case…" with no way back to
+    // the tab that had worked a second ago. Luke: "I keep getting stuck in this view when I switch tabs."
+    //
+    // The balance, the tabs and the frame are all known before any request is made, so they are drawn first
+    // and only the shelf itself waits. Switching away from a stalled tab is now the obvious thing to do
+    // rather than a reload.
     return (
         <div className="cs">
             <div className="cs-head">
-                <b>{Number(chips ?? shelf.balance ?? 0).toLocaleString()}</b>
+                <b>{Number(chips ?? shelf?.balance ?? 0).toLocaleString()}</b>
                 <i>chips</i>
             </div>
             <p className="cs-intro">Won at the machines. Good here and nowhere else.</p>
@@ -82,7 +91,15 @@ export default function ChipStore({ chips, onBuy, onRefresh }) {
             {said ? <p className={`cs-said${said.good ? " is-good" : ""}`}>{said.text}</p> : null}
 
             <div className="cs-shelf">
-                {shelf.items.map((item) => (
+                {!shelf ? <p className="cs-wait">Opening the case…</p>
+                    : shelf.failed ? (
+                        <p className="cs-wait">
+                            The counter didn&apos;t answer.
+                            <button type="button" className="cs-retry"
+                                onClick={() => { unlock(); setReload((n) => n + 1); }}>Try again</button>
+                        </p>
+                    ) : shelf.items.length === 0 ? <p className="cs-wait">Nothing on this shelf.</p>
+                        : shelf.items.map((item) => (
                     <button key={item.id} type="button"
                         className={`cs-item${item.owned ? " is-owned" : ""}${!item.afford && !item.owned ? " is-dear" : ""}`}
                         onClick={() => {
