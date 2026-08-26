@@ -114,18 +114,19 @@ const COLLAPSE_SEAM_TIER = 1;
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
 // The Miner's Lamp buys five floors of safe roof — the same lever Shoring buys, which is what makes it
 // legible: a member who owns both can add the two numbers themselves.
-// ── EVERY THIRD LEVEL FROM THE FIRST, NOT FROM THE THIRD ─────────────────────────────────────────────────
-// ValkyrieSylve: "what's the incentive to level up shoring all the way to 10 if you get the max safe steps
-// at 9?" None — and it was arithmetic, not intent. The track runs to 10 and paid on floor(n/3), which lands
-// on 3, 6 and 9; ten is not divisible by three, so the last level of the track bought literally nothing. The
-// first two were the same dead ground at the other end: two upgrades before anything moved.
+// ── EVERY THIRD LEVEL, FROM THE THIRD ────────────────────────────────────────────────────────────────────
+// This briefly paid on 1, 4, 7 and 10 instead of 3, 6 and 9, on the reasoning that the last level of a track
+// should buy something — ValkyrieSylve had asked in the plaza why you would take Shoring to 10 when the top
+// safe step lands at 9. The arithmetic was right and the trade was not: shifting the cadence hands a fourth
+// free floor to a maxed miner and a free floor to somebody who has bought exactly one upgrade, which turns
+// the opening of every run into a formality. Luke: "that made digging way too easy, it gives you like four
+// extra 0% risk steps, which is not what I wanted — undo that."
 //
-// Shifted by two, so the steps land on 1, 4, 7 and 10. Same cadence, same three-level spacing, same value at
-// zero — but the first level of the track does something and the last level of the track finishes it, which
-// is the least a maxed track can owe you. It is a small buff to early miners, which is the direction the
-// plaza was already pointing: "it is brutal sometimes even with upgrades."
+// Undone. The dead tenth level comes back with it and is the better problem to have: a track whose last rung
+// is flat is a tuning complaint, and a push-your-luck game whose first four steps cannot fail is not a
+// push-your-luck game. If level 10 should pay, it should pay in something that is not safe depth.
 export const safeDepthFor = (shoringLevel = 0, lamp = false) =>
-    COLLAPSE_FREE_DEPTH + Math.floor((Math.max(0, shoringLevel) + 2) / 3) + (lamp ? 5 : 0);
+    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? 5 : 0);
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
 const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
 const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.
@@ -683,14 +684,6 @@ const MINE_CONSUMABLES = {
     // Still here, still worth finding — just no longer one pull in five.
     sail_lucky_lure: 6,
 };
-// Painted chest icon for a tier (the same art the equipment screen shows), or null if none was generated.
-async function chestArtFor(tier) {
-    const { getChestArt } = await import("@/lib/marketplace/chest-art.js");
-    const art = await getChestArt().catch(() => ({}));
-    const v = art?.[tier];
-    return (typeof v === "string" ? v : v?.url) || null;
-}
-
 /** One weighted pick off a { id: weight } table. */
 function pickWeighted(table) {
     const entries = Object.entries(table);
@@ -1454,14 +1447,16 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     for (let i = 0; i < Math.round(flux * 12); i += 1) bag.push("up");
     for (let i = 0; i < Math.round(bellows * 12); i += 1) bag.push("extra");
     for (let i = 0; i < Math.round(sEff.extraPartChance * 12); i += 1) bag.push("extra");
-    // A curio is the "ooh" — but a DELIBERATELY small one. The seam and the chests are where real gear comes
-    // from; a smelt turning up a legendary would make the furnace the best loot source in the game for the
-    // price of five taps. So: consumables and low chests only, and only off a genuinely good run.
-    if (band.key === "pixel") bag.push("curio", "curio");
-    else if (band.key === "perfect") bag.push("curio");
-    // Crucible affinity is the ONLY way a merely-clean pour turns up a curio, so the stat has somewhere to
-    // matter beyond making good runs better.
-    if (sEff.curioBonus > 0 && Math.random() < sEff.curioBonus) bag.push("curio");
+    // ── NO CURIO TICKETS IN THE BAG ──────────────────────────────────────────────────────────────────────
+    // They used to live here, two of them on a flawless pour, and the bag is drawn from ONCE PER BATCH PER
+    // DRAW. That was written when a pour was ten batches; SMELT_MAX_BATCHES is 200, and there are two draws
+    // each, so a good pour rolled the same 5% curio chance four hundred times. Luke, on one screenshot:
+    // "no wonder the economy and chest economy is inflated" — six iron chests and eleven consumables out of
+    // a single pour, and that was a 97-batch one.
+    //
+    // The fix is the one the overflow below already uses and already explains: roll it ONCE FOR THE POUR.
+    // Everything that scales with batch count has to be something you spent ore on; a curio is a bonus, and
+    // a bonus that multiplies by how much you happened to have in the hopper is not a bonus, it is a faucet.
 
     // ONE OR TWO PARTS from a batch, decided by how the whole hand went — not one lucky pour. A clean run is
     // worth a second part; a scrappy one still gets you the one you paid for. Never more than two: the batch
@@ -1484,10 +1479,22 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
             // No GEAR from the furnace. It used to roll gear here, which is the one thing that makes a side
             // activity outshine the loop it feeds — smelting exists to supply the Forge, not to replace it.
             else if (ticket === "extra") { add(o.part, 2); extras += 1; }
-            else if (ticket === "curio") curios.push(Math.random() < 0.72 ? "consumable" : "chest");
             else add(o.part, 1);
         }
     }
+
+    // ── ONE CURIO ROLL, FOR THE WHOLE POUR ───────────────────────────────────────────────────────────────
+    // Band-gated so a good pour is still the reason to play the heat bar, and the Crucible affinity still has
+    // somewhere to matter. A flawless hand finds something about a third of the time; a merely clean one
+    // finds nothing unless the stat carries it. Against the four hundred rolls this replaced, that is the
+    // "reduce the chance by a lot" it needs to be.
+    //
+    // AND NEVER A CHEST. Luke: "we should definitely not be giving out chests when you do this at all." The
+    // furnace was minting iron chests by the half-dozen into an economy that already has five chest sources,
+    // and a chest is supposed to be a scoped reward for the thing that dropped it. Consumables only.
+    const CURIO_CHANCE = { pixel: 0.35, perfect: 0.20, great: 0.08 };
+    const curioOdds = Math.min(0.6, (CURIO_CHANCE[band.key] || 0) + (sEff.curioBonus || 0));
+    if (curioOdds > 0 && Math.random() < curioOdds) curios.push("consumable");
 
     // ── THE POT RUNS OVER ────────────────────────────────────────────────────────────────────────────────────
     // The Crucible's last two levels, rolled ONCE for the whole pour rather than per batch. Per batch it would
@@ -1506,20 +1513,13 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     // whole pack, so anything that was "a handful of round trips" at ten is a queue of them at ninety. The
     // chests are all the same tier by definition (the line below is a function of the ore, not the ticket),
     // so they are one call with a count and one art lookup no matter how many turned up.
+    // The chest branch that stood here is deleted rather than left behind a condition that can no longer be
+    // true. A furnace does not hand out chests any more, and unreachable code that mints currency is the
+    // worst kind to leave lying about — it reads as a live feature to the next person and it is one edit away
+    // from being one again.
     const bonus = [];
-    // Capped at iron. A gold chest out of a furnace is exactly the "crazy good" this should not be.
-    const chestTier = t >= 3 ? "iron" : "wooden";
-    const chestCount = curios.filter((c) => c === "chest").length;
-    if (chestCount > 0) {
-        await addChests(buyerId, { [chestTier]: chestCount }, { source: "mining" }).catch(() => {});
-        // Hand back the ART with the chest, the way grantMiningConsumable does. Without it the reveal had
-        // nothing to draw and printed the words "wooden chest" next to a sprite-less gap.
-        const art = await chestArtFor(chestTier);
-        const name = `${chestTier[0].toUpperCase()}${chestTier.slice(1)} chest`;
-        for (let i = 0; i < chestCount; i += 1) bonus.push({ kind: "chest", tier: chestTier, name, art });
-    }
     for (const c of curios) {
-        if (c === "chest") continue;
+        if (c !== "consumable") continue;
         // eslint-disable-next-line no-await-in-loop
         const got = await grantMiningConsumable(buyerId);
         if (got) bonus.push({ kind: "consumable", ...got });
