@@ -283,6 +283,19 @@ export async function openChest(buyerId, tier) {
     if (!def) return { ok: false, error: "unknown_tier" };
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+    // ── THE BURN SIDE OF THE LEDGER ──────────────────────────────────────────────────────────────────────
+    // The decrement above was the only record that a chest ever left circulation, and a decrement is not a
+    // record — it is the absence of one. Every question worth asking about the chest economy needs this row:
+    // how many are opened against how many are handed out, whether the pile is growing, what the sink rate
+    // is. mkt_chest_grant has always had the mint half; this is the other one.
+    //
+    // Written immediately after the guarded UPDATE that proves a chest was actually taken, so a row can never
+    // claim an open that did not happen. Best-effort like the grant side: an analytics write must never be
+    // the reason somebody loses a chest they have already spent.
+    await db.query(
+        `INSERT INTO mkt_chest_open (buyer_id, tier, count, source) VALUES ($1, $2, 1, $3)`,
+        [buyerId, tier, "open"],
+    ).catch(() => {});
     await trackActivity(buyerId, "open_chest", { tier });
     // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
     // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
