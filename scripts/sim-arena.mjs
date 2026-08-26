@@ -29,7 +29,10 @@ import {
     accuracyFromFerocity, BLEED_TURNS, DRAIN_SHARE, FEAST_SHARE, FREE_KINDS, guardSoakFrom, healthFrom,
     RIPOSTE_SHARE, SHIELD_CAP, speedOf, SUNDER_CUT, SUNDER_TURNS, swingFrom, WARD_SOAK,
 } from "../src/lib/marketplace/arena-kit.js";
-import { arenaRating, counterBlow, drinkFor, lightBurn, openWound, ringStats, throwBlows } from "../src/lib/marketplace/arena-engine.js";
+// `ringStats` was folded into fighterFrom when NPCs stopped being a special case (see the note at the top of
+// arena-engine.js). It was still in this import list and unused — which made the whole module fail to load,
+// hidden behind the alias problem that stopped the file starting at all.
+import { arenaRating, counterBlow, drinkFor, lightBurn, openWound, throwBlows } from "../src/lib/marketplace/arena-engine.js";
 import { npcAbilities, npcFor, tierForRating } from "../src/lib/marketplace/arena-npc.js";
 
 const RUNS = Number(process.argv[2]) || 2000;

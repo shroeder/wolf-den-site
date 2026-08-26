@@ -17571,12 +17571,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Luke, twice: "extend the animation frame vertically so we can see more" and then "make the play area
    taller so I can see more of it." 58vh -> 68vh. Every object in the room is a fraction OF --room, so
    the whole scene grows together rather than the cabinets staying put in a taller box. */
-/* ── HOW TALL THE ROOM IS ──
-   Luke: "is it possible to make the animation area taller?" It is, and it was the smaller of the two numbers
-   below doing the damage — see the short-screen rule. The room is where every animation on this floor
-   happens: the walk, the cabinets lighting as you pass, the rope, the people. Everything under it is a list
-   that can be scrolled to. */
-.cas-roomwrap { position: relative; --room: clamp(240px, 76vh, 760px); }
+/* ── HOW TALL THE ROOM IS, AND WHY IT CANNOT JUST GROW ──
+   Luke asked for a taller animation area, so I raised this to 76vh/56vh and it came back: "the bg is fuzzy,
+   the slot machines tops of their sprites are all cut off."
+   Both are the same cause. The room is not a viewport onto a scene, it is a WALL TILE — room.webp, 1860x620,
+   repeated on x at `auto 122%` — plus cabinet sprites sized as a fraction of this variable. Grow the
+   variable and the tile is scaled past the resolution it was painted at (fuzzy) while the sprites grow into
+   an arch drawn for a shorter room (clipped). The art has to be re-cut for a taller room; the number on its
+   own cannot do it, and I should have checked that before changing it.
+   Back to what it was. */
+.cas-roomwrap { position: relative; --room: clamp(210px, 68vh, 680px); }
 /* ── EXCEPT ON A SHORT PHONE ───────────────────────────────────────────────────────
    Taking the room to 58vh is what Luke asked for — "extend the animation frame vertically so we can see more
    and it's more immersive" — and on a 667px-tall phone it pushed the cabinets off the bottom of the screen.
@@ -17585,10 +17589,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    58vh is a bigger room only when there IS more room. Below 700px of viewport the fixed chrome above the
    floor (site header, purse, nav) is most of the screen, so the fraction has to come down or the room grows
    into space that does not exist. Every phone Luke has shot this on is over 700 and keeps the taller frame. */
-/* A phone in portrait is 700-ish CSS pixels tall, so this rule — not the one above — is what almost every
-   member actually gets, and 44vh capped at 300px was giving the room less than half the screen while the
-   bounties list underneath had all it wanted. 56vh and a 400px cap. */
-@media (max-height: 700px) { .cas-roomwrap { --room: clamp(230px, 56vh, 400px); } }
+@media (max-height: 700px) { .cas-roomwrap { --room: clamp(200px, 44vh, 300px); } }
 .cas-room { position: relative; height: var(--room); margin: 10px 0; border-radius: 16px;
     overflow: hidden; border: 1px solid rgba(255,215,94,0.16);
     /* The wall, repeated across the width of the floor. It is drawn as a FLAT elevation with no vanishing
