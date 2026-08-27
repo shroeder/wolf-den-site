@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { equipMemo, forgetEquipment, primeEquip } from "@/lib/marketplace/equip-cache.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
@@ -173,20 +174,64 @@ export const powerFor = (itemId) => {
 // ── READING THEM ─────────────────────────────────────────────────────────────────────────────────────────────
 // Cached per request rather than per process. A member equips a piece and the next harvest has to know; a
 // five-minute cache would make the whole system feel broken in exactly the way saved gun placements did.
+//
+// ── ⚠️ AND UNTIL NOW THAT SENTENCE DESCRIBED A CACHE THAT WAS NEVER BUILT ────────────────────────────────────
+// The comment was right about what it wanted and nothing implemented it, so all 73 call sites went to the
+// database individually. Counted against a real member: ONE `/api/marketplace/arena` read made 161 round
+// trips, and EIGHTY-NINE of them were this exact query with this exact argument.
+//
+// That is the arena's cost. It is not algorithmic — a CPU profile of the handler came back 95.7% idle, with
+// `configSecureContext` among the live frames — it is eighty-nine TLS handshakes and eighty-nine JSON parses
+// to ask the same question. Which is why the route bills 235ms of Active CPU against a 54ms P75, and why it
+// takes 4.7 seconds of wall clock.
+//
+// `cache` from React is exactly the tool the comment asked for: memoised for the life of ONE request and
+// thrown away after it, so equipping a piece is still visible on the very next one. Not a TTL — a TTL is a
+// per-process cache wearing a disguise, and it is the thing this comment already warned against.
 const EMPTY = new Set();
+
+// Asked once per member per request-ish window, and invalidated the moment anything changes what they wear.
+// The whole argument, and the measurement behind it, is in equip-cache.js.
+/** Called by anything that changes what a member is wearing. See inventory.js. */
+export const forgetPowers = forgetEquipment;
+
+// ── AND THE BOARD ASKS ABOUT SEVENTY PEOPLE AT ONCE ──────────────────────────────────────────────────────────
+// Memoising per buyer collapses the repeats for ONE member and does nothing for a leaderboard: measured, a
+// single arena state read asked this question about SEVENTY DISTINCT buyer ids, so seventy cache keys each
+// missed exactly once and seventy queries went out. Caching cannot fix a fan-out; only batching can.
+//
+// One query for all of them, filling the same memo the per-buyer path reads, so callers need no new shape —
+// they go on asking `equippedPowers(id)` and the answer is already there. Everyone asked about is primed,
+// including members wearing nothing, or their empty answer would be the one thing still costing a round trip.
+export async function primePowers(buyerIds) {
+    const ids = [...new Set((buyerIds || []).map((x) => x && String(x)).filter(Boolean))];
+    if (!ids.length) return;
+    const rows = await db
+        .query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1::uuid[]) AND item_id IS NOT NULL`, [ids])
+        .catch(() => null);
+    if (!rows) return;                       // a failure primes nothing; the per-buyer path still works
+    const byBuyer = new Map(ids.map((id) => [id, new Set()]));
+    for (const r of rows) {
+        const key = ITEM_POWER[r.item_id];
+        if (key) byBuyer.get(String(r.buyer_id))?.add(key);
+    }
+    for (const [id, powers] of byBuyer) primeEquip("powers", id, powers);
+}
 
 /** Every power the member is currently WEARING, as a Set of keys. */
 export async function equippedPowers(buyerId) {
     if (!buyerId) return EMPTY;
-    const rows = await db
-        .query(`SELECT item_id FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id IS NOT NULL`, [buyerId])
-        .catch(() => []);
-    const out = new Set();
-    for (const r of rows) {
-        const key = ITEM_POWER[r.item_id];
-        if (key) out.add(key);
-    }
-    return out;
+    return equipMemo("powers", String(buyerId), async () => {
+        const rows = await db
+            .query(`SELECT item_id FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id IS NOT NULL`, [buyerId])
+            .catch(() => []);
+        const out = new Set();
+        for (const r of rows) {
+            const key = ITEM_POWER[r.item_id];
+            if (key) out.add(key);
+        }
+        return out;
+    });
 }
 
 /** Is this one power active right now? The question every consumer actually asks. */

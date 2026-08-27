@@ -88,6 +88,7 @@ async function petInPendingTrade(ownerId, petId) {
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
 export async function listTradeableItems(viewerId, { q = "", rarity = null, limit = 160 } = {}) {
     if (!viewerId) return [];
     const rows = await db.query(
@@ -189,6 +190,7 @@ export async function voidPendingTradesForItem(buyerId, itemId) {
 // Move an item (with its charge state) from one member to another; unequips it from the sender first.
 async function moveItem(fromId, toId, itemId) {
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [fromId, itemId]).catch(() => {});
+forgetPowers(fromId);   // an item leaving the wearer changes their powers
     const row = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING charges_left`, [fromId, itemId]).catch(() => null);
     if (!row) return false;
     // A jewel does not travel with the piece. It is the sender's — they paid for the socket and found the

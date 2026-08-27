@@ -222,10 +222,17 @@ async function ladderFor(buyerId) {
     const ids = rows.map((r) => r.id);
     // Badges in bulk alongside the gear — this list is the one you PICK an opponent from, so a power figure
     // that leaves out a third of what they hit with is the matchmaker aiming at the wrong number.
+    // ── ONE QUERY FOR EVERYONE'S POWERS, BEFORE ANYTHING ASKS PER MEMBER ─────────────────────────────────
+    // Measured: a single getArenaState asked "what is this member wearing" about SEVENTY DISTINCT buyers, one
+    // query each, because the fan-out is over the leaderboard and a per-buyer memo cannot help a list. The
+    // stats and badges beside it were already batched for exactly this reason; powers were not. See
+    // primePowers — it fills the same memo `equippedPowers` reads, so nothing downstream changes shape.
+    const { primePowers } = await import("@/lib/marketplace/ascension-powers.js");
     const [stats, badges] = await Promise.all([
+        primePowers(ids).catch(() => {}),
         getEquippedStatsForMembers(ids).catch(() => new Map()),
         getBadgePassivesForMembers(ids).catch(() => new Map()),
-    ]);
+    ]).then(([, a, b]) => [a, b]);
     return rows
         .map((r) => {
             const level = levelForXp(Number(r.xp) || 0).level;
@@ -697,10 +704,17 @@ async function standings() {
         import("@/lib/marketplace/inventory.js"),
         import("@/lib/marketplace/badges.js"),
     ]);
+    // ── ONE QUERY FOR EVERYONE'S POWERS, BEFORE ANYTHING ASKS PER MEMBER ─────────────────────────────────
+    // Measured: a single getArenaState asked "what is this member wearing" about SEVENTY DISTINCT buyers, one
+    // query each, because the fan-out is over the leaderboard and a per-buyer memo cannot help a list. The
+    // stats and badges beside it were already batched for exactly this reason; powers were not. See
+    // primePowers — it fills the same memo `equippedPowers` reads, so nothing downstream changes shape.
+    const { primePowers } = await import("@/lib/marketplace/ascension-powers.js");
     const [stats, badges] = await Promise.all([
+        primePowers(ids).catch(() => {}),
         getEquippedStatsForMembers(ids).catch(() => new Map()),
         getBadgePassivesForMembers(ids).catch(() => new Map()),
-    ]);
+    ]).then(([, a, b]) => [a, b]);
     return rows.map((r) => {
         const level = levelForXp(Number(r.xp) || 0).level;
         const g = stats.get(r.buyer_id) || {};

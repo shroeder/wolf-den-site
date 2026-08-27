@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { equipMemo } from "@/lib/marketplace/equip-cache.js";
 
 // ── UTILITY AFFIXES ("attunements") ──────────────────────────────────────────────────────────────────────────
 // A rare bonus stat the FORGE can roll onto a piece of gear when you enhance it. Unlike combat stat_bonus, an
@@ -85,6 +86,12 @@ export function rollUtil(curUtil, chanceVal) {
 // Sum every EQUIPPED item's attunement into one totals object each feature reads.
 //   { farm: {harvestLuck,...}, petXp: %, raidDmg: %, sea: {dredge,trove,tailwind}, forgeYield: % }
 export async function getEquippedUtilTotals(buyerId) {
+    if (!buyerId) return { farm: {}, petXp: 0, raidDmg: 0, sea: {}, depth: {}, forgeYield: 0 };
+    // Two round trips a call, and the arena asked for it 69 times in one request. See equip-cache.js.
+    return equipMemo("util", String(buyerId), () => readEquippedUtilTotals(buyerId));
+}
+
+async function readEquippedUtilTotals(buyerId) {
     const out = { farm: {}, petXp: 0, raidDmg: 0, sea: {}, depth: {}, forgeYield: 0 };
     if (!buyerId) return out;
     const eq = await db.query(`SELECT item_id FROM mkt_user_equipment WHERE buyer_id = $1`, [buyerId]).catch(() => []);

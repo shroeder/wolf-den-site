@@ -17,6 +17,7 @@ import { grantMissingBadge } from "@/lib/marketplace/badges.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { equippedPowers, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
@@ -162,6 +163,7 @@ async function resolveLoginProcs(buyerId) {
             const won = pool[Math.floor(Math.random() * pool.length)];
             await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});
             await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
+forgetPowers(buyerId);   // an item leaving the wearer changes their powers
             await db.query(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, p.id]).catch(() => {});
             await voidPendingTradesForItem(buyerId, p.id).catch(() => {}); // shattered item can't back a pending trade
             out.push({ emoji: "🎲", text: `${p.label} shattered → unlocked ${won.name}!` });

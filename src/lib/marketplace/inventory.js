@@ -324,6 +324,7 @@ const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 9
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { equippedPowers, hasPower, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,
@@ -537,6 +538,7 @@ export async function sellItem(buyerId, itemId) {
     }
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
+    forgetPowers(buyerId);   // what they are wearing just changed — see equippedPowers
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
     // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
     try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(buyerId, itemId, "sold"); } catch { /* no bench, no gems */ }
@@ -577,11 +579,13 @@ export async function equipItem(buyerId, slot, itemId) {
     }
     // If it's equipped in the OTHER ring slot, move it (an item can't be in two slots).
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
+    forgetPowers(buyerId);   // what they are wearing just changed — see equippedPowers
     await db.query(
         `INSERT INTO mkt_user_equipment (buyer_id, slot, item_id) VALUES ($1, $2, $3)
          ON CONFLICT (buyer_id, slot) DO UPDATE SET item_id = $3`,
         [buyerId, slot, itemId]
     );
+    forgetPowers(buyerId);   // equipping is the case the cache must never be stale for — see equippedPowers
     await bumpEquipment(buyerId);
     await trackActivity(buyerId, "equip", { itemId, name: item.name, slot });
     return getInventory(buyerId);
@@ -590,6 +594,7 @@ export async function equipItem(buyerId, slot, itemId) {
 export async function unequipItem(buyerId, slot) {
     if (!buyerId) throw new Error("Not signed in.");
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND slot = $2`, [buyerId, slot]).catch(() => {});
+    forgetPowers(buyerId);   // what they are wearing just changed — see equippedPowers
     await bumpEquipment(buyerId);
     await trackActivity(buyerId, "unequip", { slot });
     return getInventory(buyerId);
