@@ -84,7 +84,9 @@ export default function ItemLab({ who, equipped, bag, sets, inventory, compendiu
             {tab === "chest" ? <ChestOpener /> : null}
             {tab === "mine" ? (
                 <MiningMinigame
-                    node={{ name: "Deep Cobalt Seam", art: "/images/mining/seam-cobalt.png", color: "#8fe3ff",
+                    // There is no seam art — the mine draws ORE. `seam-cobalt.png` has never existed, so this lab node
+                    // rendered a broken image and check:art has been red on it. Mythril is the blue one.
+                    node={{ name: "Deep Cobalt Seam", art: "/images/mining/ore-mythril.png", color: "#8fe3ff",
                         partTier: 4, pct: 100, mySwings: 0, widen: 0.4 }}
                     pick={{ name: "Runed Pick", tier: 4 }}
                     onSwing={async () => ({ ok: true, grade: "perfect", gradeLabel: "PERFECT", damage: 980, combo: 1, hits: 1, score: 980, pct: 0, quality: 3, cracked: CRACKED })}

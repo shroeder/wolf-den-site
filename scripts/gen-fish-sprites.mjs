@@ -59,6 +59,29 @@ const FISH = {
     fish_lionfish: "A dramatic lionfish with long banded fan-like fins in ember orange and cream, spines fully spread",
     fish_narwhal: "A pale frost-white narwhal with a long spiralled ivory tusk and faint blue ice shimmer",
     fish_tidewyrm: "A small coiling sea-dragon hatchling with jade scales, delicate fins and a glowing tide-blue crest",
+    // ── DEEP WATER ── the six that only an owner's boat reaches (see DEEP_FISH in fishing.js). They had no
+    // art at all and every one of them fell through FishArt's onError to a bare 🐟, which is what Luke caught
+    // on a Lanternjaw: "no sprites generated". Written to read as one plate with the other thirty-four rather
+    // than as a separate set — same side-on pose, same house style — but pitched darker and lit from within,
+    // because the thing that makes them deep-water fish is that they carry their own light.
+    fish_lanternjaw: "A dark deep-sea fish with an oversized underslung jaw lined with needle teeth, a row of "
+        + "pale blue-green photophores glowing along its lower flank lighting its own face from below",
+    fish_glassfin: "A transparent ray with glass-clear wings, its faint skeleton and pale organs visible "
+        + "through the body, edges catching a cold blue-white shimmer",
+    fish_bonecrab: "A bone-white abyssal crab with long spindly armoured legs and thin claws, its shell "
+        + "ridged and chalky like old coral, faint violet light in the joints",
+    // ⚠️ REROLLED. The first pass of both of these was faithful to the brief and unusable: a genuinely
+    // black animal on a dark plate is a smudge at 44px, which is the size the fishing log actually draws it.
+    // Both now carry their own rim light and an interior glow — the silhouette has to survive the downscale,
+    // and "it absorbs light" is a description, not a sprite.
+    fish_gulper: "A black gulper eel in profile with an enormous hinged pouch of a mouth gaping far wider "
+        + "than its body, throat lit from inside with a dull ember-orange glow, a bright cyan rim light "
+        + "tracing the whole top edge of its body and a thin whip tail ending in a vivid red spark",
+    fish_hadaloctopus: "A ghost-pale hadal octopus with translucent webbed arms and huge dark eyes, its "
+        + "domed mantle faintly lit from inside with cold lavender light",
+    fish_lightless: "A vast eyeless creature from the deepest trench in profile, its dark slate body outlined "
+        + "by a cold violet rim light so the whole silhouette reads clearly, a wide seam of a mouth glowing "
+        + "faint white, and many long trailing filaments tipped with small pale lights",
 };
 
 const shrink = (buf) => sharp(buf)

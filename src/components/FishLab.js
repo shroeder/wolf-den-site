@@ -64,7 +64,11 @@ export default function FishLab({ monsters = [] }) {
             return { ok: true, landed: true, catchResult: {
                 treasure: true, gold: 0, xp: 12, tier: "mythic",
                 prize: { kind: "consumable", label: "Growth Tonic", emoji: "🧴", id: "farm_growth_tonic",
-                    where: "Added to your supplies", spriteUrl: "/images/consumables/farm_growth_tonic.png" },
+                    // Consumable art lives in `mkt_consumable_sprite`, not on disk — there is no
+                    // public/images/consumables/ and there never has been. A lab fixture cannot reach the
+                    // database, so this shows the no-sprite fallback, which is a real state the haul card
+                    // has to render anyway.
+                    where: "Added to your supplies", spriteUrl: null },
             } };
         }
         if (HAUL === "gear") {

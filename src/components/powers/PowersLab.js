@@ -137,17 +137,17 @@ const REVEAL_FIXTURE = {
     "reveal-simple": {
         id: "r_broth", name: "Thin Broth", kind: "dish", tier: 1, tierName: "Simple", tierColor: "#cfd8e3",
         flavor: "It is warm, and that is the whole of it.",
-        sprite: null, fallback: "/images/cooking/dish.webp",
-        needs: [{ ref: "veg_onion", qty: 2, name: "Onion", sprite: null, fallback: "/images/cooking/dish.webp" }],
+        sprite: null, fallback: "/images/cooking/dish.png",
+        needs: [{ ref: "veg_onion", qty: 2, name: "Onion", sprite: null, fallback: "/images/cooking/dish.png" }],
         makes: null, book: { total: 64, before: 35 },
     },
     "reveal-legendary": {
         id: "r_feast", name: "The Wolf's Own Feast", kind: "dish", tier: 5, tierName: "Legendary", tierColor: "#ff9ec4",
         flavor: "Served once, to nobody who would say what was in it.",
-        sprite: null, fallback: "/images/cooking/dish.webp",
+        sprite: null, fallback: "/images/cooking/dish.png",
         needs: [
-            { ref: "fish_squid", qty: 3, name: "Squid", sprite: null, fallback: "/images/cooking/dish.webp" },
-            { ref: "p_dough", qty: 2, name: "Dough", sprite: null, fallback: "/images/cooking/dish.webp" },
+            { ref: "fish_squid", qty: 3, name: "Squid", sprite: null, fallback: "/images/cooking/dish.png" },
+            { ref: "p_dough", qty: 2, name: "Dough", sprite: null, fallback: "/images/cooking/dish.png" },
         ],
         makes: null, book: { total: 64, before: 63 },
     },
