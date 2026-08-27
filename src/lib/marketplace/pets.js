@@ -146,13 +146,21 @@ export async function petsPeek(buyerId) {
         await syncPetAchievements(buyerId).catch(() => {});
         await accrueEquippedPetTrickle(buyerId).catch(() => {});
     }
-    const st = await petsState(buyerId, { sync: false });
+    // The art, yes — the watcher draws the pet at its old and new level. The sweep, no; that is the whole
+    // point of this function. See the note on petsState's options.
+    const st = await petsState(buyerId, { sync: false, sprites: true });
     // ONLY the four fields <PetAlerts> reads. The full reply is 80KB of collection state for a watcher that
     // compares a pet-to-level map against localStorage.
     return { signedIn: true, petLevels: st.petLevels || {}, petSprites: st.petSprites || {}, ownedIds: st.ownedIds || [] };
 }
 
-export async function petsState(buyerId, { sync = false } = {}) {
+// ⚠️ `sync` AND `sprites` ARE TWO DIFFERENT QUESTIONS. `sync` runs the achievement sweep and the trickle —
+// 81 round trips, the reason petsPeek exists. `sprites` builds the per-level art, which is three reads and a
+// loop. They used to be the same flag, so turning the sweep off also turned the ART off: the level-up card
+// went to generic paw prints, because <PetAlerts> reads oldArt/newArt straight out of petSprites.
+// Defaults to following `sync` so every existing caller behaves exactly as before.
+export async function petsState(buyerId, { sync = false, sprites = null } = {}) {
+    const wantSprites = sprites === null ? sync : sprites === true;
     if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], outgoing: {}, petLevels: {} };
     if (sync) {
         await syncPetAchievements(buyerId).catch(() => {});
@@ -197,7 +205,7 @@ export async function petsState(buyerId, { sync = false } = {}) {
     // The battle-sprite art for each owned pet at each level 1–5 (resolved: highest evolved sprite ≤ level,
     // else base). Powers the pets-page sprite display + the level-up "evolution" reveal. Only on page loads.
     const petSprites = {};
-    if (sync) {
+    if (wantSprites) {
         const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
         const [base, levelArt, stoneMap] = await Promise.all([
             getPetSpriteData().catch(() => ({})),
