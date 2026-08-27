@@ -1,0 +1,14 @@
+-- ── CONSIGNED STOCK MUST NEVER BE DISCOUNTED ─────────────────────────────────────────────────────────────────
+-- The online shop takes 10% off any single over $100 (see src/lib/single-discount.js). That rule knows nothing
+-- about consignment, so it was discounting other people's cards: a $153 Blastoise shown at $137.70 while the
+-- consignor is owed their share of the ORIGINAL price. At the payout rates on the consignors table today —
+-- eight of the nine active ones sit between 87% and 95% — a 10% discount is larger than the shop's entire
+-- margin, so every one of those sales lost money.
+--
+-- The feed stores category NAMES and consignors are keyed on Square's category ID, so there was no way to tell
+-- from a feed row whether an item was somebody else's. This column is set by the reconciler, which walks Square
+-- categories by id and already has exactly that key in hand.
+--
+-- Defaults FALSE, and the reconciler overwrites on its next run. Nothing is silently un-marked in between: the
+-- discount also refuses anything it cannot prove is not consigned once the feed carries the flag.
+ALTER TABLE inventory_feed ADD COLUMN IF NOT EXISTS consigned boolean NOT NULL DEFAULT false;

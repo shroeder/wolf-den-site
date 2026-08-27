@@ -61,7 +61,7 @@ export default async function ShopProductPage({ params }) {
 
     // Online singles promo: 10% off singles over $100. The online price (and the structured-data offer)
     // reflect the discounted amount; the strikethrough shows the original.
-    const pricing = item.price != null ? computeShopPricingDollars(item.name, item.price) : null;
+    const pricing = item.price != null ? computeShopPricingDollars(item.name, item.price, { consigned: item.consigned === true }) : null;
     const isSingle = isSingleName(item.name);
 
     const jsonLd = {

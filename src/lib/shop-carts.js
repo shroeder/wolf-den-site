@@ -8,6 +8,7 @@ import {
     getExistingCartId,
     setShopCartId,
 } from "@/lib/shop-cart-session";
+import { loadActiveConsignorsByCategory } from "@/lib/consignment/trade-sales";
 
 function normalizeQuantity(value, fallback = 1) {
     const parsed = Number(value);
@@ -24,9 +25,14 @@ function toInventoryMap(categories) {
 
     for (const category of categories || []) {
         for (const item of category.items || []) {
+            const prev = inventory.get(item.id);
             inventory.set(item.id, {
                 ...item,
                 categoryName: category.name,
+                // Every Square category this variation is filed under. The consignment check needs IDs, not
+                // names — consignors are keyed on square_category_id — and an item can sit in several
+                // categories, so they accumulate rather than the last one winning.
+                categoryIds: [...(prev?.categoryIds || []), category.id].filter(Boolean),
             });
         }
     }
@@ -223,6 +229,8 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
     ]);
 
     const inventoryMap = toInventoryMap(categories);
+    // Which Square categories belong to an active consignor. The same map the reconciler and cost-sync use.
+    const consignorCategories = await loadActiveConsignorsByCategory().catch(() => new Map());
     const items = [];
     let subtotalCents = 0;
     let itemCount = 0;

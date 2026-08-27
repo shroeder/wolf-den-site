@@ -17,9 +17,20 @@ export function isSingleName(name) {
 
 // Given an item's name + full (catalog) price in cents, return the online-shop pricing breakdown.
 // Non-eligible items return a zero discount, so callers can use the result unconditionally.
-export function computeShopPricing(name, priceCents) {
+// ── NEVER ON SOMEBODY ELSE'S CARD ────────────────────────────────────────────────────────────────────────────
+// Luke, seeing 10% OFF on a consigned shelf: "we cant offer discount on consigner categories."
+//
+// He is right, and it is worse than a policy breach — it sells at a loss. The consignor is owed their share of
+// the price the card was listed at, and eight of the nine active consignors are on 87% to 95%. Ten percent off
+// is therefore larger than the shop's whole margin: a $153 single discounted to $137.70 against a 95% payout
+// takes $137.70 in and owes $145.35 out.
+//
+// This rule only ever saw a NAME and a PRICE, so it had no way to know. `consigned` comes off the feed row,
+// stamped by the reconciler, which is the one place that has Square's category ID — the key consignors are
+// filed under. See migration 412.
+export function computeShopPricing(name, priceCents, { consigned = false } = {}) {
     const originalCents = Math.max(0, Math.round(Number(priceCents) || 0));
-    const eligible = originalCents > SINGLE_DISCOUNT_MIN_CENTS && isSingleName(name);
+    const eligible = !consigned && originalCents > SINGLE_DISCOUNT_MIN_CENTS && isSingleName(name);
     if (!eligible) {
         return { originalCents, priceCents: originalCents, discountCents: 0, isDiscounted: false };
     }
@@ -28,7 +39,7 @@ export function computeShopPricing(name, priceCents) {
 }
 
 // Dollar-denominated convenience for client display code that works in dollars.
-export function computeShopPricingDollars(name, priceDollars) {
-    const p = computeShopPricing(name, Math.round((Number(priceDollars) || 0) * 100));
+export function computeShopPricingDollars(name, priceDollars, opts = {}) {
+    const p = computeShopPricing(name, Math.round((Number(priceDollars) || 0) * 100), opts);
     return { originalDollars: p.originalCents / 100, priceDollars: p.priceCents / 100, isDiscounted: p.isDiscounted };
 }

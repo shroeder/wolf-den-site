@@ -6,6 +6,7 @@ import { refreshStockSnapshot } from "@/lib/looking-for/stock";
 import { createServerLogger } from "@/lib/server-logger";
 import { listShopInventory } from "@/lib/consignment/square";
 import { SITE_URL } from "@/lib/site";
+import { loadActiveConsignorsByCategory } from "@/lib/consignment/trade-sales";
 
 const logger = createServerLogger({ source: "job", subsystem: "inventory-feed" });
 
@@ -174,6 +175,9 @@ export async function reconcileInventory({ force = false } = {}) {
 
     // 1. Current in-stock variations, one entry per variation (collect every category it's in).
     const inventory = await listShopInventory();
+    // Which Square categories belong to an active consignor — the same map cost-sync.js uses to decide that a
+    // consigned item has no unit cost of ours. Loaded once per reconcile rather than per item.
+    const consignorsByCategory = await loadActiveConsignorsByCategory().catch(() => new Map());
     const current = new Map();
 
     for (const category of inventory) {
@@ -195,12 +199,23 @@ export async function reconcileInventory({ force = false } = {}) {
                     price: typeof item.price === "number" ? item.price : null,
                     imageUrl: item.imageUrl || null,
                     categoryNames: new Set(),
+                    // Somebody else's card. See the note by consignorsByCategory above.
+                    consigned: false,
                 };
                 current.set(item.id, entry);
             }
 
             if (category.name) {
                 entry.categoryNames.add(category.name);
+            }
+            // ── IS THIS ITEM SOMEBODY ELSE'S? ────────────────────────────────────────────────────────────
+            // Consignors are keyed on Square's category ID and this loop is walking Square's categories, so
+            // this is the one place in the system that has both halves. The feed only ever stored category
+            // NAMES, which is why the shop could not tell a consigned single from our own and discounted it.
+            // Sticky across categories: an item in one consigned category is consigned, whatever else it is
+            // also filed under.
+            if (consignorsByCategory.has(category.id)) {
+                entry.consigned = true;
             }
         }
     }
@@ -227,6 +242,7 @@ export async function reconcileInventory({ force = false } = {}) {
     const prices = [];
     const quantities = [];
     const categories = [];
+    const consignedFlags = [];
     const newIds = [];
     const restockIds = [];
     const priceDropIds = [];
@@ -238,6 +254,7 @@ export async function reconcileInventory({ force = false } = {}) {
         prices.push(entry.price);
         quantities.push(entry.quantity);
         categories.push(Array.from(entry.categoryNames).join(CATEGORY_SEPARATOR) || null);
+        consignedFlags.push(entry.consigned === true);
 
         if (seeding) {
             continue;
@@ -259,19 +276,20 @@ export async function reconcileInventory({ force = false } = {}) {
     if (ids.length) {
         await db.query(
             `INSERT INTO inventory_feed
-                (variation_id, name, image_url, price, quantity, category_names, in_stock, updated_at)
-             SELECT v, n, img, p, q, c, TRUE, NOW()
-             FROM UNNEST($1::text[], $2::text[], $3::text[], $4::numeric[], $5::int[], $6::text[])
-                AS t(v, n, img, p, q, c)
+                (variation_id, name, image_url, price, quantity, category_names, consigned, in_stock, updated_at)
+             SELECT v, n, img, p, q, c, cn, TRUE, NOW()
+             FROM UNNEST($1::text[], $2::text[], $3::text[], $4::numeric[], $5::int[], $6::text[], $7::boolean[])
+                AS t(v, n, img, p, q, c, cn)
              ON CONFLICT (variation_id) DO UPDATE SET
                 name = EXCLUDED.name,
                 image_url = EXCLUDED.image_url,
                 price = EXCLUDED.price,
                 quantity = EXCLUDED.quantity,
                 category_names = EXCLUDED.category_names,
+                consigned = EXCLUDED.consigned,
                 in_stock = TRUE,
                 updated_at = NOW()`,
-            [ids, names, images, prices, quantities, categories]
+            [ids, names, images, prices, quantities, categories, consignedFlags]
         );
     }
 

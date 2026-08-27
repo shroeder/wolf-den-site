@@ -200,3 +200,28 @@ export async function listConsignmentTradeSales(consignorId, { startAt = null, e
         };
     });
 }
+
+// ── STAMP WHOSE CARD IT IS, BEFORE THE SHOP PRICES IT ────────────────────────────────────────────────────────
+// The online singles promo takes 10% off anything over $100 whose name ends in a condition token, and it had
+// no idea whose stock it was discounting. A consignor is owed their share of the LISTED price and the active
+// payout rates run 80% to 95%, so on most of them a 10% discount is bigger than the shop's entire margin.
+//
+// Marked from Square's category IDs — the key consignors are actually filed under — rather than the category
+// NAMES the feed stores, and done here so the price shown and the price charged read the same field.
+export async function markConsignedCategories(categories) {
+    const list = Array.isArray(categories) ? categories : [];
+    if (!list.length) return list;
+    const byCategory = await loadActiveConsignorsByCategory().catch(() => new Map());
+    if (!byCategory.size) return list;
+    // An item can sit in several categories; one consigned category makes it consigned.
+    const consignedIds = new Set();
+    for (const category of list) {
+        if (!byCategory.has(category?.id)) continue;
+        for (const item of category.items || []) if (item?.id) consignedIds.add(item.id);
+    }
+    if (!consignedIds.size) return list;
+    return list.map((category) => ({
+        ...category,
+        items: (category.items || []).map((item) => (consignedIds.has(item?.id) ? { ...item, consigned: true } : item)),
+    }));
+}
