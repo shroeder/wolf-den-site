@@ -340,7 +340,7 @@ export const COMBAT_FIELDS = [
     // mitigation and getting through it
     "armor", "pierce", "blockChance", "blockReduction", "blockStack", "blockStackMax",
     // the procs that come off affix points
-    "counter", "doublestrike", "lifesteal", "stun", "haste",
+    "counter", "lifesteal", "stun", "haste",
     // over time, and what drinks from it
     "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage", "burnLeech",
     // how many stacks one proc lays down — 1 unless a skill says more (Immolate's `burn`, Rend's `bleed`)
@@ -350,7 +350,7 @@ export const COMBAT_FIELDS = [
     // the Runecaller's
     "freeze", "chill", "ward", "wardRefill", "surge", "soulfire", "cataclysm",
     // and the tree's flat shares, which add on top of the point-based versions above
-    "counterBonus", "doublestrikeBonus", "lifestealBonus", "stunBonus", "hasteBonus", "wildProc",
+    "counterBonus", "lifestealBonus", "stunBonus", "hasteBonus", "wildProc",
 ];
 
 /** A fighter reduced to exactly what the ring needs, for writing into bout_json. Spread this; never retype it. */
@@ -379,7 +379,6 @@ export const sideOf = (f) => ({
         counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT + (Number(f.counterBonus) || 0))),
         // 1 point = 0.5% chance the swing lands twice. Uncapped, like crit chance: past 100% it is simply
         // always two, and the surplus rolls for a third.
-        doublestrike: Math.max(0, (Number(f.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT + (Number(f.doublestrikeBonus) || 0)),
         // 1 point = 0.25% of whatever you actually inflict, healed back.
         lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT + (Number(f.lifestealBonus) || 0)),
         // A shield's block chance, and what a block is worth to THIS fighter — the Warden blocks harder.
@@ -470,11 +469,17 @@ export function goesAgain(f, rng = Math.random, wasExtra = false) {
 
 // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the whole
 // multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
-export const blowCount = (ds, rng = Math.random) => {
-    if (ds <= 0) return 1;
-    const guaranteed = 1 + Math.floor(ds);
-    return guaranteed + (rng() < ds - Math.floor(ds) ? 1 : 0);
-};
+// ── ONE BLOW A SWING, UNLESS A SKILL SAYS OTHERWISE ──────────────────────────────────────────────────────────
+// Double strike is gone. It was a second answer to "you swing more often" living alongside the bar refund —
+// Quickblade and weapon Attack Speed were converted into `extra` when the timer landed, and this was left
+// behind. Two mechanics, one promise, and only one of them visible on screen.
+//
+// The points are not lost: every source of them now feeds the refund at DOUBLESTRIKE_PER_POINT, which is the
+// rate this function used. See the note on `extra` in arena.js.
+//
+// A skill that strikes a fixed number of times still does — Onslaught's `hits: 3` comes through hitsOverride,
+// which never went through this roll.
+export const blowCount = () => 1;
 
 // ── ONE SWING, WHOEVER THREW IT AND HOWEVER IT WAS CHOSEN ────────────────────────────────────────────────────
 // Lifted whole out of autoBout. An auto-resolved bout and a turn you took by hand must be the same arithmetic

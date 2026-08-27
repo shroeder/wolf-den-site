@@ -41,7 +41,7 @@ import {
 import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
-import { arenaRating, fighterFields } from "@/lib/marketplace/arena-engine.js";
+import { arenaRating, fighterFields, DOUBLESTRIKE_PER_POINT} from "@/lib/marketplace/arena-engine.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
@@ -388,7 +388,19 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         //
         // Quickblade lands in `perks.extra` and is added flat on top, which is the same arithmetic it did
         // when it was adding to a clock.
-        extra: extraTurnFrom(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.extra || 0),
+        // ── DOUBLE STRIKE IS PART OF THIS NOW ────────────────────────────────────────────────────────────
+        // Luke: "lets completely remove double strike, I thought we already converted it into the 50 percent
+        // refund mechanic." Quickblade and weapon Attack Speed were converted; doublestrike was left behind as
+        // a separate blow-count roll, so the game had two different answers to "you swing more often".
+        //
+        // Its points are NOT thrown away — gear is rolled with this affix, badges and pets grant it, and a
+        // Reaver has five ranks of Frenzy in it. Every source feeds the bar refund at the rate the engine
+        // already used, DOUBLESTRIKE_PER_POINT, so a piece that read "+40 Double Strike" is worth exactly what
+        // it was worth, spent on the mechanic that is actually on screen.
+        extra: extraTurnFrom(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
+            + (perks.extra || 0)
+            + (Number(stats.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT
+            + (Number(perks.doublestrikeBonus) || 0),
         // ── AND THE RATE ITSELF, FOR A TIMER BOUT ────────────────────────────────────────────────────────
         // The same weapon speed and the same Ferocity, kept as the rate rather than converted into the
         // chance above. A timer bout paces off this; a classic bout ignores it entirely. Both numbers are
@@ -455,7 +467,6 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         cataclysm: perks.cataclysm || 0,
         counterBonus: perks.counterBonus || 0,
         stunBonus: perks.stunBonus || 0,
-        doublestrikeBonus: perks.doublestrikeBonus || 0,
         hasteBonus: perks.hasteBonus || 0,
         // Shares, added by the engine AFTER the per-point conversion: the tree's own Bloodletting/Bloodwarden,
         // plus the class base and any perk that pays a flat percentage. Gear points are `lifesteal` above.
@@ -511,10 +522,9 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // Brutality: the class's own, plus the tree's. Reaver carries base damage the way the Warden carries
         // base Lifedrink — "hit hardest" was a tagline the numbers did not pay for.
         dmgPct: Math.max(0, (base.dmgPct || 0) + (perks.dmgPct || 0)),
-        // Raw points, uncapped — the engine turns them into a chance (DOUBLESTRIKE_PER_POINT). The old 25%
-        // ceiling is gone for the same reason the crit-chance one is: past 100% it just means two blows every
-        // time, with the surplus rolling for a third.
-        doublestrike: Number(stats.doublestrike) || 0,
+        // No longer passed to the engine — see `extra` above, where these points now live. Kept OUT of the
+        // kit entirely rather than sent and ignored, because a stat the engine reads and does nothing with is
+        // how doublestrike ended up with no pet or badge term for months.
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep

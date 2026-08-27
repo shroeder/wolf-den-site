@@ -97,7 +97,10 @@ export const STAT_META = {
     pierce: { label: "Pierce", icon: "🗡️", desc: "Thins their armour. Each point ignores 0.5% of it.", suffix: "" },
     lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you land comes back as health. Each point is 0.25%.", suffix: "" },
     counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands. Each point is 0.25%.", suffix: "" },
-    doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your swing lands twice — a whole extra hit, with its own crit roll. Each point is 0.5%.", suffix: "" },
+    // The affix KEEPS ITS KEY so every piece already rolled with it keeps its value — it now buys the bar
+    // refund instead of a second blow, at the same 0.5% a point. The label had to change with it: an affix
+    // that says "lands twice" while granting something else is the kind of lie the info cards were full of.
+    doublestrike: { label: "Quickened", icon: "⚡", desc: "Chance your swing only half-spends your turn bar, so you act again sooner. Each point is 0.5%.", suffix: "" },
     stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stops their turn bar dead for a second. Each point is 0.5%.", suffix: "" },
     haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing sends your turn bar to double speed for 6 seconds. Each point is 0.5%.", suffix: "" },
 

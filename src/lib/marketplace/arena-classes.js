@@ -275,8 +275,10 @@ export const TREES = {
         N({ id: "rv_concuss", tier: 2, name: "Concussive", ranks: 5, stat: "stunBonus", per: 0.02, needs: 7,
             desc: "+2% chance a blow stops their turn bar dead for a second.",
             sprite: "/images/arena/node/rv_stun.webp" }),
-        N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "doublestrikeBonus", per: 0.02, needs: 7,
-            desc: "+2% chance the swing lands twice. Each blow rolls its own crit.",
+        // Was doublestrikeBonus, the same value in the mechanic that replaced it. Anybody holding five ranks
+        // here keeps exactly what they bought — see the note on `extra` in arena.js.
+        N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "extra", per: 0.02, needs: 7,
+            desc: "+2% chance the swing only half-spends your bar, so you come round again sooner.",
             sprite: "/images/arena/node/rv_flurry.webp" }),
 
         // TIER 4 — capstones.
@@ -287,7 +289,7 @@ export const TREES = {
             desc: "+3% of all bleed damage healed back to you. Rend starts it, Deep Cuts deepens it, this drinks it.",
             sprite: "/images/arena/node/rv_leech.webp" }),
         N({ id: "rv_harvest", tier: 3, name: "Red Harvest", ranks: 5, stat: "wildProc", per: 0.01, needs: 12,
-            desc: "+1% chance on any swing to fire one of doublestrike, counter or haste at random.",
+            desc: "+1% chance on any swing to fire one of counter or haste at random.",
             sprite: "/images/arena/node/rv_wild.webp" }),
     ],
     // ── WARDEN ── blocks, counters and sustain. It wins by still being standing, and by making the swing that
