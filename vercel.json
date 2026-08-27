@@ -3,6 +3,30 @@
     "trailingSlash": false,
     "headers": [
         {
+            "_comment": [
+                "STATIC ART IS CACHED. There was no Cache-Control anywhere in this repo — not here, not in",
+                "next.config.mjs — so public/ was served with Next's default max-age=0 and the browser",
+                "revalidated EVERY sprite on EVERY page view. There are 1,150 of them, and a member moving",
+                "between the arena, the farm and the casino re-asked for most of them each time.",
+                "",
+                "Each of those revalidations is a billed edge request. This is the single biggest reducible",
+                "number on the invoice and it costs nothing to fix.",
+                "",
+                "A DAY, not a year, and deliberately not `immutable`: sprite filenames are stable and do get",
+                "REDRAWN under the same name — two of the six new fish were rerolled that way an hour ago.",
+                "`immutable` would have pinned the unreadable versions in every member's browser for a year.",
+                "A day of hard cache plus a week of stale-while-revalidate takes the repeat traffic away while",
+                "a redrawn sprite still reaches everybody within a day."
+            ],
+            "source": "/(images|logo)/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=86400, stale-while-revalidate=604800"
+                }
+            ]
+        },
+        {
             "source": "/(.*)",
             "headers": [
                 {
