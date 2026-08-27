@@ -10,11 +10,36 @@
 // ── RECIPES ──────────────────────────────────────────────────────────────────────────────────────────────
 // `need` is { ref → qty } over crops, fish and preps alike. A recipe is either a PREP (output goes back to the
 // pantry as an ingredient) or a DISH (output is a consumable rolled from the tier's pool).
-const R = (id, name, tier, need, flavor) => ({ id, name, tier, need, flavor, kind: "dish" });
+// ── WHAT A TIER COSTS ────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "we also need to make it require more ingredients as the tiers go up as they are way too easy to make
+// a pile of."
+//
+// Measured before touching it, resolving every prep back to raw crops and fish — because a tier-5 plate that
+// LISTS "2 starfruit + 1 essence" really costs the essence's own three as well, and the listed number hides
+// most of the curve:
+//
+//     tier   listed   really
+//       1      3.2      4.9
+//       5      5.7     16.0
+//
+// So the chain already climbs 3.3x and the shelf still fills up, which says the multiplier is the lever rather
+// than the base. Applied HERE, in the three builders, so one table decides it for all 98 recipes and the card
+// a player reads is the same number the pantry is debited — a scale applied at spend time would have made the
+// recipe card lie.
+//
+// TIER 1 IS UNTOUCHED, deliberately. It is where somebody learns the minigame, and the complaint is about
+// piles of legendary dishes, not about flour. The compounding through preps does the rest: a tier-5 dish made
+// of tier-4 preps pays the multiplier twice.
+const TIER_COST = { 1: 1, 2: 1.25, 3: 1.5, 4: 1.75, 5: 2 };
+const cost = (tier, need) => Object.fromEntries(
+    Object.entries(need || {}).map(([k, v]) => [k, Math.max(1, Math.round(v * (TIER_COST[tier] || 1)))]),
+);
+
+const R = (id, name, tier, need, flavor) => ({ id, name, tier, need: cost(tier, need), flavor, kind: "dish" });
 // A BAIT recipe. Shaped exactly like a prep — it has an `out` that lands in the pantry — because that is what
 // it is: something you cook in order to spend it somewhere else. Fishing is the only thing that spends it.
-const B = (id, name, tier, need, out, flavor) => ({ id, name, tier, need, out, flavor, kind: "bait" });
-const P = (id, name, tier, need, out, flavor) => ({ id, name, tier, need, out, flavor, kind: "prep" });
+const B = (id, name, tier, need, out, flavor) => ({ id, name, tier, need: cost(tier, need), out, flavor, kind: "bait" });
+const P = (id, name, tier, need, out, flavor) => ({ id, name, tier, need: cost(tier, need), out, flavor, kind: "prep" });
 
 export const RECIPES = [
     // ═══ PREP · turn raw stuff into cooking ingredients ═══

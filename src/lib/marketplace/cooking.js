@@ -79,9 +79,25 @@ export const MAX_TRACK = 5;
 //   Seasoning — a second WHOLE dish
 //   Big Pot   — MORE of whatever the dish makes
 //   Larder    — the dish costs you NOTHING
+// ── AND ALL THREE ROLLS ARE CUT ──────────────────────────────────────────────────────────────────────────────
+// Luke: "cooking needs a nerf. we need to nerf the chance it makes double and the chance it upgrades a tier
+// and the chance it doesn't use ingredients."
+//
+// Measured on the real kitchen before touching them — the top eight cooks hold, in track terms:
+//
+//     heat 24%   season 24%   larder 18%   (Shroeder, 396 cooks)
+//
+// and every one of those stacks a pet passive and an equipped kitchen perk ON TOP of the track, so the odds a
+// player actually plays are meaningfully higher than the cap printed here. Three multiplicative freebies at a
+// quarter each is why a shelf of 600 ingredients turns into a pile of dishes: a cook that costs nothing, pays
+// twice and comes out a tier better is worth roughly six of the one the recipe describes.
+//
+// Cut about a third off each track's per-level and its ceiling. NOT the execution terms further down: a
+// flawless cook still bumps a tier outright and still improves the double, because skill paying out is the
+// thing the minigame is for and the file's own note says both halves have to survive.
 export const COOK_TRACKS = {
-    heat:   { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "pct", name: "Heat",      icon: "/images/cooking/track-heat.png",   desc: "Chance the dish comes out one tier better than the recipe." },
-    season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance the dish pays out TWICE — double whatever it makes." },
+    heat:   { max: MAX_TRACK, per: 0.04, cap: 0.20, kind: "pct", name: "Heat",      icon: "/images/cooking/track-heat.png",   desc: "Chance the dish comes out one tier better than the recipe." },
+    season: { max: MAX_TRACK, per: 0.05, cap: 0.25, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance the dish pays out TWICE — double whatever it makes." },
     // "boost", not "pct": the other three are ROLLS the card labels "Chance", and Big Pot is not a roll —
     // every level is felt on every cook. Labelling it "Chance 30%" would have read as a 30%% shot at nothing.
     // BIG POT FEEDS THE HALL. Finding an axis for this took two goes, both wrong for the same reason:
@@ -95,7 +111,7 @@ export const COOK_TRACKS = {
     // what COOKING ITSELF is worth: a bigger pot feeds more people, so the cook learns more. It is the only
     // track that pays out even on a dish whose reward you did not want, which is a real reason to buy it.
     batch:  { max: MAX_TRACK, per: 0.10, cap: 0.50, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "A bigger pot feeds the whole hall — more cooking XP from every dish." },
-    larder: { max: MAX_TRACK, per: 0.035, cap: 0.175, kind: "pct", name: "Larder",    icon: "/images/cooking/track-larder.png", desc: "Chance a cook doesn't use up its ingredients at all." },
+    larder: { max: MAX_TRACK, per: 0.02, cap: 0.10, kind: "pct", name: "Larder",    icon: "/images/cooking/track-larder.png", desc: "Chance a cook doesn't use up its ingredients at all." },
 };
 export const TRACK_COL = { heat: "heat_level", season: "season_level", batch: "batch_level", larder: "larder_level" };
 export const trackValue = (t, lvl) => Math.min(COOK_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * COOK_TRACKS[t].per);
