@@ -1526,10 +1526,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     } : null;
     // Newest nearest the body, and the interrupt sits at the bottom of the column because it is the thing
     // that just interrupted. Three is the cap: past that they arrive faster than anybody reads them.
+    // ── ONE LABEL PER FIGHTER. THE CURRENT ONE. ─────────────────────────────────────────────────────────────
+    // This was slice(-3), and each label lives RESULT_MS + 120 (~1.17s) while the ring resolves a round about
+    // every 475ms — so labels necessarily outlived their own beat and stacked up from DIFFERENT rounds.
+    //
+    // Filmed on production, real PvP against JT: three at once over two fighters — RIMEGUARD, STRIKE and
+    // RETRIBUTION — while the round counter went 9 to 12 in 1.9 seconds and the log underneath said "The ice
+    // bites back — 82". Nothing on that screen told you which of the three had just happened, and two of them
+    // were from exchanges already over.
+    //
+    // Luke: "I dont want it to show history. I just want it to show current then fade."
     const headsFor = (side) => {
         const own = heads.filter((h) => h.side === side);
         const all = alertHead?.side === side ? [...own, alertHead] : own;
-        return all.slice(-3);
+        return all.slice(-1);
     };
 
     // ── THE DECK DOES NOT DISAPPEAR OUT FROM UNDER A FIGHT STILL PLAYING ─────────────────────────────────
