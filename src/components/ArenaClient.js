@@ -1902,7 +1902,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         }
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
         const t = setTimeout(() => { setShake(0); setHitSide(null); setLungeSide(null); }, 360);
-        const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
+
         // Each head clears on its own timer rather than the whole queue at once, or an event that arrived
         // late gets cut short by the one before it.
         const t4 = setTimeout(() => setHeads((q) => q.slice(1)), RESULT_MS + 120);
@@ -1911,8 +1911,27 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // (The counter's bespoke choreography lived here. It was the first event to get its own moment, and
         // the queue below generalises exactly that — so keeping it meant two players firing one blow: two
         // sounds, two shakes. One player owns the beat now.)
-        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+        return () => { clearTimeout(t); clearTimeout(t3); clearTimeout(t4); };
     }, [bout]);
+
+    // ── THE MOVE BANNER FADES ON ITS OWN CLOCK, NOT THE BOUT'S ───────────────────────────────────────────────
+    // It used to be cleared by a timer created inside the effect above, which is keyed on `bout` — the whole
+    // object. Any refresh that hands back a new bout object runs that effect's CLEANUP, which killed the clear
+    // timer, and if the refresh was not a new beat nothing re-armed it. The banner then sat there naming an
+    // exchange that was over.
+    //
+    // Filmed in a real PvP bout against JT: STRIKE came up at 460ms and was still on screen at 1660ms, and in
+    // an earlier reel it was still up a whole round later, next to the opponent's own callout — so the screen
+    // showed my last move and their current one side by side, with no way to tell which was now. Luke: "I dont
+    // want it to show history. I just want it to show current then fade."
+    //
+    // Keyed on the banner itself: it appears, it fades RESULT_MS later, and nothing about the bout's identity
+    // can extend or cancel that.
+    useEffect(() => {
+        if (!clash) return undefined;
+        const t = setTimeout(() => setClash(null), RESULT_MS - 80);
+        return () => clearTimeout(t);
+    }, [clash]);
 
     // The end of a bout is its loudest moment, and it was a three-note blip.
     useEffect(() => {
