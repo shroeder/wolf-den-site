@@ -385,7 +385,7 @@ function StatusRow({ list, side, onPick }) {
 // change how fast the bar moves, stun and freeze STOP it. A frozen bar that merely ran slowly would be
 // indistinguishable from a chilled one, and they mean opposite things.
 const TIMER_WORD = { haste: "2x", chill: "SLOW", stun: "STUNNED", freeze: "FROZEN" };
-function TurnTimer({ from, to, ms, foe = false }) {
+function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
     const [w, setW] = useState(from?.fill ?? 0);
     const state = to?.state || from?.state || null;
     // Held bars do not travel: the whole point of a stun is that the bar is where it was. Snapping to `from`
@@ -401,17 +401,19 @@ function TurnTimer({ from, to, ms, foe = false }) {
     // A bar that just emptied must not slide backwards over half a second — it was spent, and the reset is
     // the punctuation that says so.
     const falling = (to?.fill ?? 0) < (from?.fill ?? 0);
-    // ── A FULL BAR IS NOT FILLING ────────────────────────────────────────────────────────────────────────
+    // ── READY IS A FACT ABOUT THE FIGHT, NOT ABOUT THE FILL ──────────────────────────────────────────────
     // Luke: "I attack, and it shows my bar as green and 2x but its not my turn?"
     //
-    // It WAS his turn — that is the whole reason the bar was full. `2x` is a RATE, and once the bar is at
-    // the top the rate has nothing left to describe: it has filled, it is not moving, and the fight is
-    // waiting on this fighter to act. Printing the speed it got there at over a stopped bar reads as a bar
-    // still charging, which is the exact opposite of what a full bar means.
+    // The first answer to this read READY off the fill, on the reasoning that a full bar means it is your
+    // turn. The reasoning is right and the test was wrong, and the difference is the whole bug: the bar is
+    // ALSO full on the line where it gets spent — the frame of your own swing — so deriving the word from
+    // the fill printed READY over every blow he threw. Measured across 120 rung-100 bouts on his real kit,
+    // every single full-bar frame in the transcript was one of his own swings.
     //
-    // A hold still wins — a stun or a freeze is the more important thing to say, and neither can be sitting
-    // on a full bar anyway, because a bar that filled gets spent.
-    const ready = !held && (to?.fill ?? from?.fill ?? 0) >= 0.999;
+    // So it is passed in. The fight is waiting on you when the transcript has run out AND the server is
+    // asking for an action — nothing else is "your turn", least of all a number on a line that has already
+    // happened. A hold still outranks it, and the foe never gets it: the fight is never waiting on them.
+    const ready = !held && waiting;
     return (
         <span className={`ar-timer${state ? ` is-${state}` : ""}${ready ? " is-ready" : ""}${foe ? " is-foe" : ""}`}>
             <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, w)) * 100)}%`,
@@ -580,7 +582,8 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
                 Rendered last inside the body so it draws over the contact shadow rather than under it. */}
             {timer ? (
                 <span className="ar-atb" aria-hidden="true">
-                    <TurnTimer from={timer.from} to={timer.to} ms={timer.ms} foe={foe} />
+                    <TurnTimer from={timer.from} to={timer.to} ms={timer.ms} foe={foe}
+                        waiting={Boolean(timer.waiting)} />
                 </span>
             ) : null}
             {/* ── AND WHAT JUST HAPPENED TO THIS FIGHTER ──────────────────────────────────────────────────
@@ -1414,7 +1417,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Nothing here computes a rate. `bars` is stamped on every log line by the server (arena-ring.js) and the
     // only arithmetic on this side is "which two lines am I between" — see the warning in TurnTimer about why.
     const atbMode = raw?.mode === "atb";
-    const barsPrev = atbMode ? (logAll[shown - 1]?.bars || null) : null;
+    // `barsAfter` is where the previous beat left the bar once it was PAID — see stampSpent in
+    // arena-ring.js. Reading `bars` here instead is what made a spent bar slide backwards out of the top
+    // rather than empty: the line stamps the arrival (full, which is why that fighter swung), and without
+    // the spend to start the next line from, the bar travelled from full down to wherever it had refilled
+    // to. Falling back to `bars` keeps every transcript written before the spend was stamped.
+    const barsPrev = atbMode ? (logAll[shown - 1]?.barsAfter || logAll[shown - 1]?.bars || null) : null;
     // ── WHEN THE TRANSCRIPT RUNS OUT, "NEXT" IS NOW ──────────────────────────────────────────────────────────
     // `raw.bars` is the live snapshot the server publishes for exactly this moment. Without it the bars froze
     // on the last EVENT rather than the present: the foe swung at 1678ms with their bar full and mine at 0.64,
@@ -1521,7 +1529,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             if (e.who === "you") foeHp -= e.dmg; else hp -= e.dmg;
         }
         const done = shown >= logAll.length;
-        const cur = logAll[Math.max(0, shown - 1)] || null;
+        // ── NOTHING HAS PLAYED YET AT ZERO, AND THAT INCLUDES THE FIRST LINE ─────────────────────────
+        // Luke: "if the enemy goes first, by the time the user sees the screen the health is already down
+        // from 100% — and THEN they see the attack animation."
+        //
+        // `Math.max(0, shown - 1)` reads logAll[0] when the cursor is at zero, so the opening blow's health
+        // stamp was applied before that blow had played. Reproduced against his account at rung 100: the
+        // foe opens at 2,913ms for 2,247 off 2,370, and the fight screen mounted showing him on 123 health
+        // — then played the swing that took it. The damage arrived before its own animation, every time
+        // the foe's bar filled first.
+        //
+        // A cursor at zero means no line has been shown, so there is no last line to read anything off:
+        // health is max, nobody is stunned, nothing is burning. Every field below falls back correctly on
+        // null, which is why this is the whole fix.
+        const cur = shown > 0 ? (logAll[shown - 1] || null) : null;
         // The stamp wins wherever there is one. `?? ` and not `||`, because zero health is a real reading and
         // the one that matters most.
         if (cur?.meHp != null) hp = cur.meHp;
@@ -2502,7 +2523,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             burning={Boolean(bout.burning)} burnLeft={bout.burnLeft || 0}
                             frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
                             chilled={bout.chilled || 0}
-                            timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs } : null}
+                            timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs,
+                                waiting: yourTurn && !playing && raw?.awaiting === "act" } : null}
                             events={atbMode ? headsFor("you") : null} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}

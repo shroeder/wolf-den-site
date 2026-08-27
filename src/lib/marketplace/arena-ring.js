@@ -77,6 +77,29 @@ function stampBars(ring, from) {
     for (let i = from; i < ring.log.length; i += 1) if (ring.log[i]) ring.log[i].bars = b;
 }
 
+// ── AND WHERE THE BAR IS ONCE THE BEAT IS PAID FOR ───────────────────────────────────────────────────────────
+// `bars` above is the ARRIVAL: the instant the bar filled, which is why the fighter is swinging at all. That
+// is the frame the law at the top of arena-atb.js demands — you watched it approach. But it is not where the
+// bar is when the beat is over, because closeTurn spends it, and until this existed that spend was in no
+// transcript anywhere.
+//
+// Luke, at rung 100: "I attack, and it shows my bar as green and 2x but its not my turn?"
+//
+// Swept 120 rung-100 bouts against his real kit: EVERY frame in which his bar read full was a frame of his
+// own swing, 1,000 of them green at 2x. The engine was right — it had spent the bar correctly every time —
+// and the screen had no number to draw the spend with, so his bar went from full straight to two-thirds on
+// the foe's next line. A bar that slides BACKWARDS from the top is the one thing an ATB bar must never do:
+// full means it is yours, and his was full while the fight had moved on.
+//
+// Stamped on the LAST line of the beat only, because its one consumer is the NEXT line's starting point —
+// the screen reads it as `from` and fills forward from empty. Put it on the whole beat and the swing itself
+// would start from a spent bar, which throws away the arrival this is careful to keep.
+function stampSpent(ring) {
+    if (!ring.atb) return;
+    const L = ring.log[ring.log.length - 1];
+    if (L) L.barsAfter = bars(ring.atb, ring.now);
+}
+
 /** Has somebody won, and write it onto the ring if so. */
 function settle(ring) {
     if (ring.over) return true;
@@ -277,7 +300,9 @@ function advance(ring, rng) {
         });
         narrate(ring, from, { name: ring.foeName, by: ring.acting, again: isExtra });
         stampBars(ring, from);
-        if (!acts) { closeTurn(ring, rng); continue; }   // stunned, chilled, or dead on their own wound
+        // Stunned, chilled, or dead on their own wound. The beat is still PAID — closeTurn spends the bar —
+        // so it carries a spend for the next line to start from exactly like a swing does.
+        if (!acts) { closeTurn(ring, rng); stampSpent(ring); continue; }
 
         // ── THEIR BEAT NEEDS NOBODY ──────────────────────────────────────────────────────────────────────
         // Resolved here and the loop carries on, so a member is only ever stopped for a decision that is
@@ -307,6 +332,7 @@ function advance(ring, rng) {
             if (foeSkill?.id) ring.foeCd[foeSkill.id] = foeSkill.cooldown || 0;   // see the note in act()
             for (const k of Object.keys(ring.foeCd)) ring.foeCd[k] = Math.max(0, ring.foeCd[k] - 1);
             closeTurn(ring, rng);
+            stampSpent(ring);
             continue;
         }
 
@@ -591,8 +617,11 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
     // It returns BEFORE the cooldown tick, not after. Ticking here as well would have advanced every cooldown
     // in the deck twice on any beat a free skill was cast — the free skill paying for itself out of everything
     // else's rhythm, which is not free, it is a discount on the whole deck.
+    // A free skill pays no beat, so there is no spend to stamp: the bar is exactly where stampBars left it
+    // and it is still your turn — which is the one case where a full bar and a waiting fight agree.
     if (skill?.free) return ring;
     closeTurn(ring, rng);
+    stampSpent(ring);
     for (const k of Object.keys(ring.cd)) ring.cd[k] = Math.max(0, ring.cd[k] - 1);
     return advance(ring, rng);
 }
