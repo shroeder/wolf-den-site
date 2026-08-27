@@ -142,21 +142,50 @@ export function lossEffort(b = {}) {
 //
 // Every one is read off the bout log — things that actually happened, not a score. They are NAMED because a
 // named thing is a thing you tell somebody about: "I won that on a Comeback" is a story, "+40" is not.
+// ── THE LOWEST YOUR HEALTH EVER GOT ──────────────────────────────────────────────────────────────────────────
+// Luke, on a card that said "Damage taken 792" three lines under an UNTOUCHED laurel: "untouched is incorrect
+// i took a bunch of hits."
+//
+// Two of the three health feats were reading `b.hp`, which is where your health ENDED. "Won without dropping
+// below nine tenths" and "won from under a fifth" are both statements about the WORST moment of the fight, and
+// a Runecaller with lifedrink and regen ends a bout well above the pit it climbed out of. `b.lowHp` was
+// already written into the Comeback test as the right idea — and nothing anywhere has ever set it, so that
+// test has been reading the final number too since the day it was written.
+//
+// Derived from the log instead of stamped by the engine, because every line already carries `meHp` — the
+// screen rebuilt both health bars off those stamps months ago — so this works on transcripts written before
+// anybody thought to record a low-water mark, and there is no new field for a future change to forget.
+const lowestHp = (b) => {
+    const stamps = (b?.log || []).map((l) => Number(l?.meHp)).filter((n) => Number.isFinite(n));
+    const final = Number.isFinite(Number(b?.hp)) ? Number(b.hp) : Infinity;
+    return stamps.length ? Math.min(final, ...stamps) : (Number.isFinite(final) ? final : 0);
+};
+
 export const FEATS = [
     {
         id: "flawless", name: "Flawless", laurels: 55, vp: 10, color: "#fff0a8",
         blurb: "Won without dropping below nine tenths of your health.",
-        test: (b) => b.won && b.hp / Math.max(1, b.maxHp) >= 0.9,
+        test: (b) => b.won && lowestHp(b) / Math.max(1, b.maxHp) >= 0.9,
     },
     {
         id: "untouched", name: "Untouched", laurels: 80, vp: 20, color: "#8bf0b4",
         blurb: "Won without a single blow landing on you.",
-        test: (b) => b.won && !(b.log || []).some((l) => l.who === "them" && l.damage > 0),
+        // ⚠️ THIS FIRED ON EVERY SINGLE WIN. It looked for `who === "them"`, and the SERVER's log says "me"
+        // and "foe" — "you"/"them" is the CLIENT's translation in ArenaClient's logAll. So the `.some()` never
+        // matched a line in its life, `!false` is true, and every victory came with +80 laurels and +20 VP.
+        // The same one-word confusion cost the health bars their arithmetic once already; the note is still in
+        // ArenaClient where it happened.
+        //
+        // Not repaired by correcting the string, either. A test that walks the log looking for one shape of
+        // line breaks again the moment a line changes shape — a thorn, a burn tick and the pit all take health
+        // off you and none of them is a "blow" by that reading. Untouched means you never lost a point of
+        // health, which is exactly what the "Damage taken" line on the same card is showing.
+        test: (b) => b.won && lowestHp(b) >= Math.max(1, b.maxHp),
     },
     {
         id: "comeback", name: "Comeback", laurels: 70, vp: 15, color: "#ff9f1c",
         blurb: "Won from under a fifth of your health.",
-        test: (b) => b.won && (b.lowHp ?? b.hp) / Math.max(1, b.maxHp) <= 0.2,
+        test: (b) => b.won && lowestHp(b) / Math.max(1, b.maxHp) <= 0.2,
     },
     {
         id: "giantkiller", name: "Giant-Killer", laurels: 65, vp: 15, color: "#b061ff",

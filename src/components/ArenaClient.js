@@ -1839,7 +1839,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // through to the swing fallback and were announced as swings he never threw.
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
-                        : last.thorns ? "Thorns"
+                        : last.thorns ? (last.iceThorns ? "Rimeguard" : "Thorns")
                             : last.counter ? "Retaliation"
                                 : last.stunnedSkip ? "Stunned"
                                     : last.chilledSkip ? "Frozen stiff"
@@ -1869,7 +1869,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // The same list as the clash above, and it has to stay the same list — see the warning there.
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
-                        : last.thorns ? "Thorns"
+                        : last.thorns ? (last.iceThorns ? "Rimeguard" : "Thorns")
                             : last.counter ? "Retaliation"
                                 : last.stunnedSkip ? "Stunned"
                                     : last.chilledSkip ? "Frozen"
@@ -1883,7 +1883,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 note: locked
                     ? `loses this beat${(Number(mine ? last.meStun : last.foeStun) || 0) > 0
                         ? ` · ${Number(mine ? last.meStun : last.foeStun) || 0} more` : ""}`
-                    : last.again ? "goes again" : null,
+                    // ── "goes again" MEANT NOTHING TO THE PERSON READING IT ──────────────────────────
+                    // Luke: "what does goes again mean?" It is the BAR REFUND — the swing only half emptied
+                    // the bar, so it came round again before the other fighter's did. The phrase is left over
+                    // from the old go-again roll, which was a coin flip for a free turn and is gone. Under a
+                    // timer the honest sentence is about the bar, because the bar is the thing on screen.
+                    : last.again ? "bar half spent" : null,
                 crit,
                 grade: locked ? (last.chilledSkip ? "freeze" : "stun")
                     : last.burnTick ? "burn"

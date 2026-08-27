@@ -619,7 +619,7 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         // there was no line here at all — a member cast Bastion, the transcript said nothing, and the only
         // evidence the beat happened was a cooldown starting. See the push in act().
         else if (l.cast) l.text = `${actor} cast${verb} ${skill?.name || "a skill"}.`;
-        else if (l.thorns) l.text = `Thorns bite back — ${took}`;
+        else if (l.thorns) l.text = l.iceThorns ? `The ice bites back — ${took}` : `Thorns bite back — ${took}`;
         else if (l.counter) l.text = `${actor} answer${verb} — ${took}`;
         else if (l.ability) l.text = `${actor} cast${verb} ${l.ability} — ${took}`;
         else l.text = `${actor} strike${verb} — ${took}`;

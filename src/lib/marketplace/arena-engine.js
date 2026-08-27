@@ -581,12 +581,19 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance, meBurn: A.burnLeft, foeBurn: B.burnLeft });
         // RIMEGUARD answers EVERY blow rather than only a blocked one — that is the difference between the
         // Runecaller's thorns and the Warden's.
-        if (def.iceThorns > 0 && dealt > 0 && att.hp > 0) thornsBack += Math.round(dealt * def.iceThorns);
+        // ── AND IT SAYS WHICH KIND IT WAS ────────────────────────────────────────────────────────────────
+        // Luke: "why do I have 2 thorns when he didn't hit me?" He has `thorns: 0` and always has — every one
+        // of those lines is ICE thorns off Rimeguard, which is a different effect with a different trigger:
+        // ordinary thorns take a share of what your BLOCK turned aside, ice takes a share of every blow that
+        // lands. Both were writing the same sentence, so a Runecaller reading "Thorns bite back" was being
+        // told about a mechanic they do not own, twice, for blows they could not see being blocked.
+        let iced = false;
+        if (def.iceThorns > 0 && dealt > 0 && att.hp > 0) { thornsBack += Math.round(dealt * def.iceThorns); iced = true; }
         // Thorns are logged AFTER the blow that set them off — they are the answer to it, and playing them
         // first put the reply on screen before the question.
         if (thornsBack > 0 && att.hp > 0) {
             att.hp -= thornsBack;
-            log.push({ t, who: who === "me" ? "foe" : "me", dmg: thornsBack, thorns: true,
+            log.push({ t, who: who === "me" ? "foe" : "me", dmg: thornsBack, thorns: true, iceThorns: iced,
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
         }
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
