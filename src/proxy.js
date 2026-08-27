@@ -34,6 +34,17 @@ export function proxy(request) {
     return NextResponse.next();
 }
 
+// ── ⚠️ AND IT DOES NOT RUN FOR A PICTURE ─────────────────────────────────────────────────────────────────────
+// The matcher excluded Next's own build output and nothing else, so it ran on every file in public/ as well —
+// 1,150 of them, 716 webp and 416 png. Every sprite on every screen was an edge invocation: an arena bout
+// pulls two hero sprites, the skill icons and a backdrop; the casino floor pulls five cabinets; the farm pulls
+// its decorations, crops and pets. A single page view was tens of invocations before anybody clicked
+// anything, and on a plan billed by invocation that is the biggest multiplier in the app.
+//
+// This middleware does exactly two things — redirect the apex domain, and mint an anonymous visitor id for
+// cookieless web visitors. Neither is meaningful for a .webp: the document request always arrives first and
+// carries both. So static assets are excluded by folder AND by extension, because public/ grows new folders
+// and an extension list catches those on the day they are added rather than the day somebody notices.
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+    matcher: ["/((?!_next/static|_next/image|favicon.ico|images/|logo/|push-sw.js|.*\\.(?:png|jpe?g|gif|webp|svg|ico|mp3|wav|woff2?)$).*)"],
 };
