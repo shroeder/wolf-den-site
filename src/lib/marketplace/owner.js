@@ -18,6 +18,13 @@ export function isPrimaryOwner(buyerId) {
     return Boolean(buyerId) && String(buyerId) === PRIMARY_OWNER_ID;
 }
 
+// The id itself, for the places that need it as a VALUE rather than as a question — a SQL predicate cannot
+// call `isPrimaryOwner`. The casino report excludes it: Luke plays the floor to test it, and one owner with a
+// test panel outweighs the whole membership (see casino-report.js).
+export function primaryOwnerId() {
+    return PRIMARY_OWNER_ID;
+}
+
 // ── THE HOUSE DOES NOT WIN THE RAFFLE ────────────────────────────────────────────────────────────────────────
 // The boss raffle hands out a REAL object off the shelf in Montgomery, and it is a prize the shop is giving to
 // its members. The owner was already excluded; staff were not, and staff play — Eric is a regular and finished

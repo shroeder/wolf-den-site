@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { SLOT_MACHINES } from "@/lib/marketplace/casino.js";
 import { slot5 } from "@/lib/marketplace/casino-slot5.js";
 import { isBonus, SOURCE_LABEL, WIN_SOURCES } from "@/lib/marketplace/casino-win-source.js";
+import { primaryOwnerId } from "@/lib/marketplace/owner.js";
 
 // ── WHAT THE FLOOR IS ACTUALLY DOING ─────────────────────────────────────────────────────────────────────────
 // Luke: "I just wanna know how much coin people spent and how many chips they won, by person. And I need to
@@ -36,6 +37,20 @@ import { isBonus, SOURCE_LABEL, WIN_SOURCES } from "@/lib/marketplace/casino-win
 // `slot5_forced` is a forced outcome from the owner's test panel. On the day this was written those 211 spins
 // had minted 473,828 chips against 23,870 from all real play — twenty to one. Folded into a total, every
 // number on the screen becomes a description of the test panel. They are counted, reported, and kept out.
+// ── AND THE OWNER IS NOT ON THE FLOOR ────────────────────────────────────────────────────────────────────────
+// Luke: "ignore me from this entirely."
+//
+// He is not a customer of this casino, he is the person testing it, and the numbers say so: over the seven
+// days this was written he had staked 160,636 gold across 1,927 plays against 25,000 from everybody else put
+// together — six sevenths of the floor was one man checking his own machines. Every rate, every split and
+// every "most played cabinet" was a description of his testing.
+//
+// Excluded from every query in this file rather than filtered out of one list at the end, so there is no
+// screen and no total that quietly still has him in it. It also retires the `slot5_forced` special case by
+// construction: the test panel is his, so its spins leave with him. The forced tally is kept anyway, because
+// a number that is deliberately absent should still be visible as absent.
+const EXCLUDED = primaryOwnerId();
+
 const TZ = "America/Chicago";
 
 const num = (v) => Number(v) || 0;
@@ -83,7 +98,7 @@ const CHIP_GAME = {
 // that describes neither. So every machine key here is `game:id`, and every label says which floor it is on.
 const machineKey = (game, id) => `${game}:${id}`;
 const machineLabel = (game, id) => {
-    if (game === "slot5") return `${slot5(id).label} (5-reel)`;
+    if (game === "slot5") return slot5(id).label;
     if (game === "slot") return `${SLOT_MACHINES[id]?.label || id} (3-reel)`;
     return id;
 };
@@ -96,6 +111,38 @@ export const GAME_LABEL = {
     blackjack: "Blackjack",
     wheel: "The wheel",
     gamble: "Double or nothing",
+};
+
+// ── WHAT IS ACTUALLY ON THE FLOOR ────────────────────────────────────────────────────────────────────────────
+// Luke: "double or nothing doesnt exist neither does 3 reel slots."
+//
+// Correct, and checked in the client rather than taken on trust: the three-reel handler (`pull`) is referenced
+// by nothing at all, and the Double or Nothing button only renders when a three-reel meter has a pending win,
+// so it cannot be reached either. The wheel went with them — CasinoClient says so in as many words ("The wheel
+// is gone; the shape it set is not"). All three still have live server routes and a tail of ledger rows, and
+// every one of those rows is the owner's.
+//
+// They are named rather than deleted so their history is still recognised — an unmapped reason would land in
+// no column and silently vanish — but they are kept out of the totals and reported on their own, because a
+// floor report is a description of the floor as it is.
+const LIVE_GAMES = new Set(["slot5", "keno", "bingo", "blackjack"]);
+const RETIRED_GAMES = new Set(["slot", "wheel", "gamble"]);
+
+// ── AND A ROW IS A MACHINE, NOT A CATEGORY ───────────────────────────────────────────────────────────────────
+// Luke: "we want it by slot machine by name."
+//
+// "Five-reel cabinets — 121k over 1,500 plays" is five machines wearing one number, and the five are the whole
+// point: they have different volatilities, different bonus shares and different tunings, and the one question
+// this screen exists to answer is which of them the floor is actually playing. So the unit of a row is the
+// thing you walk up to — The Hunt, The Harvest, The Deep, The Menagerie, The Vault — with Keno, Bingo and
+// Blackjack beside them as themselves.
+const unitKey = (game, machine) => (game === "slot5" ? `slot5:${machine || ""}` : game);
+const unitLabel = (key) => {
+    if (!key.startsWith("slot5:")) return GAME_LABEL[key] || key;
+    const id = key.slice("slot5:".length);
+    // A stake with no cabinet on it is a real row and must not be folded into a named machine — it would put
+    // spend on a cabinet that never took it.
+    return id ? slot5(id).label : "Five-reel (cabinet not recorded)";
 };
 
 /** An empty tally, so every row has every column whether or not it was ever written to. */
@@ -114,8 +161,10 @@ const add = (into, key, field, v) => {
 // account for.
 async function ledgers({ days, buyerId = null }) {
     const iv = `${days} days`;
-    const who = buyerId ? " AND e.buyer_id = $2" : "";
-    const args = buyerId ? [iv, buyerId] : [iv];
+    // ONE member when drilling in, EVERYONE BUT THE OWNER otherwise — the same parameter either way, so the
+    // two shapes cannot drift into different placeholder numbering. See EXCLUDED.
+    const who = buyerId ? " AND e.buyer_id = $2" : " AND e.buyer_id <> $2";
+    const args = [iv, buyerId || EXCLUDED];
     const [coin, chip] = await Promise.all([
         db.query(
             `SELECT e.buyer_id AS id, e.reason,
@@ -159,8 +208,8 @@ async function ledgers({ days, buyerId = null }) {
 // them at all.
 async function winSources({ days, buyerId = null, byMachine = false }) {
     const iv = `${days} days`;
-    const who = buyerId ? " AND e.buyer_id = $2" : "";
-    const args = buyerId ? [iv, buyerId] : [iv];
+    const who = buyerId ? " AND e.buyer_id = $2" : " AND e.buyer_id <> $2";   // see the note in ledgers
+    const args = [iv, buyerId || EXCLUDED];
     // Forced spins are left out here for the same reason they are left out of every total: 211 of them had
     // minted twenty times what all real play had, almost entirely into the free-spins column, so a split that
     // included them would report the floor as a free-spins machine because the test panel forces free spins.
@@ -228,7 +277,13 @@ const paylineVsBonus = (rows) => {
 };
 
 const gameRows = (byGame) => Object.entries(byGame)
-    .map(([game, v]) => ({ game, label: GAME_LABEL[game] || game, ...v }))
+    .map(([key, v]) => ({
+        key,
+        game: key.startsWith("slot5:") ? "slot5" : key,
+        machine: key.startsWith("slot5:") ? key.slice("slot5:".length) : null,
+        label: unitLabel(key),
+        ...v,
+    }))
     .sort((a, z) => z.coinSpent - a.coinSpent || z.chipsWon - a.chipsWon);
 
 /**
@@ -253,26 +308,28 @@ export async function getCasinoReport({ days = 7 } = {}) {
                  SELECT (created_at AT TIME ZONE '${TZ}')::date AS day,
                         SUM(-delta) AS spent, 0 AS won, COUNT(*) AS plays
                    FROM mkt_coin_event
-                  WHERE reason LIKE 'casino%bet' AND created_at >= NOW() - $1::interval
+                  WHERE reason ~ '_bet$' AND buyer_id <> $2 AND created_at >= NOW() - $1::interval
                   GROUP BY 1
                  UNION ALL
                  SELECT (created_at AT TIME ZONE '${TZ}')::date AS day,
                         0 AS spent, SUM(delta) AS won, 0 AS plays
                    FROM mkt_chip_event
-                  WHERE delta > 0 AND reason <> 'slot5_forced' AND created_at >= NOW() - $1::interval
+                  WHERE delta > 0 AND reason <> 'slot5_forced' AND buyer_id <> $2
+                    AND created_at >= NOW() - $1::interval
                   GROUP BY 1
                ) x
-              GROUP BY 1 ORDER BY 1`, [iv]).catch(() => []),
+              GROUP BY 1 ORDER BY 1`, [iv, EXCLUDED]).catch(() => []),
         db.query(
             `SELECT COALESCE(item_id, 'item') AS item, COUNT(*)::int AS n,
                     COALESCE(SUM(price), 0)::bigint AS chips
                FROM mkt_chip_purchase
-              WHERE created_at >= NOW() - $1::interval
-              GROUP BY 1 ORDER BY chips DESC LIMIT 20`, [iv]).catch(() => []),
+              WHERE created_at >= NOW() - $1::interval AND buyer_id <> $2
+              GROUP BY 1 ORDER BY chips DESC LIMIT 20`, [iv, EXCLUDED]).catch(() => []),
         db.queryOne(
             `SELECT COUNT(*)::int AS visits, COUNT(DISTINCT buyer_id)::int AS members
                FROM mkt_activity_event
-              WHERE event = 'casino_vip_enter' AND created_at >= NOW() - $1::interval`, [iv]).catch(() => null),
+              WHERE event = 'casino_vip_enter' AND buyer_id <> $2
+                AND created_at >= NOW() - $1::interval`, [iv, EXCLUDED]).catch(() => null),
         db.query(`SELECT id, COALESCE(NULLIF(display_name, ''), alias) AS name FROM mkt_buyer`).catch(() => []),
     ]);
 
@@ -283,28 +340,35 @@ export async function getCasinoReport({ days = 7 } = {}) {
     const totals = zero();
     // Kept apart from every total on the screen. See the header.
     const test = { plays: 0, chipsWon: 0 };
+    // The same treatment for games that are no longer on the floor — see LIVE_GAMES.
+    const retired = { plays: 0, coinSpent: 0, coinBack: 0 };
 
     for (const r of coin) {
         const game = BET_GAME[r.reason];
         const spent = -num(r.total);        // bets are negative deltas
-        if (game) {
+        // A game nobody can reach is not the floor. Tallied so it is visible as excluded, never added in.
+        if (RETIRED_GAMES.has(game) || RETIRED_GAMES.has(WIN_GAME[r.reason])) {
+            if (game) { retired.plays += num(r.n); retired.coinSpent += spent; }
+            else retired.coinBack += num(r.total);
+            continue;
+        }
+        if (game && LIVE_GAMES.has(game)) {
+            const k = unitKey(game, r.machine);
             add(byPlayer, r.id, "coinSpent", spent);
             add(byPlayer, r.id, "plays", num(r.n));
-            add(byGame, game, "coinSpent", spent);
-            add(byGame, game, "plays", num(r.n));
+            add(byGame, k, "coinSpent", spent);
+            add(byGame, k, "plays", num(r.n));
             totals.coinSpent += spent;
             totals.plays += num(r.n);
             if (r.machine) {
-                const k = machineKey(game, r.machine);
-                add(byMachine, k, "coinSpent", spent);
-                add(byMachine, k, "plays", num(r.n));
+                const mk = machineKey(game, r.machine);
+                add(byMachine, mk, "coinSpent", spent);
+                add(byMachine, mk, "plays", num(r.n));
             }
         } else if (WIN_GAME[r.reason]) {
             add(byPlayer, r.id, "coinBack", num(r.total));
-            add(byGame, WIN_GAME[r.reason], "coinBack", num(r.total));
+            add(byGame, unitKey(WIN_GAME[r.reason], r.machine), "coinBack", num(r.total));
             totals.coinBack += num(r.total);
-            // The three-reel floor pays GOLD, so its cabinets need that column too or a machine that has
-            // paid out 14,000 gold reads as a machine that has never paid anything.
             if (r.machine) add(byMachine, machineKey(WIN_GAME[r.reason], r.machine), "coinBack", num(r.total));
         } else if (COMP.has(r.reason)) {
             add(byPlayer, r.id, "coinComped", num(r.total));
@@ -326,12 +390,14 @@ export async function getCasinoReport({ days = 7 } = {}) {
             continue;
         }
         const game = CHIP_GAME[r.reason];
-        if (!game) continue;
+        if (!game || !LIVE_GAMES.has(game)) continue;
+        const k = unitKey(game, r.ref);
         add(byPlayer, r.id, "chipsWon", won);
         add(byPlayer, r.id, "wins", num(r.n));
         byPlayer[r.id].best = Math.max(byPlayer[r.id].best, num(r.best));
-        add(byGame, game, "chipsWon", won);
-        add(byGame, game, "wins", num(r.n));
+        add(byGame, k, "chipsWon", won);
+        add(byGame, k, "wins", num(r.n));
+        byGame[k].best = Math.max(byGame[k].best, num(r.best));
         totals.chipsWon += won;
         totals.wins += num(r.n);
         if (r.ref && game === "slot5") {
@@ -355,11 +421,10 @@ export async function getCasinoReport({ days = 7 } = {}) {
             players: Object.keys(byPlayer).length,
         },
         test,
+        retired,
+        excluded: { owner: true },
+        // One row per machine. There is no separate by-cabinet list any more — this IS it.
         byGame: gameRows(byGame),
-        byMachine: Object.entries(byMachine).map(([key, v]) => {
-            const [game, machine] = key.split(":");
-            return { key, game, machine, label: machineLabel(game, machine), ...v };
-        }).sort((a, z) => z.coinSpent - a.coinSpent || z.chipsWon - a.chipsWon),
         players: Object.entries(byPlayer)
             .map(([id, v]) => ({ id, name: nameOf.get(id) || "Member", ...v }))
             .sort((a, z) => z.coinSpent - a.coinSpent)
@@ -429,13 +494,21 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
     const byMachine = {};
     const totals = zero();
     const test = { plays: 0, chipsWon: 0 };
+    const retired = { plays: 0, coinSpent: 0, coinBack: 0 };
 
+    // The same rules as the floor above, and deliberately the same shape: a member's drill-down that counted
+    // a retired game or lumped the five cabinets together would disagree with the screen it was opened from.
     for (const r of coin) {
         const game = BET_GAME[r.reason];
         const spent = -num(r.total);
-        if (game) {
-            add(byGame, game, "coinSpent", spent);
-            add(byGame, game, "plays", num(r.n));
+        if (RETIRED_GAMES.has(game) || RETIRED_GAMES.has(WIN_GAME[r.reason])) {
+            if (game) { retired.plays += num(r.n); retired.coinSpent += spent; }
+            else retired.coinBack += num(r.total);
+            continue;
+        }
+        if (game && LIVE_GAMES.has(game)) {
+            add(byGame, unitKey(game, r.machine), "coinSpent", spent);
+            add(byGame, unitKey(game, r.machine), "plays", num(r.n));
             totals.coinSpent += spent;
             totals.plays += num(r.n);
             if (r.machine) {
@@ -444,7 +517,7 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
                 add(byMachine, k, "plays", num(r.n));
             }
         } else if (WIN_GAME[r.reason]) {
-            add(byGame, WIN_GAME[r.reason], "coinBack", num(r.total));
+            add(byGame, unitKey(WIN_GAME[r.reason], r.machine), "coinBack", num(r.total));
             totals.coinBack += num(r.total);
             if (r.machine) add(byMachine, machineKey(WIN_GAME[r.reason], r.machine), "coinBack", num(r.total));
         } else if (COMP.has(r.reason)) {
@@ -456,9 +529,11 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
         if (r.reason === "slot5_forced") { test.plays += num(r.n); test.chipsWon += won; continue; }
         if (won < 0) { totals.chipsSpent += -won; continue; }
         const game = CHIP_GAME[r.reason];
-        if (!game) continue;
-        add(byGame, game, "chipsWon", won);
-        add(byGame, game, "wins", num(r.n));
+        if (!game || !LIVE_GAMES.has(game)) continue;
+        const uk = unitKey(game, r.ref);
+        add(byGame, uk, "chipsWon", won);
+        add(byGame, uk, "wins", num(r.n));
+        byGame[uk].best = Math.max(byGame[uk].best, num(r.best));
         totals.chipsWon += won;
         totals.wins += num(r.n);
         totals.best = Math.max(totals.best, num(r.best));
@@ -495,6 +570,7 @@ export async function getCasinoPlayerReport({ buyerId, days = 7 } = {}) {
         player: { id: buyerId, name: who?.name || "Member", gold: num(who?.gold), chips: num(who?.chips) },
         totals: { ...totals, coinNet: totals.coinSpent - totals.coinComped },
         test,
+        retired,
         byGame: gameRows(byGame),
         machines,
         sources: overall,
