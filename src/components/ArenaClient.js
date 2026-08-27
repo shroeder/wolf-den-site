@@ -384,7 +384,19 @@ function StatusRow({ list, side, onPick }) {
 // The four states are colour AND behaviour, because colour alone does not survive a glance: haste and chill
 // change how fast the bar moves, stun and freeze STOP it. A frozen bar that merely ran slowly would be
 // indistinguishable from a chilled one, and they mean opposite things.
+// ── AND THE COLD SAYS HOW COLD ───────────────────────────────────────────────────────────────────────────
+// "SLOW" was the only honest thing it could say while chill was a flat 0.55x that ignored the stat that
+// applied it. The magnitude is real now — a 22% chill slows the bar 22% and two of them stack to 44% — so
+// the bar prints the number it is actually running at. A player who spent five ranks on Chill can see the
+// five ranks.
 const TIMER_WORD = { haste: "2x", chill: "SLOW", stun: "STUNNED", freeze: "FROZEN" };
+const timerWord = (state, snap) => {
+    if (state === "chill") {
+        const pct = Math.round((snap?.slow || 0) * 100);
+        return pct > 0 ? `-${pct}%` : "SLOW";
+    }
+    return TIMER_WORD[state] || "";
+};
 // How long the emptying takes. It is punctuation, not travel: the bar was spent, and the eye needs to see
 // that it went to nothing rather than merely dropped.
 const SPEND_MS = 140;
@@ -451,7 +463,7 @@ function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
             <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, bar.w)) * 100)}%`,
                 transitionDuration: `${bar.dur}ms` }} />
             {ready ? <b className="ar-timer-word">READY</b>
-                : state ? <b className="ar-timer-word">{TIMER_WORD[state] || ""}</b> : null}
+                : state ? <b className="ar-timer-word">{timerWord(state, to || from)}</b> : null}
         </span>
     );
 }

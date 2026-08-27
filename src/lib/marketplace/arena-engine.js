@@ -13,7 +13,7 @@
 //
 // The rule for this file: if it touches the database, the session, or the clock, it does not belong here.
 import {
-    BLEED_MAX_STACKS, BLEED_PER_TURN, BLEED_TICK_CAP, BLEED_TURNS, BLEED_TURNS_CAP, CHILL_CAP,
+    BLEED_MAX_STACKS, BLEED_PER_TURN, BLEED_TICK_CAP, BLEED_TURNS, BLEED_TURNS_CAP,
     CONTROL_IMMUNE_TURNS, COUNTER_POWER, REND_PER_TURN, REND_TICK_CAP, REND_TURNS, REND_TURNS_CAP,
     SHIELD_DECAY,
 } from "@/lib/marketplace/arena-kit.js";
@@ -413,7 +413,7 @@ export const sideOf = (f) => ({
         // attack speed, Ferocity and Quickblade all land now that nothing is paced off a clock.
         extra: Math.max(0, Math.min(EXTRA_TURN_MAX, Number(f.extra) || 0)),
         // And the chance one of THEIR turns simply does not happen — Chill, which used to slow their clock.
-        skipChance: Math.max(0, Math.min(0.6, Number(f.skipChance) || 0)),
+        skipChance: Math.max(0, Math.min(0.85, Number(f.skipChance) || 0)),
         // ── AND THE SAME TWO INPUTS AGAIN, UNCONVERTED ───────────────────────────────────────────────────
         // `extra` above is weapon speed and Ferocity folded into a go-again chance, which is lossy on
         // purpose. The timer needs the rate itself rather than the chance it was turned into, so it rides
@@ -755,10 +755,18 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     // between it and the Warden's Bastion.
     A.shield += Math.round(A.maxHp * A.ward);
     B.shield += Math.round(B.maxHp * B.ward);
-    // CHILL is a share of the OTHER fighter's turns that simply do not happen. Applied once, at the bell,
-    // because it lasts the bout — it is a condition they are under, not a status they can shake.
-    if (A.chill > 0) B.skipChance = Math.min(CHILL_CAP, B.skipChance + A.chill);
-    if (B.chill > 0) A.skipChance = Math.min(CHILL_CAP, A.skipChance + B.chill);
+    // ── CHILL, TRANSLATED — AND THIS IS THE AUTO-RESOLVER, NOT THE RING ──────────────────────────────────
+    // ⚠️ There is no bar here. autoBout resolves a fight nobody is watching (an away defence, and every
+    // balance projection check:sim / check:road / check:npc print), so it still takes turns, and chill has to
+    // be expressed in that vocabulary.
+    //
+    // A bar slowed X% takes X% fewer turns, so the honest translation of "their bar runs 22% slower" is "22%
+    // of their turns do not happen". That is what this is, and it is why CHILL_CAP is gone: the ring does not
+    // cap the slow (see CHILL_RATE_FLOOR — the only limit there is a stall guarantee), so capping it at 25%
+    // here would make the same two fighters resolve differently depending on whether anybody was watching.
+    // The 0.85 ceiling is the same stall guarantee wearing the turn-based shape.
+    if (A.chill > 0) B.skipChance = Math.min(0.85, B.skipChance + A.chill);
+    if (B.chill > 0) A.skipChance = Math.min(0.85, A.skipChance + B.chill);
     const log = [];
     let t = 0;
     let swings = 0;

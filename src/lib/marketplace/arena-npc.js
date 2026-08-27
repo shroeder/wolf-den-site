@@ -1,6 +1,7 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
 import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
 import { CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
+import { npcTempo } from "@/lib/marketplace/arena-atb.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -373,6 +374,8 @@ export function npcFor(tier) {
     return {
         id: `npc:${t}`,
         npc: true,
+        // Same reason as statsForPower — the tier is the axis, not this fighter's Ferocity. See npcTempo.
+        tempo: npcTempo(t),
         tier: t,
         band: band.key,
         name: `${band.name}${idx > 1 ? numeral : ""}`,
@@ -574,6 +577,11 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
     // npcStats dresses them all out of the real catalogue instead.
     return {
         ...npcStats(power, archKey, seed),
+        // ── THE BAR'S RATE IS GIVEN, NOT DERIVED ─────────────────────────────────────────────────────────
+        // `seed` is the rung for every Road caller and the tier for everything else, which is exactly the
+        // axis a foe's speed should climb. Handed over explicitly because deriving it from this fighter's
+        // Ferocity — a gear budget in the thousands — answers 79 at rung 100. See npcTempo.
+        tempo: npcTempo(seed || 1),
         // `tough` and `guard` stay on the line for anything that reads them off the card. tough is already
         // folded into vitality by npcStats, so nothing may multiply by it a second time.
         tough: arch.tough || 1,

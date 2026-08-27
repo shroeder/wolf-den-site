@@ -79,7 +79,7 @@ export const STAT_META = {
     // armour rating are what the thing IS before a single stat is rolled on it, and they were missing from
     // this table entirely, which meant nothing anywhere in the game printed them.
     base_damage: { label: "Damage", icon: "⚔️", desc: "The weapon's own damage. Might multiplies it — this is the number every swing starts from.", suffix: "" },
-    speed: { label: "Attack Speed", icon: "⏱️", desc: "Above bare-handed, this is your chance to take another turn immediately. Ferocity adds to it.", suffix: "/s" },
+    speed: { label: "Attack Speed", icon: "⏱️", desc: "How fast your turn bar fills. Ferocity adds to it, and anything above bare-handed also buys a chance your swing only half-empties the bar.", suffix: "/s" },
     armor: { label: "Armour", icon: "🛡️", desc: "Comes off every blow, flat, before anything else. Tenacity multiplies it.", suffix: "" },
     block_chance: { label: "Block Chance", icon: "🛡️", desc: "How often this shield blocks — a block takes 35% off the blow.", suffix: "%" },
 
@@ -98,8 +98,8 @@ export const STAT_META = {
     lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you land comes back as health. Each point is 0.25%.", suffix: "" },
     counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands. Each point is 0.25%.", suffix: "" },
     doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your swing lands twice — a whole extra hit, with its own crit roll. Each point is 0.5%.", suffix: "" },
-    stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stuns — they lose the swing that was due. Each point is 0.5%.", suffix: "" },
-    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing grants you another turn on the spot. Each point is 0.5%.", suffix: "" },
+    stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stops their turn bar dead for a second. Each point is 0.5%.", suffix: "" },
+    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing sends your turn bar to double speed for 6 seconds. Each point is 0.5%.", suffix: "" },
 
     // ── OUTSIDE THE RING ─────────────────────────────────────────────────────────────────────────────────
     fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize. Does nothing in a fight.", suffix: "" },
@@ -814,7 +814,7 @@ const VITALITY_SHARE_OF_FEROCITY = 0.6;
 // the same sword is a tier with one sword in it.
 //
 //   base_damage    main hand only. Common ~10 up to primordial ~100.
-//   speed          main hand only. Every weapon has one. Nothing reads it yet.
+//   speed          main hand only. Every weapon has one. It is the bar's fill rate — see tempoOf.
 //   armor          every worn piece that is not a weapon, ring or amulet. A plain integer. A common chest is
 //                  ~40 and a primordial chest ~850; the other slots are a share of the chest by coverage.
 //   block_chance   shields only. Ranges to 0.75 on the best shield in the game, with most sitting near 0.30.

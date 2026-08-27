@@ -254,7 +254,7 @@ export const TREES = {
             desc: "+6% chance a blow opens a bleed. A wound ticks three times for a fifth of the blow and armour never sees it.",
             sprite: "/images/arena/node/rv_might.webp" }),
         N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "extra", per: 0.06,
-            desc: "+6% chance to take another turn immediately. Every turn you steal is another roll at everything else.",
+            desc: "+6% chance your swing only HALF empties your turn bar, so the next one comes round twice as soon. Never twice in a row.",
             sprite: "/images/arena/node/rv_strike.webp" }),
         N({ id: "rv_edge", tier: 0, name: "Killing Edge", ranks: 5, stat: "crit", per: 0.03,
             desc: "+3% critical chance.", sprite: "/images/arena/node/rv_crit.webp" }),
@@ -273,7 +273,7 @@ export const TREES = {
             desc: "+3% chance to answer a blow with one of your own. A counter is a real swing and rolls its own crit.",
             sprite: "/images/arena/node/rv_counter.webp" }),
         N({ id: "rv_concuss", tier: 2, name: "Concussive", ranks: 5, stat: "stunBonus", per: 0.02, needs: 7,
-            desc: "+2% chance a blow stuns — they lose the swing that was due.",
+            desc: "+2% chance a blow stops their turn bar dead for a second.",
             sprite: "/images/arena/node/rv_stun.webp" }),
         N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "doublestrikeBonus", per: 0.02, needs: 7,
             desc: "+2% chance the swing lands twice. Each blow rolls its own crit.",
@@ -281,7 +281,7 @@ export const TREES = {
 
         // TIER 4 — capstones.
         N({ id: "rv_scent", tier: 3, name: "Bloodscent", ranks: 5, stat: "hasteBonus", per: 0.02, needs: 12,
-            desc: "+2% chance a swing grants you another turn on the spot.",
+            desc: "+2% chance a swing sends your turn bar to DOUBLE speed for six seconds.",
             sprite: "/images/arena/node/rv_haste.webp" }),
         N({ id: "rv_exsang", tier: 3, name: "Exsanguinate", ranks: 5, stat: "bleedLeech", per: 0.03, needs: 12,
             desc: "+3% of all bleed damage healed back to you. Rend starts it, Deep Cuts deepens it, this drinks it.",
@@ -326,7 +326,7 @@ export const TREES = {
 
         // TIER 4 — capstones.
         N({ id: "wd_concuss", tier: 3, name: "Concussion", ranks: 5, stat: "stunBonus", per: 0.02, needs: 12,
-            desc: "+2% chance a blow stuns — they lose the swing that was due.",
+            desc: "+2% chance a blow stops their turn bar dead for a second.",
             sprite: "/images/arena/node/wd_stun.webp" }),
         N({ id: "wd_thorns", tier: 3, name: "Thornmail", ranks: 5, stat: "thorns", per: 0.04, needs: 12,
             desc: "+4% of the damage your BLOCK turns aside is sent back down the blade.",
@@ -349,10 +349,10 @@ export const TREES = {
 
         // TIER 2 — the cold.
         N({ id: "rc_frost", tier: 1, name: "Frostbite", ranks: 5, stat: "freeze", per: 0.02, needs: 3,
-            desc: "+2% chance a blow freezes — they lose the swing that was due.",
+            desc: "+2% chance a blow FREEZES: their turn bar stops dead. Every rank also makes your freezes last longer — see the Runecaller's two seconds.",
             sprite: "/images/arena/node/rc_freeze.webp" }),
         N({ id: "rc_chill", tier: 1, name: "Chill", ranks: 5, stat: "chill", per: 0.02, needs: 3,
-            desc: "+2% chance the enemy is too cold to take their turn at all. It lasts the whole bout.",
+            desc: "Every blow you land slows their turn bar by another 2%, and the cold wears off over eight seconds. It stacks, and nothing caps it.",
             sprite: "/images/arena/node/rc_chill.webp" }),
         N({ id: "rc_rime", tier: 1, name: "Rimeguard", ranks: 5, stat: "iceThorns", per: 0.03, needs: 3,
             desc: "+3% of the damage done to you is sent back. Every blow, not only the ones you block.",

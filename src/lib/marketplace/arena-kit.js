@@ -257,7 +257,9 @@ export const CONTROL_IMMUNE_TURNS = 1;
 // The permanent per-beat chill roll. 0.6 was a coin flip on losing your turn, for ever, from one stat — the
 // single largest source of "my build did nothing". It is a nudge now, and the immunity above bounds the worst
 // case regardless.
-export const CHILL_CAP = 0.25;
+// CHILL_CAP is gone. Chill is a magnitude now — the share of a bar's rate it takes — and arena-atb.js caps
+// nothing but the stall floor. A second, tighter cap living here would have meant the same cold was worth
+// four different amounts depending on which file you asked.
 export const SUNDER_CUT = 0.4;      // of their guard, removed
 export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.

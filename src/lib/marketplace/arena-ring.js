@@ -29,8 +29,8 @@
 //
 // Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
 // every exchange was a brace nobody was choosing.
-import { goesAgain, openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
-import { bars, chill, fillTo, hold, haste, newTrack, nextUp, spend } from "@/lib/marketplace/arena-atb.js";
+import { openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
+import { BAR_REFUND, bars, chill, fillsAt, fillTo, foeExtra, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
@@ -50,6 +50,19 @@ export const RING_BEAT_CAP = 300;
 // AND THE OLD MECHANISM IS SWITCHED OFF, not left running alongside. `def.stunned` is a turn the defender must
 // skip and `att.bonusTurns` is a turn the attacker is handed; under a timer those are the bar's job, and
 // leaving them set would charge a stun twice — hold the bar AND eat the turn after it.
+// ── AND THIS IS THE ONLY PLACE AN EFFECT REACHES A BAR ───────────────────────────────────────────────────────
+// ⚠️ IT USED TO READ LOG LINES AND NOTHING ELSE, AND THAT COST EVERY SKILL IN THE GAME ITS EFFECT.
+//
+// The rolled procs write their flags onto the line resolveSwing pushes — `stunned`, `frozen`, `hasted`, `wild`
+// — so reading lines caught all of those. A SKILL does not go through resolveSwing for its status effects:
+// castSkill applies them directly, and it applied them to fields (`bonusTurns`, `stunned`, `skipChance`) that
+// this function then zeroed. Audited one at a time against a live ring: Rimebind, Rimebind + Hold Fast,
+// Rimebind + Killing Cold, Overflow + Bind, Onslaught + Second Wind, Rally + Roar and Bastion + Unbowed —
+// every single one left the bar untouched. Seven skills and eleven branch nodes describing an effect that
+// could not happen.
+//
+// So castSkill records its intent on `ring.castFx` and this drains it. One path in, one place that knows how
+// an effect becomes a bar, and a skill and a proc that land the same way.
 function barEffects(ring, from) {
     if (!ring.atb) return;
     for (let i = from; i < ring.log.length; i += 1) {
@@ -57,12 +70,33 @@ function barEffects(ring, from) {
         if (!L || !L.who) continue;
         const attacker = L.who === "me" ? ring.atb.me : ring.atb.foe;
         const defender = L.who === "me" ? ring.atb.foe : ring.atb.me;
+        const att = L.who === "me" ? ring.A : ring.B;
+        const def = L.who === "me" ? ring.B : ring.A;
         // Freeze is checked first and wins: they are the same shape and it is the longer of the two, so a blow
-        // that landed both should read as the bigger one.
-        if (L.frozen) hold(defender, ring.now, "freeze");
-        else if (L.stunned) hold(defender, ring.now, "stun");
+        // that landed both should read as the bigger one. How LONG is the defender's problem but the
+        // attacker's doing — see freezeMsFor.
+        if (L.frozen) { const ms = freezeMsFor(att); hold(defender, ring.now, "freeze", ms); L.freezeMs = ms; }
+        else if (L.stunned) hold(defender, ring.now, "stun", STUN_HOLD_MS);
         if (L.hasted || L.wild === "haste") haste(attacker, ring.now);
+        // A blow can carry cold in its own right — the Chill stat off the tree. The magnitude is the stat.
+        if (att.chill > 0 && def.hp > 0) { chill(defender, ring.now, att.chill); L.chilled = att.chill; }
     }
+    // ── WHAT THE CAST ASKED FOR ──────────────────────────────────────────────────────────────────────────
+    const fx = ring.castFx;
+    if (fx) {
+        const attacker = fx.who === "me" ? ring.atb.me : ring.atb.foe;
+        const defender = fx.who === "me" ? ring.atb.foe : ring.atb.me;
+        if (fx.freezeMs > 0) hold(defender, ring.now, "freeze", fx.freezeMs);
+        if (fx.chill > 0) chill(defender, ring.now, fx.chill);
+        if (fx.haste) haste(attacker, ring.now);
+        // Shrugging off the ice means the BAR starts moving again — the old `stunned` counter it used to
+        // decrement has not existed since the timer became the only mode, so Clear Head and Unbowed were
+        // clearing a number nobody read.
+        if (fx.unfreeze) { attacker.holdUntil = 0; attacker.held = null; }
+        ring.castFx = null;
+    }
+    // The old turn-based carriers are zeroed rather than read. A stun is a held bar and an extra turn is a
+    // refunded one; leaving these set would charge a fighter twice for the same effect.
     ring.A.stunned = 0;
     ring.B.stunned = 0;
     ring.A.bonusTurns = 0;
@@ -97,7 +131,12 @@ function stampBars(ring, from) {
 function stampSpent(ring) {
     if (!ring.atb) return;
     const L = ring.log[ring.log.length - 1];
-    if (L) L.barsAfter = bars(ring.atb, ring.now);
+    if (!L) return;
+    L.barsAfter = bars(ring.atb, ring.now);
+    // A bar that comes back half full needs a name on it, or it is the clump this whole mode exists to
+    // remove — see BAR_REFUND. Stamped on the same line the spend is, so the screen says it at the moment
+    // the bar visibly fails to empty.
+    if (ring.refunded) { L.refund = ring.refunded === "me" ? "you" : "them"; ring.refunded = null; }
 }
 
 /** Has somebody won, and write it onto the ring if so. */
@@ -211,33 +250,37 @@ function closeTurn(ring, rng = Math.random) {
     // same principle openTurn already states for a lock that renews itself — you have to be IN the fight.
     // Difficulty is a foe you cannot beat. A foe you never got to play against is not difficulty.
     const beforeYourFirst = !ring.youActed && ring.acting === "foe";
-    // ── UNDER THE TIMER THERE IS NO "GOES AGAIN", BY CONSTRUCTION ────────────────────────────────────
-    // `extra` exists ONLY because the clock was removed: a fighter who took p extra turns per turn under
-    // the clock was given a p chance to go again instead, so the same gear kept paying the same amount.
-    // The timer is that clock, back and visible — so rolling `extra` on top would pay a fast fighter for
-    // their speed twice, once in a bar that fills quicker and once in a coin flip.
+    // ── THE SWING THAT DOES NOT EMPTY THE BAR ────────────────────────────────────────────────────────
+    // `extra` is Quickblade and a weapon's Attack Speed above bare-handed. Under the old clock it was the
+    // chance to take another turn on the spot; under the timer it read NOWHERE, so five tree ranks and a
+    // stat on every weapon in the game did nothing at all. It is the refund now — the swing lands and the
+    // bar keeps part of itself, so the next one comes round sooner. Same promise, in the bar's vocabulary.
     //
-    // Note this does NOT touch the doublestrike affix, which is a different thing entirely: that one is
-    // two blows inside one turn, it is resolved inside resolveSwing, and it is untouched here.
-    if (ring.atb) {
-        spend(ring.acting === "me" ? ring.atb.me : ring.atb.foe);
-        ring.lastActed = ring.acting;
-        ring.wasExtra = false;
-        ring.wentAgain = null;
-        ring.acting = null;
-        ring.awaiting = null;
-        ring.incoming = null;
-        return;
-    }
-    const again = ring.over || beforeYourFirst ? null : goesAgain(f, rng, ring.wasExtra);
-    ring.wasExtra = Boolean(again);
-    if (!again) ring.up = ring.acting === "me" ? "foe" : "me";
-    // The screen has to be able to SAY it, and it has to know which of the two it was: a Haste proc you can
-    // see coming is a different feeling from a lucky roll off your weapon.
-    ring.wentAgain = again;
+    // ONE IN A ROW, and `wasExtra` is the flag that was already keeping that rule for the old go-again: a
+    // refunded swing cannot itself be refunded. Without it a lucky streak is an unanswerable combo, and
+    // check:turn-order's "runs of three or more must be zero" starts failing on whoever invested in it.
+    //
+    // Not before your first turn either, for the same reason the opening flip cannot be chained.
+    const track = ring.acting === "me" ? ring.atb.me : ring.atb.foe;
+    const refunding = !ring.over && !beforeYourFirst && !ring.wasExtra
+        && (f.extra || 0) > 0 && rng() < f.extra;
+    spend(track, refunding ? BAR_REFUND : 0);
+    ring.wasExtra = refunding;
+    // How many turns this fighter has taken back to back. `wasExtra` alone does NOT bound this, and the
+    // simulation is what showed it: a refund leaves the bar at 0.55, the head start wins the next race
+    // outright, and the turn AFTER that is decided by pacing with the refund guard already cleared. At rung
+    // 60 that produced 761 runs of three or more. See the cap in advance().
+    if (ring.runSide === ring.acting) ring.runLen = (ring.runLen || 1) + 1;
+    else { ring.runSide = ring.acting; ring.runLen = 1; }
+    // The screen has to be able to SAY it — a bar that comes back half full with no explanation is the
+    // clump this whole mode exists to remove.
+    ring.refunded = refunding ? ring.acting : null;
+    ring.lastActed = ring.acting;
+    ring.wentAgain = null;
     ring.acting = null;
     ring.awaiting = null;
     ring.incoming = null;
+    return;
 }
 
 /**
@@ -262,22 +305,35 @@ function advance(ring, rng) {
         // The one line the timer mode replaces. Everything below this point — the blows, the crits, the
         // bleed, the armour — is the same code the classic ring runs, which is the entire reason this can
         // be gated to one person without the two drifting apart.
-        if (ring.atb) {
-            const nx = nextUp(ring.atb, ring.now, ring.lastActed);
-            // Neither bar will ever fill again — both fighters held longer than the fight can last. Settled
-            // as an unresolved draw rather than looped on, the same way the beat cap resolves a stalemate.
-            if (!nx) { ring.over = true; ring.won = false; ring.awaiting = null; ring.incoming = null; return ring; }
-            fillTo(ring.atb.me, ring.now, nx.at);
-            fillTo(ring.atb.foe, ring.now, nx.at);
-            ring.now = nx.at;
-            ring.up = nx.side;
+        // ── WHOEVER'S BAR FILLS FIRST. There is no other branch. ─────────────────────────────────────────
+        let nx = nextUp(ring.atb, ring.now, ring.lastActed);
+        // Neither bar will ever fill again — both fighters held or chilled longer than the fight can last.
+        // Settled as an unresolved draw rather than looped on, the same way the beat cap resolves a stalemate.
+        if (!nx) { ring.over = true; ring.won = false; ring.awaiting = null; ring.incoming = null; return ring; }
+        // ── AND NOBODY TAKES A THIRD TURN IN A ROW ───────────────────────────────────────────────────────
+        // The exact mirror of openTurn's "you cannot lose two turns in a row", and the same kind of rule: a
+        // guarantee that the fight stays a fight, not a balance number. Two in a row is what a faster bar or
+        // a refund honestly buys and it is meant to happen; three is the thing four members reported in one
+        // day as the Road being broken. The other fighter gets it at the moment THEY fill, so the turn is
+        // still taken when their bar says — it is only whose it is that is forced.
+        if (nx.side === ring.runSide && (ring.runLen || 0) >= 2) {
+            const other = nx.side === "me" ? "foe" : "me";
+            const at = fillsAt(other === "me" ? ring.atb.me : ring.atb.foe, ring.now);
+            // Unless they genuinely cannot ever swing — a bar held or chilled past the horizon. Then the run
+            // is the honest answer and settle() will end the bout on the beat cap.
+            if (Number.isFinite(at)) nx = { side: other, at };
         }
+        fillTo(ring.atb.me, ring.now, nx.at);
+        fillTo(ring.atb.foe, ring.now, nx.at);
+        ring.now = nx.at;
+        ring.up = nx.side;
         const mine = ring.up === "me";
         ring.acting = ring.up;
         // A turn counter, not a clock — EXCEPT under the timer, where it is milliseconds and means what it
         // says. The fight screen has always paced playback off the gaps between `t` values, so handing it a
         // real elapsed time is the whole of the client-side pacing change.
-        ring.t = ring.atb ? Math.round(ring.now) : ring.t + 1;
+        // Milliseconds, always — the fight screen paces playback off the gaps between these.
+        ring.t = Math.round(ring.now);
         ring.beat += 1;
         const att = mine ? ring.A : ring.B;
         const def = mine ? ring.B : ring.A;
@@ -352,13 +408,14 @@ function advance(ring, rng) {
  * chill that slows the other fighter's clock once, for the whole bout. Duplicated deliberately rather than
  * shared: it is six lines, and the alternative is a fourth function whose only job is to be called twice.
  */
-export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName = null, atb = false } = {}) {
+export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName = null } = {}) {
     const A = sideOf(me);
     const B = sideOf(foe);
     A.shield += Math.round(A.maxHp * A.ward);
     B.shield += Math.round(B.maxHp * B.ward);
-    if (A.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + A.chill);
-    if (B.chill > 0) A.skipChance = Math.min(0.6, A.skipChance + B.chill);
+    // `chill` used to be converted into a standing chance to lose a turn (`skipChance`) here, at the bell,
+    // for the whole bout. There are no turns to lose any more and the stat means what it says: it is applied
+    // to the BAR, per blow, in barEffects. Nothing is set at the bell.
     // ── WHO OPENS ────────────────────────────────────────────────────────────────────────────────────────────
     // A coin flip, and it matters MORE now than it did under the clock. Two equal clocks used to hand every
     // tie to A, which measured 65% to whoever happened to be the challenger; strict alternation is that same
@@ -382,28 +439,24 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName =
         turn: null, incoming: null,
         over: false, won: false, unresolved: false,
     };
-    // ── AND THE TIMER, IF THIS BOUT WAS GIVEN ONE ────────────────────────────────────────────────────────
-    // Stamped at the bell and never re-read from the gate again, so a bout keeps the mode it opened in even
-    // if the flag moves under it. A fight in flight is never re-decided.
+    // ── AND THE TIMER, WHICH EVERY BOUT NOW HAS ──────────────────────────────────────────────────────────
+    // The opening flip above still matters: two identical fighters have identical bars, so something has to
+    // break the first tie, and `lastActed` seeds it from the same coin toss rather than inventing a rule.
     //
-    // The opening flip still happens above and still matters: two identical fighters have identical bars, so
-    // something has to break the first tie, and `lastActed` seeds it from the same coin toss the classic ring
-    // uses rather than inventing a second rule.
-    //
-    // A STANDING CHILL BECOMES A STANDING SLOWER BAR. `skipChance` is the Runecaller's chill, applied once at
-    // the bell for the whole bout — under turns it is a chance to lose one, and there are no turns to lose
-    // here. A bar that fills slower for the rest of the fight is the same idea in the timer's vocabulary, and
-    // it is the one effect that is translated at the bell rather than off a log line.
-    if (atb) {
-        ring.atb = { me: newTrack(A.tempo), foe: newTrack(B.tempo) };
-        ring.now = 0;
-        ring.lastActed = flip ? "foe" : "me";
-        if (A.skipChance > 0) chill(ring.atb.me, 0, 10 ** 9);
-        if (B.skipChance > 0) chill(ring.atb.foe, 0, 10 ** 9);
-        // and then the chance-to-skip itself is switched off, or a chilled fighter pays for it twice.
-        A.skipChance = 0;
-        B.skipChance = 0;
-    }
+    // THE FOE'S RATE IS HELD RELATIVE TO YOURS, and this is the only place that happens — see foeTempo. Your
+    // own tempo is whatever you built; theirs is kept within a factor of 1.9 of it so that back-to-back turns
+    // remain impossible however far the ladder inflates above what a member can carry.
+    ring.atb = {
+        me: newTrack(A.tempo),
+        foe: newTrack(foeTempo(A.tempo, B.tempo)),
+    };
+    // AND THEIR REFUND CHANCE THE SAME WAY, for exactly the same reason. `extra` comes out of extraTurnFrom,
+    // which reads a ferocity budget that is on nobody's scale above about rung 50 — every Road foe past it
+    // sits pinned at EXTRA_TURN_MAX, so half of all their swings came back with a bar already half full.
+    // Measured at rung 60 before this: 2,384 of the NPC's 7,197 turns were back to back.
+    B.extra = foeExtra(A.extra, B.extra);
+    ring.now = 0;
+    ring.lastActed = flip ? "foe" : "me";
     return advance(ring, rng);
 }
 
@@ -426,15 +479,34 @@ function castSkill(ring, skill, att, def) {
     if (skill.shield > 0) A.shield += Math.round(A.maxHp * skill.shield);
     if (skill.heal > 0) A.hp = Math.min(A.maxHp, A.hp + Math.round(A.maxHp * skill.heal));
     if (skill.cleanse) { A.bleedLeft = 0; A.burnLeft = 0; }
-    if (skill.unfreeze > 0) A.stunned = Math.max(0, A.stunned - skill.unfreeze);
-    if (skill.haste > 0) A.bonusTurns += 1;
+    // ── EVERY TURN-ORDER EFFECT A SKILL HAS IS RECORDED, NOT APPLIED ──────────────────────────────────────────
+    // These used to be written straight onto the fighter — `bonusTurns`, `stunned`, `skipChance` — which are
+    // the three fields barEffects zeroes on its way past, so a cast's freeze, chill and haste all died between
+    // being applied and the next line of the transcript. See the note on barEffects; this is the other half of
+    // that fix. The bar is the only thing that holds a turn now, and only barEffects touches it.
+    const side = att === ring.A ? "me" : "foe";
+    const fx = { who: side, freezeMs: 0, chill: 0, haste: false, unfreeze: false };
+    if (skill.unfreeze > 0) fx.unfreeze = true;
+    if (skill.haste > 0) fx.haste = true;
     // ── A FREEZE CANNOT BE STACKED ON A FROZEN FIGHTER ───────────────────────────────────────────────────────
     // Rimebind mirrored won 100% of bouts for whoever opened: freeze them, they lose the beat, freeze them
     // again before they ever act. A lock that renews itself is not a control effect, it is the end of the
     // fight. So a freeze only lands on somebody who is currently able to act — the beat they spend frozen is
-    // also the beat they are immune.
-    if (skill.freeze > 0 && B.stunned <= 0) B.stunned += Math.round(skill.freeze);
-    if (skill.chill > 0) B.skipChance = Math.min(0.6, B.skipChance + skill.chill);
+    // also the beat they are immune. Under the timer "currently frozen" is a bar that is being held.
+    const theirBar = side === "me" ? ring.atb?.foe : ring.atb?.me;
+    const alreadyHeld = Boolean(theirBar && ring.now < (theirBar.holdUntil || 0));
+    // `skill.freeze` is a COUNT of beats in the old vocabulary — 1 from Rimebind, 2 with Hold Fast. It scales
+    // the length the caster's class and tree have earned rather than setting it, so a Runecaller's second beat
+    // of ice is worth more than a Reaver's, which is the whole point of freezeMsFor.
+    // ⚠️ The cap is applied AFTER the multiply, not inside freezeMsFor. Hold Fast doubles the length, and a
+    // full Frostbite Runecaller doubled comes to 5.6 seconds — nearly two of their opponent's swings, which is
+    // the lockout the immunity rule exists to prevent. FREEZE_MS_CAP is the ceiling on what actually lands.
+    if (skill.freeze > 0 && !alreadyHeld) {
+        fx.freezeMs = Math.min(FREEZE_MS_CAP, freezeMsFor(A) * Math.max(1, Math.round(skill.freeze)));
+    }
+    // The magnitude IS the number on the card now. No 0.6 clamp: see CHILL_RATE_FLOOR for the only floor left.
+    if (skill.chill > 0) fx.chill = skill.chill;
+    ring.castFx = fx;
     // SET, never stacked. A skill you can cast eight times in a bout must not be able to multiply a permanent
     // stat eight times — that is a number growing without a ceiling, which is how a fight stops ending.
     if (skill.thorns > 0) A.thorns = Math.max(A.thorns, skill.thorns);

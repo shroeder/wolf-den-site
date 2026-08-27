@@ -196,7 +196,7 @@ export const SKILLS = [
                 { id: "on_relent", name: "Relentless", sprite: "/images/arena/skill/node/on_relent.webp",
                     desc: "Comes back two beats sooner.", mod: { cooldown: -2 } },
                 { id: "on_wind", name: "Second Wind", sprite: "/images/arena/skill/node/on_wind.webp",
-                    desc: "Finishing the flurry buys you another turn, straight away.", mod: { haste: 1 } },
+                    desc: "Finishing the flurry doubles your turn bar's speed for six seconds.", mod: { haste: 1 } },
                 { id: "on_cadence", name: "Cadence", sprite: "/images/arena/skill/node/on_cadence.webp",
                     desc: "CAPSTONE. Ready every other beat. Lighter blows, thrown twice as often as anybody else can answer.",
                     mod: { cooldown: -2, power: -0.18 } },
@@ -278,7 +278,7 @@ export const SKILLS = [
             ]),
             ...br("resolve", [
                 { id: "ba_clear", name: "Clear Head", sprite: "/images/arena/skill/node/ba_clear.webp",
-                    desc: "Raising the shield shakes off a freeze.", mod: { unfreeze: 1 } },
+                    desc: "Raising the shield shakes the ice off your turn bar and starts it moving again.", mod: { unfreeze: 1 } },
                 { id: "ba_staunch", name: "Staunch", sprite: "/images/arena/skill/node/ba_staunch.webp",
                     desc: "And puts out a burn and closes a wound.", mod: { cleanse: true } },
                 { id: "ba_unbowed", name: "Unbowed", sprite: "/images/arena/skill/node/ba_unbowed.webp",
@@ -309,7 +309,7 @@ export const SKILLS = [
             ]),
             ...br("punish", [
                 { id: "re_ring", name: "Ringing Blow", sprite: "/images/arena/skill/node/re_ring.webp",
-                    desc: "Retribution stuns. They lose the swing that was due.", mod: { freeze: 1 } },
+                    desc: "Retribution freezes. Their turn bar stops dead.", mod: { freeze: 1 } },
                 { id: "re_brace", name: "Bracing Answer", sprite: "/images/arena/skill/node/re_brace.webp",
                     desc: "Answering also raises a small shield.", mod: { shield: 0.1 } },
                 { id: "re_back", name: "Backhand", sprite: "/images/arena/skill/node/re_back.webp",
@@ -349,9 +349,9 @@ export const SKILLS = [
             ]),
             ...br("warcry", [
                 { id: "ra_clear", name: "Clear Head", sprite: "/images/arena/skill/node/ra_clear.webp",
-                    desc: "Rally shakes off a freeze as well as the wounds.", mod: { unfreeze: 1 } },
+                    desc: "Rally shakes the ice off your turn bar as well as closing the wounds.", mod: { unfreeze: 1 } },
                 { id: "ra_roar", name: "Roar", sprite: "/images/arena/skill/node/ra_roar.webp",
-                    desc: "You come up swinging — another turn, straight away.", mod: { haste: 1 } },
+                    desc: "You come up swinging — your turn bar runs at double speed for six seconds.", mod: { haste: 1 } },
                 { id: "ra_fury", name: "Battle Fury", sprite: "/images/arena/skill/node/ra_fury.webp",
                     desc: "CAPSTONE. Standing up costs you no beat at all — a lighter heal, but you never stop swinging.",
                     mod: { free: true, heal: -0.07 } },
@@ -422,11 +422,11 @@ export const SKILLS = [
         nodes: [
             ...br("winter", [
                 { id: "ri_hold", name: "Hold Fast", sprite: "/images/arena/skill/node/ri_hold.webp",
-                    desc: "They lose a second beat.", mod: { freeze: 1 } },
+                    desc: "The ice holds them twice as long.", mod: { freeze: 1 } },
                 { id: "ri_cold", name: "Killing Cold", sprite: "/images/arena/skill/node/ri_cold.webp",
-                    desc: "And the cold stays on them: a share of their turns never happen.", mod: { chill: 0.12 } },
+                    desc: "And the cold stays on them: their turn bar runs 12% slower, wearing off over eight seconds.", mod: { chill: 0.12 } },
                 { id: "ri_zero", name: "Absolute Zero", sprite: "/images/arena/skill/node/ri_zero.webp",
-                    desc: "CAPSTONE. Deeper cold, back a beat sooner. They spend the whole bout losing turns.",
+                    desc: "CAPSTONE. 15% off their turn bar on top, and back a beat sooner. The cold stacks and nothing caps it.",
                     mod: { chill: 0.15, cooldown: -1, power: -0.2 } },
             ]),
             ...br("shatter", [
@@ -550,12 +550,12 @@ const FIELD_LABELS = {
     power: ["Power", "x"], hits: ["Blows", ""], cooldown: ["Cooldown", "beats"],
     shield: ["Shield", "%"], heal: ["Heal", "%"], drain: ["Drain", "%"], pierce: ["Pierce", "%"],
     soulfire: ["Soulfire", "%"], grudge: ["Grudge", "%"], thorns: ["Thorns", "%"], chill: ["Chill", "%"],
-    freeze: ["Freeze", "beats"], bleedDamage: ["Wound tick", "%"], bleedLeech: ["Wound leech", "%"],
+    freeze: ["Freeze", "x"], bleedDamage: ["Wound tick", "%"], bleedLeech: ["Wound leech", "%"],
     burnDamage: ["Burn tick", "%"], burnLeech: ["Burn leech", "%"], keepGrudge: ["Ledger kept", "%"],
     executeAt: ["Execute from", "%"], executeMax: ["Execute peak", "%"],
     desperateAt: ["Desperate from", "%"], desperateMax: ["Desperate peak", "%"],
     bleed: ["Wound", "flag"], burn: ["Burn", "flag"], cleanse: ["Cleanse", "flag"],
-    unfreeze: ["Shrug off", "flag"], haste: ["Haste", "flag"], free: ["Costs no beat", "flag"],
+    unfreeze: ["Shrug the ice off", "flag"], haste: ["Double bar speed", "flag"], free: ["Costs no beat", "flag"],
 };
 
 const shown = (v, unit) => {

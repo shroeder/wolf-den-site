@@ -481,7 +481,7 @@ export const SCENES = {
             const foe = { ...b.foe, damage: 175, health: 1600, critChance: 0.25, critMult: 2.1, extra: 0,
                 armor: 45, pierce: 0, counter: 0, doublestrike: 20, blockChance: 0.2, blockReduction: 0.5,
                 burnChance: 0.3, tempo: 1.85 };
-            let ring = openRing(me, foe, { atb: true, foeName: b.foe?.name || "Roan Vasquez" });
+            let ring = openRing(me, foe, { foeName: b.foe?.name || "Roan Vasquez" });
             // Played out here rather than left waiting: the screen walks a finished transcript, and a ring
             // parked on `awaiting: "act"` would hand it two lines and stop.
             for (let i = 0; i < 400 && !ring.over; i += 1) {
