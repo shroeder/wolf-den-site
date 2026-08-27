@@ -62,8 +62,22 @@ for (const src of everythingSrc) {
 // here with the reason, rather than deleted, exempted silently, or left to make this gate red forever.
 // An entry without a reason is not an entry. Empty this list, do not grow it.
 const KNOWN_ORPHANS = {
-    // Empty, and it should stay that way. SpriteFx lived here for exactly as long as it took to restore the
-    // wiring 78242120 removed; an exemption that outlives its bug is just a gate with a hole in it.
+    // ⚠️ NOT A BUG. DO NOT "RESTORE" THIS. It has now been wired up twice and removed twice.
+    //
+    // 30181d7b mounted it (2026-08-15 17:06). 78242120 removed it eighteen minutes later in a commit about
+    // burn tuning that never mentioned VFX. On 2026-08-27 I read that as an accidental overwrite off a stale
+    // copy, restored it, filmed it, and shipped it. Luke, watching a real fight: "remove flat sprite attack
+    // animations, im seeing some new sprites that flash for a second. they dont look good due to sprite blink."
+    //
+    // The art is single FRAMES. It appears and vanishes with no in or out, so at 620ms it does not read as an
+    // effect, it reads as the screen glitching. The contact sheet I judged it from showed the frames it is ON
+    // and could not show the pop, which is exactly the trap film.mjs exists to avoid and I fell into anyway:
+    // I looked for "does the art appear" and never asked "does the appearing look good".
+    //
+    // The particle canvas (ArenaFx) is the effect system. If painted art is ever wanted here it needs a fade
+    // in and out at minimum, and judging it means watching the transition, not the peak.
+    SpriteFx: "Deliberately not rendered — single-frame art that pops in and out and reads as a blink. "
+        + "Removed twice. See the note above this list before touching it.",
 };
 
 for (const file of componentFiles) {

@@ -15,7 +15,6 @@ import {
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
 import ArenaFx from "@/components/arena/ArenaFx";
-import SpriteFx, { hasSheet } from "@/components/arena/SpriteFx";
 import { classById } from "@/lib/marketplace/arena-classes.js";
 import ArenaUpgrades from "@/components/arena/ArenaUpgrades";
 import RecipeShelf from "@/components/RecipeShelf";
@@ -1035,9 +1034,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [alert, setAlert] = useState(null);
     const [counterWind, setCounterWind] = useState(null); // "left" | "right" — who is drawing back to strike
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
-    // The painted effect currently playing. Cleared on a timer so the element unmounts and the next cast gets
-    // a fresh animation rather than re-triggering a finished one.
-    const [sprite, setSprite] = useState(null);
+
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     // `pending` and `menu` are gone with the deck — there is no command to commit to and no submenu.
     const [clash, setClash] = useState(null);
@@ -2039,14 +2036,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
             fxRef.current?.play({ kind, element: froze ? "ice" : element, side: target, power, crit: Boolean(l.crit) });
         }
-        // ── THE PAINTED FRAME, ON THE SAME EVENT AS THE PARTICLES ────────────────────────────────────────
-        // One cast, one picture. Only kinds that actually have art; everything else stays canvas-only.
-        // SpriteFx positions on "left"/"right", NOT the bout's "you"/"them" — handing it the wrong vocabulary
-        // falls through to the default side silently, which puts the fire over the fighter who THREW it.
-        if (hasSheet(kind)) {
-            setSprite({ id: `${bout?.log?.length || 0}-${kind}`, kind, side: target === "you" ? "left" : "right", crit: Boolean(l.crit) });
-            timers.push(setTimeout(() => setSprite(null), 620));
-        }
         return () => timers.forEach(clearTimeout);
     }, [bout?.log?.length]);
 
@@ -2707,15 +2696,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     {/* ── THE SPELL LAYER ── full-screen additive canvas, FF6-style: the sprites stay put and
                         the SCREEN does the work. */}
                     <ArenaFx ref={fxRef} onShake={onShake} />
-                    {/* ── THE SPRITE LAYER ────────────────────────────────────────────────────────────────
-                        Seventeen generated effect frames sat in the repo drawn by nothing: 30181d7b wired
-                        this up and 78242120 — a burn-tuning commit that never mentions VFX — removed the
-                        exact same 23 lines eighteen minutes later, off a stale copy of the file. Keyed on the
-                        beat AND the kind so a repeat of the same move replays from scratch rather than
-                        sitting there as a finished animation. */}
-                    {sprite ? (
-                        <SpriteFx key={sprite.id} kind={sprite.kind} side={sprite.side} crit={sprite.crit} />
-                    ) : null}
 
 
                     {/* The quick-cast rail is gone with the deck: nothing is cast, so nothing is ready. */}
