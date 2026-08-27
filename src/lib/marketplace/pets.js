@@ -115,6 +115,43 @@ export async function ownsPet(buyerId, petId) {
     return isCollectibleUnlocked(def, levelForXp(buyer?.xp || 0).level, { owned: granted });
 }
 
+// ── WHAT THE BACKGROUND WATCHER NEEDS, AT A CADENCE THAT MAKES SENSE ─────────────────────────────────────────
+// <PetAlerts> is mounted in the ROOT layout, so it polls this on every page of the site, and it was calling
+// petsState({ sync: true }) to do it. Measured against a real member:
+//
+//     petsState({ sync: true })    93 round trips  1458ms   <- what the watcher was paying
+//     petsState({ sync: false })   12 round trips   128ms
+//     syncPetAchievements alone    64 round trips   692ms
+//
+// Eighty-one of those ninety-three are the sync: a sweep of friendships, donations, trades, damage dealt and
+// card watchlists, asking "have you earned a new pet yet". That is a fair question and a terrible cadence —
+// it made /api/marketplace/pets the single most expensive route on the site at 150ms of Active CPU a call,
+// billed on every navigation by every member.
+//
+// It is still asked, just not two hundred times an hour. Five minutes is late enough to cost nothing and
+// prompt enough that nobody notices: the pets page itself still syncs on every open, so the moment anybody
+// goes looking, the answer is exact.
+//
+// The clock is per instance and deliberately not in the database — a missed rate-limit costs one extra sweep,
+// a migration to store a timestamp costs a column and a write on every page load, which is the thing being
+// fixed. Worst case is one sweep per warm instance per five minutes.
+const lastSweep = new Map();   // buyerId -> ms
+const SWEEP_EVERY_MS = 300000;
+
+export async function petsPeek(buyerId) {
+    if (!buyerId) return { signedIn: false, petLevels: {}, petSprites: {}, ownedIds: [] };
+    const now = Date.now();
+    if ((lastSweep.get(buyerId) || 0) + SWEEP_EVERY_MS <= now) {
+        lastSweep.set(buyerId, now);
+        await syncPetAchievements(buyerId).catch(() => {});
+        await accrueEquippedPetTrickle(buyerId).catch(() => {});
+    }
+    const st = await petsState(buyerId, { sync: false });
+    // ONLY the four fields <PetAlerts> reads. The full reply is 80KB of collection state for a watcher that
+    // compares a pet-to-level map against localStorage.
+    return { signedIn: true, petLevels: st.petLevels || {}, petSprites: st.petSprites || {}, ownedIds: st.ownedIds || [] };
+}
+
 export async function petsState(buyerId, { sync = false } = {}) {
     if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], outgoing: {}, petLevels: {} };
     if (sync) {

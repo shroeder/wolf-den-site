@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish } from "@/lib/marketplace/pets.js";
+import { petsPeek, petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish } from "@/lib/marketplace/pets.js";
 import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -27,7 +27,8 @@ export async function GET(request) {
             // (so it doesn't consume the "your pets earned X since last visit" banner on the pets page).
             const peek = new URL(request.url).searchParams.get("peek") === "1";
             if (peek) {
-                const state = await petsState(buyer?.id || null, { sync: true });
+                // petsPeek, not petsState({ sync: true }) — see the note on petsPeek for the measurement.
+                const state = await petsPeek(buyer?.id || null);
                 return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
             }
             // Settle passive pet income BEFORE reading state so the gold/xp shown is already up to date.
