@@ -7,7 +7,6 @@ import ViewPing from "@/components/ViewPing";
 import { listShopInventory } from "@/lib/consignment/square";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
-import { markConsignedCategories } from "@/lib/consignment/trade-sales";
 
 export const metadata = {
     title: "Pokemon, MTG & Accessories",
@@ -30,9 +29,6 @@ export default async function ShopPage() {
     ]);
     if (categories) {
         categories = await attachSetNames(categories).catch(() => categories);
-        // Whose card is it. Stamped before anything prices it, so the strikethrough the shopper sees and the
-        // amount shop-carts charges are reading the same fact — see markConsignedCategories.
-        categories = await markConsignedCategories(categories).catch(() => categories);
     }
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
     const hasContent = (categories && categories.length > 0) || (justInItems && justInItems.length > 0);

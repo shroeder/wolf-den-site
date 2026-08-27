@@ -3,7 +3,6 @@ import "server-only";
 import { calculateOnlineFeeCents, getShopSalesTaxRate, listShopInventory, toPriceCents } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
-import { computeShopPricing } from "@/lib/single-discount";
 import {
     getExistingCartId,
     setShopCartId,
@@ -256,11 +255,16 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
             continue;
         }
 
-        const fullPriceCents = toPriceCents(inventoryItem.price);
-        // Online-only promo: 10% off singles over $100. Applied here so the charged amount, tax, and
-        // order record all use the discounted price automatically (checkout derives its total from this).
-        const pricing = computeShopPricing(inventoryItem.name, fullPriceCents);
-        const priceCents = pricing.priceCents;
+        // ── THE CATALOG PRICE, AND ONLY THE CATALOG PRICE ────────────────────────────────────────────────
+        // There was a "10% off singles over $100" promo applied here. The Wolf Den does not discount, and no
+        // one asked for it — the commit that added it on 2026-07-14 cites no request, unlike every other
+        // change in this repo. It ran for six weeks, and because it keyed on nothing but price and a
+        // condition token in the name it spent most of itself on CONSIGNED cards: of the six items that
+        // qualified, five belonged to consignors on 87-95% payouts, where 10% is more than the whole margin.
+        //
+        // If a discount is ever wanted again it belongs in Square, where the POS and the online shop read the
+        // same number, not in a helper the shop applies on its way to checkout.
+        const priceCents = toPriceCents(inventoryItem.price);
         const maxQuantity = Math.max(0, Number(inventoryItem.quantity || 0));
 
         if (maxQuantity < quantity || maxQuantity < 1) {
@@ -282,8 +286,10 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
             unavailable: maxQuantity < quantity || maxQuantity < 1,
             lineTotalCents,
             priceCents,
-            originalPriceCents: pricing.originalCents,
-            isDiscounted: pricing.isDiscounted,
+            // Kept on the line, both equal to the catalog price, so cart views that read them still render.
+            // There is no promo; nothing here is ever discounted.
+            originalPriceCents: priceCents,
+            isDiscounted: false,
         });
     }
 

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 
 import ThemedSelect from "@/components/ThemedSelect";
-import { computeShopPricingDollars, isSingleName } from "@/lib/single-discount";
+import { isSingleName } from "@/lib/single-discount";
 import { productHandle } from "@/lib/inventory-feed/product-url";
 import { useTvMode } from "@/lib/tv-mode-client";
 
@@ -14,23 +14,12 @@ const formatPrice = (price) => {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(price);
 };
 
-// Price with the online singles promo applied: strikethrough original + discounted price + a "10% off"
-// badge when eligible (single over $100), otherwise just the price.
-function PriceDisplay({ name, price, consigned = false, fallback = "Price unavailable" }) {
+// The price. Nothing else — there is no promo. See the note in shop-carts.js.
+function PriceDisplay({ price, fallback = "Price unavailable" }) {
     if (typeof price !== "number" || Number.isNaN(price) || price <= 0) {
         return <span className="muted">{fallback}</span>;
     }
-    // Consigned singles never carry the promo — the consignor is owed their share of the LISTED price,
-    // and every active payout rate here is 87% or better, so a 10% cut is more than the whole margin.
-    const pr = computeShopPricingDollars(name, price, { consigned });
-    if (!pr.isDiscounted) return <>{formatPrice(price)}</>;
-    return (
-        <span className="shop-price-discounted">
-            <span className="shop-price-was">{formatPrice(pr.originalDollars)}</span>{" "}
-            <span className="shop-price-now">{formatPrice(pr.priceDollars)}</span>{" "}
-            <span className="shop-price-badge">10% off</span>
-        </span>
-    );
+    return <>{formatPrice(price)}</>;
 }
 
 
@@ -647,7 +636,7 @@ export default function ShopInventoryClient({
                 <div className="shop-detail-meta">
                     <h3>{detailItem.name}</h3>
                     <p className="shop-detail-summary">
-                        <PriceDisplay name={detailItem.name} price={detailItem.price} consigned={detailItem.consigned} /> | {detailItem.quantity} in stock
+                        <PriceDisplay price={detailItem.price} /> | {detailItem.quantity} in stock
                     </p>
                     <p className="shop-detail-category secondary">{detailItem.categoryName}</p>
                     {isSingleName(detailItem.name) && (
@@ -831,7 +820,7 @@ export default function ShopInventoryClient({
                                         {item.setName ? <p className="shop-tile-set">{item.setName}</p> : null}
                                         {isFiltering && <p className="shop-item-category">{item.categoryName}</p>}
                                         <div className="shop-tile-meta-row">
-                                            <p className="shop-tile-price"><PriceDisplay name={item.name} price={item.price} consigned={item.consigned} fallback="Price unavailable" /></p>
+                                            <p className="shop-tile-price"><PriceDisplay price={item.price} fallback="Price unavailable" /></p>
                                             <div className="shop-tile-badges">
                                                 {canShowPaymentUi && cartQuantityForItem(item.id) > 0 && (
                                                     <span className="shop-in-cart-badge" title="In cart">🛒 {cartQuantityForItem(item.id)}</span>

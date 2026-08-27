@@ -5,7 +5,7 @@ import { getInventoryItem } from "@/lib/inventory-feed/feed";
 import { productHandle, variationIdFromHandle } from "@/lib/inventory-feed/product-url";
 import { SITE_URL } from "@/lib/site";
 import ShopProductBuy from "@/components/ShopProductBuy";
-import { computeShopPricingDollars, isSingleName } from "@/lib/single-discount";
+import { isSingleName } from "@/lib/single-discount";
 
 // Regenerate each product's static HTML at most every 30 min (inventory reconcile runs ~every 15).
 export const revalidate = 1800;
@@ -59,9 +59,6 @@ export default async function ShopProductPage({ params }) {
 
     const url = `${SITE_URL}/shop/${productHandle(item.name, item.variationId)}`;
 
-    // Online singles promo: 10% off singles over $100. The online price (and the structured-data offer)
-    // reflect the discounted amount; the strikethrough shows the original.
-    const pricing = item.price != null ? computeShopPricingDollars(item.name, item.price, { consigned: item.consigned === true }) : null;
     const isSingle = isSingleName(item.name);
 
     const jsonLd = {
@@ -74,7 +71,8 @@ export default async function ShopProductPage({ params }) {
             ? {
                   offers: {
                       "@type": "Offer",
-                      price: (pricing?.priceDollars ?? item.price).toFixed(2),
+                      // The structured-data offer quotes the catalog price, because that is what is charged.
+                      price: Number(item.price || 0).toFixed(2),
                       priceCurrency: "USD",
                       availability: item.inStock
                           ? "https://schema.org/InStock"
@@ -108,15 +106,7 @@ export default async function ShopProductPage({ params }) {
                         )}
                         {item.price != null && (
                             <p className="mkt-market-price">
-                                {pricing?.isDiscounted ? (
-                                    <>
-                                        <span className="shop-price-was">{currency.format(pricing.originalDollars)}</span>{" "}
-                                        <strong className="shop-price-now">{currency.format(pricing.priceDollars)}</strong>{" "}
-                                        <span className="shop-price-badge">10% off online</span>
-                                    </>
-                                ) : (
-                                    <strong>{currency.format(item.price)}</strong>
-                                )}
+                                <strong>{currency.format(item.price)}</strong>
                             </p>
                         )}
                         <p className="muted">
