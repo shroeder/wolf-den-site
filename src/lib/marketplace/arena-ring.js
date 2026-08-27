@@ -30,7 +30,7 @@
 // Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
 // every exchange was a brace nobody was choosing.
 import { openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
-import { BAR_REFUND, bars, chill, fillsAt, fillTo, foeExtra, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
+import { BAR_REFUND, bars, chill, fillTo, foeExtra, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
@@ -75,8 +75,18 @@ function barEffects(ring, from) {
         // Freeze is checked first and wins: they are the same shape and it is the longer of the two, so a blow
         // that landed both should read as the bigger one. How LONG is the defender's problem but the
         // attacker's doing — see freezeMsFor.
-        if (L.frozen) { const ms = freezeMsFor(att); hold(defender, ring.now, "freeze", ms); L.freezeMs = ms; }
-        else if (L.stunned) hold(defender, ring.now, "stun", STUN_HOLD_MS);
+        // ── A LOCK MAY NOT LAND ON A LOCKED FIGHTER ──────────────────────────────────────────────────
+        // NOT an "x in a row" rule — those are all gone, and turn order is the bars and nothing else. This is
+        // the STACKING rule castSkill has always kept in its own words: "a lock that renews itself is not a
+        // control effect, it is the end of the fight." The cast path checked it; the rolled proc never did,
+        // so a fighter with a high freeze chance could re-hold a bar that was already held, forever.
+        //
+        // check:arena caught it the moment the counting rules came out: its bully (90% freeze, 60% chill)
+        // took FIVE beats before the member's first, and every one of them was the same freeze renewing
+        // itself. The beat somebody spends frozen is also the beat they are immune.
+        const locked = ring.now < (defender.holdUntil || 0);
+        if (L.frozen && !locked) { const ms = freezeMsFor(att); hold(defender, ring.now, "freeze", ms); L.freezeMs = ms; }
+        else if (L.stunned && !locked) hold(defender, ring.now, "stun", STUN_HOLD_MS);
         if (L.hasted || L.wild === "haste") haste(attacker, ring.now);
         // A blow can carry cold in its own right — the Chill stat off the tree. The magnitude is the stat.
         if (att.chill > 0 && def.hp > 0) { chill(defender, ring.now, att.chill); L.chilled = att.chill; }
@@ -261,17 +271,17 @@ function closeTurn(ring, rng = Math.random) {
     // check:turn-order's "runs of three or more must be zero" starts failing on whoever invested in it.
     //
     // Not before your first turn either, for the same reason the opening flip cannot be chained.
+    // ── NO "ONCE IN A ROW" GUARD. Luke: "remove any x in a row rules." ───────────────────────────────
+    // This used to refuse a refund to anybody whose last swing was already refunded, and advance() used to
+    // refuse anybody a third turn outright. Both are gone. If your bar fills first it is your turn, however
+    // many times running that happens to be — which is what a turn timer MEANS, and the thing the old clock
+    // could never show. The rules existed because a rung-60 foe's bar filled eighty times faster than a
+    // member's; that was fixed at the source instead (see npcTempo), so the guards were treating a symptom
+    // nobody has any more at the cost of capping what speed can buy.
     const track = ring.acting === "me" ? ring.atb.me : ring.atb.foe;
-    const refunding = !ring.over && !beforeYourFirst && !ring.wasExtra
-        && (f.extra || 0) > 0 && rng() < f.extra;
+    const refunding = !ring.over && (f.extra || 0) > 0 && rng() < f.extra;
     spend(track, refunding ? BAR_REFUND : 0);
     ring.wasExtra = refunding;
-    // How many turns this fighter has taken back to back. `wasExtra` alone does NOT bound this, and the
-    // simulation is what showed it: a refund leaves the bar at 0.55, the head start wins the next race
-    // outright, and the turn AFTER that is decided by pacing with the refund guard already cleared. At rung
-    // 60 that produced 761 runs of three or more. See the cap in advance().
-    if (ring.runSide === ring.acting) ring.runLen = (ring.runLen || 1) + 1;
-    else { ring.runSide = ring.acting; ring.runLen = 1; }
     // The screen has to be able to SAY it — a bar that comes back half full with no explanation is the
     // clump this whole mode exists to remove.
     ring.refunded = refunding ? ring.acting : null;
@@ -306,23 +316,11 @@ function advance(ring, rng) {
         // bleed, the armour — is the same code the classic ring runs, which is the entire reason this can
         // be gated to one person without the two drifting apart.
         // ── WHOEVER'S BAR FILLS FIRST. There is no other branch. ─────────────────────────────────────────
-        let nx = nextUp(ring.atb, ring.now, ring.lastActed);
+        const nx = nextUp(ring.atb, ring.now, ring.lastActed);
         // Neither bar will ever fill again — both fighters held or chilled longer than the fight can last.
         // Settled as an unresolved draw rather than looped on, the same way the beat cap resolves a stalemate.
         if (!nx) { ring.over = true; ring.won = false; ring.awaiting = null; ring.incoming = null; return ring; }
-        // ── AND NOBODY TAKES A THIRD TURN IN A ROW ───────────────────────────────────────────────────────
-        // The exact mirror of openTurn's "you cannot lose two turns in a row", and the same kind of rule: a
-        // guarantee that the fight stays a fight, not a balance number. Two in a row is what a faster bar or
-        // a refund honestly buys and it is meant to happen; three is the thing four members reported in one
-        // day as the Road being broken. The other fighter gets it at the moment THEY fill, so the turn is
-        // still taken when their bar says — it is only whose it is that is forced.
-        if (nx.side === ring.runSide && (ring.runLen || 0) >= 2) {
-            const other = nx.side === "me" ? "foe" : "me";
-            const at = fillsAt(other === "me" ? ring.atb.me : ring.atb.foe, ring.now);
-            // Unless they genuinely cannot ever swing — a bar held or chilled past the horizon. Then the run
-            // is the honest answer and settle() will end the bout on the beat cap.
-            if (Number.isFinite(at)) nx = { side: other, at };
-        }
+        // Whoever fills first, every time, with nothing on top. See the note in closeTurn.
         fillTo(ring.atb.me, ring.now, nx.at);
         fillTo(ring.atb.foe, ring.now, nx.at);
         ring.now = nx.at;
@@ -346,11 +344,8 @@ function advance(ring, rng) {
         // earned it steps up. This is the only reason a fight is ever anything other than you-them-you-them,
         // and every one of them gets a sentence — which is the entire point of replacing the clock.
         const isExtra = ring.wasExtra;
-        // And the other half of the same guarantee: your first turn cannot be the one a stun or a chill
-        // eats. `lostLast` is the flag openTurn already honours for "you cannot lose two in a row" (it
-        // reads it as `owed`), so the rule is expressed in the vocabulary that is already there rather
-        // than as a second mechanism that has to be kept in step with the first.
-        if (mine && !ring.youActed) att.lostLast = true;
+        // `lostLast` went with the lose-two-in-a-row rule it fed — see openTurn. What still protects an
+        // opening beat is controlImmune, which is a per-effect rule rather than a counting one.
         const acts = openTurn({
             A: ring.A, B: ring.B, att, def, who: ring.acting, log: ring.log, t: ring.t, rng,
         });

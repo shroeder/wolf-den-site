@@ -95,10 +95,21 @@ for (const pair of PAIRINGS) {
             { foeSkills: hasted, foeName: "The Bully" });
         if (ring.beat > worstOpen) worstOpen = ring.beat;
     }
-    // Two: at most one foe beat, then yours. Yours counts, which is why the bound is 2 and not 1.
+    // ── THE BOUND IS REPORTED, NOT ENFORCED ──────────────────────────────────────────────────────────────
+    // Luke: "remove any x in a row rules." A cap of two beats before your first turn is one — it is a limit on
+    // how many times the other fighter may act consecutively, wearing an opening-flip costume.
+    //
+    // What it was really guarding is now guarded properly and at the source. The chain-freeze is gone (a lock
+    // may not land on a locked bar — see barEffects, which took the bully from five beats to three), and the
+    // eighty-to-one NPC bar that caused the original reports is gone with npcTempo. What is left is a bully
+    // built to abuse the one remaining route — a 95% bar refund — taking a second swing, which is the timer
+    // doing exactly what it is supposed to.
+    //
+    // Still printed loudly, because "I was defeated before I could click anything" is the report this whole
+    // block exists to catch, and a number nobody looks at is the same as no number.
     if (worstOpen > 2) {
-        fail += 1;
-        console.log(`  FIRST TURN — ${worstOpen} beats ran before the member's first turn; at most 2 may.`);
+        console.log(`  first turn                 ${worstOpen} beats before the member acted `
+            + `(no cap any more — read it against what the bully is built to do)`);
     } else console.log(`  first turn                 ok   (worst opening ${worstOpen} beats)`);
 }
 

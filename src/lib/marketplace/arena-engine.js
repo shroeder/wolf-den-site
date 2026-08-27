@@ -378,7 +378,6 @@ export const sideOf = (f) => ({
         guardChance: Math.max(0, Math.min(1, Number(f.guardChance) || 0)),
         // Did this fighter lose their last turn — see the note at the top of openTurn. Carried on the side
         // rather than on the ring so a raid, a fishing bout and an arena challenge all get the same rule.
-        lostLast: false,
         guardSize: Math.max(0, Number(f.guardSize) || 0),
         regen: Math.max(0, Number(f.regen) || 0),
         thorns: Math.max(0, Number(f.thorns) || 0),
@@ -640,8 +639,11 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         // Only the TURN is guaranteed, never survival. Bleed and burn still tick and can still kill you
         // where you stand, because a wound is damage rather than a lost turn — and walking into rung 97 on
         // day one is still meant to remove you from the premises.
-        const owed = att.lostLast === true;
-        att.lostLast = false;
+        // ── "YOU CANNOT LOSE TWO TURNS IN A ROW" IS GONE ────────────────────────────────────────────
+        // Luke: "remove any x in a row rules." This banked a free pass whenever a stun or a chill took your
+        // beat, so the next one could not be taken however cold you were. `controlImmune` already does the
+        // job it was really there for — one beat off the board buys you the next one through — and it is a
+        // rule about the EFFECT rather than a tally of how many turns you have lost lately.
 
         // ── NOBODY IS WORN DOWN BEFORE THEY HAVE ACTED ONCE ──────────────────────────────────────────
         // The other half of "your first turn is sacred", and GrayKitsune found the hole in it: "My first turn
@@ -705,11 +707,10 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
         if (att.controlImmune > 0) {
             // You were taken off the board last beat. Whatever is on you now, you get to swing through it.
             att.controlImmune -= 1;
-        } else if (!owed) {
+        } else {
             const denied = frozen || (att.skipChance > 0 && rng() < att.skipChance);
             if (denied) {
                 att.controlImmune = CONTROL_IMMUNE_TURNS;
-                att.lostLast = true;
                 log.push({ t, who, stunnedSkip: frozen, chilledSkip: !frozen, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
                 return false;
             }
@@ -737,59 +738,19 @@ export function takeTurn({ A, B, att, def, who, log, t, rng = Math.random, mult 
     return true;
 }
 
-// ── AUTO-ATTACK COMBAT ───────────────────────────────────────────────────────────────────────────────────────
-// No commands, no skills. Two fighters take turns and the fight resolves itself.
+// ── AUTO-ATTACK COMBAT: THE TOMBSTONE ────────────────────────────────────────────────────────────────────────
+// `autoBout` was here — a whole second resolver. Two fighters took strictly alternating turns, `goesAgain`
+// decided who went twice, and there was no bar anywhere in it.
 //
-// STRICTLY ALTERNATING, same as the ring — see the note on EXTRA_TURN_MAX. The challenger opens, because
-// somebody has to and bringing the fight is the fairest reason. A fighter goes again only when `goesAgain`
-// says so, which is the one place that answer is written.
+// Luke: "when do we use autoBout? Ideally, we don't use that at all."
 //
-// Still here, and still used, for every fight nobody is present to play: a defence somebody else brought, and
-// the simulator's hundred thousand bouts. It is now a thin loop over the same three functions the interactive
-// ring calls, so an auto-resolved bout and a played one cannot disagree about what a swing is.
+// In production it was already never: `interactiveFor` was pinned true and all three buildBout callers passed
+// it, so `resolveAuto` was dead code wearing a live-looking branch. What kept it dangerous was the ELEVEN
+// balance scripts still measuring through it — check:road, check:npc, check:npcband, check:statvalue,
+// check:arith, sim:pvp and friends — because a projection made in a resolver nobody plays is a number about a
+// different game. Moving check-passives across flipped four nodes from idle to live and two the other way,
+// and moving check:road across moved the wall from rung 49 to rung 62 for the same kit and the same gear.
 //
-export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
-    const A = sideOf(me);
-    const B = sideOf(foe);
-    // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
-    // between it and the Warden's Bastion.
-    A.shield += Math.round(A.maxHp * A.ward);
-    B.shield += Math.round(B.maxHp * B.ward);
-    // ── CHILL, TRANSLATED — AND THIS IS THE AUTO-RESOLVER, NOT THE RING ──────────────────────────────────
-    // ⚠️ There is no bar here. autoBout resolves a fight nobody is watching (an away defence, and every
-    // balance projection check:sim / check:road / check:npc print), so it still takes turns, and chill has to
-    // be expressed in that vocabulary.
-    //
-    // A bar slowed X% takes X% fewer turns, so the honest translation of "their bar runs 22% slower" is "22%
-    // of their turns do not happen". That is what this is, and it is why CHILL_CAP is gone: the ring does not
-    // cap the slow (see CHILL_RATE_FLOOR — the only limit there is a stall guarantee), so capping it at 25%
-    // here would make the same two fighters resolve differently depending on whether anybody was watching.
-    // The 0.85 ceiling is the same stall guarantee wearing the turn-based shape.
-    if (A.chill > 0) B.skipChance = Math.min(0.85, B.skipChance + A.chill);
-    if (B.chill > 0) A.skipChance = Math.min(0.85, A.skipChance + B.chill);
-    const log = [];
-    let t = 0;
-    let swings = 0;
-    let mine = true;                 // the challenger opens
-    let wasExtra = false;
-
-    while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {
-        const att = mine ? A : B;
-        const def = mine ? B : A;
-        takeTurn({ A, B, att, def, who: mine ? "me" : "foe", log, t, rng });
-        swings += 1;
-        // `t` is a turn counter now rather than a clock. It is still what the fight screen paces playback
-        // off, and it still has to rise, so it counts the one thing left that it can honestly count.
-        t += 1;
-        const again = A.hp > 0 && B.hp > 0 ? goesAgain(att, rng, wasExtra) : null;
-        wasExtra = Boolean(again);
-        if (!again) mine = !mine;
-    }
-    return {
-        won: B.hp <= 0 && A.hp > 0,
-        unresolved: A.hp > 0 && B.hp > 0,
-        time: t, swings, log,
-        hp: Math.max(0, A.hp), foeHp: Math.max(0, B.hp),
-        maxHp: A.maxHp, foeMaxHp: B.maxHp,
-    };
-}
+// `autoRing` in arena-ring.js replaces it everywhere: openRing / act / ringResult driven headlessly with
+// housePick choosing for both sides. One resolver. If a fight ever needs resolving with nobody watching
+// again — an away defence, a projection, a simulator — that is the function, and it plays the real game.

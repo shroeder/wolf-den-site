@@ -12,7 +12,11 @@
 //            the engine reads but no source can grant is a stat nobody will ever have.
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/audit-combat.mjs [member]
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { getEquippedStats } from "../src/lib/marketplace/inventory.js";
 import { CLASSES, treeFor, treeEffects } from "../src/lib/marketplace/arena-classes.js";
 import { db } from "../src/lib/db.js";
@@ -33,7 +37,7 @@ const DUMMY = { damage: 100, health: 2000, armor: 40, speed: 1, critChance: 0.1,
 const play = (me) => {
     let s = "";
     for (let i = 1; i <= 20; i += 1) {
-        const r = autoBout({ ...me }, { ...DUMMY }, { rng: seeded(i * 104729) });
+        const r = autoRing({ ...me }, { ...DUMMY }, { rng: seeded(i * 104729) });
         s += `${r.won ? 1 : 0}:${r.swings}:${Math.round(r.hp)}:${Math.round(r.foeHp)}|`;
     }
     return s;

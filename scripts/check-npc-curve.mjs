@@ -11,7 +11,11 @@
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-curve.mjs [maxTier=60] [days=12]
 import { npcFor } from "../src/lib/marketplace/arena-npc.js";
 import { fighterFrom, combatStats } from "../src/lib/marketplace/arena.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { getEquippedStats, getEquippedIds } from "../src/lib/marketplace/inventory.js";
 import { db } from "../src/lib/db.js";
 
@@ -44,7 +48,7 @@ for (const m of REF) console.log(`    ${m.who.padEnd(20)} damage ${String(Math.r
 
 const rate = (me, foe) => {
     let w = 0;
-    for (let s = 0; s < 40; s += 1) if (autoBout({ ...me }, { ...foe }, { rng: seeded(701 + s * 7919) }).won) w += 1;
+    for (let s = 0; s < 40; s += 1) if (autoRing({ ...me }, { ...foe }, { rng: seeded(701 + s * 7919) }).won) w += 1;
     return w / 40;
 };
 

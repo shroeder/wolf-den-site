@@ -27,7 +27,11 @@
 //     --exclude="A,B"              everyone but these
 import { CLASSES, treeFor, treeEffects } from "../src/lib/marketplace/arena-classes.js";
 import { fighterFrom, combatStats } from "../src/lib/marketplace/arena.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { getEquippedStats, getEquippedIds } from "../src/lib/marketplace/inventory.js";
 import { db } from "../src/lib/db.js";
 
@@ -196,7 +200,7 @@ for (let f = 0; f < FIGHTS; f += 1) {
     const seed = Math.floor(rnd() * 4294967296);
     const mk = () => { let x = seed >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
     for (const [me, foe] of [[a, b], [b, a]]) {
-        const r = autoBout({ ...me.fighter }, { ...foe.fighter }, { rng: mk() });
+        const r = autoRing({ ...me.fighter }, { ...foe.fighter }, { rng: mk() });
         bouts += 1;
         swingSum += r.swings;
         me.bouts += 1;
@@ -296,7 +300,7 @@ for (const a of field) {
         const seedR = () => { let x = 991; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
         const weaker = a.sheet.dmg <= b.sheet.dmg ? a : b;
         const stronger = weaker === a ? b : a;
-        const r = autoBout({ ...weaker.fighter }, { ...stronger.fighter }, { rng: seedR() });
+        const r = autoRing({ ...weaker.fighter }, { ...stronger.fighter }, { rng: seedR() });
         tally[i].n += 1;
         if (r.won) tally[i].underdog += 1;
     }

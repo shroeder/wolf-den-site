@@ -81,6 +81,16 @@ export const tempoOf = (weaponSpeed = BARE_TEMPO, ferocity = 0) =>
 // behind at eighty to one.
 export const TEMPO_RATIO = 1.9;
 
+// ── AND THE CLAMP IS ONE-SIDED, BECAUSE A FLOOR PUNISHES THE INVESTMENT ──────────────────────────────────────
+// The first version clamped the foe into [yours / 1.9 … yours x 1.9]. The ceiling is the guarantee and it
+// stays. The FLOOR was a mistake and check:arith caught it in one line: ferocity +0 and ferocity +500 both
+// came back "10.4 swings a bout", because dragging the foe up to yours/1.9 means every point of speed you buy
+// makes your OPPONENT faster too. That is the same complaint the fixed band produced, wearing a new shape —
+// and it is worse, because "my new weapon sped the enemy up" is not a trade-off anybody would accept.
+//
+// A foe slower than you simply stays slower. What stops that becoming a fighter who never acts is the
+// three-in-a-row rule in advance(), which is a fairness guarantee rather than a rate.
+
 // ── AND A ROAD FOE IS GIVEN A TEMPO RATHER THAN HAVING ONE DERIVED ───────────────────────────────────────────
 // tempoOf reads Ferocity, which for a MEMBER is a stat measured at 20-140. An NPC's is a gear budget that
 // climbs with the rung and never stops, so the same divisor answers 79 at rung 100 and 305 at rung 120. The
@@ -103,7 +113,7 @@ export const npcTempo = (rung = 1, size = 120) => {
 export const foeTempo = (mine, theirs) => {
     const m = Math.max(0.2, Number(mine) || BARE_TEMPO);
     const t = Math.max(0.2, Number(theirs) || BARE_TEMPO);
-    return Math.max(m / TEMPO_RATIO, Math.min(m * TEMPO_RATIO, t));
+    return Math.min(m * TEMPO_RATIO, t);
 };
 
 // ── THE FOUR WAYS TO INTERFERE WITH A BAR ────────────────────────────────────────────────────────────────────

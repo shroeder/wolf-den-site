@@ -16,7 +16,11 @@
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-value.mjs [budget=25] [days=12]
 import { fighterFrom, combatStats } from "../src/lib/marketplace/arena.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { getEquippedStats, getEquippedIds } from "../src/lib/marketplace/inventory.js";
 import { mergeStats } from "../src/lib/marketplace/items.js";
 import { db } from "../src/lib/db.js";
@@ -61,7 +65,7 @@ function winRate(me, selfIndex) {
         if (i === selfIndex) continue;
         const foe = baseline[i];
         for (const [a, b] of [[me, foe], [foe, me]]) {
-            const r = autoBout({ ...a }, { ...b }, { rng: seeded(1013 + i * 7919)() });
+            const r = autoRing({ ...a }, { ...b }, { rng: seeded(1013 + i * 7919)() });
             n += 1;
             if (a === me ? r.won : !r.won && !r.unresolved) w += 1;
         }

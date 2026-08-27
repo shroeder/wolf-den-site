@@ -12,7 +12,11 @@
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-ladder-spread.mjs [maxTier=60] [days=5]
 import { npcBuild } from "../src/lib/marketplace/arena-npc.js";
 import { fighterFrom } from "../src/lib/marketplace/arena.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { db } from "../src/lib/db.js";
 
 const MAX = Number(process.argv[2]) || 60;
@@ -43,7 +47,7 @@ for (const r of rows) {
     if (!kit || !kit.health) continue;
     const rate = (foe, n) => {
         let w = 0;
-        for (let s = 0; s < n; s += 1) if (autoBout({ ...kit }, { ...foe }, { rng: seeded(6101 + s * 7919) }).won) w += 1;
+        for (let s = 0; s < n; s += 1) if (autoRing({ ...kit }, { ...foe }, { rng: seeded(6101 + s * 7919) }).won) w += 1;
         return w / n;
     };
     let fair = 0;        // highest rung won at least half the time

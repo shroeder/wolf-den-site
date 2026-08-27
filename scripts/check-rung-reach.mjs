@@ -10,7 +10,11 @@
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-rung-reach.mjs [name] [tries=100]
 import { npcFor } from "../src/lib/marketplace/arena-npc.js";
 import { fighterFrom } from "../src/lib/marketplace/arena.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// ⚠️ THE RING, NOT THE OLD TURN-BASED RESOLVER. autoBout took turns; the game hands them to whoever's
+// BAR FILLS FIRST, and the two disagree about which stats matter — moving check-passives across flipped
+// four nodes from idle to live and two the other way. A projection measured in a resolver nobody plays
+// is a number about a different game. autoRing drives the real openRing/act path headlessly.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { db } from "../src/lib/db.js";
 
 const WHO = process.argv[2] || "The Wolf Den";
@@ -31,7 +35,7 @@ const SAMPLES = 3000;
 const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
 const winRate = (foe, samples) => {
     let w = 0;
-    for (let s = 0; s < samples; s += 1) if (autoBout({ ...kit }, { ...foe }, { rng: seeded(9001 + s * 7919) }).won) w += 1;
+    for (let s = 0; s < samples; s += 1) if (autoRing({ ...kit }, { ...foe }, { rng: seeded(9001 + s * 7919) }).won) w += 1;
     return w / samples;
 };
 const reach = (p, n) => 1 - Math.pow(1 - p, n);

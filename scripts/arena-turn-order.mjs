@@ -94,9 +94,22 @@ for (const rung of RUNGS) {
     console.log(`   doublestrike (two blows, one turn) ${pct(T.multiHit)} · out-of-turn blows ${T.wild}`);
 }
 
+// ── AND RUNS ARE REPORTED, NOT REFUSED ──────────────────────────────────────────────────────────────────────
+// Luke: "remove any x in a row rules."
+//
+// This used to exit non-zero on any run of three, and the ring used to enforce the same thing by handing the
+// turn away. Both are gone. Under a timer a fighter who is genuinely twice as fast SHOULD swing twice while
+// you swing once — refusing it capped what speed could buy at exactly 2x, which is the complaint the fixed
+// tempo band produced in a different shape.
+//
+// The thing that was actually broken was never the runs, it was WHY: a rung-60 foe's bar filled eighty times
+// faster than a member's, because NPC ferocity is a gear budget in the thousands. That is fixed at the source
+// now (npcTempo puts the whole ladder on a member's scale, 0.9 to 2.4). So this prints the numbers and lets a
+// person judge them, which is what it was for before it was load-bearing.
 if (ATB && worstRun3 > 0) {
-    console.error(`\nFAIL: ${worstRun3} runs of three or more turns in a row under the timer.`);
-    console.error("Something is paying a fighter for their speed twice, or the tempo band has come uncapped.");
-    process.exit(1);
+    console.log(`
+Longest runs seen: ${worstRun3} bouts had a fighter take three or more turns in a row.`);
+    console.log("That is a timer working, not a fault — read `from pacing` above against the tempo gap.");
 }
-console.log(`\nOK — no fighter took three turns in a row across ${RUNS * RUNGS.length} bouts.`);
+console.log(`
+OK — ${RUNS * RUNGS.length} bouts measured. Turn order is the bars and nothing else.`);

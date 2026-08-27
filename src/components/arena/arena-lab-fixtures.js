@@ -2,8 +2,8 @@
 
 import { resolveSkill, skillsForClass } from "@/lib/marketplace/arena-skills.js";
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
-import { autoBout } from "@/lib/marketplace/arena-engine.js";
-import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
+
+import { act, autoRing, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import { arenaLevelFor, arenaXpFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -447,7 +447,9 @@ export const SCENES = {
             const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, extra: 0,
                 armor: 40, pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.25,
                 blockReduction: 0.5, stun: 0, haste: 0 };
-            const r = autoBout(me, foe);
+            // The ring, headlessly — the same argument as the `timer` scene below: a hand-written log is a
+            // fixture of what somebody THOUGHT the engine does, and autoBout was a second engine.
+            const r = autoRing(me, foe);
             return baseState({
                 // THE SCENE HAS TO ACTUALLY PLAY. This handed over `over: true` and the FINAL hit points, so a
                 // scene whose whole note is "played back blow by blow" opened on the victory card and never
