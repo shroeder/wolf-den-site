@@ -385,22 +385,54 @@ function StatusRow({ list, side, onPick }) {
 // change how fast the bar moves, stun and freeze STOP it. A frozen bar that merely ran slowly would be
 // indistinguishable from a chilled one, and they mean opposite things.
 const TIMER_WORD = { haste: "2x", chill: "SLOW", stun: "STUNNED", freeze: "FROZEN" };
+// How long the emptying takes. It is punctuation, not travel: the bar was spent, and the eye needs to see
+// that it went to nothing rather than merely dropped.
+const SPEND_MS = 140;
 function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
-    const [w, setW] = useState(from?.fill ?? 0);
+    const [bar, setBar] = useState({ w: from?.fill ?? 0, dur: SPEND_MS });
+    // ── THE BAR MAY ONLY EVER MOVE FORWARD, AND A SPEND IS THE ONE EXCEPTION ─────────────────────────────
+    // Luke: "my ATB bar was full, and going from fully full down to not full. The bar should never go
+    // backwards."
+    //
+    // It should not, and this component was the reason it did. It paints `to` and nothing else, which was
+    // right while `from` was simply the previous line's stamp — the value already on screen. It stopped
+    // being right the moment `from` started carrying `barsAfter`, the SPEND: that number is now a real
+    // position the bar passes through, and it was being used for arithmetic and never drawn. So the width
+    // went from full straight to wherever the bar had refilled to by the next line — downhill, over the
+    // whole beat, because `falling` compared the two SERVER numbers (0.2 < 0 is false) rather than
+    // comparing the target to what is actually painted.
+    //
+    // WHERE IT IS PAINTED is the thing that matters, so that is what is tracked. A target below it is a
+    // spend and snaps; a target above it fills over the beat. And when `from` itself sits below the painted
+    // position, the beat between these two lines emptied the bar, so it is emptied on screen first and
+    // fills forward from there — which is the whole mechanic, finally drawn.
+    const painted = useRef(from?.fill ?? 0);
     const state = to?.state || from?.state || null;
-    // Held bars do not travel: the whole point of a stun is that the bar is where it was. Snapping to `from`
-    // rather than easing to `to` keeps the halt readable even when the two happen to differ slightly.
+    // Held bars do not travel: the whole point of a stun is that the bar is where it was.
     const held = state === "stun" || state === "freeze";
     useEffect(() => {
-        const target = held ? (from?.fill ?? 0) : (to?.fill ?? from?.fill ?? 0);
+        const at = painted.current;
+        const start = from?.fill ?? 0;
+        const end = held ? start : (to?.fill ?? start);
+        const spent = start < at - 0.02;
+        // The emptying is paid for out of the beat rather than added to it, so the bar still arrives at
+        // `end` exactly when the stepper moves on.
+        const glide = Math.max(90, (ms || 300) - (spent ? SPEND_MS : 0));
+        painted.current = end;
         // Two frames, not one: a width set in the same paint as the transition property is applied jumps
         // instead of animating, which turns every fill into a snap.
-        const id = requestAnimationFrame(() => requestAnimationFrame(() => setW(target)));
-        return () => cancelAnimationFrame(id);
-    }, [to, from, held]);
-    // A bar that just emptied must not slide backwards over half a second — it was spent, and the reset is
-    // the punctuation that says so.
-    const falling = (to?.fill ?? 0) < (from?.fill ?? 0);
+        const raf2 = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
+        if (!spent) {
+            const id = raf2(() => setBar({ w: end, dur: end < at ? SPEND_MS : glide }));
+            return () => cancelAnimationFrame(id);
+        }
+        let t = null;
+        const id = raf2(() => {
+            setBar({ w: start, dur: SPEND_MS });
+            t = setTimeout(() => setBar({ w: end, dur: glide }), SPEND_MS);
+        });
+        return () => { cancelAnimationFrame(id); if (t) clearTimeout(t); };
+    }, [to, from, held, ms]);
     // ── READY IS A FACT ABOUT THE FIGHT, NOT ABOUT THE FILL ──────────────────────────────────────────────
     // Luke: "I attack, and it shows my bar as green and 2x but its not my turn?"
     //
@@ -416,8 +448,8 @@ function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
     const ready = !held && waiting;
     return (
         <span className={`ar-timer${state ? ` is-${state}` : ""}${ready ? " is-ready" : ""}${foe ? " is-foe" : ""}`}>
-            <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, w)) * 100)}%`,
-                transitionDuration: `${falling ? 140 : Math.max(90, ms || 300)}ms` }} />
+            <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, bar.w)) * 100)}%`,
+                transitionDuration: `${bar.dur}ms` }} />
             {ready ? <b className="ar-timer-word">READY</b>
                 : state ? <b className="ar-timer-word">{TIMER_WORD[state] || ""}</b> : null}
         </span>
