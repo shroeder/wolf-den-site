@@ -18,11 +18,17 @@ import ConsumableArt from "@/components/ConsumableArt";
 //
 // IT RENDERS NOTHING WHEN THERE IS NOTHING. A panel that says "you have none" on every feature page is a row
 // of dead furniture on six screens, and the member it is for is the one who DOES have something.
-// `reloadOnUse` rather than a second callback, because SERVER components mount this too (the farm page does)
-// and a function prop cannot cross that boundary — it is not serialisable, and the whole subtree silently
-// fails to render. A boolean can. Client hosts that own the thing being changed pass `onUsed` instead and
-// refresh themselves.
-export default function ConsumableShelf({ feature, title = "In your pack", onUsed = null, reloadOnUse = false }) {
+// ── `reloadOnUse` IS GONE, AND IT WAS NEVER NEEDED ───────────────────────────────────────────────────────────
+// It existed so a SERVER component could mount this without passing a function prop (not serialisable). Only
+// one host ever set it — the farm — and FarmClient has been a client component the whole time, so it could
+// always have been told directly. What the flag actually did was `window.location.reload()`, which threw the
+// page away: Luke, using fertilizer, "it redirects me out of the garden." Which panel was open is component
+// state, so the reload dropped him back on Today.
+//
+// A host that owns the thing being changed passes `onUsed` and refreshes itself. A host that cannot be told
+// has no business mounting a control that changes what it is showing, so there is no boolean escape hatch any
+// more — the next person to need one should lift the shelf into a client component instead.
+export default function ConsumableShelf({ feature, title = "In your pack", onUsed = null }) {
     const [data, setData] = useState(null);
     const [busy, setBusy] = useState(null);
     const [msg, setMsg] = useState(null);
@@ -53,15 +59,12 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
             // The host page owns the thing that just changed — the voyage clock, the crop timers, the strike
             // count. It has to be told, or the shelf reports a change the screen behind it does not show.
             onUsed?.(id, d);
-            // A hard reload for a host that cannot be told — see reloadOnUse. Left until after the message
-            // has been set and the shelf reloaded, so a failed reload still leaves the screen correct.
-            if (reloadOnUse) window.location.reload();
         } else {
             setMsg({ ok: false, text: d?.error === "none_owned" ? "You don't have one of those."
                 : d?.error === "strikes_capped" ? "You already hold the most bonus strikes a day can (8)."
                     : "Couldn't use that." });
         }
-    }, [load, onUsed, reloadOnUse]);
+    }, [load, onUsed]);
 
     // ── AND SPENDING ONE THAT IS ALREADY ON YOU ──────────────────────────────────────────────────────────
     // Same shape as `use`, different verb: an active pill names an EFFECT rather than an item. Only pills the
@@ -78,14 +81,15 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
         if (d?.ok) {
             setMsg({ ok: true, text: d.applied || "Done." });
             await load();
+            // ⚠️ THIS is the path fertilizer takes — an ACTIVE pill, not a stash item — and it reloaded the
+            // page too. Fixing only `use` above would have left the exact button Luke reported still doing it.
             onUsed?.(a.kind, d);
-            if (reloadOnUse) window.location.reload();
         } else {
             setMsg({ ok: false, text: d?.error === "nothing_growing"
                 ? "Nothing is growing that could use it."
                 : d?.error === "no_fertilizer" ? "None left in the shed." : "Couldn't use that." });
         }
-    }, [load, onUsed, reloadOnUse]);
+    }, [load, onUsed]);
 
     if (!data) return null;
     const { stash = [], active = [] } = data;

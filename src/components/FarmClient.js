@@ -595,6 +595,28 @@ export default function FarmClient({ initial, viewingAlias }) {
     // after a purchase (plot_upgrade, seedpack_buy) and the amount EARNED (harvest, encounter_resolve, which
     // return the balance separately as `goldAfter`). Reading whichever was present would have set the purse to
     // a harvest payout. So the balance-only key is the contract, and the two purchase paths were given it.
+    // ── REFRESHING WITHOUT LEAVING THE SCREEN ────────────────────────────────────────────────────────────
+    // Luke: "when I click to use fertilizer or other items in the farm it redirects me out of the garden."
+    //
+    // It was not a redirect — it was `window.location.reload()`. The shed's item shelf was mounted with
+    // `reloadOnUse`, a flag that exists for SERVER components, which cannot be handed a function prop. This
+    // one is a client component and always has been, so it could always have been told directly; the hard
+    // reload threw the whole page away, and `panel` is component state, so it came back on "today" and the
+    // garden you were standing in was gone. Fertilizer, tonic, seeds and the charms all did it.
+    //
+    // The GET returns the same shape the page was seeded with, so this is the seed applied again: the shed's
+    // counts, the plots and the purse all move, and nothing that is only in memory — which panel is open, how
+    // far the pasture is scrolled — is touched.
+    const refreshFarm = useCallback(async () => {
+        const res = await fetch("/api/marketplace/farm", { cache: "no-store" }).catch(() => null);
+        const f = res?.ok ? await res.json().catch(() => null) : null;
+        if (!f || f.error) return;
+        setFarm(f);
+        if (f.garden) setGarden(f.garden);
+        // The nav purse is its own component and reads the balance for itself.
+        try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+    }, []);
+
     const gardenAct = useCallback(async (body, key) => {
         setGardenBusy(key);
         const r = await post(body);
@@ -1436,7 +1458,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             its useState calls from `initial`, so new server data does not reach it, and a
                             Growth Tonic that takes 60% off your slowest crop has to move the timer you are
                             looking at or it reads as having done nothing. */}
-                        <ConsumableShelf feature="farm" title="In your shed" reloadOnUse />
+                        {/* `onUsed`, never `reloadOnUse` — see refreshFarm. A hard reload here is what was
+                            throwing the member out of the garden panel. */}
+                        <ConsumableShelf feature="farm" title="In your shed" onUsed={refreshFarm} />
                         <NeighbourStrip
                             neighbours={farm.neighbours}
                             ratesLeft={farm.rating?.charge?.left ?? 0}
