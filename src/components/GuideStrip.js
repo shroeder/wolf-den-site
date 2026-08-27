@@ -78,7 +78,10 @@ export default function GuideStrip() {
     // watching it complete under you is the whole payoff. Everywhere else this costs nothing.
     useEffect(() => {
         if (!show || !here) return undefined;
-        const t = setInterval(() => load(true), 20_000);
+        // Gated like the app's other polls. This one rides on EVERY page of the game, so ungated it was 180
+        // requests an hour from any tab left open anywhere, forever, to re-read a progress bar nobody is
+        // looking at.
+        const t = setInterval(() => { if (document.visibilityState === "visible") load(true); }, 20_000);
         return () => clearInterval(t);
     }, [show, here, load]);
 

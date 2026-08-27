@@ -191,13 +191,23 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
     // ── YOU ARE HERE, AND SO IS EVERYBODY ELSE ───────────────────────────────────────────────────────────
     // Position pushed on a timer and the room re-read on the same one. The walk is local and immediate because
     // it must never wait on a round trip; the server hears about it afterwards so the room sees you move.
+    // ── ⚠️ AND IT STOPS WHEN NOBODY IS LOOKING ───────────────────────────────────────────────────────────
+    // This was TWO round trips every three seconds, forever, with no visibility check — 2,400 requests an
+    // hour from one person standing in the lounge, and it kept running at exactly that rate on a tab they
+    // had left behind hours ago. On a plan billed by invocation that is the single most expensive line of
+    // code in the app, and nothing about it was visible from anywhere.
+    //
+    // Seven of the app's other nine polls already gate on `visibilityState`; this one and the casino floor's
+    // were the two that never did. Five seconds rather than three as well: the silhouettes behind the rope
+    // are ambience, and nobody has ever noticed a person arriving two seconds late.
     useEffect(() => {
         const id = setInterval(async () => {
+            if (document.visibilityState !== "visible") return;
             const r = await POST({ action: "vip_move", x: xRef.current, y: 72, facing });
             if (r?.ok === false) return;
             const s = await POST({ action: "vip_state" });
             if (s?.open) setSt(s);
-        }, 3000);
+        }, 5000);
         return () => clearInterval(id);
     }, [facing]);
 

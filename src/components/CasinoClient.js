@@ -1065,6 +1065,10 @@ export default function CasinoClient({ initial }) {
     const NEAR_EXTRA = 110;
     useEffect(() => {
         const id = setInterval(async () => {
+            // The other people in the room are the only reason this exists, and a hidden tab cannot see them.
+            // Ungated it billed 600 requests an hour from a floor nobody was standing on. See the note in
+            // VipLounge, which was the same fault at four times the rate.
+            if (document.visibilityState !== "visible") return;
             const r = await casFetch({ method: "GET" });
             // The rounds ride along on the poll that was already running for the other people in the room.
             // A shared game needs no channel of its own: the draw is something the floor learns
