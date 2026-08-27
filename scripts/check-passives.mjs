@@ -67,7 +67,16 @@ const seeded = (n) => () => { n = (n * 1664525 + 1013904223) % 4294967296; retur
 // So the partner is built to KEEP PACE now. Its bar runs as fast as the fighter's, which is what makes the
 // twelve-swings-to-kill promise above true again rather than aspirational.
 const sparringFor = (me) => ({
-    damage: Math.max(1, Math.round(Math.max((Number(me.health) || 1000) / 12, (Number(me.armor) || 0) * 3))),
+    // ── ⚠️ ARMOUR IS ADDED, NOT TRIPLED ──────────────────────────────────────────────────────────────────
+    // The note above is right that a partner swinging for less than the fighter's armour deals literally 1.
+    // `armor * 3` overshot it into absurdity: against a real tanky kit — armour 726, health 2,370 — it swung
+    // for 2,178, which is a TWO-HIT KILL. "Kills in about twelve swings" was aspirational; nothing that heals,
+    // shields or regenerates can matter when the whole fight is two blows, and that is the third and last
+    // reason Exsanguinate kept reading as idle.
+    //
+    // Mitigation is flat, so the honest sizing is "get through the armour, THEN take a twelfth of the health":
+    // armour + health/12 nets the twelve swings the comment promises, at any armour value.
+    damage: Math.max(1, Math.round((Number(me.armor) || 0) + (Number(me.health) || 1000) / 12)),
     // Sized off what the fighter actually PUTS OUT per swing rather than off its damage stat: crits and
     // doublestrike roughly double it, so x20 was buying about ten swings, not twenty.
     health: Math.max(1, Math.round((Number(me.damage) || 100) * 40)),
@@ -78,16 +87,42 @@ const sparringFor = (me) => ({
 });
 
 // What a fight LOOKS like, as one comparable fingerprint: who won, how long, and how much moved either way.
+// ── ⚠️ AND IT COUNTS DAMAGE, NOT THE GAP BETWEEN FULL AND DEAD ───────────────────────────────────────────────
+// `taken` used to be `maxHp - hp`, which SATURATES: a fighter who dies has taken exactly maxHp however much
+// they healed on the way, so every point of sustain is arithmetically invisible in any fight they lose. The
+// partner above is deliberately built to win, so that was every fight — which is why Exsanguinate read as
+// idle for three passes running while the leech was working perfectly.
+//
+// Measured against the same node: at a difficulty the fighter survives, bleedLeech moves `taken` from 226,944
+// to 209,430. One rung harder and both are 292,800 to the digit.
+//
+// Summed off the LOG instead, by the same rule the fight screen rebuilds its health bars with: a tick damages
+// the fighter it is NAMED for, every other line damages the other side. That number does not saturate — heal
+// through a beating and you go on to take MORE total damage, so sustain shows up as a bigger number rather
+// than as no number at all.
 function fingerprint(me, foe) {
-    let dealt = 0, taken = 0, swings = 0, wins = 0;
+    let dealt = 0, taken = 0, swings = 0, wins = 0, hpArea = 0;
     for (let s = 1; s <= 24; s += 1) {
         const r = autoRing(me, { ...foe }, { rng: seeded(s * 7919) });
         swings += r.swings;
         wins += r.won ? 1 : 0;
-        dealt += (r.foeMaxHp - r.foeHp);
-        taken += (r.maxHp - r.hp);
+        for (const l of r.log || []) {
+            if (Number.isFinite(Number(l?.meHp))) hpArea += Number(l.meHp);
+            const d = Number(l?.dmg) || 0;
+            if (!d) continue;
+            if (l.bleedTick || l.burnTick) { if (l.who === "me") taken += d; else dealt += d; continue; }
+            if (l.who === "me") dealt += d; else taken += d;
+        }
     }
-    return `${wins}|${swings}|${Math.round(dealt)}|${Math.round(taken)}`;
+    // ── AND THE AREA UNDER THE HEALTH CURVE ──────────────────────────────────────────────────────────────
+    // Damage sums catch anything that changes how a fight GOES. They still miss a small heal that changes
+    // nothing about when somebody dies — Exsanguinate and Immolate are the same node twice, and which of the
+    // two showed up came down to whether its heal happened to move a killing blow by one swing.
+    //
+    // Every line stamps `meHp`, so summing it is the area under the health curve: a fighter who drinks from a
+    // wound is higher at every subsequent line whether or not they last a beat longer. It is the one term
+    // here that measures SUSTAIN directly rather than inferring it from an outcome.
+    return `${wins}|${swings}|${Math.round(dealt)}|${Math.round(taken)}|${Math.round(hpArea)}`;
 }
 
 const baseKit = await kitFor(who.id, { skillTree: {} });
@@ -112,6 +147,10 @@ const baseFp = fp2(baseKit);
 
 let broken = 0;
 let total = 0;
+// One unspent baseline per class — see the note on `against` below.
+const classBase = {};
+for (const cls of CLASSES) classBase[cls.id] = fp2(await kitFor(who.id, { skillTree: {}, classId: cls.id }));
+
 for (const cls of CLASSES) {
     console.log(`\n── ${cls.name.toUpperCase()} ${"─".repeat(56 - cls.name.length)}`);
     for (const node of treeFor(cls.id)) {
@@ -125,7 +164,12 @@ for (const cls of CLASSES) {
         const kit = await kitFor(who.id, { skillTree: spend, classId: cls.id });
         const against = partner
             ? fp2(await kitFor(who.id, { skillTree: { [partner]: spend[partner] }, classId: cls.id }))
-            : baseFp;
+            // ⚠️ The SAME CLASS, spending nothing. This used to compare against the classless kit, so every
+            // node was measured across a class change as well as its own effect — a Warden's DR, guard and
+            // accuracy all move a fight before a point is spent. That confound is permissive, and it hid a
+            // real fault: with thorns deliberately broken in the engine this still reported 36 of 36, because
+            // switching to Warden had moved the fingerprint by itself.
+            : classBase[cls.id];
         // 1. what did the node move on the character?
         const moved = [];
         for (const k of new Set([...Object.keys(baseKit), ...Object.keys(kit)])) {
