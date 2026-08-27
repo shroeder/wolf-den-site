@@ -617,6 +617,13 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
             <span className="ar-shadow" aria-hidden="true" />
+            {/* ── WHICH ONE IS ME ──────────────────────────────────────────────────────────────────────────
+                Both fighters are gold-and-green painted knights, and at phone size in a real bout the only
+                thing separating them is which side they stand on and a small name over a bar at the top of
+                the screen. Asked as a player watching an unfamiliar opponent: "which one am I?" — and the
+                honest answer was "count the bars". A quiet permanent tag under your own feet answers it
+                without competing with anything that only appears when something happens. */}
+            {!foe ? <b className="ar-mine-tag" aria-hidden="true">YOU</b> : null}
             {/* ── HASTE ── the glow goes BEHIND the body (z-index below .ar-hero) so it reads as light coming
                 off them rather than a film over the sprite, and the motes drift up out of the same place. */}
             {hasted ? (
@@ -1856,7 +1863,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                     : last.chilledSkip ? "Frozen stiff"
                                         : last.fever ? "The pit closes"
                                             : last.guard ? "Guard up"
-                                                : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
+                                                // ── A BLOW THAT WAS TURNED ASIDE SAYS SO ─────────────
+                                                // Filmed in a real bout: "You strike — the guard holds" put a
+                                                // full-size STRIKE on screen with no damage number and nothing
+                                                // moving. The banner named what was THROWN, so the one case
+                                                // where a player most needs to be told the outcome was the one
+                                                // case that looked identical to a hit landing.
+                                                : (Number(last.damage) === 0 && Number(last.blocked) > 0) ? "Blocked"
+                                                    : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
                 crit,
                 again: Boolean(last.again),
@@ -1874,9 +1888,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const locked = Boolean(last.stunnedSkip || last.chilledSkip);
             const dot = Boolean(last.burnTick || last.bleedTick);
             const mine = last.who === "you";
+            // A blocked blow is the DEFENDER's moment — their guard held — so the label belongs over them,
+            // not over the fighter whose swing failed.
+            const wasBlocked = Number(last.damage) === 0 && Number(last.blocked) > 0;
             const h = {
                 id: headId.current,
-                side: mine ? "you" : "them",
+                side: wasBlocked ? (mine ? "them" : "you") : (mine ? "you" : "them"),
                 // The same list as the clash above, and it has to stay the same list — see the warning there.
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
@@ -1886,7 +1903,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                     : last.chilledSkip ? "Frozen"
                                         : last.fever ? "The pit closes"
                                             : last.guard ? "Guard up"
-                                                : last.ability || (mine ? "Strike" : "Swing"),
+                                                // Same rule as the banner. The label goes over the DEFENDER
+                                                // below, because a guard holding is their doing, not the
+                                                // swinger's.
+                                                : (Number(last.damage) === 0 && Number(last.blocked) > 0) ? "Blocked"
+                                                    : last.ability || (mine ? "Strike" : "Swing"),
                 // Louder than a move, and on the same scale as one. These are the things that happen TO a
                 // fighter rather than because of them, which is the whole reason they are called out at all.
                 alert: locked || dot || Boolean(last.again),
@@ -1899,7 +1920,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     // the bar, so it came round again before the other fighter's did. The phrase is left over
                     // from the old go-again roll, which was a coin flip for a free turn and is gone. Under a
                     // timer the honest sentence is about the bar, because the bar is the thing on screen.
-                    : last.again ? "bar half spent" : null,
+                    // "bar half spent" was still the mechanic's name, not the player's. What it MEANS to the
+                    // person watching is that this fighter comes round again before the other one does.
+                    : last.again ? "acts again sooner" : null,
                 crit,
                 grade: locked ? (last.chilledSkip ? "freeze" : "stun")
                     : last.burnTick ? "burn"
@@ -3977,11 +4000,20 @@ function Styles() {
             /* ON the fighter, not under it: hung below the sprite these fell off the bottom of the frame
                and the one that matters most -- FROZEN -- was the one you could not see. Burning sits at the
                feet, ice a row above it, because a fighter can be both at once. */
-            .ar-state-word { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%);
+            /* Sits clear of the permanent YOU tag below it. */
+            .ar-mine-tag { position: absolute; left: 50%; bottom: 1%; transform: translateX(-50%);
+                z-index: 8; font-size: 8px; font-weight: 900; letter-spacing: .22em; font-style: normal;
+                color: rgba(255,215,94,.62); text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
+            /* ── A STATE THAT COSTS YOU TURNS HAS TO BE LOUDER THAN 9.5px ─────────────────────────────────
+               "Why did I lose a turn?" is the question FROZEN answers, and it was answering it in the
+               smallest text on the screen, at the bottom of a fighter, while numbers three times its size
+               flew over the top. Bigger, and ringed in its own colour so the state reads before the word. */
+            .ar-state-word { position: absolute; left: 50%; bottom: 8%; transform: translateX(-50%);
                 z-index: 9; display: inline-flex; align-items: center; gap: 5px;
                 padding: 2px 8px; border-radius: 999px; white-space: nowrap;
-                font-size: 9.5px; font-weight: 900; letter-spacing: .14em; font-style: normal;
-                background: rgba(6,10,16,.72); backdrop-filter: blur(2px);
+                font-size: 11px; font-weight: 900; letter-spacing: .14em; font-style: normal;
+                background: rgba(6,10,16,.86); backdrop-filter: blur(2px);
+                box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px currentColor;
                 animation: arStateIn .3s cubic-bezier(.2,1.4,.3,1) both; }
             .ar-state-word i { font-style: normal; font-size: 9px; opacity: .85;
                 padding: 0 4px; border-radius: 999px; background: rgba(255,255,255,.16); }
@@ -5015,8 +5047,15 @@ function Styles() {
                 transform: translateY(calc(var(--g, 0) * -30px)); }
             .ar-pops.is-right { right: 18%; }
             .ar-pops.is-left { left: 18%; }
+            /* ── A NUMBER HAS TO READ OVER THE ART, NOT JUST OVER THE BACKGROUND ──────────────────────────
+               Filmed on a phone in a real bout: the damage numbers land on top of the fighters, which are
+               gold-and-green painted armour, and a soft drop shadow is no help against a busy mid-tone. A
+               HARD outline is — it separates the glyph from whatever is behind it regardless of colour, which
+               matters because these numbers are gold, red, orange and white depending on what happened. */
             .ar-pop { font-size: 1.9rem; font-weight: 900; line-height: 1.05;
-                letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
+                letter-spacing: -0.02em; pointer-events: none;
+                -webkit-text-stroke: 3px rgba(0,0,0,.92); paint-order: stroke fill;
+                text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
                 font-variant-numeric: tabular-nums;
                 animation: arPop .95s cubic-bezier(.2,1,.3,1) both; }
             .ar-pop.is-dmg { color: #ffd75e; }

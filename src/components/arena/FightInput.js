@@ -38,7 +38,7 @@ export default function FightInput({ bout, busy, onAct, hold = false }) {
             {/* AND IT SAYS WHICH OF THE TWO IT IS. A greyed deck under the words "Your beat" is the same lie
                 as no deck at all -- it is not your beat, the ring is still working through the answer to the
                 last one. The buttons hold their place; the label tells the truth about why they are dark. */}
-            <div className="fin-lab">
+            <div className={`fin-lab${mine ? " is-mine" : ""}`}>
                 <span>{mine ? "Your beat" : "The ring"}</span>
                 <em>{mine
                     ? (deck.length ? "attack, or spend a skill" : "no skills yet — see the Skills tab")
@@ -79,6 +79,18 @@ export default function FightInput({ bout, busy, onAct, hold = false }) {
                 .fin-lab span { font-size: 9.5px; font-weight: 900; letter-spacing: .16em;
                     text-transform: uppercase; color: #9aa2ab; }
                 .fin-lab em { font-style: normal; font-size: 9.5px; color: #7d858f; }
+                /* ── "IS IT MY GO?" HAS TO BE ANSWERABLE WITHOUT READING ──────────────────────────────
+                   The only thing that distinguished your beat from the ring's was 9.5px of grey text and
+                   slightly dimmer buttons. On a phone, mid-fight, that is not an answer — filmed against a
+                   real opponent and it was genuinely hard to tell at a glance whether the game was waiting
+                   for me or playing itself. Gold and a soft pulse when it is your move; nothing when it is
+                   not, because the absence has to be as clear as the presence. */
+                .fin-lab.is-mine span { color: #ffd75e; text-shadow: 0 0 10px rgba(255,215,94,.45); }
+                .fin-lab.is-mine em { color: #cbb27a; }
+                .fin-lab.is-mine span::before { content: "B8"; margin-right: 5px; display: inline-block;
+                    animation: finNudge 1.1s ease-in-out infinite; }
+                @keyframes finNudge { 0%, 100% { transform: translateX(0); opacity: .75; }
+                    50% { transform: translateX(2px); opacity: 1; } }
 
                 /* One row, thumb-sized. Four buttons at most — a plain attack and three skills — so they can
                    share the width evenly without any of them getting too small to hit. */
