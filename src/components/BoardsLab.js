@@ -84,7 +84,8 @@ const QM_LOCKER = [
         blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
     { id: "scroll_ancient", name: "Ancient Codex", price: 500, icon: "GiSpellBook", art: null,
         blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
-    { id: "pot_fury", name: "Bottled Fury", price: 150, icon: "GiPotionBall", art: null,
+    // Mirrors the real counter in sailing.js — a lab that quotes a stale price is a lab that lies.
+    { id: "pot_fury", name: "Bottled Fury", price: 1000, icon: "GiPotionBall", art: null,
         blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
     { id: "elixir_renewal", name: "Elixir of Renewal", price: 5000, icon: "GiHealthPotion", art: null,
         blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },

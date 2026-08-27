@@ -3175,7 +3175,11 @@ export const LOCKER = {
         blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
     scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 500, icon: "GiSpellBook",
         blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
-    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 150, icon: "GiPotionBall",
+    // 150 -> 1000. Luke: "bottled fury should be 1k." It was the cheapest thing on the counter and the most
+    // valuable: 6,500 GOLD in the shop, against the Ancient Codex's 5,000 — which sits here at 500. At 150 a
+    // doubloon bought forty-three gold of triple strike damage while every other row bought about ten, so the
+    // voyage's whole payout was worth more spent here than anywhere else in the game.
+    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 1000, icon: "GiPotionBall",
         blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
     elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 5000, icon: "GiHealthPotion",
         blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },
