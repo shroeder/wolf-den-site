@@ -2036,8 +2036,26 @@ function boutTelemetry(b, won) {
             missed: rows.reduce((n, l) => n + (Number(l.missed) || 0), 0),
         };
     };
-    const myRows = log.filter((l) => l.who === "you");
-    const theirRows = log.filter((l) => l.who !== "you");
+    // ── WHOSE LINE IS THIS ───────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THIS FILTERED ON `who === "you"` AND THE RING HAS NEVER WRITTEN THAT. It writes "me" and "foe"; only
+    // one line in this file ("call") ever says "you". So myRows was ALWAYS EMPTY and theirRows caught every
+    // line on both sides — every bout resolved by the ring stored `dealt` as zeros and `taken` as the sum of
+    // BOTH fighters.
+    //
+    // Caught by looking up a real bout: a win where the telemetry said 0 dealt and 3460 taken, with hpLeft at
+    // full and the foe on zero — you cannot kill somebody dealing nothing. Confirmed against a bout whose real
+    // figures were on the defeat card: dealt 1,985 and taken 4,365, stored as taken = 6350, which is exactly
+    // their sum.
+    //
+    // It matters more than one screen: scripts/arena-report.mjs reads this, and that report is what the tuning
+    // is supposed to be measured against.
+    //
+    // Keyed on THEM, not on you. "foe" is the only value with one meaning — the player's side is "me" from the
+    // ring and "you" from the call line, and a future third spelling of the player would silently empty this
+    // again the same way.
+    const isTheirs = (l) => l.who === "foe" || l.who === "them";
+    const myRows = log.filter((l) => !isTheirs(l));
+    const theirRows = log.filter(isTheirs);
     const stat = (f) => (f ? {
         damage: Math.round(f.damage || 0),
         health: Math.round(f.health || 0),

@@ -25,6 +25,16 @@ function table(title, rows, cols) {
     const w = cols.map((c) => Math.max(c.h.length, ...rows.map((r) => String(c.f(r) ?? "").length)));
     console.log("   " + cols.map((c, i) => c.h.padEnd(w[i])).join("  "));
     for (const r of rows) console.log("   " + cols.map((c, i) => String(c.f(r) ?? "").padEnd(w[i])).join("  "));
+    // ── A COLUMN OF ZEROS IS A BROKEN COLUMN, NOT A FINDING ──────────────────────────────────────────────────
+    // Every bout resolved by the ring stored `dealt` as zeros, because boutTelemetry split the log on
+    // `who === "you"` and the ring writes "me". Six hundred and seventy nine bouts in one 48h window all read
+    // "0 dealt per round", which is not a balance signal, it is an empty field — and a table that prints it
+    // without comment is how a wrong number gets tuned against.
+    const dmgCol = cols.findIndex((c) => /dealt/.test(c.h));
+    if (dmgCol >= 0 && rows.length && rows.every((r) => Number(cols[dmgCol].f(r)) === 0)) {
+        console.log(`   ⚠  every row reads 0 in "${cols[dmgCol].h}" — these bouts predate the telemetry`);
+        console.log("      side-split fix; the field was never written. Not a real zero.");
+    }
 }
 
 // ── ONE BOUT, IN FULL ────────────────────────────────────────────────────────────────────────────────────────
@@ -41,6 +51,16 @@ if (arg("--bout")) {
     console.log(`\nbout ${id} · ${r.created_at.toISOString()} · ${r.rounds} rounds`);
     console.log(`${r.challenger} ${r.challenger_won ? "BEAT" : "LOST TO"} ${r.defender || (t?.rung ? `rung ${t.rung}` : `tier ${r.npc_tier}`)}`);
     if (!t) { console.log("\n(no telemetry — bout predates mig 369)"); process.exit(0); }
+    // ── A ROW FROM BEFORE THE SIDE-SPLIT WAS FIXED IS NOT A ZERO, IT IS A BLANK ────────────────────
+    // boutTelemetry split the log with `who === "you"` while the ring has only ever written "me" and "foe",
+    // so every bout it resolved stored dealt = all zeros and taken = BOTH fighters added together. Averaging
+    // those in would drag every figure this report exists to produce toward nonsense, quietly. A fight with
+    // rounds in it and nothing dealt did not happen; it was mis-recorded.
+    if (r.rounds > 0 && !(Number(t.dealt?.dealt) > 0) && Number(t.taken?.dealt) > 0) {
+        console.log("");
+        console.log("⚠️  Recorded before the telemetry side-split was fixed.");
+        console.log("   `dealt` is empty and `taken` holds BOTH fighters. These numbers are not usable.");
+    }
     const line = (label, s, f) => console.log(`  ${label.padEnd(9)} ${f.damage} dmg · ${f.critChance}% crit x${f.critMult} · ${f.health} hp · ${f.dr}% reduction · ${f.accuracy}% accuracy · ${f.element}
              dealt ${s.dealt} over ${s.swings} swings (${s.perSwing}/swing, ${s.crits} crits)
              ${s.turnedAside} turned aside · ${s.shieldEaten} eaten by shield · ${s.returned} came back
