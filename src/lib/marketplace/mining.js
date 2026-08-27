@@ -963,6 +963,26 @@ const trackCards = (defs, row, valueFn, costFn, fmt) => Object.entries(defs).map
     };
 });
 
+// ── THE TWO NUMBERS ON THE MINE PILL ─────────────────────────────────────────────────────────────────────────
+// GameNav shows trips left and smeltable parts. The HUD was calling getMiningState for them — the whole
+// smeltery, the current node, the three collections, the loadout affinity totals — 18 round trips and 573ms
+// measured, for two integers. tripsAllowed and smeltCostFor are the same helpers the mine screen uses, so the
+// pill and the page cannot disagree.
+export async function miningNav(buyerId) {
+    if (!buyerId) return { unlocked: false, trips: 0, partsReady: 0 };
+    const [row, ore] = await Promise.all([
+        minerRow(buyerId),
+        db.query(`SELECT tier, qty FROM mkt_ore WHERE buyer_id = $1 AND qty > 0 ORDER BY tier`, [buyerId]).catch(() => []),
+    ]);
+    const cost = smeltCostFor(row?.crucible_level);
+    return {
+        unlocked: true,
+        trips: Math.max(0, tripsAllowed(row) - (Number(row?.trips_used) || 0)),
+        // What the ore would actually SMELT INTO, not raw ore — the badge promises something you can do.
+        partsReady: (ore || []).reduce((s, r) => s + Math.floor(Number(r.qty) / Math.max(1, cost)), 0),
+    };
+}
+
 export async function getMiningState(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await minerRow(buyerId);

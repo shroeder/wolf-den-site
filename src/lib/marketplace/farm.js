@@ -14,7 +14,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { ITEMS, randomDropPool } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
-import { getGarden, farmPetCapBonus, dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
+import { getGarden, farmPetCapBonus, dropSeedFrom, plotCount } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { farmRatingBits, farmLoveBoard } from "@/lib/marketplace/farm-rating.js";
@@ -435,6 +435,44 @@ export async function farmVisitors(farmOwnerId, viewerId) {
         border: r.equipped_border && r.equipped_border !== "none" ? r.equipped_border : null,
         isYou: String(r.id) === String(viewerId),
     }));
+}
+
+// ── THE TWO NUMBERS THE NAV BADGE NEEDS ──────────────────────────────────────────────────────────────────────
+// GameNav draws a Farm pill from `cropsReady` and `petNudge`, and to get them the HUD was calling getFarm —
+// the owner row, the whole garden, every sprite, the level sprites, the petted rows, the visitor list. That is
+// 77 database round trips and 977ms, measured, and it made the farm the most expensive single piece of the
+// batched HUD endpoint by a factor of four.
+//
+// The rules are the same ones the farm screen uses, called rather than copied: plotCount for how many plots
+// you actually have, pettingBudget for charges left, and the same petted-today query keyed on the same DAY.
+// The pet count only gets fetched when there are charges left to spend, because with none left the answer is
+// zero however many animals are un-petted.
+export async function farmNav(buyerId) {
+    if (!buyerId) return { cropsReady: 0, petNudge: 0 };
+    const [budget, upRow] = await Promise.all([
+        pettingBudget(buyerId).catch(() => null),
+        db.queryOne(`SELECT COALESCE(farm_upgrades,'{}'::jsonb) AS up FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+    // Bounded by the plots you own, exactly as getGarden bounds its loop — a row for a slot beyond your plot
+    // count is not a crop the screen would ever draw, so it must not light the badge either.
+    const slots = plotCount(upRow?.up || {});
+    const readyRow = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_farm_plot WHERE buyer_id = $1 AND slot < $2 AND ready_at <= NOW()`,
+        [buyerId, slots],
+    ).catch(() => null);
+
+    const left = Number(budget?.own?.left) || 0;
+    let petNudge = 0;
+    if (left > 0) {
+        const [st, pettedRows] = await Promise.all([
+            petsState(buyerId, { sync: false }).catch(() => null),
+            db.query(`SELECT pet_id FROM mkt_pet_level WHERE buyer_id = $1::text AND petted_day = ${DAY}`, [buyerId]).catch(() => []),
+        ]);
+        const pettedToday = new Set((pettedRows || []).map((r) => r.pet_id));
+        const unpetted = (st?.ownedIds || []).filter((id) => !pettedToday.has(id)).length;
+        petNudge = Math.min(left, unpetted);
+    }
+    return { cropsReady: Number(readyRow?.n) || 0, petNudge };
 }
 
 export async function getFarm(ownerId, viewerId) {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { arenaNav } from "@/lib/marketplace/arena.js";
-import { MINING_UNLOCKED, getMiningState } from "@/lib/marketplace/mining.js";
+import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
 import { DELVES_UNLOCKED, getDelveState } from "@/lib/marketplace/delves.js";
 import { COOK_UNLOCKED } from "@/lib/marketplace/cooking.js";
 import { getChests } from "@/lib/marketplace/chests.js";
@@ -13,7 +13,7 @@ import { getBossStrikesLeft } from "@/lib/marketplace/boss.js";
 import { fishingUnlocked, sailingNeedsAttention, unusedCasts } from "@/lib/marketplace/sailing.js";
 import { getFeatureClaimCounts } from "@/lib/marketplace/feature-dailies.js";
 import { getTownTodo } from "@/lib/marketplace/town.js";
-import { getFarm } from "@/lib/marketplace/farm.js";
+import { farmNav } from "@/lib/marketplace/farm.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -60,7 +60,7 @@ export async function GET(request) {
         const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm] =
             await Promise.all([
                 safe(arenaNav(id), { unlocked: false, fightsLeft: 0 }),
-                MINING_UNLOCKED(id) ? safe(getMiningState(id), null) : null,
+                MINING_UNLOCKED(id) ? safe(miningNav(id), null) : null,
                 DELVES_UNLOCKED(id) ? safe(getDelveState(id), null) : null,
                 safe(getChests(id), []),
                 safe(getSpinState(id), null),
@@ -70,7 +70,7 @@ export async function GET(request) {
                 safe(unusedCasts(id), 0),
                 safe(getFeatureClaimCounts(id), {}),
                 safe(getTownTodo(id), null),
-                safe(getFarm(id, id), null),
+                safe(farmNav(id), null),
             ]);
 
         const chestList = Array.isArray(chests) ? chests : (chests?.chests || []);
@@ -84,7 +84,7 @@ export async function GET(request) {
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             mine: {
                 unlocked: Boolean(mining?.unlocked),
-                trips: Number(mining?.trips?.left) || 0,
+                trips: Number(mining?.trips) || 0,
                 partsReady: Number(mining?.partsReady) || 0,
             },
             delves: {
@@ -98,7 +98,7 @@ export async function GET(request) {
             sailing: { attention: Boolean(attention), casts: Number(casts) || 0, forgeable: 0, fishing: fishingUnlocked(id) },
             featureClaims: featureClaims || {},
             townTodo: townTodo || null,
-            farm: { cropsReady: Number(farm?.garden?.readyCount) || 0, petNudge: Number(farm?.petNudge) || 0 },
+            farm: { cropsReady: Number(farm?.cropsReady) || 0, petNudge: Number(farm?.petNudge) || 0 },
         });
     });
 }
