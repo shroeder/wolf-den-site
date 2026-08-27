@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { buyConsumable, featureConsumables, listConsumables, useActiveEffect, useConsumable } from "@/lib/marketplace/consumables.js";
+import { buyConsumable, canBulkUse, featureConsumables, listConsumables, useActiveEffect, useConsumable, useConsumableBulk } from "@/lib/marketplace/consumables.js";
 import { withRequestLogging } from "@/lib/server-logger";
 import { db } from "@/lib/db";
 
@@ -50,6 +50,12 @@ export async function POST(request) {
             // against a closed list, so a body naming anything else gets nothing.
             if (body?.action === "active") {
                 res = await useActiveEffect(buyer.id, String(body?.effect || "").trim());
+            } else if (body?.action === "use_stack") {
+                // The whole stack of an ORDINARY consumable — vials, tokens, strike charges. Distinct from
+                // "use_all" below, which has only ever meant pet food and routes to feedPetBulk. The server
+                // decides what may be spent in bulk (see canBulkUse); a body asking for a targeted or
+                // situational one gets "not_bulkable" rather than a stack burnt on one plot or one voyage.
+                res = await useConsumableBulk(buyer.id, id);
             } else if (body?.action === "use_all") {
                 const { feedPetBulk } = await import("@/lib/marketplace/farm.js");
                 const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);

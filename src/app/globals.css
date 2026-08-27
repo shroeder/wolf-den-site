@@ -21639,6 +21639,12 @@ body.cas-seated .social-fab { display: none; }
     border: 1px solid #fff3c4; box-shadow: 0 2px 0 rgba(0,0,0,0.35); }
 .cshelf-use:not(:disabled):active { transform: translateY(2px); box-shadow: none; }
 .cshelf-use:disabled { opacity: 0.55; cursor: default; }
+/* "Use" and "All N" sit together. The bulk one is deliberately the QUIETER of the two: spending a whole stack
+   is the rarer intent and the irreversible one, so it must not be the button a thumb lands on by accident. */
+.cshelf-acts { display: flex; flex: none; gap: 6px; align-items: center; }
+.cshelf-use.is-all { color: #ffe9a8; background: rgba(255,226,122,0.10);
+    border: 1px solid rgba(255,226,122,0.42); box-shadow: none; }
+.cshelf-use.is-all:not(:disabled):active { transform: translateY(2px); background: rgba(255,226,122,0.18); }
 /* A consumable that needs a target picker it cannot open from here says where it IS spent, rather than
    offering a button that would dead-end. */
 /* The two consumables that need a target picker send you to the screen that has one, rather than offering a

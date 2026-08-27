@@ -154,6 +154,17 @@ export default function ConsumablesClient() {
                                             {busy === `all:${i.id}` ? "Feeding…" : `Use all ${i.count}`}
                                         </button>
                                     ) : null}
+                                    {/* AND THE SAME FOR ORDINARY CONSUMABLES. Pet food had a one-tap stack and
+                                        nothing else did, so eleven vials was eleven taps and eleven requests.
+                                        `bulk` comes from the server's own allow-list (canBulkUse) — the ones
+                                        that need a target or that a stack would WASTE never offer this. */}
+                                    {i.count > 1 && !i.feedable && i.bulk ? (
+                                        <button type="button" className="con-use-all" disabled={busy === `all:${i.id}`}
+                                            title={`Use all ${i.count} in one go`}
+                                            onClick={() => post({ id: i.id, action: "use_stack" }, `all:${i.id}`)}>
+                                            {busy === `all:${i.id}` ? "Using…" : `Use all ${i.count}`}
+                                        </button>
+                                    ) : null}
                                 </div>
                             </div>
                         ))}

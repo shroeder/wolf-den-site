@@ -294,7 +294,9 @@ export async function featureConsumables(buyerId, feature) {
         .map((r) => {
             const c = CONSUMABLES[r.consumable_id];
             return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc,
-                count: Number(r.count) || 0, target: c.target || null };
+                // Whether the shelf may offer "Use all". Decided here, from the same allow-list the POST
+                // enforces, so the button and the door can never disagree about what is bulk-usable.
+                count: Number(r.count) || 0, target: c.target || null, bulk: canBulkUse(r.consumable_id) };
         })
         // Cheapest-feeling first is wrong here; what you want at a glance is the thing you have most of, then
         // by name so the shelf does not reshuffle itself between visits.
@@ -367,7 +369,9 @@ export async function listConsumables(buyerId) {
         // `feedable` drives the stash's "Use all" — read off the EFFECT, the same question feedPetBulk asks,
         // so a food added later is offered here without anyone remembering to update a list of kinds.
         return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, count: r.count,
-            target: c.target || null, feedable: c.effect?.type === "pet_xp" };
+            // `bulk` is the same question for everything that ISN'T pet food, answered by the one allow-list
+            // the POST enforces — so the button and the door cannot disagree.
+            target: c.target || null, feedable: c.effect?.type === "pet_xp", bulk: canBulkUse(r.consumable_id) };
     }).filter(Boolean);
     // The member's charged gear, for the recharge / cooldown-reset target pickers.
     const now = Date.now();
@@ -413,6 +417,64 @@ export async function buyConsumable(buyerId, id) {
 
 // Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the
 // consumable is spent so a bad target never wastes it.
+// ── SPENDING A STACK IN ONE REQUEST ──────────────────────────────────────────────────────────────────────────
+// Drinking eleven vials is eleven taps and, until now, eleven function invocations — the client had no bulk
+// path at all, so the only way to spend a stack was to spend it one at a time. Chests (openChests) and the
+// Forge (combineAllAtTier, salvageAllOfRarity) already do this server-side; this is the same shape for the
+// shelf.
+//
+// IT LOOPS THE SINGLE-ITEM PATH ON PURPOSE, exactly as the Forge does. Summing the effect and applying it once
+// would be fewer queries, but it would be a SECOND implementation of what every consumable does — and some of
+// them grant XP, which pays gold 1:1 unless the caller says otherwise. A bulk path that re-derives the reward
+// is how a money printer gets built. Looping cannot drift: eleven uses here are the same eleven uses the
+// player would have tapped.
+//
+// ── WHICH ONES, AND WHY NOT THE REST ─────────────────────────────────────────────────────────────────────────
+// Only effects that are untargeted and purely additive, where N uses is N times the result and nothing is
+// wasted. Everything else is deliberately excluded rather than left to the client to be careful with:
+//
+//   recharge / reset_cooldown   need a specific item; "all" has no meaning against one target
+//   pet_xp / pet_level          already bulk, via feedPetBulk on the equipped pet (see the route)
+//   farm_fertilizer             lands on a chosen plot
+//   sail_*                      situational one-shots mid-voyage; dumping a stack burns the lot for one leg
+//
+// The allow-list lives HERE and not in the UI, so a client cannot ask for a bulk it was never meant to have.
+export const BULK_USE_CAP = 25;
+const BULK_USABLE = new Set(["xp", "strikes", "damage", "spin_token"]);
+
+/** Is there a sensible "use all" for this consumable? The shelf asks so it can draw the button. */
+export const canBulkUse = (id) => BULK_USABLE.has(CONSUMABLES[id]?.effect?.type);
+
+export async function useConsumableBulk(buyerId, id, { max = BULK_USE_CAP } = {}) {
+    const c = CONSUMABLES[id];
+    if (!buyerId || !c) return { ok: false, error: "unknown" };
+    if (!canBulkUse(id)) return { ok: false, error: "not_bulkable" };
+    const row = await db.queryOne(
+        `SELECT count FROM mkt_user_consumable WHERE buyer_id = $1 AND consumable_id = $2`, [buyerId, id]).catch(() => null);
+    const have = Math.max(0, Number(row?.count) || 0);
+    if (have < 1) return { ok: false, error: "none_owned" };
+
+    const runs = Math.min(have, Math.max(1, max));
+    const lines = [];
+    let used = 0;
+    let remaining = have;
+    for (let i = 0; i < runs; i += 1) {
+        const r = await useConsumable(buyerId, id).catch(() => null);
+        if (!r?.ok) break;   // a refusal mid-stack (capped out, nothing left) stops cleanly and keeps the rest
+        used += 1;
+        remaining = Number.isFinite(r.remaining) ? r.remaining : Math.max(0, remaining - 1);
+        if (r.applied) lines.push(r.applied);
+    }
+    if (!used) return { ok: false, error: "none_applied" };
+    return {
+        ok: true, used, remaining, name: c.name, emoji: c.emoji,
+        // The LAST sentence plus a count, rather than eleven identical lines stacked up the screen.
+        applied: used === 1 ? (lines[0] || "Used.") : `${used} x ${c.name} - ${lines[lines.length - 1] || "used"}`,
+        // Whether anything is left, so the caller knows if the cap stopped it rather than the stack running out.
+        cappedAt: used === max && have > max ? max : null,
+    };
+}
+
 export async function useConsumable(buyerId, id, targetItemId = null, targetPetId = null) {
     const c = CONSUMABLES[id];
     if (!buyerId || !c) return { ok: false, error: "unknown" };

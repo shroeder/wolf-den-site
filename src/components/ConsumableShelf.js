@@ -41,6 +41,29 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
 
     useEffect(() => { load(); }, [load]);
 
+    // ── SPENDING THE STACK IN ONE REQUEST ── (named spendStack, not useStack: in a component file a
+    // `useX` is a hook, and the lint rule is right to say so.) ────────────────────────────────────────────────────────────────
+    // Eleven vials was eleven taps and eleven invocations. The loop lives on the server now (see
+    // useConsumableBulk), which keeps the behaviour identical to tapping eleven times — the same path runs
+    // eleven times, it just runs there. Only offered where the SERVER said the item is bulk-usable.
+    const spendStack = useCallback(async (id) => {
+        setBusy(id);
+        setMsg(null);
+        const r = await fetch("/api/marketplace/consumables", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ id, action: "use_stack" }),
+        }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        setBusy(null);
+        if (d?.ok) {
+            setMsg({ ok: true, text: d.applied || "Used." });
+            await load();
+            onUsed?.();
+        } else {
+            setMsg({ ok: false, text: d?.error === "not_bulkable" ? "That one is used one at a time." : "Could not use those." });
+        }
+    }, [load, onUsed]);
+
     const use = useCallback(async (id) => {
         setBusy(id);
         setMsg(null);
@@ -148,9 +171,18 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
                             ) : c.target ? (
                                 <a className="cshelf-go" href="/marketplace/store">Pick ›</a>
                             ) : (
-                                <button type="button" className="cshelf-use" disabled={busy === c.id} onClick={() => use(c.id)}>
-                                    {busy === c.id ? "…" : "Use"}
-                                </button>
+                                <span className="cshelf-acts">
+                                    <button type="button" className="cshelf-use" disabled={busy === c.id} onClick={() => use(c.id)}>
+                                        {busy === c.id ? "…" : "Use"}
+                                    </button>
+                                    {/* Only when the server says so, and only when there is a stack to spend —
+                                        "Use all" on a single item is the "Use" button with a longer name. */}
+                                    {c.bulk && c.count > 1 ? (
+                                        <button type="button" className="cshelf-use is-all" disabled={busy === c.id} onClick={() => spendStack(c.id)}>
+                                            {busy === c.id ? "…" : `All ${c.count}`}
+                                        </button>
+                                    ) : null}
+                                </span>
                             )}
                         </div>
                     ))}

@@ -63,7 +63,12 @@ export default [
     {
         // API routes are server code with no React in them, but the rule fires on any function called useX —
         // useConsumable, useItem and useCharge are all "use this item", not hooks.
-        files: ["src/app/api/**"],
+        //
+        // src/lib/marketplace is the same story and hit it the same way: useConsumableBulk calls
+        // useConsumable in a loop, which reads to this rule as a hook called conditionally. NOT src/lib
+        // wholesale — tv-mode-client, use-visible-poll and useScrollLock live there and use REAL hooks, so
+        // they keep the rule.
+        files: ["src/app/api/**", "src/lib/marketplace/**"],
         rules: { "react-hooks/rules-of-hooks": "off" },
     },
 ];
