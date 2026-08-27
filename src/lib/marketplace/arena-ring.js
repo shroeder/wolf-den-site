@@ -539,8 +539,11 @@ function castSkill(ring, skill, att, def) {
         bleedDamage: A.bleedDamage, burnDamage: A.burnDamage, burnLeech: A.burnLeech,
         lifesteal: A.lifesteal, grudge: A.grudge, banked: A.banked,
     };
-    if (skill.bleed > 0) A.bleedChance = 1;
-    if (skill.burn > 0) A.burnChance = 1;
+    // A skill's `bleed`/`burn` is a COUNT, and both halves of it matter: it guarantees the proc AND says how
+    // many stacks that proc lays down. Only the guarantee was being read, so Immolate's `burn: 1` and a
+    // hypothetical `burn: 2` were the same thing. One stack per proc unless the skill says more.
+    if (skill.bleed > 0) { A.bleedChance = 1; A.bleedStacks = Math.max(1, Math.round(skill.bleed)); }
+    if (skill.burn > 0) { A.burnChance = 1; A.burnStacks = Math.max(1, Math.round(skill.burn)); }
     if (skill.pierce > 0) A.pierce = Math.min(1, A.pierce + skill.pierce);
     if (skill.soulfire > 0) A.soulfire += skill.soulfire;
     if (skill.bleedDamage > 0) A.bleedDamage += skill.bleedDamage;

@@ -72,26 +72,28 @@ export const HASTE_PER_POINT = 0.005;
 // Three ticks at a fifth of the blow that opened it, and armour never sees a drop of it. It ticks on the
 // BLEEDING fighter's own swings, which is what "three turns" means when there are no turns: three more times
 // they step up to swing, they lose blood first.
-export const BLEED_TICKS = 3;
 export const BLEED_SHARE = 0.20;
 // A burn is a bleed in a different colour: same three ticks, same fifth of the blow, same contempt for armour.
 // Tracked separately so a fighter can be burning AND bleeding, and so the two read differently on screen.
-export const BURN_TICKS = 3;
-// ── STACKING, AND THE CEILING ON IT ──────────────────────────────────────────────────────────────────────────
+// ── STACKING ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Luke, on how these are meant to work: "burn and bleed are supposed to stack and decay. both decay 1 per time
-// they do damage, and they stack based on whatever proced them, it uses the highest damage, so stacking extends
-// the damage and conditionally resets the damage per tick if the damage was higher."
+// they do damage, and they stack based on whatever proced them, it uses the highest damage, so stacking
+// extends the damage and conditionally resets the damage per tick if the damage was higher." And on the rate:
+// "each process adds 1 unless specified otherwise."
 //
-// So a second proc EXTENDS rather than replaces, and the per-tick figure only ever goes UP. Before this, both
-// lines assigned: `burnLeft = BURN_TICKS` reset the timer to three no matter what it was, and `burnPer = ...`
-// overwrote the damage with the new blow's share even when that was smaller. Filmed in a real bout: an
-// Overflow crit of 1166 lit a burn worth ~466 a tick, then an Immolate for 728 REPLACED it with ~291 — the
-// follow-up made the burn weaker, and the counter on screen never moved off 3, so it looked like nothing had
-// happened at all.
+// ONE STACK PER PROC. A skill's `burn`/`bleed` is a COUNT and lays down that many — both halves of a field
+// only half of which was read, because the ring took the guarantee from it and threw the number away. The
+// per-tick figure only ever goes UP: a weaker follow-up extends the timer and cannot dilute it.
 //
-// Each proc adds a full duration rather than a single tick, so the number visibly moves and a second
-// application is worth about what the first was. The cap is three applications' worth.
-export const DOT_MAX_TICKS = BURN_TICKS * 3;
+// Before this, both lines ASSIGNED. `burnLeft = 3` reset the timer whatever it was, and `burnPer` overwrote
+// the damage even when the new blow was smaller. Filmed in a real bout: an Overflow crit of 1166 lit a burn
+// worth ~466 a tick, then an Immolate for 728 REPLACED it with ~291 — the follow-up made the burn WEAKER, and
+// the counter on screen never moved off 3.
+//
+// NO CEILING, and NO FIRST-TURN GRACE, both by decision. Stacking is the whole point of a damage-over-time
+// build and a cap is what makes the tenth proc worth nothing; the `!firstTurn` guard meant a DoT landed on
+// the opener cost them nothing at all. Neither can stall a bout — a DoT only ever shortens one, and it ticks
+// at the START of the victim's turn, so it can kill before they swing.
 export const BURN_SHARE = 0.20;
 // Runic Overflow: every Nth swing of your own is a Surge.
 export const SURGE_EVERY = 5;
@@ -332,6 +334,8 @@ export const COMBAT_FIELDS = [
     "counter", "doublestrike", "lifesteal", "stun", "haste",
     // over time, and what drinks from it
     "bleedChance", "bleedDamage", "bleedLeech", "burnChance", "burnDamage", "burnLeech",
+    // how many stacks one proc lays down — 1 unless a skill says more (Immolate's `burn`, Rend's `bleed`)
+    "burnStacks", "bleedStacks",
     // the Warden's four, plus the ice that answers every blow
     "guardChance", "guardSize", "regen", "thorns", "iceThorns", "grudge",
     // the Runecaller's
@@ -400,6 +404,7 @@ export const sideOf = (f) => ({
         grudge: Math.max(0, Number(f.grudge) || 0),
         // ── THE RUNECALLER'S ───────────────────────────────────────────────────────────────────────────
         burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),
+        burnStacks: Math.max(1, Math.round(Number(f.burnStacks) || 1)),
         burnDamage: Math.max(0, Number(f.burnDamage) || 0),
         burnLeech: Math.max(0, Math.min(1, Number(f.burnLeech) || 0)),
         freeze: Math.max(0, Math.min(1, Number(f.freeze) || 0)),
@@ -419,6 +424,7 @@ export const sideOf = (f) => ({
         // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
         // from an affix.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
+        bleedStacks: Math.max(1, Math.round(Number(f.bleedStacks) || 1)),
         stunned: 0,      // turns this fighter must skip
         bonusTurns: 0,   // turns GRANTED (a haste proc), taken whether or not the roll comes up
         bleedLeft: 0,    // ticks of bleed still owed
@@ -581,15 +587,15 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         // ONE DAMAGE. Filmed on a real bout it is most of the transcript: "You burn — 1", over and over,
         // from blows that did nothing. A wound needs a wound.
         if (dealt > 0 && def.hp > 0 && (cata || (att.burnChance > 0 && rng() < att.burnChance))) {
-            // Extend, and keep the FIERCER fire — see DOT_MAX_TICKS.
-            def.burnLeft = Math.min(DOT_MAX_TICKS, (def.burnLeft || 0) + BURN_TICKS);
+            // Extend, and keep the FIERCER fire — see the note on stacking above.
+            def.burnLeft = (def.burnLeft || 0) + (att.burnStacks || 1);
             def.burnPer = Math.max(Number(def.burnPer) || 0, dealt * (BURN_SHARE + att.burnDamage));
             burned = true;
         }
         if (def.hp > 0 && (cata || (att.freeze > 0 && rng() < att.freeze))) { def.stunned += 1; frozen = true; }
         if (dealt > 0 && att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
             // Same rule as the burn above: a second wound deepens the first rather than replacing it.
-            def.bleedLeft = Math.min(DOT_MAX_TICKS, (def.bleedLeft || 0) + BLEED_TICKS);
+            def.bleedLeft = (def.bleedLeft || 0) + (att.bleedStacks || 1);
             def.bleedPer = Math.max(Number(def.bleedPer) || 0, dealt * (BLEED_SHARE + att.bleedDamage));
             bled = true;
         }
@@ -694,10 +700,24 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
 
         // BLOOD FIRST. The tick lands whether or not they are stunned — a stun stops you swinging, it does
         // not stop you bleeding — and it can kill, which is the whole point of a wound.
-        if (!firstTurn && att.bleedLeft > 0) {
-            const tick = Math.max(1, Math.round(att.bleedPer));
+        if (att.bleedLeft > 0) {
+            // ── A WOUND IS ALL AT ONCE, THEN LESS ────────────────────────────────────────────────────────
+            // Luke: "lets have bleed decay by 1/2 of its stacks every time it ticks, and lets have bleed scale
+            // its damage based on its stack count... you bleed 10 percent of damage dealt and it applies 3
+            // stacks thats 30 percent of damage on first tick, then it decays rounded down, the next tick
+            // would be 10 percent."
+            //
+            // So bleed and burn are deliberately DIFFERENT SHAPES now. Burn is long and level: one stack off
+            // per tick, the same figure each time. Bleed is front-loaded: every stack bleeds at once and then
+            // half of them close, so it hits hardest the moment it lands and fades fast. Stacking bleed buys
+            // a spike; stacking burn buys time.
+            //
+            // `bleedPer` is the PER-STACK share, kept at the highest blow that ever opened the wound — so a
+            // small follow-up adds a stack without diluting what the big one is worth.
+            const tick = Math.max(1, Math.round(att.bleedPer * att.bleedLeft));
             att.hp -= tick;
-            att.bleedLeft -= 1;
+            // Halved and rounded DOWN, so three stacks is two ticks (3 then 1) and one stack is its last.
+            att.bleedLeft = Math.floor(att.bleedLeft / 2);
             // Whoever OPENED the wound drinks from it. The bleeding fighter is the one paying, so the leech
             // belongs to the other side of the ring.
             const cutter = att === A ? B : A;
@@ -708,7 +728,7 @@ export function openTurn({ A, B, att, def, who, log, t, rng = Math.random }) {
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance });
             if (att.hp <= 0) return false;
         }
-        if (!firstTurn && att.burnLeft > 0) {
+        if (att.burnLeft > 0) {
             const tick = Math.max(1, Math.round(att.burnPer));
             att.hp -= tick;
             att.burnLeft -= 1;
