@@ -676,6 +676,21 @@ async function arenaRow(buyerId) {
     return row;
 }
 
+// ── WHAT THE NAV BAR NEEDS, AND NOTHING ELSE ─────────────────────────────────────────────────────────────────
+// GameNav draws an Arena entry with a count on it, and to get those two values it used to call the whole of
+// getArenaState — the board, every rival's kit, the standings, the powers of seventy members — on EVERY
+// navigation anywhere in the game. That one read is 74 database round trips and a 215KB reply, and the nav
+// throws all of it away except `unlocked` and `fightsLeft`.
+//
+// Both come off a single row. `fightsUsed` and `dailyFightsFor` are the same helpers getArenaState itself
+// uses, so the number in the menu cannot drift from the number on the screen.
+export async function arenaNav(buyerId) {
+    if (!buyerId) return { unlocked: false, fightsLeft: 0 };
+    const row = await arenaRow(buyerId);
+    const daily = dailyFightsFor(row);
+    return { unlocked: true, fightsLeft: Math.max(0, daily - fightsUsed(row)), fightsPerDay: daily };
+}
+
 // THE LEADERBOARD — everyone, ordered by Victory Points earned.
 //
 // This used to order by `position`, a rung you SWAPPED with whoever you beat. That is why the top of the

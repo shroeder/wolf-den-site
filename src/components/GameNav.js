@@ -104,124 +104,76 @@ const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${hre
 export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
-    const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
     // The nav's copy of fishingUnlocked, off the sailing status route. Fishing went back under construction on
     // 2026-08-18 while the rework lands, and a nav entry pointing at a page that 404s is worse than no entry.
     // Declared HERE, beside signedIn, for the same reason that one says so: `links` reads both.
-    const [fishingOn, setFishingOn] = useState(false);
     // The Kitchen is owner-gated. The nav asks the server rather than deciding locally, because "am I the owner"
     // isn't something the client knows and shouldn't be something it guesses.
-    const [kitchen, setKitchen] = useState(false);
     // DISHES you could cook right now. Prep recipes are excluded on purpose: a prep makes an ingredient for
     // something else, so badging it would nag you toward busywork rather than toward the thing that pays.
     // The Mine is owner-gated while it's being built. Same contract as the Kitchen: ask the server, never guess,
     // and a non-owner simply has no Mine in the menu with nothing to see.
-    const [mine, setMine] = useState(false);
-    const [mineTrips, setMineTrips] = useState(0);
     // SMELTS COUNT TOO. The badge only ever counted digs, so a member sitting on a full ore stash with no trips
     // left saw a bare Mine entry and no reason to open it — the furnace half of the feature was invisible from
     // the menu. `partsReady` is what the ore would actually smelt INTO (not raw ore), so the number promises
     // something real rather than lighting up for 2 Iron Ore that cannot make a single filing.
-    const [minePartsReady, setMinePartsReady] = useState(0);
+    // ── ONE REQUEST FOR THE WHOLE MENU ───────────────────────────────────────────────────────────────────────
+    // This used to be fourteen fetches, six of them here and eight below, every one re-running on `pathname`.
+    // Walking three screens billed 42 function invocations to draw a menu — and four of those endpoints built
+    // an entire feature's state (the casino floor, the jeweller's bench, the arena board) so that this file
+    // could read one boolean off the reply. /api/marketplace/hud answers all of it at once; see the note there.
+    const [hud, setHud] = useState(null);
     useEffect(() => {
         let dead = false;
-        fetch("/api/marketplace/mining", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => {
-                if (dead || !d?.unlocked) return;
-                setMine(true);
-                setMineTrips(Number(d?.trips?.left) || 0);
-                setMinePartsReady(Number(d?.partsReady) || 0);
-            })
-            .catch(() => { /* no mine, no menu entry */ });
-        return () => { dead = true; };
-    }, [pathname]);
-
-    // The Arena, same contract as the Mine and the Dungeons: ask the server, never guess. A non-owner simply
-    // has no Arena entry while it is still owner-gated.
-    const [arena, setArena] = useState(false);
-    const [arenaFights, setArenaFights] = useState(0);
-    useEffect(() => {
-        let dead = false;
-        fetch("/api/marketplace/arena", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) { setArena(true); setArenaFights(Number(d?.fightsLeft) || 0); } })
-            .catch(() => { /* no arena, no menu entry */ });
-        return () => { dead = true; };
-    }, [pathname]);
-
-    // The Market is PUBLIC, so unlike the Arena and the Mine its menu entry does not wait on a round trip —
-    // THE MARKET FETCH IS GONE with the Market badge (see the note in badgeFor). It existed only to count
-    // other people's open stalls, and it cost a request on every navigation to do it.
-
-    // The Jewelcutter, same contract as everything else under construction: ask the server, never guess. The
-    // endpoint answers { unlocked: false } for anyone off the allow-list, so a non-owner simply has no bench in
-    // their menu — and no jewels either, since the same predicate gates the drops.
-    const [jeweller, setJeweller] = useState(false);
-    useEffect(() => {
-        let dead = false;
-        fetch("/api/marketplace/jeweller", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) setJeweller(true); })
-            .catch(() => { /* no bench, no menu entry */ });
-        return () => { dead = true; };
-    }, [pathname]);
-
-    // The Casino, same contract as the Mine: ask the server, never guess. Its GET answers { open: false } for
-    // anyone off the owner list, so a non-owner simply has no Casino entry — and, until now, no entry for
-    // anybody, because it had never been added here at all.
-    const [casino, setCasino] = useState(false);
-    useEffect(() => {
-        let dead = false;
-        fetch("/api/marketplace/casino", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => { if (!dead && d?.open) setCasino(true); })
-            .catch(() => { /* no floor, no menu entry */ });
-        return () => { dead = true; };
-    }, [pathname]);
-
-    // Delves, same contract as the Mine: ask the server, never guess. A non-owner simply has no Delves entry.
-    const [delves, setDelves] = useState(false);
-    const [delveRuns, setDelveRuns] = useState(0);
-    useEffect(() => {
-        let dead = false;
-        fetch("/api/marketplace/delves", { cache: "no-store", credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) { setDelves(true); setDelveRuns((d?.dungeons || []).filter((x) => x.unlocked && !x.runToday).length); } })
-            .catch(() => { /* no delves, no menu entry */ });
-        return () => { dead = true; };
-    }, [pathname]);
-    // Every failure mode here looks identical to "you're not the owner" — a dropped request, a cached reply from
-    // before you signed in, a blip in the route — and the Kitchen just isn't in the menu, with nothing to see.
-    // So: never cached, and one retry before believing a negative.
-    useEffect(() => {
-        let dead = false;
-        const ask = async (attempt = 0) => {
-            try {
-                const r = await fetch("/api/marketplace/cooking", { cache: "no-store", credentials: "same-origin" });
-                const d = await r.json();
-                if (dead) return;
-                if (d?.unlocked) {
-                    setKitchen(true);
-                    // The dish count that used to ride along here is gone: the Kitchen pill counts claimable
-                    // QUESTS now, not cookable dishes (see badgeFor). This response is still what tells the
-                    // menu the Kitchen exists at all.
-                    return;
-                }
-                // A negative on the first go is retried once — the common cause is the session cookie not being
-                // live yet on a fresh sign-in, and a wrong "no" here is invisible rather than noisy.
-                if (attempt === 0) setTimeout(() => { if (!dead) ask(1); }, 1200);
-            } catch {
-                if (!dead && attempt === 0) setTimeout(() => { if (!dead) ask(1); }, 1200);
-            }
+        // Every failure mode here looks identical to "you are not signed in" — a dropped request, a cached reply
+        // from before you signed in, a blip in the route — and the menu simply has no Kitchen, no Arena and no
+        // Mine in it, with nothing to say so. The cooking fetch used to carry this retry alone; now that one
+        // reply decides the whole strip, it matters fourteen times as much. A wrong "no" costs one more request
+        // a second later, and only ever when the first answer was negative.
+        const load = (attempt = 0) => {
+            fetch("/api/marketplace/hud", { cache: "no-store", credentials: "same-origin" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => {
+                    if (dead) return;
+                    if (d) setHud(d);
+                    if (!d?.signedIn && attempt === 0) setTimeout(() => { if (!dead) load(1); }, 1200);
+                })
+                .catch(() => { if (!dead && attempt === 0) setTimeout(() => { if (!dead) load(1); }, 1200); });
         };
-        ask();
-        // Cooking a dish spends the ingredients, so the badge has to be able to go DOWN without a navigation —
-        // otherwise it sits there insisting on a dish you just made.
-        const onRefresh = () => ask(1); // 1 = don't re-arm the sign-in retry; we already know the answer
+        load();
+        // Cooking a dish spends the ingredients and opening a chest spends the chest, so the badges have to be
+        // able to go DOWN without a navigation — otherwise they sit there insisting on a thing you just did.
+        const onRefresh = () => load(1); // 1 = do not re-arm the sign-in retry; we already know the answer
         window.addEventListener("wolfden-hud-refresh", onRefresh);
         return () => { dead = true; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [pathname]);
+
+    // Everything the strip draws, read off the one reply. These were fourteen pieces of useState fed by
+    // fourteen fetches; nothing here needs to be state, because none of it changes except when `hud` does.
+    const signedIn = Boolean(hud?.signedIn);
+    const fishingOn = Boolean(hud?.sailing?.fishing);
+    const kitchen = Boolean(hud?.kitchen);
+    const mine = Boolean(hud?.mine?.unlocked);
+    const mineTrips = Number(hud?.mine?.trips) || 0;
+    const minePartsReady = Number(hud?.mine?.partsReady) || 0;
+    const arena = Boolean(hud?.arena?.unlocked);
+    const arenaFights = Number(hud?.arena?.fightsLeft) || 0;
+    const jeweller = Boolean(hud?.jeweller);
+    const casino = Boolean(hud?.casino);
+    const delves = Boolean(hud?.delves?.unlocked);
+    const delveRuns = Number(hud?.delves?.runs) || 0;
+    const chests = Number(hud?.chests) || 0;
+    const spins = Number(hud?.spins) || 0;
+    const bossStrikes = Number(hud?.bossStrikes) || 0;
+    const questsReady = Number(hud?.questsReady) || 0;
+    const sailAttn = Boolean(hud?.sailing?.attention);
+    const castsLeft = Number(hud?.sailing?.casts) || 0;
+    const forgeReady = Number(hud?.sailing?.forgeable) || 0;
+    const featureClaims = hud?.featureClaims || {};
+    const townTodo = hud?.townTodo || null;
+    const cropsReady = Number(hud?.farm?.cropsReady) || 0;
+    const petNudge = Number(hud?.farm?.petNudge) || 0;
+
     // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
@@ -261,58 +213,6 @@ export default function GameNav() {
             window.removeEventListener("resize", measure);
             ro?.disconnect();
         };
-    }, [inGame, pathname]);
-
-    const [chests, setChests] = useState(0);
-    const [townTodo, setTownTodo] = useState(null); // { total, quests, well, tavern, event } from the town
-    const [spins, setSpins] = useState(0);
-    const [bossStrikes, setBossStrikes] = useState(0);
-    const [questsReady, setQuestsReady] = useState(0);
-    const [cropsReady, setCropsReady] = useState(0);
-    const [petNudge, setPetNudge] = useState(0); // own pets you can still pet today (free daily reward)
-    const [sailAttn, setSailAttn] = useState(false);
-    const [castsLeft, setCastsLeft] = useState(0); // unthrown fishing casts — nudges people back to the rail
-    const [forgeReady, setForgeReady] = useState(0); // chests the shards in your hold can already forge
-    // ── THE WINDFALL ── one of the four rarest chests, dropped out of ordinary play. Rides on the chest poll
-    // below, so a member finds out on their very next screen without a second request existing anywhere.
-    const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
-    useEffect(() => {
-        if (!inGame) return undefined;
-        let alive = true;
-        const loadChests = () => {
-            fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
-                if (!alive) return;
-                setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
-                // The endpoint CLEARS it as it hands it over, so this arrives exactly once. Nothing here may
-                // drop it on the floor — there is no second chance to show a thing that happens once a year.
-                // The art rides on the payload from the chest-art map itself, not from the owned-chest list —
-                // opening it before the card fires must not cost the card its picture.
-            }).catch(() => {});
-            fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
-            fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
-            fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
-            // The status route has always returned `casts` (and now `forgeable`); this used to read only
-            // `attention`, which quietly made the cast badge below dead code.
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setCastsLeft(d?.casts || 0); setForgeReady(d?.forgeable || 0); setFishingOn(Boolean(d?.fishing)); }).catch(() => {});
-            fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
-            // Town is the one hub whose tasks are invisible from outside it — the pint, a claimable bounty and
-            // the wish all sit behind a door you have to walk through. `todo=1` returns the counts alone rather
-            // than the whole plaza, so the pill costs a small query and not a full town render.
-            fetch("/api/marketplace/town?todo=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.todo) setTownTodo(d.todo); }).catch(() => {});
-        };
-        loadChests();
-        const onRefresh = () => loadChests();
-        window.addEventListener("wolfden-hud-refresh", onRefresh);
-        return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
-    }, [inGame, pathname]);
-    useEffect(() => {
-        if (!inGame) return undefined;
-        let alive = true;
-        const load = () => fetch("/api/marketplace/farm", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setCropsReady(d?.garden?.readyCount || 0); setPetNudge(d?.petNudge || 0); }).catch(() => {});
-        load();
-        const onRefresh = () => load();
-        window.addEventListener("wolfden-hud-refresh", onRefresh);
-        return () => { alive = false; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [inGame, pathname]);
 
     // Robustly pin the background while the full menu is open (overflow:hidden alone leaks scroll on mobile).
