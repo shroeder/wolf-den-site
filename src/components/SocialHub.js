@@ -735,12 +735,32 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     // must not itself cause a render, and it has to survive every poll.
     const didFirstScroll = useRef(false);
 
+    // ── A SILENT ROOM DOES NOT NEED ASKING EVERY TWELVE SECONDS ──────────────────────────────────────────────
+    // /api/marketplace/global-chat was the highest-volume route on the site: 6.1K calls in six hours, which is
+    // this 12s poll running in every open panel whether or not a word had been said. It stays at 12s while
+    // people are talking and stretches to 24s, then 36s, through silence — and snaps back to 12s on the very
+    // first message that arrives, or the moment this member sends one.
+    const quiet = useRef(0);        // consecutive polls that brought nothing new
+    const lastSeenId = useRef(null);
+    const tick = useRef(0);
+
     const load = useCallback(async () => {
         // chrome-fanout: on-demand - runs when the plaza tab is opened
         const r = await fetch(`/api/marketplace/global-chat?channel=${encodeURIComponent(channel)}`, { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.messages) setMessages(d.messages);
         else setMessages((m) => (m === null ? [] : m));
+        // Did anything actually happen? The backoff below reads this — a room nobody is talking in does not
+        // need asking five times a minute, and the plaza is the busiest route on the site precisely because
+        // it was asked that often whether or not there was anything to say.
+        // A SIGNATURE, not just the last id: if the id ever stopped coming down, an id-only check would read
+        // "nothing new" forever and quietly put a busy room on the slowest cadence. Count plus last-message
+        // still changes when somebody speaks, whatever fields the row happens to carry.
+        const list = Array.isArray(d?.messages) ? d.messages : [];
+        const last = list[list.length - 1];
+        const sig = `${list.length}:${last?.id ?? last?.created_at ?? last?.body ?? ""}`;
+        if (sig !== lastSeenId.current) { lastSeenId.current = sig; quiet.current = 0; }
+        else quiet.current += 1;
         // Rides in with the feed rather than taking its own endpoint — see the note on the route.
         if (Array.isArray(d?.roster)) setRoster(d.roster);
         // The rooms this member can see come back with the feed rather than from a second endpoint — the hub
@@ -762,7 +782,14 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     useEffect(() => {
         if (!open) return undefined;
         load();
-        const iv = setInterval(() => { if (document.visibilityState === "visible") load(); }, 12000);
+        const iv = setInterval(() => {
+            if (document.visibilityState !== "visible") return;
+            tick.current += 1;
+            // Skip ticks rather than re-arming a timer, so the visibility gate stays where check:polls can see it.
+            const every = quiet.current >= 25 ? 3 : quiet.current >= 5 ? 2 : 1;
+            if (tick.current % every !== 0) return;
+            load();
+        }, 12000);
         return () => clearInterval(iv);
     }, [open, load]);
 
@@ -794,6 +821,9 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
             body: JSON.stringify({ body, channel }),
         }).catch(() => null);
         if (r && r.ok) {
+            // Sending is talking: the room is live again, so drop straight back to the 12s cadence rather than
+            // leaving the person who just spoke waiting 36s to see a reply.
+            quiet.current = 0; tick.current = 0;
             setInput(""); setNote(""); await load(); scrollToEndIfPinned(endRef, true);
         } else {
             // ── A REFUSED MESSAGE HAS TO SAY SO ──────────────────────────────────────────────────────────
