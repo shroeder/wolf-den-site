@@ -3287,25 +3287,3 @@ function VisitPets({ pets = [], ownerName, petsLeft = 0, petXp = 30, petGold = 8
     );
 }
 
-function HeroCard({ m, onClick }) {
-    const avatar = m.spriteUrl || m.avatarUrl;
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "8px 12px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.1)", background: "linear-gradient(100deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))", color: "inherit", cursor: "pointer", textAlign: "left" }}
-        >
-            <span style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.08)", border: "2px solid rgba(255,215,94,0.55)", display: "grid", placeItems: "center", boxShadow: "0 2px 6px rgba(0,0,0,0.35)" }}>
-                {avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={avatar} alt="" width={46} height={46} style={{ width: 46, height: 46, objectFit: "cover", transform: m.spriteFlip ? "scaleX(-1)" : "none" }} />
-                ) : <span style={{ fontSize: 20 }}>🐾</span>}
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-                <span className="muted" style={{ fontSize: 12 }}>🎨 {m.decoCount} decoration{m.decoCount === 1 ? "" : "s"} · ⭐ {m.ratingCount} rating{m.ratingCount === 1 ? "" : "s"}</span>
-            </span>
-            <span style={{ opacity: 0.45, fontSize: 20, fontWeight: 700 }}>›</span>
-        </button>
-    );
-}

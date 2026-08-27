@@ -58,10 +58,21 @@ export function equipLockReason(item, ctx, metrics = null) {
 
 // ---- Ownership + equipped state + aggregated stats ----
 export async function getEquippedIds(buyerId) {
-    const rows = await db.query(`SELECT slot, item_id FROM mkt_user_equipment WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    const bySlot = {};
-    for (const r of rows) bySlot[r.slot] = r.item_id;
-    return bySlot;
+    // ⚠️ ASKED FOUR TIMES A REQUEST BEFORE THIS CACHE. One getArenaState read ran this exact query four times
+    // for the same member — the kit builder, the stat totals, the board and the bout each asked independently,
+    // and none of them could see that the others already had the answer. It is the same question equip-cache.js
+    // was built for ("what is this member wearing"), which had been wired to the powers set and the attunement
+    // totals but never to the raw slot map underneath them.
+    //
+    // Same contract as the rest of that file: the window only collapses repeats WITHIN a request, and every
+    // path that writes to mkt_user_equipment calls forgetEquipment, so equipping a piece is visible on the very
+    // next read.
+    return equipMemo("ids", buyerId, async () => {
+        const rows = await db.query(`SELECT slot, item_id FROM mkt_user_equipment WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+        const bySlot = {};
+        for (const r of rows) bySlot[r.slot] = r.item_id;
+        return bySlot;
+    });
 }
 
 // ── EVERY PIECE YOU OWN ──────────────────────────────────────────────────────────────────────────────────────
@@ -325,6 +336,7 @@ const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 9
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { equippedPowers, hasPower, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
+import { equipMemo } from "@/lib/marketplace/equip-cache.js";
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,

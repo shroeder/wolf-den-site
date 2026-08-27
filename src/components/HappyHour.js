@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { nudgeFeed } from "@/lib/nudge-feed";
 
 function fmtLeft(secs) {
     if (secs <= 0) return "0m";
@@ -18,13 +19,18 @@ export default function HappyHour({ compact = false }) {
     const [busy, setBusy] = useState(false);
     const [msg, setMsg] = useState(null);
 
-    async function load() {
-        const r = await fetch("/api/marketplace/happy-hour", { cache: "no-store" }).catch(() => null);
-        const d = r?.ok ? await r.json().catch(() => null) : null;
+    // The FIRST read shares the root-layout watchers' reply — HappyHourWatcher is on this page too, asking the
+    // identical question. The refreshes after it have to go to the server: the whole point of the 20s poll is
+    // to watch the pool move as other people donate, and a shared reply from page load cannot show that.
+    async function load(shared = false) {
+        const d = shared
+            ? (await nudgeFeed())?.happyHour || null
+            : await fetch("/api/marketplace/happy-hour", { cache: "no-store" })
+                .then((r) => (r?.ok ? r.json() : null)).catch(() => null);
         if (d) { setSt(d); if (d.active) setSecs(d.endsInSecs || 0); }
     }
     useEffect(() => {
-        load();
+        load(true);
         const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 20000); // reflect the pool as others donate
         return () => clearInterval(t);
     }, []);

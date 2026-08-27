@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
+import { nudgeFeed } from "@/lib/nudge-feed";
 
 // Live stat strip for the game hub: XP + progress to the next unlock, gold, and spin tokens. Best-effort —
 // pulls from the same endpoints the reward nudge + spin wheel use, and self-hides gracefully when signed out.
@@ -14,7 +15,9 @@ export default function GameHubStats() {
         let alive = true;
         (async () => {
             const [u, s] = await Promise.all([
-                fetch("/api/marketplace/next-unlock", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+                // next-unlock already came down with the root-layout watchers on this page load; RewardNudge
+                // is reading the very same reply. See lib/nudge-feed.js.
+                nudgeFeed().then((d) => d?.nextUnlock || null).catch(() => null),
                 fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
             ]);
             if (!alive) return;

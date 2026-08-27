@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { STAT_META } from "@/lib/marketplace/items.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { equipMemo, forgetEquipment } from "@/lib/marketplace/equip-cache.js";
 
 // ── WHAT CHIPS BUY THAT DOES NOT GO AWAY ─────────────────────────────────────────────────────────────────────
 // Luke: "let's allow buying permanent upgrades to core stats... starts at 250, cost goes up by 250 each time,
@@ -125,13 +126,21 @@ export const trackByPerk = (perk) => STAT_TRACKS.find((t) => t.perk === perk) ||
 /** Every perk this member holds, as `{ perk: level }`. Empty object for a signed-out or perk-less member. */
 export async function getCasinoPerks(buyerId) {
     if (!buyerId) return {};
-    const rows = await db.query(
-        `SELECT perk, level FROM mkt_casino_perk WHERE buyer_id = $1 AND level > 0`, [buyerId],
-    ).catch(() => []);
-    const out = {};
-    for (const r of rows) out[r.perk] = Number(r.level) || 0;
-    return out;
+    // Memoised for the same reason getEquippedIds is: one getArenaState read asked this twice and then asked
+    // hasUnlock four more times on top, six round trips for a map that cannot change mid-request. Both writers
+    // are in this file and both call forgetPerks, so buying an unlock is visible on the very next read.
+    return equipMemo("perks", buyerId, async () => {
+        const rows = await db.query(
+            `SELECT perk, level FROM mkt_casino_perk WHERE buyer_id = $1 AND level > 0`, [buyerId],
+        ).catch(() => []);
+        const out = {};
+        for (const r of rows) out[r.perk] = Number(r.level) || 0;
+        return out;
+    });
 }
+
+/** Drop the memoised perk map — called by both writers below. */
+export const forgetPerks = (buyerId) => forgetEquipment(buyerId);
 
 /**
  * Does this member own a one-off unlock?
@@ -141,11 +150,10 @@ export async function getCasinoPerks(buyerId) {
  */
 export async function hasUnlock(buyerId, perk) {
     if (!buyerId || !perk) return false;
-    const row = await db.queryOne(
-        `SELECT 1 FROM mkt_casino_perk WHERE buyer_id = $1 AND perk = $2 AND level > 0 LIMIT 1`,
-        [buyerId, perk],
-    ).catch(() => null);
-    return Boolean(row);
+    // Answered off the one memoised map rather than its own query per perk. This used to be a round trip EACH
+    // TIME a gated feature asked, and a single arena read asks four times.
+    const perks = await getCasinoPerks(buyerId);
+    return (Number(perks?.[perk]) || 0) > 0;
 }
 
 /**
@@ -178,6 +186,7 @@ export async function grantCasinoPerk(buyerId, perk) {
          RETURNING level`,
         [buyerId, perk],
     ).catch(() => null);
+    forgetPerks(buyerId);   // the map just changed; the memo must not outlive it
     if (row) await trackActivity(buyerId, "casino_perk", { perk, level: Number(row.level) }).catch(() => {});
     return row ? Number(row.level) : null;
 }
@@ -189,4 +198,5 @@ export async function revokeCasinoPerk(buyerId, perk) {
           WHERE buyer_id = $1 AND perk = $2`,
         [buyerId, perk],
     ).catch(() => {});
+    forgetPerks(buyerId);   // refunded a level; the memo must not outlive it
 }
