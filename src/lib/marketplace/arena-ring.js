@@ -631,9 +631,23 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         // they were handed is already the whole story.
         if (l.again) l.text = l.text.includes(" — ") ? l.text.replace(" — ", " again — ") : `${l.text} (again)`;
         if (l.crit && l.damage > 0) l.text = l.text.replace(" — ", " — CRIT ");
-        if (l.frozen) l.text += " Frozen solid.";
-        else if (l.burned) l.text += " It catches fire.";
-        else if (l.bled) l.text += " The wound opens.";
+        // ── SAY WHAT LANDED, NOT WHAT WAS ROLLED ─────────────────────────────────────────────────────────
+        // ⚠️ THIS READ `l.frozen`, WHICH IS THE PROC, NOT THE RESULT. `frozen` means the roll came up; whether
+        // the freeze actually took is `hold()`'s answer, and hold REFUSES a bar still inside its six-second
+        // immunity window (see CC_IMMUNE_MS). Refusals were already collected into l.resisted and then read by
+        // nobody, so a freeze the rules had just declined still announced itself as "Frozen solid."
+        //
+        // Luke, playing it: "I also see a message saying he is frozen. I thought, weird, how did I freeze him
+        // again." He had frozen the same opponent the beat before. The game told him he had done a thing the
+        // game had just stopped him doing, which is worse than either outcome on its own.
+        //
+        // AND THESE ARE NO LONGER EXCLUSIVE. A blow that froze AND burned said only "Frozen solid", so the
+        // burn stack ticking up had no sentence anywhere — "he was already at 3x stacks of burn, so I expected
+        // to see that go up from 3, but it stayed at 3." Whether it stacked or not, the line has to say.
+        if (l.frozen && Number(l.freezeMs) > 0) l.text += " Frozen solid.";
+        else if ((l.resisted || []).includes("freeze")) l.text += " The cold does not take — he is still shaking off the last one.";
+        if (l.burned) l.text += " It catches fire.";
+        if (l.bled) l.text += " The wound opens.";
     }
 }
 
