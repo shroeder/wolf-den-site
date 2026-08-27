@@ -262,6 +262,14 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // the geode and the win itself. Stored in multiples, shown in chips.
             recent: (r.winAgain ? r.winAgain.row : (r.meter || []))
                 .map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
+            // ── AND WHAT THE ROW LOOKS LIKE ONCE THE DUST SETTLES ───────────────────────────────
+            // `recent` on a firing spin is the row that was PAID, because the animation lights those
+            // slots before it empties them — so the row the fire leaves behind was never sent, and the
+            // bar sat on the old entries until the next spin replaced them. Luke, having won 401:
+            // "I spun once, and got 401, but it put 113 and 8." Those two were the old row, still on
+            // screen after the payout that consumed them. This is the row AFTER, so the bar can settle
+            // onto it instead of lying about what it is holding.
+            next: (r.meter || []).map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
             cleared: Boolean(r.winAgain),
             fired: r.winAgain ? { total: chipsFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
         } : null,

@@ -24,10 +24,15 @@ const BLOW_MS = 2200;       // the explosion, on top of everything, before the r
 // prop the component does not read is a second opinion about units waiting to disagree with the first.
 export default function WinAgainBar({ meter, firing, onFired }) {
     const slots = meter?.slots || 5;
-    const recent = meter?.recent || [];
     const [lit, setLit] = useState(-1);
     const [total, setTotal] = useState(null);
     const [blown, setBlown] = useState(false);   // the explosion is up
+    // ── AFTER THE EXPLOSION, THE ROW IS WHAT THE FIRE LEFT BEHIND ────────────────────────────────────────
+    // `recent` on a firing spin is the row that was just PAID — the lights walk it and then it is gone. It
+    // used to stay on screen after the blow, so the bar spent the rest of the spin displaying entries that
+    // had already been collected. Luke, having won 401: "I spun once, and got 401, but it put 113 and 8."
+    const rowNow = meter?.recent || [];
+    const recent = blown && meter?.next ? meter.next : rowNow;
     const timers = useRef([]);
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -41,7 +46,7 @@ export default function WinAgainBar({ meter, firing, onFired }) {
         // one is its own beat with its own note, climbing, so five slots sound like a build and not a loop.
         let i = 0;
         const step = () => {
-            if (i >= recent.length) {
+            if (i >= rowNow.length) {
                 // ── AND THEN IT GOES OFF ─────────────────────────────────────────────────────────────
                 // Luke: "if you win it again it needs to pop off and explode to let you know."
                 //

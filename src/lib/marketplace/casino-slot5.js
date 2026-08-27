@@ -1694,7 +1694,31 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
             //
             // It compounds, which is the point and also the cost — see the paytable note; the sweep pays
             // for it.
-            nextMeter = [paid];
+            // ── AND THE SPIN THAT FIRED IT STILL BANKS ITS OWN WIN ──────────────────────
+            // Luke: "I spun once, and got 401, but it put 113 and 8"; then, one spin later, "I got 30 and
+            // it completely removed everything and put 121".
+            //
+            // Both are this line. It was `[paid]` — the row reseeded with the METER's payout and nothing
+            // else, so the reels' own win on a firing spin was computed, named `reelWin`, and then never
+            // used. Measured over 60,000 spins: that happened on all 4,892 fires and threw away 1,404,085
+            // in banked wins, which is MORE than the meter paid out in the same run (777,157). The one
+            // rule this whole feature has — "every time you win an amount, that goes up top" — was off on
+            // exactly the spins a player is paying most attention to.
+            //
+            // From the seat it reads as the machine forgetting the spin you just watched: 280 off the
+            // reels plus 121 from the row is 401 on the counter, and the row comes back holding 121.
+            //
+            // So the top-left is what the SPIN paid off the reels. The gem collection stays out of it,
+            // for the reason on `reelWin`: the row is
+            // drawn the instant the response lands, and a pick'em you have not played yet must not have
+            // its answer sitting above the reels.
+            // It banks THIS SPIN'S OWN WIN, not that win plus the payout. Both fix the bug; the
+            // difference is what it costs. Carrying the payout forward as well compounds — the row is
+            // seeded with everything the spin was worth, so the next fire pays at least that again —
+            // and swept at 250,000 spins it takes The Vault to 111.2% against a floor of 98.6-105.7,
+            // which check:slot5 fails as "one of them is the smart pick". This lands at 101.2%, in the
+            // middle of the pack, with no other cabinet touched.
+            nextMeter = [Math.max(0, reelWin) / bet];
             return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain,
                 meter: nextMeter.slice(0, m.winAgain.slots), total, bet };
         }

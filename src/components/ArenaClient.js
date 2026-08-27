@@ -401,11 +401,23 @@ function TurnTimer({ from, to, ms, foe = false }) {
     // A bar that just emptied must not slide backwards over half a second — it was spent, and the reset is
     // the punctuation that says so.
     const falling = (to?.fill ?? 0) < (from?.fill ?? 0);
+    // ── A FULL BAR IS NOT FILLING ────────────────────────────────────────────────────────────────────────
+    // Luke: "I attack, and it shows my bar as green and 2x but its not my turn?"
+    //
+    // It WAS his turn — that is the whole reason the bar was full. `2x` is a RATE, and once the bar is at
+    // the top the rate has nothing left to describe: it has filled, it is not moving, and the fight is
+    // waiting on this fighter to act. Printing the speed it got there at over a stopped bar reads as a bar
+    // still charging, which is the exact opposite of what a full bar means.
+    //
+    // A hold still wins — a stun or a freeze is the more important thing to say, and neither can be sitting
+    // on a full bar anyway, because a bar that filled gets spent.
+    const ready = !held && (to?.fill ?? from?.fill ?? 0) >= 0.999;
     return (
-        <span className={`ar-timer${state ? ` is-${state}` : ""}${foe ? " is-foe" : ""}`}>
+        <span className={`ar-timer${state ? ` is-${state}` : ""}${ready ? " is-ready" : ""}${foe ? " is-foe" : ""}`}>
             <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, w)) * 100)}%`,
                 transitionDuration: `${falling ? 140 : Math.max(90, ms || 300)}ms` }} />
-            {state ? <b className="ar-timer-word">{TIMER_WORD[state] || ""}</b> : null}
+            {ready ? <b className="ar-timer-word">READY</b>
+                : state ? <b className="ar-timer-word">{TIMER_WORD[state] || ""}</b> : null}
         </span>
     );
 }
@@ -4255,9 +4267,15 @@ function Styles() {
                 text-shadow: 0 1px 3px #000; pointer-events: none; }
 
             /* HASTE — green, and it is the one state that is GOOD, so it also glows. */
+            /* Full, and waiting on whoever owns it. It reads as an arrived bar rather than a fast one —
+               see the note in TurnTimer. It outranks the haste colours below it on source order. */
+            .ar-timer.is-ready { border-color: rgba(255,214,102,.75); box-shadow: 0 0 10px rgba(255,200,80,.4); }
+            .ar-timer.is-ready .ar-timer-word { color: #ffeab0; letter-spacing: .14em; }
             .ar-timer.is-haste { border-color: rgba(96,240,150,.55); box-shadow: 0 0 9px rgba(96,240,150,.35); }
             .ar-timer.is-haste .ar-timer-fill { background: linear-gradient(90deg, #7ef0a8, #2fd47a); }
             .ar-timer.is-haste .ar-timer-word { color: #b6f5cd; }
+            .ar-timer.is-ready.is-haste { border-color: rgba(255,214,102,.75); box-shadow: 0 0 10px rgba(255,200,80,.4); }
+            .ar-timer.is-ready .ar-timer-word { color: #ffeab0; }
 
             /* CHILL — a deeper, duller blue than freeze on purpose. These two are the pair most easily
                confused and they mean different things: this one is a tax, that one is a stop. */
