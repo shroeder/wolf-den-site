@@ -7,9 +7,12 @@ import { withRequestLogging } from "@/lib/server-logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// What the casino floor is actually doing: chips staked against chips paid, per game and per cabinet, plus
-// which bonuses fire, who plays, what leaves through the Counter and every win worth ten times its bet. See
-// casino-report.js — and note that returns are withheld below a sample floor rather than printed as noise.
+// What the casino floor is actually doing, in the two currencies it moves: COIN SPENT and CHIPS WON, never
+// netted against each other. Per game, per cabinet, per member, plus where the chips came from — pay line or
+// bonus — and what leaves through the Counter. Read off the coin and chip ledgers rather than the activity
+// feed, which did not exist for the floor's first five days; see casino-report.js.
+//
+// Tapping a member goes to /api/admin/casino/player for the same numbers one level down.
 // GET ?days=1|7|30. Read-only.
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/admin/casino", async ({ logger, internalError }) => {

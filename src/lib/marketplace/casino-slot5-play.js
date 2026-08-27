@@ -8,6 +8,7 @@ import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { spinSources, splitChips } from "@/lib/marketplace/casino-win-source.js";
 
 // ── PLAYING THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
 // Gold in, chips out, and the gold never comes back. That asymmetry is the whole design (see chips.js), and it
@@ -207,11 +208,18 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // round to zero individually and to one together, and a machine that pays nothing for a three-line win
     // is a machine somebody will rightly call broken.
     const won = chipsFor(stake, r.total / stake);
+    // ── AND WHERE EVERY ONE OF THOSE CHIPS CAME FROM ─────────────────────────────────────────────────────
+    // The ledger used to record the payout and three of the eight places it could have come from, so "was
+    // that a payline or a bonus" had no answer for most wins — see the header of casino-win-source.js. The
+    // split rides on the chip event because that is the row the admin report reads: it is the ledger, it
+    // cannot miss a payout, and it goes back further than casino_play telemetry does.
+    const gold = spinSources(r, stake);
+    const from = splitChips(won, gold);
     let chips = null;
     if (won > 0) {
         chips = await moveChips(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
-            meta: { bet: stake, base: r.base.total / stake, free: r.free ? r.free.total / stake : 0, locked: r.locked ? r.locked.total / stake : 0 },
+            meta: { bet: stake, machine: m.id, forced: Boolean(want), from },
         });
     }
 
@@ -226,7 +234,7 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     await trackActivity(buyerId, "casino_play", {
         game: "slot5", machine: m.id, bet: stake,
         wonChips: won, multiple: Number((r.total / stake).toFixed(3)),
-        features, forced: Boolean(want),
+        features, forced: Boolean(want), from,
     }).catch(() => {});
 
     return {
