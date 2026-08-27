@@ -79,8 +79,44 @@ export const BASE_FILL_MS = 6700;
 // explaining which is which. One function, one rate, named for the thing it paces.
 export const FEROCITY_PER_TEMPO = 100;
 export const BARE_TEMPO = 1;
+
+// ── AND IT IS CLAMPED, WHICH IS THE WHOLE OF "THE NPC KEEPS SWINGING TWICE IN A ROW" ─────────────────────────
+// Luke: "it appears that NPCs are still attacking twice in a row."
+//
+// He was right, and it was not the go-again mechanic — that is already switched off under the timer (see
+// closeTurn in arena-ring.js). It was this line, with no ceiling on it.
+//
+// /100 was sized against MEMBER ferocity, which the note above measures at 20-140 across the forty most active
+// arena members. NPC ferocity is not on that scale at all: it is a gear BUDGET that scales with the rung and
+// keeps going. Measured off npcFor:
+//
+//     rung  40    136 ferocity   tempo 2.10      <- the band this was tuned for
+//     rung  60    525            tempo 6.08
+//     rung 100  7,858            tempo 79.66     <- the rung Luke was fighting
+//     rung 120 30,408            tempo 305.57
+//
+// A bar that fills eighty times faster than yours is not a fast opponent, it is a fight you watch. Simulated
+// at rung 60 against a real member's kit: 52.8% of every turn in the bout was somebody going twice in a row,
+// 570 of them the NPC's, and 330 of those were runs of THREE OR MORE. That is exactly the report.
+//
+// ── THE CEILING IS UNDER TWICE THE FLOOR, ON PURPOSE ─────────────────────────────────────────────────────────
+// Not a round number picked for looking tidy. Both bars are filled to the moment the winner's completes, the
+// winner is emptied, and the loser keeps what it had — so whether a fighter can EVER swing twice in a row is
+// decided by one ratio. Work it through and the fast fighter goes again only when the slow one's rate is under
+// half of theirs. Keep the whole band inside a factor of two and back-to-back turns cannot happen at all,
+// whatever anybody is wearing and however far the ladder inflates above what a member can carry.
+//
+// 2.3 / 1.2 = 1.92. The fast end is untouched (the fastest member measured 2.24); the floor lifts the slowest
+// from 0.84, which costs the bottom of the range some of its spread and buys the guarantee. Ferocity and weapon
+// speed still set where inside the band you sit, and still buy everything else they buy.
+//
+// The bar was elongated to start (see BASE_FILL_MS): this puts the slowest swing at 5.6s and the fastest at
+// 2.9s, against the 8.0s / 3.0s that line was tuned to. Come down on BASE_FILL_MS, not on this.
+export const TEMPO_MIN = 1.2;
+export const TEMPO_MAX = 2.3;
 export const tempoOf = (weaponSpeed = BARE_TEMPO, ferocity = 0) =>
-    Math.max(0.2, (Number(weaponSpeed) || BARE_TEMPO) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_TEMPO);
+    Math.max(TEMPO_MIN, Math.min(TEMPO_MAX,
+        (Number(weaponSpeed) || BARE_TEMPO) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_TEMPO));
 
 // ── THE FOUR WAYS TO INTERFERE WITH A BAR ────────────────────────────────────────────────────────────────────
 // Two of them change the RATE and two of them HOLD it, and that difference is the entire reason a player can

@@ -18,6 +18,7 @@
     "check:guide": "node scripts/check-guide.mjs",
     "check:art": "node scripts/check-image-paths.mjs",
     "check:arena": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-arena.mjs",
+    "check:turn-order": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/arena-turn-order.mjs",
     "check:bout": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-bout-fields.mjs",
     "sim": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-arena.mjs",
     "audit:seeds": "node scripts/audit-seed-rates.mjs",
