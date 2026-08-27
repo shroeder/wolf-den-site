@@ -218,9 +218,25 @@ export async function getMemberMetrics(buyerId) {
     // its own jackpot, `choice` names the wheel bet, and keno stamps how many of the five came up. Note the
     // absence of an import from casino.js — fishing.js already imports THIS file, so reaching the other way
     // would close a cycle. Counting facts the floor wrote down avoids needing to.
+    //
+    // ── AND IT COUNTS EVERY CABINET, BECAUSE A LIST OF THREE ROTS ────────────────────────────────────
+    // GrayKitsune: "The badges dont count gold spent across every activity, it says I've only used 200
+    // gold total."
+    //
+    // He had spent 1,600 over 16 plays; the badge saw 200 over 2. `plays` and `wagered` named three
+    // reasons — the one slot, the wheel and keno — and the floor has grown five more cabinets, blackjack
+    // and bingo since. Across the whole Den at the time of the fix: 36,650 gold counted against 185,561
+    // actually staked, so FOUR FIFTHS of the floor was invisible, and `casino_slot5_bet` alone (the five
+    // new machines, 118,200 gold) was bigger than everything the list knew about put together.
+    //
+    // Matched on the shape of the reason rather than by name, so the next cabinet counts the day it opens
+    // instead of the day somebody remembers this query exists. Every stake on the floor is logged as
+    // `casino_<game>_bet` — see logCoin in casino.js, casino-slot5-play.js, blackjack and bingo — and
+    // nothing else on the floor ends that way. ⚠️ A new cabinet that names its stake anything else is
+    // invisible here again, which is the one thing to check when adding one.
     const casinoRow = await db.queryOne(
-        `SELECT COUNT(*) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet'))::int AS plays,
-                COALESCE(-SUM(delta) FILTER (WHERE reason IN ('casino_slot_bet','casino_wheel_bet','casino_keno_bet')), 0)::bigint AS wagered,
+        `SELECT COUNT(*) FILTER (WHERE reason ~ '_bet$')::int AS plays,
+                COALESCE(-SUM(delta) FILTER (WHERE reason ~ '_bet$'), 0)::bigint AS wagered,
                 COUNT(*) FILTER (WHERE reason = 'casino_slot_win' AND meta->>'jackpot' = 'true')::int AS jackpots,
                 COUNT(*) FILTER (WHERE reason = 'casino_keno_win' AND (meta->>'hits')::int = 5)::int AS perfect
            FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'`,

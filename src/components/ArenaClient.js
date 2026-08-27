@@ -1759,13 +1759,23 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // This fell through to "Strike" for anything with no ability on it, so the big centred
                 // callout announced STRIKE over a burn tick and over "You cannot act." — filmed, four
                 // frames running, on a turn nobody swung. A line that is not a blow says what it is.
+                // ⚠️ THORNS AND A COUNTER ARE ON THIS LIST FOR THE SAME REASON BURN WAS ADDED TO THE ONE
+                // ABOVE. Luke, on a fight he had not swung in yet: "why is my dude so strike strike strike
+                // when I didn't even attack it yet." Three STRIKE callouts over his head on round 2, and
+                // the line under them read "Thorns bite back — 337". A thorn and a counter are lines the
+                // engine deliberately attributes to the fighter who OWNS them and deliberately leaves
+                // without an `ability` (see the note on `answer` in arena-ring.js's narrate — tagging them
+                // with the caster's skill would put their name on your reply). So both fell all the way
+                // through to the swing fallback and were announced as swings he never threw.
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
-                        : last.stunnedSkip ? "Stunned"
-                            : last.chilledSkip ? "Frozen stiff"
-                                : last.fever ? "The pit closes"
-                                    : last.guard ? "Guard up"
-                                        : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
+                        : last.thorns ? "Thorns"
+                            : last.counter ? "Retaliation"
+                                : last.stunnedSkip ? "Stunned"
+                                    : last.chilledSkip ? "Frozen stiff"
+                                        : last.fever ? "The pit closes"
+                                            : last.guard ? "Guard up"
+                                                : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
                 crit,
                 again: Boolean(last.again),
@@ -1786,13 +1796,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const h = {
                 id: headId.current,
                 side: mine ? "you" : "them",
+                // The same list as the clash above, and it has to stay the same list — see the warning there.
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
-                        : last.stunnedSkip ? "Stunned"
-                            : last.chilledSkip ? "Frozen"
-                                : last.fever ? "The pit closes"
-                                    : last.guard ? "Guard up"
-                                        : last.ability || (mine ? "Strike" : "Swing"),
+                        : last.thorns ? "Thorns"
+                            : last.counter ? "Retaliation"
+                                : last.stunnedSkip ? "Stunned"
+                                    : last.chilledSkip ? "Frozen"
+                                        : last.fever ? "The pit closes"
+                                            : last.guard ? "Guard up"
+                                                : last.ability || (mine ? "Strike" : "Swing"),
                 // Louder than a move, and on the same scale as one. These are the things that happen TO a
                 // fighter rather than because of them, which is the whole reason they are called out at all.
                 alert: locked || dot || Boolean(last.again),

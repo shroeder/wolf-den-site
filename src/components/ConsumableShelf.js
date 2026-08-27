@@ -57,7 +57,9 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
             // has been set and the shelf reloaded, so a failed reload still leaves the screen correct.
             if (reloadOnUse) window.location.reload();
         } else {
-            setMsg({ ok: false, text: d?.error === "none_owned" ? "You don't have one of those." : "Couldn't use that." });
+            setMsg({ ok: false, text: d?.error === "none_owned" ? "You don't have one of those."
+                : d?.error === "strikes_capped" ? "You already hold the most bonus strikes a day can (8)."
+                    : "Couldn't use that." });
         }
     }, [load, onUsed, reloadOnUse]);
 

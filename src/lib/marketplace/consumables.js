@@ -567,6 +567,21 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         return { ok: true, remaining: decF.count, name: c.name, emoji: c.emoji, applied: appliedF };
     }
 
+    // ── A POTION THAT CANNOT DO ANYTHING IS NOT SPENT ────────────────────────────────────────────────────
+    // Alyssa: "I got 2 adrenaline vials from the mines and used them but didn't get the extra boss strikes."
+    //
+    // She was right, and nothing was broken: she was already holding 11 strikes' worth against a cap of 8,
+    // so both vials went in, both rows were written, and both were worth exactly zero. Her ledger for that
+    // day — +5, +3, then +3, +2, +2 — is four potions drunk for three strikes. The screen even says which
+    // eight count (see activeBoosts), but it says it AFTER the vial is gone, which is the wrong end.
+    //
+    // Same rule the pet treats above already keep, in the same words: validate BEFORE spending so it is
+    // never wasted. Refused only when it would do NOTHING — a vial that can still land one of its two is
+    // allowed through, because part of a potion is a choice the member can reasonably make.
+    if (e.type === "strikes") {
+        const held = await memberBonusStrikes(buyerId).catch(() => 0);
+        if (held >= MAX_POTION_STRIKES) return { ok: false, error: "strikes_capped" };
+    }
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
     if (!dec) return { ok: false, error: "none_owned" };
     let applied = "";

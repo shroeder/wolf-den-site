@@ -52,6 +52,9 @@ export default function ConsumablesClient() {
             } else {
                 const errs = {
                     not_enough_gold: "Not enough gold.", none_owned: "You don't have any of those.",
+                    // Refused rather than swallowed — see the cap guard in consumables.js. It names the
+                    // number so the answer is "come back tomorrow", not "that did nothing".
+                    strikes_capped: "You're already carrying the most bonus strikes a day can hold (8). Save it for tomorrow.",
                     already_full: "That item's charges are already full.", not_on_cooldown: "That item isn't on cooldown.",
                     bad_target: "Pick a charged item.", target_not_owned: "You don't own that item.",
                     no_pet_equipped: "Equip a pet first — treats feed your active pet.",
