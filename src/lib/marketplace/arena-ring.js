@@ -699,6 +699,35 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
 }
 
 /** The bout fields the rest of the game already reads, rebuilt off a ring. */
+// ── A FIGHT NOBODY IS WATCHING, RESOLVED BY THE RING ANYWAY ──────────────────────────────────────────────────
+// Luke: "when do we use autoBout? Ideally, we don't use that at all."
+//
+// He is right, and the reason is not tidiness. autoBout is a SECOND resolver: it takes turns, it has its own
+// copy of turn order, its own reading of chill, and no bar at all. Every balance projection in the repo —
+// check:road, check:npc, check:sim, check:stat-value, check:passives, sim-pvp — was measured through it,
+// which means every number those printed described a game nobody plays.
+//
+// This is the ring driven headlessly. Both sides choose with housePick, the same AI the defence has always
+// used, so it is the real openRing / act / ringResult path with nobody's thumb on it. Returns autoBout's
+// shape, `swings` and all, so a caller can be moved across a line at a time.
+export function autoRing(me, foe, { rng = Math.random, mySkills = null, foeSkills = null, foeName = null } = {}) {
+    let ring = openRing(me, foe, { rng, foeSkills: foeSkills || foe?.skills || {}, foeName });
+    const deck = mySkills || me?.skills || {};
+    // The ring resolves everything that needs no decision on its own, so this only ever runs on a beat that
+    // is genuinely the player's. The guard is a runaway backstop; RING_BEAT_CAP is what actually ends a
+    // stalemate, and settle() gets there first.
+    for (let guard = 0; guard < 1000 && !ring.over && ring.awaiting === "act"; guard += 1) {
+        const skill = housePick(deck, ring.cd, {
+            selfFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
+            foeFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
+            shield: ring.A.shield, banked: ring.A.banked, maxHp: ring.A.maxHp,
+            bleeding: ring.A.bleedLeft > 0 || ring.A.burnLeft > 0,
+        });
+        ring = act(ring, { skill, rng });
+    }
+    return { ...ringResult(ring), swings: ring.beat };
+}
+
 export function ringResult(ring) {
     return {
         over: ring.over,

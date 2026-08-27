@@ -28,9 +28,15 @@ const classes = readFileSync(join(LIB, "arena-classes.js"), "utf8");
 // arena-engine.js too: the beat's pure arithmetic lives there now so the balance simulator can run the real
 // code, and this check reads the engine as TEXT — so a file it does not open is a mechanic it cannot see.
 // Moving the burn and wound helpers out reported five live nodes as dead until this line was updated.
+// arena-ring.js and arena-atb.js as well, and for the third time the same lesson: a file this does not open
+// is a mechanic it cannot see. Turn order, the timer bar and every status effect that touches it moved into
+// those two, so `extra` (the bar refund, read in closeTurn) and `chill` (applied to the bar in barEffects)
+// both reported as dead nodes while being the most recently rewritten mechanics in the game.
 const engine = readFileSync(join(LIB, "arena.js"), "utf8")
     + readFileSync(join(LIB, "arena-kit.js"), "utf8")
-    + readFileSync(join(LIB, "arena-engine.js"), "utf8");
+    + readFileSync(join(LIB, "arena-engine.js"), "utf8")
+    + readFileSync(join(LIB, "arena-ring.js"), "utf8")
+    + readFileSync(join(LIB, "arena-atb.js"), "utf8");
 // The AI picker rebuilds the one move an opponent is throwing — a THIRD allowlist these flags must survive.
 const picker = readFileSync(join(LIB, "arena-ai.js"), "utf8");
 // The kit AND the class table: a folded stat may be set by classBase() in arena-classes rather than
@@ -95,6 +101,69 @@ function sharedReads(stat) {
     return { mine, theirs };
 }
 
+// ── ⚠️ THE ENGINE STOPPED HAVING A PERK BAG, AND THIS CHECK DID NOT NOTICE ───────────────────────────────────
+// This used to look for `P.<stat>` and `FP.<stat>` — your perks and theirs, spelled out separately on the two
+// sides of every line. That model is gone: `sideOf` now folds every perk ONTO the fighter and the engine reads
+// `att.<stat>` / `def.<stat>`, which is strictly better because the two sides physically cannot drift — the
+// same code runs for whoever is swinging.
+//
+// There are ZERO `P.` and ZERO `FP.` left in arena-engine.js. So this test reported 33 of 36 nodes dead, which
+// is not a finding, it is a broken guard — and the file's own comment eight lines up says what that costs:
+// "a guard that goes red on the fix is worse than no guard, because the next person silences it." It happened
+// again, to the same check, for the same reason.
+//
+// The sidedness tests went with it, deliberately. ATTACKER-ONLY and DEFENDER-ONLY existed to catch the two
+// spellings drifting apart; with one symmetric function there is nothing to drift, and a check that cannot
+// fail is noise.
+//
+// A stat is ALIVE if either is true:
+//   1. the engine reads it off a fighter — `att.x`, `def.x`, `attacker.x`, `defender.x`. NOT `f.x`, which is
+//      the builder reading its own input and would count every stat as read the moment it was declared.
+//   2. the builder FOLDS it into another stat that is itself alive — stunBonus is never read anywhere, it is
+//      added into `stun` inside sideOf, and `stun` is what the engine swings on. Resolved rather than
+//      assumed: find the builder line that consumes it and check the key that line assigns.
+// Naming the identifiers a fighter can be called was the first attempt and it was wrong within a minute:
+// the engine reads `lighter.burnLeech` when a burn drinks, and the ring reads `f.extra` off whichever side is
+// swinging. An allowlist of variable names is a list somebody has to remember to extend — the exact shape of
+// bug this whole file exists to catch. So the test is structural instead.
+//
+// EVERY LINE that assigns something, anywhere in the sources above, with the key it assigns to.
+const LINES = engine.split(String.fromCharCode(10));
+const ASSIGNS = LINES.map((l) => (l.match(/^\s{2,}([a-zA-Z][a-zA-Z0-9]*):\s*(.+)$/) || []).slice(1))
+    .map(([key, expr]) => (key ? { key, expr } : null));
+// The COMBAT_FIELDS allowlist is a list of NAMES, not a use of any of them. Counting it as a read would make
+// every stat alive the moment it was declared, which is precisely the bug.
+const fieldsStart = LINES.findIndex((l) => l.includes("COMBAT_FIELDS = ["));
+const fieldsEnd = fieldsStart < 0 ? -1 : LINES.findIndex((l, i) => i > fieldsStart && l.trim() === "];");
+
+// RULE A — somebody reads `.stat` on a line that is not simply DECLARING that stat. A declaration copies the
+// value onto the fighter and proves nothing; a read is a line that does something with it.
+function directRead(stat) {
+    const re = new RegExp(`\\.${stat}\\b`);
+    for (let i = 0; i < LINES.length; i += 1) {
+        if (fieldsStart >= 0 && i >= fieldsStart && i <= fieldsEnd) continue;
+        if (!re.test(LINES[i])) continue;
+        if (ASSIGNS[i]?.key === stat) continue;     // `stat: ... Number(f.stat) ...` — the fold itself
+        return true;
+    }
+    return false;
+}
+// RULE B — it is FOLDED into another stat, and that one is alive. stunBonus is never read anywhere; it is
+// added into `stun` inside the builder, and `stun` is what the engine swings on. armorPct is the same shape
+// one file over, multiplied into `armor` by the kit. Resolved rather than assumed: follow the key.
+function aliveStat(stat, seen = new Set()) {
+    if (seen.has(stat)) return false;          // a fold that points at itself is not a read
+    seen.add(stat);
+    if (directRead(stat)) return true;
+    const re = new RegExp(`\\.${stat}\\b`);
+    for (let i = 0; i < LINES.length; i += 1) {
+        const a = ASSIGNS[i];
+        if (!a || a.key === stat || !re.test(a.expr)) continue;
+        if (aliveStat(a.key, seen)) return true;
+    }
+    return false;
+}
+
 const problems = [];
 const seenStat = new Set();
 
@@ -124,11 +193,9 @@ for (const n of nodes) {
     seenStat.add(n.stat);
 
     if (!FOLDED.has(n.stat)) {
-        const mine = new RegExp(`P\\.${n.stat}\\b`).test(engine) || sharedReads(n.stat).mine;
-        const theirs = new RegExp(`FP\\.${n.stat}\\b`).test(engine) || sharedReads(n.stat).theirs;
-        if (!mine && !theirs) problems.push(`DEAD PASSIVE      ${n.id} (${n.name}) — "${n.stat}" is read nowhere in the engine`);
-        else if (!mine) problems.push(`DEFENDER-ONLY     ${n.id} (${n.name}) — "${n.stat}" is read as FP.${n.stat} but never as P.${n.stat}`);
-        else if (!theirs) problems.push(`ATTACKER-ONLY     ${n.id} (${n.name}) — "${n.stat}" is read as P.${n.stat} but never as FP.${n.stat}`);
+        if (!aliveStat(n.stat)) {
+            problems.push(`DEAD PASSIVE      ${n.id} (${n.name}) — "${n.stat}" is read nowhere in the engine`);
+        }
     } else if (!new RegExp(`\\b${n.stat}\\b`).test(kit)) {
         problems.push(`DEAD PASSIVE      ${n.id} (${n.name}) — "${n.stat}" is folded by the kit, but the kit never mentions it`);
     }

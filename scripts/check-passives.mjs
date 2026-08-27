@@ -18,7 +18,10 @@
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-passives.mjs [member]
 import { CLASSES, treeFor } from "../src/lib/marketplace/arena-classes.js";
-import { autoBout } from "../src/lib/marketplace/arena-engine.js";
+// THE RING, NOT the old turn-based resolver. This used to measure through the second engine — the
+// one nobody plays any more — so a node could read as idle because that resolver ignores it while
+// the game pays it out every fight, or the reverse. autoRing drives the real openRing/act path.
+import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { db } from "../src/lib/db.js";
 
 const WHO = process.argv[2] || "The Wolf Den";
@@ -50,10 +53,27 @@ const seeded = (n) => () => { n = (n * 1664525 + 1013904223) % 4294967296; retur
 // AND IT HAS TO GET THROUGH THE ARMOUR. Mitigation is FLAT, so a partner swinging for less than the fighter's
 // armour deals literally 1 — the baseline took no damage at all and every defensive node in three trees read
 // as doing nothing. The partner's blow is floored well above the armour it is walking into.
+// ── ⚠️ AND IT HAS TO GET A TURN, WHICH UNDER THE RING IT DID NOT ─────────────────────────────────────────────
+// Every note above was written against the old turn-based resolver, where turn order alternated and a partner
+// with any damage at all was guaranteed to use it. The ring hands turns to whoever's BAR FILLS FIRST, and this
+// partner had no tempo — so it defaulted to 1.0 against a real member's 1.9 and simply never acted.
+//
+// Measured with Luke's own kit: 24 fights, 24 wins, 268 swings, and ONE point of damage taken in total. The
+// baseline was untouchable, so "anything that keeps you alive shows immediately" had nothing to show. That is
+// the whole reason Exsanguinate, Immolate, Chill and Aether Ward reported idle — all four are defensive or
+// sustain, all four move a real fight, and none of them can move one the fighter was never in danger of
+// losing.
+//
+// So the partner is built to KEEP PACE now. Its bar runs as fast as the fighter's, which is what makes the
+// twelve-swings-to-kill promise above true again rather than aspirational.
 const sparringFor = (me) => ({
     damage: Math.max(1, Math.round(Math.max((Number(me.health) || 1000) / 12, (Number(me.armor) || 0) * 3))),
-    health: Math.max(1, Math.round((Number(me.damage) || 100) * 20)),
+    // Sized off what the fighter actually PUTS OUT per swing rather than off its damage stat: crits and
+    // doublestrike roughly double it, so x20 was buying about ten swings, not twenty.
+    health: Math.max(1, Math.round((Number(me.damage) || 100) * 40)),
     critChance: 0.15, critMult: 1.6, armor: 0, speed: 1,
+    // THE LINE THAT WAS MISSING. Without it the partner is a spectator.
+    tempo: Math.max(0.2, Number(me.tempo) || 1),
     pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.2, blockReduction: 0.35,
 });
 
@@ -61,7 +81,7 @@ const sparringFor = (me) => ({
 function fingerprint(me, foe) {
     let dealt = 0, taken = 0, swings = 0, wins = 0;
     for (let s = 1; s <= 24; s += 1) {
-        const r = autoBout(me, { ...foe }, { rng: seeded(s * 7919) });
+        const r = autoRing(me, { ...foe }, { rng: seeded(s * 7919) });
         swings += r.swings;
         wins += r.won ? 1 : 0;
         dealt += (r.foeMaxHp - r.foeHp);
@@ -74,7 +94,21 @@ const baseKit = await kitFor(who.id, { skillTree: {} });
 // One partner for the whole run, built off the UNSPENT fighter, so every node is measured against the
 // same opponent rather than one that grew with it.
 const SPARRING = sparringFor(baseKit);
-const baseFp = fingerprint(baseKit, SPARRING);
+
+// ── ⚠️ ONE DIFFICULTY IS NOT ENOUGH, AND FOUR LIVE NODES PAID FOR THAT ───────────────────────────────────────
+// The partner above is deliberately built to WIN, so anything that keeps you alive shows up. It does its job
+// for mitigation and it is blind to SUSTAIN: against an opponent that kills you every single time, a node that
+// heals you a share of a bleed tick moves the fight by less than the swing you die on, so `wins`, `swings`,
+// `dealt` and `taken` all come back byte-identical and the node reads as idle.
+//
+// Exsanguinate, Immolate, Chill and Aether Ward were all reported dead by exactly that. Measured directly
+// against a survivable opponent, every one of them moves the fight — Chill at 0.5 turns 0 wins in 40 into 34.
+//
+// So a node has to be invisible at BOTH ends to count as idle: an opponent you cannot beat, and one you can.
+// A single verdict from a single difficulty is a coin toss about which half of the tree it can see.
+const EASIER = { ...SPARRING, damage: Math.max(1, Math.round(SPARRING.damage * 0.55)) };
+const fp2 = (kit) => `${fingerprint(kit, SPARRING)}#${fingerprint(kit, EASIER)}`;
+const baseFp = fp2(baseKit);
 
 let broken = 0;
 let total = 0;
@@ -90,7 +124,7 @@ for (const cls of CLASSES) {
         if (partner) spend[partner] = treeFor(cls.id).find((n) => n.id === partner).ranks;
         const kit = await kitFor(who.id, { skillTree: spend, classId: cls.id });
         const against = partner
-            ? fingerprint(await kitFor(who.id, { skillTree: { [partner]: spend[partner] }, classId: cls.id }), SPARRING)
+            ? fp2(await kitFor(who.id, { skillTree: { [partner]: spend[partner] }, classId: cls.id }))
             : baseFp;
         // 1. what did the node move on the character?
         const moved = [];
@@ -101,7 +135,7 @@ for (const cls of CLASSES) {
             if (a !== b) moved.push(`${k} ${a}->${b}`);
         }
         // 2. did the fight change?
-        const fp = fingerprint(kit, SPARRING);
+        const fp = fp2(kit);
         const fought = fp !== against;
         const ok = moved.length > 0 && fought;
         if (!ok) broken += 1;

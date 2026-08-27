@@ -41,7 +41,7 @@ import {
 import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
-import { arenaRating, autoBout, fighterFields } from "@/lib/marketplace/arena-engine.js";
+import { arenaRating, fighterFields } from "@/lib/marketplace/arena-engine.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
@@ -128,8 +128,8 @@ export const COMBAT_OPEN = true;
 //
 // A bout opened BEFORE this flip has no ring and is not playable. It still works — `playable()` refuses it
 // and the screen plays it back as the transcript it always was.
-export const INTERACTIVE = true;
-export const interactiveFor = (buyerId) => INTERACTIVE || isOwner(buyerId);
+// `INTERACTIVE` / `interactiveFor` are gone with the auto-resolver they chose between — a flag pinned true is
+// a gate to the next person who reads it. Every bout opens a ring.
 // ── AND WHETHER THIS FIGHT GETS A TIMER BAR ──────────────────────────────────────────────────────────────────
 // `atbFor` is gone with the classic ring. Every bout is a timer bout — see the note at the top of
 // arena-atb.js about why the gate was deleted rather than pinned to true.
@@ -1468,7 +1468,7 @@ const TOWN_EDGE = 2;
 // A member id, as opposed to `ladder:12` or `town:<enemy>`. Used where a value is about to meet a uuid column.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {}, interactive = false } = {}) {
+function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {} } = {}) {
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
         myPower, theirPower, npcTier, size,
@@ -1596,8 +1596,15 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
     // back. Both go through the same three functions in arena-engine, so the two cannot disagree about what
     // a swing is — that is the whole reason the ring was built on top of the auto-resolver rather than beside
     // it.
-    if (interactive) openBoutRing(bout);
-    else resolveAuto(bout);
+    // ── AND IT IS ALWAYS THE RING ────────────────────────────────────────────────────────────────────────
+    // Luke: "when do we use autoBout? Ideally, we don't use that at all."
+    //
+    // In production it was already never — `interactiveFor` was `INTERACTIVE || isOwner(buyerId)` with
+    // INTERACTIVE pinned true, and all three buildBout callers passed it, so `resolveAuto` had been dead code
+    // wearing a live-looking branch. Both are gone: a second resolver that nothing calls is worse than no
+    // second resolver, because every balance script in the repo was still measuring through it and reporting
+    // numbers about a game nobody plays. See autoRing in arena-ring.js for the headless driver those use now.
+    openBoutRing(bout);
     return bout;
 }
 
@@ -1649,19 +1656,6 @@ function syncRing(b) {
     return b;
 }
 
-// Run the fight and write the result onto the bout. `log` is the play-by-play the screen animates.
-function resolveAuto(b) {
-    const r = autoBout(b.me, b.foe);
-    b.log = r.log;
-    b.beat = r.swings;
-    b.hp = Math.max(0, r.hp);
-    b.foeHp = Math.max(0, r.foeHp);
-    b.over = true;
-    b.won = r.won;
-    b.unresolved = Boolean(r.unresolved);
-    b.duration = r.time;
-    return b;
-}
 
 /**
  * FIGHT A TOWN RAIDER ON THE ARENA ENGINE.
@@ -1710,7 +1704,6 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
-        interactive: interactiveFor(buyerId),
         // `townEdge` is stamped alongside the rider so a bout can say whether it has already been scaled —
         // see the repair in resolveBeat, which is what rescues the fights that were open when this shipped.
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
@@ -1761,7 +1754,6 @@ export async function startFishingBout(buyerId, monsterId) {
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
-        interactive: interactiveFor(buyerId),
     });
     await saveBout(buyerId, b);
     // The whole state, for the reason this function's own comment gives above and startTownBout's does too:
@@ -1905,7 +1897,6 @@ export async function startBout(buyerId, targetId = null) {
     const bout = buildBout(me, foe, foeKit, {
         npcTier, size: board.length, myPower,
         extra: rung > 0 ? { ladder: { rung } } : {},
-        interactive: interactiveFor(buyerId),
     });
     // The counter moves for an arena fight and stands still for a rung — the other half of the rule above.
     // Both columns are left completely alone on a Road bout: bumping `fights_day` while holding the count
