@@ -87,7 +87,7 @@ export default function FightInput({ bout, busy, onAct, hold = false }) {
                    not, because the absence has to be as clear as the presence. */
                 .fin-lab.is-mine span { color: #ffd75e; text-shadow: 0 0 10px rgba(255,215,94,.45); }
                 .fin-lab.is-mine em { color: #cbb27a; }
-                .fin-lab.is-mine span::before { content: "B8"; margin-right: 5px; display: inline-block;
+                .fin-lab.is-mine span::before { content: "▸"; margin-right: 5px; display: inline-block;
                     animation: finNudge 1.1s ease-in-out infinite; }
                 @keyframes finNudge { 0%, 100% { transform: translateX(0); opacity: .75; }
                     50% { transform: translateX(2px); opacity: 1; } }

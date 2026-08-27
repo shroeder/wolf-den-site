@@ -617,13 +617,6 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
             <span className="ar-shadow" aria-hidden="true" />
-            {/* ── WHICH ONE IS ME ──────────────────────────────────────────────────────────────────────────
-                Both fighters are gold-and-green painted knights, and at phone size in a real bout the only
-                thing separating them is which side they stand on and a small name over a bar at the top of
-                the screen. Asked as a player watching an unfamiliar opponent: "which one am I?" — and the
-                honest answer was "count the bars". A quiet permanent tag under your own feet answers it
-                without competing with anything that only appears when something happens. */}
-            {!foe ? <b className="ar-mine-tag" aria-hidden="true">YOU</b> : null}
             {/* ── HASTE ── the glow goes BEHIND the body (z-index below .ar-hero) so it reads as light coming
                 off them rather than a film over the sprite, and the motes drift up out of the same place. */}
             {hasted ? (
@@ -4000,10 +3993,6 @@ function Styles() {
             /* ON the fighter, not under it: hung below the sprite these fell off the bottom of the frame
                and the one that matters most -- FROZEN -- was the one you could not see. Burning sits at the
                feet, ice a row above it, because a fighter can be both at once. */
-            /* Sits clear of the permanent YOU tag below it. */
-            .ar-mine-tag { position: absolute; left: 50%; bottom: 1%; transform: translateX(-50%);
-                z-index: 8; font-size: 8px; font-weight: 900; letter-spacing: .22em; font-style: normal;
-                color: rgba(255,215,94,.62); text-shadow: 0 1px 3px rgba(0,0,0,.9); pointer-events: none; }
             /* ── A STATE THAT COSTS YOU TURNS HAS TO BE LOUDER THAN 9.5px ─────────────────────────────────
                "Why did I lose a turn?" is the question FROZEN answers, and it was answering it in the
                smallest text on the screen, at the bottom of a fighter, while numbers three times its size
