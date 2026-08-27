@@ -173,6 +173,15 @@ export function drinkFor(b, amount, rate, side = "me") {
 //
 // Naming, preserved from the engine and worth knowing: `b.bleed` is the BURN on them and `b.gash` is the
 // wound; `b.foeBleed` and `b.foeGash` are the two on you.
+// ⚠️ SIMULATOR ONLY — THE GAME DOES NOT RUN THIS BURN.
+// Its only caller is counterBlow(), whose only callers are scripts/sim-arena.mjs and scripts/lib/sim-harness.mjs.
+// Nothing the ring executes touches it. The live burn is in throwBlows: a share of the BLOW that lit it, one
+// stack per proc, ticking at the START of the victim's turn. This one is a share of MAX HEALTH with its own
+// stack and turn caps, and it is the model `npm run sim` measures.
+//
+// That divergence has already cost real work: the arena info card quoted REND_PER_TURN at players for months,
+// so the game taught this burn and ran the other one, and a careful retune of REND_PER_TURN on 2026-08-15
+// moved a number the live game never reads. Do not tune burn from `npm run sim` output.
 export function lightBurn(b, onFoe, perks = {}) {
     const maxHp = onFoe ? b.foeMaxHp : b.maxHp;
     const track = onFoe ? b.bleed : b.foeBleed;

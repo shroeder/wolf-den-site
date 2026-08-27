@@ -24,6 +24,13 @@
 //
 // Usage:  node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-arena.mjs [runs]
 //         npm run sim
+// ⚠️  THIS SIMULATES THE PRE-RING ENGINE, NOT THE FIGHT PLAYERS GET.
+// It drives counterBlow/lightBurn/openWound directly. The live game resolves every bout through
+// arena-ring.js, whose burn and bleed are a share of the BLOW that landed them, one stack per proc,
+// ticking at the start of the victim's turn. lightBurn here is a share of MAX HEALTH with stack and turn
+// caps of its own. The two models disagree, so a damage-over-time figure out of this file is about a game
+// nobody plays. For anything the ring actually does, use scripts/check-class-balance.mjs or autoRing.
+
 import { CLASSES, classBase, treeAbilities, treeEffects, treeFor } from "../src/lib/marketplace/arena-classes.js";
 import {
     accuracyFromFerocity, BLEED_TURNS, DRAIN_SHARE, FEAST_SHARE, FREE_KINDS, guardSoakFrom, healthFrom,
