@@ -22,7 +22,10 @@ import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
-import { BATTLE_ITEMS, BIND_CUT, BLEED_PER_TURN, DOOM_MULT, DREAD_CUT, REND_PER_TURN, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS, BIND_CUT, DOOM_MULT, DREAD_CUT, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
+// The live damage-over-time shares, from the engine that actually runs them — NOT arena-kit's REND_PER_TURN
+// and BLEED_PER_TURN, which feed lightBurn() and are read by the simulator alone.
+import { BLEED_SHARE, BURN_SHARE } from "@/lib/marketplace/arena-engine.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -293,7 +296,13 @@ const pct = (n) => `${Number((n * 100).toFixed(1))}%`;
 const STATUS_KINDS = {
     // The old icon was a marshmallow on a stick; at 12px it read as a slice of toast.
     burn:    { Icon: GiFlame,          label: "Burning",        tone: "fire",
-               what: () => `Takes ${pct(REND_PER_TURN)} of max health at the end of every turn. Stacks.` },
+               // ⚠️ THIS DESCRIBED A BURN THE GAME DOES NOT RUN. It quoted REND_PER_TURN — "4.5% of max health"
+               // — which belongs to lightBurn(), whose only caller is counterBlow(), whose only callers are
+               // scripts/sim-arena.mjs and the sim harness. So the card taught the SIMULATOR's burn to every
+               // player: wrong source (max health, not the blow), wrong timing (end of turn, not the start of
+               // theirs), and it was the only place claiming it stacks, which is why Luke counted stacks that
+               // were never there. What the live engine actually does is below.
+               what: () => `Takes ${pct(BURN_SHARE)} of the blow that lit it, at the START of each of their turns. Stacks: a new one extends it and keeps the fiercer tick.` },
     sunder:  { Icon: GiCrackedShield, label: "Guard stripped", tone: "bad",
                what: () => `${pct(SUNDER_CUT)} of their damage reduction is gone while it lasts.` },
     dread:   { Icon: GiTerror,        label: "Dread",          tone: "bad",
@@ -315,7 +324,7 @@ const STATUS_KINDS = {
     // "Ragged Cut" told you that you were on fire. Its own track, its own colour, and it says the one thing
     // that makes it different from a burn.
     bleed:   { Icon: GiDroplets,      label: "Bleeding",       tone: "blood",
-               what: () => `Takes ${pct(BLEED_PER_TURN)} of max health every turn, and it goes STRAIGHT to health — a guard does not stop it. Stacks.` },
+               what: () => `Takes ${pct(BLEED_SHARE)} of the blow that opened it at the start of each of their turns, STRAIGHT to health — a guard does not stop it. Stacks: a new one extends it and keeps the deeper tick.` },
     frozen:  { Icon: GiIciclesAura,       label: "Frozen",         tone: "ice",
                what: () => "Solid. The next turn is lost — the beat passes without an action." },
     noguard: { Icon: GiCrackedShield, label: "Guard shattered", tone: "ice",

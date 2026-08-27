@@ -77,6 +77,21 @@ export const BLEED_SHARE = 0.20;
 // A burn is a bleed in a different colour: same three ticks, same fifth of the blow, same contempt for armour.
 // Tracked separately so a fighter can be burning AND bleeding, and so the two read differently on screen.
 export const BURN_TICKS = 3;
+// ── STACKING, AND THE CEILING ON IT ──────────────────────────────────────────────────────────────────────────
+// Luke, on how these are meant to work: "burn and bleed are supposed to stack and decay. both decay 1 per time
+// they do damage, and they stack based on whatever proced them, it uses the highest damage, so stacking extends
+// the damage and conditionally resets the damage per tick if the damage was higher."
+//
+// So a second proc EXTENDS rather than replaces, and the per-tick figure only ever goes UP. Before this, both
+// lines assigned: `burnLeft = BURN_TICKS` reset the timer to three no matter what it was, and `burnPer = ...`
+// overwrote the damage with the new blow's share even when that was smaller. Filmed in a real bout: an
+// Overflow crit of 1166 lit a burn worth ~466 a tick, then an Immolate for 728 REPLACED it with ~291 — the
+// follow-up made the burn weaker, and the counter on screen never moved off 3, so it looked like nothing had
+// happened at all.
+//
+// Each proc adds a full duration rather than a single tick, so the number visibly moves and a second
+// application is worth about what the first was. The cap is three applications' worth.
+export const DOT_MAX_TICKS = BURN_TICKS * 3;
 export const BURN_SHARE = 0.20;
 // Runic Overflow: every Nth swing of your own is a Surge.
 export const SURGE_EVERY = 5;
@@ -566,14 +581,16 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         // ONE DAMAGE. Filmed on a real bout it is most of the transcript: "You burn — 1", over and over,
         // from blows that did nothing. A wound needs a wound.
         if (dealt > 0 && def.hp > 0 && (cata || (att.burnChance > 0 && rng() < att.burnChance))) {
-            def.burnLeft = BURN_TICKS;
-            def.burnPer = dealt * (BURN_SHARE + att.burnDamage);
+            // Extend, and keep the FIERCER fire — see DOT_MAX_TICKS.
+            def.burnLeft = Math.min(DOT_MAX_TICKS, (def.burnLeft || 0) + BURN_TICKS);
+            def.burnPer = Math.max(Number(def.burnPer) || 0, dealt * (BURN_SHARE + att.burnDamage));
             burned = true;
         }
         if (def.hp > 0 && (cata || (att.freeze > 0 && rng() < att.freeze))) { def.stunned += 1; frozen = true; }
         if (dealt > 0 && att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
-            def.bleedLeft = BLEED_TICKS;
-            def.bleedPer = dealt * (BLEED_SHARE + att.bleedDamage);
+            // Same rule as the burn above: a second wound deepens the first rather than replacing it.
+            def.bleedLeft = Math.min(DOT_MAX_TICKS, (def.bleedLeft || 0) + BLEED_TICKS);
+            def.bleedPer = Math.max(Number(def.bleedPer) || 0, dealt * (BLEED_SHARE + att.bleedDamage));
             bled = true;
         }
         log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
