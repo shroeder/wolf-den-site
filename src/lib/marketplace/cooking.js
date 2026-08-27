@@ -113,11 +113,21 @@ export const trackCost = (lvl) => 400 * (Number(lvl) + 1) * (Number(lvl) + 1);
 //
 // So: the ladder is the reward, timing is the climb, and the tier bump on a flawless run moves you to the NEXT
 // ladder entirely. Order matters in these arrays — index 0 is the consolation, the last entry is the prize.
+//
+// ── AND SEEDS ARE NOT ON FOUR OF THESE LADDERS ANY MORE ──────────────────────────────────────────────────────
+// Luke: "these seeds should not ever be a reward for cooking unless it's the secret tier and top execution."
+//
+// They sat at INDEX 0 of tiers 1 through 4 — the consolation rung — so the kitchen's answer to a fumbled cook
+// was farm seeds, every single time, at every tier anybody can reach. The farm's rarity curve is the thing
+// that pays for: a Star Fruit is a mythic crop with a 43-hour grow, and tier 4 handed one over for cooking
+// badly. Four ladders' worth of failure was quietly the best seed source in the game.
+//
+// Now the only seed the kitchen pays is a Star Fruit, on the Master's ladder, at the very top — which needs
+// the Master's Book to reach at all, a flawless cook to climb, and the jackpot roll on top of that.
 export const TIERS = [
     {
         tier: 1, name: "Simple", color: "#cfd8e3",
         rewards: [
-            { kind: "seed", pool: ["wheat", "carrot", "potato"], min: 2, max: 3 },
             { kind: "gold", min: 90, max: 160 },
             { kind: "parts", partTier: 1, min: 2, max: 4 },
             { kind: "consumable", id: "farm_pet_whistle" },
@@ -129,7 +139,6 @@ export const TIERS = [
     {
         tier: 2, name: "Hearty", color: "#7ec8ff",
         rewards: [
-            { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 },
             { kind: "gold", min: 220, max: 380 },
             { kind: "parts", partTier: 2, min: 2, max: 4 },
             { kind: "consumable", id: "scroll_wisdom" },
@@ -141,7 +150,6 @@ export const TIERS = [
     {
         tier: 3, name: "Fine", color: "#c9a2ff",
         rewards: [
-            { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 1, max: 2 },
             { kind: "gold", min: 240, max: 400 },
             { kind: "parts", partTier: 3, min: 2, max: 4 },
             { kind: "consumable", id: "treat_toy" },
@@ -153,10 +161,6 @@ export const TIERS = [
     {
         tier: 4, name: "Exquisite", color: "#ffd75e",
         rewards: [
-            // ONE, and only as the consolation rung. Seeds sit at index 0 of every ladder, so this is what a BAD
-            // cook pays out — handing over 2-3 mythic seeds for a fumbled run undercut the farm's whole
-            // rarity curve, which is the one place starfruit is supposed to be hard to come by.
-            { kind: "seed", pool: ["starfruit"], min: 1, max: 1 },
             { kind: "gold", min: 420, max: 680 },
             { kind: "parts", partTier: 4, min: 2, max: 3 },
             { kind: "consumable", id: "treat_feast" },
@@ -204,6 +208,12 @@ export const TIERS = [
             { kind: "spin", n: 3 },
             { kind: "chest", chestTier: "mythic" },
             { kind: "chest", chestTier: "ascendant" },
+            // ── THE ONLY SEED THE KITCHEN PAYS ───────────────────────────────────────────────────────────
+            // Last rung of the last ladder, which is the hardest thing to reach in cooking: tier 6 needs the
+            // Master's Book before a pot is even lit, the top of a ladder needs a flawless run, and the top
+            // band needs the jackpot roll after that. A Star Fruit is the farm's mythic crop and this is the
+            // one place outside the farm it comes from — which is what makes it worth the chain.
+            { kind: "seed", pool: ["starfruit"], min: 1, max: 1 },
         ],
     },
 ];
@@ -295,7 +305,8 @@ export function rewardLabel(r, art = {}) {
 //
 // Luke: "cooking needs to get solved. its just far too rewarding. I really love cooking though and how
 // rewarding it is." Both of those have to survive, so this does not touch the minigame, the XP, or the middle
-// of the ladder. A good cook still pays gold, parts, seeds, treats — every rung it always did.
+// of the ladder. A good cook still pays gold, parts, treats and chests — every rung it always did. (Seeds are
+// no longer among them below tier 6; see the note on TIERS.)
 //
 // What changes is that the JACKPOT BAND — the top rungs, where the mythic chest and the spins live — becomes
 // a CHANCE you become eligible for rather than a thing you are owed. Cook badly and you cannot reach it at
