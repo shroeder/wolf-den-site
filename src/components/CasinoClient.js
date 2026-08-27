@@ -575,14 +575,26 @@ export default function CasinoClient({ initial }) {
     //
     // A position push is worth sending when the position changed. `sentRef` holds what the server was last
     // told, so a still player sends nothing at all and a walking one still reads as live to the room.
+    // ⚠️ AND A HEARTBEAT, BECAUSE PRESENCE EXPIRES. casinoOccupants only returns people whose row is newer
+    // than `NOW() - INTERVAL '90 seconds'`. Suppressing the unchanged push entirely meant a member standing
+    // still at a machine stopped refreshing updated_at and DISAPPEARED FROM THE FLOOR for everybody else
+    // after a minute and a half — they could see the room, the room could not see them.
+    //
+    // So: send when the position changed, or when it has been long enough that the row is about to go stale.
+    // 45s is half the window, which survives one dropped request. A still player goes from 1,440 posts an
+    // hour to 80, which is the saving that mattered, without falling out of the room.
+    const HEARTBEAT_MS = 45000;
     const sentRef = useRef(null);
+    const sentAtRef = useRef(0);
     useEffect(() => {
         const id = setInterval(() => {
             if (document.visibilityState !== "visible") return;
             const at = Math.round(xRef.current);
             const key = `${at}:${facing}`;
-            if (sentRef.current === key) return;    // standing still — the room already knows where you are
+            const now = Date.now();
+            if (sentRef.current === key && now - sentAtRef.current < HEARTBEAT_MS) return;
             sentRef.current = key;
+            sentAtRef.current = now;
             casPost({ action: "move", x: xRef.current, y: 72, facing });
         }, 2500);
         return () => clearInterval(id);

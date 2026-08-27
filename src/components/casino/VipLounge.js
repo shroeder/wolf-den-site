@@ -203,14 +203,26 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
     // The move half only fires when there IS a move — same rule as the floor. The room read stays on the
     // timer because other people move whether or not you do, but a still player has stopped sending two
     // requests every tick to say nothing has changed.
+    // ⚠️ AND A HEARTBEAT, BECAUSE PRESENCE EXPIRES. casinoOccupants only returns people whose row is newer
+    // than `NOW() - INTERVAL '90 seconds'`. Suppressing the unchanged push entirely meant a member standing
+    // still at a machine stopped refreshing updated_at and DISAPPEARED FROM THE FLOOR for everybody else
+    // after a minute and a half — they could see the room, the room could not see them.
+    //
+    // So: send when the position changed, or when it has been long enough that the row is about to go stale.
+    // 45s is half the window, which survives one dropped request. A still player goes from 1,440 posts an
+    // hour to 80, which is the saving that mattered, without falling out of the room.
+    const HEARTBEAT_MS = 45000;
     const sentRef = useRef(null);
+    const sentAtRef = useRef(0);
     useEffect(() => {
         const id = setInterval(async () => {
             if (document.visibilityState !== "visible") return;
             const at = Math.round(xRef.current);
             const key = `${at}:${facing}`;
-            if (sentRef.current !== key) {
+            const now = Date.now();
+            if (sentRef.current !== key || now - sentAtRef.current >= HEARTBEAT_MS) {
                 sentRef.current = key;
+                sentAtRef.current = now;
                 const r = await POST({ action: "vip_move", x: xRef.current, y: 72, facing });
                 if (r?.ok === false) return;
             }
