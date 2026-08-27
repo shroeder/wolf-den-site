@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useVisiblePoll } from "@/lib/use-visible-poll";
+import { nudgeFeed, refreshNudges } from "@/lib/nudge-feed";
 
 // ── YOU EARNED A BADGE ───────────────────────────────────────────────────────────────────────────────────────
 //
@@ -19,9 +20,10 @@ export default function BadgePop() {
     const [badge, setBadge] = useState(null);
     const [closing, setClosing] = useState(false);
 
-    const load = useCallback(() => fetch("/api/marketplace/badge-pop", { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (d?.badge) setBadge(d.badge); })
+    // Shared with the other three root-layout watchers — see lib/nudge-feed.js. The POST that marks the badge
+    // seen stays below, because acknowledging is this component's job and the read is not.
+    const load = useCallback(() => nudgeFeed()
+        .then((d) => { if (d?.badge?.badge) setBadge(d.badge.badge); })
         .catch(() => {}), []);
 
     // ── IT ONLY ASKED ONCE, ON MOUNT ─────────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ export default function BadgePop() {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ slug }),
         }).catch(() => {});
+        refreshNudges(); // the server's answer just changed; the shared reply must not outlive it
         setTimeout(() => {
             setBadge(null);
             setClosing(false);

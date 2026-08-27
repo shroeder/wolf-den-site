@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { nudgeFeed } from "@/lib/nudge-feed";
 
 // Site-wide "Happy Hour is LIVE!" announcement. The moment an event is active, EVERY signed-in member gets a
 // juicy gold modal explaining the ×N XP/gold surge + a recap of who chipped in to summon it. Shows once per
@@ -20,8 +21,7 @@ export default function HappyHourWatcher() {
     useEffect(() => {
         let alive = true;
         const check = async () => {
-            const r = await fetch("/api/marketplace/happy-hour", { cache: "no-store" }).catch(() => null);
-            const d = r?.ok ? await r.json().catch(() => null) : null;
+            const d = (await nudgeFeed())?.happyHour || null;
             if (!alive || !d?.active || !d.id) return;
             let seen = null;
             try { seen = localStorage.getItem(SEEN_KEY); } catch { /* private mode */ }

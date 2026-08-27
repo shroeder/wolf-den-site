@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { nudgeFeed, refreshNudges } from "@/lib/nudge-feed";
 
 // ── "YOU FOUND A RECIPE" ─────────────────────────────────────────────────────────────────────────────────────
 // Mounted site-wide, because a recipe can drop from roughly eighteen places — a harvest, a cast, any chest, the
@@ -45,8 +46,9 @@ export default function RecipeFoundWatcher() {
         if (busyRef.current) return;
         busyRef.current = true;
         try {
-            const r = await fetch("/api/marketplace/recipe-found", { cache: "no-store", credentials: "same-origin" }).catch(() => null);
-            const d = r?.ok ? await r.json().catch(() => null) : null;
+            // The read rides the shared feed with the other three watchers; the acknowledgement below is
+            // still this component's own POST, because only it knows which cards it actually showed.
+            const d = (await nudgeFeed())?.recipes || null;
             const fresh = (d?.pending || []).filter((x) => x?.id && !seenRef.current.has(x.id));
             if (!fresh.length) return;
             for (const x of fresh) seenRef.current.add(x.id);
@@ -55,6 +57,7 @@ export default function RecipeFoundWatcher() {
                 method: "POST", headers: { "content-type": "application/json" },
                 body: JSON.stringify({ ids: fresh.map((x) => x.id) }),
             }).catch(() => {});
+            refreshNudges(); // acknowledged; the shared reply must not hand these back
             setQueue((q) => [...q, ...fresh]);
             setShown(true);
             chime();

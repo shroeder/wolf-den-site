@@ -60,7 +60,8 @@
     "check:feel": "node scripts/check-feel.mjs",
     "check:classes": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-class-balance.mjs",
     "check:vercel": "node scripts/check-vercel-json.mjs",
-    "check:polls": "node scripts/check-polls.mjs"
+    "check:polls": "node scripts/check-polls.mjs",
+    "check:chrome": "node scripts/check-chrome-fanout.mjs"
   },
   "keywords": [],
   "author": "",

@@ -73,6 +73,7 @@ function Thread({ thread, onActivity }) {
     const didFirstScroll = useRef(false);
 
     const load = useCallback(async () => {
+        // chrome-fanout: on-demand - runs when a thread is opened, not on page load
         const r = await fetch(`/api/marketplace/dm/${thread.id}`, { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         const t = d?.thread;
@@ -301,12 +302,14 @@ export default function SocialHub() {
     }, [pathname]);
 
     const loadInbox = useCallback(async () => {
+        // chrome-fanout: on-demand — runs when the dock is opened, not on page load
         const r = await fetch("/api/marketplace/inbox", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         setInbox(d?.items || []);
     }, []);
 
     const loadFriends = useCallback(async () => {
+        // chrome-fanout: on-demand — runs when the dock is opened, not on page load
         const r = await fetch("/api/marketplace/friends", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         setFriends(d || { friends: [], incoming: [], outgoing: [] });
@@ -324,6 +327,7 @@ export default function SocialHub() {
         if (!open || tab !== "discover") return undefined;
         const q = discoverQ.trim();
         const t = setTimeout(async () => {
+            // chrome-fanout: on-demand - runs as somebody types in Discover
             const r = await fetch(`/api/marketplace/members?q=${encodeURIComponent(q)}`, { cache: "no-store" }).catch(() => null);
             const d = r && r.ok ? await r.json().catch(() => null) : null;
             setDiscover(d?.members || []);
@@ -732,6 +736,7 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     const didFirstScroll = useRef(false);
 
     const load = useCallback(async () => {
+        // chrome-fanout: on-demand - runs when the plaza tab is opened
         const r = await fetch(`/api/marketplace/global-chat?channel=${encodeURIComponent(channel)}`, { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
         if (d?.messages) setMessages(d.messages);

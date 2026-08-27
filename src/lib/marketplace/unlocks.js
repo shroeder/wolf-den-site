@@ -56,3 +56,23 @@ export function showcaseTrack() {
     }));
     return { spine, unlockedUnlockable: 0, totalUnlockable: allUnlocks().length };
 }
+
+// ── THE NEXT-UNLOCK STRIP, AS A FUNCTION ─────────────────────────────────────────────────────────────────────
+// Lifted out of /api/marketplace/next-unlock so the batched nudge feed can serve the same body without a second
+// copy of the rules. The route still answers on its own — this is the shared definition of what it says, not a
+// second one.
+export async function nextUnlockPayload(buyerId) {
+    if (!buyerId) return { authed: false };
+    const { db } = await import("@/lib/db");
+    const { levelForXp } = await import("@/lib/marketplace/xp.js");
+    const row = await db.queryOne(`SELECT xp, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const xp = Math.max(0, Math.floor(Number(row?.xp) || 0));
+    const gold = Math.max(0, Math.floor(Number(row?.gold) || 0));
+    const lv = levelForXp(xp);
+    const level = lv.level;
+    const next = nextUnlock(level);
+    const pct = Math.round(lv.progress * 100);
+    const xpToGo = lv.xpToNext;
+    if (!next) return { authed: true, maxed: true, xp, gold, level, pct, xpToGo };
+    return { authed: true, xp, gold, level, icon: next.icon, label: next.label, unlockLevel: next.level, xpToGo, pct };
+}

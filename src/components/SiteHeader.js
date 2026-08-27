@@ -78,6 +78,7 @@ export default function SiteHeader() {
             setCartEnabled(true);
 
             try {
+                // chrome-fanout: on-demand — behind NEXT_PUBLIC_PAYMENTS_ENABLED, which is off
                 const response = await fetch("/api/shop/cart", { cache: "no-store" }).catch(() => null);
                 const payload = response ? await response.json().catch(() => null) : null;
 
@@ -88,6 +89,7 @@ export default function SiteHeader() {
 
                 setCartCount(Number(payload.itemCount || 0));
 
+                // chrome-fanout: on-demand — behind NEXT_PUBLIC_PAYMENTS_ENABLED, which is off
                 const authResponse = await fetch("/api/shop/auth", { cache: "no-store" }).catch(() => null);
                 const authPayload = authResponse ? await authResponse.json().catch(() => null) : null;
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { nudgeFeed } from "@/lib/nudge-feed";
 
 // A slim, site-wide "next unlock" strip for signed-in members — the always-on engagement carrot. Shows
 // the next reward + a progress bar + XP to go, linking to the full rewards track. Renders nothing for
@@ -16,8 +17,8 @@ export default function RewardNudge() {
         let alive = true;
         let toastTimer = null;
         const load = async () => {
-            const r = await fetch("/api/marketplace/next-unlock", { cache: "no-store" }).catch(() => null);
-            const d = r && r.ok ? await r.json().catch(() => null) : null;
+            // Shared with the other three root-layout watchers — one request between them. See lib/nudge-feed.js.
+            const d = (await nudgeFeed())?.nextUnlock || null;
             if (!alive) return;
             setData(d);
             // XP-gain toast: compare this load's total XP to what we last saw on this device.

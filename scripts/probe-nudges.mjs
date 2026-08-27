@@ -1,0 +1,13 @@
+import { db } from "../src/lib/db.js";
+const who = await db.queryOne(`SELECT id FROM mkt_buyer WHERE display_name = 'The Wolf Den'`);
+const { nextUnlockPayload } = await import("../src/lib/marketplace/unlocks.js");
+const { getHappyHourState } = await import("../src/lib/marketplace/happy-hour-core.js");
+const { pendingRecipeReveals } = await import("../src/lib/marketplace/cooking.js");
+const { pendingBadge } = await import("../src/lib/marketplace/badge-pop.js");
+console.log();
+console.log("  nextUnlockPayload:", JSON.stringify(await nextUnlockPayload(who.id)));
+console.log("  happyHour        :", JSON.stringify(await getHappyHourState(who.id)).slice(0, 110));
+console.log("  recipes pending  :", (await pendingRecipeReveals(who.id)).length);
+console.log("  badge pending    :", JSON.stringify(await pendingBadge(who.id)));
+console.log("  signed-out       :", JSON.stringify(await nextUnlockPayload(null)));
+console.log();
