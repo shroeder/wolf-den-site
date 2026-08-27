@@ -83,15 +83,24 @@ export async function petOwnerCounts(petIds = []) {
     // reported 0 for it — and the panel reads `owners <= 1` as "the only one in the Den", so a Bunny that
     // every member at level 2 already owns would have been announced as the rarest thing on the farm. The
     // count for those is simply how many members are at or past that level.
-    // At most three ids reach here (one per cushion), so a query each is cheaper than the SQL to fuse them.
-    for (const id of ids) {
-        const def = collectibleById(id);
-        if (!def || def.source !== "level") continue;
-        const r = await db.queryOne(
-            `SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE COALESCE(xp, 0) >= $1`, [xpForLevel(def.level)]
-        ).catch(() => null);
-        // Granted rows and level-unlocks can overlap, so take whichever is larger rather than summing.
-        out[id] = Math.max(out[id] || 0, Number(r?.n) || 0);
+    // ── ⚠️ "AT MOST THREE IDS REACH HERE" WAS NOT TRUE ───────────────────────────────────────────────────
+    // That is what this comment used to say, and on it rested "so a query each is cheaper than the SQL to
+    // fuse them". `ids` is whatever the stand is holding, not one per cushion: counted against a real farm,
+    // ONE getFarm ran this exact COUNT twelve times. Twelve TLS handshakes to ask twelve variations of a
+    // question about a table with about thirty rows in it.
+    //
+    // The whole membership's XP is one small read, and the counting is a comparison. One round trip however
+    // many level pets are on the stand, and it cannot go back to twelve when somebody adds a fourth cushion.
+    const levelIds = ids.filter((id) => collectibleById(id)?.source === "level");
+    if (levelIds.length) {
+        const xps = await db.query(`SELECT COALESCE(xp, 0) AS xp FROM mkt_buyer`).catch(() => []);
+        const all = (xps || []).map((r) => Number(r.xp) || 0);
+        for (const id of levelIds) {
+            const need = xpForLevel(collectibleById(id).level);
+            const n = all.reduce((acc, xp) => acc + (xp >= need ? 1 : 0), 0);
+            // Granted rows and level-unlocks can overlap, so take whichever is larger rather than summing.
+            out[id] = Math.max(out[id] || 0, n);
+        }
     }
     return out;
 }
