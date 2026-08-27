@@ -62,10 +62,8 @@ for (const src of everythingSrc) {
 // here with the reason, rather than deleted, exempted silently, or left to make this gate red forever.
 // An entry without a reason is not an entry. Empty this list, do not grow it.
 const KNOWN_ORPHANS = {
-    SpriteFx: "Wired up by 30181d7b (2026-08-15, 'the arena's painted VFX render now') and unwired the SAME DAY "
-        + "by 78242120, a burn-damage fix whose message never mentions VFX — so the arena's seventeen effect "
-        + "frames have not drawn since. Restore the import and the <SpriteFx> render in ArenaClient, then FILM "
-        + "it (scripts/film.mjs) before calling it fixed.",
+    // Empty, and it should stay that way. SpriteFx lived here for exactly as long as it took to restore the
+    // wiring 78242120 removed; an exemption that outlives its bug is just a gate with a hole in it.
 };
 
 for (const file of componentFiles) {
