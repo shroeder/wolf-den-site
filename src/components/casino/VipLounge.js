@@ -200,11 +200,20 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
     // Seven of the app's other nine polls already gate on `visibilityState`; this one and the casino floor's
     // were the two that never did. Five seconds rather than three as well: the silhouettes behind the rope
     // are ambience, and nobody has ever noticed a person arriving two seconds late.
+    // The move half only fires when there IS a move — same rule as the floor. The room read stays on the
+    // timer because other people move whether or not you do, but a still player has stopped sending two
+    // requests every tick to say nothing has changed.
+    const sentRef = useRef(null);
     useEffect(() => {
         const id = setInterval(async () => {
             if (document.visibilityState !== "visible") return;
-            const r = await POST({ action: "vip_move", x: xRef.current, y: 72, facing });
-            if (r?.ok === false) return;
+            const at = Math.round(xRef.current);
+            const key = `${at}:${facing}`;
+            if (sentRef.current !== key) {
+                sentRef.current = key;
+                const r = await POST({ action: "vip_move", x: xRef.current, y: 72, facing });
+                if (r?.ok === false) return;
+            }
             const s = await POST({ action: "vip_state" });
             if (s?.open) setSt(s);
         }, 5000);

@@ -567,8 +567,22 @@ export default function CasinoClient({ initial }) {
     // Your position is local and immediate — the walk must never wait on a round trip — and pushed to the
     // server on a timer so the other people in the room see you move. The same shape the tavern uses.
     useEffect(() => { xRef.current = x; }, [x]);
+    // ── ⚠️ AND IT ONLY TELLS THE SERVER WHEN THERE IS SOMETHING TO TELL ──────────────────────────────────────
+    // This fired every 2.5 seconds unconditionally: not gated on the tab being visible, and — the expensive
+    // half — not gated on having MOVED. A member standing perfectly still at a machine posted their unchanged
+    // position 1,440 times an hour, and a member who wandered off with the tab open kept doing it all night.
+    // The casino was the second-highest route by invocations days after it opened, and this is why.
+    //
+    // A position push is worth sending when the position changed. `sentRef` holds what the server was last
+    // told, so a still player sends nothing at all and a walking one still reads as live to the room.
+    const sentRef = useRef(null);
     useEffect(() => {
         const id = setInterval(() => {
+            if (document.visibilityState !== "visible") return;
+            const at = Math.round(xRef.current);
+            const key = `${at}:${facing}`;
+            if (sentRef.current === key) return;    // standing still — the room already knows where you are
+            sentRef.current = key;
             casPost({ action: "move", x: xRef.current, y: 72, facing });
         }, 2500);
         return () => clearInterval(id);

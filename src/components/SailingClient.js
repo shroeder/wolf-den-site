@@ -426,6 +426,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // Clock + arrival detection: when the voyage timer crosses arrival, fire the chime + Land-ho celebration.
     useEffect(() => {
         const id = setInterval(() => {
+            // Nothing in here is worth doing for a tab nobody is looking at: the clock repaint is invisible,
+            // the arrival sting would play to an empty room, and the halfway refetch is a REQUEST. On return
+            // the very next tick catches all three up — the server resolved the encounter without us.
+            if (document.visibilityState !== "visible") return;
             setNow(Date.now());
             const s = stateRef.current;
             if (s.status === "sailing" && s.arrivesAt && Date.now() >= s.arrivesAt && !arrivedRef.current) {
