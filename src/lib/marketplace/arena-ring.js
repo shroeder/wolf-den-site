@@ -75,21 +75,27 @@ function barEffects(ring, from) {
         // Freeze is checked first and wins: they are the same shape and it is the longer of the two, so a blow
         // that landed both should read as the bigger one. How LONG is the defender's problem but the
         // attacker's doing — see freezeMsFor.
-        // ── A LOCK MAY NOT LAND ON A LOCKED FIGHTER ──────────────────────────────────────────────────
-        // NOT an "x in a row" rule — those are all gone, and turn order is the bars and nothing else. This is
-        // the STACKING rule castSkill has always kept in its own words: "a lock that renews itself is not a
-        // control effect, it is the end of the fight." The cast path checked it; the rolled proc never did,
-        // so a fighter with a high freeze chance could re-hold a bar that was already held, forever.
-        //
-        // check:arena caught it the moment the counting rules came out: its bully (90% freeze, 60% chill)
-        // took FIVE beats before the member's first, and every one of them was the same freeze renewing
-        // itself. The beat somebody spends frozen is also the beat they are immune.
-        const locked = ring.now < (defender.holdUntil || 0);
-        if (L.frozen && !locked) { const ms = freezeMsFor(att); hold(defender, ring.now, "freeze", ms); L.freezeMs = ms; }
-        else if (L.stunned && !locked) hold(defender, ring.now, "stun", STUN_HOLD_MS);
+        // ── EVERY CONTROL EFFECT ASKS, AND MAY BE TOLD NO ────────────────────────────────────────────
+        // `hold` and `chill` own the answer now — see CC_IMMUNE_MS. They refuse a kind this bar is still
+        // shaking off and report it, so the line only claims an effect that actually landed. That one rule
+        // replaced the ad-hoc "a lock may not land on a locked bar" check AND the counting rules before it:
+        // the beat you spend frozen plus six seconds after is the beat you cannot be frozen again.
+        const resisted = [];
+        if (L.frozen) {
+            const ms = freezeMsFor(att);
+            if (hold(defender, ring.now, "freeze", ms)) L.freezeMs = ms;
+            else resisted.push("freeze");
+        } else if (L.stunned) {
+            if (!hold(defender, ring.now, "stun", STUN_HOLD_MS)) resisted.push("stun");
+        }
         if (L.hasted || L.wild === "haste") haste(attacker, ring.now);
         // A blow can carry cold in its own right — the Chill stat off the tree. The magnitude is the stat.
-        if (att.chill > 0 && def.hp > 0) { chill(defender, ring.now, att.chill); L.chilled = att.chill; }
+        if (att.chill > 0 && def.hp > 0) {
+            if (chill(defender, ring.now, att.chill)) L.chilled = att.chill;
+            else resisted.push("chill");
+        }
+        // Named on the line, because a blow that lands no ice must not read as one that silently failed.
+        if (resisted.length) L.resisted = resisted;
     }
     // ── WHAT THE CAST ASKED FOR ──────────────────────────────────────────────────────────────────────────
     const fx = ring.castFx;
@@ -486,17 +492,18 @@ function castSkill(ring, skill, att, def) {
     // ── A FREEZE CANNOT BE STACKED ON A FROZEN FIGHTER ───────────────────────────────────────────────────────
     // Rimebind mirrored won 100% of bouts for whoever opened: freeze them, they lose the beat, freeze them
     // again before they ever act. A lock that renews itself is not a control effect, it is the end of the
-    // fight. So a freeze only lands on somebody who is currently able to act — the beat they spend frozen is
-    // also the beat they are immune. Under the timer "currently frozen" is a bar that is being held.
-    const theirBar = side === "me" ? ring.atb?.foe : ring.atb?.me;
-    const alreadyHeld = Boolean(theirBar && ring.now < (theirBar.holdUntil || 0));
+    // fight.
+    //
+    // The check is no longer HERE. `hold` refuses a kind the target is still shaking off and says so, which
+    // covers this case and the five others it did not — a rolled proc, a second caster, a stun following a
+    // freeze. One rule, at the point of application. See CC_IMMUNE_MS.
     // `skill.freeze` is a COUNT of beats in the old vocabulary — 1 from Rimebind, 2 with Hold Fast. It scales
     // the length the caster's class and tree have earned rather than setting it, so a Runecaller's second beat
     // of ice is worth more than a Reaver's, which is the whole point of freezeMsFor.
     // ⚠️ The cap is applied AFTER the multiply, not inside freezeMsFor. Hold Fast doubles the length, and a
     // full Frostbite Runecaller doubled comes to 5.6 seconds — nearly two of their opponent's swings, which is
     // the lockout the immunity rule exists to prevent. FREEZE_MS_CAP is the ceiling on what actually lands.
-    if (skill.freeze > 0 && !alreadyHeld) {
+    if (skill.freeze > 0) {
         fx.freezeMs = Math.min(FREEZE_MS_CAP, freezeMsFor(A) * Math.max(1, Math.round(skill.freeze)));
     }
     // The magnitude IS the number on the card now. No 0.6 clamp: see CHILL_RATE_FLOOR for the only floor left.
@@ -582,7 +589,14 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         if (skill && l.who === by && !answer) l.ability = skill.name;
         // Only on the mover's own line — a thorn or a counter is YOUR reply, and it is not the thing the
         // clock handed them.
-        if (again && l.who === by && !answer) l.again = true;
+        //
+        // ⚠️ AND ONLY ON A LINE SOMEBODY CHOSE. Luke: "why does bleeding say go again, and why is it twice?"
+        // `again` marks the beat that was handed to you — under the timer, a refunded bar. narrate tags every
+        // line in the beat's range with it, and openTurn pushes the wound and burn ticks into that same range,
+        // so a bleed you were standing there taking came out as "BLEEDING · goes again" and did it once per
+        // tick. A tick is not a turn: it happens TO you and nobody was handed anything.
+        const passive = Boolean(l.bleedTick || l.burnTick || l.fever || l.stunnedSkip || l.chilledSkip);
+        if (again && l.who === by && !answer && !passive) l.again = true;
         const mine = l.who === "me";
         const actor = mine ? "You" : name;
         const verb = mine ? "" : "s";

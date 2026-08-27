@@ -190,6 +190,24 @@ export function freezeMsFor(f = {}) {
 // whoever invested in it.
 export const BAR_REFUND = 0.55;
 
+// ── AND YOU SHAKE A CONTROL EFFECT OFF, PER KIND ─────────────────────────────────────────────────────────────
+// Luke: "develop an immunity to the crowd control of that type after it wears off for like 6 seconds — so if
+// you're frozen, once you come unfrozen you can't be frozen for 6 seconds, and the same for chill and stun."
+//
+// This is the rule that replaces every counting rule that came out. It is not "you may not lose two turns in a
+// row" — nothing tallies turns — it is a property of the EFFECT: ice that has just been shrugged off does not
+// take again immediately. Which means a fast fighter still swings as often as their bar allows, and a control
+// build still lands its opener, but neither can hold somebody down indefinitely by repeating themselves.
+//
+// PER KIND, deliberately. A freeze does not make you immune to a stun, and neither stops a chill. Three
+// separate windows, so a Runecaller's whole toolkit still works on one target — it simply cannot be the same
+// tool over and over.
+//
+// The window runs from when the effect ENDS, not from when it lands, so "six seconds" is six seconds of being
+// able to act. That also subsumes the older "a lock may not land on a locked bar" check, because while the
+// effect is still running `now` is inside the window by construction.
+export const CC_IMMUNE_MS = 6000;
+
 // ── AND THE FOE'S CHANCE AT IT IS HELD TO YOURS ──────────────────────────────────────────────────────────────
 // The same fix as foeTempo, for the same root cause. `extra` is built by extraTurnFrom out of weapon speed and
 // ferocity, and NPC ferocity is a gear budget that is on nobody's scale — every Road foe past about rung 50
@@ -208,6 +226,8 @@ export const newTrack = (tempo = BARE_TEMPO) => ({
     fill: 0,
     holdUntil: 0,    // stun / freeze: the bar does not move at all until this
     held: null,      // "stun" | "freeze" — what the screen should say and colour it
+    // Per-kind: the moment this bar can be given that effect again. See CC_IMMUNE_MS.
+    immune: {},      // { freeze?: ms, stun?: ms, chill?: ms }
     // Every rate change currently on this bar, each with the moment it lapses. One list rather than a pair of
     // *Until marks, because both effects stack and a chill decays through several expiries.
     mods: [],        // { kind: "haste" | "chill", amount, until }
@@ -302,20 +322,25 @@ export const spend = (track, refund = 0) => {
 // ── APPLYING THE FOUR ────────────────────────────────────────────────────────────────────────────────────────
 // Each ADDS rather than replaces, so a second one landing on an already-affected fighter is worth something
 // instead of restarting a shorter version — being hit twice must never be better for the victim than once.
+/** Returns true if it landed, false if this bar is still shaking that kind off. See CC_IMMUNE_MS. */
 export function hold(track, now, kind = "stun", ms = null) {
-    if (!track) return track;
+    if (!track) return false;
+    if (now < ((track.immune || {})[kind] || 0)) return false;
     const dur = Math.max(1, Number(ms) || (kind === "freeze" ? FREEZE_BASE_MS : STUN_HOLD_MS));
     track.holdUntil = Math.max(track.holdUntil || 0, now) + dur;
     // A freeze showing over a stun is right: it is the longer and more serious of the two, and if both are
     // running the bar is stopped until the freeze ends anyway.
     track.held = track.held === "freeze" ? "freeze" : kind;
-    return track;
+    // Measured from when it ENDS, so the window is six seconds of being able to act.
+    track.immune = { ...(track.immune || {}), [kind]: track.holdUntil + CC_IMMUNE_MS };
+    return true;
 }
 
+// Not crowd control — nothing resists being helped, so there is no immunity window here.
 export function haste(track, now, ms = HASTE_MS, amount = HASTE_BOOST) {
-    if (!track) return track;
+    if (!track) return false;
     track.mods = [...live(track, now), { kind: "haste", amount, until: now + Math.max(1, ms) }];
-    return track;
+    return true;
 }
 
 /**
@@ -323,16 +348,18 @@ export function haste(track, now, ms = HASTE_MS, amount = HASTE_BOOST) {
  * window. See the note on CHILL_STEPS for why it is stored as steps rather than as a curve.
  */
 export function chill(track, now, amount = 0.2, ms = CHILL_MS) {
-    if (!track) return track;
+    if (!track) return false;
+    if (now < ((track.immune || {}).chill || 0)) return false;
     const a = Math.max(0, Number(amount) || 0);
-    if (a <= 0) return track;
+    if (a <= 0) return false;
     const dur = Math.max(1, Number(ms) || CHILL_MS);
     const next = live(track, now);
     for (let i = 1; i <= CHILL_STEPS; i += 1) {
         next.push({ kind: "chill", amount: a / CHILL_STEPS, until: now + (dur * i) / CHILL_STEPS });
     }
     track.mods = next;
-    return track;
+    track.immune = { ...(track.immune || {}), chill: now + dur + CC_IMMUNE_MS };
+    return true;
 }
 
 // ── WHAT THE SCREEN DRAWS ────────────────────────────────────────────────────────────────────────────────────
@@ -352,6 +379,10 @@ export const snapshot = (track, now) => {
     }
     return {
         fill: Math.max(0, Math.min(1, track.fill)),
+        // The rate this bar is ACTUALLY running at. A foe's card reads its own stat line, which is the raw
+        // one — but a Road foe's is clamped relative to yours on the way into the ring (see foeTempo), so the
+        // card could promise a speed the bar never runs at. This is the number the fight is using.
+        tempo: track.tempo,
         // The rate as a MULTIPLE of this fighter's own baseline, so the screen can show "2x" or "0.6x" without
         // knowing what their tempo is. 0 means stopped.
         mult: track.tempo > 0 ? Number(((rateAt(track, now) * BASE_FILL_MS) / track.tempo).toFixed(2)) : 0,
@@ -359,6 +390,9 @@ export const snapshot = (track, now) => {
         // whole point of making the magnitude real is that it is now worth printing.
         slow: Number(Math.min(1 - CHILL_RATE_FLOOR, slow).toFixed(2)),
         state: held ? (track.held || "stun") : boost > 0 ? "haste" : slow > 0 ? "chill" : null,
+        // What this bar is currently shrugging off, so a blow that lands no ice can say so rather than
+        // looking like it silently failed. See CC_IMMUNE_MS.
+        resists: Object.entries(track.immune || {}).filter(([, t]) => t > now).map(([k]) => k),
         // How much longer the current state runs, so a bar can show a countdown rather than ending without
         // warning. For a chill this is the LAST step's expiry — the moment the cold is fully gone.
         until: Math.max(0, held ? (track.holdUntil - now) : Math.max(hasteUntil, chillUntil) - now),

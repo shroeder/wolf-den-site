@@ -57,7 +57,8 @@
     "check:npcband": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-growth.mjs",
     "check:road": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-road.mjs",
     "check:polish": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-polish.mjs",
-    "check:feel": "node scripts/check-feel.mjs"
+    "check:feel": "node scripts/check-feel.mjs",
+    "check:classes": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-class-balance.mjs"
   },
   "keywords": [],
   "author": "",

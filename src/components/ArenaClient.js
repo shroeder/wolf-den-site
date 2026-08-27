@@ -468,7 +468,7 @@ function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
     );
 }
 
-function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null, bleed = null, atb = false }) {
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null, bleed = null, atb = false, barTempo = 0 }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
@@ -577,8 +577,20 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                     false. The chance to take another turn is switched off in that mode (see closeTurn), so
                     printing it would advertise a mechanic the fight does not have. The same two inputs are
                     showing, as the thing they now buy: how long this fighter takes to swing. */}
+                {/* ── TWO DECIMALS, AND IT MATTERS ────────────────────────────────────────────────────
+                    Luke: "what's with 3.5s a swing when we have different weapon bases and ferocity stats?
+                    Seems like BS."
+
+                    The maths was right and the FORMAT was hiding it — his 1.906 and JT's 1.920 are
+                    genuinely different bars and both rounded to "3.5s". Across the five most active members
+                    the real spread is 1.42 to 2.07, which is 4.7s to 3.2s: a difference worth seeing, and
+                    one decimal cannot show it.
+
+                    `barTempo` is the rate the BAR is running at rather than the one on the stat line. A Road
+                    foe's tempo is clamped relative to yours on the way into the ring, so the card could
+                    otherwise promise a speed the fight never uses. */}
                 {atb ? (
-                    <i title="How long this fighter's turn timer takes to fill. Set by your weapon's attack speed and sharpened by Ferocity."><b>{(BASE_FILL_MS / Math.max(0.2, f?.tempo || 1) / 1000).toFixed(1)}s</b> a swing</i>
+                    <i title="How long this fighter's turn timer takes to fill. Set by your weapon's attack speed and sharpened by Ferocity."><b>{(BASE_FILL_MS / Math.max(0.2, barTempo || f?.tempo || 1) / 1000).toFixed(2)}s</b> a swing</i>
                 ) : (f?.extra || 0) > 0 ? (
                     <i title="Chance to take another turn immediately. Your weapon's attack speed above bare-handed, plus 1% for every 5 points of Ferocity, plus Quickblade."><b>{Math.round(f.extra * 100)}%</b> again</i>
                 ) : null}
@@ -995,6 +1007,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // looked like taking one. Two pieces of state, because they are two facts.
     const [shake, setShake] = useState(0);          // 0 = still, 1 = a hit, 2 = a heavy one. Intensity only.
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
+    // ── WHO SWUNG, WHICH IS NOT THE SAME QUESTION ────────────────────────────────────────────────────────
+    // Luke: "whenever I bleed it looks like the enemy lurches forward to hit me when they didn't actually hit
+    // me, it's just bleed damage ticking."
+    //
+    // `hitSide` answers "whose health just fell" and the ring drew BOTH things off it — the victim flinches
+    // and the other fighter lunges. For a blow those are the same event. For a wound opening, a burn, or the
+    // pit closing, nobody swung at all, so the opponent was thrown into an attack animation for damage they
+    // had no part in. Null on a tick: you flinch, they stand still.
+    const [lungeSide, setLungeSide] = useState(null);
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     // ── THE NUMBERS QUEUE, THEY DO NOT SHARE A SLOT ──────────────────────────────────────────────────────────
     // This was a single `pop` that every new line overwrote, and under the timer the lines come fast: filmed at
@@ -1285,6 +1306,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         setBeatQueue(null);
         setClash(null);
         setHitSide(null);
+        setLungeSide(null);
         setShake(0);
         setStop(false);
         setCounterWind(null);
@@ -1765,11 +1787,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             }
         }
 
+        // Damage nobody threw: a wound, a fire, or the pit biting both fighters at once.
+        const passiveDmg = Boolean(last?.bleedTick || last?.burnTick || last?.fever);
         if (p.hp != null && bout.hp < p.hp) {
             // YOU TOOK IT. Weight is the fraction of your whole bar this blow cost, which is what decides how
             // hard everything hits: the shake, the buzz, and how low and long the sound is.
             const w = Math.min(1, (p.hp - bout.hp) / Math.max(1, bout.maxHp * 0.22));
             setHitSide("you");
+            setLungeSide(passiveDmg ? null : "you");
             setShake(w > 0.7 ? 2 : 1);
             setStop(true);
             Sfx.hurt(w);
@@ -1783,6 +1808,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // YOU LANDED IT.
             const w = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.22));
             setHitSide("them");
+            setLungeSide(passiveDmg ? null : "them");
             setShake(crit || w > 0.7 ? 2 : 1);
             setStop(true);
             if (crit) { Sfx.crit(w); Haptic.crit(); duck(0.5, 0.3); }
@@ -1869,7 +1895,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             setHeads((q) => [...q, h].slice(-6));
         }
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
-        const t = setTimeout(() => { setShake(0); setHitSide(null); }, 360);
+        const t = setTimeout(() => { setShake(0); setHitSide(null); setLungeSide(null); }, 360);
         const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
         // Each head clears on its own timer rather than the whole queue at once, or an event that arrived
         // late gets cut short by the one before it.
@@ -2243,10 +2269,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     // Still heard and still felt a little — it is damage, and silence would be its own kind
                     // of lie. What it does not get is the recoil, the shake and the hit-stop.
                     setHitSide(null);
+                    setLungeSide(null);
                     Sfx.burn();
                     Haptic.hit(0.25);
                 } else if (DAMAGE_KINDS.has(e.kind)) {
                     setHitSide(hurtSide);
+                    setLungeSide(hurtSide);
                     setShake(e.crit || e.kind === "counter" ? 2 : 1);
                     setStop(true);
                     // ── COUNTER IS CHECKED BEFORE CRIT, AND THAT ORDER IS THE WHOLE POINT ────────────
@@ -2269,7 +2297,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 else if (e.kind === "block" || e.kind === "ward") { Sfx.block(0.4); }
                 else if (e.kind === "miss") { Sfx.block(0.3); }
             }, at + wind));
-            timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
+            timers.push(setTimeout(() => { setShake(0); setHitSide(null); setLungeSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
             }
         }
         // No blanket clear at the end of the beat any more — every group expires on its own timer, and a
@@ -2503,6 +2531,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-barcol">
                             <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
                                 active={yourTurn} shield={bout.shield || 0} atb={atbMode}
+                                barTempo={barsNext?.me?.tempo || 0}
                                 burn={bout.foeBleed || null} bleed={bout.foeGash || null} />
                             <StatusRow list={statusesFor(bout, "you")} side="you" onPick={(s) => setStatusPick({ kind: s.kind, side: "you" })} />
                         </span>
@@ -2518,6 +2547,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-barcol is-foe">
                             <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
                                 foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} atb={atbMode}
+                                barTempo={barsNext?.foe?.tempo || 0}
                                 burn={bout.bleed || null} bleed={bout.gash || null} />
                             <StatusRow list={statusesFor(bout, "them")} side="them" onPick={(s) => setStatusPick({ kind: s.kind, side: "them" })} />
                         </span>
@@ -2571,7 +2601,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             DOM order, which is what made the last flip go wrong. */}
                         {/* Whoever took the blow recoils; the other one lunged to deliver it. Driven by
                             `hitSide`, never by the intensity — see the note on the state itself. */}
-                        <FighterBody f={st.me} hurt={hitSide === "you"} lunge={hitSide === "them"}
+                        <FighterBody f={st.me} hurt={hitSide === "you"} lunge={lungeSide === "them"}
                             down={bout.over && !bout.won}
                             wind={counterWind === "left" ? COUNTER_WIND_MS : 0}
                             brace={false}
@@ -2583,7 +2613,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs,
                                 waiting: yourTurn && !playing && raw?.awaiting === "act" } : null}
                             events={atbMode ? headsFor("you") : null} />
-                        <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
+                        <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={lungeSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
                             brace={false}
