@@ -28,6 +28,15 @@ import ConsumableArt from "@/components/ConsumableArt";
 // A host that owns the thing being changed passes `onUsed` and refreshes itself. A host that cannot be told
 // has no business mounting a control that changes what it is showing, so there is no boolean escape hatch any
 // more — the next person to need one should lift the shelf into a client component instead.
+// Why a stack stopped, in the member's words. The server sends the reason; this only spells it.
+const BULK_ERR = {
+    not_bulkable: "That one is used one at a time.",
+    strikes_capped: "You are already holding the most bonus strikes you can.",
+    none_owned: "You have none of those left.",
+    pet_maxed: "That pet is already at max level.",
+    no_pet_equipped: "Equip a pet first.",
+};
+
 export default function ConsumableShelf({ feature, title = "In your pack", onUsed = null }) {
     const [data, setData] = useState(null);
     const [busy, setBusy] = useState(null);
@@ -56,11 +65,15 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
         const d = r ? await r.json().catch(() => null) : null;
         setBusy(null);
         if (d?.ok) {
-            setMsg({ ok: true, text: d.applied || "Used." });
+            // Stopped part-way is its own sentence: four of eleven went and the rest are still in the pack.
+            setMsg({ ok: true, text: d.stopped ? `${d.applied} — stopped there: ${BULK_ERR[d.stopped] || "no more would apply"}` : (d.applied || "Used.") });
             await load();
             onUsed?.();
         } else {
-            setMsg({ ok: false, text: d?.error === "not_bulkable" ? "That one is used one at a time." : "Could not use those." });
+            // The server's own reason, not a shrug. Tested live: an account at the strike cap got
+            // "strikes_capped" back and would otherwise have been told "Could not use those", which is the
+            // one thing it definitely was not.
+            setMsg({ ok: false, text: d?.message || BULK_ERR[d?.error] || "Could not use those." });
         }
     }, [load, onUsed]);
 

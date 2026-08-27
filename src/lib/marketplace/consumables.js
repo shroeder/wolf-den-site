@@ -458,20 +458,30 @@ export async function useConsumableBulk(buyerId, id, { max = BULK_USE_CAP } = {}
     const lines = [];
     let used = 0;
     let remaining = have;
+    // ⚠️ WHY THE REFUSAL IS KEPT. Tested live against an account already holding the maximum bonus strikes:
+    // the first use came back "strikes_capped", the loop stopped and spent nothing — right — but the caller
+    // reported "none_applied", so the shelf would have said "Could not use those" to somebody whose actual
+    // problem was that they were already at the cap. The single-use path says why; the bulk one has to as well
+    // or it is a worse button than the one it replaces.
+    let refusal = null;
     for (let i = 0; i < runs; i += 1) {
         const r = await useConsumable(buyerId, id).catch(() => null);
-        if (!r?.ok) break;   // a refusal mid-stack (capped out, nothing left) stops cleanly and keeps the rest
+        if (!r?.ok) { refusal = r || null; break; }   // capped out or nothing left: stop cleanly, keep the rest
         used += 1;
         remaining = Number.isFinite(r.remaining) ? r.remaining : Math.max(0, remaining - 1);
         if (r.applied) lines.push(r.applied);
     }
-    if (!used) return { ok: false, error: "none_applied" };
+    // Nothing landed: hand back the reason the FIRST use gave, not a generic one of our own.
+    if (!used) return { ok: false, error: refusal?.error || "none_applied", message: refusal?.message || null };
     return {
         ok: true, used, remaining, name: c.name, emoji: c.emoji,
         // The LAST sentence plus a count, rather than eleven identical lines stacked up the screen.
         applied: used === 1 ? (lines[0] || "Used.") : `${used} x ${c.name} - ${lines[lines.length - 1] || "used"}`,
         // Whether anything is left, so the caller knows if the cap stopped it rather than the stack running out.
         cappedAt: used === max && have > max ? max : null,
+        // Stopped EARLY — the stack still has some and the game refused the next one (full, capped, maxed).
+        // The shelf says so rather than leaving somebody wondering why four of eleven went.
+        stopped: used < runs ? (refusal?.error || null) : null,
     };
 }
 
