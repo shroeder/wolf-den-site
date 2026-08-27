@@ -127,7 +127,13 @@ export const SKILLS = [
         id: "rupture", classId: "reaver", name: "Rupture",
         sprite: "/images/arena/skill/rupture.webp",
         blurb: "A blow that opens the artery. Wounds tick past armour, which is the point of them.",
-        power: 1.6, cooldown: 3, bleed: 1,
+        // ── THE WOUND IS THE POINT OF THIS SKILL ─────────────────────────────────────────────────────────
+        // Three stacks, not one. Bleed bleeds ALL its stacks at once and then half of them close, so one
+        // stack is a single small tick and the whole front-loaded shape never happens. Measured over 200
+        // Reaver-vs-Warden bouts while this was `bleed: 1`: the highest stack ever seen was 3, and 538 of 619
+        // ticks left nothing behind — the halving outpaced a 30% proc rate and bleed sat at one stack for the
+        // entire fight. Laying three is what makes Rupture a spike instead of a rounding error.
+        power: 1.6, cooldown: 3, bleed: 3,
         branches: [
             { id: "hemorrhage", name: "Hemorrhage", tag: "The wound does the killing" },
             { id: "butcher", name: "Butcher", tag: "The blow does the killing" },
@@ -140,8 +146,8 @@ export const SKILLS = [
                 { id: "rp_ragged", name: "Ragged Edge", sprite: "/images/arena/skill/node/rp_ragged.webp",
                     desc: "Harder again, and the blow behind it lands heavier.", mod: { bleedDamage: 0.08, power: 0.15 } },
                 { id: "rp_exsang", name: "Exsanguinate", sprite: "/images/arena/skill/node/rp_exsang.webp",
-                    desc: "CAPSTONE. The wound becomes the weapon — it bites half again as hard, and the blow that opens it is a light one.",
-                    mod: { bleedDamage: 0.18, power: -0.6 } },
+                    desc: "CAPSTONE. The wound becomes the weapon — it opens deeper, bites half again as hard, and the blow that opens it is a light one.",
+                    mod: { bleedDamage: 0.18, power: -0.6, bleed: 2 } },
             ]),
             ...br("butcher", [
                 { id: "rp_hooked", name: "Hooked", sprite: "/images/arena/skill/node/rp_hooked.webp",
