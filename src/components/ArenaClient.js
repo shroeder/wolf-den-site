@@ -578,10 +578,14 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
             {events?.length ? (
                 <span className="ar-heads" aria-hidden="true">
                     {events.map((h, i) => (
-                        <b key={h.id} className={`ar-head is-${h.grade || "hit"}${h.crit ? " is-crit" : ""}`}
+                        <b key={h.id} className={`ar-head is-${h.grade || "hit"}${h.crit ? " is-crit" : ""}`
+                            + `${h.alert ? " is-alert" : ""}`}
                             style={{ "--i": i }}>
                             {h.crit ? <i className="ar-head-crit">Critical</i> : null}
                             {h.move}
+                            {/* "frozen" without a number is not something you can act on, and it is the
+                                reason the interrupt is louder than a move in the first place. */}
+                            {h.note ? <i className="ar-head-note">{h.note}</i> : null}
                         </b>
                     ))}
                 </span>
@@ -933,7 +937,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [shake, setShake] = useState(0);          // 0 = still, 1 = a hit, 2 = a heavy one. Intensity only.
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
-    const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
+    // ── THE NUMBERS QUEUE, THEY DO NOT SHARE A SLOT ──────────────────────────────────────────────────────────
+    // This was a single `pop` that every new line overwrote, and under the timer the lines come fast: filmed at
+    // 390 wide, the foe struck for 159, the number was on screen for one frame out of five, and the SWING
+    // callout over their head outlived it by four to one. The number — the only part of a blow that says how
+    // much it cost — was the shortest-lived thing in the exchange.
+    //
+    // It is the same fault the head column was built to fix, still sitting on the other half of the callout:
+    // one slot means the second event overprints the first. So each group lives on its own timer and expires
+    // on its own, and older ones ride up out of the way instead of being deleted mid-flight.
+    const [popQ, setPopQ] = useState([]);        // floating damage numbers, newest last
+    const popId = useRef(0);
     const [beatQueue, setBeatQueue] = useState(null);  // the beat's events, played one at a time
     // The thing nobody pressed — an extra turn, a lost beat, a wound ticking — held on screen with a sound
     // and a real dwell. See the note where the queue is built.
@@ -956,6 +970,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // stacks them, oldest on top, and both get read.
     const [heads, setHeads] = useState([]);
     const headId = useRef(0);
+    // Four is the cap and 1600ms is the life: the float animation is 950ms (1150ms for a crit) and the rest is
+    // the beat it belongs to, so a number is still readable while the blow after it lands.
+    const pushPop = useCallback((items) => {
+        if (!items?.length) return;
+        popId.current += 1;
+        const id = popId.current;
+        setPopQ((q) => [...q, { id, items }].slice(-4));
+        setTimeout(() => setPopQ((q) => q.filter((g) => g.id !== id)), 1600);
+    }, []);
+
     // The counter's sentence, held back until the counter actually plays — see the .ar-beat line.
     const [counterHeld, setCounterHeld] = useState(false);
     const [err, setErr] = useState(null);
@@ -1198,7 +1222,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // a transcript that got shorter, which is what a rematch against the SAME opponent looks like.
     const clearRing = useCallback(() => {
         prev.current = { hp: null, foeHp: null, round: null };
-        setPop(null);
+        setPopQ([]);
         setBeatQueue(null);
         setClash(null);
         setHitSide(null);
@@ -1387,6 +1411,39 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // contradicted it.
     const barsNext = atbMode ? (logAll[shown]?.bars || raw?.bars || barsPrev) : null;
     const barsMs = atbMode && logAll[shown] ? beatMs(logAll[shown], logAll.length - shown) : 300;
+
+    // ── EVERYTHING THAT HAPPENED TO ONE FIGHTER, IN ONE PLACE ────────────────────────────────────────────────
+    // Luke, on the first attempt at this: "the callouts are still poor."
+    //
+    // Filmed, and he is right. Moving the MOVE over the fighter's head fixed half of it and left the louder
+    // half untouched: the interrupt banner is still a full-width headline across the dead middle of the ring,
+    // and it now out-shouts the thing it was meant to be a footnote to. A frame of it, measured — the player
+    // lands a CRITICAL for 427 and gets 12.5px of grey over their head, while a burn TICK gets a centred
+    // headline three times the size in the middle of the screen. The comment on that banner says it is
+    // "deliberately LOUDER than the move callout beside it", which was true and reasonable when the move
+    // callout was 1.6rem in the centre of the ring. It has not been that since the callouts moved.
+    //
+    // So under the timer the interrupt joins the same column as the move, over the fighter it happened to.
+    // One place per fighter, one hierarchy, and the middle of the ring stays empty for the sprites and the
+    // damage numbers. The classic ring keeps the banner, where the centre is where its move callout lives too.
+    // ONLY "they move first", because it is the one interrupt with no log line behind it — it is set when the
+    // bout opens, before anything has been swung. Every other kind is a flag on a line, and that line's own
+    // head carries it (see the head builder); synthesising a second one here printed BLEEDING twice.
+    const alertHead = atbMode && alert?.kind === "first" ? {
+        id: "alert:first",
+        side: "them",
+        alert: true,
+        move: "They move first",
+        note: null,
+        grade: "turn",
+    } : null;
+    // Newest nearest the body, and the interrupt sits at the bottom of the column because it is the thing
+    // that just interrupted. Three is the cap: past that they arrive faster than anybody reads them.
+    const headsFor = (side) => {
+        const own = heads.filter((h) => h.side === side);
+        const all = alertHead?.side === side ? [...own, alertHead] : own;
+        return all.slice(-3);
+    };
 
     // ── THE DECK DOES NOT DISAPPEAR OUT FROM UNDER A FIGHT STILL PLAYING ─────────────────────────────────
     // GrayKitsune, twice in one session: "suddenly all my skills vanish"; "the button just vanish and then
@@ -1684,17 +1741,39 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // The same event, addressed to a fighter. Capped at three a side: past that they are stacking
             // faster than anybody reads them, and the oldest is already gone from the screen's memory.
             headId.current += 1;
+            // ── THE INTERRUPT IS THIS LINE, NOT A SECOND EVENT BESIDE IT ─────────────────────────────
+            // Filmed after the banner moved over the head: a bleed tick printed BLEEDING twice over the same
+            // fighter, a pill and a plain copy of itself, because the interrupt and the move callout were
+            // both being built from the same log line by two different code paths. They are one thing. The
+            // line already says which it is, so the line's own head IS the interrupt — which also gives it a
+            // head's full lifetime instead of the 460ms the banner had.
+            const locked = Boolean(last.stunnedSkip || last.chilledSkip);
+            const dot = Boolean(last.burnTick || last.bleedTick);
+            const mine = last.who === "you";
             const h = {
                 id: headId.current,
-                side: last.who === "you" ? "you" : "them",
+                side: mine ? "you" : "them",
                 move: last.burnTick ? "Burning"
                     : last.bleedTick ? "Bleeding"
                         : last.stunnedSkip ? "Stunned"
-                            : last.chilledSkip ? "Frozen stiff"
+                            : last.chilledSkip ? "Frozen"
                                 : last.fever ? "The pit closes"
                                     : last.guard ? "Guard up"
-                                        : last.ability || (last.who === "you" ? "Strike" : "Swing"),
-                crit, grade: crit ? "crit" : last.grade,
+                                        : last.ability || (mine ? "Strike" : "Swing"),
+                // Louder than a move, and on the same scale as one. These are the things that happen TO a
+                // fighter rather than because of them, which is the whole reason they are called out at all.
+                alert: locked || dot || Boolean(last.again),
+                // "frozen" with no number is not something anybody can act on.
+                note: locked
+                    ? `loses this beat${(Number(mine ? last.meStun : last.foeStun) || 0) > 0
+                        ? ` · ${Number(mine ? last.meStun : last.foeStun) || 0} more` : ""}`
+                    : last.again ? "goes again" : null,
+                crit,
+                grade: locked ? (last.chilledSkip ? "freeze" : "stun")
+                    : last.burnTick ? "burn"
+                        : last.bleedTick ? "bleed"
+                            : last.again ? "turn"
+                                : crit ? "crit" : last.grade,
                 damage: Number(last.damage) || 0,
             };
             setHeads((q) => [...q, h].slice(-6));
@@ -1990,11 +2069,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             return undefined;
         }
         if (!pops.length) return undefined;
-        setPop({ id: bout.log.length, items: pops });
-        // Outlives the animation (2.1s, crit 2.4s) rather than cutting it off — unmounting at 1000ms is what
-        // made even the old, faster float disappear mid-air.
-        const t = setTimeout(() => setPop(null), 2500);
-        return () => clearTimeout(t);
+        pushPop(pops);
+        return undefined;
     }, [bout?.log?.length]);
 
     // ── PLAYING A BEAT, ONE THING AT A TIME ─────────────────────────────────────────────────────────────────
@@ -2064,7 +2140,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 timers.push(setTimeout(() => setCounterWind(null), at + wind + 40));
             }
             timers.push(setTimeout(() => {
-                setPop({ id: `${beatQueue.id}-${i}`, items: [{ side: e.side, n: e.n, kind: POP_KIND[e.kind] || e.kind, text: e.kind === "miss" ? "MISS" : null, crit: e.crit }] });
+                pushPop([{ side: e.side, n: e.n, kind: POP_KIND[e.kind] || e.kind, text: e.kind === "miss" ? "MISS" : null, crit: e.crit }]);
                 // The ring itself answers, every time — this is the half that was only ever played once per
                 // beat, which is why ten numbers flew while the fighters stood still.
                 const hurtSide = e.side === "left" ? "you" : "them";
@@ -2106,7 +2182,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
             }
         }
-        timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS + held) + 1400));
+        // No blanket clear at the end of the beat any more — every group expires on its own timer, and a
+        // sweep here is precisely what used to cut the last number of a beat off mid-flight.
         return () => { for (const t of timers) clearTimeout(t); setAlert(null); };
     }, [beatQueue]);
 
@@ -2414,7 +2491,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
                             chilled={bout.chilled || 0}
                             timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs } : null}
-                            events={atbMode ? heads.filter((h) => h.side === "you").slice(-3) : null} />
+                            events={atbMode ? headsFor("you") : null} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
@@ -2425,7 +2502,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             frozen={Boolean(bout.foeFrozen)} frozenLeft={bout.foeFrozenLeft || 0}
                             chilled={bout.foeChilled || 0}
                             timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs } : null}
-                            events={atbMode ? heads.filter((h) => h.side === "them").slice(-3) : null} />
+                            events={atbMode ? headsFor("them") : null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -2448,11 +2525,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             positioned on its own, which is fine for one and a pile-up for two: guard a blow and
                             the damage and the blocked amount were printed on top of each other. One COLUMN per
                             side now, bottom-up, so a beat that produces four numbers produces four rows. */}
-                        {pop ? ["left", "right"].map((side) => {
-                            const items = pop.items.filter((it) => it.side === side);
+                        {popQ.flatMap((g, gi) => ["left", "right"].map((side) => {
+                            const items = g.items.filter((it) => it.side === side);
                             if (!items.length) return null;
                             return (
-                                <span key={`${pop.id}-${side}`} className={`ar-pops is-${side}`} aria-hidden="true">
+                                // `--g` counts BACK from the newest, so the group that just landed sits where
+                                // numbers have always sat and the ones before it ride up out of its way.
+                                <span key={`${g.id}-${side}`} className={`ar-pops is-${side}`} aria-hidden="true"
+                                    style={{ "--g": popQ.length - 1 - gi }}>
                                     {items.map((it, i) => (
                                         <span key={`${it.kind}-${i}`}
                                             className={`ar-pop is-${it.side} is-${it.kind}`}
@@ -2481,7 +2561,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                     ))}
                                 </span>
                             );
-                        }) : null}
+                        }))}
 
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
                     </div>
@@ -2520,12 +2600,32 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         not need explaining, and these do. It says whose it is, because "extra turn" is a
                         reward or a warning depending entirely on that, and how many beats a lockout costs,
                         because "frozen" without a number is not information you can act on. */}
-                    {alert ? (
+                    {/* ── AND IT IS STILL ANNOUNCED ──────────────────────────────────────────────────
+                        The head column is aria-hidden — it is decoration over a sprite, and the beat's
+                        sentence below carries the same information in prose. But the banner this replaces
+                        was a role="status", so an interrupt used to be spoken and would otherwise stop
+                        being. This is that announcement with no pixels attached. */}
+                    {alert && atbMode ? (
+                        <p className="ar-sr" role="status">
+                            {alert.kind === "first" ? `${bout.foe?.name || "Your opponent"} opens`
+                                : alert.kind === "again" ? (alert.mine ? "You go again" : `${bout.foe?.name} goes again`)
+                                    : alert.kind === "locked"
+                                        ? `${alert.mine ? "You lose" : `${bout.foe?.name} loses`} this beat`
+                                        : `${alert.mine ? "You are" : `${bout.foe?.name} is`} ${alert.bleed ? "bleeding" : "burning"}`}
+                        </p>
+                    ) : null}
+
+                    {alert && !atbMode ? (
                         <div className={`ar-alert is-${alert.kind}${alert.mine ? " is-mine" : ""}`} role="status">
                             <b>{alert.kind === "first" ? "THEY MOVE FIRST"
                                 : alert.kind === "again" ? "EXTRA TURN"
                                     : alert.kind === "locked" ? (alert.frozen ? "FROZEN" : "STUNNED")
                                         : (alert.bleed ? "BLEEDING" : "BURNING")}</b>
+                            {/* ── AND THE SUB-LINE HAS TO NAME THE SAME EFFECT THE HEADLINE DOES ──────────
+                                Filmed: "BLEEDING" over "it is burning Roan Vasquez". The headline branched on
+                                `alert.bleed` and this line did not, so every bleed tick in the game printed a
+                                sentence about fire under the word BLEEDING — two lines of one banner
+                                disagreeing about what was happening. */}
                             <i>{alert.kind === "first" ? `${bout.foe.name} opens`
                                 : alert.kind === "again"
                                 ? (alert.mine ? "you go again" : `${bout.foe.name} goes again`)
@@ -2533,7 +2633,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                     ? (alert.mine
                                         ? `you lose this beat${alert.beats > 0 ? ` — ${alert.beats} more to come` : ""}`
                                         : `${bout.foe.name} loses this beat`)
-                                    : (alert.mine ? "it is burning you" : `it is burning ${bout.foe.name}`)}</i>
+                                    : alert.bleed
+                                        ? (alert.mine ? "you are bleeding" : `${bout.foe.name} is bleeding`)
+                                        : (alert.mine ? "it is burning you" : `it is burning ${bout.foe.name}`)}</i>
                         </div>
                     ) : null}
 
@@ -4091,11 +4193,32 @@ function Styles() {
                 color: #fff; text-shadow: 0 2px 8px #000, 0 0 16px rgba(0,0,0,.9);
                 animation: arHeadUp .5s cubic-bezier(.2,1.35,.35,1) both; }
             /* Older entries fade as they climb, so a stack of three does not read as three equally-live
-               things — only the bottom one just happened. */
-            .ar-head[style*="--i: 1"] { opacity: .68; font-size: 11px; }
-            .ar-head[style*="--i: 2"] { opacity: .42; font-size: 10px; }
+               things — only the bottom one just happened.
+               OFF THE CUSTOM PROPERTY, NOT OFF THE style ATTRIBUTE STRING. This was
+               .ar-head[style*="--i: 1"] — a substring match against however the browser chose to serialise
+               an inline style — the space after the colon, the trailing semicolon, the order of the
+               declarations. Nothing guarantees any of that, and when it does not match, every entry renders
+               at full weight and a stack of three reads as three things that all just happened. */
+            .ar-head { opacity: calc(1 - var(--i, 0) * 0.29); }
             .ar-head-crit { display: block; font-style: normal; font-size: 8.5px; letter-spacing: .28em;
                 color: #ffe9a8; }
+            /* ── THE INTERRUPT, STILL LOUDER THAN A MOVE — BUT ON THE SAME SCALE AS ONE ──────────────────
+               Bigger, wider-tracked and with a ground behind it so it reads as something that HAPPENED TO
+               this fighter rather than something they did. It is no longer a headline across the middle of
+               the ring: a burn tick outshouting a critical was the whole complaint. */
+            .ar-head.is-alert { font-size: 11px; letter-spacing: .16em; padding: 3px 9px 4px;
+                border-radius: 999px; background: rgba(10,6,16,.82);
+                box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.09);
+                text-shadow: 0 1px 4px #000; }
+            .ar-head.is-alert.is-burn { color: #ffb066; box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,150,60,.4); }
+            .ar-head.is-alert.is-bleed { color: #ff8a92; box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,90,110,.4); }
+            .ar-head.is-alert.is-stun { color: #ffe08a; box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,210,90,.45); }
+            .ar-head.is-alert.is-freeze { color: #bfe9ff; box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(150,220,255,.45); }
+            .ar-head.is-alert.is-turn { color: #ffe9a8; box-shadow: 0 2px 10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,220,140,.4); }
+            .ar-head-note { display: block; font-style: normal; font-size: 8.5px; letter-spacing: .1em;
+                text-transform: none; opacity: .82; margin-top: 1px; }
+            .ar-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+                overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
             .ar-head.is-crit { color: #fff6cc; font-size: 15px;
                 text-shadow: 0 2px 10px #000, 0 0 22px rgba(255,215,94,.9); }
             .ar-head.is-block { color: #cfe0ff; }
@@ -4104,8 +4227,12 @@ function Styles() {
             .ar-head.is-stun { color: #ffe08a; }
             .ar-head.is-guard { color: #a8d8ff; }
             /* The foe's read cool and yours read warm — a second, quieter signal on top of the position,
-               for the glance that has not found the sprite yet. */
-            .ar-fighter.is-foe .ar-head { color: #cfe8ff; }
+               for the glance that has not found the sprite yet.
+               :not(.is-alert) because this rule outranks every status colour above it on specificity alone
+               (0,3,0 against 0,2,0), so the foe's BURNING came out the same flat blue as their SWING and the
+               one callout whose colour IS its meaning lost it. A move takes the side colour; a status keeps
+               the colour of the status. */
+            .ar-fighter.is-foe .ar-head:not(.is-alert) { color: #cfe8ff; }
             .ar-fighter.is-foe .ar-head.is-crit { color: #ffd0d6; }
             @keyframes arHeadUp { from { opacity: 0; transform: translateY(10px) scale(.85) } }
 
@@ -4719,7 +4846,11 @@ function Styles() {
             .ar-pop.is-counter-crit { color: #fff6cc; font-size: 2.5rem; letter-spacing: .02em;
                 text-shadow: 0 0 20px rgba(255,205,90,1), 0 0 42px rgba(255,150,40,.8), 0 3px 8px #000; }
             .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
-                align-items: center; gap: 6px; pointer-events: none; }
+                align-items: center; gap: 6px; pointer-events: none;
+                /* Older groups ride up rather than sitting under the new one. Without this, four live groups
+                   are four numbers printed on the same pixel — which is the single-slot bug again, wearing a
+                   queue. */
+                transform: translateY(calc(var(--g, 0) * -30px)); }
             .ar-pops.is-right { right: 18%; }
             .ar-pops.is-left { left: 18%; }
             .ar-pop { font-size: 1.9rem; font-weight: 900; line-height: 1.05;

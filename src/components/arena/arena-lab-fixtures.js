@@ -3,6 +3,7 @@
 import { resolveSkill, skillsForClass } from "@/lib/marketplace/arena-skills.js";
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
 import { autoBout } from "@/lib/marketplace/arena-engine.js";
+import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import { arenaLevelFor, arenaXpFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -456,6 +457,53 @@ export const SCENES = {
                     maxHp: me.health, foeMaxHp: foe.health,
                     hp: me.health, foeHp: foe.health, over: false, won: r.won },
             });
+        },
+    },
+    // ── THE TIMER RING, WHICH NOTHING COULD LOOK AT ──────────────────────────────────────────────────────
+    // The head callouts, the two bars and the whole atb layout render on `mode === "atb"` and NOTHING ELSE,
+    // and no scene set it. So the one part of the ring that is actively being tuned was the one part the lab
+    // could not show — every look at it had to be a real owner bout on a real account, which is why it went
+    // out with the damage number missing from the callout and nobody caught it.
+    //
+    // Runs the REAL ring in timer mode and hands over the transcript it produces, bars and all, exactly as
+    // ringResult would. Same argument as `playback`: a hand-written log is a fixture of what somebody thought
+    // the engine does.
+    timer: {
+        label: "Timer ring",
+        note: "The owner-gated bar mode, played back. Callouts sit over the head of whoever they happened to.",
+        state: () => {
+            const b = makeBout();
+            // Tempos deliberately apart so the two bars visibly fill at different rates — a scene where both
+            // bars are identical cannot show what the mode is FOR.
+            const me = { ...b.me, damage: 190, health: 1700, critChance: 0.4, critMult: 2.4, extra: 0,
+                armor: 60, pierce: 20, counter: 25, doublestrike: 30, blockChance: 0.15, blockReduction: 0.35,
+                bleedChance: 0.5, tempo: 1.35 };
+            const foe = { ...b.foe, damage: 175, health: 1600, critChance: 0.25, critMult: 2.1, extra: 0,
+                armor: 45, pierce: 0, counter: 0, doublestrike: 20, blockChance: 0.2, blockReduction: 0.5,
+                burnChance: 0.3, tempo: 1.85 };
+            let ring = openRing(me, foe, { atb: true, foeName: b.foe?.name || "Roan Vasquez" });
+            // Played out here rather than left waiting: the screen walks a finished transcript, and a ring
+            // parked on `awaiting: "act"` would hand it two lines and stop.
+            for (let i = 0; i < 400 && !ring.over; i += 1) {
+                if (ring.awaiting !== "act") break;
+                ring = act(ring, {});
+            }
+            const r = ringResult(ring);
+            // ── HANDED OVER BY THE STUB, NOT MOUNTED ────────────────────────────────────────────────────
+            // `bout: null`, and the fight arrives when Challenge is pressed. It has to: ArenaClient opens a
+            // bout that was ALREADY THERE at the end of its transcript, deliberately and correctly — you
+            // cannot walk back into a fight and have it replay from the first blow. A scene that mounts with
+            // a full log is therefore a scene of a RESUMED bout, which shows the last frame of a fight and
+            // nothing playing. Filmed exactly that, and it made every callout look like it was on screen for
+            // eight hundred milliseconds doing nothing.
+            //
+            // Press Challenge and `startedHere` is set, the cursor opens at zero and the client walks the
+            // transcript beat by beat, which is the thing worth filming.
+            //   node scripts/film.mjs "<lab>?scene=timer&chrome=0" out/x --click ".ar-next"
+            return { ...baseState({ bout: null }), atbBout: { ...b, mode: "atb", me, foe: { ...b.foe, ...foe },
+                log: r.log, beat: 0, bars: r.log[r.log.length - 1]?.bars || null,
+                maxHp: me.health, foeMaxHp: foe.health,
+                hp: me.health, foeHp: foe.health, over: false, won: r.won } };
         },
     },
     turn: {

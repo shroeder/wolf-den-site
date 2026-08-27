@@ -181,6 +181,15 @@ function makeServer(initial) {
     return async function handle(body) {
         const action = String(body?.action || "");
         if (action === "start") {
+            // ── A SCENE MAY HAVE BROUGHT ITS OWN FIGHT ──────────────────────────────────────────────────
+            // The timer scene resolves a real ring up front and hands the whole transcript over here rather
+            // than mounting with it, because a bout that is already on screen when the client mounts is a
+            // RESUMED one and opens at its last beat. Pressing Challenge is what makes it play.
+            if (st.atbBout) {
+                st.bout = JSON.parse(JSON.stringify(st.atbBout));
+                st.fightsLeft = Math.max(0, st.fightsLeft - 1);
+                return { ok: true, ...st };
+            }
             // The same fork the real startBout takes: a member, or a tier out of the Gauntlet.
             const tier = typeof body.target === "string" && body.target.startsWith("npc:") ? Number(body.target.slice(4)) : 0;
             const base = SCENES.turn.state().bout.foe;
