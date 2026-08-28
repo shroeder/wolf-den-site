@@ -45,14 +45,12 @@ export function pointsFor(r) {
 
 // ── THE SKILL PURSE ──────────────────────────────────────────────────────────────────────────────────────────
 // Earned off what is INVESTED in the passive tree rather than off the level, which is the shape Luke asked
-// for: "every three points you invest in the passive tree, you get one point to invest in a skill." The rate
-// is 1:1 now (see TREE_POINTS_PER_SKILL_POINT) but the derivation is the same either way — spend in the tree,
-// earn here.
-//
-// Nothing is stored. Both halves are computed from the two JSON bags every time, so a respec cannot leave a
-// stored counter describing a tree that no longer exists.
+// ── THE SKILL PURSE ──────────────────────────────────────────────────────────────────────────────────────────
+// Off LEVEL now, not off tree spending: one point every LEVELS_PER_SKILL_POINT levels, SKILL_POINT_CAP in
+// total. Nothing is stored — both halves are computed from the row every time, so a respec cannot leave a
+// counter describing a tree that no longer exists.
 export function skillPointsFor(r) {
-    const earned = skillPointsFrom(pointsSpent(r?.skill_tree || {}));
+    const earned = skillPointsFrom(arenaLevelFor(Number(r?.arena_xp) || 0).level);
     // Only what THIS class's skills cost — see skillPointsSpent. Points sunk into a class you no longer
     // are were being held against you forever.
     const spent = skillPointsSpent(r?.skills || {}, r?.arena_class || null);
@@ -62,18 +60,17 @@ export function skillPointsFor(r) {
 /**
  * Would pulling `back` points out of the passive tree leave the skill panel over-spent?
  *
- * It can, and that is the one place these two screens are genuinely coupled: skill points are bought with tree
- * points, so refunding a tree node can un-buy a skill point that has already been spent on a capstone.
+ * ⚠️ IT CANNOT ANY MORE, AND THIS IS KEPT AS A DELIBERATE NO-OP. Skill points were bought with tree points, so
+ * refunding a tree node could un-buy a skill point already spent on a capstone — the refund was REFUSED, from a
+ * button on a different screen, and the member had to work out which skill node to give up first. Skill points
+ * come off LEVEL now, so the two screens are no longer coupled and a tree respec never touches your skills.
  *
- * The alternatives were both bad. Silently deleting a skill node to pay for it destroys something the member
- * chose, with no warning, from a button on a different screen. Letting the panel go negative means every read
- * afterwards has to decide what a negative purse means. So the refund is REFUSED and says why — take a point
- * out of the skill panel first, where the member can see which one they are giving up.
+ * The callers stay as they are: a guard that has become impossible to trip is cheaper to leave answering
+ * honestly than to unpick from four call sites.
  */
 export function refundWouldOrphanSkills(r, back = 1) {
-    const { earned, spent } = skillPointsFor(r);
-    const after = skillPointsFrom(Math.max(0, pointsSpent(r?.skill_tree || {}) - back));
-    return spent > after ? { blocked: true, spent, earned, after } : { blocked: false };
+    void r; void back;
+    return { blocked: false };
 }
 
 async function spendGold(buyerId, amount, reason, meta) {
@@ -469,6 +466,28 @@ export async function takeSkillNode(buyerId, skillId, nodeId) {
     // a bag that somehow holds a capstone without its middle rung cannot buy its way further.
     const above = def.nodes.filter((n) => n.branch === node.branch && n.tier < node.tier);
     if (above.some((n) => !held.includes(n.id))) return { ok: false, error: "locked" };
+
+    // ── ONE PATH PER SKILL ───────────────────────────────────────────────────────────────────────────────
+    // The three branches are written as an argument between three ways to use the skill — Retribution's are
+    // "bank it all, spend it once", "answer often, and stop them", and "the answer puts you back together" —
+    // and they carry numbers that contradict each other on purpose: the Ledger capstone adds a turn of
+    // cooldown, the Punish branch takes two away.
+    //
+    // Nothing enforced it. The only rule was the tier gate above, which orders a branch without limiting you
+    // to one, so a member with enough points took every branch of every skill and every skill converged on its
+    // maximal form. JT's Retribution held all nine nodes and all three capstones at once: grudge 1.30 on a
+    // three-turn cooldown that also froze, shielded, pierced 40% of armour and healed him to full — 5,013 off
+    // a 580 damage stat, against a 2,490 health pool.
+    //
+    // That is the same failure the branches were introduced to fix. The note above SKILLS records the first
+    // version giving "each skill five flat nodes with no ordering: every one was an improvement, so every path
+    // arrived at the same place." Branches made the paths distinct and still let you buy all of them.
+    const otherBranch = held
+        .map((id) => def.nodes.find((n) => n.id === id))
+        .find((n) => n && n.branch !== node.branch);
+    if (otherBranch) {
+        return { ok: false, error: "other_branch", branch: otherBranch.branch, want: node.branch };
+    }
 
     bag[skillId] = [...held, nodeId];
     await db.query(`UPDATE mkt_arena SET skills = $2::jsonb WHERE buyer_id = $1`,

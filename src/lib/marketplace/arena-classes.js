@@ -31,12 +31,21 @@ export function arenaXpForLevel(level) {
 }
 
 /** Level, and how far into it you are — everything the badge and the bar need. */
+// ── WHERE THE CLIMB STOPS ────────────────────────────────────────────────────────────────────────────────────
+// There was no ceiling — the loop ran to 200 — so a member's tree budget grew forever and the top of the
+// ladder could never be caught. 24 is the level the furthest-along member had actually reached when this was
+// set, so it takes nothing from anybody: it fixes the ceiling at the top of the game rather than below it.
+export const ARENA_MAX_LEVEL = 24;
+
 export function arenaLevelFor(xp = 0) {
     const x = Math.max(0, Number(xp) || 0);
     let level = 1;
-    while (arenaXpForLevel(level + 1) <= x && level < 200) level += 1;
+    while (arenaXpForLevel(level + 1) <= x && level < ARENA_MAX_LEVEL) level += 1;
     const floor = arenaXpForLevel(level);
     const ceil = arenaXpForLevel(level + 1);
+    // At the cap the bar reads full rather than empty, and `next` is null so nothing renders a target that can
+    // never arrive. Everything that divides by span is already guarded by the Math.max below.
+    if (level >= ARENA_MAX_LEVEL) return { level, xp: x, into: 1, span: 1, next: null, maxed: true };
     return { level, xp: x, into: x - floor, span: Math.max(1, ceil - floor), next: ceil };
 }
 

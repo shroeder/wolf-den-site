@@ -50,38 +50,34 @@
 //   chill       share of THEIR turns that simply do not happen, for the rest of the bout
 //   soulfire    share of what landed, dealt again past armour and shields both
 //   free        true means it does NOT cost your beat — you cast it and still swing
-export const SKILL_UNLOCK_COST = 1;
+// ── OWNING THE SKILL IS FREE; CHOOSING ITS PATH IS NOT ───────────────────────────────────────────────────────
+// This used to cost a point. You have exactly three class skills and you were always going to own all three,
+// so charging for them was a tax collected before any decision got made — and it put the budget at 12 for a
+// build that has 9 decisions in it. Unlocking is free now and every point goes into a choice.
+export const SKILL_UNLOCK_COST = 0;
 export const NODE_COST = 1;
 
-// ── THE EXCHANGE RATE ────────────────────────────────────────────────────────────────────────────────────────
-// ONE FOR ONE. Every point the passive tree pays out earns one here too — they are not in competition, and a
-// level gives you one of each.
+// ── ONE POINT EVERY OTHER LEVEL, NINE IN TOTAL ───────────────────────────────────────────────────────────────
+// Luke: "I think for skills, you should only be allowed to invest in one path per skill... 3 skills, 1 tree
+// each 9 points."
 //
-// It was 3:1, on the reasoning that a skill point should cost something. That reasoning was arithmetic done
-// against a curve nobody checked, and the curve is exponential. Measured, in days of winning ALL TEN daily
-// Gauntlet fights — the ceiling, so a real member is two or three times slower:
+// Every skill is three branches of three nodes, so one path per skill is 3 nodes and a whole character is
+// exactly 9. The budget is built to land on that and stop: a point every other level, capped at 9, so the last
+// one arrives at level 18 and levels 19-24 keep feeding the passive tree only. A member can finish their
+// skills without finishing their character.
 //
-//                                     3:1        2:1        1:1
-//   first capstone (4 points)         11d         4d         1d
-//   one skill complete (10)         never        81d         7d
-//   all three complete (30)         never      never       953d
-//
-// At 3:1 one finished skill sat 953 days away and two-thirds of the eighty-one nodes were decoration — content
-// authored for nobody, which is the same trap as gear that cannot be obtained. The claim in this comment's
-// previous version, that a maxed tree pays out 20 skill points, was fiction: level 61 costs 1.16 BILLION arena
-// XP. Nobody has ever been within three orders of magnitude of it.
-//
-// Luke's call is 1:1, and the trade he is accepting is real. A capstone arrives fast — inside the first week
-// for an ordinary member — so the branch commitment is not permanent the way it would be at 2:1, and a
-// dedicated player owns every node of one skill in a month. What that buys is that members PLAY the system
-// instead of reading about the parts of it they will never reach, and the respec that already exists (three
-// free refunds a day) means trying a branch was never meant to be a life sentence anyway.
-export const TREE_POINTS_PER_SKILL_POINT = 1;
+// ⚠️ THIS IS DERIVED FROM LEVEL, NOT FROM TREE POINTS SPENT, and that decoupling is deliberate. It used to be
+// "every point you invest in the passive tree earns one here", which tied two screens together: refunding a
+// tree node could un-buy a skill point already spent on a capstone, so tree refunds had to be REFUSED with an
+// explanation (see refundWouldOrphanSkills). Off level, that cannot happen — respec the tree as often as you
+// like and your skills are untouched.
+export const SKILL_POINT_CAP = 9;
+export const LEVELS_PER_SKILL_POINT = 2;
 
-/** How many skill points a member has earned, ever. Derived from what is in the passive tree rather than
- *  stored, so it can never drift out of step with a respec. */
-export const skillPointsFrom = (treePointsSpent = 0) =>
-    Math.floor(Math.max(0, Number(treePointsSpent) || 0) / TREE_POINTS_PER_SKILL_POINT);
+/** How many skill points a member has earned, ever. Derived from arena level rather than stored, so it can
+ *  never drift out of step with a respec. */
+export const skillPointsFrom = (level = 0) =>
+    Math.min(SKILL_POINT_CAP, Math.floor(Math.max(0, Number(level) || 0) / LEVELS_PER_SKILL_POINT));
 
 // ── A SKILL IS A THREE-WAY ARGUMENT ──────────────────────────────────────────────────────────────────────────
 // The first build gave each skill five flat nodes with no ordering: every one was an improvement, so every path

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GiSwapBag } from "react-icons/gi";
 
-import { NODE_COST, SKILL_UNLOCK_COST, TREE_POINTS_PER_SKILL_POINT } from "@/lib/marketplace/arena-skills.js";
+import { LEVELS_PER_SKILL_POINT, NODE_COST, SKILL_POINT_CAP, SKILL_UNLOCK_COST } from "@/lib/marketplace/arena-skills.js";
 
 // ── THE SKILL PANEL ──────────────────────────────────────────────────────────────────────────────────────────
 // Separate from the passive tree on purpose, and the separation is the point. The tree is thirty-six numbers
@@ -128,22 +128,40 @@ function Detail({ s, busy, points, onTake, onNode, onRefund, onClose }) {
 
             {!s.unlocked ? (
                 <button type="button" className="skp-buy" disabled={busy || !s.canUnlock} onClick={() => onTake(s.id)}>
-                    {s.canUnlock ? `Unlock for ${SKILL_UNLOCK_COST} point` : `Needs ${SKILL_UNLOCK_COST} skill point`}
+                    {SKILL_UNLOCK_COST > 0
+                        ? (s.canUnlock ? `Unlock for ${SKILL_UNLOCK_COST} point` : `Needs ${SKILL_UNLOCK_COST} skill point`)
+                        : "Unlock — free"}
                 </button>
             ) : (
                 <>
+                    {/* ── ONE PATH PER SKILL, AND THE TAB HAS TO SAY SO ────────────────────────────────
+                        Once a node is held, the other two branches are closed for this skill. The server
+                        refuses them, so a panel that still renders their buttons is a panel offering a
+                        purchase that cannot happen — and the member is left to work out why from an error.
+                        The committed branch is marked, the other two read as shut, and the tag underneath
+                        explains it once rather than on every rung. */}
                     <div className="skp-brs" role="tablist" aria-label="Branches">
-                        {s.branches.map((x) => (
-                            <button key={x.id} type="button" role="tab" aria-selected={x.id === b.id}
-                                className={`skp-br${x.id === b.id ? " is-on" : ""}${x.depth >= x.nodes.length ? " is-full" : ""}`}
-                                onClick={() => setBranch(x.id)}>
-                                <b>{x.name}</b>
-                                <span className="skp-pips" aria-hidden="true">
-                                    {x.nodes.map((n) => <i key={n.id} className={n.held ? "is-on" : ""} />)}
-                                </span>
-                            </button>
-                        ))}
+                        {s.branches.map((x) => {
+                            const committed = s.branches.find((y) => y.nodes.some((n) => n.held));
+                            const shut = Boolean(committed) && committed.id !== x.id;
+                            return (
+                                <button key={x.id} type="button" role="tab" aria-selected={x.id === b.id}
+                                    className={`skp-br${x.id === b.id ? " is-on" : ""}${x.depth >= x.nodes.length ? " is-full" : ""}${shut ? " is-shut" : ""}`}
+                                    title={shut ? `You have committed this skill to ${committed.name}. Refund those nodes to change path.` : x.tag}
+                                    onClick={() => setBranch(x.id)}>
+                                    <b>{x.name}</b>
+                                    <span className="skp-pips" aria-hidden="true">
+                                        {x.nodes.map((n) => <i key={n.id} className={n.held ? "is-on" : ""} />)}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
+                    {(() => {
+                        const committed = s.branches.find((y) => y.nodes.some((n) => n.held));
+                        if (!committed || committed.id === b.id) return null;
+                        return <p className="skp-br-shut">This skill is committed to <b>{committed.name}</b>. Refund those nodes to take a different path.</p>;
+                    })()}
 
                     <p className="skp-br-tag">{b.tag}</p>
 
@@ -227,7 +245,10 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
     // broken — see the note on the sub-line below.
     const treeUnspent = p.points?.available || 0;
     const chosen = skills.find((s) => s.id === sel) || null;
-    const toNext = TREE_POINTS_PER_SKILL_POINT - (treeSpent % TREE_POINTS_PER_SKILL_POINT);
+    // Skill points come off LEVEL now, not off tree spending, so the countdown is to the next level that pays.
+    const lvl = Number(p.level) || 0;
+    const capped = (p.points?.skillEarned ?? 0) >= SKILL_POINT_CAP;
+    const toNextLevel = LEVELS_PER_SKILL_POINT - (lvl % LEVELS_PER_SKILL_POINT);
     const onTake = (id) => onAct("take_skill", { skillId: id });
     const onNode = (skillId, nodeId) => onAct("take_skill_node", { skillId, nodeId });
     const onRefund = (skillId, nodeId) => onAct("refund_skill", { skillId, nodeId });
@@ -260,14 +281,12 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                         At a rate of one the old countdown sentence was also nonsense: "1 more tree point
                         for the next" is true on every beat of the game and tells nobody anything. */}
                     <p className="skp-sub">
-                        {points === 0 && treeUnspent > 0
-                            ? `Spend your ${num(treeUnspent)} tree point${treeUnspent === 1 ? "" : "s"} and you earn ${treeUnspent === 1 ? "one" : "that many"} here.`
-                            : TREE_POINTS_PER_SKILL_POINT === 1
-                                ? "Every point you SPEND in the tree earns you one here."
-                                : `Every ${TREE_POINTS_PER_SKILL_POINT} points spent in the tree earns 1 here. ${
-                                    toNext === TREE_POINTS_PER_SKILL_POINT
-                                        ? "The next tree point spent starts the next one."
-                                        : `${toNext} more tree point${toNext === 1 ? "" : "s"} for the next.`}`}
+                        {capped
+                            ? `That is all ${SKILL_POINT_CAP} of them — one path in each of your three skills. Levels past this one feed the tree.`
+                            : `One point every ${LEVELS_PER_SKILL_POINT} levels, ${SKILL_POINT_CAP} in all. ${
+                                toNextLevel === LEVELS_PER_SKILL_POINT
+                                    ? "The next level starts the next one."
+                                    : `${toNextLevel} more level${toNextLevel === 1 ? "" : "s"} for the next.`}`}
                     </p>
                 </div>
                 <div className={`skp-points${points > 0 ? " is-live" : ""}`}>
@@ -400,6 +419,14 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                 .skp-br.is-on { background: color-mix(in srgb, var(--c) 17%, transparent);
                     border-color: color-mix(in srgb, var(--c) 62%, transparent); }
                 .skp-br.is-on b { color: color-mix(in srgb, var(--c) 68%, white); }
+                /* A branch this skill can no longer enter. Dimmed rather than removed — the choice you did
+                   not make is part of understanding the one you did, and it comes back if you refund. */
+                .skp-br.is-shut { opacity: 0.34; filter: grayscale(0.7); }
+                .skp-br.is-shut.is-on { opacity: 0.6; filter: grayscale(0.45); }
+                .skp-br-shut { margin: 6px 0 0; font-size: 11.5px; line-height: 1.4; color: #b9b4c8;
+                    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+                    border-radius: 9px; padding: 7px 9px; }
+                .skp-br-shut b { color: #ffd75e; }
                 /* A branch you have run to its capstone should read as DONE from the tab, not only from
                    inside it — that is the one state worth being smug about. */
                 .skp-br.is-full { border-color: color-mix(in srgb, var(--c) 75%, transparent);
