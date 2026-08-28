@@ -757,7 +757,18 @@ export async function channelUnread(buyerId, channels = ["global", "announce"]) 
           WHERE c.channel = ANY($2)
             AND c.buyer_id <> $1
             AND c.created_at > COALESCE(m.seen_at, NOW() - INTERVAL '7 days')
-            AND (m.joined_at IS NULL OR c.created_at >= m.joined_at)
+            -- ── A ROOM YOU HAVE NOT WALKED INTO YET OWES YOU NOTHING ──────────────────────────────────
+            -- This was: m.joined_at IS NULL OR ... and NULL is exactly the state of somebody who has just
+            -- been given a room and not opened it: mkt_channel_member is written by joinedAt on FIRST OPEN.
+            -- So the moment Luke made his son a VIP, the badge counted the whole week of VIP chat he had
+            -- never been part of — the one thing the windowing rule above exists to prevent. Luke: "the
+            -- badges shouldnt show unread for messages before they joined."
+            --
+            -- global and announce are NOT windowed (see the note by since in the feed query) and nobody
+            -- gets a member row for them, so they keep the old meaning or every badge in the plaza goes to
+            -- zero.
+            AND (c.channel IN ('global', 'announce')
+                 OR (m.joined_at IS NOT NULL AND c.created_at >= m.joined_at))
           GROUP BY c.channel`,
         [buyerId, channels],
         // `seen_at` arrives in migration 403. For the minutes between the new code serving and that landing,

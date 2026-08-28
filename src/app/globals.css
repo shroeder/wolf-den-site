@@ -6684,10 +6684,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Friends list rows. */
 /* --- Hoisted messaging dock (global, every marketplace page) --- */
 /* ===== Social hub (site-wide floating friends + messaging) ===== */
+/* ── AND IT HAS TO SIT INSIDE THE SAFE AREA ─────────────────────────────────────────
+   Luke, on an iPad: "the chat button is bleeding off the bottom and right side, its cut off." A fixed
+   right/bottom of 20px is measured from the LAYOUT viewport, which on iPadOS runs underneath the rounded
+   corners and the home indicator.
+
+   ⚠️ THIS IS NOT THE FIX ON ITS OWN, and saying so here rather than letting somebody assume it is:
+   env(safe-area-inset-*) only reports a non-zero value when the page declares viewport-fit=cover, and this
+   app does not — Next's default viewport meta has no viewport-fit. So these insets are 0 on iPad today and
+   this rule behaves exactly as the old one did. It is written this way so it becomes correct the moment
+   viewport-fit is turned on, which is the real fix and a site-wide decision: it lets EVERY edge of EVERY
+   page run under the notch and the home indicator, so it wants checking, not shipping blind. */
 .social-fab {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    right: max(20px, env(safe-area-inset-right, 0px));
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
     z-index: 900;
     width: 56px;
     height: 56px;
@@ -7235,7 +7246,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .enotif-earned { margin: 12px 0 0; font-weight: 900; font-size: 1.05rem; color: #ffd75e; animation: enotifPop 0.5s ease-out; }
 @keyframes enotifPop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 @media (max-width: 480px) {
-    .social-fab { right: 16px; bottom: 16px; }
+    .social-fab { right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
 }
 
 .mkt-dock-btn {
@@ -22775,8 +22786,21 @@ body.cas-seated .social-fab { display: none; }
     border-radius: 14px; border: 1px solid rgba(180,90,255,.22);
     box-shadow: inset 0 3px 14px rgba(0,0,0,.8); }
 .vip-room::-webkit-scrollbar { display: none; }
+/* ── THE ART HAS TO REACH THE RIGHT-HAND EDGE ───────────────────────────────────────
+   Luke, on an iPad: "the vip room background is black on the right hand side."
+
+   The element is `max(100%, --vroom * 1.5)` wide, but the background was sized `auto 100%` — full height,
+   natural width. Those two disagree the moment the viewport is wider than the art is at that height: an iPad
+   in landscape gives --vroom about 508px, so a 3:2 backdrop renders ~760px wide inside an element ~1140px
+   wide, and the last 380px is whatever is behind it. Which is black.
+
+   `cover` cannot leave a gap at any size. The backdrop is a flat painted wall (see the note on scrolling
+   rooms) so cropping a little off the top and bottom of it costs nothing, and a background-color underneath
+   means even a failed image load reads as a dim room rather than a hole. */
 .vip-world { position: relative; height: 100%; width: max(100%, calc(var(--vroom) * 1.5));
-    background: url("/images/casino/vip-room.webp") no-repeat left center / auto 100%; }
+    background-color: #1a0f28;
+    background-image: url("/images/casino/vip-room.webp");
+    background-repeat: no-repeat; background-position: left center; background-size: cover; }
 /* A pool of lamplight on the carpet, so the bottom of the room is not a flat band of colour — and so there is
    something to tap that is unambiguously "the floor". */
 .vip-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 16%;
