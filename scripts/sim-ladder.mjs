@@ -34,7 +34,7 @@ const NAMES = ONLY ? ONLY.split(",").map((x) => x.trim().toLowerCase()).filter(B
 const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
 
 const top = await db.query(
-    `SELECT a.buyer_id, a.vp, a.arena_class, b.display_name, b.alias, COALESCE(b.xp,0) AS xp
+    `SELECT a.buyer_id, a.vp, a.arena_class, a.skills, b.display_name, b.alias, COALESCE(b.xp,0) AS xp
        FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
       WHERE COALESCE(b.xp,0) > 0
       ORDER BY a.vp DESC NULLS LAST LIMIT $1`, [NAMES ? 500 : N]);
@@ -57,7 +57,23 @@ for (const r of top) {
         name: r.display_name || (r.alias ? "@" + r.alias : "Wolf"),
         vp: Number(r.vp) || 0, cls: cls || "none", kit,
         // Their own class's deck. housePick chooses from it each beat, the same way the ring does in play.
-        skills: Object.fromEntries((cls ? skillsForClass(cls) : []).map((s) => [s.id, []])),
+        // ── THE DECK IS THEIRS, NOT THE CLASS LIST ───────────────────────────────────────────────────────
+        // This used to be `skillsForClass(cls).map((s) => [s.id, []])`, which reads as "give them their class's
+        // skills" and is not what it does. resolveSkill() treats the value as the array of skill-upgrade nodes
+        // the member has BOUGHT, and an empty array is still an array — so every fighter was handed every
+        // skill in their class, at base, for free, and everyone who had actually spent skill points had that
+        // investment deleted. Skills are their own progression, separate from the tree.
+        //
+        // Mirrors arena.js's mySkills exactly, including the class filter: a class respec leaves skills behind
+        // that are no longer yours, and the server refuses them.
+        skills: (() => {
+            const mine = new Set((cls ? skillsForClass(cls) : []).map((x) => x.id));
+            const deck = {};
+            for (const [id, nodes] of Object.entries(r.skills || {})) {
+                if (mine.has(id) && Array.isArray(nodes)) deck[id] = nodes;
+            }
+            return deck;
+        })(),
     });
 }
 

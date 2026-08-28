@@ -21,7 +21,7 @@
 import { db } from "../src/lib/db.js";
 import { kitFor } from "../src/lib/marketplace/arena.js";
 import { autoRing } from "../src/lib/marketplace/arena-ring.js";
-import { skillsForClass } from "../src/lib/marketplace/arena-skills.js";
+import { skillsForClass, skillPointsFrom, skillPointsSpent, SKILL_UNLOCK_COST, NODE_COST } from "../src/lib/marketplace/arena-skills.js";
 import { CLASSES, treeFor } from "../src/lib/marketplace/arena-classes.js";
 
 const SUBJECT = process.argv[2] || "JT";
@@ -31,7 +31,7 @@ const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 10139
 
 const find = async (name) => {
     const r = await db.queryOne(
-        `SELECT a.buyer_id, a.arena_class, a.skill_tree, COALESCE(b.display_name, b.alias) AS name
+        `SELECT a.buyer_id, a.arena_class, a.skill_tree, a.skills, COALESCE(b.display_name, b.alias) AS name
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
           WHERE LOWER(COALESCE(b.display_name, b.alias)) LIKE LOWER($1) ORDER BY a.vp DESC NULLS LAST LIMIT 1`,
         [`%${name}%`]);
@@ -57,24 +57,57 @@ const spend = (clsId, budget) => {
     return take;
 };
 
-const deck = (cls) => Object.fromEntries(skillsForClass(cls || "").map((s) => [s.id, []]));
+// ── THE DECK IS BOUGHT, NOT GRANTED ──────────────────────────────────────────────────────────────────────────
+// resolveSkill() reads the value as the array of skill-upgrade nodes the member has PURCHASED, so
+// `{id: []}` for every class skill does not mean "his class's skills" — it hands out the whole class list free
+// at base rank and deletes whatever he actually bought. Skills are their own progression, paid for out of a
+// budget earned from tree points (skillPointsFrom), and spent at SKILL_UNLOCK_COST + NODE_COST each.
+//
+// His REAL deck, filtered to a class exactly as arena.js does:
+const realDeck = (cls, stored) => {
+    const mine = new Set(skillsForClass(cls || "").map((x) => x.id));
+    const out = {};
+    for (const [id, nodes] of Object.entries(stored || {})) if (mine.has(id) && Array.isArray(nodes)) out[id] = nodes;
+    return out;
+};
+// And for a class he is not: he cannot keep Warden skills as a Reaver, so the same BUDGET is respent into the
+// new class's list, unlocks first and then nodes. Invented, like the tree respend — which is why the control
+// row respends his own class the same way, and you read that row first.
+const spentDeck = (cls, budget) => {
+    const out = {};
+    let left = budget;
+    for (const sk of skillsForClass(cls || "")) {
+        if (left < SKILL_UNLOCK_COST) break;
+        out[sk.id] = []; left -= SKILL_UNLOCK_COST;
+        for (const n of (sk.nodes || [])) {
+            if (left < NODE_COST) break;
+            out[sk.id].push(n.id); left -= NODE_COST;
+        }
+    }
+    return out;
+};
 
 // Everything about him except the class and the allocation is untouched: real gear, real badges, real pets.
-const build = async (label, classId, tree) => ({
+const build = async (label, classId, tree, skills) => ({
     label,
     cls: classId,
     kit: await kitFor(subj.buyer_id, tree === null ? { classId } : { classId, skillTree: tree }),
-    skills: deck(classId),
+    skills,
 });
 
 const oppKit = await kitFor(opp.buyer_id);
-const oppSkills = deck(opp.arena_class);
+const oppSkills = realDeck(opp.arena_class, opp.skills);
+
+// What he has actually spent on skills, and therefore what a respec would give him back to spend elsewhere.
+const ownDeck = realDeck(subj.arena_class, subj.skills);
+const skillBudget = Math.max(skillPointsSpent(ownDeck, subj.arena_class), 0);
 
 const fighters = [
-    await build(`${subj.name} — as he is (${subj.arena_class})`, subj.arena_class, null),
-    await build(`${subj.name} — respent into ${subj.arena_class} [CONTROL]`, subj.arena_class, spend(subj.arena_class, points)),
+    await build(`${subj.name} — as he is (${subj.arena_class})`, subj.arena_class, null, ownDeck),
+    await build(`${subj.name} — respent into ${subj.arena_class} [CONTROL]`, subj.arena_class,
+        spend(subj.arena_class, points), spentDeck(subj.arena_class, skillBudget)),
     ...(await Promise.all(CLASSES.filter((c) => c.id !== subj.arena_class)
-        .map((c) => build(`${subj.name} — as a ${c.name}`, c.id, spend(c.id, points))))),
+        .map((c) => build(`${subj.name} — as a ${c.name}`, c.id, spend(c.id, points), spentDeck(c.id, skillBudget))))),
 ];
 
 const rate = (kit, skills) => {
