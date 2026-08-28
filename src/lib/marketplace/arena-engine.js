@@ -113,6 +113,27 @@ export const SURGE_EVERY = 5;
 // on half of them.
 //
 // Returns the number of MULTIPLES, so 0 means the blow did not crit at all and 2 means twice the crit damage.
+// ── HOW HARD A BLOW LANDS IS A ROLL, NOT A CONSTANT ──────────────────────────────────────────────────────────
+// Nothing in resolveSwing used to vary. `raw` is damage x crit x surge x mult, every term fixed, so a normal
+// hit dealt EXACTLY the same number every time and a crit dealt exactly critMult times it. Two builds produced
+// the same fight on every seed — the duel between JT and The Wolf Den traded byte-identical transcripts on
+// different seeds, 1492 / 298 / CRIT 5013, twice running.
+//
+// SWING_SPREAD is the half-width of a uniform roll around the blow: 0.15 means every hit lands somewhere in
+// 85%-115% of it, which is the ordinary band for the genre. It multiplies `raw`, so it scales with damage,
+// crit and grudge alike instead of only mattering to small hits, and it leaves every stat's contribution to
+// the AVERAGE untouched — a build worth 10% more damage is still worth exactly 10% more.
+//
+// ⚠️ IT IS TEXTURE, NOT BALANCE, and it was measured before being believed: at ±15% the top ten still had
+// 60 of 90 pairings decided (>=97% or <=3%), exactly as at ±0, and JT vs The Wolf Den moved 37.0% -> 34.9%,
+// which is noise. A symmetric roll cannot change who is favoured, a ±15% swing cannot bridge the 4.5x damage
+// gap across that ladder, and a bout that ends in two beats gives variance nowhere to accumulate. Anyone
+// reaching for this number to fix a matchup should raise the bout length or close the power spread instead.
+//
+// 0 restores the old deterministic behaviour exactly — the guard below means no rng() is drawn at all.
+export const SWING_SPREAD = 0.15;
+export const swingRoll = (rng = Math.random) => (SWING_SPREAD > 0 ? 1 + (rng() * 2 - 1) * SWING_SPREAD : 1);
+
 export function critStacks(critChance = 0, rng = Math.random) {
     const cc = Number(critChance) || 0;
     if (cc <= 0) return 0;
@@ -338,7 +359,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
             const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1)
-                * (surging ? 1 + att.surge : 1) * mult;
+                * (surging ? 1 + att.surge : 1) * mult * swingRoll(rng);
             // ── PIERCE THINS THE ARMOUR ──────────────────────────────────────────────────────────────
             // It used to route a share of the blow AROUND the armour and send the rest through it in full,
             // which is algebraically nothing: `raw*p + (raw - raw*p - armour)` collapses to `raw - armour`
