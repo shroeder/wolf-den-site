@@ -30,7 +30,6 @@ import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
     arenaLevelFor, arenaXpFor, classBase, CLASSES, classById, DEFAULT_GUARD,
-    DEFAULT_DR, DR_CAP,
     FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -275,15 +274,9 @@ async function ladderFor(buyerId) {
  * Might, not health — a companion hits alongside you, it does not lend you its constitution — and Beastbond
  * multiplies the pet's share.
  */
-// How much damage reduction a wardrobe's Tenacity is actually worth, given what you already turn aside.
-// `points` are gear points (a best-in-slot helm + back is 14); the share of the remaining gap to DR_CAP they
-// close is what you get, so the same armour is worth more to a Reaver than to a Warden.
-function drFromTenacity(currentDr, points = 0) {
-    const p = Math.max(0, Number(points) || 0) / 100;
-    if (p <= 0) return 0;
-    const headroom = Math.max(0, 1 - (Number(currentDr) || 0) / DR_CAP);
-    return p * headroom;
-}
+// drFromTenacity lived here — it converted a wardrobe's Tenacity into damage reduction against the gap to
+// DR_CAP. It was declared and never called once: damage reduction was deleted, so Tenacity's only remaining
+// job is multiplying armour (see the armor line in kitFor). Removed rather than left looking like a rule.
 
 // EXPORTED so a balance run can ask what a member's pets, badges and compendium are worth on their own —
 // call it with an empty wardrobe and you get exactly the layer that is NOT gear. A sim built on gear alone
@@ -1568,8 +1561,13 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // disagree — the card reads the same fields resolveBeat multiplies.
             health: foeKit.health, damage: foeKit.damage,
             critChance: foeKit.critChance, critMult: foeKit.critMult,
-            // One number for mitigation on both sides of the ring now, and one for landing a blow.
-            dr: foeKit.dr ?? DEFAULT_DR,
+            // ── AND `dr` IS CARRIED AS ZERO, NOT AS DEFAULT_DR ───────────────────────────────────────
+            // Damage reduction was deleted — armour is the whole of mitigation — and the engine reads no `dr`
+            // at all. This defaulted to 0.20 anyway, so every NPC's card advertised "20% reduction" for a
+            // mechanic the bout never applied. A card that states a rule the fight does not run is the exact
+            // defect the ring has been dug out of twice; the field stays (the bout shape is asserted by
+            // check:bout) and it stays honest.
+            dr: foeKit.dr ?? 0,
             lifesteal: foeKit.lifesteal || 0,
             bleedChance: foeKit.bleedChance || 0, burnChance: foeKit.burnChance || 0, dmgPct: foeKit.dmgPct || 0,
             doublestrike: foeKit.doublestrike || 0,
@@ -1606,7 +1604,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             element: me.element, abilities: me.abilities, might: me.might, extra: me.extra,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
-            dr: me.dr ?? DEFAULT_DR,
+            dr: me.dr ?? 0,
             lifesteal: me.lifesteal || 0,
             bleedChance: me.bleedChance || 0, burnChance: me.burnChance || 0, dmgPct: me.dmgPct || 0,
             doublestrike: me.doublestrike || 0,

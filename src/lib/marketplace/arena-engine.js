@@ -19,7 +19,9 @@ import {
 } from "@/lib/marketplace/arena-kit.js";
 // Accuracy and the damage-reduction ceiling are the CLASS file's — a fighter's floor and cap come from what
 // they are, not from the kit they carry.
-import { DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
+// DR_CAP was imported here too and never used — damage reduction was deleted in favour of armour being the
+// whole of mitigation, and the ceiling for a system that no longer exists went with it.
+import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 import { EXTRA_TURN_MAX, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 // Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
 import { luckyRoll } from "@/lib/marketplace/fortune.js";

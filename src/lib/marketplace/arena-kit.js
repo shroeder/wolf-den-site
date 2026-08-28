@@ -752,30 +752,27 @@ export const DAMAGE_MAX = 3500;
 export const mightMult = (might = 0) => (Math.max(0, Number(might) || 0) / MIGHT_MAX) * DAMAGE_MAX;
 
 // damage = base damage x the might calculation
-export const WEAPON_BASE_REF = 100;
+// ── AN EMPTY HAND IS THE WORST WEAPON, NOT THE BEST ──────────────────────────────────────────────────────────
+// This is the fallback for a member with nothing in their main hand, and it was 100 — the TOP of the old
+// 10-to-100 rarity ladder. So punching beat every weapon in the game bar one primordial, and 69 of the 73
+// armed members in the Den hit harder with their hands than with the sword they were carrying. Flattening the
+// ladder to 32 did not fix that, it made it universal: unarmed was 2.5x the best weapon in the catalogue.
+//
+// Half of what a real weapon carries. Being unarmed is now a penalty, which is what an empty slot should be,
+// and every weapon in the game is an upgrade over it.
+export const WEAPON_BASE_REF = 16;
 // The weapon's base is divided by this before Might multiplies it. Without it the two numbers were both
 // damage and multiplied each other into the tens of thousands.
 export const WEAPON_BASE_DIVISOR = 100;
 export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
     ((Number(baseDamage) || WEAPON_BASE_REF) / WEAPON_BASE_DIVISOR) * mightMult(might);
 
-// ── FEROCITY IS THE ACCURACY STAT ────────────────────────────────────────────────────────────────────────────
-// It used to buy four points at 200 Ferocity, which is not a stat, it is a rounding error — and that was the
-// right call while the base sat at 95%, because there was nothing to climb toward. With the base at 75 there
-// is 23 points of room under the ceiling, and Ferocity is what buys it back.
+// ── THE ACCURACY NOTE THAT USED TO BE HERE IS GONE ───────────────────────────────────────────────────────────
+// It explained, with a worked table, how Ferocity bought accuracy: 20 fero for 77%, 207 for 93% at the cap,
+// "a plain swing can always miss". Accuracy was deleted on 2026-08-27 — nothing in the ring has ever rolled to
+// hit since — and the explanation outlived the mechanic by long enough to mislead a reader of this file.
 //
-// Deliberately Ferocity rather than a new stat. The four gear stats are Might, Crit Chance, Crit Power and
-// Ferocity; adding a fifth would mean re-rolling every item in the game. Ferocity already buys health and
-// speed, and "a body built to keep swinging is also a body that lands them" is a sentence a member can hold
-// in their head — a kit that wants to hit reliably now has a reason to take the defensive stat, which is a
-// real build decision where there was none.
-//
-//   starting out    20 fero  →  +2   (77%)
-//   half geared     70 fero  →  +7   (82%)
-//   well geared    135 fero  →  +14  (89%)
-//   best in slot   207 fero  →  +18  (93%, at the cap)
-//
-// The ceiling stays below ACCURACY_CAP so the tree still has somewhere to go and a plain swing can always miss.
+// What Ferocity actually buys is below: the extra-turn chance, via speedOf and extraTurnFrom.
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
