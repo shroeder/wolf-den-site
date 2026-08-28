@@ -90,6 +90,16 @@ for (let a = 0; a < who.length; a += 1) {
 
 console.log("");
 console.log("  " + (pairs.length * BOUTS).toLocaleString() + " bouts across " + pairs.length + " ordered pairings.");
+
+// ── HOW MANY OF THESE ARE ACTUALLY FIGHTS? ───────────────────────────────────────────────────────────────────
+// A pairing that lands on 0% or 100% over hundreds of seeded bouts is not a close matchup that went one way —
+// it is decided before the bell, and no amount of play changes it. That is a more serious problem than class
+// balance: it means the ladder's outcome is a lookup of who is stronger, and the fight is a formality.
+const decided = pairs.filter((x) => x.p >= 0.97 || x.p <= 0.03).length;
+const close = pairs.filter((x) => x.p > 0.35 && x.p < 0.65).length;
+console.log("  " + decided + " of " + pairs.length + " ordered pairings are DECIDED (>=97% or <=3%); only "
+    + close + " are close (35-65%).");
+
 console.log("  Largest first-half vs second-half gap in any pairing: " + (drift * 100).toFixed(1) + " points"
     + (drift < 0.06 ? "  — converged." : "  — still moving; raise the bout count."));
 
