@@ -169,6 +169,16 @@ export async function grantCustomCredit(buyerId, n = 1, ctx = {}) {
 
 // Start a creation: spend one credit, draw the first single option. OWNERS/admins create for FREE (no token
 // needed) — they run the store, so they never burn credits to make art.
+// The two numbers every creation response has to carry: what you hold, and whether you pay at all. One helper
+// so start, refine and finalize cannot answer differently — which is exactly what went wrong.
+async function creditState(buyerId) {
+    const [row, free] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(custom_deco_credits,0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        hasOwnerStanding(buyerId).catch(() => false),
+    ]);
+    return { credits: row?.c ?? 0, free };
+}
+
 export async function startCustomDeco(buyerId, name, prompt) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     const nm = String(name || "").trim().slice(0, 40) || "My Decoration";
@@ -272,7 +282,12 @@ export async function refineCustomDeco(buyerId, id, correction) {
           WHERE id = $1 AND status <> 'final'`,
         [Number(id), JSON.stringify(merged)]
     ).catch(() => {});
-    return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting", pendingNote: "" } };
+    // ⚠️ credits AND free, EVERY TIME. Luke: "as an owner, im only able to use one free creation, the second
+    // time it prompts me to buy creations until I refreshed the screen." start returned `free`; refine and
+    // finalize did not, and the panel syncs whatever it is handed — so the first response said "owner, free"
+    // and the next one said nothing, which the client read as false and drew a purchase prompt over a member
+    // who does not pay. A response that answers half the question is worse than one that answers none.
+    return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting", pendingNote: "" }, ...(await creditState(buyerId)) };
 }
 
 // Finalize: lock in the chosen image → grant it as an owned, placeable decoration.
@@ -289,7 +304,7 @@ export async function finalizeCustomDeco(buyerId, id, chosenUrl) {
     // premium, deliberate act, so a single finished piece is a fair unlock.
     await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'artisan') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // First Creation / Artisan / Gallery
-    return { ok: true, decoId, name: row.name };
+    return { ok: true, decoId, name: row.name, ...(await creditState(buyerId)) };
 }
 
 // Finalized customs for a member → { 'custom:<id>' → { name, url } }. Used to render custom decos in the farm.

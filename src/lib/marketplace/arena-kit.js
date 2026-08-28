@@ -260,8 +260,6 @@ export const CONTROL_IMMUNE_TURNS = 1;
 // CHILL_CAP is gone. Chill is a magnitude now — the share of a bar's rate it takes — and arena-atb.js caps
 // nothing but the stall floor. A second, tighter cap living here would have meant the same cold was worth
 // four different amounts depending on which file you asked.
-export const SUNDER_CUT = 0.4;      // of their guard, removed
-export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.
 export const RIPOSTE_SHARE = 0.3;   // of their landed blow, sent back at them
 // A SHIELD CEILING. Wards and ripostes are played on THEIR beat and do not cost you a swing, so a loadout of
@@ -375,23 +373,20 @@ export function effectOf(kind, power, element, hits = 1, opts = {}) {
             };
         case "rend":
             return {
-                head: `${Math.round(REND_PER_TURN * 100)}%`, sub: `a turn, ${REND_TURNS} turns`,
-                line: `Burns for ${REND_TURNS} more turns after it lands`,
-                tags: [{ t: "Stacks with itself", k: "good" }],
+                // Quoted REND_PER_TURN — 4.5% of MAX HEALTH — which belongs to lightBurn, the burn the game
+                // never ran and which has now been deleted. The live burn is a share of the BLOW that lit it,
+                // one stack a proc, ticking at the start of their turn. See the note on stacking in
+                // arena-engine.js.
+                head: "20%", sub: "of the blow, a tick",
+                line: "Burns for a share of the blow that lit it, at the start of each of their turns",
+                tags: [{ t: "Stacks — extends it, keeps the fiercer tick", k: "good" }],
             };
         case "drain":
             return {
                 head: x(power), sub: "damage",
                 line: `${x(power)} damage, and you keep ${Math.round(DRAIN_SHARE * 100)}% of it`,
                 tags: [{ t: `Heals ${Math.round(DRAIN_SHARE * 100)}% of it`, k: "good" }],
-            };
-        case "sunder":
-            return {
-                head: `−${Math.round(SUNDER_CUT * 100)}%`, sub: "their guard",
-                line: `${x(power)} damage and strips ${Math.round(SUNDER_CUT * 100)}% of their guard for ${SUNDER_TURNS} turns`,
-                tags: [{ t: `For ${SUNDER_TURNS} turns`, k: "good" }],
-            };
-        case "gamble":
+            };        case "gamble":
             return {
                 head: x(power * 2), sub: "or nothing",
                 line: `${x(power * 2)} damage on a coin flip, nothing on the other side`,
@@ -781,10 +776,6 @@ export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
 //   best in slot   207 fero  →  +18  (93%, at the cap)
 //
 // The ceiling stays below ACCURACY_CAP so the tree still has somewhere to go and a plain swing can always miss.
-export const ACCURACY_PER_FEROCITY = 0.001;
-export const ACCURACY_FROM_FEROCITY_CAP = 0.18;
-export const accuracyFromFerocity = (fero = 0) =>
-    Math.min(ACCURACY_FROM_FEROCITY_CAP, Math.max(0, Number(fero) || 0) * ACCURACY_PER_FEROCITY);
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
@@ -899,14 +890,6 @@ export const BATTLE_ITEMS = [
 // Every one of these is telegraphed a beat ahead like any other move, and every one has an answer. That is the
 // line they are written to: a move you cannot see coming is a dice roll, and a move with no counter is a wall.
 // Read the tell, then decide whether to swing, brace or drink.
-export const DREAD_CUT = 0.30;      // Dread Howl — your damage, while it lasts
-export const DREAD_TURNS = 3;
-export const SNARE_ACC = 0.18;      // Hobbling Chain — off your accuracy
-export const SNARE_TURNS = 3;
-export const BIND_CUT = 0.5;        // Gravebind — your Guard banks this share of normal
-export const BIND_TURNS = 2;
-export const DOOM_TURNS = 3;        // Deathknell — beats until it lands
-export const DOOM_MULT = 2.8;       // and what it hits for when it does
 export const FRENZY_DMG = 1.45;     // Blood Frenzy — their damage up
 export const FRENZY_DR = 0.5;       // and their guard down, which is the window
 export const FRENZY_TURNS = 3;

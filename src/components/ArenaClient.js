@@ -22,7 +22,13 @@ import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
-import { BATTLE_ITEMS, BIND_CUT, DOOM_MULT, DREAD_CUT, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
+// ── THE FIVE STATUSES THAT COULD NEVER HAPPEN ────────────────────────────────────────────────────────────────
+// dread, snare, bound, doom and sunder each had an info card here explaining what they do to you — "your
+// damage is cut by 25%", "18% off your accuracy", "your Guard banks only half". Not one of them is ever SET.
+// Nothing in arena-ring.js or arena-engine.js writes any of the five; the brain that would, arena-ai.js, is
+// imported by the dev lab and nothing else. So the cards, the constants behind them and the fields they read
+// were five mechanics' worth of scaffolding around nothing.
+import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
 // The live damage-over-time shares, from the engine that actually runs them — NOT arena-kit's REND_PER_TURN
 // and BLEED_PER_TURN, which feed lightBurn() and are read by the simulator alone.
 import { BLEED_SHARE, BURN_SHARE } from "@/lib/marketplace/arena-engine.js";
@@ -303,18 +309,8 @@ const STATUS_KINDS = {
                // theirs), and it was the only place claiming it stacks, which is why Luke counted stacks that
                // were never there. What the live engine actually does is below.
                what: () => `Takes ${pct(BURN_SHARE)} of the blow that lit it, at the START of each of their turns. Stacks: a new one extends it and keeps the fiercer tick.` },
-    sunder:  { Icon: GiCrackedShield, label: "Guard stripped", tone: "bad",
-               what: () => `${pct(SUNDER_CUT)} of their damage reduction is gone while it lasts.` },
-    dread:   { Icon: GiTerror,        label: "Dread",          tone: "bad",
-               what: () => `Your damage is cut by ${pct(DREAD_CUT)}.` },
-    snare:   { Icon: GiChainedHeart,  label: "Chained",        tone: "bad",
-               what: () => `${pct(SNARE_ACC)} off your accuracy — you will miss more.` },
-    bound:   { Icon: GiTombstone,     label: "Gravebound",     tone: "bad",
-               what: () => `Your Guard banks only ${pct(BIND_CUT)} of what it should.` },
     branded: { Icon: GiSpikedHalo,    label: "Branded",        tone: "mark",
                what: () => "Every blow they land on you is a guaranteed crit." },
-    doom:    { Icon: GiRingingBell,   label: "The Bell",       tone: "doom",
-               what: () => `When it finishes counting down they hit for ${DOOM_MULT}x.` },
     frenzy:  { Icon: GiAngryEyes,     label: "Their frenzy",   tone: "bad",
                what: () => "They are swinging faster than they should." },
     // ── THE TWO NEW ONES ── a lost turn and a lost guard are the biggest things that can happen to you in
@@ -340,21 +336,15 @@ function statusesFor(bout, side) {
     if (side === "them") {
         if (bout.bleed?.turns > 0) add("burn", bout.bleed.turns, { dmg: bout.bleed.dmg, stacks: bout.bleed.stacks });
         if (bout.gash?.turns > 0) add("bleed", bout.gash.turns, { dmg: bout.gash.dmg, stacks: bout.gash.stacks });
-        add("sunder", Number(bout.sunder) || 0);
         add("frozen", Number(bout.foeFrozen) || 0);
         add("noguard", Number(bout.foeNoGuard) || 0);
         return out;
     }
     if (bout.foeBleed?.turns > 0) add("burn", bout.foeBleed.turns, { dmg: bout.foeBleed.dmg, stacks: bout.foeBleed.stacks });
     if (bout.foeGash?.turns > 0) add("bleed", bout.foeGash.turns, { dmg: bout.foeGash.dmg, stacks: bout.foeGash.stacks });
-    add("sunder", Number(bout.foeSunder) || 0);
     add("frozen", Number(bout.frozen) || 0);
     add("noguard", Number(bout.noGuard) || 0);
-    add("dread", Number(bout.dread) || 0);
-    add("snare", Number(bout.snare) || 0);
-    add("bound", Number(bout.bound) || 0);
     if (bout.branded) add("branded", true);
-    if (bout.doomReady) add("doom", true); else add("doom", Number(bout.doom) || 0);
     add("frenzy", Number(bout.foeFrenzy) || 0);
     return out;
 }

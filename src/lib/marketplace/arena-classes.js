@@ -184,7 +184,6 @@ export const classBase = (id) => {
         blockReduction: c?.blockReduction ?? null,
         blockStack: c?.blockStack ?? 0,
         blockStackMax: c?.blockStackMax ?? 0,
-        accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
         bleedChance: c?.bleedChance || 0,
@@ -198,14 +197,11 @@ export const DEFAULT_DR = 0.20;
 // Half a Warden's, which is the rule for every class that is not one: bracing well is the Warden's job.
 // NPCs use it too — they have no class and no Fortune, so a Gauntlet foe's guard is exactly this.
 export const DEFAULT_GUARD = 0.12;
-export const DEFAULT_ACCURACY = 0.75;
 // Nobody dodges forever and nobody hits forever: a ceiling on each so investment cannot end the interaction.
 export const DR_CAP = 0.60;
 // 0.98 rather than 1.0, deliberately: a plain swing must ALWAYS be able to miss. At a cap of 1 a
 // well-invested fighter reaches "never misses", and the moment that happens every skill's accuracy cost
 // stops being a trade-off and becomes a rounding error — which is the whole mechanic gone.
-export const ACCURACY_CAP = 0.98;
-export const ACCURACY_FLOOR = 0.35;
 
 // ── WHAT A CLASS GIVES YOU FOR FREE ──────────────────────────────────────────────────────────────────────────
 // The inherent half of a class, in words, built from the SAME numbers the engine folds — never prose typed out
@@ -220,7 +216,6 @@ export function classPassives(id) {
     if (b.health) out.push({ label: "Vigour", value: `+${b.health} health` });
     if (b.dr !== DEFAULT_DR) out.push({ label: "Damage reduction", value: `${Math.round(b.dr * 100)}%` });
     if (b.guard !== DEFAULT_GUARD) out.push({ label: "Guard", value: `${Math.round(b.guard * 100)}% of health` });
-    if (b.accuracy !== DEFAULT_ACCURACY) out.push({ label: "Accuracy", value: `${Math.round(b.accuracy * 100)}%` });
     if (b.lifesteal) out.push({ label: "Lifedrink", value: `${Math.round(b.lifesteal * 100)}% of all damage back` });
     if (b.dmgPct) out.push({ label: "Brutality", value: `+${Math.round(b.dmgPct * 100)}% damage on everything you throw` });
     if (b.bleedChance) out.push({ label: "Ragged Edge", value: `${Math.round(b.bleedChance * 100)}% chance any hit opens a wound` });

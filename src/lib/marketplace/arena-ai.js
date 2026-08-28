@@ -15,7 +15,10 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS, REND_TICK_CAP } from "@/lib/marketplace/arena-kit.js";
+import { DRAIN_SHARE, guardSoakFrom, REND_TICK_CAP } from "@/lib/marketplace/arena-kit.js";
+// Was DOOM_TURNS from arena-kit. The doom status is never applied by anything the game runs, so the constant
+// went with the rest of that family; this file is the dev lab's opponent brain and keeps its own number.
+const DOOM_BEATS = 3;
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 

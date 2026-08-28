@@ -7,15 +7,14 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bars as liveBars, tempoOf, BAR_REFUND} from "@/lib/marketplace/arena-atb.js";
 import {
-    accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
+    buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
     BLOCK_REDUCTION, GUARD_BASE_SHARE, extraTurnFrom, guardSoakFrom,
-    DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
     BLEED_PER_TURN, BLEED_TURNS, BLEED_MAX_STACKS, BLEED_TICK_CAP, BLEED_TURNS_CAP,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_TICK_CAP, REND_TURNS_CAP,
-    SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
+    RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
@@ -30,8 +29,8 @@ import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
-    ACCURACY_CAP, ACCURACY_FLOOR, arenaLevelFor, arenaXpFor, classBase, CLASSES, classById, DEFAULT_GUARD,
-    DEFAULT_ACCURACY, DEFAULT_DR, DR_CAP,
+    arenaLevelFor, arenaXpFor, classBase, CLASSES, classById, DEFAULT_GUARD,
+    DEFAULT_DR, DR_CAP,
     FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -1324,7 +1323,6 @@ function publicBout(b) {
         ),
         // The NPC-only states. Published because the fight screen draws a chip for each — an effect the
         // player is under and cannot see is indistinguishable from the numbers being wrong.
-        dread: b.dread || 0, snare: b.snare || 0, bound: b.bound || 0,
         branded: Boolean(b.branded), doom: b.doom || 0, doomReady: Boolean(b.doomReady),
         foeFrenzy: b.foeFrenzy || 0,
         incoming: b.incoming || null,

@@ -856,7 +856,23 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Custom (player-made) decorations
     const customStart = useCallback(async (name, prompt) => {
         const r = await post({ action: "deco_custom_start", name, prompt });
-        if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits, draft: r.draft } } }));
+        // Keep what the reply does not mention rather than blanking it — the server now sends credits+free on
+        // every creation response, and this is the belt to that braces: a future action that forgets one must
+        // not be able to tell an owner they have to buy something.
+        if (r?.ok) {
+            setFarm((f) => ({
+                ...f,
+                decorations: {
+                    ...f.decorations,
+                    custom: {
+                        ...(f.decorations?.custom || {}),
+                        ...(r.credits !== undefined ? { credits: r.credits } : {}),
+                        ...(r.free !== undefined ? { free: r.free } : {}),
+                        draft: r.draft,
+                    },
+                },
+            }));
+        }
         return r;
     }, [post]);
     // The refreshed draft is folded back into farm state, not just returned: the dock reads it to decide whether
@@ -2201,7 +2217,13 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
     const [st, setSt] = useState({ library: [], activeId: null, credits: null, free: false, draftPrompt: null });
     const [err, setErr] = useState(null);
     const [confirmId, setConfirmId] = useState(null); // a background pending delete-confirm
-    const sync = (r) => { if (r && "library" in r) setSt({ library: r.library || [], activeId: r.activeId ?? null, credits: r.credits ?? null, free: Boolean(r.free), draftPrompt: r.draftPrompt ?? null }); };
+    const sync = (r) => {
+        if (!r || !("library" in r)) return;
+        setSt({ library: r.library || [], activeId: r.activeId ?? null, credits: r.credits ?? null, free: Boolean(r.free), draftPrompt: r.draftPrompt ?? null });
+        // Fill the box with what this draft was asked for, so Redo re-rolls the same idea and the words are
+        // there to edit. Only when the box is empty — never clobber something half-typed.
+        setDesc((d) => (d && d.trim() ? d : (r.draftPrompt || "")));
+    };
     useEffect(() => {
         let alive = true;
         onAct({ action: "farm_bg_state" }).then((r) => { if (alive) sync(r); });
@@ -2234,10 +2256,19 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
             {draft ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ fontSize: 12.5, color: "#cdbde8" }}>👀 It&apos;s live on your farm above — keep it?</div>
-                    {/* Say what Redo will re-roll, so the button is not a mystery box. */}
-                    {st.draftPrompt ? (
-                        <div style={{ fontSize: 11.5, color: "#9d8bbb", fontStyle: "italic", marginTop: 2 }}>“{st.draftPrompt}”</div>
-                    ) : null}
+                    {/* ── AND YOU CAN CHANGE YOUR MIND WITHOUT THROWING IT AWAY ───────────────────────────
+                        The draft step had no box at all, so the only way to reword a description was Discard
+                        and start over. Seeded from the draft's own prompt, so Redo re-rolls what you asked
+                        for unless you edit it — and editing it is now a thing you can do. */}
+                    <textarea
+                        value={desc}
+                        onChange={(e) => setDesc(e.target.value.slice(0, 300))}
+                        rows={2}
+                        placeholder="Describe it differently, or leave it and re-roll the same idea"
+                        style={{ width: "100%", resize: "vertical", marginTop: 2, padding: "8px 10px", borderRadius: 10,
+                            border: "1px solid rgba(201,162,255,0.35)", background: "rgba(0,0,0,0.28)", color: "#e8ddff",
+                            fontSize: 12.5, lineHeight: 1.4, fontFamily: "inherit" }}
+                    />
                     <div style={{ display: "flex", gap: 8 }}>
                         <button type="button" disabled={busy} onClick={accept} style={{ flex: 1, padding: 11, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy ? 0.6 : 1 }}>✓ Save &amp; use</button>
                         <button type="button" disabled={busy || low} onClick={generate} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9c9ff", cursor: "pointer", opacity: busy || low ? 0.5 : 1 }}>🎲 Redo · 3</button>
