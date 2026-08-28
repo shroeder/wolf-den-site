@@ -119,6 +119,26 @@ export const STAT_META = {
 // Charged-perk reward keys → the real-world thing you hand over in-store. Redeemed via the admin app
 // (Items & Gear), each use burns a charge and starts the item's cooldown. Keep keys STABLE (redemptions
 // are logged by key).
+// ── WHERE A PIECE ACTUALLY COMES FROM ────────────────────────────────────────────────────────────────────────
+// David B, in the plaza: "anyone else missing a lot of the pendents in the compendium?" He was not missing
+// them — he had 22 of 76, and the compendium showed the other 54 as identical blank tiles with nothing on them
+// but "Not yet collected". Twenty-three of those pendants are counter items handed over in the shop, eleven are
+// elite-tier, thirty come out of chests, and the screen said none of that even though `source` was already on
+// every row it drew.
+//
+// A completion screen that will not say how a thing is obtained turns every gap into the same question, and
+// the answer to most of them is "keep opening chests" while the answer to a quarter of them is "you cannot,
+// this one is handed to you at the counter".
+export const ITEM_SOURCE_LABEL = {
+    level: "Earned by reaching its level",
+    chest: "Found in chests",
+    xp_shop: "Bought in the Armoury with XP",
+    boss_drop: "Dropped by the weekly boss",
+    elite: "The elite tiers — chests from Ascendant up",
+    bounty_reward: "Paid out by a bounty",
+    admin: "Handed over the counter in the shop",
+};
+
 export const REWARDS = {
     // Small freebies (fixed, low value)
     free_snack: "Free snack from the counter",

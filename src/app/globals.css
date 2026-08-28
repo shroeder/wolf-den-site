@@ -16916,6 +16916,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cmp-sheet-flavor { margin: 0 0 10px; font-style: italic; font-size: 0.82rem; color: #8b93a0; }
 .cmp-sheet-state { margin: 0; font-size: 0.78rem; font-weight: 800; color: #6a727d; }
 .cmp-sheet-state.is-have { color: #8fd6a2; }
+.cmp-sheet-source { margin: 4px 0 0; font-size: 0.76rem; color: #7d8794; }
 
 /* ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────────
    It shipped as a hundred grey text tiles under ten text headings and read as homework. Everything below is
