@@ -60,7 +60,7 @@ export const VIP_CENTS = 70000;
  */
 export async function standingFor(buyerId) {
     if (!buyerId) return { level: 1, rank: RANKS[0], spentCents: 0, roles: [], chosen: null };
-    const [row, store, online] = await Promise.all([
+    const [row, store, online, badgeRows] = await Promise.all([
         // `role` arrives in migration 402. Between the new code serving and that migration landing, asking
         // for it throws — and a null row here would read as level 1 with no roles, which would take VIP and
         // Staff off the people who have them and shut them out of their own rooms for the length of a
@@ -84,15 +84,33 @@ export async function standingFor(buyerId) {
                FROM mkt_credit_purchase WHERE buyer_id = $1 AND status = 'paid'`,
             [buyerId],
         ).catch(() => null),
+        // The two badges that carry standing. Read here, in the same round trip as the rest, so granting the
+        // role costs nothing extra — see the note by `roles` below for why the badge counts at all.
+        db.query(
+            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff')`,
+            [buyerId],
+        ).catch(() => []),
     ]);
 
     const level = levelForXp(Number(row?.xp) || 0).level;
     const rank = rankForLevel(level);
     const spentCents = Number(store?.c || 0) + Number(online?.c || 0);
 
+    // ── THE BADGE IS THE DESIGNATION; THE ALLOW-LIST IS THE DEV KEY ──────────────────────────────────────
+    // Luke: "Owners, people with the owner badge are not able to get into the VIP room, and they should be."
+    //
+    // These roles came only from isOwner/isStaff, which are hardcoded id sets in owner.js — and OWNER_BUYER_IDS
+    // holds exactly one account. Meanwhile three people wear the `owner` badge and one wears `staff`, granted
+    // through the badge system, and none of them got the role. So the room turned away the people whose badge
+    // says they own it, and the VIP chat channel turned them away too — channelsFor reads this same list.
+    //
+    // The two stay separate on purpose. isOwner gates UNRELEASED FEATURES (see owner.js) and PRIMARY_OWNER_ID
+    // gates firing a raid at the whole membership; neither should follow a badge somebody was given. What the
+    // badge earns is the social standing it depicts: the room, its chat, and the chip.
     const roles = [];
-    if (isOwner(buyerId)) roles.push(ROLES.owner);
-    if (isStaff(buyerId)) roles.push(ROLES.staff);
+    const wears = new Set((badgeRows || []).map((r) => r.badge_slug));
+    if (isOwner(buyerId) || wears.has("owner")) roles.push(ROLES.owner);
+    if (isStaff(buyerId) || wears.has("staff")) roles.push(ROLES.staff);
     if (spentCents >= VIP_CENTS) roles.push(ROLES.vip);
     // The ladder is last and always present: it is the floor, not a prize.
     roles.push({ key: `rank:${rank.title}`, name: rank.title, tone: rank.tone, glow: false, rank: true });
@@ -220,6 +238,11 @@ export function chipFor(buyerId, stored, xpTotal) {
     const level = levelForXp(Number(xpTotal) || 0).level;
     const rank = rankForLevel(level);
     const fallback = { key: `rank:${rank.title}`, name: rank.title, tone: rank.tone, glow: false, rank: true };
+    // ⚠️ chipFor is SYNCHRONOUS and cannot read badges — it is called per chat line, and a query per message
+    // is not a trade worth making. So it still checks the allow-lists only, which means a badge-holder gets
+    // the room and the channel but wears their rank chip rather than an Owner one. That is a deliberate
+    // half-measure, not an oversight: if the chip should follow the badge too, chipFor needs the badge passed
+    // in by its caller, which already loads the member row.
     if (!stored) return isOwner(buyerId) ? ROLES.owner : isStaff(buyerId) ? ROLES.staff : fallback;
     if (stored === "owner") return isOwner(buyerId) ? ROLES.owner : fallback;
     if (stored === "staff") return isStaff(buyerId) ? ROLES.staff : fallback;

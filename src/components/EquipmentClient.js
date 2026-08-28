@@ -1070,8 +1070,18 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 )
                             ) : it.equipped ? (
                                 <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === it.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
-                            ) : !slotDefs.length ? (
+                            ) : !slotDefs.length && !it.collectionPiece ? (
                                 // Equippable gear equips via the per-slot buttons in the comparison above; this is a fallback only.
+                                //
+                                // ⚠️ AND NOT FOR A COLLECTION PIECE. `!slotDefs.length` is true for gear with no
+                                // slot comparison to show — which is exactly what a collection piece is, because
+                                // it HAS no slot. So the card explained "owning it is enough, it never needs to
+                                // be worn" and then offered a blue Equip button directly underneath, which posts
+                                // an equip with no slot and comes back "missing_slot". Luke: "we have an equip
+                                // button that baits people to clicking it and throwing an error."
+                                //
+                                // The Sell and Salvage blocks below already guard on `it.collectionPiece`; this
+                                // one was the only action on the card that did not.
                                 <button type="button" className="button primary" onClick={() => { equipFromBag(it); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
                             ) : null}
                             {!it.shop && !it.collectionPiece && it.sellValue > 0 ? (
