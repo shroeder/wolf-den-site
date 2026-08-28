@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { mint } from "@/lib/marketplace/gold-rate.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -304,8 +305,16 @@ const settle = async (buyerId, run, result) => {
     await saveRun(buyerId, run);
     return { ok: true, ...(await getDelveState(buyerId)) };
 };
+// ⚠️ THE MINT RATE IS APPLIED HERE, at the one place gold enters a run, and the caller is handed back what
+// actually landed so the line it prints is that number. It used to be applied once at the surface instead:
+// every floor announced "+250 gold", the running tally said "Carrying 1,000", and the wrap card paid 400.
+// Kaishiern: "The rewards gotten during a dungeon no longer match the end reward screen about what it actually
+// gives you." Nothing was being taken — the run spent four floors quoting a pre-halving number. Minting at the
+// bank rather than at the payout is what makes that impossible to reintroduce: a new gold source added below
+// cannot forget, because it never sees an unminted number in the first place.
 const bank = (run, { gold = 0, xp = 0, chest = null, parts = null, frags = 0, gear = null } = {}) => {
-    run.banked.gold += gold;
+    const paidGold = mint(gold, "delve");
+    run.banked.gold += paidGold;
     run.banked.xp += xp;
     if (chest) run.banked.chests.push(chest);
     // Parts and fragments are BANKED like everything else and handed over at the surface, so dying still pays
@@ -314,6 +323,7 @@ const bank = (run, { gold = 0, xp = 0, chest = null, parts = null, frags = 0, ge
     if (parts) { run.banked.parts = run.banked.parts || {}; run.banked.parts[parts.tier] = (run.banked.parts[parts.tier] || 0) + parts.n; }
     if (frags) run.banked.frags = (run.banked.frags || 0) + frags;
     if (gear) { run.banked.gear = run.banked.gear || []; run.banked.gear.push(gear); }
+    return { gold: paidGold, xp };
 };
 
 // ── THE KILL TABLE ───────────────────────────────────────────────────────────────────────────────────────────
@@ -425,7 +435,7 @@ export async function delveAct(buyerId, action, choice = null) {
             const ev = floor.event;
             const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * (ev.lootMult || 1));
             const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
-            bank(run, { gold, xp });
+            const paid = bank(run, { gold, xp });
             const isBoss = ev.kind === KIND.boss;
             const got = await rollFightLoot(buyerId, run, d, { mult: ev.lootMult || 1, boss: isBoss });
             // A dungeon boss is one run per dungeon per day, so this is the most RELIABLE of the four stone
@@ -439,7 +449,7 @@ export async function delveAct(buyerId, action, choice = null) {
             }
             const { partName } = await import("@/lib/marketplace/forge-parts.js");
             const extras = lootLine(got, partName);
-            lines.push(`${run.foe.name} falls. +${gold} gold, +${xp} XP${extras.length ? `, ${extras.join(", ")}` : ""}.`);
+            lines.push(`${run.foe.name} falls. +${paid.gold} gold, +${xp} XP${extras.length ? `, ${extras.join(", ")}` : ""}.`);
             const felled = run.foe;
             run.foe = null;
             run.log.push({ floor: run.floor, kind: "fight", text: lines.join(" ") });
@@ -502,24 +512,24 @@ export async function delveAct(buyerId, action, choice = null) {
             // 0.35 -> 0.18. A room called "chest" still pays gold and XP every time; the loot CHEST inside
             // it is the rarer half, which is what the room's own art has always implied.
             const gotChest = Math.random() < 0.18;
-            bank(run, { gold, xp, chest: gotChest ? tier : null });
+            const paid = bank(run, { gold, xp, chest: gotChest ? tier : null });
             floor.done = true;
-            run.log.push({ floor: run.floor, kind: "chest", text: `+${gold} gold, +${xp} XP${gotChest ? `, and a ${tier} chest` : ""}.` });
+            run.log.push({ floor: run.floor, kind: "chest", text: `+${paid.gold} gold, +${xp} XP${gotChest ? `, and a ${tier} chest` : ""}.` });
             return settle(buyerId, run, {
                 tone: ev.rare ? "rare" : "loot", title: ev.rare ? ev.title : "It opens",
                 line: gotChest ? "There is a whole chest in here." : "Coin, and something worth knowing.",
-                art: encounterArt(run.dungeonId, ev), gold, xp, chest: gotChest ? tier : null, rare: Boolean(ev.rare),
+                art: encounterArt(run.dungeonId, ev), gold: paid.gold, xp, chest: gotChest ? tier : null, rare: Boolean(ev.rare),
             });
         }
         case KIND.cache: {
             const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * 1.2 * (ev.lootMult || 1));
-            bank(run, { gold });
+            const paid = bank(run, { gold });
             floor.done = true;
-            run.log.push({ floor: run.floor, kind: "cache", text: `Pocketed ${gold} gold.` });
+            run.log.push({ floor: run.floor, kind: "cache", text: `Pocketed ${paid.gold} gold.` });
             return settle(buyerId, run, {
                 tone: ev.rare ? "rare" : "loot", title: ev.rare ? ev.title : "Pocketed",
                 line: "Nobody was coming back for it.",
-                art: encounterArt(run.dungeonId, ev), gold, rare: Boolean(ev.rare),
+                art: encounterArt(run.dungeonId, ev), gold: paid.gold, rare: Boolean(ev.rare),
             });
         }
         case KIND.rest: {

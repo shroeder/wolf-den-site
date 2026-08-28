@@ -80,7 +80,7 @@ export async function offerChoice(ctx, run, d, floor, action, choice) {
     let healed = 0; let damage = 0;
     if (res?.heal) { healed = Math.min(run.maxHp - run.hp, Math.round(run.maxHp * res.heal)); run.hp += healed; parts.push(`+${healed} health`); }
     if (res?.damage) { damage = hurt(run, Math.round(run.maxHp * res.damage)); parts.push(`-${damage} health`); }
-    if (res?.gold) { bank(run, { gold: res.gold }); parts.push(`+${res.gold} gold`); }
+    if (res?.gold) { parts.push(`+${bank(run, { gold: res.gold }).gold} gold`); }
     if (res?.xp) { bank(run, { xp: res.xp }); parts.push(`+${res.xp} XP`); }
     if (res?.chest) { bank(run, { chest: res.chest }); parts.push(`a ${res.chest} chest`); }
     if (res?.potion) { run.potions += res.potion; parts.push(`+${res.potion} potion${res.potion === 1 ? "" : "s"}`); }
@@ -426,9 +426,13 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     const chests = run.banked.chests || [];
 
     // Clearing pays a completion purse on top of what you carried out — the reason to risk the last floor.
-    const bonusGold = cleared ? Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * 6) : 0;
+    // ⚠️ THE BANKED GOLD IS ALREADY MINTED — bank() does it as each floor pays, so the run's own lines quote
+    // the true number. Only the clear purse is invented here, so only the purse is minted here. Minting the
+    // sum again would halve the run twice, and the card's own purse line (which prints bonusGold) would then
+    // disagree with the gold tile beside it — which is the shape of the bug this pair of changes closes.
+    const bonusGold = cleared ? mint(Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * 6), "delve") : 0;
     const bonusXp = cleared ? Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * 6) : 0;
-    const totalGold = mint(gold + bonusGold, "delve");
+    const totalGold = gold + bonusGold;
     const totalXp = xp + bonusXp;
 
     if (totalGold > 0) {
