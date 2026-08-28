@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { generateSceneImage } from "@/lib/marketplace/openai-image.js";
 import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { hasOwnerStanding } from "@/lib/marketplace/owner.js";
 
 // ── Custom farm background LIBRARY ───────────────────────────────────────────────────────────────────────────
 // A member keeps EVERY background they generate (mkt_farm_bg rows) and equips one at a time — or none, which
@@ -38,7 +38,10 @@ export async function getFarmBgState(buyerId) {
         draft: b?.farm_bg_draft_url || null,
         credits: Number(b?.c || 0),
         cost: FARM_BG_COST,
-        free: isOwner(buyerId),
+        // The badge, not the allow-list — a custom background costs 3 creations and an owner pays for
+        // none of it. Same pair of checks as custom-deco: the STATE and the SPEND must agree, or the
+        // server allows what the screen has already refused.
+        free: await hasOwnerStanding(buyerId),
     };
 }
 
@@ -48,7 +51,7 @@ export async function startFarmBg(buyerId, prompt) {
     const desc = String(prompt || "").trim();
     if (desc.length < 4) return { ok: false, error: "describe_it" };
     // Owners/admins generate backgrounds for FREE (they run the store — no tokens burned).
-    const free = isOwner(buyerId);
+    const free = await hasOwnerStanding(buyerId);
     const paid = free ? { custom_deco_credits: null } : await db.queryOne(
         `UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits - $2 WHERE id = $1 AND COALESCE(custom_deco_credits, 0) >= $2 RETURNING custom_deco_credits`,
         [buyerId, FARM_BG_COST]

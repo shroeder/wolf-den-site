@@ -127,7 +127,12 @@ export async function getCustomState(buyerId) {
         db.queryOne(`SELECT COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT * FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'drafting' ORDER BY id DESC LIMIT 1`, [buyerId]).catch(() => null),
     ]);
-    return { credits: b?.c || 0, draft: draftRow ? mapDraft(draftRow) : null, free: isOwner(buyerId) };
+    // ⚠️ THE SAME QUESTION THE SPEND ASKS, AND IT HAS TO GIVE THE SAME ANSWER. This said isOwner — the
+    // one-account allow-list — while startCustomDeco below had already been moved to hasOwnerStanding. So the
+    // server would have let an owner-badge holder create for nothing, and this told the screen they had none
+    // and no free path, which is the only thing the member ever sees. Luke: "my son has the owner badge and
+    // still cant make things, its still trying to get him to buy creations."
+    return { credits: b?.c || 0, draft: draftRow ? mapDraft(draftRow) : null, free: await hasOwnerStanding(buyerId) };
 }
 
 // ── THE HALF-WRITTEN TWEAK ───────────────────────────────────────────────────────────────────────────────────

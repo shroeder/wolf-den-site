@@ -2,7 +2,7 @@ import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import ViewPing from "@/components/ViewPing";
 import CreationTokensClient from "@/components/CreationTokensClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { hasOwnerStanding } from "@/lib/marketplace/owner.js";
 import { CREATION_TOKEN_TIERS } from "@/lib/marketplace/creation-tokens.js";
 import { getTokenBalance } from "@/lib/marketplace/creation-tokens-server.js";
 
@@ -30,6 +30,8 @@ export default async function CreationTokensPage() {
 
     const paymentsEnabled = process.env.PAYMENTS_ENABLED === "true" && process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
     const tokenBalance = await getTokenBalance(buyer.id).catch(() => 0);
+    // The badge, not the one-account allow-list — the same question custom-deco's `free` asks.
+    const owns = await hasOwnerStanding(buyer.id).catch(() => false);
 
     return (
         <div className="stack reveal">
@@ -40,7 +42,7 @@ export default async function CreationTokensPage() {
                 squareLocationId={process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || ""}
                 tiers={CREATION_TOKEN_TIERS}
                 initialTokenBalance={tokenBalance}
-                isOwner={isOwner(buyer.id)}
+                isOwner={owns}
             />
         </div>
     );
