@@ -12,6 +12,39 @@
 
 export const CHANGELOG = [
     {
+        key: "fortune-is-luck",
+        date: "2026-08-28",
+        tag: "improved",
+        title: "Fortune is luck now",
+        blurb: "Fortune used to be raffle tickets and nothing else — and if you were wearing it, it was not even that: the draw only ever counted the Fortune on your pets, so every point of it on a pendant, a ring, a set, a forge enhancement or a socketed gem was doing nothing at all. It does something now, everywhere. Fortune is luck: better odds on what a chest holds, on what a kill drops in the dungeons, on the pet off a raid or a sea fight, on treasure on the line, on the mine's bonus finds and the smelter's curios, on the gold merchant turning up, on what the Loot Pig is carrying, and on a Regalia piece falling out of a salvage. It also steadies your damage — it lifts the bottom of the range every blow rolls in, so you throw fewer feeble swings, and it never raises the top. Every item card, pet card and stat sheet has been rewritten to say so. The other half of that: the boss raffle is damage again. Tickets come from hitting the boss, and Fortune buys none — which also means the free entries that Fortune used to hand people who never swung are gone. Open your gear and look at what you are already carrying; most of the Den is holding more Fortune than they knew.",
+        href: "/marketplace/inventory",
+        askedBy: ["Dave"],
+    },
+    {
+        key: "skills-one-path",
+        date: "2026-08-28",
+        tag: "improved",
+        title: "One path per skill, and everyone picks again",
+        blurb: "Each of your three class skills is three branches of three nodes, and the branches disagree on purpose — one ends the fight faster, one keeps the pressure on, one keeps you standing. Nothing used to stop you buying all three, so everybody's skill converged on the same maximal shape and the choice was not a choice. You may now hold nodes in ONE branch per skill, the budget is twelve points, and you earn one every other level all the way to 24 — three unlocks and one three-node path in each skill, which is an exact fit. Because the rule changed under builds that were bought under the old one, every node has been refunded: your skills are still yours and still on your bar, and what you choose again is the path. If your Arena looked different this morning, that is why.",
+        href: "/marketplace/arena",
+    },
+    {
+        key: "the-ring-rebuilt",
+        date: "2026-08-27",
+        tag: "improved",
+        title: "The ring, rebuilt",
+        blurb: "Combat is one mode now and a lot of it works differently. Turn order is the bars and nothing else — no hidden ordering underneath. Accuracy is gone entirely: nothing in the ring ever rolled to hit, so a number that said 100% and meant nothing has been replaced with something the track can actually sell. Double strike is gone the same way, and the points that bought it now buy tempo instead. Bleed and burn stack and keep the fiercer tick, Rupture lays three stacks so bleeding actually builds, and crowd control has a memory: six seconds of immunity per kind after one wears off, so you cannot be locked out of your own fight. Every blow now lands somewhere in a range instead of dealing the identical number forever. The timer bar draws the beat it is spent on, and the foe's bar can no longer fill faster than yours.",
+        href: "/marketplace/arena",
+    },
+    {
+        key: "the-gold-slowdown",
+        date: "2026-08-26",
+        tag: "improved",
+        title: "Gold pays less, and here is where",
+        blurb: "This is the change most of you noticed without being told, so: the gold faucet was turned down across the game, and the nine biggest earners were turned down again on top of that. The Long Road stopped paying like a jackpot, the furnace stopped minting chests, cooking no longer pays farm seeds for cooking badly, and the dungeons pay the number the run quotes rather than a bigger one. Nothing about what you already hold has changed and nothing was taken back. The reason is that the Den has been open long enough for the earliest players to be a very long way ahead of everyone arriving now, and the gap was widening every week rather than closing. If it has gone too far the other way, say so in the plaza with what you earn in a day — that is the number being watched, and it is easier to argue with than a feeling.",
+        href: "/marketplace/play",
+    },
+    {
         key: "casino",
         date: "2026-08-26",
         tag: "new",
