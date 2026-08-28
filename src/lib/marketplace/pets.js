@@ -151,7 +151,13 @@ export async function petsPeek(buyerId) {
     const st = await petsState(buyerId, { sync: false, sprites: true });
     // ONLY the four fields <PetAlerts> reads. The full reply is 80KB of collection state for a watcher that
     // compares a pet-to-level map against localStorage.
-    return { signedIn: true, petLevels: st.petLevels || {}, petSprites: st.petSprites || {}, ownedIds: st.ownedIds || [] };
+    // `incoming` is a PENDING GIFT somebody has to accept. petsState already loads it, so passing it through
+    // costs nothing and it is what <PetAlerts> needs to tell them — sharePet fires a web push, but a member
+    // who never granted notification permission had no way at all to learn an offer was waiting.
+    return {
+        signedIn: true, petLevels: st.petLevels || {}, petSprites: st.petSprites || {},
+        ownedIds: st.ownedIds || [], incoming: st.incoming || [],
+    };
 }
 
 // ⚠️ `sync` AND `sprites` ARE TWO DIFFERENT QUESTIONS. `sync` runs the achievement sweep and the trickle —

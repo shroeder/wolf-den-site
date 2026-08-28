@@ -47,8 +47,22 @@ async function casFetch(init) {
     }
 }
 /** POST an action to the floor. Returns the parsed body, or null if it failed or timed out. */
+// ── A PLAY HAS TO ANNOUNCE ITSELF ────────────────────────────────────────────────────────────────────────────
+// Luke: "quests arent working until I refresh my screen." The floor bounties are <FeatureDailies>, which
+// refetches on mount, when its `refreshKey` bumps, and when the tab regains focus. Cooking, the farm and
+// sailing all pass a refreshKey; the CASINO renders it with none — so a bounty progressed by a spin sat there
+// showing 3/5 until you reloaded the page or switched apps and came back.
+//
+// Rather than thread a tick through five machines, every casino POST fires the game's existing
+// "something happened" event, which FeatureDailies now listens for. `move` is excluded: it is the position
+// heartbeat and fires on a timer, so refreshing off it would poll the bounty endpoint all day.
 const casPost = (body) => casFetch({
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+}).then((r) => {
+    if (body?.action && body.action !== "move") {
+        try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* SSR / no window */ }
+    }
+    return r;
 });
 
 // ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────────────────────

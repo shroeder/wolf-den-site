@@ -7,7 +7,7 @@ import { generateImage, refineDecoPrompt, describeDecoFromName } from "@/lib/mar
 import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { hasOwnerStanding, isOwner } from "@/lib/marketplace/owner.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // Placed decorations render at 66px BASE, but the scale slider goes to 2.5x - so a maxed-out decoration
@@ -169,7 +169,10 @@ export async function startCustomDeco(buyerId, name, prompt) {
     const nm = String(name || "").trim().slice(0, 40) || "My Decoration";
     const desc = String(prompt || "").trim();
     if (desc.length < 4) return { ok: false, error: "describe_it" };
-    const free = isOwner(buyerId);
+    // Luke: "owner badge holders should be able to use creations freely without buying tokens." isOwner is the
+    // one-account allow-list; hasOwnerStanding also accepts the badge, which is how the other two owners are
+    // designated. See the note on it in owner.js.
+    const free = await hasOwnerStanding(buyerId);
     const paid = free ? { custom_deco_credits: null } : await db.queryOne(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits - 1 WHERE id = $1 AND COALESCE(custom_deco_credits, 0) > 0 RETURNING custom_deco_credits`, [buyerId]).catch(() => null);
     if (!paid) return { ok: false, error: "no_credits" };
     if (!free) await logCreationLedger(buyerId, -1, { source: "spend_deco", actorId: buyerId, actorLabel: "self", balanceAfter: paid.custom_deco_credits, meta: { name: nm } });

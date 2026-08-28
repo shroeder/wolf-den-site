@@ -31,7 +31,16 @@ export default function FeatureDailies({ feature, refreshKey = 0 }) {
         load();
         const onFocus = () => { if (document.visibilityState === "visible") load(); };
         document.addEventListener("visibilitychange", onFocus);
-        return () => { alive = false; document.removeEventListener("visibilitychange", onFocus); };
+        // ── AND WHEN SOMETHING ACTUALLY HAPPENED ────────────────────────────────────────────────────────
+        // `refreshKey` only helps a host that remembers to pass one, and the casino did not — so its bounties
+        // showed stale progress until the page was reloaded. This is the same event the rest of the game
+        // already fires after an action, so a host that forgets the prop still updates.
+        window.addEventListener("wolfden-hud-refresh", load);
+        return () => {
+            alive = false;
+            document.removeEventListener("visibilitychange", onFocus);
+            window.removeEventListener("wolfden-hud-refresh", load);
+        };
     }, [feature, refreshKey]);
 
     const claim = useCallback(async (key) => {

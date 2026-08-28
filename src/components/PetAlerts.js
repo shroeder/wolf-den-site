@@ -25,6 +25,7 @@ const SEEN_KEY = "wd_pet_levels_seen";
 // it landed. Deliberately not the server's `newPets`: that clears the moment the pets page is opened, so it
 // answers "new since you last looked at the pets screen" rather than "new since you last saw it announced".
 const OWNED_KEY = "wd_pets_owned_seen";
+const GIFT_KEY = "wd_pet_gifts_seen";   // share ids already shown, so one offer prompts once
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const rc = (r) => RARITY_COLOR[r] || "#ffd75e";
 
@@ -51,6 +52,7 @@ function chime() {
 export default function PetAlerts() {
     const [queue, setQueue] = useState([]);       // pending level-ups (one shown at a time)
     const [arrived, setArrived] = useState([]);   // pets that have just joined the collection
+    const [offers, setOffers] = useState([]);     // pending gifts, waiting to be accepted
     const [mounted, setMounted] = useState(false);
     const inFlight = useRef(false);
     const lastCheck = useRef(0);
@@ -98,6 +100,16 @@ export default function PetAlerts() {
             // answer the question. Writing [] as the baseline off one of those would make every pet look new
             // on the next poll and fire a parade of cards for animals owned for months, so an absent list is
             // skipped entirely rather than believed.
+            if (Array.isArray(d.incoming)) {
+                let seenGifts = {};
+                try { seenGifts = JSON.parse(localStorage.getItem(GIFT_KEY) || "{}"); } catch { seenGifts = {}; }
+                const fresh = d.incoming.filter((g) => g?.id && !seenGifts[g.id]);
+                if (fresh.length) {
+                    for (const g of fresh) seenGifts[g.id] = 1;
+                    try { localStorage.setItem(GIFT_KEY, JSON.stringify(seenGifts)); } catch { /* ignore */ }
+                    setOffers((q) => [...q, ...fresh]);
+                }
+            }
             if (Array.isArray(d.ownedIds)) {
                 const owned = d.ownedIds.map(String);
                 let hadOwned = null;
@@ -196,6 +208,11 @@ export default function PetAlerts() {
         };
     }, [check]);
 
+    // ── AND A GIFT WAITING TO BE ACCEPTED ────────────────────────────────────────────────────────────────
+    // Luke: "when you gift a copy of a pet to someone it should alert them to accept it." sharePet already
+    // sends a web push, but that only reaches somebody who granted notification permission — everyone else
+    // had to happen to open the Pets page. Shown once per offer, tracked by share id.
+    const gift = (offers || [])[0] || null;
     const current = queue[0] || null;
     const dismiss = () => setQueue((q) => q.slice(1));
     if (!mounted) return null;
@@ -204,6 +221,27 @@ export default function PetAlerts() {
     // Shown ahead of any level-up in the queue: you got the pet before it grew, so that is the order the two
     // cards should arrive in. Same markup the pets page used, so there is one look for this moment and it is
     // still the one members already know.
+    if (gift) {
+        const shed = () => setOffers((q) => q.slice(1));
+        const who = gift.from || (gift.fromAlias ? `@${gift.fromAlias}` : "A member");
+        return createPortal(
+            <div className="petx-overlay petx-celebrate" onClick={shed} role="dialog" aria-modal="true" aria-label="A pet is waiting for you">
+                <div className="petx-cele rarity-rare" onClick={(e) => e.stopPropagation()}>
+                    <div className="petx-confetti" aria-hidden="true">{Array.from({ length: 14 }).map((_, i) => <span key={i} style={{ "--i": i }}>{["🎁", "✨", "🎉", "⭐"][i % 4]}</span>)}</div>
+                    <div className="petx-hero petx-hero-big">
+                        <span className="petx-hero-glow" />
+                        <span className="petx-hero-icon"><PetArt id={gift.petId} /></span>
+                    </div>
+                    <div className="petx-cele-tag">A gift!</div>
+                    <h2 className="petx-title">{gift.petName}</h2>
+                    <p className="petx-sub">{who} is giving this to you. It is yours once you accept it.</p>
+                    <a className="btn-gold" href="/marketplace/pets">Accept it →</a>
+                </div>
+            </div>,
+            document.body,
+        );
+    }
+
     const joined = arrived[0] || null;
     if (joined) {
         const shed = () => setArrived((q) => q.slice(1));

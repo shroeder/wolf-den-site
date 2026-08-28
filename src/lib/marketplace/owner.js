@@ -94,3 +94,22 @@ const PRIZE_BARRED_BUYER_IDS = new Set([
 export function barredFromPrizes(buyerId) {
     return Boolean(buyerId) && PRIZE_BARRED_BUYER_IDS.has(String(buyerId));
 }
+
+// ── OWNER BY ALLOW-LIST, OR BY THE BADGE SOMEBODY WAS GIVEN ──────────────────────────────────────────────────
+// isOwner above is a hardcoded id set, and it holds one account. It gates UNRELEASED FEATURES, which is
+// exactly right for a dev preview key and exactly wrong for "does this person run the shop" — three people
+// wear the `owner` badge and none of them were recognised by it. That is what shut them out of the VIP room
+// (see standingFor) and what made them pay for creations they should not pay for.
+//
+// ASYNC, and deliberately not folded into isOwner: isOwner is called synchronously all over the codebase and
+// making it async would be a rewrite. Use this where the question is "is this one of the owners", and keep
+// isOwner where the question is "may this account see something unreleased".
+export async function hasOwnerStanding(buyerId) {
+    if (!buyerId) return false;
+    if (isOwner(buyerId)) return true;
+    const { db } = await import("@/lib/db");
+    const row = await db
+        .queryOne(`SELECT 1 FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug = 'owner' LIMIT 1`, [buyerId])
+        .catch(() => null);
+    return Boolean(row);
+}
