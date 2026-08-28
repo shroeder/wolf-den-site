@@ -849,40 +849,66 @@ const VITALITY_SHARE_OF_FEROCITY = 0.6;
 //                  ~40 and a primordial chest ~850; the other slots are a share of the chest by coverage.
 //   block_chance   shields only. Ranges to 0.75 on the best shield in the game, with most sitting near 0.30.
 //
-// THE VARIETY IS DETERMINISTIC. A hash of the item id gives each piece a spread of +/-25% around its tier's
-// number, so the catalogue has texture but a given item is the same every time the server starts and nothing
-// drifts between two processes reading the same item.
-const RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+// THE VARIETY IS DETERMINISTIC. A hash of the item id gives each piece a spread of +/-25% around the flat
+// number below, so the catalogue has texture but a given item is the same every time the server starts and
+// nothing drifts between two processes reading the same item. It hashes the ID, never the rarity.
 const vary = (id, salt) => {
     let h = 2166136261;
     for (const ch of `${id}:${salt}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
     return 0.75 + ((h >>> 0) % 1000) / 1000 * 0.5;   // 0.75 .. 1.25
 };
-// Geometric ladders, so every tier is a real step rather than a flat addition.
-const lerpGeo = (lo, hi, tier) => lo * Math.pow(hi / lo, tier / 8);
+// RARITY_LADDER and lerpGeo lived here and are gone with the tier scaling they existed to compute — see the
+// note below. Nothing in this file reads an item's rarity to work out a number any more.
 const ARMOR_SLOT_WEIGHT = { chest: 1.0, off_hand: 0.8, helmet: 0.7, back: 0.6, boots: 0.5, belt: 0.4 };
 const TENACITY_SHARE_OF_ARMOUR_FEROCITY = 0.4;
 const MIGHT_SHARE_TO_VITALITY = 0.45;
 const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test(`${it.name || ""} ${it.icon || ""}`);
 
+// ── RARITY IS NOT AN INPUT ANY MORE ──────────────────────────────────────────────────────────────────────────
+// Luke: "nothing should scale with rarity... I mean for calculations."
+//
+// Every intrinsic below used to be `lerpGeo(lo, hi, tier)` — a geometric ladder keyed off the rarity index, so
+// a primordial weapon carried 96 base damage against a common's 9. That was rarity paid FOUR TIMES over on the
+// same item, because the catalogue's authored stats already climb with it: a primordial main hand carries 39.3
+// Might to a common's 3.7, plus 21 pierce to 0, plus nearly twice the swings. The generated ladder multiplied
+// all of that again, which is most of why the gear ceiling sits where nobody can see it.
+//
+// So the intrinsics are FLAT. What an item is worth is now the stats a designer typed on it, and rarity is
+// what it says on the tin: how hard the thing was to find.
+//
+// ── THE FLAT VALUES ARE THE CURRENT MEANS, ON PURPOSE ────────────────────────────────────────────────────────
+// Each one is the average of what the catalogue already carried, so the change removes the SLOPE without
+// moving the game's overall power level: a mid-tier member's damage, armour and bout length are where they
+// were this morning. Anchoring at the top instead would have tripled everyone's damage against health that
+// did not move, and turned every bout in the game into three swings.
+//
+//   base_damage  31.8 mean -> 32     armor (chest, weight 1.0)  219 mean -> 220
+//   speed         1.03 mean -> 1.0   block_chance              0.312 mean -> 0.31
+//   pierce        7.0 mean -> 7      haste                       6.7 mean -> 7
+//
+// vary() STAYS. It hashes the item's ID, not its rarity, so two swords still differ from each other — the
+// texture the catalogue was given is untouched. Only the tier slope is gone.
+const BASE_DAMAGE_FLAT = 32;
+const WEAPON_SPEED_FLAT = 1.0;
+const PIERCE_FLAT = 7;
+const HASTE_FLAT = 7;
+const ARMOR_FLAT = 220;          // at slot weight 1.0 (chest); the other slots are a share by coverage
+const BLOCK_CHANCE_FLAT = 0.31;
+
 (() => {
     for (const it of ITEMS) {
-        const tier = Math.max(0, RARITY_LADDER.indexOf(String(it.rarity || "common")));
         const stats = { ...(it.stats || {}) };
         // Precision bought accuracy and accuracy no longer exists, so the affix is stripped rather than
         // left on 24 items as a number that does nothing.
         delete stats.precision;
-        // ── HASTE, ON A HANDFUL OF THE HIGH-TIER PIECES ──────────────────────────────────────────────
-        // Rollable like any affix, but ten of the mythic-through-eternal items carry it as part of what they
-        // ARE — the pieces you go looking for rather than reforge toward.
-        const hasteTier = RARITY_LADDER.indexOf(String(it.rarity || "common"));
-        if (hasteTier >= 4 && hasteTier <= 6 && vary(it.id, "haste") > 1.205) {
-            stats.haste = Math.max(1, Math.round(lerpGeo(3, 10, tier) * vary(it.id, "hasteval")));
+        // ── HASTE, ON A HANDFUL OF PIECES ────────────────────────────────────────────────────────────
+        // It sat on 11 items and the reason it was worth having is that it is NOT on everything. That is
+        // kept; what changed is who decides. It used to be "mythic through eternal", which is rarity picking
+        // the winners — it is the item's own hash now, so the same handful of pieces carry it and none of
+        // them carry it because of what tier they are.
+        if (vary(it.id, "haste") > 1.205 && vary(it.id, "hasteroll") > 1.10) {
+            stats.haste = Math.max(1, Math.round(HASTE_FLAT * vary(it.id, "hasteval")));
         }
-        // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────
-        // It was on 8 items. Weapons carry it as a matter of course from rare upward — going through armour
-        // is what a weapon is for — and the rarest non-weapons can roll it too, about half of them, so it
-        // stays a thing you notice on a chest piece rather than a line every item has.
         // MIGHT AND VITALITY IN EQUAL MEASURE. A best-in-slot loadout carried 143 might against 38
         // vitality — the offensive stat at nearly four times the defensive one — so a share of every
         // item's might is moved across. Done here rather than by editing 264 stat lines: one number to
@@ -894,15 +920,18 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
             const keptM = m0 - move;
             if (keptM > 0) stats.might = keptM; else delete stats.might;
         }
-        const pierceTier = RARITY_LADDER.indexOf(String(it.rarity || "common"));
-        if (it.slot === "main_hand" && pierceTier >= 1) {
-            stats.pierce = Math.max(1, Math.round(lerpGeo(2, 20, tier) * vary(it.id, "prc")));
-        } else if (pierceTier >= 5 && vary(it.id, "prcroll") > 1.0) {
-            stats.pierce = Math.max(1, Math.round(lerpGeo(2, 12, tier) * vary(it.id, "prc")));
+        // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────
+        // Going through armour is what a weapon is FOR, so every main hand carries it — that used to start
+        // at rare and it starts at all of them now. A minority of non-weapons still roll it, decided by the
+        // item's hash rather than by its tier, so it stays a thing you notice on a chest piece.
+        if (it.slot === "main_hand") {
+            stats.pierce = Math.max(1, Math.round(PIERCE_FLAT * vary(it.id, "prc")));
+        } else if (vary(it.id, "prcroll") > 1.175) {
+            stats.pierce = Math.max(1, Math.round(PIERCE_FLAT * vary(it.id, "prc")));
         }
         if (it.slot === "main_hand") {
-            stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
-            stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;
+            stats.base_damage = Math.max(1, Math.round(BASE_DAMAGE_FLAT * vary(it.id, "dmg")));
+            stats.speed = Math.round(WEAPON_SPEED_FLAT * vary(it.id, "spd") * 100) / 100;
         }
         if (ARMOR_SLOT_WEIGHT[it.slot]) {
             // ── ARMOUR TRADES SPEED FOR TOUGHNESS ────────────────────────────────────────────────────
@@ -917,11 +946,11 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
                 stats.tenacity = (Number(stats.tenacity) || 0) + move;
                 if (kept > 0) stats.ferocity = kept; else delete stats.ferocity;
             }
-            stats.armor = Math.max(1, Math.round(lerpGeo(40, 850, tier) * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
-            // 0.13 at common to 0.64 at primordial, and the +25% end of the spread puts the best shield in
-            // the game at 0.75 — which is the number Luke set as the ceiling.
+            // Slot weight is COVERAGE, not rarity — a breastplate covers more of you than a belt, and that
+            // is true of a common one and a primordial one alike. It stays.
+            stats.armor = Math.max(1, Math.round(ARMOR_FLAT * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
             if (it.slot === "off_hand" && isShield(it)) {
-                stats.block_chance = Math.min(0.75, Math.round(lerpGeo(0.13, 0.64, tier) * vary(it.id, "blk") * 100) / 100);
+                stats.block_chance = Math.min(0.75, Math.round(BLOCK_CHANCE_FLAT * vary(it.id, "blk") * 100) / 100);
             }
         }
         it.stats = stats;
