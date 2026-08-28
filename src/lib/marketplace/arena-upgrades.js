@@ -25,12 +25,20 @@ export const ARENA_UPGRADES = [
         unit: (v) => `+${v.toFixed(1)} might`,
     },
     {
-        // The counterpart to the Reaver's Killer's Eye node, for the two classes that have no accuracy node
-        // at all. Gold-bought and class-agnostic, so a Warden who wants their Rampage-equivalent to land can
-        // pay for it the slow way — which is what these tracks are for.
-        id: "aim", name: "Steady Hand", icon: "/images/arena/track/instinct.webp", max: 12, base: 300, stat: "accuracy", per: 0.004,
-        desc: "A blade that goes where you send it. Fewer swings miss outright.",
-        unit: (v) => `+${(v * 100).toFixed(1)}% accuracy`,
+        // ⚠️ THIS TRACK SOLD A STAT THE GAME DOES NOT READ. It granted `accuracy`, and accuracy is referenced
+        // in exactly two functions — throwBlows and counterBlow — both simulator-only with no caller in the
+        // game. The ring never rolls to hit. Twenty members had bought 63 levels of it for 70,800 gold, JT
+        // alone 21,000, and every one of those levels did nothing.
+        //
+        // Repointed rather than removed, and the id is kept, so every level already paid for starts working
+        // instead of needing a refund. PIERCE is live (resolveSwing reads it through drFrom on every blow) and
+        // it fits what the card always promised: a blade that goes where you send it now goes THROUGH what
+        // they are wearing. 2 points a level against PIERCE_PER_POINT 0.005 is 12% at max — the same
+        // magnitude as Footwork's 12% damage reduction, so it sits level with its siblings rather than
+        // becoming the obvious buy.
+        id: "aim", name: "Steady Hand", icon: "/images/arena/track/instinct.webp", max: 12, base: 300, stat: "pierce", per: 2,
+        desc: "A blade that goes where you send it — straight through what they are wearing.",
+        unit: (v) => `+${(v * 0.5).toFixed(1)}% of their armour ignored`,
     },
     {
         id: "instinct", name: "Instinct", icon: "/images/arena/track/instinct.webp", max: 15, base: 340, stat: "crit", per: 0.006,

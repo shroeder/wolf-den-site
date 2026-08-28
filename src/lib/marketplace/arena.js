@@ -540,7 +540,12 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
         // swinging is also a body that lands them — and raised by the tree.
         // ACCURACY IS DELETED. Every swing lands, so precision has nothing to buy.
-        accuracy: 1,
+        // ── ACCURACY IS GONE ─────────────────────────────────────────────────────────────────────────────
+        // Luke: "accuracy doesnt exist in game anymore." Confirmed against the resolver: `acc` is read in
+        // exactly two functions, throwBlows and counterBlow, and both are simulator-only with no caller in
+        // the game. The ring never rolls to hit. It was still being computed here, sent to the client on both
+        // fighters, and written into every bout's telemetry as "accuracy":100 — a number the game presented
+        // as real and nothing behind it.
         // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
         // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
         // command lands, so the number the button prints and the number the engine banks are the same one.
@@ -1563,7 +1568,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             critChance: foeKit.critChance, critMult: foeKit.critMult,
             // One number for mitigation on both sides of the ring now, and one for landing a blow.
             dr: foeKit.dr ?? DEFAULT_DR,
-            accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
             bleedChance: foeKit.bleedChance || 0, burnChance: foeKit.burnChance || 0, dmgPct: foeKit.dmgPct || 0,
             doublestrike: foeKit.doublestrike || 0,
@@ -1601,7 +1605,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
             dr: me.dr ?? DEFAULT_DR,
-            accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
             bleedChance: me.bleedChance || 0, burnChance: me.burnChance || 0, dmgPct: me.dmgPct || 0,
             doublestrike: me.doublestrike || 0,
@@ -2083,7 +2086,6 @@ function boutTelemetry(b, won) {
         critMult: Number((f.critMult || 0).toFixed(2)),
         // One name for mitigation now, on both sides — see the DAMAGE REDUCTION note in kitFor.
         dr: Math.round((f.dr || 0) * 100),
-        accuracy: Math.round((f.accuracy ?? 1) * 100),
         gearPower: Math.round(f.gearPower || 0),
         element: f.element || null,
     } : null);

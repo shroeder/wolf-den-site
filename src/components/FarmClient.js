@@ -2198,16 +2198,23 @@ const bgErr = (e) => ({ no_credits: "You need 3 creations to generate a backgrou
 // any you don't want. Generating charges 3 creations up front (refunded only on genuine failure).
 function FarmBgCreator({ draft, busy, onAct, onClose }) {
     const [desc, setDesc] = useState("");
-    const [st, setSt] = useState({ library: [], activeId: null, credits: null, free: false });
+    const [st, setSt] = useState({ library: [], activeId: null, credits: null, free: false, draftPrompt: null });
     const [err, setErr] = useState(null);
     const [confirmId, setConfirmId] = useState(null); // a background pending delete-confirm
-    const sync = (r) => { if (r && "library" in r) setSt({ library: r.library || [], activeId: r.activeId ?? null, credits: r.credits ?? null, free: Boolean(r.free) }); };
+    const sync = (r) => { if (r && "library" in r) setSt({ library: r.library || [], activeId: r.activeId ?? null, credits: r.credits ?? null, free: Boolean(r.free), draftPrompt: r.draftPrompt ?? null }); };
     useEffect(() => {
         let alive = true;
         onAct({ action: "farm_bg_state" }).then((r) => { if (alive) sync(r); });
         return () => { alive = false; };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
-    const generate = async () => { setErr(null); const r = await onAct({ action: "farm_bg_start", prompt: desc }); sync(r); if (!r?.ok) setErr(bgErr(r?.error)); };
+    // Redo re-rolls what the draft was ASKED for when the box is empty — which it is after any reload, and
+    // the draft panel has no box to type in anyway. Typing a new description still wins if there is one.
+    const generate = async () => {
+        setErr(null);
+        const r = await onAct({ action: "farm_bg_start", prompt: (desc || "").trim() || st.draftPrompt || "" });
+        sync(r);
+        if (!r?.ok) setErr(bgErr(r?.error));
+    };
     const accept = async () => { sync(await onAct({ action: "farm_bg_finalize" })); setDesc(""); };
     const discard = async () => { sync(await onAct({ action: "farm_bg_discard" })); };
     const equip = async (id) => { sync(await onAct({ action: "farm_bg_equip", id })); };
@@ -2227,6 +2234,10 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
             {draft ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ fontSize: 12.5, color: "#cdbde8" }}>👀 It&apos;s live on your farm above — keep it?</div>
+                    {/* Say what Redo will re-roll, so the button is not a mystery box. */}
+                    {st.draftPrompt ? (
+                        <div style={{ fontSize: 11.5, color: "#9d8bbb", fontStyle: "italic", marginTop: 2 }}>“{st.draftPrompt}”</div>
+                    ) : null}
                     <div style={{ display: "flex", gap: 8 }}>
                         <button type="button" disabled={busy} onClick={accept} style={{ flex: 1, padding: 11, fontWeight: 900, borderRadius: 11, border: "none", cursor: "pointer", color: "#20122e", background: "linear-gradient(180deg,#d9b8ff,#b98cff)", boxShadow: "0 3px 0 #7a54b0", opacity: busy ? 0.6 : 1 }}>✓ Save &amp; use</button>
                         <button type="button" disabled={busy || low} onClick={generate} style={{ flex: "0 0 auto", padding: "11px 13px", fontWeight: 800, borderRadius: 11, border: "1px solid rgba(201,162,255,0.5)", background: "rgba(201,162,255,0.12)", color: "#d9c9ff", cursor: "pointer", opacity: busy || low ? 0.5 : 1 }}>🎲 Redo · 3</button>

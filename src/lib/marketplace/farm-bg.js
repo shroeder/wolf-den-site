@@ -26,7 +26,7 @@ const buildBgPrompt = (desc) =>
 export async function getFarmBgState(buyerId) {
     if (!buyerId) return { library: [], activeId: null, activeUrl: null, draft: null, credits: 0, cost: FARM_BG_COST, free: false };
     const [b, rows] = await Promise.all([
-        db.queryOne(`SELECT farm_bg_active_id, farm_bg_draft_url, COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT farm_bg_active_id, farm_bg_draft_url, farm_bg_draft_prompt, COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT id, url, prompt, created_at FROM mkt_farm_bg WHERE buyer_id = $1 ORDER BY created_at DESC, id DESC`, [buyerId]).catch(() => []),
     ]);
     const activeId = b?.farm_bg_active_id != null ? Number(b.farm_bg_active_id) : null;
@@ -36,6 +36,13 @@ export async function getFarmBgState(buyerId) {
         activeId,
         activeUrl: library.find((x) => x.active)?.url || null,
         draft: b?.farm_bg_draft_url || null,
+        // ── WHAT THE DRAFT WAS ASKED FOR ─────────────────────────────────────────────────────────────────
+        // startFarmBg stores the description on the draft (farm_bg_draft_prompt) and this never handed it
+        // back, so the panel had a draft it could not describe. Its Redo button posts `prompt: desc` from
+        // local state, which is empty after any reload — and the server answered "Describe your background
+        // first" next to a panel with no box to describe it in. Luke: "unable to iterate bg. asks me to type
+        // in text but no input provided."
+        draftPrompt: b?.farm_bg_draft_prompt || null,
         credits: Number(b?.c || 0),
         cost: FARM_BG_COST,
         // The badge, not the allow-list — a custom background costs 3 creations and an owner pays for
