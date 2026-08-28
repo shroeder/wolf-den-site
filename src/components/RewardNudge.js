@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { nudgeFeed } from "@/lib/nudge-feed";
+import Coin from "@/components/Coin";
 
 // A slim, site-wide "next unlock" strip for signed-in members — the always-on engagement carrot. Shows
 // the next reward + a progress bar + XP to go, linking to the full rewards track. Renders nothing for
@@ -89,7 +90,7 @@ export default function RewardNudge() {
                 {/* Coins — the enticing currency chip (shimmering gold), tap the + to buy more store credit. */}
                 {typeof data.gold === "number" ? (
                     <Link href="/marketplace/credit" className={`coin-hud${data.gold < 300 ? " is-low" : ""}`} aria-label={`${data.gold} coins — tap to get more`}>
-                        <span className="coin-hud-icon" aria-hidden="true">🪙</span>
+                        <span className="coin-hud-icon" aria-hidden="true"><Coin size={15} /></span>
                         <span className="coin-hud-amt">{data.gold.toLocaleString()}</span>
                         <span className="coin-hud-plus" aria-hidden="true">+</span>
                     </Link>

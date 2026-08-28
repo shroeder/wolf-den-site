@@ -12,6 +12,7 @@ import { bandLeftPct, bandPct, gradeKeyForDist } from "@/lib/marketplace/timing.
 import { STAT_META, statParts, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import NoticeBody from "@/components/NoticeBody";
+import Coin from "@/components/Coin";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -123,7 +124,7 @@ function GambleReveal({ reveal, diceUrl, onClose }) {
             ) : reveal.dupeAll ? (
                 <div className="tw-reveal-card" onClick={(e) => e.stopPropagation()} role="presentation">
                     <div className="tw-reveal-rarity">Full collection!</div>
-                    <div className="tw-reveal-itemwrap"><span className="tw-reveal-item tw-reveal-item-emoji" aria-hidden="true">🪙</span></div>
+                    <div className="tw-reveal-itemwrap"><span className="tw-reveal-item tw-reveal-item-emoji" aria-hidden="true"><Coin size={40} /></span></div>
                     <div className="tw-reveal-name">You already own every piece</div>
                     <div className="tw-reveal-slot">The merchant hands back {reveal.refund.toLocaleString()} gold.</div>
                     <button type="button" className="tw-reveal-btn" onClick={onClose}>Fair enough</button>
@@ -2137,7 +2138,7 @@ export default function TownClient({ initial }) {
                         <div className="tw-recap-haul">
                             {bossRecap.me.gold ? (
                                 <div className="tw-recap-prize is-gold" style={{ animationDelay: "0.05s" }}>
-                                    <span className="tw-recap-prize-ico" aria-hidden="true">🪙</span>
+                                    <span className="tw-recap-prize-ico" aria-hidden="true"><Coin size={16} /></span>
                                     <b>+{Number(bossRecap.me.gold).toLocaleString()}</b><em>gold</em>
                                 </div>
                             ) : null}

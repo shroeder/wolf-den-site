@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
 import PackageCard from "@/components/PackageCard";
+import Coin from "@/components/Coin";
 
 // Buy store credit (real dollars on your account) with a card, and spend it in-store via a QR staff scan.
 // $1 = 200 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
@@ -190,7 +191,7 @@ export default function StoreCreditClient({
             <section className="card credit-hero">
                 <div className="credit-hero-glow" aria-hidden="true" />
                 <div className="credit-hero-top">
-                    <span className="credit-hero-coin" aria-hidden="true">🪙</span>
+                    <span className="credit-hero-coin" aria-hidden="true"><Coin size={44} /></span>
                     <div className="credit-hero-copy">
                         <h1 className="credit-hero-title">Top up. Spend anywhere.</h1>
                         <p className="credit-hero-sub">Load store credit and pocket <strong>{coinsPerCent * 100} coins for every $1</strong> — the same dollars work in the shop, online, <em>and</em> in the game.</p>
@@ -201,7 +202,7 @@ export default function StoreCreditClient({
                     <span className="credit-balance-amount">{usd(balanceCents)}</span>
                 </div>
                 <div className="credit-perks">
-                    <span className="credit-perk"><b>🪙 {coinsPerCent * 100}/$1</b>coins on top</span>
+                    <span className="credit-perk"><b><Coin size={15} /> {coinsPerCent * 100}/$1</b>coins on top</span>
                     <span className="credit-perk"><b>🏪 In-store & online</b>spend it anywhere</span>
                     <span className="credit-perk"><b>♾️ Never expires</b>real money, kept</span>
                     <span className="credit-perk"><b>⚡ Instant</b>lands in your wallet</span>
@@ -244,7 +245,7 @@ export default function StoreCreditClient({
                             >
                                 {c === 2500 ? <span className="credit-chip-flag">★ Popular</span> : null}
                                 <span className="credit-chip-usd">{usd(c)}</span>
-                                <span className="credit-chip-coins">+{Math.round(c * coinsPerCent * (1 + coinBonus)).toLocaleString()} 🪙</span>
+                                <span className="credit-chip-coins">+{Math.round(c * coinsPerCent * (1 + coinBonus)).toLocaleString()} <Coin size={14} /></span>
                             </button>
                         ))}
                     </div>
@@ -276,7 +277,7 @@ export default function StoreCreditClient({
                             </div>
                         ) : null}
                         <div><span className="muted">Credit added</span><strong>{usd(amountCents)}</strong></div>
-                        <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} 🪙</strong></div>
+                        <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} <Coin size={15} /></strong></div>
                         {bonusCoins > 0 ? (
                             <div><span className="muted">↳ Gear bonus (+{Math.round(coinBonus * 100)}%)</span><strong style={{ color: "#7cffb2" }}>+{bonusCoins.toLocaleString()} 🪙</strong></div>
                         ) : null}
