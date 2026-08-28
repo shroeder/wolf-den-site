@@ -150,3 +150,85 @@ table(`is a class food? (member duels, last ${DAYS}d)`, await sql`
     { h: "rounds", f: (r) => r.rds },
 ]);
 console.log();
+
+// ── AND THE ANSWER THE MATCHUP TABLE HIDES ───────────────────────────────────────────────────────────────────
+// The table above splits every pairing by ROLE, and challenging is worth a lot — so a class that is winning
+// gets read as two unrelated rows. Warden-vs-Runecaller looks like a coin flip until you notice both sides
+// win about 60% when THEY are the challenger. This folds the two directions together: a class's win rate over
+// every real duel it fought, whichever end of it that member was standing on.
+//
+// This replaced check:classes, which fought three synthetic builds on identical gear at 25 tree points and
+// reported Reaver at 97% — the exact opposite of what the members' own bouts say. Luke: "I only care about
+// real data. not simulated bs. I only care about the real players and their current gear skills passives pets
+// badges etc." These rows ARE that: real members, real kit, real fights, whatever they were carrying.
+table(`class win rate over every duel, both roles (last ${DAYS}d)`, await sql`
+    WITH duel AS (
+        SELECT ca.arena_class AS ch, da.arena_class AS df, ab.challenger_won
+          FROM mkt_arena_bout ab
+          JOIN mkt_arena ca ON ca.buyer_id = ab.challenger_id
+          JOIN mkt_arena da ON da.buyer_id = ab.defender_id
+         WHERE ab.defender_id IS NOT NULL AND ab.npc_tier IS NULL
+           AND ca.arena_class IS NOT NULL AND da.arena_class IS NOT NULL
+           AND ab.created_at > NOW() - (${String(DAYS)} || ' days')::interval
+    ), sided AS (
+        -- One row per FIGHTER per bout, so each side is counted once from its own point of view. A mirror
+        -- contributes a win and a loss and therefore cannot flatter its own class.
+        SELECT ch AS cls, challenger_won AS won, df AS vs FROM duel
+        UNION ALL
+        SELECT df AS cls, NOT challenger_won AS won, ch AS vs FROM duel
+    )
+    SELECT cls, COUNT(*)::int AS bouts, COUNT(*) FILTER (WHERE won)::int AS wins,
+           COUNT(*) FILTER (WHERE vs <> cls)::int AS xbouts,
+           COUNT(*) FILTER (WHERE won AND vs <> cls)::int AS xwins
+      FROM sided GROUP BY 1 ORDER BY 3::numeric / NULLIF(COUNT(*), 0) DESC`, [
+    { h: "class", f: (r) => r.cls },
+    { h: "duels", f: (r) => r.bouts },
+    { h: "win%", f: (r) => pc(r.wins, r.bouts) },
+    { h: "vs OTHER classes", f: (r) => `${pc(r.xwins, r.xbouts)} of ${r.xbouts}` },
+]);
+console.log();
+
+// ── THE TOP TEN, AGAINST EACH OTHER, FOR REAL ────────────────────────────────────────────────────────────────
+// Luke: "use top 10 players and have them fight each other." Not a simulation of them — the bouts they have
+// actually fought, so every number below already contains their real gear, skills, passives, pets and badges,
+// because those are what they were carrying when it happened.
+//
+// Read a row as "this member's record against that column". Blank means they have never met, which is itself
+// worth seeing: a ladder where the top ten have not played each other is not a ladder yet.
+const TOP = await sql`
+    SELECT a.buyer_id, a.vp, a.arena_class, COALESCE(b.display_name, b.alias) AS name
+      FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
+     WHERE a.vp IS NOT NULL ORDER BY a.vp DESC NULLS LAST LIMIT 10`;
+const ids = TOP.map((r) => r.buyer_id);
+const h2h = await sql`
+    SELECT ab.challenger_id AS ch, ab.defender_id AS df, ab.challenger_won
+      FROM mkt_arena_bout ab
+     WHERE ab.npc_tier IS NULL AND ab.challenger_id = ANY(${ids}) AND ab.defender_id = ANY(${ids})
+       AND ab.created_at > NOW() - (${String(DAYS)} || ' days')::interval`;
+
+// {me: {them: [wins, bouts]}} — folded across both roles, so challenging often cannot inflate a record.
+const rec = {};
+for (const id of ids) rec[id] = Object.fromEntries(ids.map((x) => [x, [0, 0]]));
+for (const b of h2h) {
+    if (b.ch === b.df) continue;
+    rec[b.ch][b.df][1] += 1; rec[b.df][b.ch][1] += 1;
+    if (b.challenger_won) rec[b.ch][b.df][0] += 1; else rec[b.df][b.ch][0] += 1;
+}
+const short = (s) => String(s || "?").slice(0, 8);
+console.log(`
+── the top 10 against each other, real bouts (last ${DAYS}d) ${"─".repeat(20)}`);
+console.log("   " + "member".padEnd(17) + "cls".padEnd(5) + TOP.map((t) => short(t.name).padStart(9)).join("") + "   overall");
+for (const me of TOP) {
+    const cells = TOP.map((them) => {
+        if (them.buyer_id === me.buyer_id) return "—".padStart(9);
+        const [w, n] = rec[me.buyer_id][them.buyer_id];
+        return (n ? `${Math.round((w / n) * 100)}%/${n}` : "·").padStart(9);
+    });
+    let w = 0; let n = 0;
+    for (const them of TOP) { if (them.buyer_id === me.buyer_id) continue; w += rec[me.buyer_id][them.buyer_id][0]; n += rec[me.buyer_id][them.buyer_id][1]; }
+    const tot = n ? `${Math.round((w / n) * 100)}% of ${n}` : "never fought";
+    console.log("   " + short(me.name).padEnd(17) + String(me.arena_class || "-").slice(0, 4).padEnd(5) + cells.join("") + "   " + tot);
+}
+console.log();
+
+

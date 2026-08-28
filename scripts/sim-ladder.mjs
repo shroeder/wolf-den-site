@@ -1,6 +1,12 @@
 // ── THE LADDER, FOUGHT AGAINST ITSELF ────────────────────────────────────────────────────────────────────────
-// check:classes answers "is one CLASS stronger", by giving three fighters identical gear and changing only the
-// tree. That is the right question for balance and the wrong one for the ladder, because on the ladder nobody
+// ⚠️ THIS IS STILL A SIMULATION, AND SIMULATION LOST ITS ARGUMENT WITH REALITY ON 2026-08-28.
+// The deleted check:classes fought three synthetic builds on identical gear and called Reaver 97%; this script
+// called Reaver 30% and Runecaller 78%. The members' OWN bouts say Warden 66%, Runecaller 54%, Reaver 27%
+// across 2,520 cross-class fights. All three disagree, and only one of them is made of things that happened.
+// Read `node scripts/arena-report.mjs` FIRST and treat anything here as a hypothesis about a change you have
+// not shipped yet — which is the one job real data cannot do.
+//
+// The original argument for this file still holds against the synthetic test it replaced: on the ladder nobody
 // has identical gear. Luke: "I want you to simulate by using actual players base against each other, ideally
 // the top 10 players."
 //
