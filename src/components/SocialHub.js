@@ -369,6 +369,43 @@ export default function SocialHub() {
         loadFriends();
     }, [loadFriends]);
 
+    // ── THE BUTTON HAS TO BE WHERE THE PERSON CAN SEE IT ─────────────────────────────────────────────────
+    // Luke, from an iPad: "the chat button is bleeding off the bottom and right side, it's cut off."
+    //
+    // It is 20px from the corner and there is no transformed ancestor trapping it — checked at iPad size, the
+    // button lands exactly where it should. The catch is WHICH viewport it is 20px from. `position: fixed`
+    // anchors to the LAYOUT viewport, and on iOS the layout viewport is not what you are looking at: pinch a
+    // page and the visual viewport shrinks inside it, and a browser bar drawn over the bottom takes a strip of
+    // it. Either way the corner the button is pinned to is off the side of the screen, and the button goes
+    // with it. Chrome's device emulation keeps the two viewports identical, which is why every screenshot of
+    // this looked fine.
+    //
+    // So the difference between the two is measured and handed to CSS. Both are 0 when nothing is zoomed and
+    // nothing overlays, so a desktop and an Android phone get the same layout they had.
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return undefined;
+        let frame = 0;
+        const apply = () => {
+            frame = 0;
+            const el = document.documentElement;
+            const right = Math.max(0, Math.round(el.clientWidth - (vv.width + vv.offsetLeft)));
+            const bottom = Math.max(0, Math.round(el.clientHeight - (vv.height + vv.offsetTop)));
+            el.style.setProperty("--vv-inset-right", `${right}px`);
+            el.style.setProperty("--vv-inset-bottom", `${bottom}px`);
+        };
+        // Coalesced to one write a frame: iOS fires these continuously through a pinch.
+        const schedule = () => { if (!frame) frame = requestAnimationFrame(apply); };
+        apply();
+        vv.addEventListener("resize", schedule);
+        vv.addEventListener("scroll", schedule);
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            vv.removeEventListener("resize", schedule);
+            vv.removeEventListener("scroll", schedule);
+        };
+    }, []);
+
     if (!authed) return null;
 
     const incomingCount = requests || friends?.incoming?.length || 0;
@@ -381,6 +418,9 @@ export default function SocialHub() {
         return n > 99 ? "99+" : n;
     };
     const closeHub = () => window.history.back();
+
+
+
 
     return (
         <>

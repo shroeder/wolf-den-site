@@ -6695,10 +6695,19 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    this rule behaves exactly as the old one did. It is written this way so it becomes correct the moment
    viewport-fit is turned on, which is the real fix and a site-wide decision: it lets EVERY edge of EVERY
    page run under the notch and the home indicator, so it wants checking, not shipping blind. */
+/* ── PINNED TO WHAT THE PERSON CAN SEE, NOT TO THE PAGE ────────────────────────────
+   Luke, from an iPad: "the chat button is bleeding off the bottom and right side, it's cut off."
+
+   `position: fixed` anchors to the LAYOUT viewport. On iOS that is not what you are looking at — pinch and
+   the visual viewport shrinks inside it; a browser bar drawn over the bottom takes a strip of it. The corner
+   this is pinned to ends up off the screen and the button goes with it. --vv-inset-* is the gap between the
+   two, measured in SocialHub.js; both are 0 with nothing zoomed and nothing overlaying, so this is a no-op
+   everywhere the two viewports already agree — which is every desktop and the whole device emulator, which
+   is exactly why the screenshots never showed it. */
 .social-fab {
     position: fixed;
-    right: max(20px, env(safe-area-inset-right, 0px));
-    bottom: max(20px, env(safe-area-inset-bottom, 0px));
+    right: calc(max(20px, env(safe-area-inset-right, 0px)) + var(--vv-inset-right, 0px));
+    bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + var(--vv-inset-bottom, 0px));
     z-index: 900;
     width: 56px;
     height: 56px;
@@ -7127,8 +7136,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Notifications bubble (CTA on return / on new activity) */
 .social-bubble {
     position: fixed;
-    right: 20px;
-    bottom: 86px;
+    right: calc(20px + var(--vv-inset-right, 0px));
+    bottom: calc(86px + var(--vv-inset-bottom, 0px));
     z-index: 899;
     display: flex;
     align-items: stretch;
@@ -7246,7 +7255,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .enotif-earned { margin: 12px 0 0; font-weight: 900; font-size: 1.05rem; color: #ffd75e; animation: enotifPop 0.5s ease-out; }
 @keyframes enotifPop { 0% { transform: scale(0.7); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 @media (max-width: 480px) {
-    .social-fab { right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+    .social-fab { right: calc(max(16px, env(safe-area-inset-right, 0px)) + var(--vv-inset-right, 0px));
+        bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + var(--vv-inset-bottom, 0px)); }
 }
 
 .mkt-dock-btn {
