@@ -89,10 +89,6 @@
             "schedule": "0 * * * *"
         },
         {
-            "path": "/api/jobs/sailing-arrivals",
-            "schedule": "0,30 * * * *"
-        },
-        {
             "path": "/api/jobs/inventory-feed",
             "schedule": "0,30 * * * *"
         },
