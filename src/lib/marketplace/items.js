@@ -860,8 +860,6 @@ const vary = (id, salt) => {
 // RARITY_LADDER and lerpGeo lived here and are gone with the tier scaling they existed to compute — see the
 // note below. Nothing in this file reads an item's rarity to work out a number any more.
 const ARMOR_SLOT_WEIGHT = { chest: 1.0, off_hand: 0.8, helmet: 0.7, back: 0.6, boots: 0.5, belt: 0.4 };
-const TENACITY_SHARE_OF_ARMOUR_FEROCITY = 0.4;
-const MIGHT_SHARE_TO_VITALITY = 0.45;
 const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test(`${it.name || ""} ${it.icon || ""}`);
 
 // ── RARITY IS NOT AN INPUT ANY MORE ──────────────────────────────────────────────────────────────────────────
@@ -909,17 +907,15 @@ const BLOCK_CHANCE_FLAT = 0.31;
         if (vary(it.id, "haste") > 1.205 && vary(it.id, "hasteroll") > 1.10) {
             stats.haste = Math.max(1, Math.round(HASTE_FLAT * vary(it.id, "hasteval")));
         }
-        // MIGHT AND VITALITY IN EQUAL MEASURE. A best-in-slot loadout carried 143 might against 38
-        // vitality — the offensive stat at nearly four times the defensive one — so a share of every
-        // item's might is moved across. Done here rather than by editing 264 stat lines: one number to
-        // turn, and the catalogue above stays the thing a designer edits.
-        const m0 = Number(stats.might) || 0;
-        if (m0 > 0) {
-            const move = Math.max(1, Math.round(m0 * MIGHT_SHARE_TO_VITALITY));
-            stats.vitality = (Number(stats.vitality) || 0) + move;
-            const keptM = m0 - move;
-            if (keptM > 0) stats.might = keptM; else delete stats.might;
-        }
+        // ── NO STAT IS SECRETLY ANOTHER STAT ─────────────────────────────────────────────────────────
+        // 45% of every item's authored Might used to be moved into Vitality here, and 40% of an armour
+        // piece's Ferocity into Tenacity. Both were balance patches done as a transfer rather than by
+        // editing the catalogue — "one number to turn" — and both meant an item's card and an item's
+        // definition disagreed: you typed 12 Might and the game handed out 7 Might and 5 Vitality.
+        //
+        // Luke: "might should not translate to vitality, no stat should map to another stat." So an item
+        // now grants exactly the stats written on it, and a stat that ought to be more common is made more
+        // common by authoring it, which is a thing a designer can see.
         // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────
         // Going through armour is what a weapon is FOR, so every main hand carries it — that used to start
         // at rare and it starts at all of them now. A minority of non-weapons still roll it, decided by the
@@ -934,18 +930,6 @@ const BLOCK_CHANCE_FLAT = 0.31;
             stats.speed = Math.round(WEAPON_SPEED_FLAT * vary(it.id, "spd") * 100) / 100;
         }
         if (ARMOR_SLOT_WEIGHT[it.slot]) {
-            // ── ARMOUR TRADES SPEED FOR TOUGHNESS ────────────────────────────────────────────────────
-            // Tenacity was on 17 items in the whole catalogue and on NONE of the slots you would armour a
-            // fighter with — no helmet, no chest, no boots, no shield. It multiplies armour now, so it
-            // belongs on the pieces that carry armour, and ferocity is the right thing to take it from:
-            // ferocity is the attack clock, which is a weapon's business rather than a breastplate's.
-            const f0 = Number(stats.ferocity) || 0;
-            if (f0 > 0) {
-                const move = Math.max(1, Math.round(f0 * TENACITY_SHARE_OF_ARMOUR_FEROCITY));
-                const kept = f0 - move;
-                stats.tenacity = (Number(stats.tenacity) || 0) + move;
-                if (kept > 0) stats.ferocity = kept; else delete stats.ferocity;
-            }
             // Slot weight is COVERAGE, not rarity — a breastplate covers more of you than a belt, and that
             // is true of a common one and a primordial one alike. It stays.
             stats.armor = Math.max(1, Math.round(ARMOR_FLAT * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
