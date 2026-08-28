@@ -21,13 +21,32 @@ import { skillsForClass } from "../src/lib/marketplace/arena-skills.js";
 
 const N = Number(process.argv[2]) || 10;
 const BOUTS = Number(process.argv[3]) || 200;
+// ── OR NAME THE FIGHTERS YOURSELF ────────────────────────────────────────────────────────────────────────────
+// The top ten spans 4.5x on damage, so 60 of its 90 pairings are decided before the bell and the class means
+// are really a gear table wearing class labels. Naming a cohort of comparable members is how you get a
+// question about the CLASS back out of it.
+//
+//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-ladder.mjs 10 300 --only "Eric,JT"
+const ONLY = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7)
+    || (process.argv[process.argv.indexOf("--only") + 1] && process.argv.includes("--only")
+        ? process.argv[process.argv.indexOf("--only") + 1] : "");
+const NAMES = ONLY ? ONLY.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) : null;
 const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
 
 const top = await db.query(
     `SELECT a.buyer_id, a.vp, a.arena_class, b.display_name, b.alias, COALESCE(b.xp,0) AS xp
        FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
       WHERE COALESCE(b.xp,0) > 0
-      ORDER BY a.vp DESC NULLS LAST LIMIT $1`, [N]);
+      ORDER BY a.vp DESC NULLS LAST LIMIT $1`, [NAMES ? 500 : N]);
+
+if (NAMES) {
+    const hit = (r) => NAMES.some((n) => String(r.display_name || r.alias || "").toLowerCase().includes(n));
+    const picked = top.filter(hit);
+    const missed = NAMES.filter((n) => !top.some((r) => String(r.display_name || r.alias || "").toLowerCase().includes(n)));
+    if (missed.length) { console.error(`sim-ladder: no ranked member matches ${missed.join(", ")}`); process.exit(1); }
+    top.length = 0;
+    top.push(...picked);
+}
 
 const who = [];
 for (const r of top) {
@@ -45,13 +64,34 @@ for (const r of top) {
 console.log("");
 console.log("  " + who.length + " members, " + BOUTS + " bouts a pairing, resolved by the ring. Real gear, real trees.");
 console.log("");
-console.log("  " + "member".padEnd(18) + "class".padEnd(12) + "vp".padStart(7) + "  dmg".padStart(7) + "  hp".padStart(7) + " armour".padStart(8) + " tempo".padStart(7) + " crit".padStart(6));
+// ── THE STAT TABLE WRITES ITSELF ─────────────────────────────────────────────────────────────────────────────
+// This used to be a hand-written list of columns, and it omitted bleed — so a Reaver whose signature stat was
+// 18% read as a fighter carrying nothing at all. The BOUTS were always right: kitFor builds the whole kit and
+// autoRing is the ring the game runs, so bleed was in every one of those fights. It was the REPORT that lied,
+// which is the same defect that made the deleted check:classes unexplainable — six stats printed while sixteen
+// differed. A number you cannot account for is not evidence, and a hand-curated column list guarantees you
+// eventually cannot account for one.
+//
+// So the columns are derived: every numeric field of the real kit that is not identical across this cohort.
+// Nothing can be left out, because nothing is being chosen.
+const HEAD = ["damage", "health", "armor", "tempo"];
+const varying = [...new Set(who.flatMap((w) => Object.keys(w.kit)))]
+    .filter((k) => !HEAD.includes(k))
+    .filter((k) => who.every((w) => w.kit[k] === undefined || typeof w.kit[k] === "number"))
+    .filter((k) => new Set(who.map((w) => Number(w.kit[k]) || 0)).size > 1)
+    .sort();
+// A rate reads as a percentage; anything else is a count. tempo is neither, hence HEAD.
+const fmt = (k, v) => (Math.abs(v) > 0 && Math.abs(v) < 1 ? `${(v * 100).toFixed(0)}%` : String(Math.round(v * 100) / 100));
+const W = (k) => Math.max(k.length, 6) + 2;
+
+console.log("  " + "member".padEnd(18) + "class".padEnd(12) + "vp".padStart(7)
+    + HEAD.map((k) => k.padStart(8)).join("") + varying.map((k) => k.padStart(W(k))).join(""));
 for (const w of who) {
-    console.log("  " + w.name.slice(0, 17).padEnd(18) + String(w.cls).padEnd(12)
-        + String(w.vp).padStart(7) + String(Math.round(w.kit.damage || 0)).padStart(7)
-        + String(Math.round(w.kit.health || 0)).padStart(7) + String(Math.round(w.kit.armor || 0)).padStart(8)
-        + (w.kit.tempo || 0).toFixed(2).padStart(7) + ((w.kit.critChance || 0) * 100).toFixed(0).padStart(5) + "%");
+    console.log("  " + w.name.slice(0, 17).padEnd(18) + String(w.cls).padEnd(12) + String(w.vp).padStart(7)
+        + HEAD.map((k) => (k === "tempo" ? (w.kit[k] || 0).toFixed(2) : String(Math.round(w.kit[k] || 0))).padStart(8)).join("")
+        + varying.map((k) => fmt(k, Number(w.kit[k]) || 0).padStart(W(k))).join(""));
 }
+console.log(`  ${varying.length} stats differ across these ${who.length}; every one of them is shown.`);
 
 // Returns { p, first, second } — the win rate, and the two halves separately. If the halves disagree the
 // sample is too small to quote, and at this scale that is the only thing worth checking: a matrix of numbers
