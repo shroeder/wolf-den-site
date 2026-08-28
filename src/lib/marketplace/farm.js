@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { petsState } from "@/lib/marketplace/pets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel, getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
@@ -388,8 +390,10 @@ export async function claimPig(buyerId) {
     const gold = mint(PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1), "loot_pig");
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
+    // The hog's pockets, and the goose. Asked once and used twice — the two rolls are one visit.
+    const pigFortune = await fortuneFor(buyerId).catch(() => 0);
     let item = null;
-    if (Math.random() < PIG_ITEM_CHANCE) {
+    if (Math.random() < luckyChance(PIG_ITEM_CHANCE, pigFortune)) {
         const rarity = weightedPick(PIG_RARITY_WEIGHTS);
         const pool = randomDropPool((it) => it.rarity === rarity);
         const def = pool.length ? pool[randInt(pool.length)] : null;
@@ -401,7 +405,7 @@ export async function claimPig(buyerId) {
     // FARM-ONLY pet: a rare Golden Goose drop from the Wild Loot Pig (never from the boss/shop/spin/chests).
     // Small chance; idempotent grant that only flags as new when the row is actually inserted.
     let pet = null;
-    if (Math.random() < PIG_PET_CHANCE) {
+    if (Math.random() < luckyChance(PIG_PET_CHANCE, pigFortune)) {
         const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', 'golden_goose') ON CONFLICT DO NOTHING RETURNING ref`, [buyerId]).catch(() => []);
         if (ins.length) { const def = collectibleById("golden_goose"); pet = { id: "golden_goose", name: def?.name || "Golden Goose", rarity: def?.rarity || "epic", hint: def?.hint || null }; }
     }

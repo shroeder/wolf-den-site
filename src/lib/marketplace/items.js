@@ -13,6 +13,7 @@ import {
 } from "react-icons/gi";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { textIcon } from "@/lib/coin-icon.js";
+import { FORTUNE_DESC } from "@/lib/marketplace/fortune.js";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
 export const EQUIP_SLOTS = [
@@ -109,7 +110,9 @@ export const STAT_META = {
     haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing sends your turn bar to double speed for 6 seconds. Each point is 0.5%.", suffix: "" },
 
     // ── OUTSIDE THE RING ─────────────────────────────────────────────────────────────────────────────────
-    fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize. Does nothing in a fight.", suffix: "" },
+    // The one description not written here. Fortune reaches nine screens and its old copy was wrong on every
+    // one of them for as long as the stat existed — a card cannot go stale if it has no copy of its own.
+    fortune: { label: "Fortune", icon: "🍀", desc: FORTUNE_DESC, suffix: "" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 

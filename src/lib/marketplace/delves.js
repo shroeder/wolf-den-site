@@ -8,6 +8,8 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
     delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
@@ -333,7 +335,13 @@ const bank = (run, { gold = 0, xp = 0, chest = null, parts = null, frags = 0, ge
 async function rollFightLoot(buyerId, run, d, { mult = 1, boss = false } = {}) {
     const L = d.loot;
     const got = { parts: null, frags: 0, potion: 0, chest: null, gear: null };
-    const hit = (p) => Math.random() < Math.min(0.75, p * mult);
+    // ── AND FORTUNE IS ON EVERY LINE OF IT ───────────────────────────────────────────────────────────────
+    // Applied INSIDE the 0.75 ceiling rather than after it, so luck can never turn a drop into a certainty —
+    // a table where the top line always pays is not a table any more. Below the ceiling it is worth the same
+    // proportion on each of the four, which is what keeps a lucky member's kill feeling like a better version
+    // of the same fight rather than a different one.
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
+    const hit = (p) => Math.random() < Math.min(0.75, luckyChance(p * mult, fortune));
 
     if (boss || hit(FIGHT_DROPS.parts)) {
         const tier = randInt(L.parts[0], L.parts[1]);
@@ -350,7 +358,7 @@ async function rollFightLoot(buyerId, run, d, { mult = 1, boss = false } = {}) {
     // GEAR. Granted immediately so the result card can show the real piece, and recorded on the run so the wrap
     // can list it. The general drop pool only — the Depths sets belong to the mine, which is the feature built
     // to hand them out.
-    if (Math.random() < (boss ? L.gearOdds * 4 : L.gearOdds * mult)) {
+    if (Math.random() < luckyChance(boss ? L.gearOdds * 4 : L.gearOdds * mult, fortune)) {
         try {
             const [{ randomDropPool }, { grantItem }] = await Promise.all([
                 import("@/lib/marketplace/items.js"),
@@ -511,7 +519,7 @@ export async function delveAct(buyerId, action, choice = null) {
             const tier = ev.lootMult >= 1.5 ? (d.minLevel >= 30 ? "gold" : "iron") : (d.minLevel >= 30 ? "iron" : "wooden");
             // 0.35 -> 0.18. A room called "chest" still pays gold and XP every time; the loot CHEST inside
             // it is the rarer half, which is what the room's own art has always implied.
-            const gotChest = Math.random() < 0.18;
+            const gotChest = Math.random() < luckyChance(0.18, await fortuneFor(buyerId).catch(() => 0));
             const paid = bank(run, { gold, xp, chest: gotChest ? tier : null });
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "chest", text: `+${paid.gold} gold, +${xp} XP${gotChest ? `, and a ${tier} chest` : ""}.` });

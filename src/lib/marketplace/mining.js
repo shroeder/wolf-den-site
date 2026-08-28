@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -1298,7 +1300,7 @@ async function claimNode(buyerId, node, row, run = {}) {
     // before, worth a little luck each instead of being a currency you spend on pulls).
     const luck = Math.min(0.22, seeds.filter((x) => x === "rare").length * 0.02 + seeds.filter((x) => x !== "rare").length * 0.008);
     let bonus = null;
-    if (Math.random() < rank.bonus + luck + dEff.findBonus) {
+    if (Math.random() < luckyChance(rank.bonus + luck + dEff.findBonus, await fortuneFor(buyerId).catch(() => 0))) {
         const roll = Math.random();
         const lift = rank.key === "s" ? 1 : 0;
         const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
@@ -1514,7 +1516,7 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     // and a chest is supposed to be a scoped reward for the thing that dropped it. Consumables only.
     const CURIO_CHANCE = { pixel: 0.35, perfect: 0.20, great: 0.08 };
     const curioOdds = Math.min(0.6, (CURIO_CHANCE[band.key] || 0) + (sEff.curioBonus || 0));
-    if (curioOdds > 0 && Math.random() < curioOdds) curios.push("consumable");
+    if (curioOdds > 0 && Math.random() < luckyChance(curioOdds, await fortuneFor(buyerId).catch(() => 0))) curios.push("consumable");
 
     // ── THE POT RUNS OVER ────────────────────────────────────────────────────────────────────────────────────
     // The Crucible's last two levels, rolled ONCE for the whole pour rather than per batch. Per batch it would

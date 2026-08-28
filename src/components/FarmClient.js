@@ -24,7 +24,8 @@ import PackageBanner from "@/components/PackageBanner";
 import { STAND_DECO_ID } from "@/lib/marketplace/petting-stand-const";
 import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
-import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
+import { petPerk, GOLD_PER_POINT } from "@/lib/marketplace/pet-perks";
+import { FORTUNE_SHORT, fortunePct } from "@/lib/marketplace/fortune";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
 import Coin from "@/components/Coin";
 
@@ -50,7 +51,7 @@ const ownedBonusParts = (p, level = 1, maxed = false) => {
 
     if (p.stat === "gold_find") return { icon: "💰", name: `+${Math.max(1, Math.round(v * GOLD_PER_POINT))} gold / hr`, desc: `Passive income, paid whether you play or not. ${growth} Every pet you own stacks.` };
     if (p.stat === "xp_gain") return { icon: "✨", name: `+${fmtVal(v)} XP / hr`, desc: `Passive income, paid whether you play or not. ${growth} Every pet you own stacks.` };
-    if (p.stat === "fortune") return { icon: "🍀", name: `+${fmtVal(v * TICKETS_PER_FORTUNE_PER_DAY)} tickets / day`, desc: `Boss-raffle tickets, banked all week. ${growth} Every pet you own stacks.` };
+    if (p.stat === "fortune") return { icon: "🍀", name: `${fortunePct(v)} luck`, desc: `${FORTUNE_SHORT} ${growth} Every pet you own stacks.` };
 
     const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨", desc: "Stacks across your whole menagerie" };
     const isFarm = ["seedLuck", "growSpeed", "petXp", "angling", "reelStrength"].includes(p.stat); // percentage stats — seafaring is a COUNT, so it takes no % suffix
@@ -2916,9 +2917,6 @@ function IncomeRecapModal({ recap, onClose }) {
                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)" }}>
                             <span style={{ fontSize: 22 }}><Coin /></span><span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>Passive gold earned</span><span style={{ fontWeight: 900, color: "#ffd75e" }}>+{recap.gold.toLocaleString()}</span>
                         </div>
-                    ) : null}
-                    {recap.raffleTickets > 0 ? (
-                        <div className="muted" style={{ fontSize: 11.5, textAlign: "center", marginTop: 2 }}>🎟️ Your Fortune is also banking {recap.raffleTickets} boss-raffle ticket{recap.raffleTickets === 1 ? "" : "s"}/day.</div>
                     ) : null}
                 </div>
                 <div style={{ padding: "6px 16px 16px" }}>

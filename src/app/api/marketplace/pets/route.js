@@ -10,7 +10,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Map the `stat_*` art keys (mkt_town_art) to the PET_STAT_META / earning stat keys the pets screen renders.
-const STAT_ART_MAP = { stat_xp: "xp_gain", stat_gold: "gold_find", stat_fortune: "fortune", stat_might: "might", stat_critchance: "crit_chance", stat_critpower: "crit_power", stat_ferocity: "ferocity", stat_seedluck: "seedLuck", stat_growspeed: "growSpeed", stat_petbond: "petXp", stat_tickets: "tix" };
+const STAT_ART_MAP = { stat_xp: "xp_gain", stat_gold: "gold_find", stat_fortune: "fortune", stat_might: "might", stat_critchance: "crit_chance", stat_critpower: "crit_power", stat_ferocity: "ferocity", stat_seedluck: "seedLuck", stat_growspeed: "growSpeed", stat_petbond: "petXp" };
+// stat_tickets/"tix" was here too, feeding a "raffle tickets / day" row on the pet card. Fortune buys no
+// tickets any more (see fortune.js), the row is gone, and a sprite nothing renders is a request nobody needs.
 async function statSprites() {
     const rows = await db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'stat_%'`).catch(() => []);
     const map = {};

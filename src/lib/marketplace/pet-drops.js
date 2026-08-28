@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 
 // Pet DROPS from chests + the boss. Kept in its own dependency-light module (db + collectibles + activity
 // only) so chests.js / boss.js can grant pets without an import cycle through pets.js → quests.js → chests.js.
@@ -54,7 +56,11 @@ export async function maybeGrantChestPet(buyerId, openedTier) {
     if (!buyerId) return null;
     const openedIdx = CHEST_TIER_ORDER.indexOf(openedTier);
     if (openedIdx < 0) return null;
-    const chance = Math.min(CHEST_PET_CAP, CHEST_PET_BASE + openedIdx * CHEST_PET_STEP);
+    // ── FORTUNE, ON THE RAREST THING A CHEST CAN HOLD ────────────────────────────────────────────────────
+    // The cap is applied BEFORE luck, not after, so Fortune can lift a member over a ceiling that was written
+    // for the chest tier rather than for the member. That is the intent: the cap says how good a primordial
+    // chest is at coughing up a pet, and luck is a fact about the person opening it.
+    const chance = luckyChance(Math.min(CHEST_PET_CAP, CHEST_PET_BASE + openedIdx * CHEST_PET_STEP), await fortuneFor(buyerId).catch(() => 0));
     if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
     const eligible = COLLECTIBLES.filter(unlocked(buyerId))
@@ -101,7 +107,7 @@ function pickWeighted(pool) {
 // sub-roll so the rarest companions stay genuinely rare.
 export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     if (!buyerId) return null;
-    if (Math.random() > chance) return null;
+    if (Math.random() > luckyChance(chance, await fortuneFor(buyerId).catch(() => 0))) return null;
     const owned = await ownedPetSet(buyerId);
     const eligible = COLLECTIBLES.filter(unlocked(buyerId)).filter((p) => p.source === "boss" && !owned.has(p.id));
     if (!eligible.length) return null;
@@ -161,8 +167,9 @@ export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false 
     // Rarest first, so on a (near-impossible) double hit the scarcer pet wins.
     eligible.sort((a, b) => a.raidChance - b.raidChance);
     const raidWish = await wishedFrom(buyerId, eligible);
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
     for (const p of eligible) {
-        if (Math.random() < p.raidChance) return grantDrop(buyerId, raidWish || p, "raid", { boss, killed });
+        if (Math.random() < luckyChance(p.raidChance, fortune)) return grantDrop(buyerId, raidWish || p, "raid", { boss, killed });
     }
     return null;
 }
@@ -188,8 +195,9 @@ export async function maybeGrantSeaFightPet(buyerId, { tier = 1 } = {}) {
         // Rarest first, so a lucky roll that clears two thresholds pays the scarcer pet.
         .sort((a, b) => a.seaFightChance - b.seaFightChance);
     const seaWish = await wishedFrom(buyerId, eligible);
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
     for (const p of eligible) {
-        if (Math.random() < p.seaFightChance * mult) return grantDrop(buyerId, seaWish || p, "sea_fight", { tier });
+        if (Math.random() < luckyChance(p.seaFightChance * mult, fortune)) return grantDrop(buyerId, seaWish || p, "sea_fight", { tier });
     }
     return null;
 }

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { baitById, spendFromPantry } from "@/lib/marketplace/cooking.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -896,8 +898,11 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     const seaPets = await seaPetPerks(buyerId);
 // The Dredge Net turns one cast in four into treasure outright — read beside the roll it replaces.
     const dredgeNet = await hasPower(buyerId, "dredge_net");
+    // Fortune widens the treasure window on top of the Net track and a dredging pet. The SPECIES roll is
+    // deliberately left alone: Angling, Lure and bait are the stats built to pull a rarer fish, and a luck
+    // stat that also did their job would make three tracks redundant. Fortune finds THINGS, not fish.
     const isTreasure = (dredgeNet && oneIn(4))
-        || Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100);
+        || Math.random() < luckyChance(TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100, await fortuneFor(buyerId).catch(() => 0));
     // ── ASCENSION POWERS ON A CAST ───────────────────────────────────────────────────────────────────────
     // Every one of these decides WHAT IS ON THE LINE, so they all read at the species roll rather than being
     // scattered through the reel. Cold Bait and The Full Creel are first-cast-of-the-day powers, so they need

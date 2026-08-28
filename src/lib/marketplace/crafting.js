@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { itemById, STAT_META, describeStats, mergeStats, AFFIX_POOL, affixCeiling, isIntrinsicStat, pickWeightedAffix, FORGE } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
@@ -329,7 +331,7 @@ export async function salvageItem(buyerId, itemId) {
     // Rare Regalia piece drop (the "salvaging set" loop) — only pieces you don't own yet.
     let regaliaDrop = null;
     const unowned = REGALIA_IDS.filter((r) => !ownedReg.has(r));
-    if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantPiece(buyerId, pick, "forge").catch(() => {}); regaliaDrop = pieceById(pick)?.name || pick; }
+    if (unowned.length && Math.random() < luckyChance(REGALIA_DROP, await fortuneFor(buyerId).catch(() => 0))) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantPiece(buyerId, pick, "forge").catch(() => {}); regaliaDrop = pieceById(pick)?.name || pick; }
     // Salvaging is done in bulk — 585 times a week — so this reads small per action and lands as 5% of all XP.
     const xp = 4 + cfg.tier * 3;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});

@@ -548,10 +548,14 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
         // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
         // command lands, so the number the button prints and the number the engine banks are the same one.
-        // ── FORTUNE IS OUT OF COMBAT ─────────────────────────────────────────────────────────────────────
-        // It used to swell what a brace banked. Luke's call: it does nothing in a fight. The guard is the
-        // class's own number plus whatever the tree adds, and fortune is left to the systems outside the ring
-        // that already read it. It is still carried on the kit below so those systems keep working.
+        // ── FORTUNE DOES NOT BUY A BIGGER BRACE ──────────────────────────────────────────────────────────
+        // It used to swell what a brace banked, and Luke took that out: a defensive stat that a Warden could
+        // stack off gear made the guard a gear check. The guard is the class's own number plus whatever the
+        // tree adds, and it stays that way.
+        //
+        // What Fortune DOES do in the ring is one thing, and it is not this: it lifts the floor of the damage
+        // roll (arena-engine swingRoll), so a lucky fighter throws fewer feeble swings and no bigger ones.
+        // The stat is carried on the kit below because the engine reads it there.
         guard: guardSoakFrom(base.guard, 0, perks.guardSoak || 0),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),

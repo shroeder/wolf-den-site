@@ -21,6 +21,8 @@ import {
 // they are, not from the kit they carry.
 import { DEFAULT_GUARD, DR_CAP } from "@/lib/marketplace/arena-classes.js";
 import { EXTRA_TURN_MAX, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+// Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
+import { luckyRoll } from "@/lib/marketplace/fortune.js";
 
 // ── ONE CONVERTER, NOT TWO ───────────────────────────────────────────────────────────────────────────────────
 // `ringStats` lived here and turned an NPC's stat line into a fighter, while members went through fighterFrom
@@ -131,8 +133,14 @@ export const SURGE_EVERY = 5;
 // reaching for this number to fix a matchup should raise the bout length or close the power spread instead.
 //
 // 0 restores the old deterministic behaviour exactly — the guard below means no rng() is drawn at all.
+//
+// ── AND FORTUNE DECIDES WHERE IN THE BAND YOU TEND TO LAND ───────────────────────────────────────────────────
+// The one thing this stat does inside the ring, and it is deliberately not a damage bonus: luck pulls the
+// BOTTOM of the band up toward the middle and never moves the top. Your best hit is the same as everybody
+// else's; you just throw fewer of your worst. At the top of the real Fortune band that is worth about +2.5%
+// on the average, which is texture of the same order as the spread itself. See fortune.js for the curve.
 export const SWING_SPREAD = 0.15;
-export const swingRoll = (rng = Math.random) => (SWING_SPREAD > 0 ? 1 + (rng() * 2 - 1) * SWING_SPREAD : 1);
+export const swingRoll = (rng = Math.random, fortune = 0) => luckyRoll(rng, SWING_SPREAD, fortune);
 
 export function critStacks(critChance = 0, rng = Math.random) {
     const cc = Number(critChance) || 0;
@@ -359,7 +367,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
             const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1)
-                * (surging ? 1 + att.surge : 1) * mult * swingRoll(rng);
+                * (surging ? 1 + att.surge : 1) * mult * swingRoll(rng, att.fortune);
             // ── PIERCE THINS THE ARMOUR ──────────────────────────────────────────────────────────────
             // It used to route a share of the blow AROUND the armour and send the rest through it in full,
             // which is algebraically nothing: `raw*p + (raw - raw*p - armour)` collapses to `raw - armour`

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { DIG_CONSOLATION, shardCoin } from "@/lib/marketplace/dig-values.js";
@@ -394,7 +396,8 @@ async function rollMerchant(buyerId) {
     }
 
     const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
-    const chance = forced ? 1 : MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
+    // luckyChance passes a forced 1 straight back out — a Treasure Map is a guarantee, not a probability.
+    const chance = forced ? 1 : luckyChance(MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId), await fortuneFor(buyerId).catch(() => 0));
     let offer = { none: true };
     if (Math.random() < chance) {
         const stock = [...MERCHANT_STOCK].sort(() => Math.random() - 0.5).slice(0, 3).map((s) => {
@@ -847,7 +850,7 @@ const digItemCount = (tier, bonus = 0) => Math.min(5 + bonus, 2 + Math.floor(tie
 // One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
 const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
-function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardPowers = null) {
+function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardPowers = null, fortune = 0) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
@@ -883,7 +886,7 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // `> 0` and not `=== true`: a lure is a COUNT now, so a second one banks instead of overwriting the
     // first — see mig400 and the note in consumables.js. Reading it as a boolean here would have quietly
     // stopped charming anything the moment the column changed type.
-    const twinChest = (Number(row?.dig_lure) || 0) > 0 && Math.random() < LURE_TWIN_CHANCE;
+    const twinChest = (Number(row?.dig_lure) || 0) > 0 && Math.random() < luckyChance(LURE_TWIN_CHANCE, fortune);
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
     // Beachhead: a third of sites arrive half dug, so the shallow layers over the chest are already gone.
@@ -3761,7 +3764,8 @@ export async function beginDig(buyerId) {
         petFinds = Math.max(0, Math.round((await getPetSystemPerk(buyerId, "beachcomber")) / 10));
     } catch { /* no companion, no extra finds */ }
     const boardPowers = await equippedPowers(buyerId);
-    const board = newBoard(row, petStamina, petFinds, boardPowers.has("diviner_s_rod"), boardPowers);
+    // newBoard lays the site out synchronously, so its luck is handed in rather than fetched inside.
+    const board = newBoard(row, petStamina, petFinds, boardPowers.has("diviner_s_rod"), boardPowers, await fortuneFor(buyerId).catch(() => 0));
     // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
     const eff = seaEffects(await equippedSeaAffinity(buyerId));
     if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;

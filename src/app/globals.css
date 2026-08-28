@@ -9906,7 +9906,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss2-strikesrc { text-align: center; font-size: 0.8rem; margin-bottom: 4px; color: #e9dcb8; line-height: 1.4; }
 .boss2-strikesrc strong { color: #ffd75e; }
 .boss2-tix { font-weight: 800; color: #ffd75e; }
-.boss2-fortune { font-weight: 800; font-size: 0.78rem; color: #8fe39a; background: rgba(143,227,154,0.12); border: 1px solid rgba(143,227,154,0.3); border-radius: 999px; padding: 2px 9px; }
 /* Why you are not in the real-world draw. Deliberately quiet — it is an explanation, not a penalty notice. */
 .boss2-raffle-out { margin-top: 6px; font-size: 0.78rem; line-height: 1.4; color: #d9c9a8; background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.22); border-radius: 10px; padding: 6px 10px; }
 

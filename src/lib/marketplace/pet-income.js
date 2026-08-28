@@ -18,14 +18,17 @@ const XP_PER_POINT = 1; // each xp_gain point → +1 XP / hour
 // GOLD_PER_POINT is shared from pet-perks.js so the accrued income and the on-card display never drift.
 const MAX_ACCRUE_HOURS = 24; // offline accrual cap
 
-// The player's current pet income rate (for display + settling). rafflePerDay is consumed by boss.js, not here.
+// The player's current pet income rate (for display + settling).
+//
+// It used to report `raffleTickets` alongside these two, on the reasoning that a fortune pet banked entries
+// every day whether you played or not. Fortune is luck now (see fortune.js) and buys no entries, so the field
+// is gone rather than left reporting a number nothing pays out — which is what it had become.
 export async function petIncomeRate(buyerId) {
-    if (!buyerId) return { xpPerHour: 0, goldPerHour: 0, raffleTickets: 0 };
+    if (!buyerId) return { xpPerHour: 0, goldPerHour: 0 };
     const bonus = await getPetCombatBonus(buyerId).catch(() => ({ economy: {}, stats: {} }));
     return {
         xpPerHour: Math.round((bonus.economy?.xp_gain || 0) * XP_PER_POINT),
         goldPerHour: Math.round((bonus.economy?.gold_find || 0) * GOLD_PER_POINT),
-        raffleTickets: Math.round(bonus.stats?.fortune || 0),
     };
 }
 
@@ -73,8 +76,8 @@ export async function settlePetIncome(buyerId) {
 }
 
 // Once-a-day recap of what the menagerie banked. Settles first (so the tally is current), then — at most once
-// per store-local day — hands back the accumulated XP/gold and resets it. `raffleTickets` is the current daily
-// fortune rate (FYI). Returns { show:false } the rest of the day.
+// per store-local day — hands back the accumulated XP/gold and resets it. Returns { show:false } the rest of
+// the day.
 export async function getIncomeRecap(buyerId) {
     if (!buyerId) return { show: false };
     await settlePetIncome(buyerId).catch(() => {});
@@ -92,6 +95,5 @@ export async function getIncomeRecap(buyerId) {
         [buyerId]
     ).catch(() => null);
     if (!claim) return { show: false };
-    const { raffleTickets } = await petIncomeRate(buyerId).catch(() => ({ raffleTickets: 0 }));
-    return { show: true, xp: Number(row.xp) || 0, gold: Number(row.gold) || 0, raffleTickets: raffleTickets || 0 };
+    return { show: true, xp: Number(row.xp) || 0, gold: Number(row.gold) || 0 };
 }

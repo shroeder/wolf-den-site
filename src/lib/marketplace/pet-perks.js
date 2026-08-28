@@ -2,16 +2,13 @@
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
 import { effectFor } from "@/lib/marketplace/pet-ascension-effects.js";
+import { fortunePct } from "@/lib/marketplace/fortune.js";
 import { petPassive, petSpecialPassive, petBroadPassives, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
 // Passive gold income rate: each gold_find point → this many gold/hour. Single source of truth shared by the
 // income settler (pet-income.js) and the perk/owned-bonus display. Nerfed to 1/5 of the original 2.
 export const GOLD_PER_POINT = 0.4;
-// Fortune → boss-raffle tickets: each fortune point banks this many tickets PER DAY the boss is alive (shared
-// by the display here + the draw math in boss.js, so they never drift). Nerfed 3→1 (2026-07-28): at 3/day the
-// guaranteed fortune haul (fortune×3×days = up to ~84/week) swamped the damage-earned tickets — too strong.
-export const TICKETS_PER_FORTUNE_PER_DAY = 1;
 const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.6, ascendant: 3.0, eternal: 3.5 };
 const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },
@@ -356,7 +353,7 @@ function perkDescRaw(key, v, level = 1) {
         case "tenacity": return `+${v} Tenacity — multiplies the armour you are wearing`;
         case "pierce": return `+${v} Pierce — ${(v * 0.5).toFixed(1)}% of your damage ignores armour`;
         case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
-        case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
+        case "fortune": return `+${v} Fortune — ${fortunePct(v)} better drop rates everywhere, and steadier damage rolls`;
         case "extra_strike": { const c = Math.min(100, 20 + 20 * (Math.max(1, level) - 1)); return `${c}% chance for an extra daily strike${c < 100 ? " — rises to 100% by Lv 5" : " (maxed — every day!)"}`; }
         case "first_hit": return `Your first MANUAL strike each day (your daily boss tap) deals ×${v} damage — passive auto-damage isn't affected`;
         case "erupt": return `${Math.round(v.chance * 100)}% chance your strike erupts for ×${v.mult}`;

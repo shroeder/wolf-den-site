@@ -15,7 +15,7 @@
 // glows once something is in it.
 // ── THE FIVE, RE-CHOSEN ──────────────────────────────────────────────────────────────────────────────────────
 // Luke's list. What they were before was a set from an older combat model, and two of the five had stopped
-// being combat stats at all: Emerald paid Fortune, which does nothing in a fight by design, and Sapphire paid
+// being combat stats at all: Emerald paid Fortune, which at the time did nothing in a fight, and Sapphire paid
 // Ferocity, which needs about a hundred points in one lump to remove a single swing from a bout — so a Flawless
 // one was +3% attack speed and, in practice, nothing. Half the gem table was a dead socket.
 //

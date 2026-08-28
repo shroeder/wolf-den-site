@@ -29,6 +29,7 @@
     "check:delve-quote": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-delve-quote.mjs",
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",
+    "check:fortune": "node scripts/check-fortune.mjs",
     "check:tree": "node scripts/check-tree.mjs",
     "check:casino": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-casino.mjs",
     "check:slot5": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-slot5.mjs",

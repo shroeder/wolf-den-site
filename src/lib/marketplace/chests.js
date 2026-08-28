@@ -13,6 +13,8 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { luckyChance } from "@/lib/marketplace/fortune.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -187,6 +189,9 @@ export async function syncLevelChests(buyerId) {
 
     if (level <= row.chest_level) return {};
     const tally = {};
+    // Fortune is luck everywhere, and an elite chest riding on a milestone is a drop roll like any other.
+    // Asked once for the whole walk — several levels can land at once off a big raid.
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
     for (let L = row.chest_level + 1; L <= level; L++) {
         // The milestone, and the ONLY level-up chest: a Gold Chest every tenth level, exactly as the track
         // says. The loop still walks every level so that gaining several at once (which happens constantly
@@ -198,7 +203,7 @@ export async function syncLevelChests(buyerId) {
         // hat, and the reason three Ascendants are already out. Odds per roll are untouched; only the number
         // of rolls changes, so an elite chest stays a real thing that happens, just at the promised cadence.
         if (L >= 20) {
-            for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
+            for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < luckyChance(e.chance, fortune)) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
         }
     }
     // A run of levels that crossed no milestone grants nothing — don't write an empty grant row.
@@ -283,6 +288,12 @@ export async function openChest(buyerId, tier) {
     if (!def) return { ok: false, error: "unknown_tier" };
     const dec = await db.queryOne(`UPDATE mkt_user_chest SET count = count - 1 WHERE buyer_id = $1 AND tier = $2 AND count > 0 RETURNING count`, [buyerId, tier]).catch(() => null);
     if (!dec) return { ok: false, error: "no_chest" };
+    // ── FORTUNE RIDES EVERY ROLL BELOW ───────────────────────────────────────────────────────────────────
+    // A chest is a priority chain: recipe, then seed, then pet, then gem, then scroll, then consumable, then
+    // ordinary gear. Luck raises the chance at every rung, which is exactly what "better drop rates" should
+    // mean — not a better rarity roll at the end, but a better chance the chest holds something other than
+    // the ordinary. Memoised per member (see fortune-server.js), so opening fifty in a row asks once.
+    const fortune = await fortuneFor(buyerId).catch(() => 0);
     // ── THE BURN SIDE OF THE LEDGER ──────────────────────────────────────────────────────────────────────
     // The decrement above was the only record that a chest ever left circulation, and a decrement is not a
     // record — it is the absence of one. Every question worth asking about the chest economy needs this row:
@@ -307,7 +318,7 @@ export async function openChest(buyerId, tier) {
     // Banded by tier: a wooden chest can never produce a Legendary recipe however many you open. Deferred
     // import — chests.js is pulled in by cooking.js, and a static edge back would be a cycle.
     const band = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : tier === "gold" ? "chest_gold" : "chest_high";
-    if (Math.random() < (RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId)) {
+    if (Math.random() < luckyChance((RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId), fortune)) {
         const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
         const rec = await grantRecipeReward(buyerId, band).catch(() => null);
         // Null means they already know every recipe in this band — fall through to the ordinary loot rather
@@ -315,7 +326,7 @@ export async function openChest(buyerId, tier) {
         if (rec) return { ok: true, remaining: dec.count, recipe: rec };
     }
 
-    if (Math.random() < (SEED_CHANCE[tier] || 0)) {
+    if (Math.random() < luckyChance(SEED_CHANCE[tier] || 0, fortune)) {
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
         const seedBand = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : "chest_gold";
         const got = [];
@@ -341,7 +352,7 @@ export async function openChest(buyerId, tier) {
     // bench rather than something a chest hands you — that is the whole reason gems are tiered. A richer
     // chest raises the CHANCE, never the tier.
     const gChance = GEM_CHEST_CHANCE[tier] || 0;
-    if (gChance && Math.random() < gChance) {
+    if (gChance && Math.random() < luckyChance(gChance, fortune)) {
         const { GEM_KINDS, gemId } = await import("@/lib/marketplace/gems.js");
         const { grantGem } = await import("@/lib/marketplace/jeweller.js");
         const kind = GEM_KINDS[Math.floor(Math.random() * GEM_KINDS.length)];
@@ -355,7 +366,7 @@ export async function openChest(buyerId, tier) {
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.
     const sChance = SCROLL_CHEST_CHANCE[tier] || 0;
-    if (sChance && Math.random() < sChance) {
+    if (sChance && Math.random() < luckyChance(sChance, fortune)) {
         const cid = Math.random() < 0.12 ? "forge_enchant_scroll" : "forge_power_scroll";
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
@@ -364,7 +375,7 @@ export async function openChest(buyerId, tier) {
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];
-    if (cc && Math.random() < cc.chance) {
+    if (cc && Math.random() < luckyChance(cc.chance, fortune)) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];

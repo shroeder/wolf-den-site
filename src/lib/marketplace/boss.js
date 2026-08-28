@@ -10,7 +10,7 @@ import { petLevelForXp, addEquippedPetXp } from "@/lib/marketplace/pet-level.js"
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
-import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
+import { luckyRoll } from "@/lib/marketplace/fortune.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { barredFromPrizes, isHouse, isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
@@ -41,42 +41,29 @@ export const DAILY_ATTACKS = 1;
 // has always had its own ceiling and the product had none.
 export const BOSS_MULT_CAP = 20;
 
-// Fortune → boss-raffle tickets. Instead of a flat one-time bonus, each point of fortune banks
-// TICKETS_PER_FORTUNE_PER_DAY (from pet-perks.js) lottery tickets PER DAY the boss is alive — so holding
-// fortune gear/pets across the week compounds into a real edge. `fortuneTickets(fortune, boss)` is the single
-// source used by both the display and the draw.
-const MAX_FORTUNE_DAYS = 8; // don't let an unusually long-lived boss balloon the accrual
-function bossDaysActive(boss) {
-    if (!boss?.started_at) return 1;
-    // ── A DEAD BOSS STOPS BANKING ────────────────────────────────────────────────────────────────────────
-    // Measured against Date.now() this kept climbing after the draw, so the recap's ticket count drifted
-    // away from the hat that was actually drawn — a card read on Tuesday would quote a bigger number than
-    // the one the lottery ran on.
-    const end = boss.defeated_at ? new Date(boss.defeated_at).getTime() : Date.now();
-    const ms = end - new Date(boss.started_at).getTime();
-    return Math.min(MAX_FORTUNE_DAYS, Math.max(1, Math.ceil(ms / 86400000)));
-}
-export function fortuneTickets(fortune, boss) {
-    return Math.round((Number(fortune) || 0) * TICKETS_PER_FORTUNE_PER_DAY * bossDaysActive(boss));
-}
-
-// ── WHAT SOMEBODY ACTUALLY HOLDS IN THE HAT ──────────────────────────────────────────────────────────────────
-// GrayKitsune, on the card that goes up when a boss dies: "The total tickets here show less then 800, I was
-// over 1000 before the boss went down. Is it not including the ones from fortune or spirit fox in the final
-// tally or is this visual?"
+// ── A TICKET IS DAMAGE, AND ONLY DAMAGE ──────────────────────────────────────────────────────────────────────
+// Fortune used to bank bonus tickets per day the boss was alive, which is where the stat's whole meaning lived.
+// It has been rewired — Fortune is luck now, everywhere in the Den (see fortune.js), and the hat went back to
+// being filled by the one thing you turn up and do.
 //
-// Visual, and he is exactly right about which half was missing. His damage bought 788; his 36 Fortune banked
-// another 288 over the eight days the accrual caps at, for 1,076 — which is the number the live boss screen
-// showed him all week AND the number finalizeBossKill actually drew with. Only the after-the-fact surfaces
-// were wrong, and they were wrong because each of them wrote `Math.floor(dmg / divisor)` out by hand: the
-// celebration card, the recap leaderboard, the recap's own "your tickets" line, and the POT the odds are
-// quoted against. Four copies of a rule that had grown a second half.
+// Two things were wrong with the old shape and only one of them was the rate. `boss.js` read Fortune from the
+// PET pack alone, so a member's gear, sets, forge enhancements, gems and compendium milestones bought no
+// tickets at all — 5,420 tickets' worth of Fortune across the pack, in a hat that held 1,193 real ones. Paying
+// what the item cards promised would have made the draw a gear-Fortune lottery four and a half times over; a
+// prize off the shelf in Montgomery should go to somebody who fought for it.
 //
-// One function now. It takes the fortune because the caller has the pack bonuses to hand — see
-// getPackPetBonuses, which every one of these surfaces already loads or can.
-export function ticketsFor(dmg, fortune, boss) {
+// ── AND THE FREE ENTRIES ARE GONE WITH IT ────────────────────────────────────────────────────────────────────
+// Fortune tickets used to enter members who never swung at all. That was the honest reading of "free raffle
+// entries", and it is the part worth saying out loud rather than letting people discover: the hat now contains
+// exactly the people who hit the boss. Everyone who was getting free entries is also getting a stat that works
+// on every chest, dig, delve and pet roll they make instead, which the free entries never did.
+//
+// ONE FUNCTION, still — the celebration card, the recap leaderboard, the recap's own line and the POT the odds
+// are quoted against each used to write `Math.floor(dmg / divisor)` out by hand, and four copies of a rule is
+// how the rule grows a second half in three of them.
+export function ticketsFor(dmg, boss) {
     const divisor = Math.max(1, boss?.ticket_divisor || 100);
-    return Math.floor((Number(dmg) || 0) / divisor) + fortuneTickets(fortune, boss);
+    return Math.floor((Number(dmg) || 0) / divisor);
 }
 
 // Single source of truth for a member's daily manual-strike cap: base + gear/pet extra_strike + signature +
@@ -121,9 +108,13 @@ const lvl = (xp) => levelForXp(xp || 0).level;
 
 // Damage formulas (both scale with level). Equipped-gear stats buff the manual strike: might (+% damage),
 // crit_chance (+% to crit, base 25%), crit_power (+% crit multiplier, base ×2.5).
+// ── FORTUNE TILTS THE ROLL, THE SAME WAY IT DOES IN THE RING ─────────────────────────────────────────────────
+// `0.85 + rnd*0.3` is the same 85%-115% band arena-engine rolls on, so it gets the same treatment: luck lifts
+// the FLOOR toward the middle and never touches the ceiling. A member's biggest strike is unchanged by any
+// amount of Fortune — they just stop throwing the feeble ones. See fortune.js.
 function manualHit(level, stats = {}, { forceCrit = false } = {}) {
     const base = (120 + level * 15) * (1 + (stats.might || 0) / 100);
-    const roll = Math.round(base * (0.85 + Math.random() * 0.3));
+    const roll = Math.round(base * luckyRoll(Math.random, 0.15, stats.fortune));
     const critProb = Math.min(0.9, 0.25 + (stats.crit_chance || 0) / 100);
     const critMult = 2.5 + (stats.crit_power || 0) / 100;
     const crit = forceCrit || Math.random() < critProb;
@@ -483,10 +474,11 @@ export async function getBossState(buyerId = null) {
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
     // Base (Lv1) art + evolved (Lv2–5) art; each fighter shows the sprite for THEIR pet's level.
-    const [petSprites, petSpriteLevels, packPetBonuses] = await Promise.all([
+    // getPackPetBonuses used to be loaded here too — a whole-pack read, on every boss page view, whose only
+    // consumer was the fortune half of a ticket count. Fortune left the raffle; the query went with it.
+    const [petSprites, petSpriteLevels] = await Promise.all([
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
-        getPackPetBonuses().catch(() => new Map()), // whole-pack fortune, so every roster card's ticket TOTAL is the same for all viewers
     ]);
 
     // Each contributor's most prestigious badge (lowest sort_order), in one query — so the roster cards
@@ -597,11 +589,9 @@ export async function getBossState(buyerId = null) {
     const rosterDmgRank = new Map(contributors.filter((c) => (c.dmg || 0) > 0).slice(0, 3).map((c, i) => [c.id, i + 1]));
     const roster = contributors.map((c) => {
         const rcos = sanitizeCosmetics(c.avatar_cosmetics);
-        // Tickets = damage-earned + this member's fortune bonus (computed from the SHARED pack-fortune, so the
-        // total is identical on everyone's screen AND matches the actual raffle draw). fortuneTickets is broken
-        // out so the UI can show "+N from fortune".
+        // Tickets are damage and nothing else, so the roster card, the viewer's own line, the recap and the
+        // draw cannot disagree about anybody — there is only one number left to get wrong.
         const dmgTickets = Math.floor(c.dmg / divisor);
-        const fortTickets = fortuneTickets(packPetBonuses.get(c.id)?.stats?.fortune || 0, boss);
         return {
             id: c.id,
             dmgRank: rosterDmgRank.get(c.id) || null,
@@ -621,8 +611,7 @@ export async function getBossState(buyerId = null) {
             dmg: c.dmg,
             hits: c.hits,
             dmgTickets,
-            fortuneTickets: fortTickets,
-            tickets: dmgTickets + fortTickets,
+            tickets: dmgTickets,
             you: buyerId && c.id === buyerId,
         };
     });
@@ -664,11 +653,10 @@ export async function getBossState(buyerId = null) {
         const myLevel = mine?.level || lvl(goldRow?.xp || 0);
         const myAutoPerHour = Math.round(autoPerHour(myLevel, autoStats(myStats, myPet?.stats || {})) * em.mult);
         const cheerStatus = await getCheerStatus(buyerId).catch(() => ({ left: 0, perDay: CHEERS_PER_DAY }));
-        // Your headline ticket count MIRRORS your roster card exactly (damage-tickets + fortune bonus), so the
-        // number you see for yourself is the same number everyone else sees for you — no more mismatches.
+        // Your headline ticket count MIRRORS your roster card exactly, so the number you see for yourself is
+        // the same number everyone else sees for you — no more mismatches.
         const myDmgTickets = mine?.dmgTickets ?? Math.floor(dmg / divisor);
-        const myFortuneTickets = mine?.fortuneTickets ?? fortuneTickets(myPet?.stats?.fortune || 0, boss);
-        you = { attacksLeft: Math.max(0, dailyCap - used), strikeCap: dailyCap, strikeSources: strikeSources(capArgs), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay,
+        you = { attacksLeft: Math.max(0, dailyCap - used), strikeCap: dailyCap, strikeSources: strikeSources(capArgs), dmg, tickets: myDmgTickets, dmgTickets: myDmgTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay,
             // ── WHY YOUR TICKETS MIGHT NOT BE IN THE HAT ─────────────────────────────────────────────
             // Two ways to be out of the real-world draw, and both are stated rather than discovered.
             // `raffleHouse` is staff and the owner — permanent, and the reason is that the shop cannot
@@ -728,10 +716,6 @@ export async function getBossRecap(bossId, buyerId = null) {
         )
         .catch(() => []);
     const totalDamage = rows.reduce((s, r) => s + (r.dmg || 0), 0);
-    // The fortune half of everybody's ticket count — see ticketsFor. Loaded once for the whole page, the way
-    // the live boss screen already does it, so the leaderboard, the pot and your own line cannot disagree.
-    const petBonuses = await getPackPetBonuses().catch(() => new Map());
-    const fortuneOf = (id) => petBonuses.get(id)?.stats?.fortune || 0;
     const leaderboard = rows.slice(0, 15).map((r, i) => ({
         rank: i + 1,
         name: r.display_name || r.alias || "Member",
@@ -739,7 +723,7 @@ export async function getBossRecap(bossId, buyerId = null) {
         avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
         level: lvl(r.xp),
         dmg: r.dmg,
-        tickets: ticketsFor(r.dmg, fortuneOf(r.id), boss),
+        tickets: ticketsFor(r.dmg, boss),
         you: Boolean(buyerId && r.id === buyerId),
     }));
     let winner = null;
@@ -752,14 +736,14 @@ export async function getBossRecap(bossId, buyerId = null) {
         // kill Luke asked about, Eric held 982 of roughly 7,000 and had an 86% chance of losing. Handing the
         // card the pot lets it say the odds out loud, which is the only thing that settles it.
         // THE POT HAS TO BE THE WHOLE HAT, or the odds this card exists to state are wrong in the member's
-        // favour. Fortune tickets are in the draw (see finalizeBossKill) and were not in this sum.
-        const pot = rows.reduce((n, r) => n + ticketsFor(r.dmg, fortuneOf(r.id), boss), 0);
+        // favour. It is every fighter's damage tickets, which since Fortune left the draw is the whole hat.
+        const pot = rows.reduce((n, r) => n + ticketsFor(r.dmg, boss), 0);
         if (w) winner = { name: w.display_name || w.alias || "Member", avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL, tickets: boss.winner_tickets || 0, pot, you: Boolean(buyerId && buyerId === boss.winner_buyer_id) };
     }
     let mine = null;
     if (buyerId) {
         const idx = rows.findIndex((r) => r.id === buyerId);
-        if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: ticketsFor(r.dmg, fortuneOf(r.id), boss), hits: r.hits }; }
+        if (idx >= 0) { const r = rows[idx]; mine = { rank: idx + 1, dmg: r.dmg, tickets: ticketsFor(r.dmg, boss), hits: r.hits }; }
     }
     // MVP = the top damage dealer, with their battle SPRITE, for the "final blow" cinematic.
     let mvp = null;
@@ -824,13 +808,12 @@ export async function getPendingBossCelebration(buyerId) {
     ]);
     const dmg = mineRow?.dmg || 0;
     // Same sum as the live screen and the draw — see ticketsFor. This line is the one he screenshotted.
-    const myFortune = (await getPackPetBonuses().catch(() => new Map())).get(buyerId)?.stats?.fortune || 0;
     const aheadRow = await db.queryOne(`SELECT COUNT(*)::int AS n FROM (SELECT buyer_id FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > $2) x`, [row.id, dmg]).catch(() => null);
     return {
         pending: true,
         boss: { id: row.id, name: row.name },
         winner: row.winner_buyer_id ? { name: winnerRow?.display_name || winnerRow?.alias || "A member", you: row.winner_buyer_id === buyerId, tickets: row.winner_tickets || 0, prize: row.prize_name || null } : null,
-        mine: { dmg, tickets: ticketsFor(dmg, myFortune, row), rank: (aheadRow?.n || 0) + 1 },
+        mine: { dmg, tickets: ticketsFor(dmg, row), rank: (aheadRow?.n || 0) + 1 },
         heroes: heroesRows.map((h) => ({ url: h.avatar_sprite_url, flip: h.avatar_sprite_flip === true })),
         recapUrl: `/marketplace/boss/recap/${row.id}`,
     };
@@ -846,13 +829,11 @@ export async function getMyBossSummary(buyerId) {
     const boss = await getActiveBoss();
     if (!boss) return null;
     const divisor = Math.max(1, boss.ticket_divisor || 100);
-    const [row, myPet] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [boss.id, buyerId]).catch(() => null),
-        getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
-    ]);
+    // The pet read that used to sit beside this one priced the fortune half of the ticket count. Tickets are
+    // damage now, so it is one query, not two, on a summary the profile asks for on every view.
+    const row = await db.queryOne(`SELECT COALESCE(SUM(damage), 0)::int AS dmg FROM boss_hit WHERE boss_id = $1 AND buyer_id = $2`, [boss.id, buyerId]).catch(() => null);
     const dmg = row?.dmg || 0;
-    // Include fortune raffle tickets so this matches the boss screen's headline count (both feed the same raffle).
-    const tickets = ticketsFor(dmg, myPet?.stats?.fortune || 0, boss);
+    const tickets = ticketsFor(dmg, boss);
     return { bossName: boss.name, dmg, tickets, divisor };
 }
 
@@ -989,13 +970,10 @@ async function finalizeBossKill(bossId) {
     const parts = await db
         .query(`SELECT buyer_id, SUM(damage)::int AS dmg FROM boss_hit WHERE boss_id = $1 GROUP BY buyer_id HAVING SUM(damage) > 0`, [bossId])
         .catch(() => []);
-    // Fortune (raffle luck) from pets/gear adds bonus lottery tickets on top of the damage-earned ones, so
-    // it genuinely improves prize odds (the effect the stat always advertised but never actually did).
-    const petBonuses = await getPackPetBonuses().catch(() => new Map());
     const pool = parts.map((p) => ({
         id: p.buyer_id,
         dmg: p.dmg,
-        tickets: ticketsFor(p.dmg, petBonuses.get(p.buyer_id)?.stats?.fortune || 0, boss),
+        tickets: ticketsFor(p.dmg, boss),
     }));
     const ranked = pool.slice().sort((a, b) => b.dmg - a.dmg);
     const top1 = ranked[0] || null;
@@ -1006,15 +984,10 @@ async function finalizeBossKill(bossId) {
     let raffleWinner = null;
     // The Wolf Den (owner) is EXCLUDED from winning the real-world prize — they still earn in-game rewards below,
     // just never the physical raffle. Filter only the raffle pool, not the reward/chest pool.
-    // Fortune tickets are advertised on the pets screen as "Free weekly-boss raffle entries each day — real odds
-    // to win". FREE is the whole promise: you hold fortune pets, you get entries. But `pool` comes from boss_hit
-    // with HAVING SUM(damage) > 0, so a member who never swung was not in it at all and their free tickets
-    // entered no draw. The stat paid out only for people who were already fighting — exactly the people who had
-    // damage tickets anyway.
-    //
-    // The raffle pool alone is widened. `pool` still means "everyone who fought" and keeps driving participation
-    // XP, spin tokens, badges, seeds and reward items — none of which are free, and none of which should go to
-    // someone who never turned up.
+    // ── THE HAT IS THE PEOPLE WHO FOUGHT ─────────────────────────────────────────────────────────────────
+    // It used to be wider: Fortune banked free entries, so members who never swung could be drawn. That went
+    // when Fortune was rewired into luck (see the note at ticketsFor). `pool` comes from boss_hit with
+    // HAVING SUM(damage) > 0, and that is now the whole hat as well as the reward list.
     // ── AND WINNING SITS YOU OUT FOR THREE ───────────────────────────────────────────────────────────────
     // The raffle prize is a REAL object off the shelf in Montgomery, and a ticket-weighted draw has no memory:
     // the same person can take three in a row and nothing in the maths finds that odd. With a few dozen
@@ -1026,22 +999,13 @@ async function finalizeBossKill(bossId) {
     // the physical prize only, and only for three, which at the current cadence is about a month.
     const lockedOut = await raffleLockedIds(bossId).catch(() => new Set());
     // Who has ever actually bought something, in the shop or online — see everSpentIds. Asked once for
-    // everyone who could possibly be in the hat, fighters and fortune-ticket holders alike.
-    const couldWin = [...new Set([...pool.map((p) => p.id), ...petBonuses.keys()])];
+    // everyone who could possibly be in the hat.
+    const couldWin = [...new Set(pool.map((p) => p.id))];
     const spent = await everSpentIds(couldWin).catch(() => new Set(couldWin));
     // barredFromPrizes sits beside isHouse everywhere isHouse decides the POOL, and nowhere that decides
     // what the screen says. A silent bar that announces itself is not a silent bar.
     const rafflePool = pool.filter((p) => !isHouse(p.id) && !barredFromPrizes(p.id) && !lockedOut.has(p.id)
         && spent.has(p.id));
-    const inRaffle = new Set(rafflePool.map((p) => p.id));
-    for (const [buyerId, bonus] of petBonuses) {
-        if (inRaffle.has(buyerId) || isHouse(buyerId) || barredFromPrizes(buyerId) || lockedOut.has(buyerId)) continue;
-        // The fortune-ticket half of the hat gets the same test. Free entries are still entries into a draw
-        // for a real object, and the rule is about the prize, not about how you got your tickets.
-        if (!spent.has(buyerId)) continue;
-        const tickets = fortuneTickets(bonus?.stats?.fortune || 0, boss);
-        if (tickets > 0) rafflePool.push({ id: buyerId, dmg: 0, tickets });
-    }
     // ── AND IF THE COOLDOWN EMPTIES THE HAT, THE HAT WINS ────────────────────────────────────────────────
     // On a quiet week the three suspended winners could be most of the people who turned up. A prize that
     // goes to nobody is worse for everyone than a prize that goes to a repeat winner, so the suspension is
@@ -1370,6 +1334,10 @@ export async function attackBoss(buyerId) {
         crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (badgeStats.crit_chance || 0),
         crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (badgeStats.crit_power || 0),
         extra_strike: (gearStats.extra_strike || 0) + (ps.extra_strike || 0) + petExtraStrikeToday(buyerId, petBonus?.proc?.extraStrikeChance || 0),
+        // All three sources, and NOT amplified by Beastbond — luck is luck, it is not the pet's contribution
+        // to the blow. This is the same total fortuneFor() answers with; the three reads are already in hand
+        // here, so asking again would be three round trips to learn what is on the desk.
+        fortune: (gearStats.fortune || 0) + (ps.fortune || 0) + (badgeStats.fortune || 0),
     };
     // Extra daily strikes come from gear + pets (extra_strike) AND signatures AND used consumables (potions).
     const dailyCap = dailyStrikeCap({ extraStrike: stats.extra_strike, equippedIds, bonusStrikes: await memberBonusStrikes(buyerId).catch(() => 0) });

@@ -152,7 +152,7 @@ export default function GuideClient() {
                         <img src="/images/guide/ch-boss.webp" alt="" draggable="false" />
                         <div>
                             <b>The whole Den fights one boss</b>
-                            <p>Every hit you land banks raffle tickets, and good gear and pets keep banking more for every day the boss stays up.</p>
+                            <p>Every hit you land banks raffle tickets toward the prize, so turning up and swinging is the whole of it.</p>
                         </div>
                     </div>
                     <div className="gd-beat is-prize">

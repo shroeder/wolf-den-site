@@ -9,6 +9,7 @@ import PetEnshrine from "@/components/PetEnshrine";
 import PetStonesRow from "@/components/PetStonesRow";
 import PetEnshrineReveal from "@/components/PetEnshrineReveal";
 import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
+import { FORTUNE_SHORT } from "@/lib/marketplace/fortune";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 import { COIN_ICON } from "@/lib/coin-icon";
 import Glyph from "@/components/Glyph";
@@ -38,7 +39,7 @@ const STAT_EFFECT = {
     crit_chance: "Raises your chance to land a critical hit.",
     crit_power: "Increases your critical-hit damage.",
     ferocity: "Adds ferocious power to your strike.",
-    fortune: "Bonus raffle tickets in the weekly boss prize draw — real extra odds to win.",
+    fortune: FORTUNE_SHORT,
     xp_gain: "An earner: passively generates XP for you over time (paid out when you check in).",
     gold_find: "An earner: passively generates gold for you over time (paid out when you check in).",
 };
@@ -616,7 +617,6 @@ export default function PetsClient() {
                                 tiles={[
                                     state.income?.xpPerHour > 0 ? { key: "xp", icon: "✨", sprite: state.statSprites?.xp, label: "XP per day", value: `+${(state.income.xpPerHour * 24).toLocaleString()}`, desc: "Passive XP, accrued around the clock and banked until you check in." } : null,
                                     state.income?.goldPerHour > 0 ? { key: "gold", icon: COIN_ICON, sprite: state.statSprites?.gold, label: "Gold per day", value: `+${(state.income.goldPerHour * 24).toLocaleString()}`, desc: "Passive gold, accrued around the clock and banked until you check in." } : null,
-                                    state.income?.raffleTickets > 0 ? { key: "tix", icon: "🎟️", sprite: state.statSprites?.tix, label: "Raffle tickets / day", value: `+${state.income.raffleTickets}`, desc: "Free weekly-boss raffle entries each day — real odds to win." } : null,
                                 ].filter(Boolean)}
                             />
                         </div>

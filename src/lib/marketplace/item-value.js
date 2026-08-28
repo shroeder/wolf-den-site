@@ -23,8 +23,10 @@ export const STAT_WEIGHT = {
     crit_chance: 2, crit_power: 1,
     // The rare ones — scarce on gear, so a point of one is worth more than a point of a common stat.
     pierce: 2, lifesteal: 2, counter: 1.5, doublestrike: 3, stun: 1.5, haste: 1.5,
-    // Outside the ring entirely. Fortune is raffle tickets; it should never outrank a combat stat here.
-    fortune: 0.2, extra_strike: 5,
+    // Fortune was 0.2 when it was raffle tickets and nothing else — and it was not even that, since the draw
+    // only ever read the pet half of it. It is luck now: better drop rates in every feature plus a lifted
+    // floor on damage rolls, which is worth having on a piece without ever being the reason to wear it.
+    fortune: 1, extra_strike: 5,
 };
 
 /** Every stat a member can nominate as one they care about, in the order the chooser lists them. */
