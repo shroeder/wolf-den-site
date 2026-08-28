@@ -15,6 +15,17 @@ import { neon } from "@neondatabase/serverless";
 import { priceRun, quality, requirePreview } from "./lib/gen-guard.mjs";
 
 const APPLY = process.argv.includes("--apply");
+// ── PUBLISH THE ART YOU ACTUALLY LOOKED AT ───────────────────────────────────────────────────────────────────
+// Without this, --apply GENERATES A FRESH SET and uploads that — so the contact sheet you approved is not the
+// art that ships, and the preview step the money guard exists to enforce proves nothing about what members end
+// up seeing. It cost a second $0.25 run to notice, and the Ironback's rung 4 was the difference between a sea
+// turtle and a winged lion on two draws of the same prompt.
+//
+//   node scripts/regen-pet-levels.mjs ironback --from <dir> --apply
+//
+// Reads <dir>/<id>-lv1..5.png, uploads those exact bytes, and calls no image API at all.
+const FROM_AT = process.argv.indexOf("--from");
+const FROM = FROM_AT > -1 ? process.argv[FROM_AT + 1] : null;
 
 // ── THE QUALITY IS NOW A CHOICE ──────────────────────────────────────────────────────────────────────────────
 // This script hard-coded `quality: "high"` in two places, and gen-guard.mjs names it by name: "It was copied
@@ -25,15 +36,21 @@ const APPLY = process.argv.includes("--apply");
 // Medium unless --high is passed. Five pets is $1.10 at medium and $4.28 at high; the difference dies in the
 // 512px downscale two lines below.
 const Q = quality();
-const ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+// `--from <dir>` puts a bare path in argv, and a bare argv entry is how a pet id is named — so the directory
+// was being read as a sixth pet and reported as "no spritePrompt found". Drop the value that follows --from.
+const ids = process.argv.slice(2).filter((a, i) => !a.startsWith("--") && process.argv[i + 1] !== "--from");
 if (!ids.length) { console.error("Name at least one pet id."); process.exit(1); }
 
 // Five images per pet: Lv1 from text, then Lv2-5 as EDITS of it — an edit is billed the image plus the
 // reference it was handed, which is why they are priced separately.
-const total = priceRun({ count: ids.length, quality: Q })
-    + priceRun({ count: ids.length * 4, quality: Q, edit: true });
-console.log(`${ids.length} pet(s) x (Lv1 + 4 edits) = ${ids.length * 5} images, $${total.toFixed(2)} total${APPLY ? "" : " — PREVIEW ONLY, nothing will be uploaded"}`);
-if (APPLY) requirePreview({ count: ids.length * 5, total });
+if (FROM) {
+    console.log(`publishing ${ids.length} pet(s) from ${FROM} — no images will be generated, $0.00`);
+} else {
+    const total = priceRun({ count: ids.length, quality: Q })
+        + priceRun({ count: ids.length * 4, quality: Q, edit: true });
+    console.log(`${ids.length} pet(s) x (Lv1 + 4 edits) = ${ids.length * 5} images, $${total.toFixed(2)} total${APPLY ? "" : " — PREVIEW ONLY, nothing will be uploaded"}`);
+    if (APPLY) requirePreview({ count: ids.length * 5, total });
+}
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
@@ -52,11 +69,25 @@ const POSE = "Full body, cute but fierce, facing and looking toward the RIGHT si
     + "three-quarter view, turned toward the enemy.";
 const IDENTITY = "CRITICAL: it must remain unmistakably the same individual creature — identical species, "
     + "identical colour palette, identical markings, identical silhouette and proportions. This is the same "
-    + "character at a later stage, NOT a different creature of the same type. Do not restyle it.";
+    + "character at a later stage, NOT a different creature of the same type. Do not restyle it. "
+    // The sticker edge comes back at the evolved rungs specifically, because those are the ones that mention
+    // an aura — and "hugging the outline" reads to the model as a line drawn along it. Named as a defect
+    // here rather than left to the house string, which says "no sticker edge" and was not enough.
+    + "Do NOT draw an outline, halo, rim-light or coloured line tracing the creature's silhouette.";
 const EVO = {
     2: "It has visibly matured: slightly larger and sturdier, fur/scales/feathers fuller and better groomed, posture squared and alert, eyes sharper and more determined. No magical effects yet — this rung is about the creature itself looking healthier and stronger, and it must NOT look softer or younger than the base form.",
     3: "It is battle-hardened: noticeably bigger and more muscular, a few honest marks of experience (a nicked ear, a scar, weathered plating), stance widened and braced. A faint warm glow at the eyes only.",
-    4: "It has reached an EPIC evolved form: substantially larger and more imposing, with ONE dramatic new physical feature that suits this species (heavier horns, a longer mane, spreading wings, armoured plates). Any aura must hug the creature's outline — no background, no scenery, no filled backdrop. The background stays fully transparent.",
+    // ── RUNG 4 USED TO HAND THE MODEL A MENU AND IT ORDERED THE LOT ─────────────────────────────────────
+    // This said "ONE dramatic new physical feature that suits this species (heavier horns, a longer mane,
+    // spreading wings, armoured plates)". Given a sea turtle, the model took horns AND a mane AND wings and
+    // returned a lion-dragon: a different animal at the one rung between two good ones. The examples were
+    // doing the damage — they are a list of parts to BOLT ON, and every one of them belongs to some other
+    // creature. Rung 5 never had this problem because it asks for the signature feature "fully realised",
+    // which can only mean something the creature already has.
+    //
+    // So rung 4 amplifies rather than adds, and the parts are forbidden by name because a general instruction
+    // to keep the species did not survive a specific list of wings and horns.
+    4: "It has reached an EPIC evolved form: substantially larger and more imposing, and ONE feature it ALREADY HAS is dramatically amplified — heavier, sharper, more formidable, the thing that makes this creature what it is. Do NOT graft on body parts the reference image does not already show: no wings, no horns, no mane, no tails, no extra limbs, no armour it is not already wearing. It must read instantly as the SAME SPECIES as the reference. Any aura must hug the creature's outline — no background, no scenery, no filled backdrop, and no glowing line or coloured rim tracing its silhouette. The background stays fully transparent.",
     5: "It has reached its ULTIMATE LEGENDARY form: the largest and most majestic version of itself, its signature feature fully realised, bearing regal and awe-inspiring. Any glow or energy must CLING TIGHTLY to the creature's own silhouette — absolutely no background, no scenery, no filled backdrop, no glowing plate behind it. The background stays fully transparent.",
 };
 
@@ -116,18 +147,27 @@ for (const id of ids) {
     const pet = { id, spritePrompt: m[1] };
     console.log(`\n${id}: ${pet.spritePrompt.slice(0, 70)}…`);
 
-    const base = await genBase(pet);
-    fs.writeFileSync(path.join(OUT, `${id}-lv1.png`), base);
-    console.log(`  Lv1 ${(base.length / 1024).toFixed(0)}KB`);
-
-    const levels = { 1: base };
-    for (const lv of [2, 3, 4, 5]) {
-        try {
-            const buf = await genLevel(base, lv);
-            levels[lv] = buf;
-            fs.writeFileSync(path.join(OUT, `${id}-lv${lv}.png`), buf);
-            console.log(`  Lv${lv} ${(buf.length / 1024).toFixed(0)}KB`);
-        } catch (e) { console.log(`  Lv${lv} FAILED: ${e.message}`); }
+    const levels = {};
+    if (FROM) {
+        for (const lv of [1, 2, 3, 4, 5]) {
+            const f = path.join(FROM, `${id}-lv${lv}.png`);
+            if (!fs.existsSync(f)) { console.log(`  Lv${lv} MISSING at ${f}`); continue; }
+            levels[lv] = fs.readFileSync(f);
+            console.log(`  Lv${lv} ${(levels[lv].length / 1024).toFixed(0)}KB (from disk)`);
+        }
+    } else {
+        const base = await genBase(pet);
+        fs.writeFileSync(path.join(OUT, `${id}-lv1.png`), base);
+        console.log(`  Lv1 ${(base.length / 1024).toFixed(0)}KB`);
+        levels[1] = base;
+        for (const lv of [2, 3, 4, 5]) {
+            try {
+                const buf = await genLevel(base, lv);
+                levels[lv] = buf;
+                fs.writeFileSync(path.join(OUT, `${id}-lv${lv}.png`), buf);
+                console.log(`  Lv${lv} ${(buf.length / 1024).toFixed(0)}KB`);
+            } catch (e) { console.log(`  Lv${lv} FAILED: ${e.message}`); }
+        }
     }
 
     if (!APPLY) continue;
