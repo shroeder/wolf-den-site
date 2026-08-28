@@ -44,9 +44,9 @@ import { equipMemo, forgetEquipment } from "@/lib/marketplace/equip-cache.js";
 // what a stat does; every other screen that prints a stat reads it from there, and now so does this one. The
 // four sentences it hands back are true of this code today:
 //
-//   MIGHT      swingFrom() = (weapon base / divisor) x (might / MIGHT_MAX) x DAMAGE_MAX — arena-kit.js.
+//   MIGHT      swingFrom() = (weapon base / divisor) x DAMAGE_PER_MIGHT x might^STAT_EXPONENT — arena-kit.js.
 //              A pure multiplier on the weapon, which is what "the whole of what you hit for" means.
-//   VITALITY   healthFrom() = HEALTH_BASE + (vitality / VITALITY_MAX) x HEALTH_MAX — 200 + 10 a point.
+//   VITALITY   healthFrom() = HEALTH_PER_VITALITY x vitality^STAT_EXPONENT — no floor and no ceiling.
 //   TENACITY   armor x (1 + tenacity / 500) in arena.js, so 500 does double the plate exactly as stated.
 //   FEROCITY   speedOf() adds ferocity / FEROCITY_PER_SPEED (500) to attack speed and extraTurnFrom() reads
 //              that straight off as a chance — 5 points is 1%, and it stops at EXTRA_TURN_MAX (50%).

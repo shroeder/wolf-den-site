@@ -138,8 +138,8 @@ export function npcPower(tier) {
 // free: the ladder was not lurching, the wall was being paid twice.
 //
 // Re-solved with scripts/sim-archetype-cal.mjs against a real loadout — binary-searching the budget that
-// makes an even fight, per archetype, across all three classes. RE-RUN IT whenever DAMAGE_MAX,
-// ARMOUR_MAX_SHARE or HEALTH_MAX moves; these numbers are downstream of all three.
+// makes an even fight, per archetype, across all three classes. RE-RUN IT whenever DAMAGE_PER_MIGHT,
+// HEALTH_PER_VITALITY, ARMOUR_TOUGHNESS or STAT_EXPONENT moves; these numbers are downstream of all four.
 //
 // COMPOSE ITS ANSWER, DO NOT PASTE IT. statsForPower applies these multipliers before the probe fights, so
 // the calibrator measures the world WITH them already in effect and its “suggested mult” is a CORRECTION to

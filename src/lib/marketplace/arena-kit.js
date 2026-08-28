@@ -508,7 +508,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // you can beat is decided by how fast you die rather than by anything you built. Ferocity already exists, is
 // already on gear, and does nothing in here but decide who swings first — so it is what keeps you standing.
 // Nothing is invented; a real stat is read for a second real job.
-export const HEALTH_BASE = 200;
+// HEALTH_BASE (200) lived here and is gone with the ceiling it sat under — see HEALTH_PER_VITALITY.
 // ── HEALTH COMES OFF VITALITY NOW ────────────────────────────────────────────────────────────────────────────
 // It used to come off Ferocity, which also bought accuracy, initiative and 24/7 boss damage — one stat doing
 // four jobs, so every armour piece was the same decision and gear had no axis of its own. Vitality is health
@@ -526,12 +526,39 @@ export const HEALTH_BASE = 200;
 // At Luke's first pair (10000 damage / 5000 health) a maxed fighter removes twice a maxed opponent's entire
 // health with one swing and every bout in the game is one beat long. The ratio in the live game today is
 // about 11:1, so this holds that: 110000 to 10000. One number to turn if bouts run long or short.
-export const VITALITY_MAX = 500;
-export const HEALTH_MAX = 5000;
-// HEALTH_BASE is flat and the same for every class — a body is a body. Vitality above VITALITY_MAX keeps
-// paying at the same rate rather than clamping: 1000 vitality is twice the ceiling and twice the health.
-export const healthFrom = (vitality = 0) =>
-    Math.round(HEALTH_BASE + (Math.max(0, Number(vitality) || 0) / VITALITY_MAX) * HEALTH_MAX);
+// ── RATES, NOT CEILINGS ──────────────────────────────────────────────────────────────────────────────────────
+// VITALITY_MAX and HEALTH_MAX were here, with MIGHT_MAX and DAMAGE_MAX below and ARMOUR_K further down. Every
+// one of them was a PREDICTION about the top of the game, and Luke's objection is the right one: a predicted
+// maximum constrains future design and growth. ARMOUR_K proved it — chosen when member armour ran 360-729,
+// still 600 when members carried 1,100, and by then every top fighter sat on the flat of a curve calibrated
+// for a game that no longer existed.
+//
+// A RATE cannot go stale that way. It says what ONE POINT is worth, so the day gear carries more, the numbers
+// simply get bigger and every existing matchup is untouched. There is no ceiling to raise and nothing to
+// re-tune when content grows.
+//
+// ── AND THE RATE IS NOT LINEAR ───────────────────────────────────────────────────────────────────────────────
+// Luke: "but the rate can't be linear." Linear leaves the gap unbounded — measured across the 34 members who
+// actually fight, Might runs 242 down to 2, so a linear rate makes the unequipped player do 1 damage against
+// a median 100. STAT_EXPONENT gives diminishing returns with NO ceiling: growth is unbounded, but the tail is
+// compressed. At 0.75 the same 121x spread becomes 36x, the unequipped player does 4 rather than 1, and the
+// competitive band barely moves (top-to-median 1.7x -> 1.5x). A doubling of Might is still worth 1.68x damage,
+// so building for it pays.
+//
+// ⚠️ THE SAME EXPONENT IS USED FOR HEALTH, DAMAGE AND ARMOUR, and that is the property worth protecting.
+// health/damage cancels, so BOUT LENGTH IS SCALE-INVARIANT: two equally-geared fighters trade the same number
+// of beats in commons as in primordials, forever. Give health and damage different exponents and bout length
+// starts drifting the moment gear grows, which is the whole class of bug this replaces.
+export const STAT_EXPONENT = 0.75;
+const curve = (v) => Math.pow(Math.max(0, Number(v) || 0), STAT_EXPONENT);
+
+// ── HEALTH PER POINT OF VITALITY ─────────────────────────────────────────────────────────────────────────────
+// Sized so the top of the ladder lands at Luke's target of about 1,500 health. HEALTH_BASE is gone with the
+// ceiling: it was a floor everybody got for free, and the old note complained about exactly that ("a fighter
+// with 93 vitality had 432 — barely twice the free floor"). A body with no vitality at all is a body that
+// dies, which is what an unequipped fighter should be.
+export const HEALTH_PER_VITALITY = 35.7;
+export const healthFrom = (vitality = 0) => Math.round(HEALTH_PER_VITALITY * curve(vitality));
 
 // One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
 // to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.
@@ -726,7 +753,7 @@ export const arenaWinXp = (power = 0) =>
 // MIGHT_MAX is a DECLARED number, not a measured one, and it cancels: both fighters are divided by it, and a
 // bout is decided by the ratio between them. Raise it the day gear can carry more and nothing about any
 // existing matchup changes — only the size of the numbers on the card.
-export const MIGHT_MAX = 500;
+
 // ── 10000 -> 3500: BOUTS WERE ONE AND A HALF SWINGS LONG ──────────────────────────────────────────────────────
 // Measured on the live board, an equal fight was settled in 1.5 swings at the top (Eric 1.47, JT 1.51) and
 // under 2.4 for almost everybody. Luke: "combat feels one shotty."
@@ -739,17 +766,27 @@ export const MIGHT_MAX = 500;
 //
 // It cancels out of every matchup exactly the way MIGHT_MAX does — both fighters are divided by the same
 // ceiling — so this lengthens fights without moving who beats whom.
-export const DAMAGE_MAX = 3500;
+
 // ── THE WEAPON CARRIES THE BASE ──────────────────────────────────────────────────────────────────────────────
 // SWING_BASE was one global number for every fighter in the game. It is the WEAPON's now: `base_damage` on the
 // main hand is what Might multiplies, so a tier-1 blade and a primordial one are different weapons before a
 // single stat is read. DAMAGE_MAX is what a top-tier weapon carries, and it is the fallback for anything
 // swinging bare-handed (every NPC, and a member with an empty main hand).
 //
-// NOT CLAMPED at MIGHT_MAX. 1000 Might is twice the ceiling and does twice the damage — the ceiling is a
-// reference point for the scale, not a wall.
-// the might calculation: might / MIGHT_MAX x DAMAGE_MAX
-export const mightMult = (might = 0) => (Math.max(0, Number(might) || 0) / MIGHT_MAX) * DAMAGE_MAX;
+// ── DAMAGE PER POINT OF MIGHT ────────────────────────────────────────────────────────────────────────────────
+// MIGHT_MAX and DAMAGE_MAX are gone — see the note on STAT_EXPONENT for why a predicted ceiling was the wrong
+// shape. This is a rate on the same curve health uses.
+//
+// Sized against what Luke asked for: A CRIT ON A DECENT PLAYER TAKES A THIRD OF THEIR BAR. Measured on JT —
+// 219 Might, 183 Vitality, crit x2.28 — that is a 1,775 health bar, an ordinary swing of 260, and a crit of
+// 592, which is his third. The ordinary swing is deliberately NOT the third: a crit lands about one swing in
+// eight, so sizing the crit is what makes the big moment big and leaves the rest of the fight room to happen.
+// ⚠️ THIS IS THE RATE BEFORE THE WEAPON MULTIPLIES IT. swingFrom applies (weapon base / 100) on top, which
+// is 0.32 for every weapon in the game and 0.16 bare-handed — so a rate derived from a FINISHED swing has to
+// be divided by that, or the weapon gets counted twice. It was 4.556 for exactly one run of this file and
+// JT's crit came out at 10.7% of his bar instead of a third.
+export const DAMAGE_PER_MIGHT = 14.27;
+export const mightMult = (might = 0) => DAMAGE_PER_MIGHT * curve(might);
 
 // damage = base damage x the might calculation
 // ── AN EMPTY HAND IS THE WORST WEAPON, NOT THE BEST ──────────────────────────────────────────────────────────
@@ -956,16 +993,28 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 // A / (A + K) needs no ceiling because it cannot reach 100%, and it separates values the cap flattened: today
 // 550 armour and 1800 armour are both exactly 75%.
 //
-// K IS CHOSEN OFF THE REAL CEILING, which is what Luke described. The Road tops out at 1806 armour, so K = 600
-// puts the hardest thing in the game at 75% — the old cap, now EARNED — while a typical member sits at 48%
-// and the best-geared at 55%. Luke's call, from a table of the alternatives.
-export const ARMOUR_K = 600;
+// ── ARMOUR BUYS EFFECTIVE HEALTH ─────────────────────────────────────────────────────────────────────────────
+// ARMOUR_K was here — the denominator of A/(A+K), and the clearest case of the stale-ceiling problem in the
+// file: chosen when member armour ran 360-729, never moved, and by the time members carried 1,100 the whole
+// top of the ladder sat on the flat of the curve where 987 armour and 1,222 played identically.
+//
+// Stated the other way round there is no denominator to go stale. Armour buys TOUGHNESS — a multiplier on
+// your effective health — at a rate per point, on the same curve as everything else. The damage reduction is
+// whatever falls out of it:
+//
+//     toughness = 1 + ARMOUR_TOUGHNESS x armour^STAT_EXPONENT
+//     reduction = 1 - 1/toughness
+//
+// It approaches 100% and can never reach it BY CONSTRUCTION rather than by a cap somebody has to remember to
+// enforce — which is exactly how DR_CAP came to be declared in one file and applied in none. A typical worn
+// set today turns aside about 35%.
+export const ARMOUR_TOUGHNESS = 0.002806;
 
 /** The share of a blow this much armour turns aside. `pierce` removes armour BEFORE the curve, so 50% pierce
  *  means half their plate is not there — the same meaning it had under subtraction. */
 export const drFrom = (armour = 0, pierce = 0) => {
     const eff = Math.max(0, (Number(armour) || 0) * (1 - Math.min(1, Math.max(0, Number(pierce) || 0))));
-    return eff / (eff + ARMOUR_K);
+    return 1 - 1 / (1 + ARMOUR_TOUGHNESS * curve(eff));
 };
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.

@@ -479,8 +479,6 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // A shield's block chance, as a share. Item-exclusive like counter.
         blockChance: (Number(stats.block_chance) || 0) + (perks.blockChance || 0),
         blockReduction: (base.blockReduction ?? BLOCK_REDUCTION) + (perks.blockReductionBonus || 0),
-        blockStack: base.blockStack || 0,
-        blockStackMax: base.blockStackMax || 0,
         // Raw points; LIFESTEAL_PER_POINT turns them into a share of what you inflict.
         lifesteal: (Number(stats.lifesteal) || 0) + (perks.lifestealStat || 0),
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),

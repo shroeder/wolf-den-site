@@ -191,8 +191,6 @@ export const classBase = (id) => {
         health: c?.health || 0,
         dr: c?.dr ?? DEFAULT_DR,
         blockReduction: c?.blockReduction ?? null,
-        blockStack: c?.blockStack ?? 0,
-        blockStackMax: c?.blockStackMax ?? 0,
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
         bleedChance: c?.bleedChance || 0,

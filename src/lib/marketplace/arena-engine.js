@@ -198,7 +198,7 @@ export const COMBAT_FIELDS = [
     // the bell and this has to already be in bout_json by then.
     "tempo",
     // mitigation and getting through it
-    "armor", "pierce", "blockChance", "blockReduction", "blockStack", "blockStackMax",
+    "armor", "pierce", "blockChance", "blockReduction",
     // the procs that come off affix points
     "counter", "lifesteal", "stun", "haste",
     // over time, and what drinks from it
@@ -244,11 +244,9 @@ export const sideOf = (f) => ({
         // A shield's block chance, and what a block is worth to THIS fighter — the Warden blocks harder.
         blockChance: Math.max(0, Math.min(1, Number(f.blockChance) || 0)),
         blockReduction: Number(f.blockReduction) > 0 ? Number(f.blockReduction) : 0.35,
-        // The Warden's escalating guard: every blow that gets through adds `blockStack` to the chance, up to
-        // `blockStackMax` times, and a successful block spends the lot. A fighter without it has 0 and 0.
-        blockStack: Math.max(0, Number(f.blockStack) || 0),
-        blockStackMax: Math.max(0, Number(f.blockStackMax) || 0),
-        stacks: 0,
+        // blockStack / blockStackMax / stacks lived here: the Warden's escalating guard, where every blow
+        // that got through raised the block chance. No class ever defined it, so all three were permanently
+        // zero — see the note at the block roll.
         // 1 point = 0.5% to stun on a landed blow, and 0.5% that a swing casts haste on yourself.
         stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT + (Number(f.stunBonus) || 0))),
         haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT + (Number(f.hasteBonus) || 0))),
@@ -339,7 +337,12 @@ export function goesAgain(f, rng = Math.random, wasExtra = false) {
 //
 // A skill that strikes a fixed number of times still does — Onslaught's `hits: 3` comes through hitsOverride,
 // which never went through this roll.
-export const blowCount = () => 1;
+//
+// blowCount() lived here and was deleted with the last of it. It had been hollowed out to `() => 1` when
+// double strike went, but resolveSwing went on calling it as `blowCount(att.doublestrike, rng)` — a name and
+// an argument list that described a mechanic the body no longer had. Read from the call site it looks like a
+// second blow is being rolled for; nothing of the sort happens, and `att.doublestrike` is not even set on a
+// kit. One blow, unless a skill asks for more.
 
 // ── ONE SWING, WHOEVER THREW IT AND HOWEVER IT WAS CHOSEN ────────────────────────────────────────────────────
 // Lifted whole out of autoBout. An auto-resolved bout and a turn you took by hand must be the same arithmetic
@@ -353,7 +356,7 @@ export const blowCount = () => 1;
 //   hitsOverride  a skill that strikes a fixed number of times, instead of rolling doublestrike for it
 export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, mult = 1, hitsOverride = 0 }) {
         // Each blow of a doublestrike rolls its own crit, so the stat is variance as well as volume.
-        const hits = hitsOverride || blowCount(att.doublestrike, rng);
+        const hits = hitsOverride || 1;
         let dealt = 0;
         let anyCrit = false;
         let blocked = 0;
@@ -392,16 +395,18 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             // ── THE SHIELD ───────────────────────────────────────────────────────────────────────────
             // Rolled per blow, so a doublestrike gets two chances to be blocked rather than one verdict on
             // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
-            const chance = def.blockChance + def.blockStack * def.stacks;
-            if (chance > 0 && rng() < chance) {
+            // ── THE BLOCK ────────────────────────────────────────────────────────────────────────────
+            // This read `def.blockChance + def.blockStack * def.stacks`, an escalating chance that rose each
+            // time a blow got through. No class has ever defined blockStack, so the added term was always
+            // 0 x stacks, and `stacks` itself was clamped by `Math.min(def.blockStackMax, ...)` with a max of
+            // 0 — a counter that counted to zero, feeding a multiplier that was zero. Three lines of state
+            // that could not change an outcome.
+            if (def.blockChance > 0 && rng() < def.blockChance) {
                 const before = blow;
                 blow = Math.max(1, Math.round(blow * (1 - def.blockReduction)));
                 // THORNS ANSWER THE BLOCK, not the blow: what the shield turned aside is what comes back.
                 if (def.thorns > 0) thornsBack += Math.round((before - blow) * def.thorns);
-                def.stacks = 0;
                 blocked += 1;
-            } else if (def.blockStackMax > 0) {
-                def.stacks = Math.min(def.blockStackMax, def.stacks + 1);
             }
             dealt += blow;
         }
