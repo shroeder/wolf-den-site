@@ -253,8 +253,8 @@ export const TREES = {
         N({ id: "rv_rend", tier: 0, name: "Rend", ranks: 5, stat: "bleedChance", per: 0.06,
             desc: "+6% chance a blow opens a bleed. A wound ticks three times for a fifth of the blow and armour never sees it.",
             sprite: "/images/arena/node/rv_might.webp" }),
-        N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "extra", per: 0.06,
-            desc: "+6% chance your swing only HALF empties your turn bar, so the next one comes round twice as soon. Never twice in a row.",
+        N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "tempoBonus", per: 0.027,
+            desc: "Your turn bar fills faster — a steady +2.7% a rank, every beat, no roll.",
             sprite: "/images/arena/node/rv_strike.webp" }),
         N({ id: "rv_edge", tier: 0, name: "Killing Edge", ranks: 5, stat: "crit", per: 0.03,
             desc: "+3% critical chance.", sprite: "/images/arena/node/rv_crit.webp" }),
@@ -277,8 +277,8 @@ export const TREES = {
             sprite: "/images/arena/node/rv_stun.webp" }),
         // Was doublestrikeBonus, the same value in the mechanic that replaced it. Anybody holding five ranks
         // here keeps exactly what they bought — see the note on `extra` in arena.js.
-        N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "extra", per: 0.02, needs: 7,
-            desc: "+2% chance the swing only half-spends your bar, so you come round again sooner.",
+        N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "tempoBonus", per: 0.009, needs: 7,
+            desc: "Your turn bar fills faster — +0.9% a rank, on top of Quickblade.",
             sprite: "/images/arena/node/rv_flurry.webp" }),
 
         // TIER 4 — capstones.

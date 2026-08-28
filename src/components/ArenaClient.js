@@ -409,7 +409,7 @@ const timerWord = (state, snap) => {
 // How long the emptying takes. It is punctuation, not travel: the bar was spent, and the eye needs to see
 // that it went to nothing rather than merely dropped.
 const SPEND_MS = 140;
-function TurnTimer({ from, to, ms, foe = false, waiting = false , refund = false }) {
+function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
     const [bar, setBar] = useState({ w: from?.fill ?? 0, dur: SPEND_MS });
     // ── THE BAR MAY ONLY EVER MOVE FORWARD, AND A SPEND IS THE ONE EXCEPTION ─────────────────────────────
     // Luke: "my ATB bar was full, and going from fully full down to not full. The bar should never go
@@ -471,17 +471,8 @@ function TurnTimer({ from, to, ms, foe = false, waiting = false , refund = false
         <span className={`ar-timer${state ? ` is-${state}` : ""}${ready ? " is-ready" : ""}${foe ? " is-foe" : ""}`}>
             <i className="ar-timer-fill" style={{ width: `${Math.round(Math.max(0, Math.min(1, bar.w)) * 100)}%`,
                 transitionDuration: `${bar.dur}ms` }} />
-            {/* ── A BAR THAT COMES BACK HALF FULL HAS TO SAY WHY ──────────────────────────────────────
-                The ring has always stamped `refund` on the line — arena-ring.js even says "the screen has to
-                be able to SAY it — a bar that comes back half full with no explanation is the clump this
-                whole mode exists to remove" — and then no component ever read the field.
-                Luke, playing it: "I expected to get another turn... I looked down at the atb gauges,
-                expecting mine to be filling. I saw mine was already full... Did I get haste? Did the game
-                fast forward and skip the atb fill?" His `extra` is 0.365, so more than a third of his swings
-                spend 55% of the bar instead of all of it, and nothing on screen ever mentioned it. */}
             {ready ? <b className="ar-timer-word">READY</b>
-                : refund ? <b className="ar-timer-word is-refund">HALF SPENT</b>
-                    : state ? <b className="ar-timer-word">{timerWord(state, to || from)}</b> : null}
+                : state ? <b className="ar-timer-word">{timerWord(state, to || from)}</b> : null}
         </span>
     );
 }
@@ -657,7 +648,7 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
             {timer ? (
                 <span className="ar-atb" aria-hidden="true">
                     <TurnTimer from={timer.from} to={timer.to} ms={timer.ms} foe={foe}
-                        waiting={Boolean(timer.waiting)} refund={Boolean(timer.refund)} />
+                        waiting={Boolean(timer.waiting)} />
                 </span>
             ) : null}
             {/* ── AND WHAT JUST HAPPENED TO THIS FIGHTER ──────────────────────────────────────────────────
@@ -1507,8 +1498,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // rather than empty: the line stamps the arrival (full, which is why that fighter swung), and without
     // the spend to start the next line from, the bar travelled from full down to wherever it had refilled
     // to. Falling back to `bars` keeps every transcript written before the spend was stamped.
-    // The line whose bars are being shown — the same one barsPrev is read from, so the refund note and the
-    // bar it explains can never be a beat apart.
+    // The line whose bars are being shown — the same one barsPrev is read from.
     const barsLine = atbMode ? (logAll[shown - 1] || null) : null;
     const barsPrev = atbMode ? (logAll[shown - 1]?.barsAfter || logAll[shown - 1]?.bars || null) : null;
     // ── WHEN THE TRANSCRIPT RUNS OUT, "NEXT" IS NOW ──────────────────────────────────────────────────────────
@@ -1929,7 +1919,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 note: locked
                     ? `loses this beat${(Number(mine ? last.meStun : last.foeStun) || 0) > 0
                         ? ` · ${Number(mine ? last.meStun : last.foeStun) || 0} more` : ""}`
-                    // ── "goes again" MEANT NOTHING TO THE PERSON READING IT ──────────────────────────
+                    // The bar refund is gone (see arena-ring.js), so nothing sets `again` any more. Left as
+                    // null rather than deleted: `again` is still stamped by narrate for a skill that hands you
+                    // a beat, and if one ever does again this is where it says so.
                     // Luke: "what does goes again mean?" It is the BAR REFUND — the swing only half emptied
                     // the bar, so it came round again before the other fighter's did. The phrase is left over
                     // from the old go-again roll, which was a coin flip for a free turn and is gone. Under a
@@ -2683,7 +2675,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             frozen={Boolean(bout.frozen)} frozenLeft={bout.frozenLeft || 0}
                             chilled={bout.chilled || 0}
                             timer={atbMode ? { from: barsPrev?.me, to: barsNext?.me, ms: barsMs,
-                                refund: barsLine?.refund === "you",
                                 waiting: yourTurn && !playing && raw?.awaiting === "act" } : null}
                             events={atbMode ? headsFor("you") : null} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={lungeSide === "you"}
@@ -2695,7 +2686,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             burning={Boolean(bout.foeBurning)} burnLeft={bout.foeBurnLeft || 0}
                             frozen={Boolean(bout.foeFrozen)} frozenLeft={bout.foeFrozenLeft || 0}
                             chilled={bout.foeChilled || 0}
-                            timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs, refund: barsLine?.refund === "them" } : null}
+                            timer={atbMode ? { from: barsPrev?.foe, to: barsNext?.foe, ms: barsMs } : null}
                             events={atbMode ? headsFor("them") : null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
@@ -4440,9 +4431,6 @@ function Styles() {
                 background: rgba(6,4,10,0.72); border-color: rgba(0,0,0,0.55);
                 box-shadow: 0 2px 6px rgba(0,0,0,.55); }
             .ar-atb .ar-timer-word { font-size: 7px; }
-            /* HALF SPENT is the answer to "why is my bar already full", so it reads as the bar's own note
-               rather than as a status effect landing on you: gold, like the fill, not a state colour. */
-            .ar-timer-word.is-refund { color: #ffe9a8; letter-spacing: .1em; }
             /* A knocked-down fighter has no turn coming. */
             .ar-fighter.is-down .ar-atb { opacity: 0; transition: opacity .25s ease; }
 

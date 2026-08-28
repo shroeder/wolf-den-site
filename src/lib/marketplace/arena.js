@@ -5,7 +5,7 @@ import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { bars as liveBars, tempoOf } from "@/lib/marketplace/arena-atb.js";
+import { bars as liveBars, tempoOf, BAR_REFUND} from "@/lib/marketplace/arena-atb.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
@@ -388,19 +388,23 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         //
         // Quickblade lands in `perks.extra` and is added flat on top, which is the same arithmetic it did
         // when it was adding to a clock.
-        // ── DOUBLE STRIKE IS PART OF THIS NOW ────────────────────────────────────────────────────────────
-        // Luke: "lets completely remove double strike, I thought we already converted it into the 50 percent
-        // refund mechanic." Quickblade and weapon Attack Speed were converted; doublestrike was left behind as
-        // a separate blow-count roll, so the game had two different answers to "you swing more often".
+        // ── THE BAR REFUND IS GONE; ITS POINTS BUY TEMPO ─────────────────────────────────────────────────
+        // Luke: "I actually dont like the 50 percent refund." It was a coin flip that half-emptied your bar,
+        // and it was the second thing in this game promising "you act more often" — his own words are already
+        // in arena-kit.js: "combat has kind of devolved into who gets more extra turns and who can freeze the
+        // most, which makes all of their builds pretty much worthless." A refund IS an extra turn with a new
+        // name, and it produced the exact confusion he hit in a real bout: a bar that was already full with
+        // nothing on screen to say why.
         //
-        // Its points are NOT thrown away — gear is rolled with this affix, badges and pets grant it, and a
-        // Reaver has five ranks of Frenzy in it. Every source feeds the bar refund at the rate the engine
-        // already used, DOUBLESTRIKE_PER_POINT, so a piece that read "+40 Double Strike" is worth exactly what
-        // it was worth, spent on the mechanic that is actually on screen.
-        extra: extraTurnFrom(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
-            + (perks.extra || 0)
-            + (Number(stats.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT
-            + (Number(perks.doublestrikeBonus) || 0),
+        // Tempo is the honest version and it already exists: the bar simply fills faster, every beat, no roll.
+        //
+        // ⚠️ FEROCITY IS NOT CONVERTED HERE. It fed BOTH the refund (extraTurnFrom, per 500) and tempo
+        // (tempoOf, per 100). Folding its refund share in as well would pay it twice for one stat. Only the
+        // sources that had NOWHERE ELSE to go are converted: Quickblade, Frenzy, and the doublestrike points.
+        //
+        // The rate is what the refund was actually worth. A refund left 1 - BAR_REFUND = 0.45 of a bar
+        // standing, so a chance of `p` saved 0.45p of a bar per swing on average. That is the tempo it bought.
+        extra: 0,
         // ── AND THE RATE ITSELF, FOR A TIMER BOUT ────────────────────────────────────────────────────────
         // The same weapon speed and the same Ferocity, kept as the rate rather than converted into the
         // chance above. A timer bout paces off this; a classic bout ignores it entirely. Both numbers are
@@ -413,7 +417,13 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // about rung 50 onto the same bound and takes away any reason to invest in speed. See npcTempo.
         tempo: Number(stats.tempo) > 0
             ? Math.max(0.2, Number(stats.tempo))
-            : tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0),
+            : tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
+                // The tree grants tempo DIRECTLY (tempoBonus) so a node's card can quote the number it pays —
+                // check:tree compares the two and caught it when they drifted. Only the doublestrike points,
+                // which have no node of their own, still convert at what the refund was worth.
+                + (Number(perks.tempoBonus) || 0)
+                + ((Number(stats.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT
+                    + (Number(perks.doublestrikeBonus) || 0)) * (1 - BAR_REFUND),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks

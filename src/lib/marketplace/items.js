@@ -86,7 +86,10 @@ export const STAT_META = {
     // ── THE FOUR YOU BUILD ───────────────────────────────────────────────────────────────────────────────
     might: { label: "Might", icon: "⚔️", desc: "Multiplies your weapon's damage. The whole of what you hit for.", suffix: "" },
     vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Your health in the Arena.", suffix: "" },
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "Chance to take another turn immediately. 1% for every 5 points.", suffix: "" },
+    // ⚠️ THIS SAID "Chance to take another turn immediately. 1% for every 5 points." Both halves were false.
+    // There has been no extra turn since the timer landed, and the rate is per FIVE HUNDRED (FEROCITY_PER_SPEED),
+    // not five — the card overstated it by a hundred times. Ferocity buys tempo, health and accuracy.
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "Your turn bar fills faster, and you hit more accurately. 1% quicker for every 100 points.", suffix: "" },
     tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing. 500 tenacity doubles it.", suffix: "" },
 
     // ── THE CRITS ────────────────────────────────────────────────────────────────────────────────────────
@@ -100,7 +103,7 @@ export const STAT_META = {
     // The affix KEEPS ITS KEY so every piece already rolled with it keeps its value — it now buys the bar
     // refund instead of a second blow, at the same 0.5% a point. The label had to change with it: an affix
     // that says "lands twice" while granting something else is the kind of lie the info cards were full of.
-    doublestrike: { label: "Quickened", icon: "⚡", desc: "Chance your swing only half-spends your turn bar, so you act again sooner. Each point is 0.5%.", suffix: "" },
+    doublestrike: { label: "Quickened", icon: "⚡", desc: "Your turn bar fills faster. Each point is worth about 0.2% quicker.", suffix: "" },
     stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stops their turn bar dead for a second. Each point is 0.5%.", suffix: "" },
     haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing sends your turn bar to double speed for 6 seconds. Each point is 0.5%.", suffix: "" },
 

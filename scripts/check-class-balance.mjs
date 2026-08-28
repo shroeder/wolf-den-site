@@ -103,17 +103,21 @@ if (rc) {
         + `  (the ice is worth ${((avg[rc.id] - sum / n) * 100).toFixed(1)} points)`);
 }
 
-// The same isolation for the Reaver's own signature — Quickblade, five ranks of it, which under the timer is
-// the BAR REFUND. Asked because the round robin did not say what anybody expected it to.
+// The same isolation for the Reaver's own signature — Quickblade, five ranks of it. That used to be the BAR
+// REFUND and this test zeroed `extra`; the refund is gone and every point of it became TEMPO, so zeroing
+// `extra` measured nothing and dutifully reported "worth 0.0 points". A probe that cannot fail is worse than
+// no probe. It strips the tempo Quickblade and Frenzy pay for instead — 0.027 and 0.009 a rank.
 const rv = CLASSES.find((c) => c.id === "reaver");
 if (rv) {
     const fast = built[rv.id].kit;
-    built[rv.id].kit = { ...fast, extra: 0 };
+    // Quickblade x5 (0.027) plus Frenzy x5 (0.009) is 0.18 of tempo at full investment; at 25 points spent
+    // tier-first only Quickblade is reached, so this removes what those ranks actually bought.
+    built[rv.id].kit = { ...fast, tempo: Math.max(0.2, (fast.tempo || 1) - 0.135) };
     let sum = 0; let n = 0;
     for (const d of CLASSES) { if (d.id === rv.id) continue; sum += rate(rv.id, d.id); n += 1; }
     built[rv.id].kit = fast;
-    console.log(`  Reaver with the bar refund set to zero:     ${(sum / n * 100).toFixed(1)}% average`
-        + `  (the refund is worth ${((avg[rv.id] - sum / n) * 100).toFixed(1)} points)`);
+    console.log(`  Reaver without Quickblade's tempo:         ${(sum / n * 100).toFixed(1)}% average`
+        + `  (that tempo is worth ${((avg[rv.id] - sum / n) * 100).toFixed(1)} points)`);
 }
 
 const spread = Math.max(...Object.values(avg)) - Math.min(...Object.values(avg));

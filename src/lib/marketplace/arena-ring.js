@@ -30,7 +30,7 @@
 // Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
 // every exchange was a brace nobody was choosing.
 import { openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
-import { BAR_REFUND, bars, chill, fillTo, foeExtra, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
+import { bars, chill, fillTo, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
@@ -152,7 +152,6 @@ function stampSpent(ring) {
     // A bar that comes back half full needs a name on it, or it is the clump this whole mode exists to
     // remove — see BAR_REFUND. Stamped on the same line the spend is, so the screen says it at the moment
     // the bar visibly fails to empty.
-    if (ring.refunded) { L.refund = ring.refunded === "me" ? "you" : "them"; ring.refunded = null; }
 }
 
 /** Has somebody won, and write it onto the ring if so. */
@@ -284,13 +283,15 @@ function closeTurn(ring, rng = Math.random) {
     // could never show. The rules existed because a rung-60 foe's bar filled eighty times faster than a
     // member's; that was fixed at the source instead (see npcTempo), so the guards were treating a symptom
     // nobody has any more at the cost of capping what speed can buy.
+    // ── A SWING SPENDS THE WHOLE BAR ─────────────────────────────────────────────────────────────────────
+    // There was a refund here: a roll on `extra` that left 45% of the bar standing. Luke: "I actually dont
+    // like the 50 percent refund." It was a coin flip for a free turn, which is the thing he had already
+    // objected to once — see the note by CONTROL_IMMUNE_TURNS. Every point that fed it buys tempo now, so the
+    // bar fills faster instead of sometimes not emptying, and there is nothing left to explain on screen.
     const track = ring.acting === "me" ? ring.atb.me : ring.atb.foe;
-    const refunding = !ring.over && (f.extra || 0) > 0 && rng() < f.extra;
-    spend(track, refunding ? BAR_REFUND : 0);
-    ring.wasExtra = refunding;
-    // The screen has to be able to SAY it — a bar that comes back half full with no explanation is the
-    // clump this whole mode exists to remove.
-    ring.refunded = refunding ? ring.acting : null;
+    spend(track, 0);
+    ring.wasExtra = false;
+    ring.refunded = null;
     ring.lastActed = ring.acting;
     ring.wentAgain = null;
     ring.acting = null;
@@ -455,7 +456,6 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName =
     // which reads a ferocity budget that is on nobody's scale above about rung 50 — every Road foe past it
     // sits pinned at EXTRA_TURN_MAX, so half of all their swings came back with a bar already half full.
     // Measured at rung 60 before this: 2,384 of the NPC's 7,197 turns were back to back.
-    B.extra = foeExtra(A.extra, B.extra);
     ring.now = 0;
     ring.lastActed = flip ? "foe" : "me";
     return advance(ring, rng);
