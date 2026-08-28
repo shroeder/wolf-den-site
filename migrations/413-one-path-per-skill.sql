@@ -11,11 +11,12 @@
 --
 -- Two things change together, so the reset is not optional:
 --   1. a member may now hold nodes in ONE branch per skill (arena-progress.js)
---   2. the budget is nine points, one every other level, unlocks free (arena-skills.js)
+--   2. the budget is twelve points, one every other level to ARENA_MAX_LEVEL 24 — three unlocks and one
+--      three-node path in each of three skills, an exact fit (arena-skills.js)
 --
--- 24 of the 27 members holding skills span more than one branch, and everyone past level 18 spent more than
--- nine points — JT spent 21. Leaving those bags alone would grandfather the exact builds this is meant to end,
--- forever, while everyone who comes later gets nine. So every node comes off.
+-- 24 of the 27 members holding skills span more than one branch, and the top of the ladder spent well past the
+-- new budget — JT spent 21 against a ceiling of 12. Leaving those bags alone would grandfather the exact builds
+-- this is meant to end, forever, while everyone who comes later gets twelve. So every node comes off.
 --
 -- WHAT IS KEPT: the skills themselves. The keys stay and only the node arrays empty, so nobody has to re-unlock
 -- anything (which is free now anyway) and nobody loses a skill from their bar. What they choose again is the

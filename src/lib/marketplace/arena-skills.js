@@ -50,28 +50,27 @@
 //   chill       share of THEIR turns that simply do not happen, for the rest of the bout
 //   soulfire    share of what landed, dealt again past armour and shields both
 //   free        true means it does NOT cost your beat — you cast it and still swing
-// ── OWNING THE SKILL IS FREE; CHOOSING ITS PATH IS NOT ───────────────────────────────────────────────────────
-// This used to cost a point. You have exactly three class skills and you were always going to own all three,
-// so charging for them was a tax collected before any decision got made — and it put the budget at 12 for a
-// build that has 9 decisions in it. Unlocking is free now and every point goes into a choice.
-export const SKILL_UNLOCK_COST = 0;
+// ── WHAT A WHOLE CHARACTER COSTS ─────────────────────────────────────────────────────────────────────────────
+// Three skills to unlock and one three-node path in each: 3 + 9 = 12, which is exactly what the climb to
+// ARENA_MAX_LEVEL pays out at one point every other level. Nothing is left over and nothing is short.
+export const SKILL_UNLOCK_COST = 1;
 export const NODE_COST = 1;
 
-// ── ONE POINT EVERY OTHER LEVEL, NINE IN TOTAL ───────────────────────────────────────────────────────────────
+// ── ONE POINT EVERY OTHER LEVEL, TWELVE IN TOTAL ─────────────────────────────────────────────────────────────
 // Luke: "I think for skills, you should only be allowed to invest in one path per skill... 3 skills, 1 tree
-// each 9 points."
+// each 9 points", then "one every 2 levels up to 24 not 18".
 //
-// Every skill is three branches of three nodes, so one path per skill is 3 nodes and a whole character is
-// exactly 9. The budget is built to land on that and stop: a point every other level, capped at 9, so the last
-// one arrives at level 18 and levels 19-24 keep feeding the passive tree only. A member can finish their
-// skills without finishing their character.
+// Every skill is three branches of three nodes, so one path per skill is 3 nodes, and a whole character is
+// three unlocks plus nine nodes — 12. The climb pays exactly that: one point every other level to
+// ARENA_MAX_LEVEL 24. The last point lands on the last level, so skills are still paying out the whole way up
+// rather than finishing early and leaving the back half of the climb worth nothing to them.
 //
 // ⚠️ THIS IS DERIVED FROM LEVEL, NOT FROM TREE POINTS SPENT, and that decoupling is deliberate. It used to be
 // "every point you invest in the passive tree earns one here", which tied two screens together: refunding a
 // tree node could un-buy a skill point already spent on a capstone, so tree refunds had to be REFUSED with an
 // explanation (see refundWouldOrphanSkills). Off level, that cannot happen — respec the tree as often as you
 // like and your skills are untouched.
-export const SKILL_POINT_CAP = 9;
+export const SKILL_POINT_CAP = 12;
 export const LEVELS_PER_SKILL_POINT = 2;
 
 /** How many skill points a member has earned, ever. Derived from arena level rather than stored, so it can

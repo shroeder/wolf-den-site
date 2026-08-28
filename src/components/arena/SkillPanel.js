@@ -282,7 +282,7 @@ export default function SkillPanel({ progress, busy = false, onAct = () => {} })
                         for the next" is true on every beat of the game and tells nobody anything. */}
                     <p className="skp-sub">
                         {capped
-                            ? `That is all ${SKILL_POINT_CAP} of them — one path in each of your three skills. Levels past this one feed the tree.`
+                            ? `That is all ${SKILL_POINT_CAP} — three skills unlocked and one path in each. Nothing left to buy here.`
                             : `One point every ${LEVELS_PER_SKILL_POINT} levels, ${SKILL_POINT_CAP} in all. ${
                                 toNextLevel === LEVELS_PER_SKILL_POINT
                                     ? "The next level starts the next one."
