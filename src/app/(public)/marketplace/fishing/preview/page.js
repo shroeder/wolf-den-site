@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import FishingHome from "@/components/FishingHome";
+import Coin from "@/components/Coin";
 
 // ── DEV ONLY ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The real fishing screen needs a session, the owner gate and a live boat row, so the states that matter most
@@ -42,7 +43,7 @@ export default function FishingPreviewPage() {
             {CASES.map(([label, fishing, gold]) => (
                 <div key={label}>
                     <p style={{ margin: "0 0 6px", font: "900 11px/1 system-ui", letterSpacing: ".14em", textTransform: "uppercase", color: "#ffd75e" }}>
-                        {label} · 🪙 {gold.toLocaleString()}
+                        {label} · <Coin /> {gold.toLocaleString()}
                     </p>
                     <FishingHome fishing={fishing} gold={gold} status="docked" />
                 </div>

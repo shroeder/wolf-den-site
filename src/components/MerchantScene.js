@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import CoinCta from "@/components/CoinCta";
+import Coin from "@/components/Coin";
 
 // The Gold Merchant island event — shown when you LAND (before the dig) if he rolled in. A coin-catch arcade
 // minigame (move to catch falling gold, dodge the bricks, 3 lives, ~20s), his discounted exclusive shop, a
@@ -207,7 +208,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     >
                         <div className="mg-hud">
                             <span>{"❤️".repeat(Math.max(0, lives))}<span style={{ opacity: 0.3 }}>{"❤️".repeat(Math.max(0, 3 - lives))}</span></span>
-                            <span className="mg-hud-score">🪙 {score}</span>
+                            <span className="mg-hud-score"><Coin /> {score}</span>
                             <span>⏱️ {timeLeft}s</span>
                         </div>
                         {/* The merchant leans in from the top, flinging the coins into play. */}
@@ -246,9 +247,9 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     </>) : (
                     <>
                         {played ? (
-                            <div className="merchant-won">🪙 You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
+                            <div className="merchant-won"><Coin /> You caught <strong>{merchant.goldWon || Math.max(floor, Math.min(ceil, score))}</strong> gold from the coin toss!</div>
                         ) : (
-                            <button type="button" className="sail-cta sail-cta-wind" onClick={start}>🪙 Catch the coin toss!</button>
+                            <button type="button" className="sail-cta sail-cta-wind" onClick={start}><Coin /> Catch the coin toss!</button>
                         )}
 
                         {/* 10th-meeting milestone: the exclusive elephant pet is yours (not tied to the minigame). */}
@@ -259,7 +260,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                             <div className="merchant-won">✨ Perfect run — flawless coin catch!</div>
                         ) : null}
 
-                        <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own 🪙 {gold.toLocaleString()}</span></h4>
+                        <h4 style={{ margin: "14px 0 6px" }}>🛍️ Exclusive wares <span className="muted" style={{ fontWeight: 600, fontSize: "0.78rem" }}>· you own <Coin /> {gold.toLocaleString()}</span></h4>
                         {/* Buy coins right from the merchant — he trades in gold, after all. The merchant WAITS on your
                             beach until you dig, so nipping off to top up your coins never loses him. */}
                         <Link href="/marketplace/credit" className="merchant-buycoins">
@@ -285,7 +286,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                                         {it.bought ? (
                                             <button type="button" className="btn btn-small" disabled>Bought today</button>
                                         ) : afford ? (
-                                            <button type="button" className="btn btn-small" disabled={busy} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
+                                            <button type="button" className="btn btn-small" disabled={busy} onClick={() => onBuy(it.id)}><Coin /> {it.price.toLocaleString()}</button>
                                         ) : (
                                             <CoinCta price={it.price} have={gold} label="coins" />
                                         )}
@@ -307,7 +308,7 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                     <div className={`mg-recap${recap.perfect ? " is-perfect" : ""}`}>
                         <div className="mg-recap-title">{recap.perfect ? "✨ PERFECT RUN! ✨" : "Coin toss complete!"}</div>
                         <div className="mg-recap-stats">
-                            <div><span>🪙 Gold caught</span><strong>{recap.gold}</strong></div>
+                            <div><span><Coin /> Gold caught</span><strong>{recap.gold}</strong></div>
                             <div><span>💥 Hits taken</span><strong>{recap.hits}</strong></div>
                             <div><span>💨 Coins missed</span><strong>{recap.missed}</strong></div>
                         </div>

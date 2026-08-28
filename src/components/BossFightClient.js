@@ -13,6 +13,7 @@ import BossFinalBlow from "@/components/BossFinalBlow";
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
+import Coin from "@/components/Coin";
 
 // The REAL weekly boss: shared, persistent HP. One big daily manual "ability" swing + passive auto-attacks
 // from the whole pack (server-driven). Polls so you watch the community drain it live.
@@ -244,7 +245,7 @@ export default function BossFightClient() {
                     <div className="cheer-toast" key={cheerToast.key}>
                         <div className="cheer-toast-main">📣 You cheered {cheerToast.targetName}!</div>
                         <div className="cheer-toast-rewards">
-                            +{cheerToast.xp} XP · +{cheerToast.gold} 🪙
+                            +{cheerToast.xp} XP · +{cheerToast.gold} <Coin />
                             {cheerToast.petXp ? ` · 🐾 +${cheerToast.petXp}` : ""}
                             {cheerToast.selfDamage ? ` · ⚔️ ${cheerToast.selfDamage}` : ""}
                             {cheerToast.fragment ? " · 🧩 fragment!" : ""}

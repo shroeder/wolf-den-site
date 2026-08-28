@@ -26,6 +26,7 @@ import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
+import Coin from "@/components/Coin";
 
 // A pet's OWNED (just-by-having-it) passive bonus, split into { icon, name, desc } so the modal can lay it out
 // as a clean labeled row instead of a run-on sentence. Earner stats explain the real income; combat stats show
@@ -1728,7 +1729,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             {/* radial glow pulse + coin burst behind the pig */}
                             <div aria-hidden="true" style={{ position: "absolute", top: 34, left: "50%", width: 90, height: 90, marginLeft: -45, marginTop: -45, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,94,0.6), transparent 60%)", animation: "haulGlow .8s ease-out both", pointerEvents: "none" }} />
                             {PIG_BURST.map((b, i) => (
-                                <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}>🪙</span>
+                                <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}><Coin /></span>
                             ))}
                             <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>{pigResult.missed ? "🐷💨" : "🐷👑"}</div>
                             <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>{pigResult.missed ? "He slipped away" : "The Wild Loot Pig!"}</div>
@@ -1738,7 +1739,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                             {/* Nothing below this belongs on a miss — a "+0 gold" line reads as a reward of
                                 nothing rather than as an explanation. */}
                             {pigResult.missed ? null : (
-                            <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(pigResult.gold || 0).toLocaleString()} 🪙</div>
+                            <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(pigResult.gold || 0).toLocaleString()} <Coin /></div>
                             )}
                             {pigResult.item ? (
                                 <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[pigResult.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
@@ -1816,7 +1817,7 @@ function LootPig({ onFinish, crown }) {
             </div>
             {coins.map((c) => (
                 <button key={c.id} type="button" onClick={() => collect(c.id)} aria-label="Grab coin"
-                    style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", zIndex: 110, background: "none", border: "none", padding: 8, margin: -8, cursor: "pointer", fontSize: 26, lineHeight: 1, WebkitTapHighlightColor: "transparent", animation: "coinPop .4s ease-out both", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))" }}>🪙</button>
+                    style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", zIndex: 110, background: "none", border: "none", padding: 8, margin: -8, cursor: "pointer", fontSize: 26, lineHeight: 1, WebkitTapHighlightColor: "transparent", animation: "coinPop .4s ease-out both", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))" }}><Coin /></button>
             ))}
             <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
                 <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
@@ -2476,7 +2477,7 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
                             <div style={{ fontSize: 12, fontWeight: 800, color: RARITY_RING[seedInfo.rarity] || "#8fbf6a", textTransform: "capitalize" }}>{seedInfo.rarity} seed · ×{seedInfo.count} in your bag</div>
                         </div>
                         <div style={{ padding: "8px 16px 16px", display: "flex", flexDirection: "column", gap: 7 }}>
-                            {[["⏳", "Grows in", fmtGrow((seedInfo.growMin || 0) * 60)], ["🪙", "Sells for", `${(seedInfo.sell || 0).toLocaleString()} gold`], ["✨", "Harvest XP", `+${seedInfo.xp || 0} XP`], ...(seedInfo.loot ? [["🎁", "Harvest loot", seedInfo.loot]] : [])].map(([ic, lab, val]) => (
+                            {[["⏳", "Grows in", fmtGrow((seedInfo.growMin || 0) * 60)], [<Coin key="c" size={14} />, "Sells for", `${(seedInfo.sell || 0).toLocaleString()} gold`], ["✨", "Harvest XP", `+${seedInfo.xp || 0} XP`], ...(seedInfo.loot ? [["🎁", "Harvest loot", seedInfo.loot]] : [])].map(([ic, lab, val]) => (
                                 <div key={lab} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
                                     <span style={{ fontSize: 16 }} aria-hidden="true">{ic}</span>
                                     <span className="muted" style={{ fontSize: 12.5, flex: 1 }}>{lab}</span>
@@ -2497,7 +2498,7 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
                     <span style={{ display: "block", fontWeight: 800, fontSize: 14 }}>Fertilizer <span style={{ color: "#9fd0ff" }}>· {g.fertilizer} in stock</span></span>
                     <span className="muted" style={{ fontSize: 11.5 }}>Tap a growing crop to spend one — instantly cuts <b style={{ color: "#cfe8ff" }}>40%</b> off its grow time.</span>
                 </span>
-                <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "9px 14px", borderRadius: 11, border: "none", background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#3a2c08" : "inherit", fontSize: 13, fontWeight: 900, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6, boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none" }}>🪙 Buy · {g.fertilizerPrice}g</button>
+                <button type="button" onClick={onBuyFertilizer} disabled={busy || !canBuyFert} style={{ padding: "9px 14px", borderRadius: 11, border: "none", background: canBuyFert ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.1)", color: canBuyFert ? "#3a2c08" : "inherit", fontSize: 13, fontWeight: 900, cursor: canBuyFert ? "pointer" : "default", whiteSpace: "nowrap", opacity: canBuyFert ? 1 : 0.6, boxShadow: canBuyFert ? "0 3px 0 #b57f22" : "none" }}><Coin /> Buy · {g.fertilizerPrice}g</button>
             </div>
 
             {/* Farm upgrades — styled exactly like the SHIP/DIG upgrades (effect line, coin CTA, buy-pop) so the
@@ -2525,7 +2526,7 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
                                 ) : null}
                                 {u.cost == null ? <button className="pill" disabled>✓ Maxed</button>
                                     : !affordable ? <CoinCta price={u.cost} have={g.gold} className="sail-upg-cta" />
-                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.key)}>🪙 {u.cost.toLocaleString()}</button>}
+                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.key)}><Coin /> {u.cost.toLocaleString()}</button>}
                             </div>
                         );
                     })}
@@ -2575,7 +2576,7 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                                     <span style={{ color: "#c9b4ff", fontWeight: 700 }}>🐾 {s.xp} pet XP</span>
                                     {s.loot ? <span style={{ color: RARITY_RING[s.rarity] || "#cdd9c6", fontWeight: 700 }}>🎁 {s.loot}</span> : null}
                                     <span className="muted">⏳ {Math.round(s.growMin / 60)}h</span>
-                                    <span className="muted">🪙 {s.sell.toLocaleString()} sold</span>
+                                    <span className="muted"><Coin /> {s.sell.toLocaleString()} sold</span>
                                 </span>
                             </span>
                         </button>
@@ -2607,7 +2608,7 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                 {/* Buy a seed pack right here — spends gold, opens it, seeds land in your bag. No shop trip. */}
                 <div style={{ margin: "16px 0 8px", display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontWeight: 800, fontSize: 13.5 }}>🛒 Buy a seed pack</span>
-                    <span className="muted" style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+                    <span className="muted" style={{ marginLeft: "auto", fontSize: 12, fontWeight: 700, color: "#ffd75e" }}><Coin /> {gold.toLocaleString()}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                     {SEED_PACKS.map((p) => {
@@ -2621,7 +2622,7 @@ function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onB
                                     <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>{p.name}</span>
                                     <span className="muted" style={{ fontSize: 11 }}>{p.desc}</span>
                                 </span>
-                                <span style={{ fontWeight: 900, fontSize: 12.5, color: afford ? "#ffd75e" : "#9aa0a6", whiteSpace: "nowrap" }}>{bBusy ? "…" : `🪙 ${p.price.toLocaleString()}`}</span>
+                                <span style={{ fontWeight: 900, fontSize: 12.5, color: afford ? "#ffd75e" : "#9aa0a6", whiteSpace: "nowrap" }}>{bBusy ? "…" : <><Coin size={12} /> {p.price.toLocaleString()}</>}</span>
                             </button>
                         );
                     })}
@@ -2681,7 +2682,7 @@ function PlotInspectModal({ garden, slot, busy, onFertilize, onBuyFertilizer, on
                             <span style={{ fontSize: 16 }}>🎁</span><span>Chance at <strong style={{ color: ring }}>{p.loot}</strong> on harvest</span>
                         </div>
                     ) : null}
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}>🪙 sells for {(p.sell || 0).toLocaleString()} gold</div>
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 8, textAlign: "center" }}><Coin /> sells for {(p.sell || 0).toLocaleString()} gold</div>
                 </div>
                 <div style={{ padding: "10px 16px 16px", display: "flex", flexDirection: "column", gap: 9 }}>
                     {ready ? (
@@ -2749,7 +2750,7 @@ function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) 
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>Pour gold in to give this plot permanent powers — you decide its role. Levels stay through every harvest.</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 11 }}>
                         <span style={{ fontSize: 12, fontWeight: 900, color: "#e8dcff", background: "rgba(120,90,200,0.4)", border: "1px solid rgba(180,150,255,0.5)", borderRadius: 999, padding: "3px 11px" }}>⚙️ Power {total}/{maxTotal}</span>
-                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#ffd75e" }}>🪙 {gold.toLocaleString()}</span>
+                        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#ffd75e" }}><Coin /> {gold.toLocaleString()}</span>
                     </div>
                 </div>
                 {/* tracks */}
@@ -2782,7 +2783,7 @@ function PlotUpgradeModal({ garden, slot, busy, gold = 0, onUpgrade, onClose }) 
                                         <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 900, color: accent }}>✓ MAXED</span>
                                     ) : (
                                         <button type="button" disabled={!afford || Boolean(busy)} onClick={() => doUp(t.key)} style={{ marginLeft: "auto", padding: "8px 14px", borderRadius: 10, border: "none", fontWeight: 900, fontSize: 12, cursor: afford && !busy ? "pointer" : "default", background: afford ? `linear-gradient(180deg, ${accent}, ${accent}bb)` : "rgba(255,255,255,0.08)", color: afford ? "#12100a" : "#9aa0a6", opacity: afford ? 1 : 0.55, boxShadow: afford ? `0 3px 0 ${accent}55` : "none" }}>
-                                            {busy === bKey ? "…" : `🪙 ${t.cost.toLocaleString()}`}
+                                            {busy === bKey ? "…" : <><Coin size={13} /> {t.cost.toLocaleString()}</>}
                                         </button>
                                     )}
                                 </div>
@@ -2854,7 +2855,7 @@ function EncounterModal({ encounter, onResolve, onClose }) {
                         {reward && !reward.error ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                                 <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                                    <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{(reward.gold || 0).toLocaleString()} 🪙</span>
+                                    <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{(reward.gold || 0).toLocaleString()} <Coin /></span>
                                     <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{(reward.xp || 0).toLocaleString()} ✨ XP</span>
                                 </div>
                                 {reward.loot ? (
@@ -2913,7 +2914,7 @@ function IncomeRecapModal({ recap, onClose }) {
                     ) : null}
                     {recap.gold > 0 ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, background: "rgba(255,215,94,0.1)", border: "1px solid rgba(255,215,94,0.35)" }}>
-                            <span style={{ fontSize: 22 }}>🪙</span><span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>Passive gold earned</span><span style={{ fontWeight: 900, color: "#ffd75e" }}>+{recap.gold.toLocaleString()}</span>
+                            <span style={{ fontSize: 22 }}><Coin /></span><span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>Passive gold earned</span><span style={{ fontWeight: 900, color: "#ffd75e" }}>+{recap.gold.toLocaleString()}</span>
                         </div>
                     ) : null}
                     {recap.raffleTickets > 0 ? (
@@ -2955,7 +2956,7 @@ function HarvestToast({ toast, onClose }) {
                         {toast.savedSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(120,220,120,0.12)", border: "1px solid rgba(120,220,120,0.45)", fontWeight: 700, fontSize: 13 }}>🌰 Seed saved! {toast.savedEmoji} back in your bag</div> : null}
                         {toast.foundSeed ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)", fontWeight: 700, fontSize: 13 }}>🌱 Found a {toast.foundSeed.emoji} {toast.foundSeed.name} seed in the harvest!</div> : null}
                         {/* Gold demoted to a quiet garnish line. */}
-                        <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{toast.doubled ? "×2 " : ""}+{(toast.gold || 0).toLocaleString()} 🪙 sold</div>
+                        <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{toast.doubled ? "×2 " : ""}+{(toast.gold || 0).toLocaleString()} <Coin /> sold</div>
                     </>
                 )}
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
@@ -3044,7 +3045,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                                     </div>
                                     {wallet && wallet.gold >= petting.rechargeCost ? (
                                         <button type="button" onClick={onRecharge} disabled={busy} style={{ width: "100%", marginTop: 8, padding: "11px 12px", fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 10, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.7 : 1 }}>
-                                            {busyKey === "recharge" ? "Recharging…" : `🪙 Buy ${petting.rechargeAmount} more pettings · ${petting.rechargeCost.toLocaleString()}g`}
+                                            {busyKey === "recharge" ? "Recharging…" : `Buy ${petting.rechargeAmount} more pettings · ${petting.rechargeCost.toLocaleString()}g`}
                                         </button>
                                     ) : (
                                         <div style={{ marginTop: 8 }}>

@@ -198,21 +198,21 @@ const RAIN_GUARD_HOURS = 6;
 // seeds shift the odds toward the higher TIERS (see RARITY_TIER_WEIGHTS) — that's the payoff for the longer
 // grow + rarer seed. The Lucky Harvest upgrade can bump the rolled tier up a level.
 const HARVEST_POOL = [
-    { tier: 1, type: "gold", amount: 42, label: "+42 🪙" },
+    { tier: 1, type: "gold", amount: 42, label: "+42 gold" },
     { tier: 1, type: "treat", id: "treat_bone", label: "🦴 a Pet Treat" },
     { tier: 1, type: "xp", amount: 15, label: "✨ +15 XP" },
-    { tier: 2, type: "gold", amount: 126, label: "+126 🪙" },
+    { tier: 2, type: "gold", amount: 126, label: "+126 gold" },
     { tier: 2, type: "treat", id: "treat_snack", label: "🍖 a Hearty Snack" },
     { tier: 2, type: "spin", n: 1, label: "🎡 +1 wheel spin" },
     { tier: 3, type: "chest", chestTier: "wooden", label: "🧰 a Wooden chest" },
     { tier: 3, type: "treat", id: "treat_toy", label: "🧸 a Chew Toy" },
     { tier: 3, type: "seed", band: ["common", "rare"], label: "🌱 a bonus seed" },
     { tier: 4, type: "chest", chestTier: "iron", label: "🧰 an Iron chest" },
-    { tier: 4, type: "gold", amount: 385, label: "+385 🪙" },
+    { tier: 4, type: "gold", amount: 385, label: "+385 gold" },
     { tier: 4, type: "treat", id: "treat_feast", label: "🍲 a Pet Feast" },
     { tier: 4, type: "seed", band: ["rare", "epic"], label: "🌱 a rare seed" },
     { tier: 5, type: "chest", chestTier: "gold", label: "💰 a Gold chest" },
-    { tier: 5, type: "gold", amount: 910, label: "+910 🪙" },
+    { tier: 5, type: "gold", amount: 910, label: "+910 gold" },
     { tier: 5, type: "seed", band: ["epic", "legendary"], label: "🌱 an epic seed" },
     { tier: 5, type: "spin", n: 3, label: "🎡 +3 wheel spins" },
 ];

@@ -2,6 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { equipMemo } from "@/lib/marketplace/equip-cache.js";
+import { COIN_ICON } from "@/lib/coin-icon";
+import { textIcon } from "@/lib/coin-icon.js";
 
 // ── UTILITY AFFIXES ("attunements") ──────────────────────────────────────────────────────────────────────────
 // A rare bonus stat the FORGE can roll onto a piece of gear when you enhance it. Unlike combat stat_bonus, an
@@ -23,7 +25,7 @@ export const UTIL_AFFIXES = {
     // 🌾 FARM — feeds the unified farm-bonus aggregator (stacks with decorations/gear/pet/greenhouse, still capped)
     farm_harvest: { label: "Harvest Luck", icon: "🎁", per: 2, cap: 10, bucket: "farm", stat: "harvestLuck", blurb: "better harvest loot" },
     farm_grow: { label: "Green Thumb", icon: "🌱", per: 2, cap: 10, bucket: "farm", stat: "growSpeed", blurb: "faster crops" },
-    farm_gold: { label: "Rich Soil", icon: "🪙", per: 2, cap: 10, bucket: "farm", stat: "goldHarvest", blurb: "more harvest gold" },
+    farm_gold: { label: "Rich Soil", icon: COIN_ICON, per: 2, cap: 10, bucket: "farm", stat: "goldHarvest", blurb: "more harvest gold" },
     farm_seed: { label: "Seed Saver", icon: "🍀", per: 2, cap: 10, bucket: "farm", stat: "seedLuck", blurb: "more saved seeds" },
     farm_fert: { label: "Fertile Touch", icon: "💧", per: 2, cap: 10, bucket: "farm", stat: "fertPower", blurb: "stronger fertilizer" },
     // 🐾 PET — a flat % boost to ALL equipped-pet XP gains
@@ -65,7 +67,7 @@ export function describeUtil(u) {
     const def = UTIL_AFFIXES[p.key];
     const val = affixValue(p.key, p.level);
     const unit = def.bucket === "sea" || def.bucket === "depth" ? "" : "%";
-    return { key: p.key, level: p.level, maxed: p.level >= UTIL_MAX, label: def.label, icon: def.icon, value: val, unit, blurb: def.blurb, text: `${def.icon} +${val}${unit} ${def.label}` };
+    return { key: p.key, level: p.level, maxed: p.level >= UTIL_MAX, label: def.label, icon: def.icon, value: val, unit, blurb: def.blurb, text: `${textIcon(def.icon)}+${val}${unit} ${def.label}` };
 }
 
 // The forge roll: given the item's current attunement and the total chance, decide the outcome. Returns

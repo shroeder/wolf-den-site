@@ -10,6 +10,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { hasPower, oneIn, equippedPowers, powerRoll } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { COIN_ICON } from "@/lib/coin-icon";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -513,7 +514,7 @@ export async function grantHaul(buyerId, kind, tier = "common") {
         const n = (FRAGMENT_COUNT[tier] || 1) * FISH_DOUBLOONS_PER_STEP;
         const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
         await grantDoubloons(buyerId, n).catch(() => {});
-        return { kind: "doubloons", label: `${n} Doubloon${n === 1 ? "" : "s"}`, emoji: "🪙", n, where: "Stored on your boat", spriteUrl: "/images/sailing/doubloon.png" };
+        return { kind: "doubloons", label: `${n} Doubloon${n === 1 ? "" : "s"}`, emoji: COIN_ICON, n, where: "Stored on your boat", spriteUrl: "/images/sailing/doubloon.png" };
     }
     if (kind === "seed") {
         // KEPT, because this one is not a bolt-on: `seed` is a wedge in the treasure table above, so the line

@@ -13,6 +13,7 @@ import CompendiumClient from "@/components/CompendiumClient";
 import RecipeShelf from "@/components/RecipeShelf";
 import RecipeFoundWatcher from "@/components/RecipeFoundWatcher";
 import { TOWN_CSS } from "@/components/TownClient";
+import Coin from "@/components/Coin";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
 // DEV ONLY (the route 404s in production). Controls that are HARD TO REACH, at a real phone width and at
@@ -396,7 +397,7 @@ function StockadeFixture() {
                 <button type="button" className="tw-stock-btn is-fruit">
                     <span className="tw-stock-ico" aria-hidden="true">🍅</span>
                     <span className="tw-stock-lbl">Throw rotten fruit</span>
-                    <span className="tw-stock-meta">+12 XP · +6 🪙</span>
+                    <span className="tw-stock-meta">+12 XP · +6 <Coin /></span>
                     <span className="tw-stock-left">3/3</span>
                 </button>
                 <button type="button" className="tw-stock-btn is-key">

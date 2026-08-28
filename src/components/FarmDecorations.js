@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AskForCopy, CreationShareHub } from "@/components/CreationShare";
+import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 
 const RARITY_RING = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8" };
 
@@ -166,7 +168,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                                 <span style={{ position: "absolute", top: 2, right: 2, fontSize: 11 }}>🔒</span>
                             </span>
                             <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#9aa4a0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.name}</span>
-                            <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? `🪙 ${o.price.toLocaleString()}` : (o.source === "spin" ? "🎡 wheel" : o.source === "glint" ? "✨ glint" : "🏆 track")}</span>
+                            <span style={{ display: "block", fontSize: 9, fontWeight: 800, color: o.buyable ? "#ffd75e" : "#8fb3d6" }}>{o.buyable ? <><Coin size={10} /> {o.price.toLocaleString()}</> : (o.source === "spin" ? "🎡 wheel" : o.source === "glint" ? "✨ glint" : "🏆 track")}</span>
                         </button>
                     ))}
                     {onOpenCreator ? (
@@ -424,7 +426,7 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     {/* Close FIRST — the safe, default action sits on top. */}
                     <button type="button" onClick={onClose} style={{ width: "100%", padding: 12, fontWeight: 900, background: "rgba(255,255,255,0.12)", color: "inherit", border: "1px solid rgba(255,255,255,0.24)", borderRadius: 11, cursor: "pointer" }}>Close</button>
                     {canBuy && afford ? (
-                        <button type="button" disabled={busy} onClick={() => { onBuy(item.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.6 : 1 }}>🪙 Buy · {item.price.toLocaleString()}g{item.source === "special" ? " (premium)" : ""}</button>
+                        <button type="button" disabled={busy} onClick={() => { onBuy(item.id); onClose(); }} style={{ width: "100%", padding: 12, fontWeight: 900, background: "linear-gradient(180deg,#ffe488,#f3b23a)", color: "#3a2c08", border: "none", borderRadius: 11, cursor: busy ? "default" : "pointer", boxShadow: "0 3px 0 #b57f22", opacity: busy ? 0.6 : 1 }}><Coin /> Buy · {item.price.toLocaleString()}g{item.source === "special" ? " (premium)" : ""}</button>
                     ) : null}
                     {canBuy && !afford ? (
                         <div style={{ textAlign: "center", fontSize: 12.5 }}>
@@ -462,14 +464,14 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <strong style={{ fontSize: 17 }}>🪴 Decorate your farm</strong>
                         <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }} title="Total items placed on your farm">🪴 {placedTotal}/{placedCap}</span>
-                        <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 14 }}>🪙 {gold.toLocaleString()}</span>
+                        <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 14 }}><Coin /> {gold.toLocaleString()}</span>
                         <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7, lineHeight: 1 }}>×</button>
                     </div>
                     {activeBuffs.length ? (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                             {activeBuffs.map(([k, v]) => (
                                 <span key={k} style={{ padding: "2px 9px", borderRadius: 999, background: "rgba(126,213,126,0.14)", border: "1px solid rgba(126,213,126,0.5)", color: "#a7e6a7", fontSize: 11.5, fontWeight: 800 }}>
-                                    {buffMeta[k]?.icon} +{v}{buffMeta[k]?.suffix}
+                                    <Glyph value={buffMeta[k]?.icon} /> +{v}{buffMeta[k]?.suffix}
                                 </span>
                             ))}
                         </div>
@@ -535,7 +537,7 @@ export function DecoManager({ deco, gold = 0, busy, editing, onToggleEdit, onBuy
                                             <button type="button" disabled style={{ width: "100%", marginTop: 8, padding: "7px 8px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#9aa0a6", fontWeight: 800, fontSize: 12 }}>✓ Owned</button>
                                         ) : (
                                             <button type="button" disabled={busy || !afford} onClick={() => onBuy(s.id)} style={{ width: "100%", marginTop: 8, padding: "7px 8px", borderRadius: 9, border: "none", fontWeight: 800, fontSize: 12, cursor: afford && !busy ? "pointer" : "default", background: afford ? "linear-gradient(180deg,#ffe488,#f3b23a)" : "rgba(255,255,255,0.08)", color: afford ? "#3a2c08" : "#9aa0a6", opacity: afford ? 1 : 0.7 }}>
-                                                🪙 {s.price.toLocaleString()}
+                                                <Coin /> {s.price.toLocaleString()}
                                             </button>
                                         )}
                                     </div>

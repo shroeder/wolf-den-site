@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 
 import BadgeArt from "@/components/BadgeArt";
 import { bonusChips, BONUS_META } from "@/lib/marketplace/badge-bonus-meta.js";
+import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 
 // The Badges collection hub — collection milestones, a "closest to unlocking" spotlight, and a filterable grid
 // where every badge shows what it does + the system bonus it grants. Replaces the old never-ending flat list.
@@ -58,7 +60,7 @@ function BadgeCard({ b, featured = false }) {
             <span className="bc-name">{b.label}</span>
             {b.description ? <span className="bc-desc">{b.description}</span> : null}
             {chips.length ? (
-                <span className="bc-bonus">{chips.map((c, i) => <span key={i} className={`bc-bonus-chip dom-${c.domain}`}><span className="bc-chip-ico">{c.icon}</span>{c.text}</span>)}</span>
+                <span className="bc-bonus">{chips.map((c, i) => <span key={i} className={`bc-bonus-chip dom-${c.domain}`}><span className="bc-chip-ico"><Glyph value={c.icon} /></span>{c.text}</span>)}</span>
             ) : null}
             <RarityLine b={b} />
             {b.earned ? (
@@ -69,7 +71,7 @@ function BadgeCard({ b, featured = false }) {
                     <span className="bc-prog-txt">{b.progress.current.toLocaleString()} / {b.progress.target.toLocaleString()} · {b.progress.pct}%</span>
                 </span>
             ) : b.goldPrice != null ? (
-                <span className="bc-status muted">🪙 {b.goldPrice.toLocaleString()} · in shop</span>
+                <span className="bc-status muted"><Coin /> {b.goldPrice.toLocaleString()} · in shop</span>
             ) : b.dropOnly ? (
                 <span className="bc-status muted">Drop only 🎁</span>
             ) : (
@@ -139,7 +141,7 @@ export default function BadgeCollectionClient({ badges = [], initialMilestones =
                             <div key={t.count} className={`bc-ms-tier${t.claimed ? " is-claimed" : t.claimable ? " is-claimable" : t.reached ? " is-reached" : ""}`} style={{ "--chest": CHEST_TONE[t.chest] || "#c7d0d8" }}>
                                 <div className="bc-ms-target">{t.count}<span>badges</span></div>
                                 <div className="bc-ms-reward">
-                                    <span className="bc-ms-gold">🪙 {t.gold.toLocaleString()}</span>
+                                    <span className="bc-ms-gold"><Coin /> {t.gold.toLocaleString()}</span>
                                     <span className="bc-ms-chest">{t.chestCount > 1 ? `${t.chestCount}× ` : ""}{t.chestLabel} chest{t.chestCount > 1 ? "s" : ""}</span>
                                 </div>
                                 {t.claimed ? <span className="bc-ms-state done">Claimed ✓</span>
@@ -188,7 +190,7 @@ export default function BadgeCollectionClient({ badges = [], initialMilestones =
                     <div className="bc-flash-card">
                         <div className="bc-flash-emoji">🏆</div>
                         <b>Milestone claimed!</b>
-                        <span>{flash.count} badges → 🪙 {flash.gold?.toLocaleString()}{flash.chest ? ` + ${flash.chestCount > 1 ? `${flash.chestCount} ${flash.chest} chests` : `a ${flash.chest} chest`}` : ""}</span>
+                        <span>{flash.count} badges → <Coin /> {flash.gold?.toLocaleString()}{flash.chest ? ` + ${flash.chestCount > 1 ? `${flash.chestCount} ${flash.chest} chests` : `a ${flash.chest} chest`}` : ""}</span>
                     </div>
                 </div>
             ) : null}

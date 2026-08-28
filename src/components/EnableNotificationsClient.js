@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { disableWebPush, enableWebPush, hasLocalSubscription, isWebPushSupported, pushPermission, registerPushServiceWorker } from "@/lib/web-push-client";
+import Coin from "@/components/Coin";
 
 // A single-purpose landing for turning push ON. This is where the recap email's CTA points, so it has exactly
 // one job and must work on first tap: the browser only allows requestPermission() inside a real user gesture,
@@ -129,7 +130,7 @@ export default function EnableNotificationsClient() {
                 {state === "off" ? (
                     <>
                         {bounty ? (
-                            <p className="enotif-bounty">🪙 Turn them on and we&apos;ll drop <strong>{bounty.gold} gold</strong> in your pocket.</p>
+                            <p className="enotif-bounty"><Coin /> Turn them on and we&apos;ll drop <strong>{bounty.gold} gold</strong> in your pocket.</p>
                         ) : null}
                         <button type="button" className="btn-gold enotif-cta" onClick={turnOn} disabled={busy}>
                             {busy ? "Turning on…" : bounty ? `🔔 Turn on · +${bounty.gold} gold` : "🔔 Turn on notifications"}
@@ -138,7 +139,7 @@ export default function EnableNotificationsClient() {
                     </>
                 ) : null}
 
-                {earned ? <p className="enotif-earned">+{earned} 🪙 added to your gold</p> : null}
+                {earned ? <p className="enotif-earned">+{earned} <Coin /> added to your gold</p> : null}
 
                 {state === "on" ? (
                     <button type="button" className="btn-ghost" onClick={turnOff} disabled={busy}>Turn off on this device</button>

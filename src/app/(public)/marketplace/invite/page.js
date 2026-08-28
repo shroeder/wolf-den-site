@@ -5,6 +5,8 @@ import ViewPing from "@/components/ViewPing";
 import { db } from "@/lib/db";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { REF_REFERRER_GOLD, REF_JOINER_GOLD, getReferralStats } from "@/lib/marketplace/referral.js";
+import { COIN_ICON } from "@/lib/coin-icon";
+import Glyph from "@/components/Glyph";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +48,7 @@ export default async function InvitePage() {
     const tiles = [
         { label: "Friends joined", value: stats.converted, icon: "🐺" },
         { label: "Invites pending", value: Math.max(0, stats.invited - stats.converted), icon: "⏳" },
-        { label: "Gold earned", value: stats.goldEarned.toLocaleString(), icon: "🪙" },
+        { label: "Gold earned", value: stats.goldEarned.toLocaleString(), icon: COIN_ICON },
     ];
 
     return (
@@ -86,7 +88,7 @@ export default async function InvitePage() {
                                 background: "rgba(255,255,255,0.03)",
                             }}
                         >
-                            <div style={{ fontSize: 22 }} aria-hidden="true">{t.icon}</div>
+                            <div style={{ fontSize: 22 }} aria-hidden="true"><Glyph value={t.icon} size={22} /></div>
                             <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--gold, #ffd75e)" }}>{t.value}</div>
                             <div className="muted" style={{ fontSize: "0.78rem" }}>{t.label}</div>
                         </div>

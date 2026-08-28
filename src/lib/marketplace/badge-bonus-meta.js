@@ -1,3 +1,4 @@
+import { COIN_ICON } from "@/lib/coin-icon";
 // EVERY STAT CARRIES ITS OWN DRAWN SPRITE. This panel was ~30 OS emoji in a grid, which renders differently on
 // every device, carries none of the game's style, and reads as a settings screen rather than a character
 // sheet. `art` is the sprite (scripts/gen-bonus-icons.mjs, one family, one ink weight); `icon` is kept for
@@ -43,7 +44,7 @@ export const BONUS_META = {
             broadside: { art: "/images/bonus/broadside.png", icon: "💣", label: "Raid Damage", suffix: "" },
             ironclad: { art: "/images/bonus/ironclad.png", icon: "🛡️", label: "Ship Armor", suffix: "" },
             plunder: { art: "/images/bonus/plunder.png", icon: "🏴‍☠️", label: "Plunder", suffix: "" },
-            bounty: { art: "/images/bonus/bounty.png", icon: "🪙", label: "Sea Gold", suffix: "" },
+            bounty: { art: "/images/bonus/bounty.png", icon: COIN_ICON, label: "Sea Gold", suffix: "" },
             dredge: { art: "/images/bonus/dredge.png", icon: "⛏️", label: "Dig Luck", suffix: "" },
             trove: { art: "/images/bonus/trove.png", icon: "💎", label: "Fragments", suffix: "" },
             // Labelled by its EFFECT, not its name: "+3 Tailwind" reads as "three tailwinds a day" because a
@@ -63,7 +64,7 @@ export const BONUS_META = {
             harvestLuck: { art: "/images/bonus/harvestLuck.png", icon: "🎁", label: "Harvest Luck", suffix: "%" },
             petXp: { art: "/images/bonus/petXp.png", icon: "🐾", label: "Pet XP", suffix: "%" },
             fertPower: { art: "/images/bonus/fertPower.png", icon: "💧", label: "Fertilizer", suffix: "%" },
-            goldHarvest: { art: "/images/bonus/goldHarvest.png", icon: "🪙", label: "Farm Gold", suffix: "%" },
+            goldHarvest: { art: "/images/bonus/goldHarvest.png", icon: COIN_ICON, label: "Farm Gold", suffix: "%" },
         },
     },
     depth: {

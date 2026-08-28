@@ -19,6 +19,7 @@ import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
+import Coin from "@/components/Coin";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -831,7 +832,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <CoinCta price={state.digRefill?.cost ?? 0} have={state.gold} label={`Get coins for ${state.digRefill?.amount ?? 5} more digs`} className="sail-digbuy-cta" />
                             ) : (
                                 <button className="btn-ghost sail-digbuy" disabled={busy} onClick={() => act("buy_digs")}>
-                                    🪙 Buy {state.digRefill?.amount ?? 5} more digs{(state.digRefill?.cost ?? 0) > 0 ? ` · ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
+                                    <Coin /> Buy {state.digRefill?.amount ?? 5} more digs{(state.digRefill?.cost ?? 0) > 0 ? ` · ${(state.digRefill?.cost ?? 0).toLocaleString()}` : " · free"}
                                 </button>
                             )
                         ) : null}
@@ -939,7 +940,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             </div>
                             {/* "You waved!" reward pop, floating over the scene. */}
                             {waveFx ? (
-                                <div className="sail-wavefx" key={waveFx.k}>👋 +{waveFx.xp} XP · +🪙 {waveFx.coins} · −{waveFx.minutes}m</div>
+                                <div className="sail-wavefx" key={waveFx.k}>👋 +{waveFx.xp} XP · +<Coin /> {waveFx.coins} · −{waveFx.minutes}m</div>
                             ) : null}
                             <div className="sail-status">
                                 {liveStatus === "idle" && <span>⚓ Docked · ready to set sail</span>}
@@ -1052,7 +1053,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                         <b>⚔️ Ship battles</b>
                                         <em>{left
                                             ? `${left} left today`
-                                            : resetCost > 0 ? `none left — another for 🪙 ${resetCost.toLocaleString()}` : "none left today"}</em>
+                                            : resetCost > 0 ? `none left — another for ${resetCost.toLocaleString()} gold` : "none left today"}</em>
                                     </span>
                                 </button>
                             );
@@ -1077,7 +1078,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                                 : <button className="sail-act is-wind" disabled={busy || windTooPoor} onClick={() => act("recharge_wind")}>
                                     <span className="sail-act-ico" aria-hidden="true">🍃</span>
-                                    <b>Tailwind</b><em>{busy ? "catching…" : windCost > 0 ? `🪙 ${windCost.toLocaleString()}` : "free"}</em>
+                                    <b>Tailwind</b><em>{busy ? "catching…" : windCost > 0 ? <><Coin size={13} /> {windCost.toLocaleString()}</> : "free"}</em>
                                 </button>
                         )}
                         {/* Fishing — the reason a four-hour voyage isn't four hours of nothing. Also offered while
@@ -1123,7 +1124,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                         so the odd one out reads as a different kind of thing. That it doubles
                                         is something you learn the second time you press it, not label text. */}
                                     <b>Buy a battle</b>
-                                    <em>{busy ? "buying…" : `🪙 ${resetCost.toLocaleString()}`}</em>
+                                    <em>{busy ? "buying…" : <><Coin size={13} /> {resetCost.toLocaleString()}</>}</em>
                                 </button>
                             )
                         ) : null}
@@ -1143,7 +1144,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             <img src="/images/sailing/doubloon.png" alt="" width={14} height={14} style={{ objectFit: "contain", verticalAlign: "-2px" }} />
                             {" "}{(state.doubloons || 0).toLocaleString()}
                         </span>
-                        <span className="sail-frag-gold">🪙 {state.gold.toLocaleString()}</span>
+                        <span className="sail-frag-gold"><Coin /> {state.gold.toLocaleString()}</span>
                     </span>
                 </div>
             </section>
@@ -1236,7 +1237,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             </div>
                             {u.data.maxed ? <button className="pill" disabled>✓ Maxed</button>
                                 : state.gold < u.data.cost ? <CoinCta price={u.data.cost} have={state.gold} className="sail-upg-cta" />
-                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.action, u.action)}>🪙 {u.data.cost.toLocaleString()}</button>}
+                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(u.action, u.action)}><Coin /> {u.data.cost.toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
@@ -1391,7 +1392,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {t.unlocked ? (
                                 t.maxed ? <button className="pill" disabled>✓ Maxed</button>
                                     : state.gold < t.cost ? <CoinCta price={t.cost} have={state.gold} className="sail-upg-cta" />
-                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}>🪙 {t.cost.toLocaleString()}</button>
+                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}><Coin /> {t.cost.toLocaleString()}</button>
                             ) : <button className="pill" disabled>🔒 Locked</button>}
                         </div>
                     ))}
@@ -1411,7 +1412,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             </div>
                             {u.data?.maxed ? <button className="pill" disabled>✓ Maxed</button>
                                 : state.gold < (u.data?.cost || 0) ? <CoinCta price={u.data?.cost || 0} have={state.gold} className="sail-upg-cta" />
-                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`dig:${u.track}`, "upgrade_dig", { track: u.track })}>🪙 {(u.data?.cost || 0).toLocaleString()}</button>}
+                                    : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`dig:${u.track}`, "upgrade_dig", { track: u.track })}><Coin /> {(u.data?.cost || 0).toLocaleString()}</button>}
                         </div>
                     ))}
                 </div>
@@ -1447,7 +1448,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                         disabled={busy || (state.gold || 0) < (state.fishing.recharge.cost || 0)}
                                         onClick={() => act("fish_recharge")}
                                     >
-                                        🎣 Recharge a cast · 🪙 {(state.fishing.recharge.cost || 0).toLocaleString()}
+                                        🎣 Recharge a cast · <Coin /> {(state.fishing.recharge.cost || 0).toLocaleString()}
                                     </button>
                                 ) : (
                                     <button className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }} disabled>
@@ -1455,7 +1456,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     </button>
                                 )}
                                 {state.fishing.recharge?.available && (state.gold || 0) < (state.fishing.recharge.cost || 0)
-                                    ? <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.78rem", textAlign: "center" }}>You need 🪙 {((state.fishing.recharge.cost || 0) - (state.gold || 0)).toLocaleString()} more.</p>
+                                    ? <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.78rem", textAlign: "center" }}>You need <Coin /> {((state.fishing.recharge.cost || 0) - (state.gold || 0)).toLocaleString()} more.</p>
                                     : null}
                             </>
                         )
@@ -1487,7 +1488,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </div>
                                 {u.maxed ? <button className="pill" disabled>✓ Max</button>
                                     : state.gold < u.cost ? <CoinCta price={u.cost} have={state.gold} className="sail-upg-cta" />
-                                        : <button className="btn-ghost sail-upg-cta" disabled={busy} onClick={() => buyUpgrade(`fish:${u.id}`, "upgrade_fishing", { track: u.id })}>🪙 {u.cost.toLocaleString()}</button>}
+                                        : <button className="btn-ghost sail-upg-cta" disabled={busy} onClick={() => buyUpgrade(`fish:${u.id}`, "upgrade_fishing", { track: u.id })}><Coin /> {u.cost.toLocaleString()}</button>}
                             </div>
                         ))}
                     </div>

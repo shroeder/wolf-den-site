@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
 import { nudgeFeed } from "@/lib/nudge-feed";
+import Coin from "@/components/Coin";
 
 // Site-wide "Happy Hour is LIVE!" announcement. The moment an event is active, EVERY signed-in member gets a
 // juicy gold modal explaining the ×N XP/gold surge + a recap of who chipped in to summon it. Shows once per
@@ -52,13 +53,13 @@ export default function HappyHourWatcher() {
                 </div>
                 {donors.length ? (
                     <div style={{ padding: "6px 18px 4px", textAlign: "left" }}>
-                        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 800, margin: "6px 0 6px" }}>🪙 Summoned by the pack</div>
+                        <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 800, margin: "6px 0 6px" }}><Coin /> Summoned by the pack</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                             {donors.map((d, i) => (
                                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 10px", borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
                                     <span style={{ fontSize: 12, opacity: 0.7, width: 16 }}>{i + 1}.</span>
                                     <span style={{ flex: 1, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.name}</span>
-                                    <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 13, whiteSpace: "nowrap" }}>+{d.gold.toLocaleString()} 🪙</span>
+                                    <span style={{ fontWeight: 800, color: "#ffd75e", fontSize: 13, whiteSpace: "nowrap" }}>+{d.gold.toLocaleString()} <Coin /></span>
                                 </div>
                             ))}
                         </div>

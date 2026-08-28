@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import Coin from "@/components/Coin";
 
 // Daily quests card — 3 rotating bounties with progress bars + claim buttons. Claiming pops a full reward
 // celebration (flash, coin burst, gold count-up). Renders nothing until the member has quests.
@@ -54,7 +55,7 @@ export default function QuestsClient() {
                 <h3 style={{ marginTop: 0, marginBottom: 0 }}>📜 Daily Quests {readyCount ? <span className="quests-ready-badge">{readyCount}</span> : null}</h3>
                 {meta && !meta.resetUsed ? (
                     <button type="button" className="quest-reroll" onClick={reroll} disabled={busy || !meta.canReset} title={meta.canReset ? "" : "Not enough gold"}>
-                        Reroll · 🪙 {(meta.resetCost || 1500).toLocaleString()}
+                        Reroll · <Coin /> {(meta.resetCost || 1500).toLocaleString()}
                     </button>
                 ) : meta?.resetUsed ? <span className="muted" style={{ fontSize: "0.72rem" }}>rerolled today</span> : null}
             </div>

@@ -14,6 +14,8 @@
 //   fertPower   → fertilizer cuts +X% more of the remaining grow time
 //   goldHarvest → +X% gold from every harvest
 import { housePrompt } from "@/lib/marketplace/art-style.js";
+import { COIN_ICON } from "@/lib/coin-icon";
+import { textIcon } from "@/lib/coin-icon.js";
 
 export const DECO_STATS = {
     growSpeed: { label: "Grow speed", icon: "🌱", suffix: "% faster crops" },
@@ -21,7 +23,7 @@ export const DECO_STATS = {
     harvestLuck: { label: "Harvest luck", icon: "🎁", suffix: "% better harvest loot" },
     petXp: { label: "Pet bond", icon: "🐾", suffix: "% more pet XP" },
     fertPower: { label: "Fertilizer", icon: "💧", suffix: "% stronger fertilizer" },
-    goldHarvest: { label: "Harvest gold", icon: "🪙", suffix: "% more harvest gold" },
+    goldHarvest: { label: "Harvest gold", icon: COIN_ICON, suffix: "% more harvest gold" },
 };
 
 export const DECO_RARITY = {
@@ -289,5 +291,5 @@ export function buffText(buff) {
     if (!buff) return null;
     const m = DECO_STATS[buff.stat];
     if (!m) return null;
-    return `${m.icon} +${buff.value}${m.suffix}`;
+    return `${textIcon(m.icon)}+${buff.value}${m.suffix}`;
 }

@@ -279,7 +279,7 @@ export default function StoreCreditClient({
                         <div><span className="muted">Credit added</span><strong>{usd(amountCents)}</strong></div>
                         <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} <Coin size={15} /></strong></div>
                         {bonusCoins > 0 ? (
-                            <div><span className="muted">↳ Gear bonus (+{Math.round(coinBonus * 100)}%)</span><strong style={{ color: "#7cffb2" }}>+{bonusCoins.toLocaleString()} 🪙</strong></div>
+                            <div><span className="muted">↳ Gear bonus (+{Math.round(coinBonus * 100)}%)</span><strong style={{ color: "#7cffb2" }}>+{bonusCoins.toLocaleString()} <Coin /></strong></div>
                         ) : null}
                         <div><span className="muted">Processing fee (3.5%)</span><strong>{usd(feeCents)}</strong></div>
                         <div className="credit-summary-total"><span>You pay</span><strong>{usd(chargedCents)}</strong></div>

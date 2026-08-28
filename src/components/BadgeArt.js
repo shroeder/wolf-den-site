@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Glyph from "@/components/Glyph";
 
 // Renders a badge's AI sprite (a small <img>) when one exists, else falls back to the badge's emoji. The
 // {slug → url} map is fetched ONCE per page and shared across every BadgeArt via a module-level singleton
@@ -46,9 +47,8 @@ export default function BadgeArt({ slug, icon, className = "" }) {
             <img src={sprite} alt="" className={`badge-art-img ${className}`} loading="lazy" style={{ height: "1.5em", width: "auto", verticalAlign: "-0.28em" }} />
         );
     }
-    return (
-        <span className={className} aria-hidden="true">
-            {icon}
-        </span>
-    );
+    // The fallback glyph is usually an emoji, but three badges are ABOUT coins and the coin emoji is drawn by
+    // the device's font — Apple's is a silver quarter. Those rows carry the coin art's path instead, so the
+    // fallback has to be able to draw one. Glyph decides by looking at the value.
+    return <Glyph value={icon} className={className} size="1.5em" />;
 }

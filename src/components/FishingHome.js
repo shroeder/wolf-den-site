@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { FishingLog } from "@/components/FishingScene";
+import Coin from "@/components/Coin";
 
 // The dedicated fishing screen. Everything the log used to hide behind a modal, behind a button that only
 // appeared while a voyage was in flight: your collection, the Den's biggest catches, and the per-species
@@ -112,7 +113,7 @@ export default function FishingHome({ fishing, gold = 0, status = null }) {
 
             {err ? <p className="fishhome-err">{err}</p> : null}
             {recharge?.available && !canAfford ? (
-                <p className="fishhome-note">You need 🪙 {((recharge.cost || 0) - gold).toLocaleString()} more for another cast.</p>
+                <p className="fishhome-note">You need <Coin /> {((recharge.cost || 0) - gold).toLocaleString()} more for another cast.</p>
             ) : null}
             {recharge && !recharge.available && casts.left === 0 && recharge.bought >= recharge.maxPerDay ? (
                 <p className="fishhome-note">You&rsquo;ve bought all {recharge.maxPerDay} extra casts today.</p>

@@ -5,6 +5,7 @@ import { treeState } from "@/lib/marketplace/arena-classes.js";
 import { GiLaurelCrown, GiUpgrade } from "react-icons/gi";
 
 import { TIER_GATE } from "@/lib/marketplace/arena-classes.js";
+import Coin from "@/components/Coin";
 
 // ── THE SKILL TREE ───────────────────────────────────────────────────────────────────────────────────────────
 // Four tiers of three, read top to bottom, with the gate for each tier stated on it. Every node carries its
@@ -117,7 +118,7 @@ function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, readOnly
                         onClick={() => onRefund(n.id)}>
                         {freeLeft > 0
                             ? <>Refund one · <u>free · {freeLeft} left today</u></>
-                            : <>Refund one · 🪙 {money(refundCost)}</>}
+                            : <>Refund one · <Coin /> {money(refundCost)}</>}
                     </button>
                 ) : null}
             </div>
@@ -378,7 +379,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                         <div>
                             <button type="button" className="skt-danger" disabled={busy}
                                 onClick={() => { setConfirm(null); onAct("respec_tree"); }}>
-                                Yes · 🪙 {money(p.respec?.tree)}
+                                Yes · <Coin /> {money(p.respec?.tree)}
                             </button>
                             <button type="button" className="skt-cancel" onClick={() => setConfirm(null)}>Keep it</button>
                         </div>
@@ -387,7 +388,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                     <button type="button" className="skt-respec-btn"
                         disabled={busy || pts.spent <= 0 || gold < (p.respec?.tree || 0)}
                         onClick={() => setConfirm("tree")}>
-                        Refund the whole tree <u>🪙 {money(p.respec?.tree)}</u>
+                        Refund the whole tree <u><Coin /> {money(p.respec?.tree)}</u>
                     </button>
                 )}
 
@@ -403,7 +404,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                 <div>
                                     <button type="button" className="skt-danger" disabled={busy}
                                         onClick={() => { setConfirm(null); onAct("respec_class", { classId: c.id }); }}>
-                                        Yes · 🪙 {money(p.respec?.klass)}
+                                        Yes · <Coin /> {money(p.respec?.klass)}
                                     </button>
                                     <button type="button" className="skt-cancel" onClick={() => setConfirm(null)}>Cancel</button>
                                 </div>
@@ -417,7 +418,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                     <img src={c.emblem} alt="" draggable="false" />
                                 ) : null}
                                 <b>{c.name}</b>
-                                <u>🪙 {money(p.respec?.klass)}</u>
+                                <u><Coin /> {money(p.respec?.klass)}</u>
                             </button>
                         )
                     ))}

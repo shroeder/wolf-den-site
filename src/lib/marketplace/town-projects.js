@@ -7,6 +7,7 @@ import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { COIN_ICON } from "@/lib/coin-icon";
 
 // ── TOWN DEVELOPMENT ────────────────────────────────────────────────────────────────────────────────────────
 // A shared, community-funded upgrade catalog. Everyone pools gold into PROJECTS; each level costs more, grants a
@@ -50,7 +51,7 @@ export const TOWN_PROJECTS = [
         perk: (lvl) => ({ farmGrowPct: lvl * 3, farmYieldPct: lvl * 2 }),
     },
     {
-        id: "well", category: "civic", name: "The Wishing Well", emoji: "🪙", maxLevel: 10,
+        id: "well", category: "civic", name: "The Wishing Well", emoji: COIN_ICON, maxLevel: 10,
         desc: "Raise a wishing well in the square. Every member can toss a coin ONCE a day for a blessing of gold — and it grows richer each level.",
         baseCost: 1800, costMult: 1.8,
         // Halved with the rest of the faucets. Tuned in the formula rather than minted at the claim

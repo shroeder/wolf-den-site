@@ -25,6 +25,7 @@
     "check:telemetry": "node scripts/check-telemetry.mjs",
     "check:sprite-edges": "node scripts/check-sprite-edges.mjs",
     "check:rewards": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-rewards.mjs",
+    "check:coin": "node scripts/check-coin-emoji.mjs",
     "check:delve-quote": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-delve-quote.mjs",
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",

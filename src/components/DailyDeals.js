@@ -9,6 +9,7 @@ import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import { itemById } from "@/lib/marketplace/items";
 import { GiOpenBook } from "react-icons/gi";
+import Coin from "@/components/Coin";
 
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 
@@ -77,7 +78,7 @@ export default function DailyDeals() {
             </div>
             {state.signedIn && !state.resetUsed ? (
                 <button type="button" className="quest-reroll" style={{ marginBottom: 14 }} onClick={reroll} disabled={busy === "reroll" || !state.canReset} title={state.canReset ? "" : "Not enough gold"}>
-                    Reroll deals · 🪙 {(state.resetCost || 1500).toLocaleString()}
+                    Reroll deals · <Coin /> {(state.resetCost || 1500).toLocaleString()}
                 </button>
             ) : state.resetUsed ? <p className="muted" style={{ fontSize: "0.72rem", margin: "0 0 8px" }}>rerolled today — fresh deals tomorrow</p> : null}
             <p className="muted" style={{ margin: "2px 0 10px" }}>Discounted picks that rotate every day — grab them before they&apos;re gone.</p>
@@ -99,8 +100,8 @@ export default function DailyDeals() {
                             <div className="deal-name">{d.name}</div>
                         </button>
                         <div className="deal-price">
-                            <span className="deal-was">🪙 {d.basePrice.toLocaleString()}</span>
-                            <span className="deal-now">🪙 {d.price.toLocaleString()}</span>
+                            <span className="deal-was"><Coin /> {d.basePrice.toLocaleString()}</span>
+                            <span className="deal-now"><Coin /> {d.price.toLocaleString()}</span>
                         </div>
                         {d.owned ? (
                             <button type="button" className="deal-btn" disabled>Owned</button>
@@ -124,14 +125,14 @@ export default function DailyDeals() {
                         {inspect.rarity ? <div className="muted" style={{ fontSize: "0.72rem", textTransform: "capitalize", fontWeight: 700 }}>{inspect.rarity} {inspect.kind}</div> : <div className="muted" style={{ fontSize: "0.72rem" }}>{inspect.kind}</div>}
                         <p style={{ margin: "8px 0 0", fontSize: "0.9rem", fontWeight: 600 }}>{inspect.desc || "—"}</p>
                         <p className="deal-price" style={{ justifyContent: "center", marginTop: 10 }}>
-                            <span className="deal-was">🪙 {inspect.basePrice.toLocaleString()}</span>
-                            <span className="deal-now">🪙 {inspect.price.toLocaleString()}</span>
+                            <span className="deal-was"><Coin /> {inspect.basePrice.toLocaleString()}</span>
+                            <span className="deal-now"><Coin /> {inspect.price.toLocaleString()}</span>
                         </p>
                         {inspect.owned ? <div className="muted">You own this.</div> : inspect.claimed ? <div className="muted">Claimed today.</div> : state.signedIn && state.gold < inspect.price ? (
                             <div style={{ marginTop: 8 }}><CoinCta price={inspect.price} label="Get coins to buy" /></div>
                         ) : (
                             <button type="button" className="button gold" style={{ marginTop: 8 }} onClick={() => { buy(inspect.id); setInspect(null); }} disabled={!state.signedIn}>
-                                {`Buy · 🪙 ${inspect.price.toLocaleString()}`}
+                                {`Buy · ${inspect.price.toLocaleString()} gold`}
                             </button>
                         )}
                     </div>

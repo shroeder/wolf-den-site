@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import Glyph from "@/components/Glyph";
 
 // The once-a-day check-in modal: a login-streak reward to claim + a "while you were away" summary. Mounted
 // globally (marketplace layout); it self-suppresses if there's nothing to show or already claimed today.
@@ -86,11 +87,11 @@ export default function DailyCheckin() {
 
                 {claimed ? (
                     <>
-                        <h2 className="checkin-title">{reward.emoji} +{reward.label}!</h2>
+                        <h2 className="checkin-title"><Glyph value={reward.emoji} size={22} /> +{reward.label}!</h2>
                         {claimed.logins?.length ? (
                             <div className="checkin-summary">
                                 <div className="checkin-loot-head">Your gear also triggered:</div>
-                                {claimed.logins.map((l, idx) => <div key={idx} className="checkin-row">{l.emoji} {l.text}</div>)}
+                                {claimed.logins.map((l, idx) => <div key={idx} className="checkin-row"><Glyph value={l.emoji} /> {l.text}</div>)}
                             </div>
                         ) : null}
                         {(s.chestsToOpen > 0 || s.spinReady) ? <div className="checkin-summary">{prompts}</div> : null}
@@ -100,7 +101,7 @@ export default function DailyCheckin() {
                 ) : (
                     <>
                         <h2 className="checkin-title">Welcome back!</h2>
-                        <p className="checkin-sub">Today&apos;s streak reward: <strong>{reward.emoji} {reward.label}</strong></p>
+                        <p className="checkin-sub">Today&apos;s streak reward: <strong><Glyph value={reward.emoji} /> {reward.label}</strong></p>
                         <div className="checkin-summary">
                             {s.pet ? <div className="checkin-row">🐾 <strong>{s.pet.name}</strong> is Lv {s.pet.level}{s.pet.maxed ? " (MAX)" : ""}</div> : null}
                             {s.bossName && s.packDamage24h > 0 ? <div className="checkin-row">⚔️ The pack hit <strong>{s.bossName}</strong> for {s.packDamage24h.toLocaleString()} in the last day</div> : null}

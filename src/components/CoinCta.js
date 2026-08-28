@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Coin from "@/components/Coin";
 
 // Shown wherever a member can't afford a coin cost. Deliberately styled as a bright, tappable CTA (not the
 // muted "need more" text that reads as a disabled state) → takes them to buy store credit for coins.
@@ -16,8 +17,8 @@ export default function CoinCta({ price = null, have = null, label = "Get coins"
             title="Buy store credit for coins"
         >
             {short != null && short > 0
-                ? <span className="coin-cta-price">🪙 {short.toLocaleString()} short</span>
-                : price != null ? <span className="coin-cta-price">🪙 {price.toLocaleString()}</span> : null}
+                ? <span className="coin-cta-price"><Coin /> {short.toLocaleString()} short</span>
+                : price != null ? <span className="coin-cta-price"><Coin /> {price.toLocaleString()}</span> : null}
             <span className="coin-cta-get">＋ {label}</span>
         </Link>
     );

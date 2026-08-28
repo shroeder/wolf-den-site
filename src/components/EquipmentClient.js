@@ -17,6 +17,7 @@ import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, sortStatKeys, desc
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
+import Coin from "@/components/Coin";
 
 // An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
 // effective (reforged) elements passed from the server; falls back to the item's deterministic base element.
@@ -786,9 +787,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {/* Gold shop — its own STORE view, gear grouped by slot into collapsible categories. */}
             {view !== "gear" && (data.shop || []).length ? (
                 <div className="card">
-                    <h3>🪙 Gold Shop</h3>
+                    <h3><Coin /> Gold Shop</h3>
                     <p className="muted" style={{ marginTop: 0 }}>Spend gold — earned alongside your XP — on gear. Browse by slot.</p>
-                    {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off the in-game 🪙 gold shop — auto-applies to your next gold gear pick ≤ 🪙 {data.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div> : null}
+                    {data.coupon ? <div className="shop-coupon">🏷️ {data.coupon.pct}% off the in-game <Coin /> gold shop — auto-applies to your next gold gear pick ≤ <Coin /> {data.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div> : null}
                     {shopCategories.map((cat) => {
                         const open = !collapsedCats.has(cat.slot);
                         return (
@@ -820,7 +821,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
                                                 {!i.signature && i.sea ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity</span> : null}
                                                 {!i.signature && !i.sea && i.depth ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffb45e" }}>⛏️ Depths affinity</span> : null}
-                                                <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
+                                                <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}><Coin /> {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -1055,7 +1056,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         <div className="equip-sheet-foot">
                             {it.shop ? (
                                 <span className="equip-sheet-price" style={{ color: it.canAfford ? "#ffd75e" : "#c9a24a" }}>
-                                    🪙 {it.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55 }}>{(it.cost || 0).toLocaleString()}</span> {(it.effectiveCost || 0).toLocaleString()}</> : (it.cost || 0).toLocaleString()}
+                                    <Coin /> {it.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55 }}>{(it.cost || 0).toLocaleString()}</span> {(it.effectiveCost || 0).toLocaleString()}</> : (it.cost || 0).toLocaleString()}
                                     {it.discounted ? <em> {data.coupon?.pct || 50}% off</em> : null}
                                     {it.canAfford ? null : <em> not enough</em>}
                                 </span>
@@ -1063,7 +1064,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             {it.shop ? (
                                 it.canAfford ? (
                                     <button type="button" className="button gold" onClick={() => { buy(it); closeDetail(); }} disabled={busy}>
-                                        🪙 Buy for {((it.discounted ? it.effectiveCost : it.cost) || 0).toLocaleString()}
+                                        <Coin /> Buy for {((it.discounted ? it.effectiveCost : it.cost) || 0).toLocaleString()}
                                     </button>
                                 ) : (
                                     <CoinCta price={it.cost} label="Get coins to buy" />
@@ -1086,9 +1087,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             ) : null}
                             {!it.shop && !it.collectionPiece && it.sellValue > 0 ? (
                                 sellArmed ? (
-                                    <button type="button" className="button gold" onClick={() => doSell(it)} disabled={busy}>Confirm — sell for 🪙 {it.sellValue}</button>
+                                    <button type="button" className="button gold" onClick={() => doSell(it)} disabled={busy}>Confirm — sell for <Coin /> {it.sellValue}</button>
                                 ) : (
-                                    <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}>🪙 Sell for {it.sellValue}</button>
+                                    <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}><Coin /> Sell for {it.sellValue}</button>
                                 )
                             ) : null}
                             {!it.shop && !it.equipped && !it.collectionPiece ? (
@@ -1121,9 +1122,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
             {coinBurst ? createPortal((
                 <div className="coinfx" key={coinBurst.key} aria-hidden="true">
                     {coinBurst.coins.map((c, i) => (
-                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}>🪙</span>
+                        <span key={i} className="coinfx-coin" style={{ "--cx": c.x, "--cy": c.y, "--cr": c.r, animationDelay: c.d }}><Coin /></span>
                     ))}
-                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} 🪙</div>
+                    <div className="coinfx-amount">+{(coinBurst.amount || 0).toLocaleString()} <Coin /></div>
                 </div>
             ), document.body) : null}
 

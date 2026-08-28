@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import useScrollLock from "@/lib/useScrollLock";
+import Coin from "@/components/Coin";
 
 // ── THE PRIZE WHEEL — hand-painted game art: a big rotating 20-wedge disc inside a slim bulb-lit gold frame
 // with a wolf-head pointer. Real prize sprites on every wedge (no emoji). Feeds a shared PROGRESSIVE jackpot,
@@ -409,7 +410,7 @@ export default function SpinWheel() {
 
             <div className="cw-actions">
                 <button type="button" className="cw-go" onClick={spin} disabled={spinning || !st.canSpin} style={{ opacity: spinning || !st.canSpin ? 0.6 : 1 }}>{spinLabel}</button>
-                {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
+                {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · <Coin /> {st.tokenCost}</button> : null}
             </div>
 
             {/* The wheel's own chase: ten wheel-exclusive pieces that only this wheel drops, shown on the

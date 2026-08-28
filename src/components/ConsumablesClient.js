@@ -7,6 +7,7 @@ import CoinCta from "@/components/CoinCta";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
+import Coin from "@/components/Coin";
 
 const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic", farm: "Farm Supply", sail: "Voyage Gear", treat: "Pet Treat", dish: "Dish" };
 
@@ -197,9 +198,9 @@ export default function ConsumablesClient() {
                 </div>
             ) : null}
 
-            <h3 style={{ margin: "6px 0" }}>🪙 Shop</h3>
+            <h3 style={{ margin: "6px 0" }}><Coin /> Shop</h3>
             {state.coupon ? (
-                <div className="shop-coupon">🏷️ {state.coupon.pct}% off the in-game 🪙 gold shop — auto-applies to your next gold buy ≤ 🪙 {state.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div>
+                <div className="shop-coupon">🏷️ {state.coupon.pct}% off the in-game <Coin /> gold shop — auto-applies to your next gold buy ≤ <Coin /> {state.coupon.max.toLocaleString()} (one use). Not a real-store discount.</div>
             ) : null}
             <div className="badge-board">
                 {(state.shop || []).map((i) => (
@@ -210,7 +211,7 @@ export default function ConsumablesClient() {
                         {i.canAfford ? (
                             <button type="button" className="btn btn-small" disabled={busy === `buy:${i.id}`} onClick={() => post({ id: i.id, action: "buy" }, `buy:${i.id}`)} style={{ marginTop: 6 }}>
                                 {busy === `buy:${i.id}` ? "Buying…" : (
-                                    <>Buy · 🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.6, fontWeight: 700 }}>{i.price.toLocaleString()}</span> {i.effectivePrice.toLocaleString()}</> : i.price.toLocaleString()}</>
+                                    <>Buy · <Coin /> {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.6, fontWeight: 700 }}>{i.price.toLocaleString()}</span> {i.effectivePrice.toLocaleString()}</> : i.price.toLocaleString()}</>
                                 )}
                             </button>
                         ) : (

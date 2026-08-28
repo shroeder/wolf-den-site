@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import useScrollLock from "@/lib/useScrollLock";
+import Coin from "@/components/Coin";
 
 const RARITY_COL = { common: "#9aa0a6", rare: "#4aa3d4", epic: "#a855f7", legendary: "#f59e0b", mythic: "#ff5cc8", ascendant: "#ff7a3c", eternal: "#22e0c8" };
 
@@ -30,7 +31,7 @@ export default function RaidDefenseReport() {
                     <div style={{ fontSize: 46, lineHeight: 1 }}>🛡️</div>
                     <div style={{ fontWeight: 900, fontSize: 20, marginTop: 6 }}>You repelled {report.totalWins} raid{report.totalWins === 1 ? "" : "s"}!</div>
                     <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>While you were away, raiders hit your ship — and lost.</div>
-                    <div style={{ fontSize: 27, fontWeight: 900, color: "#ffd75e", marginTop: 8, textShadow: "0 2px 12px rgba(255,215,94,0.4)" }}>+{report.totalGold.toLocaleString()} 🪙</div>
+                    <div style={{ fontSize: 27, fontWeight: 900, color: "#ffd75e", marginTop: 8, textShadow: "0 2px 12px rgba(255,215,94,0.4)" }}>+{report.totalGold.toLocaleString()} <Coin /></div>
                     <div className="muted" style={{ fontSize: 11 }}>already added to your wallet</div>
                 </div>
                 <div style={{ padding: "10px 16px 8px", display: "flex", flexDirection: "column", gap: 8 }}>

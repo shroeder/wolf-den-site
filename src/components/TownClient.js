@@ -13,6 +13,7 @@ import { STAT_META, statParts, describeSea, describeFarm } from "@/lib/marketpla
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import NoticeBody from "@/components/NoticeBody";
 import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -330,7 +331,7 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
                         <div className={`tw-duel-verdict ${duel.win ? "win" : "lose"}`}>{duel.win ? "🏆 Victory!" : "💥 Driven back!"}</div>
                         <div className="tw-duel-rewards">
                             {r.xp ? <span className="tw-duel-chip xp">+{r.xp} XP</span> : null}
-                            {r.coin ? <span className="tw-duel-chip gold">+{r.coin} 🪙</span> : null}
+                            {r.coin ? <span className="tw-duel-chip gold">+{r.coin} <Coin /></span> : null}
                             {(r.loot || []).map((l, i) => (
                                 <span key={i} className={`tw-duel-chip loot${l.kind === "gear" ? " scrap" : ""}`}>
                                     {l.emoji} {l.label}{l.kind === "gear" ? <em> · scrap</em> : null}
@@ -740,7 +741,7 @@ export default function TownClient({ initial }) {
             const d = await r.json();
             if (d?.ok) {
                 setStockade(d.occupant ? d : null);
-                setStockFlash(kind === "unlock" ? `${d.freed} walks free.` : kind === "fruit" ? `SPLAT! +${d.xp} XP · +${d.gold} 🪙` : `+${d.xp} XP`);
+                setStockFlash(kind === "unlock" ? `${d.freed} walks free.` : kind === "fruit" ? `SPLAT! +${d.xp} XP · +${d.gold} gold` : `+${d.xp} XP`);
                 setTimeout(() => setStockFlash(null), kind === "unlock" ? 2600 : 1400);
             } else if (d?.error === "out_of_turns") {
                 setStockFlash("That's your lot for today.");
@@ -1269,7 +1270,7 @@ export default function TownClient({ initial }) {
         setQuestBusy(true);
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "quest_claim", key }) }).then((x) => x.json()).catch(() => null);
         setQuestBusy(false);
-        if (r?.ok) { setQuestFlash(`🪙 +${r.reward} gold — ${r.label} done!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
+        if (r?.ok) { setQuestFlash(`+${r.reward} gold — ${r.label} done!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } load(); }
         else setQuestFlash("That bounty isn't ready yet.");
     }, [load]);
     const questsClaimable = useMemo(() => (state?.quests || []).filter((q) => q.done && !q.claimed).length, [state?.quests]);
@@ -1432,7 +1433,7 @@ export default function TownClient({ initial }) {
                             >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={art.centerpiece.url} alt="" draggable={false} />
-                                {canWish ? <span className="tw-well-badge">🪙 Make a wish!</span> : <span className="tw-well-badge is-spent">✓ Wished today</span>}
+                                {canWish ? <span className="tw-well-badge"><Coin /> Make a wish!</span> : <span className="tw-well-badge is-spent">✓ Wished today</span>}
                             </button>
                         ) : (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1468,9 +1469,9 @@ export default function TownClient({ initial }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
                                 ) : (
-                                    <span className="tw-building-card"><span className="tw-building-emoji">{b.emoji}</span></span>
+                                    <span className="tw-building-card"><span className="tw-building-emoji"><Glyph value={b.emoji} size={28} /></span></span>
                                 )}
-                                <span className="tw-building-label">{raidActive ? "🔒" : b.emoji} {b.label}</span>
+                                <span className="tw-building-label">{raidActive ? "🔒" : <Glyph value={b.emoji} />} {b.label}</span>
                             </Link>
                         );
                     })}
@@ -1775,7 +1776,7 @@ export default function TownClient({ initial }) {
                                 <input value={nomCrime} onChange={(e) => setNomCrime(e.target.value)} placeholder="Their crime (optional)" aria-label="The crime" />
                                 <button type="button" className="button primary" disabled={stockBusy || !nomPick}
                                     onClick={() => stockPost({ kind: "nominate", target: nomPick.id, crime: nomCrime.trim() || null })}>
-                                    Accuse — 🪙 {stockade.election.nominateCost}
+                                    Accuse — <Coin /> {stockade.election.nominateCost}
                                 </button>
                             </div>
                         ) : <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.8rem" }}>You have made your accusation this round.</p>}
@@ -1805,7 +1806,7 @@ export default function TownClient({ initial }) {
                                 <button type="button" className="tw-stock-btn is-fruit" disabled={stockBusy || stockade.fruit.used >= stockade.fruit.max} onClick={() => stockAct("fruit")}>
                                     <span className="tw-stock-ico" aria-hidden="true">🍅</span>
                                     <span className="tw-stock-lbl">Throw rotten fruit</span>
-                                    <span className="tw-stock-meta">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} 🪙</span>
+                                    <span className="tw-stock-meta">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} <Coin /></span>
                                     <span className="tw-stock-left">{Math.max(0, stockade.fruit.max - stockade.fruit.used)}/{stockade.fruit.max}</span>
                                 </button>
                                 {/* THE WARDEN'S KEY. Drawn only for the member wearing the piece that grants
@@ -1910,8 +1911,8 @@ export default function TownClient({ initial }) {
                                         ) : <span className="tw-ware-emoji" aria-hidden="true">{w.emoji}</span>}
                                         <span className="tw-ware-label">{w.label}</span>
                                         <span className="tw-ware-price">
-                                            {w.orig && w.orig !== w.price ? <span className="tw-ware-orig">🪙 {w.orig.toLocaleString()}</span> : null}
-                                            <span className="tw-ware-now">🪙 {w.price.toLocaleString()}</span>
+                                            {w.orig && w.orig !== w.price ? <span className="tw-ware-orig"><Coin /> {w.orig.toLocaleString()}</span> : null}
+                                            <span className="tw-ware-now"><Coin /> {w.price.toLocaleString()}</span>
                                         </span>
                                         <span className={`tw-ware-left${soldOut ? " is-out" : ""}`}>{soldOut ? "back tomorrow" : `${w.remaining}/${w.capPerDay} today`}</span>
                                     </button>
@@ -1928,9 +1929,9 @@ export default function TownClient({ initial }) {
                                 <span className="tw-gamble-title">Gamble for gear</span>
                                 <span className="tw-gamble-sub">A random piece — rarely up to Tier 4!</span>
                             </span>
-                            <span className="tw-gamble-price">🪙 1,000</span>
+                            <span className="tw-gamble-price"><Coin /> 1,000</span>
                         </button>
-                        <p className="muted" style={{ fontSize: "0.8rem", margin: "10px 2px 0" }}>🪙 You have {(you?.gold || 0).toLocaleString()} gold · chests & gear live in your Gear.</p>
+                        <p className="muted" style={{ fontSize: "0.8rem", margin: "10px 2px 0" }}><Coin /> You have {(you?.gold || 0).toLocaleString()} gold · chests & gear live in your Gear.</p>
                     </div>
                 </div>
             ) : null}
@@ -1991,14 +1992,14 @@ export default function TownClient({ initial }) {
 
                         {projects.length ? (
                             <div className="tw-board-section">
-                                <div className="tw-board-title">🏗️ Town Development<span className="tw-board-gold">🪙 {(you?.gold || 0).toLocaleString()}</span></div>
+                                <div className="tw-board-title">🏗️ Town Development<span className="tw-board-gold"><Coin /> {(you?.gold || 0).toLocaleString()}</span></div>
                                 <p className="muted" style={{ fontSize: "0.8rem", margin: "0 2px 8px" }}>
                                     Everyone pools gold into the town we all share. Every level is a perk the WHOLE Den keeps — forever.
                                 </p>
                                 {(townBonuses.xpPct || townBonuses.goldPct) ? (
                                     <div className="tw-town-perks">
                                         {townBonuses.xpPct ? <span>✨ +{townBonuses.xpPct}% XP</span> : null}
-                                        {townBonuses.goldPct ? <span>🪙 +{townBonuses.goldPct}% gold</span> : null}
+                                        {townBonuses.goldPct ? <span><Coin /> +{townBonuses.goldPct}% gold</span> : null}
                                         <span className="muted">town-wide, right now</span>
                                     </div>
                                 ) : null}
@@ -2014,7 +2015,7 @@ export default function TownClient({ initial }) {
                                                         {PROJECT_ART[p.id] && art[PROJECT_ART[p.id]]?.url ? (
                                                             // eslint-disable-next-line @next/next/no-img-element
                                                             <img className="tw-proj-sprite" src={art[PROJECT_ART[p.id]].url} alt="" draggable={false} />
-                                                        ) : <span className="tw-proj-emoji" aria-hidden="true">{p.emoji}</span>}
+                                                        ) : <span className="tw-proj-emoji" aria-hidden="true"><Glyph value={p.emoji} size={20} /></span>}
                                                         <span className="tw-proj-name">{p.name}</span>
                                                         <span className="tw-proj-lvl">{p.maxed ? "MAX" : `Lv ${p.level}`}</span>
                                                     </div>
@@ -2028,7 +2029,7 @@ export default function TownClient({ initial }) {
                                                         return (
                                                             <>
                                                                 <div className="tw-fund-bar"><span style={{ width: `${p.progressPct}%` }} /></div>
-                                                                <p className="tw-proj-cost">🪙 {p.goldIn.toLocaleString()} / {p.cost.toLocaleString()} → Lv {p.level + 1}{p.perkNext ? ` · ${p.perkNext}` : ""}</p>
+                                                                <p className="tw-proj-cost"><Coin /> {p.goldIn.toLocaleString()} / {p.cost.toLocaleString()} → Lv {p.level + 1}{p.perkNext ? ` · ${p.perkNext}` : ""}</p>
                                                                 <div className="tw-fund-btns">
                                                                     {amounts.map((amt) => (
                                                                         <button key={amt} type="button" disabled={contribBusy === p.id || myGold < amt} onClick={() => contribute(p.id, amt)}>+{amt.toLocaleString()}</button>
@@ -2217,7 +2218,7 @@ export default function TownClient({ initial }) {
                         <div className="muted" style={{ margin: "4px 0 10px" }}>The pack brought it down together.</div>
                         <div className="tw-duel-rewards" style={{ justifyContent: "center" }}>
                             {bossReward.xp ? <span className="tw-duel-chip xp">+{bossReward.xp} XP</span> : null}
-                            {bossReward.gold ? <span className="tw-duel-chip gold">+{bossReward.gold} 🪙</span> : null}
+                            {bossReward.gold ? <span className="tw-duel-chip gold">+{bossReward.gold} <Coin /></span> : null}
                             {bossReward.chest ? <span className="tw-duel-chip loot">🧰 {bossReward.chest[0].toUpperCase() + bossReward.chest.slice(1)} Chest</span> : null}
                         </div>
                         <button type="button" className="tw-levelup-btn" style={{ marginTop: 12 }} onClick={() => setBossReward(null)}>Huzzah! 🐺</button>
@@ -2245,7 +2246,7 @@ export default function TownClient({ initial }) {
                                 {/* The glimmer pays real spoils too — show them, or the prize reads as thin for
                                     anyone who doesn't care about farm decorations. */}
                                 <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", margin: "0 0 10px", position: "relative", zIndex: 2 }}>
-                                    {shinyReward.gold ? <span className="tw-recap-chip">🪙 +{Number(shinyReward.gold).toLocaleString()}</span> : null}
+                                    {shinyReward.gold ? <span className="tw-recap-chip"><Coin /> +{Number(shinyReward.gold).toLocaleString()}</span> : null}
                                     {shinyReward.xp ? <span className="tw-recap-chip">⭐ +{Number(shinyReward.xp).toLocaleString()} XP</span> : null}
                                     {shinyReward.chest ? <span className="tw-recap-chip">🎁 {shinyReward.chest} chest</span> : null}
                                 </div>
@@ -2287,7 +2288,7 @@ export default function TownClient({ initial }) {
                             <>
                                 <div className="tw-reveal-rarity" style={{ color: "#ffd75e", marginTop: 4 }}>Your spoils</div>
                                 <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "8px 0" }}>
-                                    {raidRecap.gold ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} 🪙</span> : null}
+                                    {raidRecap.gold ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} <Coin /></span> : null}
                                     {raidRecap.xp ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{raidRecap.xp.toLocaleString()} ✨ XP</span> : null}
                                     {raidRecap.drops ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#e0c8ff", background: "rgba(150,90,255,0.2)" }}>🎁 {raidRecap.drops} drop{raidRecap.drops === 1 ? "" : "s"}</span> : null}
                                 </div>
@@ -2303,10 +2304,10 @@ export default function TownClient({ initial }) {
             {wellFx ? (
                 <div className="tw-wellfx" onClick={() => setWellFx(null)} role="presentation">
                     <div className="tw-wellfx-card" onClick={(e) => e.stopPropagation()} role="presentation">
-                        <div className="tw-wellfx-coin" aria-hidden="true">🪙</div>
+                        <div className="tw-wellfx-coin" aria-hidden="true"><Coin /></div>
                         <div className="tw-wellfx-title">Your wish is granted!</div>
                         <div className="tw-wellfx-rewards">
-                            <span style={{ padding: "6px 14px", borderRadius: 999, fontWeight: 900, fontSize: 16, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{Number(wellFx.gold || 0).toLocaleString()} 🪙</span>
+                            <span style={{ padding: "6px 14px", borderRadius: 999, fontWeight: 900, fontSize: 16, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{Number(wellFx.gold || 0).toLocaleString()} <Coin /></span>
                             {wellFx.xp ? <span style={{ padding: "6px 14px", borderRadius: 999, fontWeight: 900, fontSize: 16, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{Number(wellFx.xp).toLocaleString()} ✨ XP</span> : null}
                         </div>
                         <div className="muted" style={{ fontSize: "0.8rem" }}>Come back tomorrow for another wish.</div>

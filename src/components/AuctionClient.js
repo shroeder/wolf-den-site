@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ItemArt from "@/components/ItemArt";
 import CoinCta from "@/components/CoinCta";
 import { GiOpenBook } from "react-icons/gi";
+import Coin from "@/components/Coin";
 
 const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const SLOTS = [["", "All slots"], ["main_hand", "Weapon"], ["off_hand", "Off-hand"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["feet", "Feet"], ["hands", "Hands"], ["ring", "Ring"], ["amulet", "Amulet"], ["cloak", "Cloak"]];
@@ -95,18 +96,18 @@ export default function AuctionClient({ initial }) {
         setBusy(true);
         const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "buy", id }) }).then((x) => x.json()).catch(() => null);
         setBusy(false);
-        if (r?.ok) { showFlash(`✅ Bought ${r.item?.name} for ${r.price.toLocaleString()} 🪙!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
+        if (r?.ok) { showFlash(`✅ Bought ${r.item?.name} for ${r.price.toLocaleString()} gold!`); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
         else showFlash(r?.error === "insufficient_gold" ? "Not enough coins." : r?.error === "already_owned" ? "You already own that piece." : r?.error === "own_listing" ? "That's your own listing." : "That listing's gone.");
     }, [showFlash, reloadState]);
 
     const doList = useCallback(async () => {
         const p = Math.floor(Number(price) || 0);
-        if (!sellPick || p < 10) { showFlash("Set a price of at least 10 🪙."); return; }
+        if (!sellPick || p < 10) { showFlash("Set a price of at least 10 gold."); return; }
         setBusy(true);
         const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "list", itemId: sellPick.itemId, price: p, days }) }).then((x) => x.json()).catch(() => null);
         setBusy(false);
-        if (r?.ok) { showFlash(`📜 Listed ${sellPick.name} for ${p.toLocaleString()} 🪙 (fee ${r.fee.toLocaleString()} 🪙).`); setSellPick(null); setPrice(""); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
-        else showFlash(r?.error === "insufficient_gold" ? `You need ${Math.max(1, Math.ceil(p * feePct)).toLocaleString()} 🪙 for the listing fee.` : r?.error === "equipped" ? "Unequip it first." : r?.error === "collection_piece" ? "That's a collection piece — its bonus is permanent, so it can't be auctioned." : "Couldn't list that.");
+        if (r?.ok) { showFlash(`📜 Listed ${sellPick.name} for ${p.toLocaleString()} gold (fee ${r.fee.toLocaleString()}).`); setSellPick(null); setPrice(""); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
+        else showFlash(r?.error === "insufficient_gold" ? `You need ${Math.max(1, Math.ceil(p * feePct)).toLocaleString()} gold for the listing fee.` : r?.error === "equipped" ? "Unequip it first." : r?.error === "collection_piece" ? "That's a collection piece — its bonus is permanent, so it can't be auctioned." : "Couldn't list that.");
     }, [price, sellPick, days, feePct, showFlash, reloadState]);
 
     const cancel = useCallback(async (id) => {
@@ -135,7 +136,7 @@ export default function AuctionClient({ initial }) {
                     <h1 className="ah-hero-title">Auction House</h1>
                     <p className="ah-hero-sub">Sell what you don&apos;t use · snag a deal · {Math.round(feePct * 100)}% to list</p>
                 </div>
-                <span className="ah-hero-gold">🪙 {gold.toLocaleString()}</span>
+                <span className="ah-hero-gold"><Coin /> {gold.toLocaleString()}</span>
             </section>
 
             <div className="ah-tabs" role="tablist" style={{ "--i": TABS.findIndex((t) => t.k === tab) }}>
@@ -196,13 +197,13 @@ export default function AuctionClient({ initial }) {
                                         only two the market could not show them. The button still refuses the
                                         purchase in both cases; it just stops withholding the number to do it. */}
                                     {l.mine ? (
-                                        <button type="button" className="ah-buy is-mine" onClick={(e) => { e.stopPropagation(); setDetail(l); }}>🪙 {l.price.toLocaleString()} · yours</button>
+                                        <button type="button" className="ah-buy is-mine" onClick={(e) => { e.stopPropagation(); setDetail(l); }}><Coin /> {l.price.toLocaleString()} · yours</button>
                                     ) : l.owned ? (
-                                        <button type="button" className="ah-buy" disabled onClick={(e) => e.stopPropagation()}>🪙 {l.price.toLocaleString()} · owned</button>
+                                        <button type="button" className="ah-buy" disabled onClick={(e) => e.stopPropagation()}><Coin /> {l.price.toLocaleString()} · owned</button>
                                     ) : gold < l.price ? (
                                         <span onClick={(e) => e.stopPropagation()}><CoinCta price={l.price} have={gold} label="coins" /></span>
                                     ) : (
-                                        <button type="button" className="ah-buy" disabled={busy} onClick={(e) => { e.stopPropagation(); buy(l.id); }}>🪙 {l.price.toLocaleString()}</button>
+                                        <button type="button" className="ah-buy" disabled={busy} onClick={(e) => { e.stopPropagation(); buy(l.id); }}><Coin /> {l.price.toLocaleString()}</button>
                                     )}
                                     <div className="ah-card-tapHint">Tap for full details ›</div>
                                 </div>
@@ -237,11 +238,11 @@ export default function AuctionClient({ initial }) {
                     {sellPick ? (
                         <div className="ah-listform">
                             <div className="ah-listform-title">List <b style={{ color: RARITY_TXT[sellPick.rarity] || "#fff" }}>{sellPick.name}</b></div>
-                            <label className="ah-field"><span>Price (🪙)</span><input ref={priceRef} type="number" inputMode="numeric" min={10} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 2500" /></label>
+                            <label className="ah-field"><span>Price (<Coin />)</span><input ref={priceRef} type="number" inputMode="numeric" min={10} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 2500" /></label>
                             <div className="ah-field"><span>Duration</span>
                                 <div className="ah-days">{durations.map((d) => <button key={d} type="button" className={days === d ? "is-on" : ""} onClick={() => setDays(d)}>{d}d</button>)}</div>
                             </div>
-                            <div className="ah-feeline muted">Listing fee ({Math.round(feePct * 100)}%): <b>🪙 {fee.toLocaleString()}</b>{Number(price) > 0 ? ` · you keep 🪙 ${Number(price).toLocaleString()} on a sale` : ""}</div>
+                            <div className="ah-feeline muted">Listing fee ({Math.round(feePct * 100)}%): <b><Coin /> {fee.toLocaleString()}</b>{Number(price) > 0 ? ` · you keep ${Number(price).toLocaleString()} gold on a sale` : ""}</div>
                             <div className="ah-listform-btns">
                                 <button type="button" className="ah-list-btn" disabled={busy || Number(price) < 10 || gold < fee} onClick={doList}>📜 List it{gold < fee ? " (need fee)" : ""}</button>
                                 <button type="button" className="ah-cancel-btn" onClick={() => setSellPick(null)}>Cancel</button>
@@ -264,7 +265,7 @@ export default function AuctionClient({ initial }) {
                                     <div className="ah-minerow-body">
                                         <div className="ah-minerow-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                         <div className="muted" style={{ fontSize: "0.76rem" }}>
-                                            🪙 {l.price.toLocaleString()} · {l.status === "active" ? `⏳ ${timeLeft(l.expiresAt)} left` : l.status === "sold" ? "✅ sold" : l.status === "expired" ? "⌛ expired (returned)" : "↩ cancelled"}
+                                            <Coin /> {l.price.toLocaleString()} · {l.status === "active" ? `⏳ ${timeLeft(l.expiresAt)} left` : l.status === "sold" ? "✅ sold" : l.status === "expired" ? "⌛ expired (returned)" : "↩ cancelled"}
                                         </div>
                                         {l.status === "sold" && l.buyerName ? (
                                             <div style={{ fontSize: "0.76rem", fontWeight: 700, color: "#8fe39a", marginTop: 2 }}>
@@ -313,20 +314,20 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-detail-actions">
                             {detail.mine ? (
                                 detail.status === "active" ? (
-                                    <button type="button" className="ah-cancel-btn" style={{ flex: 1 }} disabled={busy} onClick={() => { cancel(detail.id); setDetail(null); }}>Cancel listing · 🪙 {detail.price.toLocaleString()}</button>
+                                    <button type="button" className="ah-cancel-btn" style={{ flex: 1 }} disabled={busy} onClick={() => { cancel(detail.id); setDetail(null); }}>Cancel listing · <Coin /> {detail.price.toLocaleString()}</button>
                                 ) : (
                                     // A sold or expired listing of your own showed NOTHING here — not even what it
                                     // went for, which is the one fact you open a finished listing to find out.
                                     <span className="ah-buy is-mine" style={{ flex: 1, textAlign: "center" }}>
-                                        🪙 {detail.price.toLocaleString()} · {detail.status === "sold" ? "sold" : "expired"}
+                                        <Coin /> {detail.price.toLocaleString()} · {detail.status === "sold" ? "sold" : "expired"}
                                     </span>
                                 )
                             ) : detail.owned ? (
-                                <button type="button" className="ah-buy" disabled style={{ flex: 1 }}>🪙 {detail.price.toLocaleString()} · you own this</button>
+                                <button type="button" className="ah-buy" disabled style={{ flex: 1 }}><Coin /> {detail.price.toLocaleString()} · you own this</button>
                             ) : gold < detail.price ? (
                                 <div style={{ flex: 1 }}><CoinCta price={detail.price} have={gold} label="coins" /></div>
                             ) : (
-                                <button type="button" className="ah-buy" style={{ flex: 1 }} disabled={busy} onClick={() => { buy(detail.id); setDetail(null); }}>🪙 Buy for {detail.price.toLocaleString()}</button>
+                                <button type="button" className="ah-buy" style={{ flex: 1 }} disabled={busy} onClick={() => { buy(detail.id); setDetail(null); }}><Coin /> Buy for {detail.price.toLocaleString()}</button>
                             )}
                             <button type="button" className="ah-detail-close" onClick={() => setDetail(null)}>Close</button>
                         </div>

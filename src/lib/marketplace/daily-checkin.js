@@ -18,6 +18,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { equippedPowers, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
+import { COIN_ICON } from "@/lib/coin-icon";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
@@ -28,11 +29,11 @@ import { forgetPowers } from "@/lib/marketplace/ascension-powers.js";
 // would pay 30 while the screen promised 60. The same rule the paytables follow: a static table is tuned where
 // it is written. Figures below are the pre-nerf ones halved (60/120/200/260/320/900).
 const STREAK_REWARDS = [
-    { gold: 30, label: "30 gold", emoji: "🪙" },
-    { gold: 60, label: "60 gold", emoji: "🪙" },
+    { gold: 30, label: "30 gold", emoji: COIN_ICON },
+    { gold: 60, label: "60 gold", emoji: COIN_ICON },
     { treat: "treat_snack", label: "a Hearty Snack (pet XP)", emoji: "🍖" },
-    { gold: 100, label: "100 gold", emoji: "🪙" },
-    { gold: 130, label: "130 gold", emoji: "🪙" },   // was an Iron chest — a check-in is a claim
+    { gold: 100, label: "100 gold", emoji: COIN_ICON },
+    { gold: 130, label: "130 gold", emoji: COIN_ICON },   // was an Iron chest — a check-in is a claim
     { gold: 160, treat: "treat_toy", label: "160 gold + a Chew Toy", emoji: "🎁" },
     { gold: 450, label: "450 gold", emoji: "🏆" }, // day-7. Was 480 + an Iron chest; a streak is a claim, so it pays coin.
 ];
@@ -141,7 +142,7 @@ async function resolveLoginProcs(buyerId) {
             p.amount = mint(p.amount, "checkin"); // written back so the line the member reads matches the credit
             await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, p.amount]).catch(() => {});
             await logCoin(buyerId, p.amount, "checkin", { meta: { proc: p.label } }).catch(() => {});
-            out.push({ emoji: "🪙", text: `${p.label} found ${p.amount} gold!` });
+            out.push({ emoji: COIN_ICON, text: `${p.label} found ${p.amount} gold!` });
         } else if (p.kind === "potion") {
             const pool = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null);
             const [pid, c] = pool[Math.floor(Math.random() * pool.length)];
@@ -152,7 +153,7 @@ async function resolveLoginProcs(buyerId) {
             out.push({ emoji: "🎟️", text: `${p.label} — +${p.amount || 1} wheel spin` });
         } else if (p.kind === "coupon") {
             await db.query(`UPDATE mkt_buyer SET shop_coupon_pct = $2, shop_coupon_max = $3, shop_coupon_at = NOW() WHERE id = $1`, [buyerId, COUPON_PCT, COUPON_MAX]).catch(() => {});
-            out.push({ emoji: "🎟️", text: `${p.label} — ${COUPON_PCT}% off an in-game 🪙 gold-shop item!` });
+            out.push({ emoji: "🎟️", text: `${p.label} — ${COUPON_PCT}% off an in-game gold-shop item!` });
         } else if (p.kind === "petGamble") {
             // Win a random pet you couldn't just get by leveling — but the item is destroyed.
             const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);

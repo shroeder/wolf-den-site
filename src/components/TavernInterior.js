@@ -6,6 +6,7 @@ import Link from "next/link";
 import SceneMusic from "@/components/SceneMusic";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import CoinCta from "@/components/CoinCta";
+import Coin from "@/components/Coin";
 
 // The enterable Tavern — a SCROLLABLE, walkable room like the plaza. Your hero walks the floor (tap to move,
 // drag to look around), other members inside show up live, and you walk up to NPC characters — the BARKEEP and
@@ -301,7 +302,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                                 <img src={iconArt.pint} alt="" className="tv-drinkfx-mug" draggable={false} />
                                             ) : <span className="tv-drinkfx-emoji">🍺</span>
                                         )}
-                                        <span className="tv-drinkfx-reward">{drinkFx.type === "round" ? `🍻 +${drinkFx.hostXp} XP` : `+${drinkFx.xp} XP · +${drinkFx.gold}🪙`}</span>
+                                        <span className="tv-drinkfx-reward">{drinkFx.type === "round" ? `🍻 +${drinkFx.hostXp} XP` : <>+{drinkFx.xp} XP · +{drinkFx.gold} <Coin size={12} /></>}</span>
                                         {[...Array(8)].map((_, k) => <span key={k} className="tv-foam" style={{ "--a": `${k * 45}deg` }} />)}
                                     </span>
                                 ) : null}
@@ -329,14 +330,14 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.pint} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍺</span>}
-                            <span className="tv-order-lbl">Pint<small>{pintAvail ? `+${st?.dailyPint?.xp || 40} XP · +${st?.dailyPint?.gold || 15}🪙` : "back tomorrow"}</small></span>
+                            <span className="tv-order-lbl">Pint<small>{pintAvail ? <>+{st?.dailyPint?.xp || 40} XP · +{st?.dailyPint?.gold || 15} <Coin size={12} /></> : "back tomorrow"}</small></span>
                         </button>
                         <button type="button" className="tv-order tv-order-round" disabled={busy || (st?.gold || 0) < roundCost} onClick={() => setConfirmDrink({ type: "round" })} title="Buy a round for everyone here">
                             {iconArt?.round ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={iconArt.round} alt="" draggable={false} />
                             ) : <span className="tv-order-emoji">🍻</span>}
-                            <span className="tv-order-lbl">Round · {roundCost.toLocaleString()}🪙<small>you +{st?.round?.hostXp || 60} XP · treats all</small></span>
+                            <span className="tv-order-lbl">Round · {roundCost.toLocaleString()}<Coin /><small>you +{st?.round?.hostXp || 60} XP · treats all</small></span>
                         </button>
                         <button type="button" className="tv-order tv-order-mini" onClick={askNews} title="Ask for gossip">🗞️</button>
                         <button type="button" className="tv-order tv-order-mini" onClick={() => setBarkeep(null)} aria-label="Step away">✕</button>
@@ -372,14 +373,14 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                 <div className="tv-dc-rewards">
                                     {isRound ? (
                                         <>
-                                            <span className="tv-dc-cost">−{roundCost.toLocaleString()} 🪙</span>
+                                            <span className="tv-dc-cost">−{roundCost.toLocaleString()} <Coin /></span>
                                             <span className="tv-dc-gain">+{hostXp} XP for you</span>
                                             <span className="tv-dc-gain sub">everyone here +{guestXp} XP</span>
                                         </>
                                     ) : (
                                         <>
                                             <span className="tv-dc-gain">+{pintXp} XP</span>
-                                            <span className="tv-dc-gain">+{pintGold} 🪙</span>
+                                            <span className="tv-dc-gain">+{pintGold} <Coin /></span>
                                             <span className="tv-dc-gain sub">free · once a day</span>
                                         </>
                                     )}
@@ -431,7 +432,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                                         <>
                                             <div className="tv-bets">
                                                 {[50, 200, 500].map((amt) => <button key={amt} type="button" disabled={busy || (st?.gold || 0) < amt} onClick={() => ante(amt)}>Ante {amt}</button>)}
-                                                <span className="muted tv-gold">🪙 {(st?.gold || 0).toLocaleString()}</span>
+                                                <span className="muted tv-gold"><Coin /> {(st?.gold || 0).toLocaleString()}</span>
                                             </div>
                                             {(st?.gold || 0) < 50 ? <CoinCta price={50} have={st?.gold || 0} label="Buy gold" /> : null}
                                             <div className="tv-dice-left muted">🎲 {dicePlaysLeft} of {diceCap} rolls left today</div>

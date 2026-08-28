@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import CoinCta from "@/components/CoinCta";
+import Coin from "@/components/Coin";
 
 // Track icons are SPRITES, never emoji — emoji are the OS's artwork and render differently on every device.
 // Falls back to nothing rather than a broken-image glyph, so a missing file is invisible instead of ugly.
@@ -60,7 +61,7 @@ export default function ArenaUpgrades({ upgrades = [], gold = 0, busy, onBuy, fl
                                 : (
                                     <button type="button" className="btn-ghost sail-upg-buy" disabled={busy}
                                         onClick={() => onBuy(u.id)}>
-                                        🪙 {u.cost.toLocaleString()}
+                                        <Coin /> {u.cost.toLocaleString()}
                                     </button>
                                 )}
                     </div>

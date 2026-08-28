@@ -8,6 +8,8 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import { bandTable, GRADE_COLOR } from "@/lib/marketplace/timing.js";
 import CoinCta from "@/components/CoinCta";
+import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 // ── Permanent credit: the Forge was Alstier1's idea. His actual AI hero sprite is enshrined in the hearth's
 // corner as a small medallion; tapping it tells the story. (Hard-coded to his sprite blob on purpose so the
 // tribute never breaks if his account/sprite changes — this is a fixed dedication, not live data.)
@@ -167,7 +169,7 @@ export default function BlacksmithClient({ initial }) {
     const doReforge = useCallback(async (item, element, replace) => {
         const r = await post({ action: "reforge_element", itemId: item.id, element, replace: replace || undefined }, `rf-${item.id}`);
         if (r?.ok) { (r.dual ? SFX.pixel : SFX.great)(); setReforgeFor(null); setReforgeFx({ item, elements: r.elements, dual: r.dual, from: r.from }); }
-        else setToast({ kind: "err", text: r?.error === "insufficient_gold" ? `Need ${(r.cost || 0).toLocaleString()} 🪙 to reforge that.` : r?.error === "already_has" ? "It already carries that element." : "Couldn't reforge that." });
+        else setToast({ kind: "err", text: r?.error === "insufficient_gold" ? `Need ${(r.cost || 0).toLocaleString()} gold to reforge that.` : r?.error === "already_has" ? "It already carries that element." : "Couldn't reforge that." });
     }, [post]);
     // Enchantment Scroll: permanently ADD an affinity (keeps the others — can exceed two).
     const doEnchant = useCallback(async (item, element) => {
@@ -509,7 +511,7 @@ export default function BlacksmithClient({ initial }) {
                                     <span className="forge-card-elems">
                                         {it.elements.length ? it.elements.map((e) => <span key={e.key} className="forge-elem-chip" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>) : <span className="forge-elem-chip is-neutral">◇ Neutral</span>}
                                     </span>
-                                    <span className="forge-card-cost">🪙 {it.cost.toLocaleString()} to reforge</span>
+                                    <span className="forge-card-cost"><Coin /> {it.cost.toLocaleString()} to reforge</span>
                                 </button>
                             )) : <div className="forge-empty">No gear to attune yet — win or buy some pieces first.</div>}
                         </div>
@@ -535,12 +537,12 @@ export default function BlacksmithClient({ initial }) {
                                         ) : null}
                                         {u.cost == null ? <button type="button" className="pill" disabled>✓ Maxed</button>
                                             : !affordable ? <CoinCta price={u.cost} have={forge.gold || 0} className="sail-upg-cta" />
-                                                : <button type="button" className="btn-ghost sail-upg-buy" disabled={Boolean(busy)} onClick={() => doUpgrade(u.key)}>{busy === `up-${u.key}` ? "…" : `🪙 ${u.cost.toLocaleString()}`}</button>}
+                                                : <button type="button" className="btn-ghost sail-upg-buy" disabled={Boolean(busy)} onClick={() => doUpgrade(u.key)}>{busy === `up-${u.key}` ? "…" : <><Coin size={13} /> {u.cost.toLocaleString()}</>}</button>}
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="forge-gold">🪙 {(forge.gold || 0).toLocaleString()} gold on hand</div>
+                        <div className="forge-gold"><Coin /> {(forge.gold || 0).toLocaleString()} gold on hand</div>
                     </>
                 )}
             </section>
@@ -787,7 +789,7 @@ function ReforgePicker({ item, elements, dualChance, gold, enchantScrolls = 0, b
                 </div>
                 {enchantScrolls > 0 ? (
                     <div className="forge-mode-toggle">
-                        <button type="button" className={!isEnchant ? "on" : ""} onClick={() => { setMode("reforge"); setPick(null); }}>Reforge · 🪙</button>
+                        <button type="button" className={!isEnchant ? "on" : ""} onClick={() => { setMode("reforge"); setPick(null); }}>Reforge · <Coin /></button>
                         <button type="button" className={isEnchant ? "on" : ""} onClick={() => { setMode("enchant"); setPick(null); }}>🪄 Enchant · scroll ({enchantScrolls})</button>
                     </div>
                 ) : null}
@@ -830,7 +832,7 @@ function ReforgePicker({ item, elements, dualChance, gold, enchantScrolls = 0, b
                         <button type="button" className="forge-reforge-go" disabled={!pick || busy} onClick={() => pick && onEnchant(pick)}>🪄 Enchant · adds affinity</button>
                     ) : (
                         <button type="button" className="forge-reforge-go" disabled={!pick || busy || !canAfford} onClick={() => pick && onPick(pick, isDual ? replaceKey : null)}>
-                            {canAfford ? `Reforge · 🪙 ${item.cost.toLocaleString()}` : `Need 🪙 ${item.cost.toLocaleString()}`}
+                            {canAfford ? `Reforge · ${item.cost.toLocaleString()} gold` : `Need ${item.cost.toLocaleString()} gold`}
                         </button>
                     )}
                 </div>
@@ -1105,7 +1107,7 @@ export function EnhanceResultModal({ res, onClose }) {
                         <div className="forge-er-stats">
                             {res.statLines.map((s) => (
                                 <div key={s.key} className={`forge-er-statrow${s.gained ? " up" : ""}${s.intrinsic ? " is-own" : ""}`}>
-                                    <span className="forge-er-stat-label">{s.icon} {s.label}
+                                    <span className="forge-er-stat-label"><Glyph value={s.icon} /> {s.label}
                                         {s.isNew && s.gained ? <span className="forge-er-newtag">NEW</span> : null}
                                         {/* The item's OWN number going up is the headline of an enhance now, so it
                                             says so rather than being one row among eight. */}
@@ -1125,11 +1127,11 @@ export function EnhanceResultModal({ res, onClose }) {
                     {res.attune ? (
                         <div className="forge-er-attune">
                             <div className="forge-er-attune-badge">🔮 {res.attune.isNew ? "ATTUNED!" : `ATTUNEMENT UP — Lv ${res.attune.level}`}</div>
-                            <div className="forge-er-attune-stat">{res.attune.icon} +{res.attune.value}{res.attune.unit} {res.attune.label}</div>
+                            <div className="forge-er-attune-stat"><Glyph value={res.attune.icon} /> +{res.attune.value}{res.attune.unit} {res.attune.label}</div>
                             <div className="forge-er-attune-blurb">{res.attune.isNew ? "This piece now carries a bonus stat" : "Leveled its bonus stat"} — {res.attune.blurb}</div>
                         </div>
                     ) : res.util ? (
-                        <div className="forge-er-hasattune">🔮 Attuned: {res.util.icon} +{res.util.value}{res.util.unit} {res.util.label} (Lv {res.util.level})</div>
+                        <div className="forge-er-hasattune">🔮 Attuned: <Glyph value={res.util.icon} /> +{res.util.value}{res.util.unit} {res.util.label} (Lv {res.util.level})</div>
                     ) : null}
                     <div className="forge-sv-xp">+{res.xp} XP</div>
                     <button type="button" className="forge-strike big" onClick={onClose}>Forged!</button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { nudgeFeed } from "@/lib/nudge-feed";
+import Coin from "@/components/Coin";
 
 function fmtLeft(secs) {
     if (secs <= 0) return "0m";
@@ -80,7 +81,7 @@ export default function HappyHour({ compact = false }) {
                     <span className="hh-timer">Summons Happy Hour</span>
                 </div>
                 <div className="hh-meter"><span style={{ width: `${rpct}%` }} /></div>
-                <div className="hh-meter-label">🪙 {r.pool.toLocaleString()} / {r.trigger.toLocaleString()} — donate {r.remaining.toLocaleString()} more to <strong>trigger a Happy Hour</strong></div>
+                <div className="hh-meter-label"><Coin /> {r.pool.toLocaleString()} / {r.trigger.toLocaleString()} — donate {r.remaining.toLocaleString()} more to <strong>trigger a Happy Hour</strong></div>
                 <div className="hh-donate">
                     {compact ? null : <span className="muted" style={{ fontSize: "0.78rem" }}>Chip in gold to summon a ×XP &amp; gold event for everyone:</span>}
                     {donateRow}
@@ -101,7 +102,7 @@ export default function HappyHour({ compact = false }) {
                 <div style={{ fontWeight: 800, color: "#ffe9a8" }}>🎉 It&apos;s LIVE for the whole pack!</div>
                 <div style={{ fontSize: "0.84rem", marginTop: 4, color: "#e9dcb8", lineHeight: 1.45 }}>
                     Every <strong style={{ color: "#ffd75e" }}>XP</strong> and <strong style={{ color: "#ffd75e" }}>gold</strong> reward across the whole game is <strong style={{ color: "#ffd75e" }}>×{st.multiplier}</strong> right now — boss strikes, spins, harvests, sailing, everything. Just play and rack it up before the timer runs out.
-                    {st.pool ? <span className="muted"> The pack donated 🪙 {st.pool.toLocaleString()} to summon it.</span> : null}
+                    {st.pool ? <span className="muted"> The pack donated <Coin /> {st.pool.toLocaleString()} to summon it.</span> : null}
                 </div>
             </div>
             {msg ? <span className={msg.ok ? "hh-ok" : "hh-err"} style={{ display: "block", marginTop: 6 }}>{msg.text}</span> : null}

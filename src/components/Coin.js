@@ -1,3 +1,5 @@
+import { COIN_ICON } from "@/lib/coin-icon";
+
 // ── ONE COIN, EVERYWHERE, THE SAME COIN ──────────────────────────────────────────────────────────────────────
 // The gold coin was the 🪙 emoji, drawn by whatever font the device ships. Google's is gold; APPLE'S IS A
 // SILVER QUARTER WITH AN EAGLE ON IT — so on an iPad the game's currency was a different coin from the one
@@ -11,7 +13,7 @@
 export default function Coin({ size = 16, className = "" }) {
     return (
         <img
-            src="/images/ui/coin.png"
+            src={COIN_ICON}
             alt=""
             aria-hidden="true"
             width={size}

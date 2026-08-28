@@ -12,6 +12,7 @@ import {
     GiSextant, GiSpearHook, GiRingingBell, GiScrollUnfurled, GiPowderBag, GiPirateFlag,
 } from "react-icons/gi";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
+import { textIcon } from "@/lib/coin-icon.js";
 
 // The nine equip slots (rings occupy ring1/ring2). `accepts` = which item.slot fits.
 export const EQUIP_SLOTS = [
@@ -1070,7 +1071,7 @@ export function sumItemFarm(itemIds = []) {
 }
 export function describeFarm(farm = {}) {
     return Object.entries(farm).filter(([, v]) => v)
-        .map(([k, v]) => { const m = DECO_STATS[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
+        .map(([k, v]) => { const m = DECO_STATS[k]; return m ? `${textIcon(m.icon)}+${v} ${m.label}` : `+${v} ${k}`; })
         .join(" · ");
 }
 

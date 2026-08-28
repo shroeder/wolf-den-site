@@ -1,3 +1,4 @@
+import { COIN_ICON } from "@/lib/coin-icon";
 // Custom profile backgrounds — cosmetic scenes behind the profile hero, unlocked by level and equipped
 // by the member. Pure (no server-only) so the picker + hero + public profile can import it. The visual
 // for each id lives in globals.css as `.bg-<id>`. Keep ids STABLE (stored in mkt_buyer.equipped_background).
@@ -17,7 +18,7 @@ export const BACKGROUNDS = [
     { id: "singularity", label: "Singularity", level: 100, icon: "🌌", hint: "The end of everything", animated: true },
     // --- Activity-earned (achievement-gated) — NOT level-gated and NOT for sale. Granted into
     // mkt_cosmetic_unlock at the digging completion site; unlocked purely by the `owned` grant (no `level`).
-    { id: "hoard", label: "Buried Hoard", icon: "🪙", hint: "A cavern of unearthed gold", animated: true, achievement: true, rarity: "epic", earn: "Forge 10 treasure chests" },
+    { id: "hoard", label: "Buried Hoard", icon: COIN_ICON, hint: "A cavern of unearthed gold", animated: true, achievement: true, rarity: "epic", earn: "Forge 10 treasure chests" },
 ];
 
 export function backgroundById(id) {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { nudgeFeed } from "@/lib/nudge-feed";
 import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 
 // A slim, site-wide "next unlock" strip for signed-in members — the always-on engagement carrot. Shows
 // the next reward + a progress bar + XP to go, linking to the full rewards track. Renders nothing for
@@ -99,7 +100,7 @@ export default function RewardNudge() {
                     <Link href="/marketplace/track" className="reward-nudge" aria-label={`Level ${data.level} — ${data.xpToGo} XP to your next unlock, ${data.label}`}>
                         {data.level ? <span className="reward-nudge-lv">Lv {data.level}</span> : null}
                         <span className="reward-nudge-bar" title={`Next: ${data.label}`}><span style={{ width: `${data.pct}%` }} /></span>
-                        <span className="reward-nudge-togo">{data.icon ? <span className="reward-nudge-next" aria-hidden="true">{data.icon}</span> : null}{data.xpToGo.toLocaleString()} XP →</span>
+                        <span className="reward-nudge-togo">{data.icon ? <span className="reward-nudge-next" aria-hidden="true"><Glyph value={data.icon} /></span> : null}{data.xpToGo.toLocaleString()} XP →</span>
                     </Link>
                 ) : null}
             </div>

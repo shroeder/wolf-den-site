@@ -6,6 +6,8 @@ import ItemArt from "@/components/ItemArt";
 import FishingWater from "@/components/FishingWater";
 import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 import { createPortal } from "react-dom";
+import Coin from "@/components/Coin";
+import Glyph from "@/components/Glyph";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Three beats, about fifteen seconds:
@@ -964,7 +966,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 </button>
                             ) : (
                                 <button type="button" className="fish-cta is-buy" disabled={busy || !canAfford} onClick={buyCast}>
-                                    {busy ? "…" : <>Buy another cast 🎣 <span className="fish-cta-cost">🪙 {rc.cost.toLocaleString()}{canAfford ? "" : " · not enough"}</span></>}
+                                    {busy ? "…" : <>Buy another cast 🎣 <span className="fish-cta-cost"><Coin /> {rc.cost.toLocaleString()}{canAfford ? "" : " · not enough"}</span></>}
                                 </button>
                             )}
                             <button type="button" className="fish-ghost" onClick={openLog}>
@@ -1032,7 +1034,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 // toolbox labelled "Something". Members asked each other for days what the
                                 // "tool box looking things" were — they were our placeholder for empty. A
                                 // treasure chest is what an unknown haul should look like.
-                                <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🗝️"}</span>
+                                <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true"><Glyph value={result.prize?.emoji || "🗝️"} size={96} /></span>
                             )}
                         </div>
                         {/* Coloured by the PRIZE too. Tinting the name with the cast's rarity is the same claim
@@ -1072,7 +1074,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 }}
                             >
                                 {casts.left > 0 ? (baits.length ? "Cast again 🎣 · pick a bait" : "Cast again 🎣")
-                                    : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
+                                    : buyable ? `Buy another cast 🎣 · ${rc.cost.toLocaleString()} gold${canAfford ? "" : " · not enough"}`
                                     : "That's your last cast today"}
                             </button>
                             )}
@@ -1185,7 +1187,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 }}
                             >
                                 {casts.left > 0 ? (baits.length ? "Cast again 🎣 · pick a bait" : "Cast again 🎣")
-                                    : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
+                                    : buyable ? `Buy another cast 🎣 · ${rc.cost.toLocaleString()} gold${canAfford ? "" : " · not enough"}`
                                     : "That's your last cast today"}
                             </button>
                             )}

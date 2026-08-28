@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 import { nudgeFeed } from "@/lib/nudge-feed";
+import Glyph from "@/components/Glyph";
 
 // Live stat strip for the game hub: XP + progress to the next unlock, gold, and spin tokens. Best-effort —
 // pulls from the same endpoints the reward nudge + spin wheel use, and self-hides gracefully when signed out.
@@ -41,7 +42,7 @@ export default function GameHubStats() {
             {!unlock.maxed && unlock.label ? (
                 <div className="game-hub-progress">
                     <div className="game-hub-bar"><span style={{ width: `${unlock.pct || 0}%` }} /></div>
-                    <span className="muted">Next: {unlock.icon} {unlock.label} · {(unlock.xpToGo || 0).toLocaleString()} XP to go</span>
+                    <span className="muted">Next: <Glyph value={unlock.icon} /> {unlock.label} · {(unlock.xpToGo || 0).toLocaleString()} XP to go</span>
                 </div>
             ) : null}
         </div>

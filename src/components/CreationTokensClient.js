@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { coinBonusPct } from "@/lib/marketplace/creation-tokens.js";
+import Coin from "@/components/Coin";
 
 // Buy CREATIONS — a creation you spend in the "Make your own" flow to design your own AI art
 // (yours forever, non-tradeable). A purchase grants CREATIONS + COINS, never store credit. Purple/pink theme,
@@ -164,7 +165,7 @@ export default function CreationTokensClient({
                     <strong style={{ fontSize: "1.35rem", color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong>
                 </div>
                 <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12.5 }}>
-                    <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>🎨 Creations + 🪙 coins in one buy</span>
+                    <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>🎨 Creations + <Coin /> coins in one buy</span>
                     <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(255,158,194,0.16)", color: "#ffd6e7", fontWeight: 700 }}>♾️ Yours forever</span>
                     <span style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(201,162,255,0.16)", color: "#e7d4ff", fontWeight: 700 }}>🔒 Personal & non-tradeable</span>
                 </div>
@@ -174,7 +175,7 @@ export default function CreationTokensClient({
                 <section className="card" style={{ textAlign: "center", border: "1px solid rgba(201,162,255,0.45)" }}>
                     <div style={{ fontSize: "2rem" }}>🎉</div>
                     <h2 style={{ margin: "4px 0", color: PURPLE }}>{done.owner ? "Granted" : "Purchased"} {done.tokens} creation{done.tokens === 1 ? "" : "s"}!</h2>
-                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} 🪙 coins dropped into your wallet. You now have <strong style={{ color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong> creations.</p>
+                    <p className="muted" style={{ marginTop: 0 }}>+{done.coins.toLocaleString()} <Coin /> coins dropped into your wallet. You now have <strong style={{ color: PURPLE }}>🎨 {tokenBalance.toLocaleString()}</strong> creations.</p>
                     <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
                         <button className="pill" onClick={() => setDone(null)}>Buy more</button>
                         <a className="pill" href="/marketplace/farm" style={{ textDecoration: "none" }}>Go make one →</a>
@@ -208,7 +209,7 @@ export default function CreationTokensClient({
                                     {t.bestValue ? <span style={badgeStyle(PINK_DEEP, PINK)}>★ Best value</span> : t.popular ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>★ Popular</span> : bonus > 0 ? <span style={badgeStyle(PURPLE_DEEP, PURPLE)}>+{bonus}% coins</span> : null}
                                     <div style={{ fontSize: "1.3rem", fontWeight: 900, color: active ? PURPLE : "#f6efff" }}>{usd(t.priceCents)}</div>
                                     <div style={{ marginTop: 6, fontWeight: 800, color: "#efe3ff" }}>🎨 {t.tokens} creations</div>
-                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#ffd6e7" }}>🪙 +{t.coins.toLocaleString()} coins</div>
+                                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#ffd6e7" }}><Coin /> +{t.coins.toLocaleString()} coins</div>
                                     {bonus > 0 && !t.bestValue && !t.popular ? null : bonus > 0 ? <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>+{bonus}% coins vs. base</div> : <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Base bundle</div>}
                                 </button>
                             );
@@ -218,7 +219,7 @@ export default function CreationTokensClient({
                     {selected ? (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: "rgba(201,162,255,0.08)", border: "1px solid rgba(201,162,255,0.25)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}><span className="muted">Creations</span><strong style={{ color: PURPLE }}>🎨 {selected.tokens}</strong></div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}><span className="muted">Coins</span><strong style={{ color: PINK }}>🪙 {selected.coins.toLocaleString()}</strong></div>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}><span className="muted">Coins</span><strong style={{ color: PINK }}><Coin /> {selected.coins.toLocaleString()}</strong></div>
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(201,162,255,0.2)" }}><span style={{ fontWeight: 800, color: "#f6efff" }}>You pay</span><strong style={{ color: "#ffffff" }}>{usd(selected.priceCents)}</strong></div>
                         </div>
                     ) : null}
