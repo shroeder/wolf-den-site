@@ -1928,22 +1928,41 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             : last.again ? "turn"
                                 : crit ? "crit" : last.grade,
                 damage: Number(last.damage) || 0,
+                // Absolute wall-clock, stamped at the moment it is pushed. The sweeper below reads this
+                // instead of owning a per-head timer, so no later render can extend or cancel a head's life.
+                dieAt: Date.now() + RESULT_MS + 120,
             };
             setHeads((q) => [...q, h].slice(-6));
         }
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
         const t = setTimeout(() => { setShake(0); setHitSide(null); setLungeSide(null); }, 360);
 
-        // Each head clears on its own timer rather than the whole queue at once, or an event that arrived
-        // late gets cut short by the one before it.
-        const t4 = setTimeout(() => setHeads((q) => q.slice(1)), RESULT_MS + 120);
         const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
 
         // (The counter's bespoke choreography lived here. It was the first event to get its own moment, and
         // the queue below generalises exactly that — so keeping it meant two players firing one blow: two
         // sounds, two shakes. One player owns the beat now.)
-        return () => { clearTimeout(t); clearTimeout(t3); clearTimeout(t4); };
+        return () => { clearTimeout(t); clearTimeout(t3); };
     }, [bout]);
+
+    // ── AND SO DO THE HEAD LABELS, FOR EXACTLY THE SAME REASON ──────────────────────────────────────────────
+    // The head labels used to be cleared by a timer created inside the effect above, which is keyed on `bout`.
+    // Any refresh handing back a new bout object runs that effect's CLEANUP, which killed the clear timer, and
+    // if the refresh was not a new beat nothing re-armed it. So the last label of a fight sat over its
+    // fighter's head forever. Luke, on a fresh ROUND 1 with both bars full: "why does it say rimebind and
+    // rimeguard at the opening. the text is just stuck there" — those were the closing labels of the PREVIOUS
+    // bout, still on screen because their only timer had been cancelled by a poll.
+    //
+    // The move banner was moved off the bout's clock for this same bug and this same reason; the heads were
+    // left behind. This effect depends on `heads` and nothing else, so the bout cannot reach it. `dieAt` is
+    // absolute, so re-arming on a push does not extend the labels already waiting.
+    useEffect(() => {
+        if (!heads.length) return undefined;
+        const due = Math.min(...heads.map((h) => h.dieAt || 0));
+        const t = setTimeout(() => setHeads((q) => q.filter((h) => (h.dieAt || 0) > Date.now())),
+            Math.max(16, due - Date.now()));
+        return () => clearTimeout(t);
+    }, [heads]);
 
     // ── THE MOVE BANNER FADES ON ITS OWN CLOCK, NOT THE BOUT'S ───────────────────────────────────────────────
     // It used to be cleared by a timer created inside the effect above, which is keyed on `bout` — the whole
@@ -2436,6 +2455,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const canBrace = bracesLeft > 0 && bout.braceReady !== false && !guardLocked;
         const wards = abilities.filter((a) => a.defensive);
         return (
+            // ── THE FIGHT IS PORTALLED, FOR THE REASON WRITTEN ON Portal ITSELF ──────────────────────────
+            // .ar.ar-fight is `position: fixed; inset: 0`, which should be the viewport and is not: the arena
+            // page sits inside `.reveal`, whose children carry a fade-in-up ANIMATION, and an animated
+            // ancestor becomes the containing block for anything fixed inside it. So the "full screen" fight
+            // was measured against the card it lives in — Luke: "when i first fight, the modal doesnt cover
+            // the whole thing. I have to scroll up to fix." The site footer sat under it and the page still
+            // scrolled behind.
+            //
+            // The recap already portalled around this exact trap; the fight it belongs to did not.
+            <Portal>
             <section className="card ar ar-fight">
                 <div ref={ringRef}
                     className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
@@ -2917,6 +2946,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 ) : null}
                 <Styles />
             </section>
+            </Portal>
         );
     }
 
