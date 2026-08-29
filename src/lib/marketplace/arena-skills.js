@@ -715,13 +715,36 @@ const NPC_CLASS = {
 export const npcClassForArchetype = (archetype = "balanced") => NPC_CLASS[archetype] || "runecaller";
 
 // Which branch each archetype commits to — the one that reads like the thing it is supposed to BE.
+// ── A BRANCH PLAN FOR EVERY CLASS AGAINST EVERY SHAPE ────────────────────────────────────────────────────────
+// This was keyed on the ARCHETYPE alone, which forced the class to be a function of the archetype — a Wall had
+// to be a Warden because "fortress" is a Warden branch. Five pairings existed out of a possible fifteen, and
+// the same five went round the ladder for ever.
+//
+// Luke: "every fight should attempt to be unique." So the plan is per CLASS and shape both, and every one of
+// the fifteen is a real reading of what that class does with that idea: a Reaver Wall bleeds you and drinks it
+// back (sanguine), a Runecaller Wall hides behind ice (rimeguard), a Warden Wall is the literal fortress.
 const NPC_BRANCH = {
-    wall: ["fortress", "medic", "ledger"],
-    brute: ["weight", "guillotine", "butcher"],
-    berserker: ["storm", "butcher", "frenzy"],
-    duelist: ["predator", "hemorrhage", "punish"],
-    balanced: ["lance", "winter", "cataclysm"],
-    caster: ["pyre", "shatter", "wellspring"],
+    reaver: {
+        wall: ["sanguine", "hemorrhage", "laststand"],
+        brute: ["weight", "guillotine", "butcher"],
+        berserker: ["storm", "butcher", "frenzy"],
+        duelist: ["predator", "hemorrhage", "punish"],
+        balanced: ["hemorrhage", "storm", "guillotine"],
+    },
+    warden: {
+        wall: ["fortress", "medic", "ledger"],
+        brute: ["reprisal", "warcry", "punish"],
+        berserker: ["warcry", "punish", "bloodprice"],
+        duelist: ["punish", "reprisal", "standard"],
+        balanced: ["fortress", "ledger", "warcry"],
+    },
+    runecaller: {
+        wall: ["rimeguard", "reclaim", "emberdrink"],
+        brute: ["pyre", "shatter", "cataclysm"],
+        berserker: ["shatter", "cataclysm", "lance"],
+        duelist: ["lance", "shatter", "wellspring"],
+        balanced: ["lance", "winter", "cataclysm"],
+    },
 };
 
 /**
@@ -730,9 +753,12 @@ const NPC_BRANCH = {
  * Depth is the whole difficulty curve here: one skill at base low down, a second by the middle, a capstone at
  * the top. It is deliberately NOT random — a rung you cannot plan against is a rung you can only grind.
  */
-export function npcSkills(rung = 1, archetype = "balanced") {
-    const classId = NPC_CLASS[archetype] || "runecaller";
-    const want = NPC_BRANCH[archetype] || NPC_BRANCH.balanced;
+export function npcSkills(rung = 1, archetype = "balanced", forceClass = null) {
+    // The class is handed in now. It used to be derived from the archetype, which is what limited the ladder
+    // to five characters; NPC_CLASS survives only as the fallback for a caller that has no class to give.
+    const classId = forceClass || NPC_CLASS[archetype] || "runecaller";
+    const plan = NPC_BRANCH[classId] || NPC_BRANCH.runecaller;
+    const want = plan[archetype] || plan.balanced;
     const mine = skillsForClass(classId);
     // How many rungs deep, and how many skills wide. A rung-1 foe has one skill at base; by rung 40 it has
     // two skills with a capstone on the first.

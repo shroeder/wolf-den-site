@@ -51,18 +51,12 @@ import { equipMemo, forgetEquipment } from "@/lib/marketplace/equip-cache.js";
 //   FEROCITY   tempoOf() adds curve(ferocity) / curve(FEROCITY_TO_DOUBLE) to your tempo, and the bar takes
 //              BASE_FILL_MS / tempo — so 200 points doubles a bare-handed bar and each point past that is
 //              worth less than the one before it. Same 0.75 curve as Might and Armour. arena-atb.js.
-//
-// The art keeps its old filenames: they are the same four drawings, and renaming four webps to rename four
-// labels is a migration for nothing.
-const TRACK_ART = { might: "whetstone", vitality: "constitution", tenacity: "bulwark", ferocity: "bloodrush" };
-export const STAT_TRACKS = ["might", "vitality", "tenacity", "ferocity"].map((stat) => ({
-    perk: stat,
-    stat,
-    art: `/images/casino/perks/${TRACK_ART[stat]}.webp`,
-    name: STAT_META[stat].label,
-    blurb: STAT_META[stat].desc,
-    per: 1,
-}));
+// TRACK_ART and STAT_TRACKS moved to casino-perk-tracks.js — this file is server-only and the arena's
+// opponent builder needs the table. Re-exported so every existing importer is untouched.
+// Imported as well as re-exported — the forwarding form binds nothing locally and this file reads
+// STAT_TRACKS twice below. Same trap as BADGE_BONUSES in badges.js; lint:undef caught both.
+import { STAT_TRACKS } from "@/lib/marketplace/casino-perk-tracks.js";
+export { STAT_TRACKS };
 
 // ── THE PRICE LADDER ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "make it 500 and it goes up 500 each time." 500 for the first, +500 every time, for ever. LINEAR

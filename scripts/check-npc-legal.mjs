@@ -24,7 +24,10 @@ const note = (t, msg) => fail.push(`rung ${t}: ${msg}`);
 
 for (let t = 1; t <= LADDER_MAX; t += 1) {
     const b = npcBuild(t, 0);
-    const deck = npcSkills(t, archetypeForTier(t).key);
+    // The CLASS is handed in, exactly as every production caller hands it in — npcSkills' own fallback
+    // derives a class from the archetype, and checking against the fallback rather than against what
+    // the rung actually is would report a mismatch on every rung whose class was drawn.
+    const deck = npcSkills(t, archetypeForTier(t).key, b.classId);
     const tree = treeFor(b.classId) || [];
 
     // ── ONE CLASS ── the tree it bought and the deck it brings must be the same class.

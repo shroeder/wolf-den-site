@@ -3,6 +3,8 @@ import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/
 import { ARENA_MAX_LEVEL, CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 // npcClassForArchetype, so a rung's TREE and its DECK cannot name two different classes.
 import { npcClassForArchetype } from "@/lib/marketplace/arena-skills.js";
+// The other three stat sources a member has, and the reroll. See arena-npc-build.js.
+import { npcExtras, npcReroll, rerollFrac, buildFor } from "@/lib/marketplace/arena-npc-build.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -157,6 +159,10 @@ export function npcPower(tier) {
 // old ladder broke monotonicity on 3 of its 9 transition rungs, the new one on 10 of 29 — the same rate, in a
 // band that is simply wider now. If a shape drifts, the lever is its item preference in npcLoadout.
 
+// Deterministic, so tier 40 is the same fighter every time the server starts and two members see one
+// opponent. Declared up here because archetypeForTier draws a rung's shape from it.
+const hash = (str) => { let h = 2166136261; for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+
 export const ARCHETYPES = [
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
       w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, tough: 1.11, guard: 0.22 },
@@ -172,9 +178,26 @@ export const ARCHETYPES = [
 // The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
 // harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
 // it deviates from.
+// ── NO CYCLE AND NO PATTERN. EVERY RUNG IS ITS OWN FIGHTER. ──────────────────────────────────────────────────
+// This was `t % 5`, so the shapes marched round in lockstep and a member who learned the order knew what was
+// coming forever. Holding a shape for three rungs was worse — the same fight three times.
+//
+// Luke: "I want the fights to differ each time. not stay the same, and i dont want a pattern during the climb
+// either, every fight should attempt to be unique."
+//
+// Drawn from the rung's own hash instead. Deterministic, so a rung is the same character every time you meet
+// it and can be planned against — but there is no order to learn, and two rungs a hundred apart are no more
+// alike than two rungs next to each other.
+//
+// ⚠️ WHICH MAKES POWER THE BUILD'S PROBLEM, NOT THE SHAPE'S. When the shape rotated on a cycle a member's win
+// rate swung with the shape rather than with the height. Uniqueness makes that worse, not better, so the
+// difficulty of a rung can no longer be a by-product of what it happens to be — see NPC_TARGET in
+// arena-npc-build.js, where the tier sets a power target and the chip spend trues each build up to it.
 export const archetypeForTier = (t) => {
     const n = Math.max(1, Math.round(t));
-    return n <= 3 ? ARCHETYPES[0] : ARCHETYPES[n % ARCHETYPES.length];
+    // The first three are always Balanced: a Straw Dummy that rolled Brute is a tutorial that hits back harder
+    // than the thing after it, and the shapes should not deviate before you have met the baseline.
+    return n <= 3 ? ARCHETYPES[0] : ARCHETYPES[hash(`shape:${n}`) % ARCHETYPES.length];
 };
 
 // ── AN NPC IS A CHARACTER, NOT A STAT BLOCK ──────────────────────────────────────────────────────────────────
@@ -196,7 +219,15 @@ export const archetypeForTier = (t) => {
 // disagreed on six of ten sampled rungs: rung 100 spent forty-one points on WARDEN passives and then brought a
 // RUNECALLER deck. A member is one class — the tree they bought is the tree their skills come from — so the
 // archetype decides, and the skills' own map is the one that answers.
-export const npcClassFor = (tier) => npcClassForArchetype(archetypeForTier(tier).key);
+// ── AND THE CLASS IS DRAWN, NOT DERIVED ──────────────────────────────────────────────────────────────────────
+// It was npcClassForArchetype, which collapsed the ladder onto five characters: a Wall was always a Warden
+// because the only Wall branch plan was a Warden's. There is a plan for all fifteen pairings now (NPC_BRANCH),
+// so the class is its own draw off the rung's hash and a Reaver Wall is a fighter you can actually meet.
+//
+// Still one class per rung — the tree it buys and the deck it brings both read this.
+const NPC_CLASSES = ["reaver", "warden", "runecaller"];
+export const npcClassFor = (tier) =>
+    NPC_CLASSES[hash(`class:${Math.max(1, Math.round(tier))}`) % NPC_CLASSES.length];
 
 // ── HOW MANY TREE POINTS A RUNG HAS SPENT, AND IT MAY NOT EXCEED A MEMBER'S ──────────────────────────────────
 // The ceiling was 60. A member's tree budget is their arena LEVEL, one point a level, and arena level stops
@@ -394,7 +425,14 @@ export function npcFor(tier) {
 const NPC_RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 // Tier 1 opens in common and the ladder tops out around the Gauntlet's Ascendant band. Beyond that the gear
 // stops climbing and only the scale below does, which is the honest version of "it keeps getting taller".
-const TIERS_PER_RARITY = 13;
+// ── THE BANDS SPAN THE WHOLE LADDER, NOT THE FIRST HALF OF IT ────────────────────────────────────────────────
+// 13 put the top rarity on at rung 104, so all nine bands were spent inside the first half and rungs 104-200
+// wore the same wardrobe. Worse, it made the climb violent where it should be gradual: a rung's gear DOUBLED
+// between 60 and 80, which is most of why the reference member sat at 52% on rung 60 and 0% on rung 80.
+//
+// Nine bands over 198 rungs at 22 apiece — the ladder is LADDER_MAX 200, so the last band lands where the
+// ladder ends and every rung between has somewhere to grow into.
+const TIERS_PER_RARITY = 22;
 const bandFor = (t) => Math.min(NPC_RARITY_LADDER.length - 1, Math.floor(Math.max(1, t) / TIERS_PER_RARITY));
 const rarityForTier = (t) => NPC_RARITY_LADDER[bandFor(t)];
 
@@ -424,7 +462,6 @@ const rarityForSlot = (tier, slot, i) => {
 };
 
 // Deterministic, so tier 40 is the same fighter every time the server starts and two members see one opponent.
-const hash = (str) => { let h = 2166136261; for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 
 const NPC_SLOTS = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring", "ring"];
 let _bySlot = null;
@@ -529,7 +566,16 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
     // as the band below and only the forge and the tree keep climbing. That is the honest consequence of the
     // rule and it is left visible rather than papered over: the fix is more gear, authored as real items, not
     // a second number system. Nobody is near it — one member has ever climbed the Road and reached rung 48.
-    const gear = sumItemStats(npcLoadout(t, seed, arch.key));
+    // The rung's own class, drawn from its hash — the same one npcBuild spends tree points in and the same
+    // one its deck comes from. npcClassForArchetype is only a fallback for a caller with no rung.
+    const classId = t ? npcClassFor(t) : npcClassForArchetype(arch.key);
+    const build = buildFor(classId, arch.key);
+
+    // ── AND IT HAS BEEN TO THE BENCH ─────────────────────────────────────────────────────────────────────
+    // A rung wore whatever its items shipped with, which is the one thing no member above the early rungs
+    // does. Value MOVES onto what this build wants and nothing is created — the crafting rule — so how good
+    // the set is stays set by the gear and rerolling only decides how few lines it sits on.
+    const gear = npcReroll(sumItemStats(npcLoadout(t, seed, arch.key)), build.wants, rerollFrac(t));
 
     // ── AND THEY HAVE ENHANCED IT ────────────────────────────────────────────────────────────────────────
     // A rung high on the ladder should not be carrying an unforged weapon. Every piece is levelled at the
@@ -543,7 +589,7 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
     const lift = 1 + FORGE.NPC_LIFT * Math.min(1, forge / FORGE.MAX_LEVEL);
     const aff = (k) => Math.round((Number(gear[k]) || 0) * lift);
 
-    return {
+    const out = {
         base_damage: forged(gear.base_damage, forgeWeaponRate) || undefined,
         speed: Number(gear.speed) || undefined,
         armor: forged(gear.armor, forgeArmourRate),
@@ -570,6 +616,20 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
         // meant. It is no longer spent on anything.
         gearPower: Math.max(1, Math.round(power)),
     };
+
+    // ── AND THE THREE SOURCES BESIDES GEAR ───────────────────────────────────────────────────────────────
+    // combatStats merges FOUR for a member — gear, pets, badges and the casino Counter — and a rung had one.
+    // Measured across the eight most active members, badges alone run 8% to 35% of what their gear carries
+    // and pets another 12% to 34% on top, so the ladder was calibrated against a fiction in which the player
+    // is only their wardrobe.
+    //
+    // Added AFTER the forge lift, deliberately: a pet is not a piece of gear and a member's forge does not
+    // enhance their badges.
+    // `out` is handed over so the chip spend can see what the gear already gave this build and buy the
+    // difference — see casinoTrim. Without it a rung's difficulty is whatever shape it happened to draw.
+    const extras = npcExtras(t, classId, arch.key, out);
+    for (const [k, v] of Object.entries(extras.stats)) out[k] = (Number(out[k]) || 0) + v;
+    return out;
 }
 
 // The inverse of npcPower, so a Road rung quoted only as a power still knows which wardrobe to wear.
