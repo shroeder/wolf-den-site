@@ -1039,18 +1039,38 @@ export const drFrom = (armour = 0, pierce = 0) => {
 // there is no saturation point, the next point is always worth something, and no build can make a chance a
 // certainty. `*_TO_HALF` is the points at which the roll is a coin flip — a number a card can print.
 //
-// ⚠️ THE ANCHORS ARE SET SO A REAL WARDROBE IS UNCHANGED. Measured best-in-slot for each: haste 59 -> 30%,
-// pierce 83 -> 42%, stun 26 -> 13%, lifesteal 23 -> 6%, which are the values the linear rates already gave.
-// Nobody wearing anything loses a thing; what changes is that piling three hundred points onto one line stops
-// buying a certainty. At 311 haste a fighter now rolls 60%, not 100%.
+// ── THE ANCHORS ARE SET FROM THE CEILING, NOT FROM THE FLOOR ─────────────────────────────────────────────────
+// The first version anchored on best-in-slot AS AUTHORED, so a wardrobe was unchanged to the percent. That was
+// the wrong end to hold: the base rolls are about a third of what a build actually reaches, because the FORGE
+// is the bigger contributor — ten pieces at MAX_LEVEL 21, +1 a stat an enhance, is up to 210 points on one
+// line against 53-83 from the items themselves.
+//
+// So the anchor is what a FULLY FORGED single-stat build arrives at, which is the number that decides whether
+// the stat is worth chasing. Luke set them: "Pierce 40% haste and 40% stun 40% counter is fine and life drink
+// 45%."
+//
+//    stat        forged ceiling    at the ceiling    a bare wardrobe    a normally-forged one
+//    pierce           293 pts           40%              21%                   30%
+//    haste            276               40%              19%                   30%
+//    stun             266               40%              17%                   29%
+//    lifesteal        263               45%              20%                   33%
+//    counter          263               33%              13%                   23%      (left where it was)
+//
+// "Normally forged" is the honest middle: an enhance draws its targets at RANDOM from the piece's own stats,
+// so about 40% of the 21 levels land on any one line rather than all of them.
+//
+// ⚠️ AND A LOWER RARITY CONCENTRATES BETTER, which is a real decision this makes visible. Line count is set by
+// rarity (AFFIX_COUNT: common 2, primordial 6) and the forge spreads over whatever lines a piece carries — so
+// a fully-forged common puts half its enhances on each of two stats where a primordial spreads them over six.
+// For a single-stat build the humbler piece genuinely wins.
 export const chanceFrom = (points = 0, half = 200) => {
     const c = curve(points) / curve(half);
     return c / (1 + c);
 };
-export const PIERCE_TO_HALF = 130;
-export const HASTE_TO_HALF = 185;
-export const STUN_TO_HALF = 330;
-export const LIFESTEAL_TO_HALF = 900;
+export const PIERCE_TO_HALF = 503;
+export const HASTE_TO_HALF = 474;
+export const STUN_TO_HALF = 457;
+export const LIFESTEAL_TO_HALF = 344;
 // Counter followed the other four a commit later — it has the same shape and the same latent ceiling
 // (400 points was a guaranteed riposte), and leaving one of five flat is how a table drifts. Anchored
 // the same way: best-in-slot is 53 points, which paid 13% flat and pays 13% here.
