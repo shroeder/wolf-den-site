@@ -710,6 +710,24 @@ function ringRead(ring, mineIsA) {
         foeThreat: Object.values(foeCd || {}).some((n) => (Number(n) || 0) <= 1),
         // Do I have the ice in hand? Overflow waits behind it rather than racing it.
         rimebindReady: !(myCd?.rimebind > 0),
+
+        // ── AND WHAT THEY BROUGHT ────────────────────────────────────────────────────────────────────
+        // Luke: "Make the enemy read what you brought — armour, shield, counter, speed — and pick its skills
+        // to counter it." Four reads, each answering one question a person would ask across the sand.
+        //
+        // ARMOUR — is my damage getting through, or should I bring something that ignores it? Expressed as
+        // the share a plain swing is losing, so it is already on the 0-1 scale the boosts want.
+        armourWall: drFrom(Number(foe.armor) || 0, Number(self.pierce) || 0),
+        // SHIELD — a ward eats blows before they reach health, and a bleed does NOT go through it: the tick
+        // is `hp -= tick` with the shield untouched. So a big guard is the one situation where a wound is
+        // worth more than a hammer.
+        shieldWall: Math.min(1, (Number(foe.shield) || 0) / Math.max(1, foe.maxHp * 0.25)),
+        // COUNTER AND THORNS — how much of what I throw comes back at me. A multi-hit rolls each of these
+        // per blow, so volume is the worst answer to a Warden and the chooser should stop reaching for it.
+        answerRisk: Math.min(1, (Number(foe.counter) || 0) + (Number(foe.thorns) || 0) + (Number(foe.iceThorns) || 0)),
+        // SPEED — their bar against mine. Above 1 they act more often than I do, which is what makes taking a
+        // beat off them worth more than another point of damage.
+        theirPace: (Number(foe.tempo) || 1) / Math.max(0.2, Number(self.tempo) || 1),
     };
 }
 

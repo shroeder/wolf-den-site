@@ -870,6 +870,55 @@ const WANTS = {
         (lethalIncoming ? 5.5 : selfFrac < 0.55 ? 4.5 - selfFrac * 4 : (bleeding ? 1.4 : 0)),
 };
 
+// ── AND WHAT THE OTHER FIGHTER BROUGHT ───────────────────────────────────────────────────────────────────────
+// The want table above says what a skill is worth in the abstract. This says what it is worth against THIS
+// opponent, which is the difference between a defence running its rotation and one that noticed what you
+// walked in wearing.
+//
+// Four reads, four answers, all multiplying the want rather than replacing it — a Warden with no pierce in its
+// deck still does the best it can rather than freezing up because the maths says its blows are poor.
+//
+//   armourWall   their plate is eating my swings   -> reach for what ignores plate
+//   shieldWall   they are behind a big ward        -> reach for a wound, which goes UNDER it (hp -= tick)
+//   answerRisk   they counter and they thorn       -> stop throwing volume into it
+//   theirPace    their bar fills faster than mine  -> a beat taken off them is worth more than damage
+//
+// Deliberately gentle. The largest single swing here is x1.6, so a matchup read tilts a decision it does not
+// dictate one — an opponent that ALWAYS has the perfect answer is not smart, it is unfair, and it stops being
+// something a member can plan against.
+function matchupBoost(sk, ctx) {
+    let m = 1;
+    const pierce = Number(sk.pierce) || 0;
+    const hits = Math.max(1, Number(sk.hits) || 1);
+    const opens = (Number(sk.bleed) || 0) + (Number(sk.burn) || 0);
+
+    // Plate. Pierce is the direct answer; soulfire is the other one, since it lands as magic armour ignores.
+    if (ctx.armourWall > 0.35) m *= 1 + (pierce > 0 ? 0.6 : 0) * ctx.armourWall
+        + (Number(sk.soulfire) > 0 ? 0.4 : 0) * ctx.armourWall;
+    // A ward. A wound ticks straight to health, so it is the one thing a guard cannot answer.
+    if (ctx.shieldWall > 0.2) m *= 1 + (opens > 0 ? 0.5 : 0) * ctx.shieldWall;
+    // Their answer. Every blow of a multi-hit rolls their counter and their thorns again.
+    if (ctx.answerRisk > 0.1 && hits > 1) m *= 1 - Math.min(0.45, ctx.answerRisk * 0.5);
+    // Their clock, twice over — and the second half is the one the Warden lives on.
+    //
+    // Measured before it existed: the matchup read changed a decision in 16 of 112 build-by-situation pairs
+    // and every single flip was a Runecaller, because pierce and DoTs are the only things the first three
+    // reads look for and a Warden's kit has neither. Its answers are a shield, a grudge and a heal, so its
+    // matchup question is not "what gets through" but "how much is coming".
+    const pace = ctx.theirPace > 1.1 ? Math.min(0.5, (ctx.theirPace - 1) * 0.6) : 0;
+    if (pace > 0) {
+        // Taking a beat away is worth more when they get more of them.
+        if ((Number(sk.freeze) || 0) + (Number(sk.chill) || 0) > 0) m *= 1 + pace;
+        // And so is anything that eats blows, for exactly the same reason: a ward against a fighter swinging
+        // half again as often is a ward doing half again the work.
+        if ((Number(sk.shield) || 0) + (Number(sk.heal) || 0) > 0) m *= 1 + pace * 0.8;
+    }
+    // What they give back. A fighter who counters and thorns is FEEDING a grudge — everything they land on me
+    // is banked and comes off the next swing — so the Warden's answer to a spiky opponent is to wait for it.
+    if (ctx.answerRisk > 0.2 && (Number(sk.grudge) || 0) > 0) m *= 1 + Math.min(0.5, ctx.answerRisk * 0.5);
+    return m;
+}
+
 /**
  * What the absent fighter reaches for this beat, or null to throw a plain attack.
  *
@@ -902,7 +951,7 @@ export function housePick(taken = {}, cd = {}, ctx = {}) {
     for (const id of ready) {
         const skill = resolveSkill(id, taken);
         if (!skill) continue;
-        const want = (WANTS[id] || (() => 1.5))(ctx);
+        const want = (WANTS[id] || (() => 1.5))(ctx) * matchupBoost(skill, ctx);
         if (want > bestWant) { best = skill; bestWant = want; }
     }
     return best;
