@@ -9,7 +9,7 @@ import { bars as liveBars, tempoOf, BAR_REFUND} from "@/lib/marketplace/arena-at
 import {
     buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
-    BLOCK_REDUCTION, GUARD_BASE_SHARE, extraTurnFrom, guardSoakFrom,
+    BLOCK_REDUCTION, GUARD_BASE_SHARE, guardSoakFrom,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
     BLEED_PER_TURN, BLEED_TURNS, BLEED_MAX_STACKS, BLEED_TICK_CAP, BLEED_TURNS_CAP,
@@ -372,14 +372,6 @@ export async function arenaPower(buyerId) {
 export function fighterFrom(stats = {}, perks = {}, classId = null) {
     const base = classBase(classId);
     return {
-        // ── THE EXTRA TURN, WHICH IS WHAT SPEED BECAME ───────────────────────────────────────────────────
-        // `speed` still rides in on the equipped weapon (items.js) the way base_damage does — only one main
-        // hand is worn, so the summed value IS that weapon's rate. It is no longer a rate anything is paced
-        // off: it converts, with Ferocity, into the chance to take another turn on the spot. See
-        // extraTurnFrom, and the tombstone in arena-engine.js for why there is no clock to be a rate for.
-        //
-        // Quickblade lands in `perks.extra` and is added flat on top, which is the same arithmetic it did
-        // when it was adding to a clock.
         // ── THE BAR REFUND IS GONE; ITS POINTS BUY TEMPO ─────────────────────────────────────────────────
         // Luke: "I actually dont like the 50 percent refund." It was a coin flip that half-emptied your bar,
         // and it was the second thing in this game promising "you act more often" — his own words are already
@@ -390,18 +382,18 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         //
         // Tempo is the honest version and it already exists: the bar simply fills faster, every beat, no roll.
         //
-        // ⚠️ FEROCITY IS NOT CONVERTED HERE. It fed BOTH the refund (extraTurnFrom, per 500) and tempo
-        // (tempoOf, per 100). Folding its refund share in as well would pay it twice for one stat. Only the
-        // sources that had NOWHERE ELSE to go are converted: Quickblade, Frenzy, and the doublestrike points.
+        // ⚠️ FEROCITY IS NOT CONVERTED HERE. It used to feed BOTH the refund (per 500) and tempo (per 100),
+        // and folding its refund share in as well would have paid one stat twice. Only the sources that had
+        // NOWHERE ELSE to go are converted: Quickblade, Frenzy, and the doublestrike points.
         //
         // The rate is what the refund was actually worth. A refund left 1 - BAR_REFUND = 0.45 of a bar
         // standing, so a chance of `p` saved 0.45p of a bar per swing on average. That is the tempo it bought.
-        extra: 0,
-        // ── AND THE RATE ITSELF, FOR A TIMER BOUT ────────────────────────────────────────────────────────
-        // The same weapon speed and the same Ferocity, kept as the rate rather than converted into the
-        // chance above. A timer bout paces off this; a classic bout ignores it entirely. Both numbers are
-        // built for every fighter because a bout is stamped with its mode at the bell, and this has to be
-        // in bout_json before the ring is opened. See arena-atb.js.
+        //
+        // `extra: 0` used to sit here, the last writer of a go-again chance nothing rolled. It and the whole
+        // second attack speed behind it are gone — see the tombstone in arena-kit.js.
+        // ── AND THE RATE ITSELF ──────────────────────────────────────────────────────────────────────────
+        // Weapon speed and Ferocity, as a rate. This has to be in bout_json before the ring is opened,
+        // because a bout is stamped with its mode at the bell. See arena-atb.js.
         // ⚠️ A FOE MAY HAND IN ITS OWN TEMPO, and every Road and Gauntlet foe does. Ferocity is a member
         // stat measured at 20-140; an NPC's is a GEAR BUDGET that climbs with the rung and never stops
         // (7,858 at rung 100, 30,408 at rung 120), so running it through the same divisor produces a tempo
@@ -1563,7 +1555,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // is their business, the same way their cooldowns were.
             skills: foeKit.skills || {},
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            extra: foeKit.extra,
             // WHICH DISCIPLINE THEY FIGHT AS. The bout knew everyone's class and published nobody's, so the
             // card could tell you their element and their crit but not whether you were swinging at a Warden.
             // Named here or the allowlist above drops it, which is how The Long Road lost its rung.
@@ -1612,7 +1603,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // is what stops a member unlocking a capstone mid-fight and swinging with it, and it is what
             // actBout re-resolves against — never the skill id in the request body.
             skills: me.skills || {}, deck: me.deck || [],
-            element: me.element, abilities: me.abilities, might: me.might, extra: me.extra,
+            element: me.element, abilities: me.abilities, might: me.might,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult,
             dr: me.dr ?? 0,

@@ -88,7 +88,9 @@ for (const rung of RUNGS) {
     worstRun3 = Math.max(worstRun3, T.runs3);
     const pct = (n) => `${((n / Math.max(1, T.turns)) * 100).toFixed(1)}%`;
     console.log(`${ATB ? "timer  " : "classic"} rung ${String(rung).padEnd(3)} ${String(npc.name).padEnd(16)} `
-        + `tempo ${me.tempo.toFixed(2)} v ${foe.tempo.toFixed(2)}   go-again ${me.extra.toFixed(2)} v ${foe.extra.toFixed(2)}`);
+        // The go-again column was here. There is no go-again chance any more, and printing `me.extra` after
+        // it was deleted is what turned this gate into a TypeError. Tempo IS turn order now.
+        + `tempo ${me.tempo.toFixed(2)} v ${foe.tempo.toFixed(2)}`);
     console.log(`   back-to-back ${pct(T.b2b)} of ${T.turns} turns (${T.b2bFoe} the NPC's) · RUNS OF 3+ ${T.runs3}`);
     console.log(`   from pacing ${T.pacing} · granted by haste ${T.hasted} · other bar ${JSON.stringify(T.heldKinds)}`);
     console.log(`   doublestrike (two blows, one turn) ${pct(T.multiHit)} · out-of-turn blows ${T.wild}`);

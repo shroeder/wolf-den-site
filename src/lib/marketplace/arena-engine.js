@@ -22,7 +22,7 @@ import {
 // DR_CAP was imported here too and never used — damage reduction was deleted in favour of armour being the
 // whole of mitigation, and the ceiling for a system that no longer exists went with it.
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
-import { EXTRA_TURN_MAX, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
 // Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
 import { luckyRoll } from "@/lib/marketplace/fortune.js";
 
@@ -68,10 +68,6 @@ export const HASTE_PER_POINT = 0.005;
 // turns per turn under the clock takes p extra turns per turn now, and the screen says GOES AGAIN when it
 // happens instead of quietly dealing them a beat.
 //
-// ONE PER EXCHANGE. An extra turn does not roll for another, or a lucky streak is an unanswerable combo.
-// A queued haste is the exception and is deliberately a separate field: it is GRANTED, not rolled.
-//
-// EXTRA_TURN_MAX and extraTurnFrom live in arena-kit.js with the other balance constants.
 // ── BLEED ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Three ticks at a fifth of the blow that opened it, and armour never sees a drop of it. It ticks on the
 // BLEEDING fighter's own swings, which is what "three turns" means when there are no turns: three more times
@@ -191,8 +187,9 @@ export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, health
 export const COMBAT_FIELDS = [
     // the four numbers a card shows
     "damage", "health", "critChance", "critMult", "dmgPct",
-    // turn order: the chance to take another one, and the chance one of theirs never happens
-    "extra", "skipChance",
+    // turn order: the chance one of their turns never happens (Chill). The go-again chance that used to sit
+    // beside this is gone — see the tombstone in arena-kit.js.
+    "skipChance",
     // and how fast this fighter's timer bar fills, for a bout opened in that mode — see arena-atb.js. It is
     // carried on every fighter rather than only on timer bouts, because a bout is stamped with its mode at
     // the bell and this has to already be in bout_json by then.
@@ -295,35 +292,15 @@ export const sideOf = (f) => ({
         bonusTurns: 0,   // turns GRANTED (a haste proc), taken whether or not the roll comes up
         bleedLeft: 0,    // ticks of bleed still owed
         bleedPer: 0,     // and what each one costs them
-        // The chance to take another turn straight away — see EXTRA_TURN_MAX. This is where a weapon's
-        // attack speed, Ferocity and Quickblade all land now that nothing is paced off a clock.
-        extra: Math.max(0, Math.min(EXTRA_TURN_MAX, Number(f.extra) || 0)),
-        // And the chance one of THEIR turns simply does not happen — Chill, which used to slow their clock.
+        // The chance one of THEIR turns simply does not happen — Chill, which used to slow their clock.
         skipChance: Math.max(0, Math.min(0.85, Number(f.skipChance) || 0)),
-        // ── AND THE SAME TWO INPUTS AGAIN, UNCONVERTED ───────────────────────────────────────────────────
-        // `extra` above is weapon speed and Ferocity folded into a go-again chance, which is lossy on
-        // purpose. The timer needs the rate itself rather than the chance it was turned into, so it rides
-        // along beside it. A fighter built without one falls back to bare-handed, same as the old clock did.
+        // ── HOW FAST THIS FIGHTER'S BAR FILLS ────────────────────────────────────────────────────────────
+        // The one attack speed there is. Weapon speed and Ferocity, at ferocity / 100 — see tempoOf. A
+        // fighter built without one falls back to bare-handed, same as the old clock did.
         tempo: Math.max(0.2, Number(f.tempo) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
 });
-
-/**
- * Does this fighter go again?
- *
- * `wasExtra` is the one-per-exchange rule: the turn you were handed does not roll for another. A GRANTED turn
- * (Haste) is checked first and consumed, because it was promised rather than rolled — and it is allowed to
- * follow an extra turn, which is what makes proccing Haste on a lucky beat feel like the event it is.
- *
- * Both loops call this, which is the whole point of it living here: an auto-resolved bout and a played one
- * cannot disagree about how many turns somebody got.
- */
-export function goesAgain(f, rng = Math.random, wasExtra = false) {
-    if (f.bonusTurns > 0) { f.bonusTurns -= 1; return "granted"; }
-    if (wasExtra || f.extra <= 0) return null;
-    return rng() < f.extra ? "extra" : null;
-}
 
 // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the whole
 // multiples are guaranteed and the remainder rolls — the same shape as crit stacks.

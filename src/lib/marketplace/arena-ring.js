@@ -15,8 +15,8 @@
 // 1.06 v 1.31 fight are correct, and from the seat they read as the game skipping your turns.
 //
 // Turn order is now the shortest rule in the game: the other fighter, unless somebody earned another turn or
-// lost one. Everything that made a fighter fast feeds `extra` instead — see EXTRA_TURN_MAX in arena-engine.js
-// — so a stat that used to be dealt out silently is an event with a sentence attached.
+// lost one. Everything that makes a fighter fast feeds the TEMPO of their bar — see tempoOf in arena-atb.js —
+// so a stat that used to be dealt out silently is a bar you can watch fill.
 //
 // ── THE SHAPE OF A BEAT ──────────────────────────────────────────────────────────────────────────────────────
 // The ring stops on exactly ONE question: what are you throwing. Everything else — the bleed ticks, the stun
@@ -242,16 +242,16 @@ function fever(ring) {
 /**
  * Hand the turn on — to the same fighter if they earned another, otherwise to the other one.
  *
- * This is the whole of turn order now. There is no clock to advance, no gap to measure and nothing to
- * decrement: the question "who is up" has exactly one answer that is not simply "the other one", and
- * `goesAgain` in arena-engine.js is where that answer lives so the auto-resolver cannot disagree with it.
+ * Turn order is the bar: whoever's fills first is up. There is nothing here to decrement and nothing to
+ * roll — the go-again chance that used to answer "who is up" is gone with the second attack speed behind
+ * it. See the tombstone in arena-kit.js.
  */
 function closeTurn(ring, rng = Math.random) {
     const f = ring.acting === "me" ? ring.A : ring.B;
     // ── YOUR FIRST TURN IS SACRED ────────────────────────────────────────────────────────────────────
     // Whoever wins the flip at the bell gets ONE beat before the other fighter has been in the fight at
-    // all. They do not get to chain that into two, three or six, which is what `goesAgain` was happily
-    // handing out — a granted turn bypasses the one-per-exchange rule by design, and stacked on the
+    // all. They do not get to chain that into two, three or six, which is what the old go-again roll was
+    // happily handing out — a granted turn bypassed the one-per-exchange rule by design, and stacked on the
     // opening coin flip that design meant the fight could be decided before the member touched anything.
     //
     // Measured against the real rung-40 champion with four members' real kits: ValkyrieSylve lost 27.7%
@@ -452,10 +452,9 @@ export function openRing(me, foe, { rng = Math.random, foeSkills = {}, foeName =
         me: newTrack(A.tempo),
         foe: newTrack(foeTempo(A.tempo, B.tempo)),
     };
-    // AND THEIR REFUND CHANCE THE SAME WAY, for exactly the same reason. `extra` comes out of extraTurnFrom,
-    // which reads a ferocity budget that is on nobody's scale above about rung 50 — every Road foe past it
-    // sits pinned at EXTRA_TURN_MAX, so half of all their swings came back with a bar already half full.
-    // Measured at rung 60 before this: 2,384 of the NPC's 7,197 turns were back to back.
+    // Their refund chance used to be held the same way and for the same reason — measured at rung 60, 2,384
+    // of the NPC's 7,197 turns were back to back off it alone. There is no refund and no go-again any more,
+    // so the tempo clamp above is the whole of it now. See the tombstone in arena-kit.js.
     ring.now = 0;
     ring.lastActed = flip ? "foe" : "me";
     return advance(ring, rng);

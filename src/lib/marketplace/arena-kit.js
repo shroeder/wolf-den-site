@@ -814,7 +814,7 @@ export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) => weaponMult
 // "a plain swing can always miss". Accuracy was deleted on 2026-08-27 — nothing in the ring has ever rolled to
 // hit since — and the explanation outlived the mechanic by long enough to mislead a reader of this file.
 //
-// What Ferocity actually buys is below: the extra-turn chance, via speedOf and extraTurnFrom.
+// What Ferocity actually buys is the TEMPO of your bar — tempoOf in arena-atb.js, at ferocity / 100.
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
@@ -965,12 +965,6 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 // 24/7 passive boss damage — worth nothing in here. It decides initiative now: the faster fighter takes the
 // first beat, and on a tie the challenger keeps it. Landing the opening blow in a ten-beat fight is a real
 // edge, so there is finally a reason to build for it.
-// ── ATTACKS PER SECOND ───────────────────────────────────────────────────────────────────────────────────────
-// The weapon's own base attack speed, plus ferocity. That is the whole of it: `10 + level*0.3 + ferocity*0.5`
-// was a number that existed to break the tie for who swung first, and under auto-attack speed is the clock,
-// so it is the weapon that sets it and ferocity that sharpens it.
-//
-// A bare-handed fighter (every NPC) swings at BARE_ATTACK_SPEED.
 // What a successful block takes off the blow. The Warden's own is higher — see arena-classes.js.
 // ── THE MOST OF A BLOW ARMOUR MAY EAT ────────────────────────────────────────────────────────────────────────
 // Armour is flat subtraction, which reads well and is the stat everybody understands. Its failure mode is at
@@ -1033,27 +1027,27 @@ export const drFrom = (armour = 0, pierce = 0) => {
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
 export const GUARD_BASE_SHARE = 0.10;
-export const BARE_ATTACK_SPEED = 1;
-export const FEROCITY_PER_SPEED = 500;
-export const speedOf = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
-    (Number(baseAttackSpeed) || BARE_ATTACK_SPEED) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_SPEED;
-
-// ── AND WHAT THAT NUMBER BUYS, NOW THAT THERE IS NO CLOCK ────────────────────────────────────────────────────
-// The chance to take another turn on the spot. See the tombstone in arena-engine.js for why the clock went;
-// this is the conversion, and it is deliberately the arithmetic that was already happening.
+// ── THE EXTRA-TURN CONVERSION IS GONE, AND WITH IT THE SECOND ATTACK SPEED ───────────────────────────────────
+// There were two attack speeds. `tempoOf` in arena-atb.js divides Ferocity by 100 and paces the bar somebody
+// watches. `speedOf` here divided the SAME Ferocity by 500, and `extraTurnFrom` read the result off as a
+// chance to take another turn on the spot -- the conversion written when the clock was removed, so that a
+// 1.31 weapon became a 31% go-again.
 //
-// THE CAP LIVES HERE, with the rest of the balance constants — arena-engine.js imports this file and not the
-// other way round, and a constant copied into the second of two files is the bug this subsystem already has
-// a comment about.
-export const EXTRA_TURN_MAX = 0.5;
+// The timer put the clock back. Then the refund that replaced the go-again was itself removed -- Luke: "I
+// actually dont like the 50 percent refund" -- and kitFor was changed to set `extra: 0` for every fighter
+// rather than convert Ferocity twice and pay one stat two ways. That left this whole branch computing a
+// number nobody read:
 //
-// Under a clock, a fighter at speed s took s turns for every 1 the baseline took. As a chance, p = s - 1 gives
-// exactly the same 1 + p turns per turn — so a 1.31 weapon is a 31% chance to go again, which is the same
-// number of swings it was already getting, in a shape somebody can watch land. Nothing rebalances; the same
-// gear is worth the same amount, and the same fights come out the same way.
+//   BARE_ATTACK_SPEED, FEROCITY_PER_SPEED, speedOf, EXTRA_TURN_MAX, extraTurnFrom   (this file)
+//   FOE_EXTRA_FLOOR, foeExtra                                                       (arena-atb.js)
+//   goesAgain, the `extra` field on a fighter, "extra" in COMBAT_FIELDS             (arena-engine.js)
 //
-// A weapon slower than bare hands buys nothing rather than costing you turns. That IS a small buff to the
-// slow end, and it is the honest reading of "speed is not a thing any more" — the alternative is a hidden
-// penalty on a stat the game has stopped talking about.
-export const extraTurnFrom = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
-    Math.max(0, Math.min(EXTRA_TURN_MAX, speedOf(baseAttackSpeed, ferocity) - BARE_ATTACK_SPEED));
+// Verified before removing: `extraTurnFrom(`, `foeExtra(` and `goesAgain(` were called from nowhere, and the
+// only writer of `extra` was the literal 0 in kitFor. Luke asked to see the attack speed logic, read this
+// alongside the live path, and had to be told which half of it runs.
+//
+// STILL HERE, and deliberately: `wasExtra`/`isExtra` in arena-ring.js. Nothing sets it true any more, so the
+// "goes again" narration never fires -- but narrate still threads it, and a skill that hands somebody a beat
+// would want it back. It is a flag stuck false, not arithmetic nobody reads.
+//
+// The live path is one number: tempo. See BASE_FILL_MS and tempoOf in arena-atb.js.

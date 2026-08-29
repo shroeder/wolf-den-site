@@ -38,15 +38,15 @@
 export const BASE_FILL_MS = 6700;
 
 // ── WHAT MAKES A BAR FILL FASTER ─────────────────────────────────────────────────────────────────────────────
-// The weapon sets it and Ferocity sharpens it — the same two inputs arena-kit.js's speedOf has always named.
-// What changed is the divisor: speedOf uses ferocity/500, which was sized for a tie-break rather than for a bar
-// somebody watches. At /500 the median member's entire Ferocity investment is worth thirty milliseconds across
-// a five-second bar. A stat that visibly does nothing is worse than a stat that is absent, because the player
-// spends real points finding out.
+// The weapon sets it and Ferocity sharpens it. What changed when the bar arrived is the DIVISOR: the old
+// speedOf used ferocity/500, sized for a tie-break rather than for a bar somebody watches, and at /500 the
+// median member's entire Ferocity investment was worth thirty milliseconds across a five-second bar. A stat
+// that visibly does nothing is worse than a stat that is absent, because the player spends real points
+// finding out.
 //
-// speedOf is NOT reused here on purpose, and this is the one duplication in this file: it carries /500, and
-// importing it to then divide the result differently would leave two divisors in play with only a comment
-// explaining which is which. One function, one rate, named for the thing it paces.
+// That /500 divisor belonged to speedOf in arena-kit.js, which fed the go-again chance rather than the bar.
+// Both it and the chance are gone now, so this is the only divisor Ferocity has: one function, one rate,
+// named for the thing it paces. See the tombstone in arena-kit.js.
 export const FEROCITY_PER_TEMPO = 100;
 export const BARE_TEMPO = 1;
 
@@ -208,17 +208,9 @@ export const BAR_REFUND = 0.55;
 // effect is still running `now` is inside the window by construction.
 export const CC_IMMUNE_MS = 6000;
 
-// ── AND THE FOE'S CHANCE AT IT IS HELD TO YOURS ──────────────────────────────────────────────────────────────
-// The same fix as foeTempo, for the same root cause. `extra` is built by extraTurnFrom out of weapon speed and
-// ferocity, and NPC ferocity is a gear budget that is on nobody's scale — every Road foe past about rung 50
-// sits pinned at EXTRA_TURN_MAX, which is a coin flip on every swing to come back with a bar already half
-// full. Simulated at rung 60: 2,384 of the NPC's 7,197 turns were back to back off this alone.
-//
-// A floor of 5% rather than zero, so a foe facing a member with no Quickblade at all still has the move in its
-// repertoire — rare and visible, which is what the refund is for. Above that it tracks what YOU brought.
-export const FOE_EXTRA_FLOOR = 0.05;
-export const foeExtra = (mine, theirs) =>
-    Math.max(0, Math.min(Number(theirs) || 0, Math.max(FOE_EXTRA_FLOOR, (Number(mine) || 0) * TEMPO_RATIO)));
+// FOE_EXTRA_FLOOR and foeExtra were here — the ratio clamp applied to the go-again chance, the way foeTempo
+// applies it to the bar. Nothing has had a go-again chance since kitFor stopped converting Ferocity twice, so
+// they clamped a number that was always zero. See the tombstone in arena-kit.js.
 
 /** A fresh bar. `fill` is 0..1 of the way to a swing. */
 export const newTrack = (tempo = BARE_TEMPO) => ({
