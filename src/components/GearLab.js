@@ -21,7 +21,7 @@ const ITEMS = [
         stats: { armor: 52, block_chance: 0.2, might: 5, ferocity: 3, vitality: 12, tenacity: 2, counter: 7 } }),
     item({ id: "dragonplate", name: "Dragonplate Armor", slot: "chest", rarity: "legendary",
         icon: "GiBreastplate", equipped: false,
-        stats: { armor: 146, might: 5, ferocity: 5, vitality: 16, tenacity: 3, doublestrike: 6, stun: 8, haste: 5 } }),
+        stats: { armor: 146, might: 5, ferocity: 5, vitality: 16, tenacity: 3, stun: 8, haste: 5 } }),
 ];
 
 const PAYLOAD = {
@@ -29,7 +29,7 @@ const PAYLOAD = {
     equipped: { main_hand: "soulflame_sword", off_hand: "dragon_shield" },
     stats: { base_damage: 29, speed: 0.74, armor: 475, block_chance: 0.2, might: 99, vitality: 82,
         ferocity: 43, tenacity: 17, crit_chance: 50, crit_power: 54, pierce: 8, lifesteal: 3,
-        counter: 7, doublestrike: 6, stun: 8, haste: 5 },
+        counter: 7, stun: 8, haste: 5 },
 };
 
 // ── STUBBED DURING RENDER, NOT IN AN EFFECT ──────────────────────────────────────────────────────────────────

@@ -14,7 +14,7 @@ import PublicGear from "@/components/PublicGear";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 
 // A weapon, a shield and a chestpiece — between them every field that was missing, plus the six affixes.
-const SWORD = { ...itemById("godsplitter"), stats: { ...itemById("godsplitter").stats, lifesteal: 4, doublestrike: 6, stun: 8 } };
+const SWORD = { ...itemById("godsplitter"), stats: { ...itemById("godsplitter").stats, lifesteal: 4, stun: 8 } };
 const SHIELD = { ...itemById("eternal_timeless_orb"), stats: { ...itemById("eternal_timeless_orb").stats, counter: 9, haste: 5 } };
 const CHEST = itemById("ascendant_uplifted_vestment");
 
@@ -27,7 +27,7 @@ const INVENTORY = {
     // The totals panel: the piece's own numbers alongside the bonuses stacked on it.
     stats: { base_damage: 31, speed: 0.83, armor: 660, block_chance: 0.44, might: 99, vitality: 82,
         ferocity: 43, tenacity: 17, crit_chance: 50, crit_power: 54, pierce: 8, lifesteal: 3,
-        counter: 7, doublestrike: 6, stun: 8, haste: 5 },
+        counter: 7, stun: 8, haste: 5 },
 };
 
 const COMPARE = {

@@ -22,7 +22,7 @@ export const STAT_WEIGHT = {
     // The crits. Chance is worth more than power because power does nothing on its own.
     crit_chance: 2, crit_power: 1,
     // The rare ones — scarce on gear, so a point of one is worth more than a point of a common stat.
-    pierce: 2, lifesteal: 2, counter: 1.5, doublestrike: 3, stun: 1.5, haste: 1.5,
+    pierce: 2, lifesteal: 2, counter: 1.5, stun: 1.5, haste: 1.5,
     // Fortune was 0.2 when it was raffle tickets and nothing else — and it was not even that, since the draw
     // only ever read the pet half of it. It is luck now: better drop rates in every feature plus a lifted
     // floor on damage rolls, which is worth having on a piece without ever being the reason to wear it.
@@ -32,7 +32,7 @@ export const STAT_WEIGHT = {
 /** Every stat a member can nominate as one they care about, in the order the chooser lists them. */
 export const PRIORITY_STATS = [
     "might", "vitality", "armor", "tenacity", "ferocity", "crit_chance", "crit_power",
-    "lifesteal", "pierce", "doublestrike", "counter", "stun", "haste", "block_chance", "fortune",
+    "lifesteal", "pierce", "counter", "stun", "haste", "block_chance", "fortune",
 ];
 
 // What nominating a stat is worth. Not "only this stat counts" — a piece that is enormous everywhere else is

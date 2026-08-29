@@ -5,7 +5,7 @@ import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { bars as liveBars, tempoOf, BAR_REFUND} from "@/lib/marketplace/arena-atb.js";
+import { bars as liveBars, tempoOf } from "@/lib/marketplace/arena-atb.js";
 import {
     buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
@@ -39,7 +39,7 @@ import {
 import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
 // instead of a hand-copied likeness of it. See arena-engine.js.
-import { arenaRating, fighterFields, DOUBLESTRIKE_PER_POINT} from "@/lib/marketplace/arena-engine.js";
+import { arenaRating, fighterFields } from "@/lib/marketplace/arena-engine.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 
@@ -386,9 +386,6 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // and folding its refund share in as well would have paid one stat twice. Only the sources that had
         // NOWHERE ELSE to go are converted: Quickblade, Frenzy, and the doublestrike points.
         //
-        // The rate is what the refund was actually worth. A refund left 1 - BAR_REFUND = 0.45 of a bar
-        // standing, so a chance of `p` saved 0.45p of a bar per swing on average. That is the tempo it bought.
-        //
         // `extra: 0` used to sit here, the last writer of a go-again chance nothing rolled. It and the whole
         // second attack speed behind it are gone — see the tombstone in arena-kit.js.
         // ── AND THE RATE ITSELF ──────────────────────────────────────────────────────────────────────────
@@ -399,15 +396,17 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // (7,858 at rung 100, 30,408 at rung 120), so running it through the same divisor produces a tempo
         // of 305 and the ratio clamp then has to swallow the whole thing — which flattens every foe past
         // about rung 50 onto the same bound and takes away any reason to invest in speed. See npcTempo.
+        // ── AND IT IS TWO TERMS NOW, NOT THREE ───────────────────────────────────────────────────────────
+        // The third was `doublestrike`, converted at 0.005 x (1 - BAR_REFUND) — a stat named
+        // for a mechanic that no longer exists, taking a second route to the same tempo Ferocity already
+        // buys. Its points are Ferocity now (see RETIRED_AFFIX in items.js and migration 415), so they arrive
+        // through tempoOf with everything else and this formula is the two lines it should always have been.
         tempo: Number(stats.tempo) > 0
             ? Math.max(0.2, Number(stats.tempo))
+            // The tree grants tempo DIRECTLY (tempoBonus) so a node's card can quote the number it pays —
+            // check:tree compares the two and caught it when they drifted.
             : tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
-                // The tree grants tempo DIRECTLY (tempoBonus) so a node's card can quote the number it pays —
-                // check:tree compares the two and caught it when they drifted. Only the doublestrike points,
-                // which have no node of their own, still convert at what the refund was worth.
-                + (Number(perks.tempoBonus) || 0)
-                + ((Number(stats.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT
-                    + (Number(perks.doublestrikeBonus) || 0)) * (1 - BAR_REFUND),
+                + (Number(perks.tempoBonus) || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
@@ -1572,7 +1571,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: foeKit.dr ?? 0,
             lifesteal: foeKit.lifesteal || 0,
             bleedChance: foeKit.bleedChance || 0, burnChance: foeKit.burnChance || 0, dmgPct: foeKit.dmgPct || 0,
-            doublestrike: foeKit.doublestrike || 0,
             // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
             // allowlist and their Guard silently falls back to a stranger's numbers.
             guard: foeKit.guard ?? DEFAULT_GUARD,
@@ -1609,7 +1607,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: me.dr ?? 0,
             lifesteal: me.lifesteal || 0,
             bleedChance: me.bleedChance || 0, burnChance: me.burnChance || 0, dmgPct: me.dmgPct || 0,
-            doublestrike: me.doublestrike || 0,
             guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {},
             classId: me.classId || null },

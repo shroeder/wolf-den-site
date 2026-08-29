@@ -226,16 +226,20 @@ const procDensity = (tier) => Math.max(0, Math.min(1, (Math.max(1, tier) - 4) / 
 
 // What a fully-kitted rung carries, in gear points — the same units a member's affixes are counted in. A member
 // with a good wardrobe runs 40-60 crit chance and single digits of the rare ones.
-const PROC_CEILING = { crit_chance: 60, crit_power: 60, pierce: 14, lifesteal: 10, counter: 12, doublestrike: 12, stun: 10, haste: 10 };
+// ── `doublestrike` WAS IN THIS BUDGET AND COULD NEVER SPEND IT ───────────────────────────────────────────────
+// A Road foe hands in its own `tempo` (see npcTempo), and kitFor takes that branch and skips the derived one
+// entirely — so the doublestrike points an archetype was allotted converted into a tempo term that was never
+// read. The stat is retired now; the points it was taking go to the archetype's other lines instead.
+const PROC_CEILING = { crit_chance: 60, crit_power: 60, pierce: 14, lifesteal: 10, counter: 12, stun: 10, haste: 10 };
 
 // The archetype decides WHICH affixes it favours, so a Duelist really is the crit one and a Wall really does
 // answer every blow — identity you can read off the card rather than a uniform sprinkle over everybody.
 const PROC_LEAN = {
     balanced: {},
-    brute: { crit_power: 1.4, pierce: 1.3, doublestrike: 1.2, stun: 1.2, crit_chance: 0.6, counter: 0.4, haste: 0.6, lifesteal: 0.5 },
-    wall: { counter: 1.6, lifesteal: 1.4, stun: 1.1, crit_chance: 0.4, crit_power: 0.5, pierce: 0.5, doublestrike: 0.4, haste: 0.4 },
-    duelist: { crit_chance: 1.8, crit_power: 1.6, pierce: 0.8, doublestrike: 1.1, haste: 0.8, counter: 0.6, stun: 0.5, lifesteal: 0.4 },
-    berserker: { doublestrike: 1.6, haste: 1.5, crit_chance: 1.1, crit_power: 1.0, pierce: 1.0, stun: 0.7, counter: 0.3, lifesteal: 0.3 },
+    brute: { crit_power: 1.4, pierce: 1.3, stun: 1.2, crit_chance: 0.6, counter: 0.4, haste: 0.6, lifesteal: 0.5 },
+    wall: { counter: 1.6, lifesteal: 1.4, stun: 1.1, crit_chance: 0.4, crit_power: 0.5, pierce: 0.5, haste: 0.4 },
+    duelist: { crit_chance: 1.8, crit_power: 1.6, pierce: 0.8, haste: 0.8, counter: 0.6, stun: 0.5, lifesteal: 0.4 },
+    berserker: { haste: 1.5, crit_chance: 1.1, crit_power: 1.0, pierce: 1.0, stun: 0.7, counter: 0.3, lifesteal: 0.3 },
 };
 
 // ── A HIGH RUNG HAS WORKED ITS GEAR ──────────────────────────────────────────────────────────────────────────
@@ -318,10 +322,6 @@ function npcProcs(tier, archKey) {
 const TELL_RULES = [
     { key: "lifesteal", from: (s, p) => (s.lifesteal || 0) * 0.0025 + (p.lifestealBonus || 0), text: "drinks what it lands" },
     { key: "counter", from: (s, p) => (s.counter || 0) * 0.0025 + (p.counterBonus || 0), text: "strikes back when you hit it" },
-    // "swings twice" was true of the mechanic this key is named after, and that mechanic is gone — blowCount
-    // was deleted and a swing is one blow unless a skill says otherwise. The points buy TEMPO now, so the
-    // thing to warn a member about is the bar, not the blow.
-    { key: "doublestrike", from: (s, p) => (s.doublestrike || 0) * 0.005 + (p.doublestrikeBonus || 0), text: "swings more often" },
     { key: "stun", from: (s, p) => (s.stun || 0) * 0.005 + (p.stunBonus || 0), text: "stuns" },
     { key: "haste", from: (s, p) => (s.haste || 0) * 0.005 + (p.hasteBonus || 0), text: "hastes itself" },
     { key: "pierce", from: (s) => (s.pierce || 0) * 0.005, text: "goes through armour" },

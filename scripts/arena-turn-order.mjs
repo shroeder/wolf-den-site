@@ -61,7 +61,7 @@ for (const rung of RUNGS) {
                 // A counter, a thorn and a wild extra blow are OUT-OF-TURN blows, not turns. They are counted
                 // on their own line because they look identical on screen and are a completely different thing.
                 if (L.thorns || L.counter || L.fever || L.cast) continue;
-                if (L.wild === "doublestrike" || L.wild === "counter") { T.wild += 1; continue; }
+                if (L.wild === "extra" || L.wild === "counter") { T.wild += 1; continue; }
                 if (L.dmg === undefined && !L.hits) continue;
                 T.turns += 1;
                 // Doublestrike: two blows inside ONE turn. Not a second turn, and deliberately not counted as
@@ -93,7 +93,7 @@ for (const rung of RUNGS) {
         + `tempo ${me.tempo.toFixed(2)} v ${foe.tempo.toFixed(2)}`);
     console.log(`   back-to-back ${pct(T.b2b)} of ${T.turns} turns (${T.b2bFoe} the NPC's) · RUNS OF 3+ ${T.runs3}`);
     console.log(`   from pacing ${T.pacing} · granted by haste ${T.hasted} · other bar ${JSON.stringify(T.heldKinds)}`);
-    console.log(`   doublestrike (two blows, one turn) ${pct(T.multiHit)} · out-of-turn blows ${T.wild}`);
+    console.log(`   two blows in one turn ${pct(T.multiHit)} · out-of-turn blows ${T.wild}`);
 }
 
 // ── AND RUNS ARE REPORTED, NOT REFUSED ──────────────────────────────────────────────────────────────────────

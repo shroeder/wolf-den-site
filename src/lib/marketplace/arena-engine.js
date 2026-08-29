@@ -43,7 +43,6 @@ import { luckyRoll } from "@/lib/marketplace/fortune.js";
 export const DEFAULT_SPEED = 10;
 export const PIERCE_PER_POINT = 0.005;
 export const COUNTER_PER_POINT = 0.0025;
-export const DOUBLESTRIKE_PER_POINT = 0.005;
 export const LIFESTEAL_PER_POINT = 0.0025;
 export const STUN_PER_POINT = 0.005;
 export const HASTE_PER_POINT = 0.005;
@@ -305,12 +304,10 @@ export const sideOf = (f) => ({
 // How many times this swing lands. Below 100% it is one blow with a chance of a second; above it, the whole
 // multiples are guaranteed and the remainder rolls — the same shape as crit stacks.
 // ── ONE BLOW A SWING, UNLESS A SKILL SAYS OTHERWISE ──────────────────────────────────────────────────────────
-// Double strike is gone. It was a second answer to "you swing more often" living alongside the bar refund —
-// Quickblade and weapon Attack Speed were converted into `extra` when the timer landed, and this was left
-// behind. Two mechanics, one promise, and only one of them visible on screen.
-//
-// The points are not lost: every source of them now feeds the refund at DOUBLESTRIKE_PER_POINT, which is the
-// rate this function used. See the note on `extra` in arena.js.
+// Double strike is gone, mechanic first and then stat. It was a second answer to "you swing more often"
+// living alongside the bar refund — two mechanics, one promise, and only one of them visible on screen. The
+// mechanic went when blowCount was hollowed out; the STAT survived it by a year, converting into tempo down a
+// second path, and is now Ferocity (see RETIRED_AFFIX in items.js and migration 415).
 //
 // A skill that strikes a fixed number of times still does — Onslaught's `hits: 3` comes through hitsOverride,
 // which never went through this roll.
@@ -433,7 +430,10 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         // extra swing it can grant lands on the NEXT one rather than compounding inside this one.
         if (att.wildProc > 0 && rng() < att.wildProc) {
             const pick = Math.floor(rng() * 3);
-            if (pick === 0) wild = "doublestrike";
+            // Named "doublestrike" until the stat of that name was retired — which made a log line say the
+            // word for a stat that no longer exists, about a proc that never read it. This proc has always
+            // been rolled off `wildProc`, not off any stat.
+            if (pick === 0) wild = "extra";
             else if (pick === 1) wild = "counter";
             else wild = "haste";
             if (wild === "haste") att.bonusTurns += 1;
@@ -491,8 +491,8 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
-        // A wild "doublestrike" is an extra blow right now; a wild "counter" makes the attacker swing again.
-        if (wild === "doublestrike" || wild === "counter") {
+        // A wild "extra" is another blow right now; a wild "counter" makes the attacker swing again.
+        if (wild === "extra" || wild === "counter") {
             const cs = critStacks(att.critChance, rng);
             const craw = att.damage * (cs > 0 ? att.critMult * cs : 1);
             const extra = Math.max(1, Math.round(craw * (1 - drFrom(def.armor, att.pierce))));

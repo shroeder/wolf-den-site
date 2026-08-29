@@ -76,7 +76,7 @@ function winRate(me, selfIndex) {
 // Every stat a member could actually put a point into, plus the two that are not stats but are what the
 // defensive ones BUY, so the comparison is like for like.
 const STATS = ["might", "vitality", "armor", "tenacity", "ferocity", "crit_chance", "crit_power",
-    "pierce", "lifesteal", "counter", "doublestrike", "stun", "haste", "block_chance"];
+    "pierce", "lifesteal", "counter", "stun", "haste", "block_chance"];
 
 console.log(`\n+${BUDGET} of one stat, handed to each of ${members.length} daily members in their real gear`);
 console.log(`(${held.join(" and ")} held out — no 25 points answers their wardrobe)\n`);

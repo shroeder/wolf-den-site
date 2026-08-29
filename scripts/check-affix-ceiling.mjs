@@ -72,7 +72,7 @@ for (const [label, rarities] of BANDS) {
 }
 
 // What the points are worth once the engine has them, so the ceiling is in the same units as the class trees.
-const PER_POINT = { lifesteal: 0.0025, pierce: 0.005, counter: 0.0025, doublestrike: 0.005, stun: 0.005, haste: 0.005 };
+const PER_POINT = { lifesteal: 0.0025, pierce: 0.005, counter: 0.0025, stun: 0.005, haste: 0.005 };
 if (PER_POINT[AFFIX]) {
     console.log(`\n  at ${(PER_POINT[AFFIX] * 100).toFixed(2)}% a point, that ceiling is:`);
     for (const [label, rarities] of BANDS) {

@@ -57,7 +57,6 @@ const ROWS = [
     ["pierce", (f) => `ignores ${(Math.min(1, base.pierce * 0.005) * 100).toFixed(1)}% -> ${(Math.min(1, f.pierce * 0.005) * 100).toFixed(1)}% of their armour`],
     ["lifesteal", (f) => `heals ${(base.lifesteal * 0.0025 * 100).toFixed(2)}% -> ${(f.lifesteal * 0.0025 * 100).toFixed(2)}% of what you deal`],
     ["counter", (f) => `strikes back ${(base.counter * 0.0025 * 100).toFixed(2)}% -> ${(f.counter * 0.0025 * 100).toFixed(2)}% of the time`],
-    ["doublestrike", (f) => `swings twice ${(base.doublestrike * 0.005 * 100).toFixed(2)}% -> ${(f.doublestrike * 0.005 * 100).toFixed(2)}% of the time`],
     ["stun", (f) => `stuns ${(base.stun * 0.005 * 100).toFixed(2)}% -> ${(f.stun * 0.005 * 100).toFixed(2)}% of blows`],
     ["haste", (f) => `hastes ${(base.haste * 0.005 * 100).toFixed(2)}% -> ${(f.haste * 0.005 * 100).toFixed(2)}% of swings`],
 ];

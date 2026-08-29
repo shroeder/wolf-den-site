@@ -484,10 +484,10 @@ export const SCENES = {
         state: () => {
             const b = makeBout();
             const me = { ...b.me, damage: 210, health: 1600, critChance: 0.35, critMult: 2.4, extra: 0.3,
-                armor: 60, pierce: 20, counter: 40, doublestrike: 30, lifesteal: 20, blockChance: 0.15,
+                armor: 60, pierce: 20, counter: 40, lifesteal: 20, blockChance: 0.15,
                 blockReduction: 0.35, stun: 30, haste: 30, bleedChance: 0.55 };
             const foe = { ...b.foe, damage: 180, health: 1500, critChance: 0.2, critMult: 2.0, extra: 0,
-                armor: 40, pierce: 0, counter: 0, doublestrike: 0, lifesteal: 0, blockChance: 0.25,
+                armor: 40, pierce: 0, counter: 0, lifesteal: 0, blockChance: 0.25,
                 blockReduction: 0.5, stun: 0, haste: 0 };
             // The ring, headlessly — the same argument as the `timer` scene below: a hand-written log is a
             // fixture of what somebody THOUGHT the engine does, and autoBout was a second engine.
@@ -520,10 +520,10 @@ export const SCENES = {
             // Tempos deliberately apart so the two bars visibly fill at different rates — a scene where both
             // bars are identical cannot show what the mode is FOR.
             const me = { ...b.me, damage: 190, health: 1700, critChance: 0.4, critMult: 2.4, extra: 0,
-                armor: 60, pierce: 20, counter: 25, doublestrike: 30, blockChance: 0.15, blockReduction: 0.35,
+                armor: 60, pierce: 20, counter: 25, blockChance: 0.15, blockReduction: 0.35,
                 bleedChance: 0.5, tempo: 1.35 };
             const foe = { ...b.foe, damage: 175, health: 1600, critChance: 0.25, critMult: 2.1, extra: 0,
-                armor: 45, pierce: 0, counter: 0, doublestrike: 20, blockChance: 0.2, blockReduction: 0.5,
+                armor: 45, pierce: 0, counter: 0, blockChance: 0.2, blockReduction: 0.5,
                 burnChance: 0.3, tempo: 1.85 };
             let ring = openRing(me, foe, { foeName: b.foe?.name || "Roan Vasquez" });
             // Played out here rather than left waiting: the screen walks a finished transcript, and a ring
