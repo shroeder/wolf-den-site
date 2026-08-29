@@ -4500,8 +4500,18 @@ function Styles() {
                 100% { transform: scale(1); opacity: 1 }
             }
             .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
-            .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; align-content: center;
+            /* ── OVER WHOEVER IT HAPPENED TO, NOT ACROSS THE MIDDLE ──────────────────────────────────────
+               inset:0 with place-items:center put CRITICAL and BLOCKED in the dead centre of the ring,
+               so the two words describing a blow sat nowhere near the blow — filmed in popstorm with the
+               damage numbers stacked over one fighter and the word for them floating between the two.
+               It goes where the number goes: your blow lands on the right, theirs on the left, same rule the
+               pops follow. Anchored from the TOP rather than the bottom: measured from the bottom it grows
+               upward into the health bars, and filmed at 82% it sat across the HUD. */
+            .ar-grade { position: absolute; top: 16%; width: 46%; z-index: 6;
+                display: grid; justify-items: center; align-content: start;
                 gap: 2px; pointer-events: none; }
+            .ar-grade:not(.is-theirs) { right: 2%; }
+            .ar-grade.is-theirs { left: 2%; }
             /* The move, named, across the middle — announced before the grade lands under it. */
             .ar-move { font-style: normal; font-size: 1rem; font-weight: 900; letter-spacing: .06em;
                 text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px #000, 0 0 22px rgba(255,215,94,.8);
