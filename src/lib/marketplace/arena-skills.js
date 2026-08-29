@@ -292,6 +292,11 @@ export const SKILLS = [
         id: "retribution", classId: "warden", name: "Retribution",
         sprite: "/images/arena/skill/retribution.webp",
         blurb: "Everything they have done to you since your last swing, handed back on this one.",
+        // ⚠️ THE NODE DELTAS ARE SIZED AGAINST THIS BASE. It was 0.6 and the four grudge mods were 0.45,
+        // 0.7, -0.25 and -0.2 — proportions of 0.6. Dropping the base to 0.2 without them took Punish to
+        // -0.05 and Blood Price to 0.00, and applySkill only assigns when the share is above zero, so both
+        // branches silently fell back to the fighter's passive instead of overwriting it. All four moved by
+        // the same third the base did, so every relationship between the branches is unchanged.
         power: 1.1, cooldown: 4, grudge: 0.2,
         branches: [
             { id: "ledger", name: "Ledger", tag: "Bank it all, spend it once" },
@@ -301,12 +306,12 @@ export const SKILLS = [
         nodes: [
             ...br("ledger", [
                 { id: "re_memory", name: "Long Memory", sprite: "/images/arena/skill/node/re_memory.webp",
-                    desc: "You hand back far more of what was banked.", mod: { grudge: 0.45 } },
+                    desc: "You hand back far more of what was banked.", mod: { grudge: 0.15 } },
                 { id: "re_keep", name: "Nothing Forgiven", sprite: "/images/arena/skill/node/re_keep.webp",
                     desc: "Half the ledger survives the swing instead of clearing.", mod: { keepGrudge: 0.5 } },
                 { id: "re_reckon", name: "Reckoning", sprite: "/images/arena/skill/node/re_reckon.webp",
                     desc: "CAPSTONE. The whole ledger comes back at once on a heavier blow — but it is a slow, patient button.",
-                    mod: { grudge: 0.7, power: 0.35, cooldown: 1 } },
+                    mod: { grudge: 0.23, power: 0.35, cooldown: 1 } },
             ]),
             ...br("punish", [
                 { id: "re_ring", name: "Ringing Blow", sprite: "/images/arena/skill/node/re_ring.webp",
@@ -315,7 +320,7 @@ export const SKILLS = [
                     desc: "Answering also raises a small shield.", mod: { shield: 0.1 } },
                 { id: "re_back", name: "Backhand", sprite: "/images/arena/skill/node/re_back.webp",
                     desc: "CAPSTONE. Comes back twice as often and every answer takes a beat off them — a smaller ledger, spent constantly.",
-                    mod: { cooldown: -2, grudge: -0.25 } },
+                    mod: { cooldown: -2, grudge: -0.08 } },
             ]),
             ...br("bloodprice", [
                 { id: "re_toll", name: "Toll", sprite: "/images/arena/skill/node/re_toll.webp",
@@ -324,7 +329,7 @@ export const SKILLS = [
                     desc: "It ignores two-fifths of their armour, so the drink is a real one.", mod: { pierce: 0.4 } },
                 { id: "re_wergild", name: "Wergild", sprite: "/images/arena/skill/node/re_wergild.webp",
                     desc: "CAPSTONE. Half of everything it lands comes back, and the swing itself mends you. A modest blow that refuses to lose.",
-                    mod: { drain: 0.25, heal: 0.1, grudge: -0.2 } },
+                    mod: { drain: 0.25, heal: 0.1, grudge: -0.07 } },
             ]),
         ],
     }),
