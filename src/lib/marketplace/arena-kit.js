@@ -998,23 +998,32 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 // file: chosen when member armour ran 360-729, never moved, and by the time members carried 1,100 the whole
 // top of the ladder sat on the flat of the curve where 987 armour and 1,222 played identically.
 //
-// Stated the other way round there is no denominator to go stale. Armour buys TOUGHNESS — a multiplier on
-// your effective health — at a rate per point, on the same curve as everything else. The damage reduction is
-// whatever falls out of it:
+// Armour buys TOUGHNESS, a multiplier on your effective health, and the damage reduction is whatever falls
+// out of it. Reduction approaches 100% and can never reach it BY CONSTRUCTION rather than by a cap somebody
+// has to remember to enforce — which is how DR_CAP came to be declared in one file and applied in none.
 //
-//     toughness = 1 + ARMOUR_TOUGHNESS x armour^STAT_EXPONENT
-//     reduction = 1 - 1/toughness
+// ── THE NUMBER SAYS WHAT IT MEANS ────────────────────────────────────────────────────────────────────────────
+// This was `ARMOUR_TOUGHNESS = 0.002806`, toughness per unit of curved armour. Correct and unreadable: it is
+// tiny only because the thing it multiplies is large (1,167 armour curves to 199), so the constant could not
+// be sanity-checked against a real fighter without a calculator, which is the same defect as a weapon base
+// that means nothing until it is divided by 100.
 //
-// It approaches 100% and can never reach it BY CONSTRUCTION rather than by a cap somebody has to remember to
-// enforce — which is exactly how DR_CAP came to be declared in one file and applied in none. A typical worn
-// set today turns aside about 35%.
-export const ARMOUR_TOUGHNESS = 0.002806;
+// Stated as the armour that DOUBLES you, it is one number anybody can check: at 2,530, toughness is 2 and a
+// blow lands for half. Everything else is derived from it.
+//
+// ⚠️ IT IS THE ARMOUR, NOT THE CURVED ARMOUR. 0.002806 was 1/356, and 356 is what 2,530 becomes AFTER the
+// exponent — so writing 356 here doubles a fighter at a seventh of the plate and took a full set from 36% to
+// 71%. The constant and the value it is compared against have to be on the same side of curve().
+export const ARMOUR_TO_DOUBLE = 2530;
+
+/** Toughness: the multiple of your own health that this much armour is worth. 0 armour is 1 — no reduction. */
+export const toughnessFrom = (armour = 0) => 1 + curve(armour) / curve(ARMOUR_TO_DOUBLE);
 
 /** The share of a blow this much armour turns aside. `pierce` removes armour BEFORE the curve, so 50% pierce
  *  means half their plate is not there — the same meaning it had under subtraction. */
 export const drFrom = (armour = 0, pierce = 0) => {
     const eff = Math.max(0, (Number(armour) || 0) * (1 - Math.min(1, Math.max(0, Number(pierce) || 0))));
-    return 1 - 1 / (1 + ARMOUR_TOUGHNESS * curve(eff));
+    return 1 - 1 / toughnessFrom(eff);
 };
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
