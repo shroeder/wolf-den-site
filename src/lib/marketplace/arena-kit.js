@@ -1026,55 +1026,49 @@ export const drFrom = (armour = 0, pierce = 0) => {
     const eff = Math.max(0, (Number(armour) || 0) * (1 - Math.min(1, Math.max(0, Number(pierce) || 0))));
     return 1 - 1 / toughnessFrom(eff);
 };
-// ── THE PROC STATS DIMINISH TOO, AND THEY NO LONGER SATURATE ─────────────────────────────────────────────────
-// Luke: "I think Pierce haste life leech and stun should all have diminishing returns."
+// ── THE PROC STATS RUN ON THE SAME EXPONENT AS EVERYTHING ELSE ───────────────────────────────────────────────
+// Luke: "I think Pierce haste life leech and stun should all have diminishing returns", then "counter should
+// be diminishing returns as well."
 //
-// They were the last linear ones left. Each point paid a flat share and the total was clamped at 1.0, which
-// makes a hard ceiling nobody can see: HASTE_PER_POINT 0.005 means 200 points is a GUARANTEED proc and the
-// 201st point is worth exactly nothing. That ceiling was unreachable while only gear paid these — the best
-// wardrobe in the game carries 59 haste across nine slots, 30% — and it stopped being unreachable the moment
-// a Road rung learned to reroll: rung 187 came out at 311 haste, hasting on every single swing for ever.
+// They were the last linear stats: each point paid a flat share, so HASTE_PER_POINT 0.005 meant 200 points was
+// a guaranteed proc and the 201st was worth exactly nothing. Unreachable while only gear paid them — the best
+// wardrobe carries 66 haste — and reachable the moment a Road rung learned to reroll, which put one at 311.
 //
-// Same shape as armour's, and for the same reason (see drFrom): c / (1 + c) approaches 1 without arriving, so
-// there is no saturation point, the next point is always worth something, and no build can make a chance a
-// certainty. `*_TO_HALF` is the points at which the roll is a coin flip — a number a card can print.
+// ⚠️ AND THE FIRST TWO ATTEMPTS AT THIS BOTH BUILT SOMETHING THAT WAS NOT THE HOUSE CURVE. I wrote it as
+// c / (1 + c), an asymptote toward 1, and anchored the constants off a ceiling. Luke: "I didn't want you to
+// anchor it to a ceiling like that. I wanted you to just change the exponent. Usually, we had exponent of
+// seventy five percent. It looks like you just put a flat cap on it, which is not what I wanted."
 //
-// ── THE ANCHORS ARE SET FROM THE CEILING, NOT FROM THE FLOOR ─────────────────────────────────────────────────
-// The first version anchored on best-in-slot AS AUTHORED, so a wardrobe was unchanged to the percent. That was
-// the wrong end to hold: the base rolls are about a third of what a build actually reaches, because the FORGE
-// is the bigger contributor — ten pieces at MAX_LEVEL 21, +1 a stat an enhance, is up to 210 points on one
-// line against 53-83 from the items themselves.
+// He is right, and the shape was the whole error. Might is DAMAGE_PER_MIGHT x might^0.75; Vitality is
+// HEALTH_PER_VITALITY x vitality^0.75. A proc is RATE x points^0.75. One exponent, one form, no second idea.
+// A rate is not a ceiling: pierce keeps climbing past 40% — 60% at 500 points, 100% at 1000 — it simply takes
+// four times the points to double, which is what the exponent means.
 //
-// So the anchor is what a FULLY FORGED single-stat build arrives at, which is the number that decides whether
-// the stat is worth chasing. Luke set them: "Pierce 40% haste and 40% stun 40% counter is fine and life drink
-// 45%."
+// The rates are picked so a FULLY FORGED single-stat build lands where Luke asked: "Pierce 40% haste and 40%
+// stun 40% counter is fine and life drink 45%". That ceiling is ten pieces at MAX_LEVEL 21 with every enhance
+// on the one line — 210 points of forge against 53-83 from the items — so it is the top of what anyone builds,
+// not the top of the function.
 //
-//    stat        forged ceiling    at the ceiling    a bare wardrobe    a normally-forged one
-//    pierce           293 pts           40%              21%                   30%
-//    haste            276               40%              19%                   30%
-//    stun             266               40%              17%                   29%
-//    lifesteal        263               45%              20%                   33%
-//    counter          263               33%              13%                   23%      (left where it was)
+//    stat        bare wardrobe   normally forged   fully forged
+//    pierce           16%              26%             40%
+//    haste            14%              25%             40%
+//    stun             12%              25%             40%
+//    counter          10%              20%             33%
+//    lifedrink        14%              28%             45%
 //
-// "Normally forged" is the honest middle: an enhance draws its targets at RANDOM from the piece's own stats,
-// so about 40% of the 21 levels land on any one line rather than all of them.
+// "Normally forged" is the honest middle: an enhance draws its targets at RANDOM from a piece's own stats, so
+// about 40% of the 21 levels land on any one line rather than all of them.
 //
 // ⚠️ AND A LOWER RARITY CONCENTRATES BETTER, which is a real decision this makes visible. Line count is set by
 // rarity (AFFIX_COUNT: common 2, primordial 6) and the forge spreads over whatever lines a piece carries — so
 // a fully-forged common puts half its enhances on each of two stats where a primordial spreads them over six.
 // For a single-stat build the humbler piece genuinely wins.
-export const chanceFrom = (points = 0, half = 200) => {
-    const c = curve(points) / curve(half);
-    return c / (1 + c);
-};
-export const PIERCE_TO_HALF = 503;
-export const HASTE_TO_HALF = 474;
-export const STUN_TO_HALF = 457;
-export const LIFESTEAL_TO_HALF = 344;
-// Counter followed the other four a commit later — it has the same shape and the same latent ceiling
-// (400 points was a guaranteed riposte), and leaving one of five flat is how a table drifts. Anchored
-// the same way: best-in-slot is 53 points, which paid 13% flat and pays 13% here.
-export const COUNTER_TO_HALF = 668;
+export const procFrom = (points = 0, rate = 0) => rate * curve(points);
+export const PIERCE_PER_POINT = 0.005648;
+export const HASTE_PER_POINT = 0.005907;
+export const STUN_PER_POINT = 0.006073;
+export const COUNTER_PER_POINT = 0.005053;
+export const LIFESTEAL_PER_POINT = 0.006890;
 
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
