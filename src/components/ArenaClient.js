@@ -5034,8 +5034,11 @@ function Styles() {
             /* ── ABOVE THE HEAD, NOT ACROSS THE CHEST ────────────────────────────────────────────────
                34% put every number over the fighter's body, so a busy beat printed eleven figures across the
                art they were meant to be read against — filmed in the popstorm scene. They start clear of the
-               sprite now and rise from there. */
-            .ar-pops { position: absolute; bottom: 62%; z-index: 21; display: flex; flex-direction: column-reverse;
+               sprite now and rise from there.
+               ⚠️ THIS IS A SHARE OF THE WHOLE RING, NOT OF THE FLOOR. The fighters live in .ar-floor, which is
+               the bottom band of it, so 62% reads as "above the fighters" and lands on their heads. Filmed at
+               62 and the left-hand stack sat squarely across the left fighter. */
+            .ar-pops { position: absolute; bottom: 74%; z-index: 21; display: flex; flex-direction: column-reverse;
                 align-items: center; gap: 6px; pointer-events: none;
                 /* Older groups ride up rather than sitting under the new one. Without this, four live groups
                    are four numbers printed on the same pixel — which is the single-slot bug again, wearing a
