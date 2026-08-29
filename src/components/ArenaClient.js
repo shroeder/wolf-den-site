@@ -3024,8 +3024,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     {/* Two numbers with no explanation anywhere is how you get asked "what are laurels".
                         One line each, on the screen that shows them. */}
                     <span className="ar-currency">
-                        <i title="Rank. Won by beating people — more for harder opponents. Never spent.">
-                            <b>{money(st.vp)}</b> VP<em>rank · never spent</em>
+                        {/* ── THE STANDING, NOT THE DISCLAIMER ────────────────────────────────────
+                            This read "rank · never spent". It was written to contrast with the laurels
+                            beside it -- that one is the currency, this one is not -- and it worked when a
+                            rung existed elsewhere on the screen to say where you stood. The rung is gone:
+                            VP is the last thing left carrying rank, and the only place that rank was
+                            visible was the leaderboard's sort order. So the card told you what VP cannot
+                            do and never once said what it had got you. Luke: "why does it say rank never
+                            spent".
+                            Costs nothing to say properly -- getArenaState already holds the whole ordered
+                            board, so `standing` is an index into an array it had anyway. */}
+                        <i title={st.standing
+                            ? `Rank. Won by beating people — more for harder opponents, and never spent. You are ${st.standing} of ${st.size} in the Den.`
+                            : "Rank. Won by beating people — more for harder opponents. Never spent."}>
+                            <b>{money(st.vp)}</b> VP
+                            <em>{st.standing ? `#${st.standing} of ${st.size}` : "rank · never spent"}</em>
                         </i>
                         <i title="The arena's own currency. Won by winning bouts, and spent in the Armoury.">
                             <b>{money(st.laurels)}</b>

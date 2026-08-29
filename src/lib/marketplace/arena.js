@@ -1057,6 +1057,19 @@ export async function getArenaState(buyerId, pre = {}) {
         unlocked: true,
         me: { ...me, name: "You", vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
         size: board.length,
+        // ── WHERE THAT VP ACTUALLY PUTS YOU ──────────────────────────────────────────────────────────────
+        // VP is the only survivor of the rung ladder -- the `position` column, the seven bands and the
+        // rank-up went with it -- so it now carries the whole idea of rank on its own. And the card printed
+        // it as "rank · never spent", which says what VP CANNOT do and leaves out the one thing it can.
+        // Luke: "why does it say rank never spent". Because it was written to contrast with the laurels
+        // beside it, back when a position existed somewhere else on the screen to answer the other half.
+        //
+        // FREE. `board` is the full standings list this function already has in hand, ordered by VP -- the
+        // same array `board.slice(0, 10)` below is cut from. No query, no round trip.
+        //
+        // Zero for anyone not on the board at all (standings() excludes members with no XP), which the
+        // screen reads as "no standing yet" rather than printing "#0".
+        standing: board.findIndex((o) => o.id === buyerId) + 1 || null,
         vp: myVp, laurels: Number(row?.laurels) || 0,
         fightsLeft: Math.max(0, dailyFights - used), fightsPerDay: dailyFights,
         // THE PURSER'S EXCHANGE. Null for everybody not wearing the piece, which is what the screen keys off —
