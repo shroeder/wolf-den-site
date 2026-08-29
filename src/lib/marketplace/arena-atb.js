@@ -74,9 +74,9 @@ import { curve } from "@/lib/marketplace/arena-kit.js";
 // nearly half, and the gap between the two closes. Nobody's tempo goes backwards from where they started —
 // they simply stop being able to buy the bar outright.
 //
-// ⚠️ ROAD FOES DO NOT MOVE. An NPC hands kitFor its own `tempo` off npcTempo and never touches this function,
-// so the whole ladder is unchanged and only members' bars slow. That is deliberate: npcTempo was already
-// written on a member's scale (0.9 to 2.4) precisely so the two could be tuned apart.
+// ⚠️ AND THIS NOW PACES THE LADDER TOO. When the curve landed, a Road foe was still handed its tempo and only
+// members slowed; NPCs derive theirs from the same function since their stats came off real gear, so the
+// ladder rides this curve as well. One function, every fighter.
 export const FEROCITY_TO_DOUBLE = 200;
 export const BARE_TEMPO = 1;
 
@@ -121,25 +121,15 @@ export const TEMPO_RATIO = 1.9;
 // A foe slower than you simply stays slower. What stops that becoming a fighter who never acts is the
 // three-in-a-row rule in advance(), which is a fairness guarantee rather than a rate.
 
-// ── AND A ROAD FOE IS GIVEN A TEMPO RATHER THAN HAVING ONE DERIVED ───────────────────────────────────────────
-// tempoOf reads Ferocity, which for a MEMBER is a stat measured at 20-140. An NPC's is a gear budget that
-// climbs with the rung and never stops, so the same divisor answers 79 at rung 100 and 305 at rung 120. The
-// ratio clamp below would then swallow every foe past about rung 50 onto the same bound — and a foe that is
-// always exactly 1.9x your speed no matter what you are wearing is worse than the old fixed band, because now
-// investing in speed changes nothing at all about the fight.
+// ── A ROAD FOE USED TO BE GIVEN A TEMPO. IT DERIVES ONE NOW, LIKE EVERYBODY. ─────────────────────────────────
+// npcTempo, NPC_TEMPO_MIN and NPC_TEMPO_MAX were here: a separate 0.9-to-2.4 curve on a member's scale, handed
+// straight to kitFor so a Road foe never touched tempoOf. It existed because an NPC's Ferocity was a BUDGET
+// that reached 30,408 by rung 120 — a member carries 20 to 140 — and running that through this file's divisor
+// answered a tempo of 305.
 //
-// So the ladder gets its own curve, on a member's scale, and it is the thing your own tempo is measured
-// against. A rung-1 foe swings a little slower than bare-handed and the top of the Road reaches 2.4 — near the
-// fastest kit anybody has actually built (2.15 measured) — which means a member who invests really does
-// out-pace the Road, and one who does not really is out-paced.
-export const NPC_TEMPO_MIN = 0.9;
-export const NPC_TEMPO_MAX = 2.4;
-export const npcTempo = (rung = 1, size = 120) => {
-    const t = Math.max(0, Math.min(1, (Math.max(1, Number(rung) || 1) - 1) / Math.max(1, size - 1)));
-    // Square-rooted so the early Road climbs quickly and the top flattens: the interesting part of the curve
-    // is where members actually are, not the last twenty rungs nobody has reached.
-    return Number((NPC_TEMPO_MIN + (NPC_TEMPO_MAX - NPC_TEMPO_MIN) * Math.sqrt(t)).toFixed(3));
-};
+// Luke: "there should be no fakeness to npc math, it should use the same constraints as players." A rung's
+// stats are the affixes on the gear it wears now (see npcStats), so its Ferocity is 24 at rung 1 and 212 at
+// rung 120 and the ordinary function answers correctly: tempo 1.09 to 2.27, all of it derived.
 export const foeTempo = (mine, theirs) => {
     const m = Math.max(0.2, Number(mine) || BARE_TEMPO);
     const t = Math.max(0.2, Number(theirs) || BARE_TEMPO);

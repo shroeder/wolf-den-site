@@ -1,7 +1,6 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
 import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
 import { CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
-import { npcTempo } from "@/lib/marketplace/arena-atb.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -146,7 +145,15 @@ export function npcPower(tier) {
 // multiply through — new = old x suggested. Pasting the suggestions straight in inverts the ladder: it made
 // the wall easy and turned the brute into the new wall, and the count of rungs that get easier as you climb
 // went UP, from 15 to 20.
-const ARCH_BAL = { balanced: 0.969, brute: 0.811, wall: 0.932, duelist: 1.184, berserker: 0.907 };
+// ── ARCH_BAL IS GONE WITH THE BUDGET IT NORMALISED ───────────────────────────────────────────────────────────
+// It was { balanced 0.969, brute 0.811, wall 0.932, duelist 1.184, berserker 0.907 } — a per-archetype
+// multiplier on how much BUDGET a shape was handed, so that a rung's stated power meant one difficulty
+// whichever shape it rotated onto. There is no budget to hand out any more: a rung's stats are the affixes on
+// the gear it wears, and its archetype decides WHICH pieces rather than how much of a number it gets.
+//
+// What replaces it is measurement, not another constant. Walked with a real member over all 200 rungs: the
+// old ladder broke monotonicity on 3 of its 9 transition rungs, the new one on 10 of 29 — the same rate, in a
+// band that is simply wider now. If a shape drifts, the lever is its item preference in npcLoadout.
 
 export const ARCHETYPES = [
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
@@ -159,7 +166,7 @@ export const ARCHETYPES = [
       w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, tough: 1.14, guard: 0.20 },
     { key: "berserker", name: "Berserker", tell: "All edge, no armour. Survive the opening and it folds.",
       w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, tough: 1.06, guard: 0.12 },
-].map((a) => ({ ...a, bal: ARCH_BAL[a.key] || 1 }));
+];
 // The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
 // harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
 // it deviates from.
@@ -222,99 +229,17 @@ function npcTree(classId, points, tier) {
 // of the ladder, because a Straw Dummy has not rolled a Riposte, and everything by the top. Ramped rather than
 // stepped so no single rung is where the game suddenly starts critting you.
 const PROC_FULL_TIER = 60;
-const procDensity = (tier) => Math.max(0, Math.min(1, (Math.max(1, tier) - 4) / (PROC_FULL_TIER - 4)));
-
-// What a fully-kitted rung carries, in gear points — the same units a member's affixes are counted in. A member
-// with a good wardrobe runs 40-60 crit chance and single digits of the rare ones.
-// ── `doublestrike` WAS IN THIS BUDGET AND COULD NEVER SPEND IT ───────────────────────────────────────────────
-// A Road foe hands in its own `tempo` (see npcTempo), and kitFor takes that branch and skips the derived one
-// entirely — so the doublestrike points an archetype was allotted converted into a tempo term that was never
-// read. The stat is retired now; the points it was taking go to the archetype's other lines instead.
-const PROC_CEILING = { crit_chance: 60, crit_power: 60, pierce: 14, lifesteal: 10, counter: 12, stun: 10, haste: 10 };
-
-// The archetype decides WHICH affixes it favours, so a Duelist really is the crit one and a Wall really does
-// answer every blow — identity you can read off the card rather than a uniform sprinkle over everybody.
-const PROC_LEAN = {
-    balanced: {},
-    brute: { crit_power: 1.4, pierce: 1.3, stun: 1.2, crit_chance: 0.6, counter: 0.4, haste: 0.6, lifesteal: 0.5 },
-    wall: { counter: 1.6, lifesteal: 1.4, stun: 1.1, crit_chance: 0.4, crit_power: 0.5, pierce: 0.5, haste: 0.4 },
-    duelist: { crit_chance: 1.8, crit_power: 1.6, pierce: 0.8, haste: 0.8, counter: 0.6, stun: 0.5, lifesteal: 0.4 },
-    berserker: { haste: 1.5, crit_chance: 1.1, crit_power: 1.0, pierce: 1.0, stun: 0.7, counter: 0.3, lifesteal: 0.3 },
-};
-
-// ── A HIGH RUNG HAS WORKED ITS GEAR ──────────────────────────────────────────────────────────────────────────
-// Luke's brief: a rung near the top should look like somebody who has actually forged what they are wearing —
-// enhanced every piece, and been SELECTIVE about rerolling, pushing the affixes they did not want into the ones
-// they did. That is what a member at that height has done, so it is what they should be facing.
-//
-// Two separate things, and the difference matters:
-//
-//   ENHANCED  every piece levelled at the forge. That is a bigger weapon and thicker plate — the rates are the
-//             forge's own (items.js FORGE), not numbers invented here, so the two can never drift.
-//   REROLLED  a member does not carry eight small affixes. They carry three or four BIG ones, because every
-//             reroll takes a line they did not want and moves its whole value onto one they did. Spreading a
-//             budget evenly is what an unplayed piece looks like; concentration is the fingerprint of somebody
-//             who has been to the bench.
-//
-// So the affix budget is poured into the few lines the archetype actually wants, and then forged up to the cap
-// the real forge would allow.
+// ── THE PROC BUDGET WAS HERE ─────────────────────────────────────────────────────────────────────────────────
+// procDensity, PROC_CEILING, PROC_LEAN, rerollFrac, npcAffixLines and npcProcs built a rung's pierce,
+// lifedrink, riposte, stun and haste out of a budget with ceilings of its own. They are gear affixes for a
+// member and they are gear affixes for a rung now — see npcStats. What survived is below, because it
+// describes the WARDROBE rather than substituting for it.
 
 // How far a rung has taken the forge. Nothing at the bottom — you do not forge a Straw Dummy's stick — and the
 // peak by the time the ladder is well past anything a member is wearing.
 const NPC_FORGE_PER_TIER = 0.32;
 export const npcForgeLevel = (tier) => Math.max(0, Math.min(FORGE.MAX_LEVEL,
     Math.floor(Math.max(0, Math.round(tier) - 6) * NPC_FORGE_PER_TIER)));
-
-// ── HOW MUCH OF THEIR SET HAS BEEN REROLLED ──────────────────────────────────────────────────────────────────
-// Nobody rerolls a common. A rung low down wears what it found — a thin, even smear of whatever the items came
-// with — and a rung near the top has been to the bench over and over, taking the lines it did not want and
-// moving their whole value onto the ones it did. So concentration RAMPS, and it is the fingerprint that tells
-// the two apart: an unplayed set has eight small affixes, a worked one has three big ones.
-const REROLL_FULL_TIER = 55;
-const rerollFrac = (tier) => Math.max(0, Math.min(0.85, (Math.max(1, tier) - 8) / (REROLL_FULL_TIER - 8)));
-
-// How many lines they have concentrated INTO. Two low down, five at the top.
-const npcAffixLines = (tier) => Math.max(2, Math.min(5, 2 + Math.floor(Math.max(0, tier - 10) / 13)));
-
-/**
- * The affixes actually on a rung's gear: what the items carried, then rerolled toward what the archetype wants
- * and forged up. Deterministic — the same rung is the same fighter every time you meet it.
- *
- * THE BUDGET IS CONSERVED. A reroll MOVES a value, it does not create one (see crafting.js, where the whole
- * value transfers and the per-stat cap deliberately does not apply). So the total is set by how good the gear
- * is, and rerolling only decides how few lines it is sitting on. An earlier version capped each line instead,
- * which pinned every rung from 15 upward to the same numbers — flat where it should have been climbing.
- */
-function npcProcs(tier, archKey) {
-    const d = procDensity(tier);
-    if (d <= 0) return {};
-    const lean = PROC_LEAN[archKey] || {};
-    const ranked = Object.entries(PROC_CEILING)
-        .map(([k, ceil]) => ({ k, ceil, want: (lean[k] === undefined ? 1 : lean[k]) }))
-        .sort((a, b) => (b.want - a.want) || (a.k < b.k ? -1 : 1));
-
-    // What the SET is worth in affixes at this height, before anybody touches a bench, lifted by how far the
-    // pieces have been enhanced.
-    const forge = npcForgeLevel(tier);
-    // NPC_LIFT, not the old CAP_FRAC — same value, so no rung moves today, but it is the Road's number now
-    // rather than a borrowed forge ceiling that no longer exists. See FORGE in items.js.
-    const lift = 1 + FORGE.NPC_LIFT * Math.min(1, forge / FORGE.MAX_LEVEL);
-    const budget = ranked.reduce((n, r) => n + r.ceil * d * r.want, 0) * lift;
-
-    // Then move it. Kept lines are weighted up and the rest down by the same fraction, so nothing is invented.
-    const K = rerollFrac(tier);
-    const keep = new Set(ranked.slice(0, npcAffixLines(tier)).map((r) => r.k));
-    const weights = ranked.map((r) => ({ ...r, w: r.want * (keep.has(r.k) ? 1 + K : 1 - K) }));
-    const totalW = weights.reduce((n, r) => n + r.w, 0) || 1;
-
-    const out = {};
-    for (const r of weights) {
-        const v = Math.round(budget * (r.w / totalW));
-        if (v >= 1) out[r.k] = v;
-    }
-    return out;
-}
-
 // ── WHAT TO WARN THEM ABOUT ──────────────────────────────────────────────────────────────────────────────────
 // Only the things that change how the fight GOES, in the member's own words, biggest first. A list of every
 // stat would be a stat block again; this is the two or three facts you would want shouted across the sand
@@ -353,7 +278,7 @@ export function npcBuild(tier, seed = 0) {
     const classId = npcClassFor(t);
     const points = npcPointsFor(t);
     const taken = npcTree(classId, points, t);
-    const stats = { ...npcStats(npcPower(t), arch.key, seed, t), ...npcProcs(t, arch.key) };
+    const stats = npcStats(npcPower(t), arch.key, seed, t);
     const perks = treeEffects(classId, taken);
     const cls = CLASSES.find((c) => c.id === classId) || {};
     return {
@@ -377,8 +302,8 @@ export function npcFor(tier) {
     return {
         id: `npc:${t}`,
         npc: true,
-        // Same reason as statsForPower — the tier is the axis, not this fighter's Ferocity. See npcTempo.
-        tempo: npcTempo(t),
+        // NO `tempo` HERE ANY MORE. It was handed in because an NPC's Ferocity was a budget on nobody's
+        // scale; it comes off the wardrobe now, so a rung goes through tempoOf exactly as a member does.
         tier: t,
         band: band.key,
         name: `${band.name}${idx > 1 ? numeral : ""}`,
@@ -491,9 +416,21 @@ const bandProgress = (tier) => (Math.max(1, tier) % TIERS_PER_RARITY) / TIERS_PE
  * through the band the tier sits, so a wardrobe climbs steadily and steps up at every band boundary. The seed
  * still chooses BETWEEN equals, so two fighters of the same tier need not be in identical kit.
  */
-export function npcLoadout(tier, seed = 0) {
+// ── AND THE ARCHETYPE IS WHAT IT WEARS ───────────────────────────────────────────────────────────────────────
+// It used to be a reweighting of a stat budget: a Wall was handed the same points as a Brute and spent more of
+// them on toughness. Now that a rung's stats ARE its wardrobe (see npcStats), the archetype has to be
+// expressed the way a member expresses one — by picking different pieces.
+//
+// TWO AXES, KEPT APART. The intrinsic ranking is the POWER axis and it is calibrated (bandProgress walks it as
+// you climb within a rarity band, and check:road is anchored to it). Sorting the pool by archetype instead
+// would have moved every rung's difficulty as a side effect of giving it a personality. So the archetype
+// chooses from a WINDOW around the piece the power axis picked: same strength, different character.
+const ARCH_WINDOW = 3;
+
+export function npcLoadout(tier, seed = 0, archKey = null) {
     const rarity = rarityForTier(tier);
     const p = bandProgress(tier);
+    const arch = ARCHETYPES.find((a) => a.key === archKey) || null;
     const ids = [];
     NPC_SLOTS.forEach((slot, i) => {
         const pool = slotPool(slot, rarity);
@@ -502,8 +439,23 @@ export function npcLoadout(tier, seed = 0) {
             + (Number(it.stats?.block_chance) || 0) * 100;
         const ranked = [...pool].sort((a, b) => key(a) - key(b) || (a.id < b.id ? -1 : 1));
         const at = Math.min(ranked.length - 1, Math.floor(p * ranked.length));
-        // Ties on the ranking key are broken by the seed, so identical-strength kit still varies.
-        const same = ranked.filter((x) => key(x) === key(ranked[at]));
+        // The window is centred on the power axis's pick, so nothing in it is stronger or weaker by design.
+        const lo = Math.max(0, at - Math.floor(ARCH_WINDOW / 2));
+        const window = ranked.slice(lo, lo + ARCH_WINDOW);
+        // `w.ferocity` was authored as the HEALTH weight (see the note in npcFor), so it prices vitality as
+        // well as speed — the one place the old weights' history still shows through.
+        const want = (it) => {
+            if (!arch) return 0;
+            const st = it.stats || {};
+            return (Number(st.might) || 0) * arch.w.might
+                + (Number(st.vitality) || 0) * arch.w.ferocity * (arch.tough || 1)
+                + (Number(st.ferocity) || 0) * arch.w.ferocity
+                + (Number(st.crit_chance) || 0) * arch.w.crit_chance
+                + (Number(st.crit_power) || 0) * arch.w.crit_power;
+        };
+        const best = Math.max(...window.map(want));
+        // Ties are broken by the seed, so two rungs of the same archetype are not the same fighter.
+        const same = window.filter((x) => want(x) === best);
         ids.push(same[hash(`${tier}:${seed}:${slot}:${i}`) % same.length].id);
     });
     return ids;
@@ -515,43 +467,69 @@ export function npcLoadout(tier, seed = 0) {
  */
 export function npcStats(power, archKey, seed = 0, tier = null) {
     const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
-    // `bal` normalises what this archetype's power is WORTH (see ARCH_BAL) — how much budget it is HANDED,
-    // never how it spends it.
-    const budget = Math.max(1, Math.round(power * (arch.bal || 1)));
     const t = tier ?? tierForPower(power);
 
-    // ── TWO HALVES, EXACTLY AS A MEMBER HAS ──────────────────────────────────────────────────────────────
-    // A member's sheet is their WEAPON and their PLATE — which come from the tier of gear they have reached —
-    // plus the points rolled on top of it, which are what they have earned. An NPC is built the same way.
+    // ── EVERY NUMBER HERE COMES OFF THE GEAR. THERE IS NO BUDGET ANY MORE. ───────────────────────────────
+    // Luke: "there should be no fakeness to npc math, it should use the same constraints as players. each npc
+    // under the hood should be using the same code pathways as the player just with a hand selected build and
+    // gear set."
     //
-    //   the intrinsics come from a real wardrobe at this tier's rarity: a weapon's base damage and swing rate,
-    //   armour spread over six pieces, a shield's block chance. Nothing here scales with the budget, because
-    //   a clock is not a total and because damage is base x might, so scaling both makes it quadratic — which
-    //   it briefly was, and a tier-90 fighter swung for 39,610.
+    // The gear half was already real — npcLoadout picks catalogue items and sumItemStats sums them, so
+    // base_damage, speed, armour and block chance have always been honest. The POINTS were not: might,
+    // vitality, ferocity and both crit stats were `npcPower(tier) x archetype weight`, a number with no
+    // wardrobe behind it. Those pieces were carrying affixes the whole time and this function threw them away.
     //
-    //   the points are the budget, spent through the archetype weights. Unchanged from what was tuned, so a
-    //   Wall is the Wall the calibration measured; it simply now carries the plate it always implied.
-    const gear = sumItemStats(npcLoadout(t, seed));
+    // What that cost, measured before the change: the ladder asked for 78,453 points at rung 120 while the
+    // best wardrobe that exists in the game carries 1,274. A 62x gap between what an opponent was made of and
+    // what a member could ever be made of — and every formula written for members broke somewhere inside it.
+    // Ferocity was the plainest case: 30,408 at rung 120 against a member's 20-140, which is why tempo had to
+    // be handed in rather than derived (a tempo of 43, a swing every 156ms). Fix the points and npcTempo
+    // deletes itself, which it has.
+    //
+    // ⚠️ THE LADDER NOW ENDS WHERE THE CATALOGUE DOES. Rungs past the top rarity band wear the same wardrobe
+    // as the band below and only the forge and the tree keep climbing. That is the honest consequence of the
+    // rule and it is left visible rather than papered over: the fix is more gear, authored as real items, not
+    // a second number system. Nobody is near it — one member has ever climbed the Road and reached rung 48.
+    const gear = sumItemStats(npcLoadout(t, seed, arch.key));
+
     // ── AND THEY HAVE ENHANCED IT ────────────────────────────────────────────────────────────────────────
     // A rung high on the ladder should not be carrying an unforged weapon. Every piece is levelled at the
     // forge, which is exactly what a member at that height has done — the rates are the forge's own, so the
     // two cannot drift. This is why a rung climbs faster than the rarity bands alone would take it.
     const forge = npcForgeLevel(t);
     const forged = (v, rate) => Math.round((Number(v) || 0) * (1 + rate * forge));
+    // The affixes lift too, because a member's forge raises their affix lines and not only the piece. Rate is
+    // FORGE.NPC_LIFT — the Road's own model of what a forged set is worth, already used for exactly this
+    // before the procs came off a budget. One model, not a second one invented here.
+    const lift = 1 + FORGE.NPC_LIFT * Math.min(1, forge / FORGE.MAX_LEVEL);
+    const aff = (k) => Math.round((Number(gear[k]) || 0) * lift);
+
     return {
         base_damage: forged(gear.base_damage, forgeWeaponRate) || undefined,
         speed: Number(gear.speed) || undefined,
         armor: forged(gear.armor, forgeArmourRate),
         forgeLevel: forge,
         block_chance: Number(gear.block_chance) || 0,
-        // Vitality is what buys health; the ferocity weight was authored as the health weight and the
-        // archetype note still depends on it, so it is what vitality is spent on.
-        vitality: Math.round(budget * arch.w.ferocity * (arch.tough || 1)),
-        might: Math.round(budget * arch.w.might),
-        crit_chance: Math.round(budget * arch.w.crit_chance),
-        crit_power: Math.round(budget * arch.w.crit_power),
-        ferocity: Math.round(budget * arch.w.ferocity),
-        gearPower: budget,
+        // The four a member builds.
+        might: aff("might"),
+        vitality: aff("vitality"),
+        ferocity: aff("ferocity"),
+        tenacity: aff("tenacity"),
+        // The crits.
+        crit_chance: aff("crit_chance"),
+        crit_power: aff("crit_power"),
+        // And the procs, which were their own invented budget (npcProcs, PROC_CEILING) and are now simply
+        // the affixes the wardrobe happens to carry — rare low down and common high up, because that is how
+        // a real wardrobe fills out. Exactly what the comment above ARCHETYPES always claimed they were.
+        pierce: aff("pierce"),
+        lifesteal: aff("lifesteal"),
+        counter: aff("counter"),
+        stun: aff("stun"),
+        haste: aff("haste"),
+        fortune: aff("fortune"),
+        // Kept as the tier's power for matchmaking and for every stored npc_best, which still mean what they
+        // meant. It is no longer spent on anything.
+        gearPower: Math.max(1, Math.round(power)),
     };
 }
 
@@ -570,23 +548,18 @@ export function tierForPower(power) {
  */
 export function statsForPower(power, archKey, element = null, seed = 0) {
     const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
-    // `bal` normalises what this archetype's power is WORTH (see the note on ARCH_BAL). Applied here, at the
-    // Road's own builder, so a rung's stated power means one difficulty whichever shape it rotated onto.
-    // The Gauntlet's npcFor above carries the same latent spread and is deliberately NOT touched: it was not
-    // measured for this and re-tuning it unasked would move a balance nobody complained about.
     // ONE BUILDER FOR EVERY OPPONENT IN THE GAME. The Road used to spend a budget across four stats here while
     // the Gauntlet did the same thing thirty lines up and a fishing monster did it a third way — three copies
     // of "how a budget becomes a fighter", which is three chances to forget the stat that was added last week.
     // npcStats dresses them all out of the real catalogue instead.
     return {
         ...npcStats(power, archKey, seed),
-        // ── THE BAR'S RATE IS GIVEN, NOT DERIVED ─────────────────────────────────────────────────────────
-        // `seed` is the rung for every Road caller and the tier for everything else, which is exactly the
-        // axis a foe's speed should climb. Handed over explicitly because deriving it from this fighter's
-        // Ferocity — a gear budget in the thousands — answers 79 at rung 100. See npcTempo.
-        tempo: npcTempo(seed || 1),
-        // `tough` and `guard` stay on the line for anything that reads them off the card. tough is already
-        // folded into vitality by npcStats, so nothing may multiply by it a second time.
+        // NO `tempo`. It was given rather than derived because this fighter's Ferocity was a gear budget in
+        // the thousands and tempoOf answered 79 at rung 100. Ferocity is what the wardrobe carries now, so
+        // the rate comes out of tempoOf like a member's.
+        // `tough` and `guard` stay on the line for anything that reads them off the card. tough is no longer
+        // multiplied into vitality — npcStats has no number to multiply — it now weights which pieces the
+        // archetype reaches for in npcLoadout, so nothing may apply it a second time here either.
         tough: arch.tough || 1,
         guard: arch.guard ?? 0.20,
         element: element || ["fire", "water", "earth", "storm", "light", "shadow"][seed % 6],

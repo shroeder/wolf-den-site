@@ -21,7 +21,10 @@ import { autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { db } from "../src/lib/db.js";
 
 const WHO = process.argv[2] || "The Wolf Den";
-const MAX = Number(process.argv[3]) || 50;
+// 50 until a rung became its wardrobe. The reference member now wins every one of the first fifty outright,
+// so a gate stopping there was measuring a stretch where nothing happens — the wall moved from rung 54 to 89
+// and the interesting band with it.
+const MAX = Number(process.argv[3]) || 120;
 const TRIES = Number(process.argv[4]) || 100;
 
 const me = await db.queryOne(`SELECT id, display_name FROM mkt_buyer WHERE display_name = $1`, [WHO]);

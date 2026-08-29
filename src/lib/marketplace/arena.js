@@ -391,22 +391,18 @@ export function fighterFrom(stats = {}, perks = {}, classId = null) {
         // ── AND THE RATE ITSELF ──────────────────────────────────────────────────────────────────────────
         // Weapon speed and Ferocity, as a rate. This has to be in bout_json before the ring is opened,
         // because a bout is stamped with its mode at the bell. See arena-atb.js.
-        // ⚠️ A FOE MAY HAND IN ITS OWN TEMPO, and every Road and Gauntlet foe does. Ferocity is a member
-        // stat measured at 20-140; an NPC's is a GEAR BUDGET that climbs with the rung and never stops
-        // (7,858 at rung 100, 30,408 at rung 120), so running it through the same divisor produces a tempo
-        // of 305 and the ratio clamp then has to swallow the whole thing — which flattens every foe past
-        // about rung 50 onto the same bound and takes away any reason to invest in speed. See npcTempo.
+        // ⚠️ NO FIGHTER HANDS IN A TEMPO ANY MORE. Every Road and Gauntlet foe used to, because an NPC's
+        // Ferocity was a gear BUDGET that reached 30,408 by rung 120 against a member's 20-140 and this
+        // function answered 305. Their Ferocity is what their wardrobe carries now, so there is one path.
         // ── AND IT IS TWO TERMS NOW, NOT THREE ───────────────────────────────────────────────────────────
         // The third was `doublestrike`, converted at 0.005 x (1 - BAR_REFUND) — a stat named
         // for a mechanic that no longer exists, taking a second route to the same tempo Ferocity already
         // buys. Its points are Ferocity now (see RETIRED_AFFIX in items.js and migration 415), so they arrive
         // through tempoOf with everything else and this formula is the two lines it should always have been.
-        tempo: Number(stats.tempo) > 0
-            ? Math.max(0.2, Number(stats.tempo))
-            // The tree grants tempo DIRECTLY (tempoBonus) so a node's card can quote the number it pays —
-            // check:tree compares the two and caught it when they drifted.
-            : tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
-                + (Number(perks.tempoBonus) || 0),
+        // The tree grants tempo DIRECTLY (tempoBonus) so a node's card can quote the number it pays —
+        // check:tree compares the two and caught it when they drifted.
+        tempo: tempoOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0)
+            + (Number(perks.tempoBonus) || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
