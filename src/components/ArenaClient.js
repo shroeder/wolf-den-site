@@ -166,6 +166,55 @@ const PLAY_OPEN_FOE_MS = 1500;
 // the moment rather than a hold.
 const RESULT_MS = 1050;
 
+// -- WHAT LANDED, NAMED AS WHAT IT DOES --------------------------------------------------------------------
+// Luke: "why do we show the name of skills at all over head? why not show the effect. like. what does rimeguard
+// and rimebind do? one is freeze and one is thorns right?" -- and having to ask IS the answer. Rimebind is a
+// Runecaller freeze; Rimeguard is its third branch, thorns off a shield of ice. Both are words you only know if
+// you built that tree, and the fight screen was printing them because the label fell through to `last.ability`,
+// which narrate sets to the skill's CARD NAME, plus one hardcoded iceThorns branch. Nothing on screen ever
+// taught either word, so to anyone watching a fight they named nothing.
+//
+// So the callout names the EFFECT, and it goes over the fighter it HAPPENED TO -- the ice is on the one who is
+// frozen, not on the one who cast it. The skill's own name is the last resort, kept for a cast that landed
+// nothing but damage, where the number over their head is the whole story anyway.
+//
+// ONE LIST. This was two copies -- the centred banner's and the head label's -- each carrying a comment telling
+// the next person to keep them in step. That is exactly how "Rimeguard" came to be in both of them.
+//
+// Reads only what SURVIVED the rules: `frozen` is the roll, `freezeMs` is the freeze that actually took after
+// hold() had its say, and `resisted` is the one it refused. Reading the roll is the bug that told Luke he had
+// frozen somebody the game had just stopped him freezing.
+function beatLabel(last, foeName = "") {
+    const mine = last.who === "you";
+    const actor = mine ? "you" : "them";
+    const target = mine ? "them" : "you";
+
+    // Things that happen TO a fighter get their own line, and that line's `who` is already the right fighter.
+    if (last.fever) return { move: "The pit closes", side: actor };
+    if (last.burnTick) return { move: "Burning", side: actor };
+    if (last.bleedTick) return { move: "Bleeding", side: actor };
+    if (last.stunnedSkip) return { move: "Stunned", side: actor };
+    if (last.chilledSkip) return { move: "Frozen stiff", side: actor };
+    // A thorn and a counter are the OWNER's reply -- the engine deliberately leaves them without an `ability`
+    // so a caster's name never lands on somebody else's answer. See `answer` in arena-ring.js's narrate.
+    if (last.thorns) return { move: last.iceThorns ? "Ice thorns" : "Thorns", side: actor };
+    if (last.counter) return { move: "Retaliation", side: actor };
+    if (last.guard) return { move: "Guard up", side: actor };
+    // A blow that was turned aside is the DEFENDER's moment -- their guard held -- so it belongs over them.
+    if (Number(last.damage) === 0 && Number(last.blocked) > 0) return { move: "Blocked", side: target };
+
+    // -- THE SKILL, SAID AS THE THING IT DID TO THEM -------------------------------------------------------
+    if (last.frozen && Number(last.freezeMs) > 0) return { move: "Frozen", side: target };
+    if ((last.resisted || []).includes("freeze")) return { move: "Shrugs off the cold", side: target };
+    if (last.bled) return { move: "Wound opens", side: target };
+    if (last.burned) return { move: "Set alight", side: target };
+    if (last.chilled) return { move: "Chilled", side: target };
+
+    // Last resort: a cast that landed nothing but damage. The number over their head is the whole story, and
+    // the skill's name at least says which button did it.
+    return { move: last.ability || (mine ? "Strike" : foeName ? `${foeName}'s swing` : "Swing"), side: actor };
+}
+
 // The freeze on contact. Every fighting game made since Street Fighter II holds both fighters still for a few
 // frames at the moment of impact; it is most of why a hit reads as a hit rather than a position change.
 // A touch longer than the classic 6-8 frames, because this fight is watched rather than played frame by
@@ -1851,22 +1900,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // without an `ability` (see the note on `answer` in arena-ring.js's narrate — tagging them
                 // with the caster's skill would put their name on your reply). So both fell all the way
                 // through to the swing fallback and were announced as swings he never threw.
-                move: last.burnTick ? "Burning"
-                    : last.bleedTick ? "Bleeding"
-                        : last.thorns ? (last.iceThorns ? "Rimeguard" : "Thorns")
-                            : last.counter ? "Retaliation"
-                                : last.stunnedSkip ? "Stunned"
-                                    : last.chilledSkip ? "Frozen stiff"
-                                        : last.fever ? "The pit closes"
-                                            : last.guard ? "Guard up"
-                                                // ── A BLOW THAT WAS TURNED ASIDE SAYS SO ─────────────
-                                                // Filmed in a real bout: "You strike — the guard holds" put a
-                                                // full-size STRIKE on screen with no damage number and nothing
-                                                // moving. The banner named what was THROWN, so the one case
-                                                // where a player most needs to be told the outcome was the one
-                                                // case that looked identical to a hit landing.
-                                                : (Number(last.damage) === 0 && Number(last.blocked) > 0) ? "Blocked"
-                                                    : last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
+                // beatLabel decides both of these now -- see it for why the effect is named and not the skill.
+                move: beatLabel(last, bout.foe.name).move,
                 mine: last.who === "you",
                 crit,
                 again: Boolean(last.again),
@@ -1884,26 +1919,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const locked = Boolean(last.stunnedSkip || last.chilledSkip);
             const dot = Boolean(last.burnTick || last.bleedTick);
             const mine = last.who === "you";
-            // A blocked blow is the DEFENDER's moment — their guard held — so the label belongs over them,
-            // not over the fighter whose swing failed.
-            const wasBlocked = Number(last.damage) === 0 && Number(last.blocked) > 0;
+            const said = beatLabel(last);
             const h = {
                 id: headId.current,
-                side: wasBlocked ? (mine ? "them" : "you") : (mine ? "you" : "them"),
-                // The same list as the clash above, and it has to stay the same list — see the warning there.
-                move: last.burnTick ? "Burning"
-                    : last.bleedTick ? "Bleeding"
-                        : last.thorns ? (last.iceThorns ? "Rimeguard" : "Thorns")
-                            : last.counter ? "Retaliation"
-                                : last.stunnedSkip ? "Stunned"
-                                    : last.chilledSkip ? "Frozen"
-                                        : last.fever ? "The pit closes"
-                                            : last.guard ? "Guard up"
-                                                // Same rule as the banner. The label goes over the DEFENDER
-                                                // below, because a guard holding is their doing, not the
-                                                // swinger's.
-                                                : (Number(last.damage) === 0 && Number(last.blocked) > 0) ? "Blocked"
-                                                    : last.ability || (mine ? "Strike" : "Swing"),
+                // beatLabel owns BOTH halves now -- what the beat is called and which fighter it belongs over.
+                // The side rule here only ever knew about the one case (a block) that flips; the effect labels
+                // added a dozen more, because a freeze belongs over the fighter who is frozen.
+                side: said.side,
+                move: said.move,
                 // Louder than a move, and on the same scale as one. These are the things that happen TO a
                 // fighter rather than because of them, which is the whole reason they are called out at all.
                 alert: locked || dot || Boolean(last.again),
