@@ -436,6 +436,48 @@ export const SCENES = {
     // Runs the actual engine over the fixture fighters and hands the screen the transcript it produces, so
     // this scene exercises PLAYBACK rather than a hand-written log: the health bars, the pacing, the crits and
     // the verdict all come from the same list the payout would have read.
+    // ── EVERY POP AT ONCE, ON PURPOSE ────────────────────────────────────────────────────────────────────
+    // The pop queue holds four groups and drops the oldest the moment a fifth arrives (pushPop, ArenaClient),
+    // so a busy beat purges numbers part-way through their fade. A real bout will not reliably deal you
+    // thirteen simultaneous riders, so this is a hand-written log where ONE beat carries every rider the
+    // reader knows how to draw: a crit, a block, a heal, a steal, a ward soak, thorns both ways, a riposte,
+    // both counters, then a bleed tick and a burn tick on the two beats after it.
+    //
+    // A hand-written log is the wrong thing for asking what the ENGINE does — see the notes on playback and
+    // timer. It is the right thing for asking what the SCREEN does when it has to draw thirteen numbers,
+    // which is the only question here.
+    //
+    // ⚠️ HANDED OVER BY THE STUB, NOT MOUNTED, for the reason spelled out on `timer`: a bout that is already
+    // on screen when the client mounts is a RESUMED one and opens at its last beat, so a mounted log shows
+    // the end of the fight and nothing playing. Written the first time as a mounted bout and filmed exactly
+    // that — thirty frames of a finished fight.
+    //   node scripts/film.mjs "<lab>?scene=popstorm&chrome=0" out/x --click ".ar-pick-row"
+    popstorm: {
+        label: "Pop storm",
+        note: "One beat carrying every rider at once — thirteen pops against a queue that holds four. Press Challenge to play it.",
+        state: () => {
+            const b = makeBout();
+            return {
+                ...baseState({ bout: null }),
+                atbBout: {
+                    ...b,
+                    beat: 0, over: false,
+                    maxHp: 1600, foeMaxHp: 1500, hp: 1600, foeHp: 1500,
+                    bleed: { turns: 4, stacks: 2, dmg: 96 },
+                    foeBleed: { turns: 3, stacks: 1, dmg: 41 },
+                    log: [
+                        { t: 1, who: "you", damage: 415, crit: true,
+                            blocked: 1, healed: 58, stolen: 22, soaked: 31,
+                            theirThorns: 44, theirSoak: 18, thorned: 37, takenBack: 26,
+                            riposted: 29, countered: 167, counterCrit: true,
+                            theirCounter: 88, theirHealed: 40, text: "Everything at once" },
+                        { t: 2, who: "foe", damage: 96, kind: "bleed", bleedTick: true, grade: "burn", text: "Bleeding" },
+                        { t: 3, who: "you", damage: 41, kind: "rend", burnTick: true, grade: "burn", text: "Burning" },
+                    ],
+                },
+            };
+        },
+    },
     playback: {
         label: "Playback",
         note: "A whole fight, resolved by the engine and played back blow by blow. This is what a bout looks like now.",

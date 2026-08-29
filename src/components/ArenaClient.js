@@ -5031,7 +5031,11 @@ function Styles() {
             .ar-pop.is-counter { color: #ffe9a8; text-shadow: 0 0 12px rgba(255,190,80,.85), 0 2px 6px #000; }
             .ar-pop.is-counter-crit { color: #fff6cc; font-size: 2.5rem; letter-spacing: .02em;
                 text-shadow: 0 0 20px rgba(255,205,90,1), 0 0 42px rgba(255,150,40,.8), 0 3px 8px #000; }
-            .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
+            /* ── ABOVE THE HEAD, NOT ACROSS THE CHEST ────────────────────────────────────────────────
+               34% put every number over the fighter's body, so a busy beat printed eleven figures across the
+               art they were meant to be read against — filmed in the popstorm scene. They start clear of the
+               sprite now and rise from there. */
+            .ar-pops { position: absolute; bottom: 62%; z-index: 21; display: flex; flex-direction: column-reverse;
                 align-items: center; gap: 6px; pointer-events: none;
                 /* Older groups ride up rather than sitting under the new one. Without this, four live groups
                    are four numbers printed on the same pixel — which is the single-slot bug again, wearing a
@@ -5072,18 +5076,23 @@ function Styles() {
             /* Punch in, HOLD, then drift. The hold is the whole point — 12% to 62% of the run is the number
                sitting still at full opacity, which is roughly a second of actually being readable against the
                quarter-second it had before. */
-            @keyframes arPop { from { opacity: 0; transform: translateY(14px) scale(.7) }
-                12% { opacity: 1; transform: translateY(-8px) scale(1.14) }
-                20% { transform: translateY(-8px) scale(1) }
-                62% { opacity: 1; transform: translateY(-14px) scale(1) }
-                to { opacity: 0; transform: translateY(-62px) scale(.96) } }
-            @keyframes arPopCrit { from { opacity: 0; transform: translateY(10px) scale(.4) rotate(-8deg) }
-                9% { opacity: 1; transform: translateY(-12px) scale(1.4) rotate(2deg) }
-                16% { transform: translateY(-12px) scale(1.1) rotate(0deg) }
-                22% { transform: translateY(-12px) scale(1.18) }
-                28% { transform: translateY(-12px) scale(1.1) }
-                66% { opacity: 1; transform: translateY(-18px) scale(1.1) }
-                to { opacity: 0; transform: translateY(-74px) scale(1) } }
+            /* ── BIG, THEN NORMAL IN 300ms, THEN RISE ────────────────────────────────────────────────
+               The number arrives at nearly twice size and settles to its own by 300ms — 32% of the .95s
+               animation — so the eye catches it at the moment it lands rather than having to find it. Only
+               after it is the right size does it start travelling upward and fading, which is what makes a
+               stack of them readable in order instead of all at once. */
+            @keyframes arPop { from { opacity: 0; transform: translateY(6px) scale(1.9) }
+                8% { opacity: 1; transform: translateY(0) scale(1.7) }
+                32% { opacity: 1; transform: translateY(-6px) scale(1) }
+                70% { opacity: 1; transform: translateY(-28px) scale(1) }
+                to { opacity: 0; transform: translateY(-66px) scale(1) } }
+            /* A crit takes the same 300ms to settle, but lands bigger and keeps a little of it. */
+            @keyframes arPopCrit { from { opacity: 0; transform: translateY(8px) scale(2.5) rotate(-6deg) }
+                8% { opacity: 1; transform: translateY(0) scale(2.2) rotate(2deg) }
+                24% { transform: translateY(-6px) scale(1.22) rotate(0deg) }
+                32% { opacity: 1; transform: translateY(-8px) scale(1.15) }
+                70% { opacity: 1; transform: translateY(-30px) scale(1.15) }
+                to { opacity: 0; transform: translateY(-78px) scale(1.05) } }
 
             /* ── HIT-STOP ── both fighters hold still for a few frames at the moment of contact. It is most of
                why a blow reads as a blow rather than a position change, and it costs one class. */
