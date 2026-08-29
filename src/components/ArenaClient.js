@@ -1837,6 +1837,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         if (isNew) {
             setClash({
                 grade: crit ? "crit" : last.grade,
+                // Nothing to announce: the block has its own pop over the fighter that made it.
+                blockOnly: Number(last.damage) === 0 && Number(last.blocked) > 0,
                 // ── NOT EVERY LINE IS A SWING ────────────────────────────────────────────────────────
                 // This fell through to "Strike" for anything with no ability on it, so the big centred
                 // callout announced STRIKE over a burn tick and over "You cannot act." — filmed, four
@@ -2141,6 +2143,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // that would be a blood droplet icon".
                 const dot = l.kind === "bleed" ? "bleed" : (l.kind === "rend" || l.grade === "burn" ? "burn" : null);
                 // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
+                // ── THE WORD GOES WITH THE NUMBER ────────────────────────────────────────────────────
+                // CRITICAL used to be a separate centred overlay (.ar-grade), which put the word describing a
+                // blow nowhere near the blow — filmed in popstorm sitting up by the health bars while the
+                // number it belonged to was four rows down over a fighter. It is a pop now, pushed just
+                // before its own number so the column reads CRITICAL then the figure.
+                if (l.crit) sub.push({ side: target, n: null, text: "CRITICAL", kind: "critword" });
                 sub.push({ side: target, n: l.damage, kind: dot || (l.crit ? "crit" : "dmg"), dot });
             } else if (l.grade === "miss") {
                 sub.push({ side: target, n: null, text: "MISS", kind: "miss" });
@@ -2821,8 +2829,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     {clash && !atbMode ? (
                         <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}${clash.crit ? " is-crit" : ""}`}
                             aria-hidden="true">
-                            {clash.crit ? <b className="ar-critword">Critical</b> : null}
-                            <em className="ar-move">{clash.move}</em>
+                            {/* Critical and Blocked are POPS now — see the note at the sub.push above. What
+                                is left here is the MOVE, named, which is a different job: it announces what
+                                is being thrown before the numbers land under it. A line whose only story is
+                                that it was blocked has no move to name, so it says nothing at all. */}
+                            {clash.blockOnly ? null : <em className="ar-move">{clash.move}</em>}
                             {/* WHY SOMEBODY JUST WENT TWICE. Turns alternate, so this is the only thing that
                                 can break the rhythm and it is never allowed to happen quietly — that is the
                                 whole reason the clock came out. It says it on the blow itself, on both sides
@@ -5084,6 +5095,12 @@ function Styles() {
             .ar-pop.is-block, .ar-pop.is-ward { font-size: 1.35rem; color: #9fdcff;
                 text-shadow: 0 3px 12px #000, 0 0 18px rgba(159,220,255,.55); }
             .ar-pop.is-heal { font-size: 1.5rem; color: #8bf0b4; text-shadow: 0 3px 12px #000, 0 0 22px rgba(139,240,180,.7); }
+            /* The word sits on the number it belongs to: small, spaced, and the same gold the crit figure
+               under it uses, so the two read as one thing arriving rather than two events. */
+            .ar-pop.is-critword { font-size: .78rem; letter-spacing: .28em; color: #ffe9a8;
+                -webkit-text-stroke: 2px rgba(0,0,0,.92);
+                text-shadow: 0 2px 9px #000, 0 0 18px rgba(255,215,94,.7); margin-bottom: -4px; }
+            .ar-pop.is-left.is-critword { color: #ffd0d6; text-shadow: 0 2px 9px #000, 0 0 18px rgba(255,140,150,.7); }
             .ar-pop u { display: block; text-decoration: none; font-size: 8.5px; font-weight: 900;
                 letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
             /* Punch in, HOLD, then drift. The hold is the whole point — 12% to 62% of the run is the number
