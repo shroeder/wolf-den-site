@@ -181,7 +181,25 @@ export default function DelveRun({ run, busy, onAct }) {
                 </div>
                 {art ? (
                     // eslint-disable-next-line @next/next/no-img-element
+                    // ── A NEW NODE PER SPRITE, NOT A NEW src ON THE OLD ONE ──────────────────────────
+                    // Reported from an iPad: the silhouette is right, you step in, and the foe stays a black
+                    // shape — then the next floor's tree stump is black too, and from there everything is.
+                    //
+                    // is-shadow paints with `filter: brightness(0)`, and iOS Safari does not reliably
+                    // re-rasterise a filtered <img> when only its `src` changes: it keeps serving the frame
+                    // it already rendered, which is the black one. Because this is ONE element that every
+                    // encounter reuses, the first silhouette of a run poisons every sprite after it.
+                    //
+                    // Keying on the art makes each encounter its own node, so there is no cached raster to
+                    // inherit. It costs a mount per encounter, which is one image the browser was decoding
+                    // anyway.
+                    //
+                    // ⚠️ THE SILHOUETTE STATE IS PART OF THE KEY, and it has to be: a fight TEASES with the
+                    // foe's own sprite and then fights with it, so `art` is the same URL on both sides of the
+                    // transition. Keyed on the art alone the node survives exactly the moment the filter comes
+                    // off, which is the moment the bug is about.
                     <img
+                        key={`${art}|${silhouette ? "shadow" : "lit"}`}
                         src={art}
                         className={`dlr-art${fighting ? " is-foe" : ""}${rare ? " is-rare" : ""}${silhouette ? " is-shadow" : ""}${result ? " is-result" : ""}`}
                         alt=""
