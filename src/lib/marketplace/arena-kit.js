@@ -785,24 +785,29 @@ export const arenaWinXp = (power = 0) =>
 // is 0.32 for every weapon in the game and 0.16 bare-handed — so a rate derived from a FINISHED swing has to
 // be divided by that, or the weapon gets counted twice. It was 4.556 for exactly one run of this file and
 // JT's crit came out at 10.7% of his bar instead of a third.
-export const DAMAGE_PER_MIGHT = 14.27;
+export const DAMAGE_PER_MIGHT = 4.566;
 export const mightMult = (might = 0) => DAMAGE_PER_MIGHT * curve(might);
 
 // damage = base damage x the might calculation
-// ── AN EMPTY HAND IS THE WORST WEAPON, NOT THE BEST ──────────────────────────────────────────────────────────
-// This is the fallback for a member with nothing in their main hand, and it was 100 — the TOP of the old
-// 10-to-100 rarity ladder. So punching beat every weapon in the game bar one primordial, and 69 of the 73
-// armed members in the Den hit harder with their hands than with the sword they were carrying. Flattening the
-// ladder to 32 did not fix that, it made it universal: unarmed was 2.5x the best weapon in the catalogue.
+// ── THE WEAPON IS A MULTIPLIER, ON THE SAME CURVE AS EVERYTHING ELSE ─────────────────────────────────────────
+// This was `(base / WEAPON_BASE_DIVISOR) * mightMult(might)` — a linear term over an arbitrary 100. Two
+// problems, both now gone:
 //
-// Half of what a real weapon carries. Being unarmed is now a penalty, which is what an empty slot should be,
-// and every weapon in the game is an upgrade over it.
-export const WEAPON_BASE_REF = 16;
-// The weapon's base is divided by this before Might multiplies it. Without it the two numbers were both
-// damage and multiplied each other into the tens of thousands.
-export const WEAPON_BASE_DIVISOR = 100;
-export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
-    ((Number(baseDamage) || WEAPON_BASE_REF) / WEAPON_BASE_DIVISOR) * mightMult(might);
+//   the /100 meant nothing. It was a scale correction from when base_damage ran 10-100 and mightMult returned
+//   up to 3,500, and once base went flat it was a constant 0.32 that had already been folded into
+//   DAMAGE_PER_MIGHT. Two constants describing one thing, which is how that rate came to be wrong by 3.1x.
+//
+//   it was LINEAR, so twice the weapon was exactly twice the blow, while Might, Vitality and armour all
+//   diminish. Weapons now run on STAT_EXPONENT like the rest: doubling the number on the blade is worth
+//   2^0.75 = 1.68x, not 2x.
+//
+// Normalised against the typical weapon, so the multiplier reads as a comparison: 32 is 1.00x, the best in the
+// catalogue is 1.19x, and an empty hand is 0.60x.
+export const WEAPON_BASE_TYPICAL = 32;
+export const WEAPON_BASE_REF = 16;      // an empty main hand — half a weapon before the curve
+export const weaponMult = (baseDamage = WEAPON_BASE_REF) =>
+    curve(Number(baseDamage) || WEAPON_BASE_REF) / curve(WEAPON_BASE_TYPICAL);
+export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) => weaponMult(baseDamage) * mightMult(might);
 
 // ── THE ACCURACY NOTE THAT USED TO BE HERE IS GONE ───────────────────────────────────────────────────────────
 // It explained, with a worked table, how Ferocity bought accuracy: 20 fero for 77%, 207 for 93% at the cap,
