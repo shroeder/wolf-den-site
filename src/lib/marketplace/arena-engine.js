@@ -360,6 +360,17 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
         let dealt = 0;
         let anyCrit = false;
         let blocked = 0;
+        // ── AND WHAT THE GUARD ACTUALLY STOPPED ─────────────────────────────────────────────────
+        // `blocked` is a COUNT of blows, and it was the only mitigation figure this swing recorded --
+        // so every screen that wanted "damage turned aside" had nothing to read and reached for the
+        // count instead. Luke, on a defeat card reading "Damage taken 2,130 / Turned aside 1":
+        // "what is turned aside, dead code?" It was one blocked BLOW, printed through the thousands
+        // formatter next to two damage totals, which makes it unreadable as anything but damage.
+        //
+        // Two numbers, because they are two different defences and a player can tell them apart: the
+        // block is the shield arm, the soak is a ward spent absorbing a blow before it reached health.
+        let turned = 0;
+        let soaked = 0;
         let thornsBack = 0;
         // The grudge is spent on THIS swing and the bank cleared, whether or not the blow lands well.
         const grudgeBonus = att.grudge > 0 ? att.banked * att.grudge : 0;
@@ -406,6 +417,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
                 blow = Math.max(1, Math.round(blow * (1 - def.blockReduction)));
                 // THORNS ANSWER THE BLOCK, not the blow: what the shield turned aside is what comes back.
                 if (def.thorns > 0) thornsBack += Math.round((before - blow) * def.thorns);
+                turned += before - blow;
                 blocked += 1;
             }
             dealt += blow;
@@ -416,6 +428,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             const eaten = Math.min(def.shield, dealt);
             def.shield -= eaten;
             dealt -= eaten;
+            soaked += eaten;
         }
         def.hp -= dealt;
         // THE GRUDGE. What was done to them since their own last swing is banked, and a share of it rides on
@@ -478,7 +491,7 @@ export function resolveSwing({ A, B, att, def, who, log, t, rng = Math.random, m
             def.bleedPer = Math.max(Number(def.bleedPer) || 0, dealt * (BLEED_SHARE + att.bleedDamage));
             bled = true;
         }
-        log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
+        log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, turned, soaked, stunned, hasted, bled, wild,
             burned, frozen, surge: surging, soul,
             meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meHp: A.hp, foeHp: B.hp, meShield: A.shield, foeShield: B.shield, meStun: A.stunned, foeStun: B.stunned, meChill: A.skipChance, foeChill: B.skipChance, meBurn: A.burnLeft, foeBurn: B.burnLeft });
         // RIMEGUARD answers EVERY blow rather than only a blocked one — that is the difference between the

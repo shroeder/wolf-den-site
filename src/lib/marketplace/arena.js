@@ -2026,10 +2026,18 @@ export const boutKindOf = (b) =>
 function boutTelemetry(b, won) {
     const log = Array.isArray(b?.log) ? b.log : [];
     const sum = (rows, f) => rows.reduce((n, l) => n + (Number(f(l)) || 0), 0);
-    // THE TWO SIDES DO NOT USE THE SAME FIELD NAMES, and guessing that they did would have quietly recorded
-    // zeroes. Your line carries `turned` (what their guard stopped) and `theirSoak` (what their banked shield
-    // ate); theirs carries `blocked` and `soaked` for the mirror of each. Written out per side rather than
-    // parameterised, so the mapping is visible and a rename breaks loudly.
+    // ── AND THE COMMENT THAT USED TO BE HERE DESCRIBED FIELDS THAT DID NOT EXIST ─────────────────────────
+    // It said the two sides use different field names -- `turned`/`theirSoak` on your lines, `blocked`/`soaked`
+    // on theirs -- and warned that guessing wrong "would have quietly recorded zeroes". It WAS the guess.
+    // resolveSwing has only ever pushed `blocked`, and none of `theirSoak`, `soaked`, `thorned`, `riposted`,
+    // `takenBack` or `theirThorns` is written anywhere in the codebase. So turnedAside, shielded and back were
+    // hard zero on both sides of every telemetry row ever stored -- including the rows scripts/arena-report.mjs
+    // is read from when the combat maths is tuned.
+    //
+    // There is one set of names, the engine writes them, and both sides read the same ones. Mitigation is
+    // recorded on the ATTACKER's line, so a side's `turned`/`soaked` is what its OPPONENT's guard stopped --
+    // which is exactly what turnedAside has always claimed to mean. Thorns and counters are their own log
+    // lines rather than a field, so `back` counts those.
     const shape = (rows, dmg, stopped, shielded, back) => {
         const hits = rows.filter((l) => (l.damage || 0) > 0);
         return {
@@ -2088,10 +2096,11 @@ function boutTelemetry(b, won) {
         element: f.element || null,
     } : null);
     const rounds = b?.beat || log.length || 0;
+    const answers = (rows) => rows.filter((l) => l.thorns || l.counter);
     const mine = shape(myRows, sum(myRows, (l) => l.damage), sum(myRows, (l) => l.turned),
-        sum(myRows, (l) => l.theirSoak), sum(myRows, (l) => (l.theirThorns || 0) + (l.takenBack || 0)));
-    const theirs = shape(theirRows, sum(theirRows, (l) => l.damage), sum(theirRows, (l) => l.blocked),
-        sum(theirRows, (l) => l.soaked), sum(theirRows, (l) => (l.thorned || 0) + (l.riposted || 0)));
+        sum(myRows, (l) => l.soaked), sum(answers(myRows), (l) => l.dmg || l.damage));
+    const theirs = shape(theirRows, sum(theirRows, (l) => l.damage), sum(theirRows, (l) => l.turned),
+        sum(theirRows, (l) => l.soaked), sum(answers(theirRows), (l) => l.dmg || l.damage));
     return {
         v: 1,
         won: Boolean(won),

@@ -206,8 +206,13 @@ export const FEATS = [
     {
         id: "bulwark", name: "Bulwark", laurels: 40, vp: 8, color: "#6fd0ff",
         blurb: "Turned aside half your own health over the bout.",
+        // UNEARNABLE UNTIL NOW. `blocked` is a count of blows -- a long bout has maybe twenty -- and
+        // this compared it against half a health bar, which is hundreds. `soaked` was written by nothing.
+        // The engine records both as DAMAGE now, and mitigation lands on the attacker's line, so what
+        // your own guard stopped is the sum over THEIR swings.
         test: (b) => {
-            const stopped = (b.log || []).reduce((n, l) => n + (l.blocked || 0) + (l.soaked || 0), 0);
+            const theirs = (b.log || []).filter((l) => l.who === "foe" || l.who === "them");
+            const stopped = theirs.reduce((n, l) => n + (l.turned || 0) + (l.soaked || 0), 0);
             return b.won && stopped >= Math.max(1, b.maxHp) * 0.5;
         },
     },

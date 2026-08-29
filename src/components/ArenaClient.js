@@ -832,7 +832,15 @@ function Recap({ bout, busy, onClose }) {
                 if (l.damage > best.n) best = { n: l.damage, name: l.ability || (l.grade === "burn" ? "Burn" : "Strike") };
             }
             if (!mine && l.damage > 0) taken += l.damage;
-            blocked += (l.blocked || 0) + (l.soaked || 0);
+            // ── YOUR GUARD, ON THEIR SWINGS ──────────────────────────────────────────────────────
+            // This summed `l.blocked` -- a COUNT of blows -- over BOTH fighters' lines and printed it
+            // through money(), the thousands formatter used for damage. So "Turned aside 1" sat under
+            // "Damage taken 2,130" reading as one point of damage, when it meant one blow somewhere in
+            // the bout was blocked, by either of you. `l.soaked` was never written by anything at all.
+            //
+            // Mitigation is recorded on the ATTACKER's line, because that is the swing it happened to.
+            // So what YOUR guard stopped is on THEIR lines, which is why this counts !mine.
+            if (!mine) blocked += (l.turned || 0) + (l.soaked || 0);
             if (mine && l.crit) crits += 1;
             healed += l.healed || 0;
         }
