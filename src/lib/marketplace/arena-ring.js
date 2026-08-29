@@ -550,6 +550,11 @@ function castSkill(ring, skill, att, def) {
     if (skill.burnDamage > 0) A.burnDamage += skill.burnDamage;
     if (skill.burnLeech > 0) A.burnLeech += skill.burnLeech;
     if (skill.drain > 0) A.lifesteal += skill.drain;
+    // ── GRUDGE REPLACES THE PASSIVE FOR THIS SWING ───────────────────────────────────────────────────────
+    // Every other line here ADDS to what the fighter already carries. This one ASSIGNS: the Warden tree's
+    // wd_grudge (5 ranks, +0.03 each, up to 0.15) is discarded for the duration of this swing and the skill's
+    // share is used instead — they do not stack. Written as `=` on purpose; the next reader should not have
+    // to infer that from the operator.
     if (skill.grudge > 0) A.grudge = skill.grudge;
     return { mult, was };
 }

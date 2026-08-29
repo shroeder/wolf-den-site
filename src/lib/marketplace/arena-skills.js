@@ -292,7 +292,7 @@ export const SKILLS = [
         id: "retribution", classId: "warden", name: "Retribution",
         sprite: "/images/arena/skill/retribution.webp",
         blurb: "Everything they have done to you since your last swing, handed back on this one.",
-        power: 1.1, cooldown: 4, grudge: 0.6,
+        power: 1.1, cooldown: 4, grudge: 0.2,
         branches: [
             { id: "ledger", name: "Ledger", tag: "Bank it all, spend it once" },
             { id: "punish", name: "Punish", tag: "Answer often, and stop them" },
