@@ -705,6 +705,15 @@ const NPC_CLASS = {
     duelist: "reaver", balanced: "runecaller", caster: "runecaller",
 };
 
+// ── AND ARENA-NPC READS IT FROM HERE, RATHER THAN CYCLING ITS OWN ────────────────────────────────────────────
+// npcClassFor used to pick a rung's class off a three-cycle of the TIER while this map picked its skills off
+// the ARCHETYPE. They disagreed on six of ten sampled rungs, and rung 100 was the plain case: forty-one points
+// of WARDEN passives — Bulwark, Bastion, Thornmail — carrying a RUNECALLER deck of Immolate, Rimebind and
+// Overflow. No member can be two classes, and the tree a fighter bought is the one its skills come from.
+//
+// Luke: "they must comply with the players same constraints." One map, one class.
+export const npcClassForArchetype = (archetype = "balanced") => NPC_CLASS[archetype] || "runecaller";
+
 // Which branch each archetype commits to — the one that reads like the thing it is supposed to BE.
 const NPC_BRANCH = {
     wall: ["fortress", "medic", "ledger"],
@@ -730,6 +739,13 @@ export function npcSkills(rung = 1, archetype = "balanced") {
     const depth = Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, rung) / 18)));
     const width = Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, rung) / 12)));
     const bag = {};
+    // ── AND IT MAY NOT SPEND MORE THAN A MEMBER HAS ──────────────────────────────────────────────────────
+    // A skill costs a point and so does each of its nodes (see skillPointsSpent), and a member earns one
+    // every two levels to a hard SKILL_POINT_CAP. Nothing here counted: the deck was `depth x width` nodes
+    // deep whatever that came to. It happened to land inside the cap at every rung measured — 9 at rung 100
+    // against a ceiling of 12 — so this changes no fighter today. It is here so that widening the curve
+    // later cannot quietly hand a rung a deck no member could buy.
+    let spent = 0;
     for (let i = 0; i < width; i += 1) {
         const branchId = want[i];
         const skill = mine.find((sk) => sk.branches.some((b) => b.id === branchId));
@@ -737,9 +753,12 @@ export function npcSkills(rung = 1, archetype = "balanced") {
         // The first skill runs deepest; the ones after it are shallower, so a foe reads as one plan with
         // support rather than three half-finished ideas.
         const d = Math.max(1, depth - i);
-        bag[skill.id] = skill.nodes
-            .filter((n) => n.branch === branchId && n.tier < d)
-            .map((n) => n.id);
+        const nodes = skill.nodes.filter((n) => n.branch === branchId && n.tier < d).map((n) => n.id);
+        // The skill itself is a point, then one per node. Take what still fits and stop.
+        if (spent + 1 > SKILL_POINT_CAP) break;
+        const room = SKILL_POINT_CAP - spent - 1;
+        bag[skill.id] = nodes.slice(0, Math.max(0, room));
+        spent += 1 + bag[skill.id].length;
     }
     return bag;
 }

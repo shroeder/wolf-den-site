@@ -1,6 +1,8 @@
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
 import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
-import { CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
+import { ARENA_MAX_LEVEL, CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
+// npcClassForArchetype, so a rung's TREE and its DECK cannot name two different classes.
+import { npcClassForArchetype } from "@/lib/marketplace/arena-skills.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -189,15 +191,27 @@ export const archetypeForTier = (t) => {
 // The last one is not decoration. A bout resolves in seconds, so the only place a member can make a decision is
 // BEFORE it — and a foe whose shape you cannot see is a coin toss wearing a portrait.
 
-// Which class a rung fights as. Cycled rather than rolled so a rung is the same character every time, and
-// offset from the archetype cycle (3 against 5) so the pairing does not repeat until rung fifteen.
-const NPC_CLASSES = ["reaver", "warden", "runecaller"];
-export const npcClassFor = (tier) => NPC_CLASSES[Math.max(1, Math.round(tier)) % NPC_CLASSES.length];
+// ── WHICH CLASS A RUNG FIGHTS AS — ONE ANSWER, NOT TWO ───────────────────────────────────────────────────────
+// This cycled reaver/warden/runecaller off the TIER, while npcSkills picked the deck off the ARCHETYPE. The two
+// disagreed on six of ten sampled rungs: rung 100 spent forty-one points on WARDEN passives and then brought a
+// RUNECALLER deck. A member is one class — the tree they bought is the tree their skills come from — so the
+// archetype decides, and the skills' own map is the one that answers.
+export const npcClassFor = (tier) => npcClassForArchetype(archetypeForTier(tier).key);
 
-// How many tree points a rung has spent. A member has ten to twelve; a rung climbs past that because the
-// ladder is endless and the tree is one of the few things about a character that can keep growing.
+// ── HOW MANY TREE POINTS A RUNG HAS SPENT, AND IT MAY NOT EXCEED A MEMBER'S ──────────────────────────────────
+// The ceiling was 60. A member's tree budget is their arena LEVEL, one point a level, and arena level stops
+// dead at ARENA_MAX_LEVEL — 24 — for the exact reason written on that constant: "a member's tree budget grew
+// forever and the top of the ladder could never be caught." So the ladder was handing its rungs two and a half
+// times the hard player ceiling, which is the same class of fakeness as the stat budget. Rung 100 carried 41.
+//
+// Measured: the furthest-along member is level 24 and has spent 24. Nobody can ever have more.
+//
+// ⚠️ THIS FLATTENS THE TOP, and that is the honest consequence rather than an oversight. Every rung past about
+// 60 now has the same tree as a maxed member, so the difficulty above it is carried by gear and the forge
+// alone. The lever, if the top needs to climb again, is more gear — authored as real items.
 const NPC_POINTS_PER_TIER = 0.42;
-export const npcPointsFor = (tier) => Math.max(0, Math.min(60, Math.round(Math.max(0, tier - 3) * NPC_POINTS_PER_TIER)));
+export const npcPointsFor = (tier) =>
+    Math.max(0, Math.min(ARENA_MAX_LEVEL, Math.round(Math.max(0, tier - 3) * NPC_POINTS_PER_TIER)));
 
 // Spend them the way a member must: one at a time, respecting each node's rank cap and its gate. Deterministic
 // per (tier, class), so the same rung is the same build every time you meet it.
@@ -381,7 +395,33 @@ const NPC_RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "asc
 // Tier 1 opens in common and the ladder tops out around the Gauntlet's Ascendant band. Beyond that the gear
 // stops climbing and only the scale below does, which is the honest version of "it keeps getting taller".
 const TIERS_PER_RARITY = 13;
-const rarityForTier = (t) => NPC_RARITY_LADDER[Math.min(NPC_RARITY_LADDER.length - 1, Math.floor(Math.max(1, t) / TIERS_PER_RARITY))];
+const bandFor = (t) => Math.min(NPC_RARITY_LADDER.length - 1, Math.floor(Math.max(1, t) / TIERS_PER_RARITY));
+const rarityForTier = (t) => NPC_RARITY_LADDER[bandFor(t)];
+
+// ── A WARDROBE IS NOT ALL ONE RARITY ─────────────────────────────────────────────────────────────────────────
+// Every slot took rarityForTier, so a rung wore ten pieces of exactly one rarity — rung 100 was celestial in
+// all ten. Luke: "seems like a poor constraint to force them to wear a rarity across all pieces."
+//
+// It is also not what a member looks like. A real wardrobe is mostly at your band, with a couple of pieces you
+// have not replaced yet and occasionally one lucky drop from above. So each slot rolls an offset, weighted to
+// sit at the band: four at band, three below, one above. Deterministic off (tier, seed, slot) like everything
+// else here, so a rung is still the same fighter every time you meet it.
+//
+// The band itself is untouched, so this shifts a rung's power by less than moving it a rung.
+// ⚠️ THE OFFSET IS PER SLOT, NOT PER RUNG, AND THAT IS THE WHOLE TRICK.
+// Rolled with the tier in the hash it wrecked monotonicity: rung N could roll a lucky helmet while N+1 rolled
+// an unlucky one, so a rung got EASIER than the one below it. Measured — 33 such breaks against 10 before,
+// which is the failure a member reads as the game being broken.
+//
+// Keyed on the slot alone, every rung wears the same SHAPE of wardrobe — the same slots run a band behind,
+// the same one runs ahead — and the whole set climbs together. Which is also the truer picture: a real player
+// lags on the same piece for ages and has one lucky drop they will not replace.
+const RARITY_SPREAD = [0, 0, 0, 0, -1, -1, -2, 1];
+const rarityForSlot = (tier, slot, i) => {
+    const off = RARITY_SPREAD[hash(`${slot}:${i}:rarity`) % RARITY_SPREAD.length];
+    const at = Math.max(0, Math.min(NPC_RARITY_LADDER.length - 1, bandFor(tier) + off));
+    return NPC_RARITY_LADDER[at];
+};
 
 // Deterministic, so tier 40 is the same fighter every time the server starts and two members see one opponent.
 const hash = (str) => { let h = 2166136261; for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
@@ -428,12 +468,11 @@ const bandProgress = (tier) => (Math.max(1, tier) % TIERS_PER_RARITY) / TIERS_PE
 const ARCH_WINDOW = 3;
 
 export function npcLoadout(tier, seed = 0, archKey = null) {
-    const rarity = rarityForTier(tier);
     const p = bandProgress(tier);
     const arch = ARCHETYPES.find((a) => a.key === archKey) || null;
     const ids = [];
     NPC_SLOTS.forEach((slot, i) => {
-        const pool = slotPool(slot, rarity);
+        const pool = slotPool(slot, rarityForSlot(tier, slot, i));
         if (!pool.length) return;
         const key = (it) => (Number(it.stats?.base_damage) || 0) + (Number(it.stats?.armor) || 0)
             + (Number(it.stats?.block_chance) || 0) * 100;
