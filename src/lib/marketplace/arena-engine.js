@@ -23,7 +23,7 @@ import {
 // whole of mitigation, and the ceiling for a system that no longer exists went with it.
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 import { chanceFrom, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom,
-    HASTE_TO_HALF, LIFESTEAL_TO_HALF, PIERCE_TO_HALF, STUN_TO_HALF } from "@/lib/marketplace/arena-kit.js";
+    COUNTER_TO_HALF, HASTE_TO_HALF, LIFESTEAL_TO_HALF, PIERCE_TO_HALF, STUN_TO_HALF } from "@/lib/marketplace/arena-kit.js";
 // Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
 import { luckyRoll } from "@/lib/marketplace/fortune.js";
 
@@ -42,14 +42,14 @@ import { luckyRoll } from "@/lib/marketplace/fortune.js";
 // What one point of each affix converts into, in one place, because the card, the sim and the engine all have
 // to agree about it. DEFAULT_SPEED is the fallback clock for anything arriving without a weapon.
 export const DEFAULT_SPEED = 10;
-// PIERCE, LIFESTEAL, STUN and HASTE no longer have a flat rate — they run through chanceFrom on the same
-// curve as everything else, anchored by *_TO_HALF in arena-kit.js. Their old rates are recorded there in the
-// note that set the anchors, because those were the numbers the anchors had to reproduce.
+// NONE OF THE FIVE HAS A FLAT RATE ANY MORE. Pierce, lifedrink, stun, haste and counter all run through
+// chanceFrom on the same curve as everything else, anchored by *_TO_HALF in arena-kit.js. Their old rates are
+// recorded there in the note that set the anchors, because those were the numbers the anchors had to
+// reproduce — every one of them pays exactly what it used to at a real best-in-slot wardrobe.
 //
-// COUNTER is deliberately still flat. It was not in the four Luke named, and it has the same latent ceiling —
-// 400 points is a guaranteed riposte — so it is a candidate rather than an oversight. Its own gear ceiling is
-// 13 points across two slots, so nothing is near it today.
-export const COUNTER_PER_POINT = 0.0025;
+// Counter came a commit after the other four. It was left flat because it was not among the ones named, and
+// that was the wrong call for a table: it had the identical latent ceiling (400 points, a guaranteed riposte),
+// and one flat entry in a curved table is how the next person learns the wrong rule.
 // ── THERE IS NO CLOCK. THE TURNS ALTERNATE. ──────────────────────────────────────────────────────────────────
 // Luke, 2026-08-21: "let's just remove the idea of speed from the arena, everyone gets a turn and then it's
 // the other person's turn unless they get stunned or something."
@@ -239,7 +239,7 @@ export const sideOf = (f) => ({
         pierce: Math.max(0, Math.min(1, chanceFrom(f.pierce, PIERCE_TO_HALF))),
         // 1 point = 0.25% chance to answer a blow with one of your own. Item-exclusive.
         // Points from gear, plus a straight share from the tree. Two sources, one number.
-        counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT + (Number(f.counterBonus) || 0))),
+        counter: Math.max(0, Math.min(1, chanceFrom(f.counter, COUNTER_TO_HALF) + (Number(f.counterBonus) || 0))),
         // 1 point = 0.5% chance the swing lands twice. Uncapped, like crit chance: past 100% it is simply
         // always two, and the surplus rolls for a third.
         // 1 point = 0.25% of whatever you actually inflict, healed back.

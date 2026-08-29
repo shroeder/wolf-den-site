@@ -1051,6 +1051,10 @@ export const PIERCE_TO_HALF = 130;
 export const HASTE_TO_HALF = 185;
 export const STUN_TO_HALF = 330;
 export const LIFESTEAL_TO_HALF = 900;
+// Counter followed the other four a commit later — it has the same shape and the same latent ceiling
+// (400 points was a guaranteed riposte), and leaving one of five flat is how a table drifts. Anchored
+// the same way: best-in-slot is 53 points, which paid 13% flat and pays 13% here.
+export const COUNTER_TO_HALF = 668;
 
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.

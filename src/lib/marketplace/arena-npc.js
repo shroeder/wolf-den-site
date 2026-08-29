@@ -1,4 +1,5 @@
-import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
+import { swingFrom, healthFrom, critChanceFrom, critMultFrom, chanceFrom,
+    COUNTER_TO_HALF, HASTE_TO_HALF, LIFESTEAL_TO_HALF, PIERCE_TO_HALF, STUN_TO_HALF } from "@/lib/marketplace/arena-kit.js";
 import { ITEMS, sumItemStats, FORGE, forgeWeaponRate, forgeArmourRate } from "@/lib/marketplace/items.js";
 import { ARENA_MAX_LEVEL, CLASSES, treeEffects, treeFor } from "@/lib/marketplace/arena-classes.js";
 // npcClassForArchetype, so a rung's TREE and its DECK cannot name two different classes.
@@ -290,11 +291,15 @@ export const npcForgeLevel = (tier) => Math.max(0, Math.min(FORGE.MAX_LEVEL,
 // stat would be a stat block again; this is the two or three facts you would want shouted across the sand
 // before the bell.
 const TELL_RULES = [
-    { key: "lifesteal", from: (s, p) => (s.lifesteal || 0) * 0.0025 + (p.lifestealBonus || 0), text: "drinks what it lands" },
-    { key: "counter", from: (s, p) => (s.counter || 0) * 0.0025 + (p.counterBonus || 0), text: "strikes back when you hit it" },
-    { key: "stun", from: (s, p) => (s.stun || 0) * 0.005 + (p.stunBonus || 0), text: "stuns" },
-    { key: "haste", from: (s, p) => (s.haste || 0) * 0.005 + (p.hasteBonus || 0), text: "hastes itself" },
-    { key: "pierce", from: (s) => (s.pierce || 0) * 0.005, text: "goes through armour" },
+    // ⚠️ THROUGH chanceFrom, NOT A COPY OF THE RATE. These five carried the flat per-point numbers written out
+    // by hand — 0.0025 and 0.005 — which was already a second copy of the engine's arithmetic and became a
+    // WRONG one the moment those stats went onto a curve. This list only orders the tells, so the error would
+    // never have thrown: it would just have promised "stuns" loudest on the foe least likely to.
+    { key: "lifesteal", from: (s, p) => chanceFrom(s.lifesteal, LIFESTEAL_TO_HALF) + (p.lifestealBonus || 0), text: "drinks what it lands" },
+    { key: "counter", from: (s, p) => chanceFrom(s.counter, COUNTER_TO_HALF) + (p.counterBonus || 0), text: "strikes back when you hit it" },
+    { key: "stun", from: (s, p) => chanceFrom(s.stun, STUN_TO_HALF) + (p.stunBonus || 0), text: "stuns" },
+    { key: "haste", from: (s, p) => chanceFrom(s.haste, HASTE_TO_HALF) + (p.hasteBonus || 0), text: "hastes itself" },
+    { key: "pierce", from: (s) => chanceFrom(s.pierce, PIERCE_TO_HALF), text: "goes through armour" },
     { key: "bleed", from: (s, p) => p.bleedChance || 0, text: "makes you bleed" },
     { key: "burn", from: (s, p) => p.burnChance || 0, text: "sets you alight" },
     { key: "ward", from: (s, p) => p.ward || 0, text: "fights behind a shield" },
