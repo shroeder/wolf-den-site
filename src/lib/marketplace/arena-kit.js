@@ -1026,6 +1026,32 @@ export const drFrom = (armour = 0, pierce = 0) => {
     const eff = Math.max(0, (Number(armour) || 0) * (1 - Math.min(1, Math.max(0, Number(pierce) || 0))));
     return 1 - 1 / toughnessFrom(eff);
 };
+// ── THE PROC STATS DIMINISH TOO, AND THEY NO LONGER SATURATE ─────────────────────────────────────────────────
+// Luke: "I think Pierce haste life leech and stun should all have diminishing returns."
+//
+// They were the last linear ones left. Each point paid a flat share and the total was clamped at 1.0, which
+// makes a hard ceiling nobody can see: HASTE_PER_POINT 0.005 means 200 points is a GUARANTEED proc and the
+// 201st point is worth exactly nothing. That ceiling was unreachable while only gear paid these — the best
+// wardrobe in the game carries 59 haste across nine slots, 30% — and it stopped being unreachable the moment
+// a Road rung learned to reroll: rung 187 came out at 311 haste, hasting on every single swing for ever.
+//
+// Same shape as armour's, and for the same reason (see drFrom): c / (1 + c) approaches 1 without arriving, so
+// there is no saturation point, the next point is always worth something, and no build can make a chance a
+// certainty. `*_TO_HALF` is the points at which the roll is a coin flip — a number a card can print.
+//
+// ⚠️ THE ANCHORS ARE SET SO A REAL WARDROBE IS UNCHANGED. Measured best-in-slot for each: haste 59 -> 30%,
+// pierce 83 -> 42%, stun 26 -> 13%, lifesteal 23 -> 6%, which are the values the linear rates already gave.
+// Nobody wearing anything loses a thing; what changes is that piling three hundred points onto one line stops
+// buying a certainty. At 311 haste a fighter now rolls 60%, not 100%.
+export const chanceFrom = (points = 0, half = 200) => {
+    const c = curve(points) / curve(half);
+    return c / (1 + c);
+};
+export const PIERCE_TO_HALF = 130;
+export const HASTE_TO_HALF = 185;
+export const STUN_TO_HALF = 330;
+export const LIFESTEAL_TO_HALF = 900;
+
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.
 export const GUARD_BASE_SHARE = 0.10;

@@ -22,7 +22,8 @@ import {
 // DR_CAP was imported here too and never used — damage reduction was deleted in favour of armour being the
 // whole of mitigation, and the ceiling for a system that no longer exists went with it.
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
-import { critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom } from "@/lib/marketplace/arena-kit.js";
+import { chanceFrom, critChanceFrom, critMultFrom, drFrom, healthFrom, swingFrom,
+    HASTE_TO_HALF, LIFESTEAL_TO_HALF, PIERCE_TO_HALF, STUN_TO_HALF } from "@/lib/marketplace/arena-kit.js";
 // Pure, and shared with every drop roll in the Den — a fighter's luck and a chest's luck are the same curve.
 import { luckyRoll } from "@/lib/marketplace/fortune.js";
 
@@ -41,11 +42,14 @@ import { luckyRoll } from "@/lib/marketplace/fortune.js";
 // What one point of each affix converts into, in one place, because the card, the sim and the engine all have
 // to agree about it. DEFAULT_SPEED is the fallback clock for anything arriving without a weapon.
 export const DEFAULT_SPEED = 10;
-export const PIERCE_PER_POINT = 0.005;
+// PIERCE, LIFESTEAL, STUN and HASTE no longer have a flat rate — they run through chanceFrom on the same
+// curve as everything else, anchored by *_TO_HALF in arena-kit.js. Their old rates are recorded there in the
+// note that set the anchors, because those were the numbers the anchors had to reproduce.
+//
+// COUNTER is deliberately still flat. It was not in the four Luke named, and it has the same latent ceiling —
+// 400 points is a guaranteed riposte — so it is a candidate rather than an oversight. Its own gear ceiling is
+// 13 points across two slots, so nothing is near it today.
 export const COUNTER_PER_POINT = 0.0025;
-export const LIFESTEAL_PER_POINT = 0.0025;
-export const STUN_PER_POINT = 0.005;
-export const HASTE_PER_POINT = 0.005;
 // ── THERE IS NO CLOCK. THE TURNS ALTERNATE. ──────────────────────────────────────────────────────────────────
 // Luke, 2026-08-21: "let's just remove the idea of speed from the arena, everyone gets a turn and then it's
 // the other person's turn unless they get stunned or something."
@@ -229,14 +233,17 @@ export const sideOf = (f) => ({
         critMult: Number(f.critMult) || 1,
         armor: Math.max(0, Number(f.armor) || 0),
         // 1 point of pierce = 0.5% of your damage that armour never sees. Capped at all of it.
-        pierce: Math.max(0, Math.min(1, (Number(f.pierce) || 0) * PIERCE_PER_POINT)),
+        // ── FOUR STATS OFF THE FLAT RATE AND ONTO THE CURVE ──────────────────────────────────────────────
+        // See chanceFrom in arena-kit.js. The tree's `*Bonus` terms are already shares and still add on top,
+        // so the clamps stay — the curve alone can no longer reach 1, but a curve plus a bonus can.
+        pierce: Math.max(0, Math.min(1, chanceFrom(f.pierce, PIERCE_TO_HALF))),
         // 1 point = 0.25% chance to answer a blow with one of your own. Item-exclusive.
         // Points from gear, plus a straight share from the tree. Two sources, one number.
         counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT + (Number(f.counterBonus) || 0))),
         // 1 point = 0.5% chance the swing lands twice. Uncapped, like crit chance: past 100% it is simply
         // always two, and the surplus rolls for a third.
         // 1 point = 0.25% of whatever you actually inflict, healed back.
-        lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT + (Number(f.lifestealBonus) || 0)),
+        lifesteal: Math.max(0, chanceFrom(f.lifesteal, LIFESTEAL_TO_HALF) + (Number(f.lifestealBonus) || 0)),
         // A shield's block chance, and what a block is worth to THIS fighter — the Warden blocks harder.
         blockChance: Math.max(0, Math.min(1, Number(f.blockChance) || 0)),
         blockReduction: Number(f.blockReduction) > 0 ? Number(f.blockReduction) : 0.35,
@@ -244,8 +251,8 @@ export const sideOf = (f) => ({
         // that got through raised the block chance. No class ever defined it, so all three were permanently
         // zero — see the note at the block roll.
         // 1 point = 0.5% to stun on a landed blow, and 0.5% that a swing casts haste on yourself.
-        stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT + (Number(f.stunBonus) || 0))),
-        haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT + (Number(f.hasteBonus) || 0))),
+        stun: Math.max(0, Math.min(1, chanceFrom(f.stun, STUN_TO_HALF) + (Number(f.stunBonus) || 0))),
+        haste: Math.max(0, Math.min(1, chanceFrom(f.haste, HASTE_TO_HALF) + (Number(f.hasteBonus) || 0))),
         // ── THE THREE TREE-ONLY EFFECTS ──────────────────────────────────────────────────────────────
         // bleedDamage deepens the wound, bleedLeech turns it into sustain, and wildProc is the one node
         // that does not know what it is going to do until it fires.
