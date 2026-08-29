@@ -295,8 +295,9 @@ export const SKILLS = [
         // ⚠️ THE NODE DELTAS ARE SIZED AGAINST THIS BASE. It was 0.6 and the four grudge mods were 0.45,
         // 0.7, -0.25 and -0.2 — proportions of 0.6. Dropping the base to 0.2 without them took Punish to
         // -0.05 and Blood Price to 0.00, and applySkill only assigns when the share is above zero, so both
-        // branches silently fell back to the fighter's passive instead of overwriting it. All four moved by
-        // the same third the base did, so every relationship between the branches is unchanged.
+        // branches silently fell back to the fighter's passive instead of overwriting it. All four were first
+        // moved by the same third the base was, then the two INCREASES were cut to a third again — so Ledger
+        // sits at 0.33 rather than the 0.58 a straight rescale gave it.
         power: 1.1, cooldown: 4, grudge: 0.2,
         branches: [
             { id: "ledger", name: "Ledger", tag: "Bank it all, spend it once" },
@@ -306,12 +307,12 @@ export const SKILLS = [
         nodes: [
             ...br("ledger", [
                 { id: "re_memory", name: "Long Memory", sprite: "/images/arena/skill/node/re_memory.webp",
-                    desc: "You hand back far more of what was banked.", mod: { grudge: 0.15 } },
+                    desc: "You hand back far more of what was banked.", mod: { grudge: 0.05 } },
                 { id: "re_keep", name: "Nothing Forgiven", sprite: "/images/arena/skill/node/re_keep.webp",
                     desc: "Half the ledger survives the swing instead of clearing.", mod: { keepGrudge: 0.5 } },
                 { id: "re_reckon", name: "Reckoning", sprite: "/images/arena/skill/node/re_reckon.webp",
                     desc: "CAPSTONE. The whole ledger comes back at once on a heavier blow — but it is a slow, patient button.",
-                    mod: { grudge: 0.23, power: 0.35, cooldown: 1 } },
+                    mod: { grudge: 0.08, power: 0.35, cooldown: 1 } },
             ]),
             ...br("punish", [
                 { id: "re_ring", name: "Ringing Blow", sprite: "/images/arena/skill/node/re_ring.webp",
