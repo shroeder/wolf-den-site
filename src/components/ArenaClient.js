@@ -823,7 +823,7 @@ function Recap({ bout, busy, onClose }) {
     // been shown anywhere. The log is the only record and it scrolls away under the deck.
     const tally = (() => {
         const log = bout?.log || [];
-        let dealt = 0, taken = 0, blocked = 0, crits = 0, healed = 0;
+        let dealt = 0, taken = 0, blocked = 0, soaked = 0, crits = 0, healed = 0;
         let best = { n: 0, name: null };
         for (const l of log) {
             const mine = l.who === "you";
@@ -840,11 +840,22 @@ function Recap({ bout, busy, onClose }) {
             //
             // Mitigation is recorded on the ATTACKER's line, because that is the swing it happened to.
             // So what YOUR guard stopped is on THEIR lines, which is why this counts !mine.
-            if (!mine) blocked += (l.turned || 0) + (l.soaked || 0);
+            //
+            // ── AND THEY ARE TWO DEFENCES, SO THEY ARE TWO ROWS ──────────────────────────────────
+            // They were added together under one label, "Turned aside", which made the sum unreadable:
+            // `turned` is the shield ARM -- the blockReduction roll taking a share off a blow that still
+            // lands -- and `soaked` is a WARD spending itself to stop a blow reaching health at all.
+            // Different stats build them, different gear raises them, and a bout can be carried entirely
+            // by one with none of the other. Luke: "so turned aside equals blocked?" It did not, and
+            // there was no way to tell from the card which half the number was.
+            if (!mine) {
+                blocked += l.turned || 0;
+                soaked += l.soaked || 0;
+            }
             if (mine && l.crit) crits += 1;
             healed += l.healed || 0;
         }
-        return { dealt, taken, blocked, crits, healed, best };
+        return { dealt, taken, blocked, soaked, crits, healed, best };
     })();
 
     // The escape hatch above, held back so it cannot be the thing you tap on the way past.
@@ -1001,7 +1012,8 @@ function Recap({ bout, busy, onClose }) {
                     <span><i>Damage dealt</i><b>{money(tally.dealt)}</b></span>
                     <span><i>Damage taken</i><b>{money(tally.taken)}</b></span>
                     {tally.best.n > 0 ? <span><i>Biggest blow</i><b>{tally.best.name} · {money(tally.best.n)}</b></span> : null}
-                    {tally.blocked > 0 ? <span><i>Turned aside</i><b>{money(tally.blocked)}</b></span> : null}
+                    {tally.blocked > 0 ? <span><i>Blocked</i><b>{money(tally.blocked)}</b></span> : null}
+                    {tally.soaked > 0 ? <span><i>Absorbed</i><b>{money(tally.soaked)}</b></span> : null}
                     {tally.crits > 0 ? <span><i>Criticals</i><b>{tally.crits}</b></span> : null}
                     {tally.healed > 0 ? <span><i>Health recovered</i><b>{money(tally.healed)}</b></span> : null}
                 </div>
