@@ -32,6 +32,8 @@
 import { openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
 import { bars, chill, fillTo, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
+// drFrom, so a defence measures an incoming blow exactly as the engine will apply it.
+import { drFrom } from "@/lib/marketplace/arena-kit.js";
 
 // The backstop, not the balance — two fighters who genuinely cannot hurt each other. Deliberately far above
 // any real fight: the auto-resolver's own telemetry has never recorded a bout past ~40 swings, and a member
@@ -367,12 +369,7 @@ function advance(ring, rng) {
         // actually theirs. Their skill choice happens the same way it always did — housePick, off their own
         // build — it simply no longer waits for a tap that was never a choice.
         if (!mine) {
-            const foeSkill = housePick(ring.foeSkills, ring.foeCd, {
-                selfFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
-                foeFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
-                shield: ring.B.shield, banked: ring.B.banked, maxHp: ring.B.maxHp,
-                bleeding: ring.B.bleedLeft > 0 || ring.B.burnLeft > 0,
-            });
+            const foeSkill = housePick(ring.foeSkills, ring.foeCd, ringRead(ring, false));
             const swungFrom = ring.log.length;
             const cast = foeSkill ? castSkill(ring, foeSkill, ring.B, ring.A) : null;
             if (!foeSkill || foeSkill.power > 0) {
@@ -669,6 +666,53 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
  * the same two parameters a crit or a surge uses, so a skill is a swing with different numbers rather than a
  * second code path that has to remember armour exists.
  */
+// ── WHAT A DEFENCE CAN SEE WHEN IT CHOOSES ───────────────────────────────────────────────────────────────────
+// housePick used to be handed six numbers and had to guess with them. This is the whole picture, built once
+// and used by both callers — the foe's beat in a played bout, and both sides of autoRing.
+//
+// Everything here is already on the ring. The point is not new state, it is that the chooser was never shown
+// what the ring already knew: whether the target is frozen (a second freeze is REFUSED and the beat is lost),
+// whether a wound is still ticking (a refresh buys nothing), whether the blow now in the air kills it, and
+// whether the other side's finisher comes off cooldown next beat.
+//
+// `now` is the ring's clock, so the freeze and immunity reads are the same ones hold() makes.
+function ringRead(ring, mineIsA) {
+    const self = mineIsA ? ring.A : ring.B;
+    const foe = mineIsA ? ring.B : ring.A;
+    const foeTrack = mineIsA ? ring.atb?.foe : ring.atb?.me;
+    const now = ring.now || 0;
+    const foeCd = mineIsA ? ring.foeCd : ring.cd;
+    const myCd = mineIsA ? ring.cd : ring.foeCd;
+
+    // A blow measured the way the engine measures it — no crit assumed, because a defence that banks on its
+    // crit holds a finisher for a kill that does not arrive.
+    const incoming = Math.max(1, (Number(foe.damage) || 0) * (1 - drFrom(self.armor || 0, foe.pierce || 0)));
+
+    return {
+        self,
+        foe,
+        selfFrac: self.hp / Math.max(1, self.maxHp),
+        foeFrac: foe.hp / Math.max(1, foe.maxHp),
+        shield: self.shield,
+        banked: self.banked,
+        maxHp: self.maxHp,
+        bleeding: self.bleedLeft > 0 || self.burnLeft > 0,
+        // A wound already running. Re-casting refreshes rather than stacks, so this is the difference between
+        // a beat that does something and a beat that does not.
+        foeBleedLeft: Number(foe.bleedLeft) || 0,
+        foeBurnLeft: Number(foe.burnLeft) || 0,
+        // Ice, and the six seconds after it during which more ice is refused outright. See CC_IMMUNE_MS.
+        foeFrozen: Boolean(foeTrack && (foeTrack.holdUntil || 0) > now),
+        foeImmuneFreeze: Boolean(foeTrack?.immune?.freeze && foeTrack.immune.freeze > now),
+        // Does the blow now in the air finish me? Shield included, because that is what it is for.
+        lethalIncoming: incoming >= Math.max(0, self.hp) + Math.max(0, self.shield),
+        // Is their big one about to land? Worth spending a freeze on.
+        foeThreat: Object.values(foeCd || {}).some((n) => (Number(n) || 0) <= 1),
+        // Do I have the ice in hand? Overflow waits behind it rather than racing it.
+        rimebindReady: !(myCd?.rimebind > 0),
+    };
+}
+
 export function act(ring, { skill = null, rng = Math.random } = {}) {
     if (ring.over || ring.awaiting !== "act") return ring;
     const from = ring.log.length;
@@ -747,12 +791,7 @@ export function autoRing(me, foe, { rng = Math.random, mySkills = null, foeSkill
     // is genuinely the player's. The guard is a runaway backstop; RING_BEAT_CAP is what actually ends a
     // stalemate, and settle() gets there first.
     for (let guard = 0; guard < 1000 && !ring.over && ring.awaiting === "act"; guard += 1) {
-        const skill = housePick(deck, ring.cd, {
-            selfFrac: ring.A.hp / Math.max(1, ring.A.maxHp),
-            foeFrac: ring.B.hp / Math.max(1, ring.B.maxHp),
-            shield: ring.A.shield, banked: ring.A.banked, maxHp: ring.A.maxHp,
-            bleeding: ring.A.bleedLeft > 0 || ring.A.burnLeft > 0,
-        });
+        const skill = housePick(deck, ring.cd, ringRead(ring, true));
         ring = act(ring, { skill, rng });
     }
     return { ...ringResult(ring), swings: ring.beat };

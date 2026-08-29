@@ -295,16 +295,28 @@ export function npcCasino(tier, wants = {}, override = null) {
 // ANCHORED ON MEASUREMENT, NOT TASTE. 653 is the combat total of the strongest member alive today — Eric D,
 // summed the way combatStats sums it. The curve puts him at rung 55 and reaches 2.5x him at 200, so the back
 // half of the ladder is where members are going rather than where they already are.
-export const MEMBER_CEILING_TODAY = 653;
-export const NPC_TARGET_AT_55 = 1.0;
-export const NPC_TARGET_AT_200 = 2.5;
+// ── AND IT IS ANCHORED AT BOTH ENDS, BECAUSE ONE ANCHOR CANNOT DO IT ─────────────────────────────────────────
+// This was geometric off a single point at rung 55. Raising that point to make the top of the ladder bite
+// lifted the BOTTOM by the same proportion, and Nynebreaker — a real member with a thin wardrobe — could no
+// longer beat rung ONE. A ladder whose first step is unwinnable is not a difficulty curve, it is a wall.
+//
+// A power law in the rung fixes both ends at once: gentle where beginners are, steep through the middle, and
+// still climbing at 200 without running away.
+//
+//   rung   1  ->  120   a first fight anybody wins
+//   rung  55  -> 1198   where the strongest kit in the Den should stop winning outright — Luke: "The target I
+//                       would like to have everyone at is about fifty five"
+//   rung 200  -> ~2500  about twice rung 55, so the back half is somewhere to grow into
+//
+// ⚠️ 1198 IS MEASURED, NOT CHOSEN. It is what rung 115 actually carried when the strongest kit was walling
+// there. The anchor is the WALL — a rung the best real build stops beating — not a stat total in the abstract,
+// which is the mistake the first version made twice.
+export const TARGET_AT_RUNG_1 = 120;
+export const TARGET_AT_RUNG_55 = 1198;
+const TARGET_EXPONENT = Math.log(TARGET_AT_RUNG_55 / TARGET_AT_RUNG_1) / Math.log(55);
 export function targetTotal(tier) {
     const t = Math.max(1, Math.min(200, Math.round(tier)));
-    // Geometric between the two anchors, extended below 55 on the same curve, so every rung's step is the same
-    // PROPORTION harder than the last rather than the same size — which is what "harder and harder" means once
-    // the numbers are large.
-    const k = Math.pow(NPC_TARGET_AT_200 / NPC_TARGET_AT_55, 1 / (200 - 55));
-    return MEMBER_CEILING_TODAY * NPC_TARGET_AT_55 * Math.pow(k, t - 55);
+    return TARGET_AT_RUNG_1 * Math.pow(t, TARGET_EXPONENT);
 }
 
 // The stats the target is measured over: the six a fighter is built out of. Procs and fortune are deliberately

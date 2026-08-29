@@ -1,3 +1,4 @@
+import { drFrom } from "@/lib/marketplace/arena-kit.js";
 // ── THE SKILLS, AND THE TREE INSIDE EACH ONE ─────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the panel and the ring read the same catalog, so what a node promises is what
 // the bout applies.
@@ -808,38 +809,97 @@ export function npcSkills(rung = 1, archetype = "balanced", forceClass = null, f
 // Deliberately NOT a good player. It does not count beats to line up Overflow behind a Rimebind, and it does
 // not hold Execute for the kill it can see coming. A defence should be competent and legible, not a machine
 // nobody can beat — the point is that it plays its kit, not that it plays it perfectly.
+// ── WHAT THE HOUSE CAN SEE ───────────────────────────────────────────────────────────────────────────────────
+// Luke: "does anything npc opponent know if they have lethal and use the right skill to win? do they use the
+// optimal skill whenever possible. do they always make the right decision for the scenario?"
+//
+// No, no and no. This scored each off-cooldown skill with a static want over six fields — foeFrac, selfFrac,
+// shield, banked, maxHp, bleeding — and cast the highest. Nothing anywhere compared a blow to the health left
+// in front of it, so "lethal" was not a concept the defence had. `execute` got a bigger want under 45% health,
+// which is a FRACTION check and not a kill check.
+//
+// What it did wrong, concretely, every fight: refreshed a bleed that already had three ticks running; cast
+// Rimebind at an already-frozen target, where hold() refuses it and the beat is simply thrown away; fired
+// Overflow the instant it came up rather than behind the freeze that would have guaranteed it landed; raised
+// Bastion because shield === 0 with nothing threatening it; and healed at 54% while a blow that killed it was
+// already in the air.
+//
+// ⚠️ THIS IS NOT THE ROAD'S AI. IT IS EVERY OPPONENT'S. housePick plays a MEMBER's stored defence when you
+// challenge them and it plays a Road rung, off the same two call sites in arena-ring. Luke: "keep in mind its
+// not just the road, its the exact same logic players we fight against will use." So every async defence in
+// the Den gets this at once — a member's build now plays itself about as well as they would.
+//
+// It is still not a perfect player and should not become one: it does not count beats ahead, does not bait,
+// and does not know what is in your deck. What it does now is stop throwing beats away and take a win it can
+// see.
+
+// What a swing is worth against a given defender, using the engine's own mitigation so the two cannot
+// disagree. Deliberately the NO-CRIT figure: a defence that assumes its crit lands would hold a finisher for a
+// kill that does not arrive, which is worse than swinging.
+const blowAgainst = (att, def, mult = 1) => {
+    const raw = (Number(att?.damage) || 0) * mult;
+    return Math.max(1, raw * (1 - drFrom(Number(def?.armor) || 0, Number(att?.pierce) || 0)));
+};
+// What actually stands between them and the floor.
+const lifeLeft = (f) => Math.max(0, Number(f?.hp) || 0) + Math.max(0, Number(f?.shield) || 0);
+
 const WANTS = {
     // End it. Worth more the closer they are to the floor, and worth nothing at all up top.
     execute: ({ foeFrac }) => (foeFrac < 0.45 ? 3 + (0.45 - foeFrac) * 8 : 0.2),
     // Volume, whenever there is nothing better to do.
     onslaught: () => 1.6,
-    // Get the wound running early — it pays over the beats that follow, so it is worth most while there ARE
-    // beats that follow.
-    rupture: ({ foeFrac }) => (foeFrac > 0.3 ? 2.2 : 1),
-    immolate: ({ foeFrac }) => (foeFrac > 0.3 ? 2.2 : 1),
-    // Control. Best used while they still have swings worth stealing.
-    rimebind: ({ foeFrac }) => (foeFrac > 0.25 ? 2.4 : 1.2),
-    // The big one. Always worth casting the moment it is up.
-    overflow: () => 4,
-    // Put the shield up when there is not one, and never otherwise.
-    bastion: ({ shield }) => (shield > 0 ? 0 : 2.6),
+    // ── A WOUND ALREADY RUNNING IS NOT WORTH RE-OPENING ──────────────────────────────────────────────────
+    // Rupture and Immolate both refresh rather than stack, so casting one over a bleed with ticks left buys
+    // nothing at all and costs the beat. `foeBleedLeft` / `foeBurnLeft` are what the ring already tracks.
+    rupture: ({ foeFrac, foeBleedLeft }) => (foeBleedLeft > 1 ? 0.4 : foeFrac > 0.3 ? 2.2 : 1),
+    immolate: ({ foeFrac, foeBurnLeft }) => (foeBurnLeft > 1 ? 0.4 : foeFrac > 0.3 ? 2.2 : 1),
+    // Control, and only where control is possible: a frozen target refuses another freeze (see CC_IMMUNE_MS),
+    // so the beat is thrown away entirely. Worth MOST when their own big skill is about to come up.
+    rimebind: ({ foeFrac, foeFrozen, foeImmuneFreeze, foeThreat }) =>
+        (foeFrozen || foeImmuneFreeze) ? 0 : (foeThreat ? 4.2 : foeFrac > 0.25 ? 2.4 : 1.2),
+    // The big one — but behind the ice if the ice is up, because a freeze guarantees it lands into a beat
+    // they do not get to answer.
+    overflow: ({ foeFrozen, rimebindReady }) => (rimebindReady && !foeFrozen ? 2.0 : 4),
+    // Put the shield up when there is not one — and urgently when the next blow would finish you.
+    bastion: ({ shield, lethalIncoming }) => (lethalIncoming ? 6 : shield > 0 ? 0 : 2.6),
     // Bank first, spend when there is something banked worth spending.
     retribution: ({ banked, maxHp }) => 1.2 + Math.min(3, (banked / Math.max(1, maxHp)) * 12),
-    // Patch up when it matters, and not before — a Rally at full health is a wasted beat.
-    rally: ({ selfFrac, bleeding }) => (selfFrac < 0.55 ? 4.5 - selfFrac * 4 : (bleeding ? 1.4 : 0)),
+    // Patch up when it matters, and not before — a Rally at full health is a wasted beat. A heal that does not
+    // outrun the blow already coming is also a wasted beat, so it defers to Bastion in that case.
+    rally: ({ selfFrac, bleeding, lethalIncoming }) =>
+        (lethalIncoming ? 5.5 : selfFrac < 0.55 ? 4.5 - selfFrac * 4 : (bleeding ? 1.4 : 0)),
 };
 
 /**
  * What the absent fighter reaches for this beat, or null to throw a plain attack.
  *
  * `taken` is their own skills bag, so a defence fights the build its owner actually paid for. `cd` is the
- * ring's cooldown bag for that side.
+ * ring's cooldown bag for that side. `ctx` is what they can SEE — see ringRead in arena-ring.js.
  */
 export function housePick(taken = {}, cd = {}, ctx = {}) {
+    const ready = Object.keys(taken || {}).filter((id) => !(cd[id] > 0));
+
+    // ── ONE: IS IT OVER? ─────────────────────────────────────────────────────────────────────────────────
+    // The whole thing the old chooser could not do. If a plain swing already finishes them, throw it — never
+    // spend a cooldown on a corpse. Otherwise take the biggest skill that DOES finish them, cheapest first,
+    // so a fight that is won is won this beat rather than two beats later against a healing Warden.
+    const { self, foe } = ctx;
+    if (self && foe) {
+        const left = lifeLeft(foe);
+        if (blowAgainst(self, foe) >= left) return null;          // a bare swing does it
+        let kill = null;
+        for (const id of ready) {
+            const sk = resolveSkill(id, taken);
+            if (!sk || !(sk.power > 0)) continue;
+            const hits = Math.max(1, Number(sk.hits) || 1);
+            if (blowAgainst(self, foe, sk.power * hits) >= left && (!kill || sk.power < kill.power)) kill = sk;
+        }
+        if (kill) return kill;
+    }
+
     let best = null;
     let bestWant = 1;                       // a plain attack is worth 1; nothing below that is worth a beat
-    for (const id of Object.keys(taken || {})) {
-        if (cd[id] > 0) continue;
+    for (const id of ready) {
         const skill = resolveSkill(id, taken);
         if (!skill) continue;
         const want = (WANTS[id] || (() => 1.5))(ctx);
