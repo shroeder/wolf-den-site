@@ -81,7 +81,10 @@ export const STAT_META = {
     // armour rating are what the thing IS before a single stat is rolled on it, and they were missing from
     // this table entirely, which meant nothing anywhere in the game printed them.
     base_damage: { label: "Damage", icon: "⚔️", desc: "The weapon's own damage. Might multiplies it — this is the number every swing starts from.", suffix: "" },
-    speed: { label: "Attack Speed", icon: "⏱️", desc: "How fast your turn bar fills. Ferocity adds to it, and anything above bare-handed also buys a chance your swing only half-empties the bar.", suffix: "/s" },
+    // ⚠️ The second clause here promised the BAR REFUND — "anything above bare-handed also buys a chance your
+    // swing only half-empties the bar" — which was removed with the rest of the go-again branch. Left behind,
+    // it sold a weapon on a mechanic that no longer exists. See the tombstone in arena-kit.js.
+    speed: { label: "Attack Speed", icon: "⏱️", desc: "How fast your turn bar fills. Ferocity adds to it, at a point of speed for every 100.", suffix: "/s" },
     armor: { label: "Armour", icon: "🛡️", desc: "Comes off every blow, flat, before anything else. Tenacity multiplies it.", suffix: "" },
     block_chance: { label: "Block Chance", icon: "🛡️", desc: "How often this shield blocks — a block takes 35% off the blow.", suffix: "%" },
 
