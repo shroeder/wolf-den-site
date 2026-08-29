@@ -5,7 +5,7 @@ import { ARENA_MAX_LEVEL, CLASSES, treeEffects, treeFor } from "@/lib/marketplac
 // npcClassForArchetype, so a rung's TREE and its DECK cannot name two different classes.
 import { npcClassForArchetype } from "@/lib/marketplace/arena-skills.js";
 // The other three stat sources a member has, and the reroll. See arena-npc-build.js.
-import { npcExtras, npcReroll, rerollFrac, buildFor } from "@/lib/marketplace/arena-npc-build.js";
+import { npcExtras, npcReroll, rerollFrac, buildForTier } from "@/lib/marketplace/arena-npc-build.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
@@ -198,7 +198,11 @@ export const archetypeForTier = (t) => {
     const n = Math.max(1, Math.round(t));
     // The first three are always Balanced: a Straw Dummy that rolled Brute is a tutorial that hits back harder
     // than the thing after it, and the shapes should not deviate before you have met the baseline.
-    return n <= 3 ? ARCHETYPES[0] : ARCHETYPES[hash(`shape:${n}`) % ARCHETYPES.length];
+    if (n <= 3) return ARCHETYPES[0];
+    // Otherwise the SHAPE IS THE BUILD'S. It was its own hash draw, which meant a rung could be a Wall wearing
+    // a Berserker's plan — the shape named one thing on the card and the build did another.
+    const b = buildForTier(n);
+    return ARCHETYPES.find((a) => a.key === b.shape) || ARCHETYPES[0];
 };
 
 // ── AN NPC IS A CHARACTER, NOT A STAT BLOCK ──────────────────────────────────────────────────────────────────
@@ -226,9 +230,8 @@ export const archetypeForTier = (t) => {
 // so the class is its own draw off the rung's hash and a Reaver Wall is a fighter you can actually meet.
 //
 // Still one class per rung — the tree it buys and the deck it brings both read this.
-const NPC_CLASSES = ["reaver", "warden", "runecaller"];
-export const npcClassFor = (tier) =>
-    NPC_CLASSES[hash(`class:${Math.max(1, Math.round(tier))}`) % NPC_CLASSES.length];
+// Its build's class, so the tree it buys, the deck it brings and the plan it follows are one character.
+export const npcClassFor = (tier) => buildForTier(tier)?.cls || "reaver";
 
 // ── HOW MANY TREE POINTS A RUNG HAS SPENT, AND IT MAY NOT EXCEED A MEMBER'S ──────────────────────────────────
 // The ceiling was 60. A member's tree budget is their arena LEVEL, one point a level, and arena level stops
@@ -252,13 +255,24 @@ function npcTree(classId, points, tier) {
     if (!tree.length || points <= 0) return {};
     const taken = {};
     const total = () => Object.values(taken).reduce((a, n) => a + n, 0);
-    const order = [...tree].sort((a, b) => (a.tier - b.tier) || (a.id < b.id ? -1 : 1));
+    // ── THE BUILD'S OWN NODES FIRST ──────────────────────────────────────────────────────────────────
+    // Points used to go in flat tier order, which spread them evenly and made every Warden the same Warden.
+    // A build names the passives it is ABOUT (see BUILDS in arena-npc-build.js) and those are bought first,
+    // in the order written, before anything else. Gates and rank caps still apply exactly as takeNode applies
+    // them — a preference cannot buy a tier-3 node at four points spent.
+    const want = buildForTier(tier)?.tree || [];
+    const rank = (n) => { const i = want.indexOf(n.id); return i < 0 ? want.length + n.tier : i; };
+    const order = [...tree].sort((a, b) => (rank(a) - rank(b)) || (a.tier - b.tier) || (a.id < b.id ? -1 : 1));
     let guard = 0;
     while (total() < points && guard < 500) {
         guard += 1;
         let placed = false;
         for (let i = 0; i < order.length; i += 1) {
-            const n = order[(i + tier) % order.length];
+            // ⚠️ NO `+ tier` ROTATION ANY MORE. It used to offset the start of the sweep by the rung, which was
+            // the only variety the tree had when every build shared one order — and it would now rotate the
+            // build's own preference away, spending a Thornmail Warden's first points on whatever node the
+            // rung number happened to land on.
+            const n = order[i];
             if (total() >= points) break;
             if ((taken[n.id] || 0) >= n.ranks) continue;
             if (total() < (n.needs || 0)) continue;
@@ -574,7 +588,7 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
     // The rung's own class, drawn from its hash — the same one npcBuild spends tree points in and the same
     // one its deck comes from. npcClassForArchetype is only a fallback for a caller with no rung.
     const classId = t ? npcClassFor(t) : npcClassForArchetype(arch.key);
-    const build = buildFor(classId, arch.key);
+    const build = buildForTier(t);
 
     // ── AND IT HAS BEEN TO THE BENCH ─────────────────────────────────────────────────────────────────────
     // A rung wore whatever its items shipped with, which is the one thing no member above the early rungs

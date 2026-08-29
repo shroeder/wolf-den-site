@@ -18,6 +18,8 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower, npcClassFor} from "@/lib/marketplace/arena-npc.js";
+// A rung's three skill paths are part of its BUILD, not a lookup by shape. See BUILDS in arena-npc-build.js.
+import { buildForTier } from "@/lib/marketplace/arena-npc-build.js";
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
     lossLaurels, vpFor, vpPreview,
@@ -1747,7 +1749,7 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         tell: prof.tell, level: null,
     };
     const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(prof.kitTier),
-        skills: npcSkills(prof.kitTier, prof.archetype, npcClassFor(prof.kitTier)) };
+        skills: npcSkills(prof.kitTier, prof.archetype, npcClassFor(prof.kitTier), buildForTier(prof.kitTier)?.branches) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         myDamageMult: TOWN_EDGE,
@@ -1797,7 +1799,7 @@ export async function startFishingBout(buyerId, monsterId) {
         blurb: m.blurb, color: null, archetype: m.archetype, level: null,
     };
     const foeKit = { ...foe, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(Math.max(1, m.tier * 3)),
-        skills: npcSkills(Math.max(1, m.tier * 3), m.archetype, npcClassFor(Math.max(1, m.tier * 3))) };
+        skills: npcSkills(Math.max(1, m.tier * 3), m.archetype, npcClassFor(Math.max(1, m.tier * 3)), buildForTier(Math.max(1, m.tier * 3))?.branches) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
         extra: { fishing: { monster: m.id, tier: m.tier } },
@@ -1907,7 +1909,7 @@ export async function startBout(buyerId, targetId = null) {
         // ring does not read. Read at the RUNG, so the depth of the deck climbs the Road with everything
         // else; a champion is read a band up, same as its abilities are.
         foeKit = { ...f, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(kitTier, f.archetype),
-            skills: npcSkills(kitTier, f.archetype, npcClassFor(kitTier)) };
+            skills: npcSkills(kitTier, f.archetype, npcClassFor(kitTier), buildForTier(kitTier)?.branches) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.
@@ -1923,7 +1925,7 @@ export async function startBout(buyerId, targetId = null) {
         // `skills` is what the RING reads; `abilities` is the old gear-signature list it does not. Without the
         // first of these an NPC throws a bare swing every beat of every fight — see npcSkills.
         foeKit = { ...n, ...fighterFrom(n, {}, null), abilities: npcAbilities(npcTier),
-            skills: npcSkills(rung > 0 ? rung : npcTier, n.archetype, npcClassFor(rung > 0 ? rung : npcTier)) };
+            skills: npcSkills(rung > 0 ? rung : npcTier, n.archetype, npcClassFor(rung > 0 ? rung : npcTier), buildForTier(rung > 0 ? rung : npcTier)?.branches) };
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };

@@ -753,12 +753,15 @@ const NPC_BRANCH = {
  * Depth is the whole difficulty curve here: one skill at base low down, a second by the middle, a capstone at
  * the top. It is deliberately NOT random — a rung you cannot plan against is a rung you can only grind.
  */
-export function npcSkills(rung = 1, archetype = "balanced", forceClass = null) {
+export function npcSkills(rung = 1, archetype = "balanced", forceClass = null, forceBranches = null) {
     // The class is handed in now. It used to be derived from the archetype, which is what limited the ladder
     // to five characters; NPC_CLASS survives only as the fallback for a caller that has no class to give.
     const classId = forceClass || NPC_CLASS[archetype] || "runecaller";
     const plan = NPC_BRANCH[classId] || NPC_BRANCH.runecaller;
-    const want = plan[archetype] || plan.balanced;
+    // The build's own three paths, when the caller has a build. NPC_BRANCH is the fallback for anything asking
+    // by shape alone — a town raid, a fishing monster — and stays as the per-class table it became.
+    const want = (Array.isArray(forceBranches) && forceBranches.length ? forceBranches : null)
+        || plan[archetype] || plan.balanced;
     const mine = skillsForClass(classId);
     // How many rungs deep, and how many skills wide. A rung-1 foe has one skill at base; by rung 40 it has
     // two skills with a capstone on the first.

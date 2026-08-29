@@ -17,8 +17,11 @@ import { npcSkills, skillsForClass, skillPointsSpent, SKILL_POINT_CAP } from "..
 // empty array that makes every node look illegal. It is what npcTree itself spends against.
 import { ARENA_MAX_LEVEL, treeFor } from "../src/lib/marketplace/arena-classes.js";
 import { LADDER_MAX } from "../src/lib/marketplace/arena-ladder.js";
-import { BUILDS_FOR_CHECK } from "../src/lib/marketplace/arena-npc-build.js";
+import { BUILDS_FOR_CHECK, buildForTier } from "../src/lib/marketplace/arena-npc-build.js";
 import { STAT_META } from "../src/lib/marketplace/items.js";
+import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
+import { treeFor as treeForClass } from "../src/lib/marketplace/arena-classes.js";
+import { skillsForClass as skillsOf } from "../src/lib/marketplace/arena-skills.js";
 
 const ALL = ["reaver", "warden", "runecaller"];
 const fail = [];
@@ -36,7 +39,24 @@ for (const [key, build] of Object.entries(BUILDS_FOR_CHECK)) {
         if (!STAT_META[stat]) fail.push(`build ${key}: rerolls toward "${stat}", which is not a stat`);
     }
     if (!Object.keys(build.wants || {}).length) fail.push(`build ${key}: wants nothing`);
+    // The companion, the passive preference and the skill paths are all ids into other tables. Every one of
+    // them fails SILENTLY when wrong — an unknown pet falls through to a fallback, an unknown node is simply
+    // never bought, an unknown branch yields an empty deck — so none of it would ever throw.
     if (!build.pet) fail.push(`build ${key}: has no companion`);
+    else if (!COLLECTIBLES.some((c) => c.id === build.pet)) fail.push(`build ${key}: pet "${build.pet}" is not a collectible`);
+    const nodes = new Set((treeForClass(build.cls) || []).map((n) => n.id));
+    for (const id of build.tree || []) if (!nodes.has(id)) fail.push(`build ${key}: tree names "${id}", not a ${build.cls} node`);
+    const branches = new Set((skillsOf(build.cls) || []).flatMap((sk) => sk.branches.map((br) => br.id)));
+    for (const id of build.branches || []) if (!branches.has(id)) fail.push(`build ${key}: branch "${id}" is not a ${build.cls} branch`);
+    // ── ONE BRANCH PER SKILL ─────────────────────────────────────────────────────────────────────────────
+    // Two paths of the same skill is not an error anywhere — the second just overwrites the first and the
+    // build quietly spends a third of the skill points it thinks it is spending. It cost rung 100 all twelve.
+    const owner = {};
+    for (const sk of skillsOf(build.cls) || []) for (const br of sk.branches) owner[br.id] = sk.id;
+    const usedSkills = (build.branches || []).map((b) => owner[b]).filter(Boolean);
+    if (new Set(usedSkills).size !== usedSkills.length) {
+        fail.push(`build ${key}: names two branches of one skill (${(build.branches || []).join(", ")})`);
+    }
 }
 
 for (let t = 1; t <= LADDER_MAX; t += 1) {
@@ -44,7 +64,7 @@ for (let t = 1; t <= LADDER_MAX; t += 1) {
     // The CLASS is handed in, exactly as every production caller hands it in — npcSkills' own fallback
     // derives a class from the archetype, and checking against the fallback rather than against what
     // the rung actually is would report a mismatch on every rung whose class was drawn.
-    const deck = npcSkills(t, archetypeForTier(t).key, b.classId);
+    const deck = npcSkills(t, archetypeForTier(t).key, b.classId, buildForTier(t)?.branches);
     const tree = treeFor(b.classId) || [];
 
     // ── ONE CLASS ── the tree it bought and the deck it brings must be the same class.
@@ -83,7 +103,10 @@ for (let t = 1; t <= LADDER_MAX; t += 1) {
 }
 
 const b100 = npcBuild(100, 0);
-const d100 = npcSkills(100, archetypeForTier(100).key);
+// ⚠️ WITH the class and the branches, like every real caller. Without them npcSkills falls back to its
+// by-shape table and this line printed "0 skill" for a rung carrying nine points — a summary that
+// contradicted the check right above it.
+const d100 = npcSkills(100, archetypeForTier(100).key, b100.classId, buildForTier(100)?.branches);
 console.log(`\n  checked all ${LADDER_MAX} rungs against a member's own caps`);
 console.log(`  passive ceiling ${ARENA_MAX_LEVEL} (arena level) · skill ceiling ${SKILL_POINT_CAP} · one path per skill`);
 console.log(`  rung 100 for scale: ${b100.classId}, ${Object.values(b100.taken).reduce((a, n) => a + n, 0)} passive, ${skillPointsSpent(d100, b100.classId)} skill\n`);
