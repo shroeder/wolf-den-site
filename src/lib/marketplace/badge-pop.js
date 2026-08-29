@@ -64,7 +64,10 @@ export async function markBadgeSeen(buyerId, slug) {
 export const WORDS = {
     might: "Might", crit_chance: "Crit chance", crit_power: "Crit power",
     vitality: "Vitality", ferocity: "Ferocity", tenacity: "Tenacity", pierce: "Pierce",
-    lifesteal: "Lifedrink", counter: "Riposte", doublestrike: "Double strike",
+    // ⚠️ "Double strike" until now, which is the KEY's name and not the stat's. The mechanic it was named
+    // for is gone — nothing swings twice — and the points buy tempo instead. STAT_META in items.js calls it
+    // Quickened, so a sword and a badge granting the same thing said two different words for it.
+    lifesteal: "Lifedrink", counter: "Riposte", doublestrike: "Quickened",
     stun: "Chance to stun", haste: "Chance to haste", armor: "Armour", base_damage: "Damage",
     fortune: "Fortune", angling: "Angling",
     broadside: "Broadside", ironclad: "Ironclad", plunder: "Plunder", bounty: "Bounty",

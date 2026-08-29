@@ -318,7 +318,10 @@ function npcProcs(tier, archKey) {
 const TELL_RULES = [
     { key: "lifesteal", from: (s, p) => (s.lifesteal || 0) * 0.0025 + (p.lifestealBonus || 0), text: "drinks what it lands" },
     { key: "counter", from: (s, p) => (s.counter || 0) * 0.0025 + (p.counterBonus || 0), text: "strikes back when you hit it" },
-    { key: "doublestrike", from: (s, p) => (s.doublestrike || 0) * 0.005 + (p.doublestrikeBonus || 0), text: "swings twice" },
+    // "swings twice" was true of the mechanic this key is named after, and that mechanic is gone — blowCount
+    // was deleted and a swing is one blow unless a skill says otherwise. The points buy TEMPO now, so the
+    // thing to warn a member about is the bar, not the blow.
+    { key: "doublestrike", from: (s, p) => (s.doublestrike || 0) * 0.005 + (p.doublestrikeBonus || 0), text: "swings more often" },
     { key: "stun", from: (s, p) => (s.stun || 0) * 0.005 + (p.stunBonus || 0), text: "stuns" },
     { key: "haste", from: (s, p) => (s.haste || 0) * 0.005 + (p.hasteBonus || 0), text: "hastes itself" },
     { key: "pierce", from: (s) => (s.pierce || 0) * 0.005, text: "goes through armour" },
