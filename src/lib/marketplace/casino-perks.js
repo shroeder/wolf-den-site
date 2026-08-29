@@ -48,8 +48,9 @@ import { equipMemo, forgetEquipment } from "@/lib/marketplace/equip-cache.js";
 //              A pure multiplier on the weapon, which is what "the whole of what you hit for" means.
 //   VITALITY   healthFrom() = HEALTH_PER_VITALITY x vitality^STAT_EXPONENT — no floor and no ceiling.
 //   TENACITY   armor x (1 + tenacity / 500) in arena.js, so 500 does double the plate exactly as stated.
-//   FEROCITY   tempoOf() adds ferocity / FEROCITY_PER_TEMPO (100) to your tempo, and the bar takes
-//              BASE_FILL_MS / tempo — so one point is about 1% quicker, and nothing caps it. arena-atb.js.
+//   FEROCITY   tempoOf() adds curve(ferocity) / curve(FEROCITY_TO_DOUBLE) to your tempo, and the bar takes
+//              BASE_FILL_MS / tempo — so 200 points doubles a bare-handed bar and each point past that is
+//              worth less than the one before it. Same 0.75 curve as Might and Armour. arena-atb.js.
 //
 // The art keeps its old filenames: they are the same four drawings, and renaming four webps to rename four
 // labels is a migration for nothing.

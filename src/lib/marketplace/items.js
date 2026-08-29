@@ -84,7 +84,7 @@ export const STAT_META = {
     // ⚠️ The second clause here promised the BAR REFUND — "anything above bare-handed also buys a chance your
     // swing only half-empties the bar" — which was removed with the rest of the go-again branch. Left behind,
     // it sold a weapon on a mechanic that no longer exists. See the tombstone in arena-kit.js.
-    speed: { label: "Attack Speed", icon: "⏱️", desc: "How fast your turn bar fills. Ferocity adds to it, at a point of speed for every 100.", suffix: "/s" },
+    speed: { label: "Attack Speed", icon: "⏱️", desc: "How fast your turn bar fills, before Ferocity is added to it.", suffix: "/s" },
     armor: { label: "Armour", icon: "🛡️", desc: "Comes off every blow, flat, before anything else. Tenacity multiplies it.", suffix: "" },
     block_chance: { label: "Block Chance", icon: "🛡️", desc: "How often this shield blocks — a block takes 35% off the blow.", suffix: "%" },
 
@@ -98,9 +98,13 @@ export const STAT_META = {
     // run on tempoOf's /100, where a point is 0.01 of tempo and a bare-handed bar starts at 1.0 — so one
     // point is about 1% and the card was UNDERSTATING Ferocity by a hundred times.
     //
+    // AND THE "hit more accurately" HALF WAS ALSO STALE. Accuracy is deleted — every swing lands (see the
+    // note in kitFor). Ferocity buys the bar and nothing else.
+    //
     // Stated against the bare-handed bar because that is the only fixed reference: fill time is
-    // BASE_FILL_MS / tempo, so the percentage a point is worth shrinks as your tempo grows.
-    ferocity: { label: "Ferocity", icon: "🔥", desc: "Your turn bar fills faster, and you hit more accurately. 100 points doubles the speed of a bare-handed bar.", suffix: "" },
+    // BASE_FILL_MS / tempo, so what a point is worth shrinks both as your tempo grows AND as your Ferocity
+    // does, now that it runs on the same 0.75 curve as Might and Armour.
+    ferocity: { label: "Ferocity", icon: "🔥", desc: "Your turn bar fills faster. 200 points doubles a bare-handed bar, and each point past that is worth a little less.", suffix: "" },
     tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing. 500 tenacity doubles it.", suffix: "" },
 
     // ── THE CRITS ────────────────────────────────────────────────────────────────────────────────────────

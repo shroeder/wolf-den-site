@@ -550,7 +550,9 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // of beats in commons as in primordials, forever. Give health and damage different exponents and bout length
 // starts drifting the moment gear grows, which is the whole class of bug this replaces.
 export const STAT_EXPONENT = 0.75;
-const curve = (v) => Math.pow(Math.max(0, Number(v) || 0), STAT_EXPONENT);
+// Exported because arena-atb.js now runs Ferocity through it too, and a second copy of an exponent is
+// exactly how DAMAGE_PER_MIGHT came to be wrong by 3.1x. One curve, one file.
+export const curve = (v) => Math.pow(Math.max(0, Number(v) || 0), STAT_EXPONENT);
 
 // ── HEALTH PER POINT OF VITALITY ─────────────────────────────────────────────────────────────────────────────
 // Sized so the top of the ladder lands at Luke's target of about 1,500 health. HEALTH_BASE is gone with the

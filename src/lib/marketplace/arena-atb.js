@@ -37,17 +37,47 @@
 // again, and that does not get reported as "too fast", it gets reported as the fight being broken.
 export const BASE_FILL_MS = 6700;
 
+import { curve } from "@/lib/marketplace/arena-kit.js";
+
 // ── WHAT MAKES A BAR FILL FASTER ─────────────────────────────────────────────────────────────────────────────
-// The weapon sets it and Ferocity sharpens it. What changed when the bar arrived is the DIVISOR: the old
-// speedOf used ferocity/500, sized for a tie-break rather than for a bar somebody watches, and at /500 the
-// median member's entire Ferocity investment was worth thirty milliseconds across a five-second bar. A stat
-// that visibly does nothing is worse than a stat that is absent, because the player spends real points
-// finding out.
+// The weapon sets it and Ferocity sharpens it. What changed when the bar arrived is the RATE: the old speedOf
+// used ferocity/500, sized for a tie-break rather than for a bar somebody watches, and at /500 the median
+// member's entire Ferocity investment was worth thirty milliseconds across a five-second bar. A stat that
+// visibly does nothing is worse than a stat that is absent, because the player spends real points finding
+// out. The correction over-shot into a flat 1/100, which is the note below.
 //
 // That /500 divisor belonged to speedOf in arena-kit.js, which fed the go-again chance rather than the bar.
 // Both it and the chance are gone now, so this is the only divisor Ferocity has: one function, one rate,
 // named for the thing it paces. See the tombstone in arena-kit.js.
-export const FEROCITY_PER_TEMPO = 100;
+// ── AND IT DIMINISHES, LIKE EVERY OTHER STAT ─────────────────────────────────────────────────────────────────
+// Luke: "I think ferocity should have diminishing returns, and be less powerful as well."
+//
+// It was the last LINEAR stat in the kit. Might, Vitality, Armour and weapon base damage all run through
+// curve() at STAT_EXPONENT 0.75 — unbounded growth with a thinning tail — and Ferocity alone paid a flat
+// 1/100 of tempo per point, forever. Measured across the 34 members with a bout on record: median 48 Ferocity,
+// top 118, against weapon speeds spanning only 0.81 to 1.24. So the stat was supplying most of everybody's
+// bar, and the top holder's Ferocity alone outweighed the entire spread of weapons in the game.
+//
+// ── THE CONSTANT IS AN ANCHOR, NOT A DIVISOR ─────────────────────────────────────────────────────────────
+// Written the same way ARMOUR_TO_DOUBLE is, and for the same reason: a bare number over a curve is unreadable
+// and gets retuned by feel. FEROCITY_TO_DOUBLE is the Ferocity that DOUBLES a bare-handed bar, which is a
+// sentence a card can print and a person can check. 200, against the old 100 — the "less powerful" half.
+//
+// The curve is the other half, and it does the work at the top rather than the bottom:
+//
+//        ferocity     31      48      77      94     118
+//        was       +0.31   +0.48   +0.77   +0.94   +1.18
+//        now       +0.25   +0.34   +0.49   +0.57   +0.67
+//        change     -21%    -29%    -37%    -40%    -43%
+//
+// A member at the median loses about a third of what Ferocity was paying them; the one at the top loses
+// nearly half, and the gap between the two closes. Nobody's tempo goes backwards from where they started —
+// they simply stop being able to buy the bar outright.
+//
+// ⚠️ ROAD FOES DO NOT MOVE. An NPC hands kitFor its own `tempo` off npcTempo and never touches this function,
+// so the whole ladder is unchanged and only members' bars slow. That is deliberate: npcTempo was already
+// written on a member's scale (0.9 to 2.4) precisely so the two could be tuned apart.
+export const FEROCITY_TO_DOUBLE = 200;
 export const BARE_TEMPO = 1;
 
 // ── AND IT IS NOT CLAMPED ANY MORE ───────────────────────────────────────────────────────────────────────────
@@ -63,7 +93,7 @@ export const BARE_TEMPO = 1;
 //
 // So a member's tempo is uncapped and always moves. The ratio is held instead, on the FOE — see foeTempo.
 export const tempoOf = (weaponSpeed = BARE_TEMPO, ferocity = 0) =>
-    Math.max(0.2, (Number(weaponSpeed) || BARE_TEMPO) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_TEMPO);
+    Math.max(0.2, (Number(weaponSpeed) || BARE_TEMPO) + curve(ferocity) / curve(FEROCITY_TO_DOUBLE));
 
 // ── THE RATIO IS WHAT IS GUARDED, AND IT IS GUARDED ON THE OPPONENT ──────────────────────────────────────────
 // Under 2.0 and back-to-back turns cannot happen at all, whatever anybody is wearing. 1.9 keeps a margin so
