@@ -72,6 +72,9 @@ const BUILDS = {
     "runecaller:berserker": { wants: { ferocity: 4, might: 2, haste: 2 }, pet: "elder_dragon",
         idea: "It acts first, then again, and you are still reading the log." },
 };
+// Exported for check:npc-legal, which asserts every `wants` key against STAT_META — see the warning above.
+// A typo there moves real affix value onto a key nothing reads, silently and for ever.
+export const BUILDS_FOR_CHECK = BUILDS;
 const FALLBACK = BUILDS["reaver:balanced"];
 export const buildFor = (classId, archetype) => BUILDS[`${classId}:${archetype}`] || FALLBACK;
 

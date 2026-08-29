@@ -17,10 +17,27 @@ import { npcSkills, skillsForClass, skillPointsSpent, SKILL_POINT_CAP } from "..
 // empty array that makes every node look illegal. It is what npcTree itself spends against.
 import { ARENA_MAX_LEVEL, treeFor } from "../src/lib/marketplace/arena-classes.js";
 import { LADDER_MAX } from "../src/lib/marketplace/arena-ladder.js";
+import { BUILDS_FOR_CHECK } from "../src/lib/marketplace/arena-npc-build.js";
+import { STAT_META } from "../src/lib/marketplace/items.js";
 
 const ALL = ["reaver", "warden", "runecaller"];
 const fail = [];
 const note = (t, msg) => fail.push(`rung ${t}: ${msg}`);
+
+// ── EVERY REROLL TARGET IS A STAT THAT EXISTS ────────────────────────────────────────────────────────────────
+// The fifteen builds name the stats they reroll toward by string. A typo moves real affix value onto a key
+// nothing reads — it does not throw, it does not show up on a card, the fighter is simply weaker than its rung
+// for ever. That is the exact failure this whole rework exists to end, and it was written down as a warning in
+// arena-npc-build.js without anything actually checking it.
+//
+// STAT_META is where the game says what a stat is, which makes it the list to check against.
+for (const [key, build] of Object.entries(BUILDS_FOR_CHECK)) {
+    for (const stat of Object.keys(build.wants || {})) {
+        if (!STAT_META[stat]) fail.push(`build ${key}: rerolls toward "${stat}", which is not a stat`);
+    }
+    if (!Object.keys(build.wants || {}).length) fail.push(`build ${key}: wants nothing`);
+    if (!build.pet) fail.push(`build ${key}: has no companion`);
+}
 
 for (let t = 1; t <= LADDER_MAX; t += 1) {
     const b = npcBuild(t, 0);
