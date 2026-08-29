@@ -56,6 +56,7 @@
     "check:arith": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-arithmetic.mjs",
     "check:npc": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-curve.mjs",
     "check:npcband": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-growth.mjs",
+    "check:npc-legal": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-npc-legal.mjs",
     "check:road": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-road.mjs",
     "check:polish": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-polish.mjs",
     "check:feel": "node scripts/check-feel.mjs",
