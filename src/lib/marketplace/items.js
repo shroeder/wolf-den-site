@@ -1249,6 +1249,10 @@ const affixSeed = (str) => {
     return h >>> 0;
 };
 
+// What the DESIGNER wrote, captured before the draw adds a thing. The coverage pass below needs to tell
+// authored lines from drawn ones, and after the loop has run there is no way to tell them apart.
+const AUTHORED_STATS = new Map(ITEMS.map((it) => [it.id, new Set(Object.keys(it.stats || {}))]));
+
 for (const it of ITEMS) {
     if (!it.stats) continue;
     const counted = () => Object.keys(it.stats).filter((k) => k !== "extra_strike").length;
@@ -1290,6 +1294,70 @@ for (const it of ITEMS) {
         const grant = RETIRED_AFFIX[k] || k;
         it.stats[grant] = (it.stats[grant] || 0) + value;
         filled += 1;
+    }
+}
+
+// ── EVERY SLOT OFFERS EVERY PROC ─────────────────────────────────────────────────────────────────────────────
+// Luke: "I think every slot should offer these stats, and allow rerolling to them."
+//
+// Nothing barred them — the slot gates went long ago and any affix can land on any piece. But the draw is
+// weighted by scarcity (counter and stun and haste at 7, lifedrink at 5) and seeded per item, so with only
+// thirty pieces in a slot the scarce ones simply never came up. Counted: counter appeared in 2 slots of 9,
+// lifedrink in 3, stun in 3. A member who wanted a riposte build could not shop for one — there was no belt,
+// no chest, no weapon, no ring that had ever rolled it.
+//
+// So coverage is guaranteed rather than hoped for: every slot carries at least PROC_PER_SLOT pieces of each.
+//
+// ⚠️ IT SWAPS, IT DOES NOT ADD. Handing an item another line would raise its affix count past what its rarity
+// is allowed (AFFIX_COUNT) and quietly make every piece stronger. The lowest-value DRAWN affix is replaced
+// instead — never an authored one, because that is the designer's statement about what the piece is — so the
+// hand stays the same size and the piece keeps its character.
+//
+// Deterministic off the item id like every other draw here, so a piece never changes on somebody.
+const PROC_STATS = ["pierce", "lifesteal", "counter", "stun", "haste"];
+const PROC_PER_SLOT = 3;
+{
+    // ⚠️ AUTHORED_STATS IS SNAPSHOTTED BEFORE THE DRAW, and it has to be. My first pass built this map here,
+    // after the loop above had run, so it held the designer's lines AND the drawn ones — every stat looked
+    // authored, `swappable` came back empty on every item, and the whole pass silently did nothing. The
+    // coverage table came out byte-identical, which is exactly what a no-op looks like from the outside.
+    const authoredOf = AUTHORED_STATS;
+
+    const slots = [...new Set(ITEMS.map((i) => i.slot))].filter(Boolean).sort();
+    for (const slot of slots) {
+        const pool = ITEMS.filter((i) => i.slot === slot && i.stats);
+        for (const proc of PROC_STATS) {
+            const has = pool.filter((i) => (i.stats[proc] || 0) > 0);
+            let need = PROC_PER_SLOT - has.length;
+            if (need <= 0) continue;
+            // Candidates: pieces that do not already carry it, ordered by the item's own hash so the choice is
+            // stable and spread across rarities rather than always landing on the same few.
+            const cands = pool
+                .filter((i) => !(i.stats[proc] > 0))
+                .sort((a, b) => (affixSeed(`${a.id}~${proc}`) % 100000) - (affixSeed(`${b.id}~${proc}`) % 100000));
+            for (const it of cands) {
+                if (need <= 0) break;
+                // The cheapest DRAWN line on the piece. Authored stats and intrinsics are never taken.
+                const cheapest = (keys) => keys.sort((a, b) => (it.stats[a] || 0) - (it.stats[b] || 0))[0];
+                const notProc = Object.keys(it.stats).filter((k) => !isIntrinsicStat(k) && !PROC_STATS.includes(k));
+                // A drawn line first — the piece's own character is the designer's and is not ours to spend.
+                let from = cheapest(notProc.filter((k) => !authoredOf.get(it.id).has(k)));
+                // ── AND A LAST RESORT, BECAUSE SOME PIECES ARE ENTIRELY HAND-WRITTEN ──────────────────
+                // Six slot/proc pairs stayed empty on the first run: every main_hand is authored down to the
+                // last line, so there was never a drawn affix to give up and the pass skipped all sixty. The
+                // smallest authored line goes instead — one or two points on a piece that has four or five —
+                // which costs the design less than a slot that can never roll a riposte at all.
+                if (!from) from = cheapest(notProc);
+                if (!from) continue;
+                const tier = AFFIX_TIER[it.rarity] || 1;
+                const jitter = (affixSeed(`${it.id}#${proc}`) % 3) - 1;
+                delete it.stats[from];
+                // Point-style, exactly as the draw values a proc — never the BIG_STATS size, which is what a
+                // Might or Vitality line gets.
+                it.stats[proc] = Math.max(1, Math.round(tier * 0.8) + jitter);
+                need -= 1;
+            }
+        }
     }
 }
 
