@@ -40,6 +40,7 @@ const NAV_SPRITE = {
     "/marketplace/track": "rewards", "/marketplace/badges": "badges", "/marketplace/leaderboard": "ranks",
     "/marketplace/invite": "invite", "/marketplace/friends": "friends", "/marketplace/inbox": "inbox",
     "/marketplace/play": "home", "/marketplace/customize": "customize", "/marketplace/profile": "profile",
+    "/marketplace/notifications": "notifications",
     "/marketplace/fishing": "fishing", "/marketplace/mining": "mining", "/marketplace/dungeons": "delves",
     // compendium.png was GENERATED and then never mapped. This table is keyed by href and the menu entry
     // carries `sprite: "compendium"`, which is only read for the Sets helmet — so the tile fell through to
@@ -77,6 +78,7 @@ const LINKS = [
     { href: "/marketplace/guide", emoji: "🧭", label: "Guide" },
     { href: "/marketplace/changelog", emoji: "📜", label: "What's New" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
+    { href: "/marketplace/notifications", emoji: "🔔", label: "Alerts" },
     { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
     { href: "/marketplace/sailing", emoji: "⛵", label: "Sailing" },
@@ -366,6 +368,11 @@ export default function GameNav() {
         { title: "You", items: [
             { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize", sub: "Avatar & card look" },
             { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Settings & account" },
+            // ── FINDABLE ──────────────────────────────────────────────────────────────────────────────
+            // Luke: "have it live in a place easier to find." It lived inside a collapsed section of the
+            // profile, which is the one screen people open when something is already wrong — so the only
+            // members who ever found it were the ones who had already decided we send too much.
+            { href: "/marketplace/notifications", emoji: "🔔", label: "Notifications", sub: "All, some or none" },
         ] },
     ];
 

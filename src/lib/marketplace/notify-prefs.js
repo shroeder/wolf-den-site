@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { NOTIFY_MODES, isNotifyMode } from "@/lib/marketplace/notify-prefs-meta.js";
 
 // ── GRANULAR NOTIFICATION PREFERENCES ────────────────────────────────────────────────────────────────────────
 // One catalog, used by three things: the profile settings UI, the push senders, and the win-back digest. If a
@@ -63,6 +64,87 @@ export const NOTIFY_KINDS = [
 // asking "can we actually reach this member by push?" has to discount them.
 export const VAPID_ROTATED_AT = "2026-07-25";
 
+// Every channel any kind can actually be delivered on. See the note in setNotifyPrefs for why this is
+// derived rather than written down.
+export const VALID_CHANNELS = new Set(NOTIFY_KINDS.flatMap((k) => k.channels));
+
+// ── ALL, SOME OR NOTHING ─────────────────────────────────────────────────────────────────────────────────────
+// Luke: "can we simplify notifications into like all, some, none."
+//
+// The granular matrix is thirty switches across six groups, and thirty switches is a screen people close. It
+// is not wrong — every one of them is enforced and somebody eventually wants each — it is just the wrong
+// FIRST question. The first question is how much you want to hear from us at all, and there are three honest
+// answers to that.
+//
+// ── WHAT "SOME" MEANS, AND WHY IT IS NOT A HAND-TYPED LIST ───────────────────────────────────────────────────
+// The catalog already sorts the kinds into groups by what they ARE, and the top group's note already says the
+// thing: "Someone is expecting an answer. These are the ones worth keeping on." So Some is those groups, read
+// off the catalog — which means a kind added to `waiting` later is in Some automatically, and a hand-kept
+// second list cannot drift away from the grouping it was copied from.
+export const SOME_GROUPS = new Set(["waiting", "social"]);
+
+// ── THE ONE EXCEPTION ────────────────────────────────────────────────────────────────────────────────────────
+// The weekly recap is in the `shop` group, so Some would switch it off — and that is the wrong call. It is not
+// a notification you receive, it is the fallback that only fires when push CANNOT reach you and you have been
+// gone six days, at most once a fortnight. Muting it for everybody who picks Some would quietly delete the one
+// thing that brings a lapsed member back, in the name of sending them less while they are not here at all.
+//
+// None still turns it off, because None has to mean none.
+const SOME_ALWAYS_ON = new Set(["digest"]);
+
+// The three labels live in notify-prefs-meta.js so the settings SCREEN can read them — this module is
+// server-only and a client component importing it pulls the database into the browser bundle. Imported here
+// as well as re-exported: `export { X } from` binds nothing locally, and every server-side caller in the game
+// imports these two from this file.
+export { NOTIFY_MODES, isNotifyMode };
+
+/** Should this (kind, channel) be on under `mode`? The single rule all three of the functions below read. */
+const onUnderMode = (kind, mode) => {
+    if (mode === "all") return true;
+    if (mode === "none") return false;
+    return SOME_GROUPS.has(kind.group) || SOME_ALWAYS_ON.has(kind.key);
+};
+
+/** The complete explicit map for a mode — every kind, every channel it can arrive on. */
+export function prefsForMode(mode) {
+    const out = {};
+    for (const k of NOTIFY_KINDS) {
+        for (const c of k.channels) out[prefKey(c, k.key)] = onUnderMode(k, mode);
+    }
+    return out;
+}
+
+/**
+ * Which of the three this member is on — or "custom" when they have picked switches by hand.
+ *
+ * DERIVED from the switches rather than stored beside them. A `notify_mode` column would be a second copy of
+ * a fact the map already holds, and the two would disagree the first time somebody flipped one switch — which
+ * is the whole reason the granular list still exists. Read this way, choosing "Some" and then turning one
+ * thing back on correctly reads as Custom, because that is what it is.
+ */
+export function notifyModeOf(prefs = {}) {
+    let on = 0;
+    let off = 0;
+    let notSome = 0;
+    for (const k of NOTIFY_KINDS) {
+        for (const c of k.channels) {
+            const isOn = allowsNotify(prefs, c, k.key);
+            if (isOn) on += 1; else off += 1;
+            if (isOn !== onUnderMode(k, "some")) notSome += 1;
+        }
+    }
+    if (!off) return "all";
+    if (!on) return "none";
+    if (!notSome) return "some";
+    return "custom";
+}
+
+/** Set every switch at once. Goes through setNotifyPrefs so the legacy column sync happens exactly once. */
+export async function setNotifyMode(buyerId, mode) {
+    if (!isNotifyMode(mode)) return await getNotifyPrefs(buyerId);
+    return setNotifyPrefs(buyerId, prefsForMode(mode));
+}
+
 const KIND_KEYS = new Set(NOTIFY_KINDS.map((k) => k.key));
 export const isNotifyKind = (kind) => KIND_KEYS.has(String(kind || ""));
 export const prefKey = (channel, kind) => `${channel}:${kind}`;
@@ -96,7 +178,17 @@ export async function setNotifyPrefs(buyerId, patch) {
     const clean = {};
     for (const [k, v] of Object.entries(patch)) {
         const [channel, kind] = String(k).split(":");
-        if (!["push", "email"].includes(channel) || !isNotifyKind(kind)) continue;
+        // ── DERIVED FROM THE CATALOG, NOT TYPED OUT ──────────────────────────────────────────────────
+        // This read `["push","email"].includes(channel)`, and the catalog has a third channel: `chat`, for
+        // the Arbiter's automated milestone posts. So `chat:milestone` was dropped here on every save — the
+        // switch rendered, town.js honoured it on read, and the write went in the bin. It has never worked,
+        // which makes it exactly the thing the note at the top of this file forbids: a toggle that does
+        // nothing. Sunflower Jinxx asked for that switch ("Are we able to turn off the auto messages for the
+        // road rungs?") and has been unable to use it since the day it shipped.
+        //
+        // Deriving the set from NOTIFY_KINDS means a fourth channel can never be half-added again: the
+        // per-kind `channels.includes(channel)` check below already does the narrow half of this job.
+        if (!VALID_CHANNELS.has(channel) || !isNotifyKind(kind)) continue;
         const def = NOTIFY_KINDS.find((d) => d.key === kind);
         if (!def.channels.includes(channel)) continue;
         clean[prefKey(channel, kind)] = Boolean(v);

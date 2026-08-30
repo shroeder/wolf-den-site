@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { NOTIFY_MODES } from "@/lib/marketplace/notify-prefs-meta.js";
 
 // Granular notification settings: one row per notification KIND, with a small switch per channel it can
 // actually be delivered on. The catalog comes from the server so the UI can never show a switch that isn't
@@ -10,12 +11,19 @@ import { useCallback, useEffect, useState } from "react";
 // rolls back the one switch that failed, since a settings screen with a Save button people forget to press is
 // how you end up still emailing someone who tried to turn it off.
 
+// ── NAMED, NOT DRAWN ─────────────────────────────────────────────────────────────────────────────────────────
+// These were emoji (🔔 ✉️ 💬), which the Den does not put in its interface. The obvious swap is a react-icons
+// glyph — and at the size this label renders, stacked above a 38px switch, a detailed gi bell reads as a grey
+// smudge and the whole point of the label is telling two switches apart at a glance.
+//
+// So it is the WORD. Four characters at 0.58rem is narrower than the switch under it, it is unambiguous at
+// any size, and the switch is already the icon-forward half of the control.
 const CHANNEL_META = {
-    push: { icon: "🔔", label: "Push" },
-    email: { icon: "✉️", label: "Email" },
+    push: { label: "Push" },
+    email: { label: "Email" },
     // Not every notification arrives on your phone. A milestone post is delivered by appearing in the plaza,
     // so "shown in chat" is a channel like any other and gets a switch like any other.
-    chat: { icon: "💬", label: "In chat" },
+    chat: { label: "Chat" },
 };
 
 function Switch({ on, busy, onToggle, ariaLabel }) {
@@ -36,15 +44,26 @@ function Switch({ on, busy, onToggle, ariaLabel }) {
 export default function NotifyPrefsClient() {
     const [groups, setGroups] = useState(null);
     const [digest, setDigest] = useState(true);
+    const [mode, setMode] = useState("all");
     const [busyKey, setBusyKey] = useState(null);
+    // Opened by hand, or opened for you when your settings do not add up to one of the three — somebody who
+    // has already tuned this by hand must not have their choices hidden behind a fold they did not ask for.
+    const [openDetail, setOpenDetail] = useState(false);
     const [err, setErr] = useState(null);
+
+    const apply = useCallback((d) => {
+        if (!d?.groups) { setGroups([]); return; }
+        setGroups(d.groups);
+        setDigest(d.digest !== false);
+        setMode(d.mode || "all");
+    }, []);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/notify-prefs", { cache: "no-store" }).catch(() => null);
         const d = r && r.ok ? await r.json().catch(() => null) : null;
-        if (d?.groups) { setGroups(d.groups); setDigest(d.digest !== false); }
-        else setGroups([]);
-    }, []);
+        apply(d);
+        if (d?.mode === "custom") setOpenDetail(true);
+    }, [apply]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -56,8 +75,31 @@ export default function NotifyPrefsClient() {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ prefs: { [prefKey]: value } }),
         }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
         setBusyKey(null);
-        if (!r || !r.ok) { revert(); setErr("Couldn't save that — try again."); }
+        if (!d) { revert(); setErr("Couldn't save that — try again."); return; }
+        // The MODE is re-read from the reply, because one switch is exactly what turns Some into Custom and
+        // the header has to say so the moment it happens rather than on the next page load.
+        setMode(d.mode || "all");
+    }
+
+    // ── PICKING ONE OF THE THREE REWRITES EVERY SWITCH ───────────────────────────────────────────────────
+    // Not optimistic, deliberately. A per-switch flip is one boolean and rolling it back is honest; this
+    // rewrites the whole matrix, so guessing the result locally means drawing thirty switches that might all
+    // be wrong. It is one request and the screen shows it working.
+    async function chooseMode(next) {
+        if (busyKey || next === mode) return;
+        setBusyKey(`mode:${next}`);
+        setErr(null);
+        const r = await fetch("/api/marketplace/notify-prefs", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ mode: next }),
+        }).catch(() => null);
+        const d = r && r.ok ? await r.json().catch(() => null) : null;
+        setBusyKey(null);
+        if (!d) { setErr("Couldn't save that — try again."); return; }
+        apply(d);
     }
 
     function toggle(kindKey, channel, current) {
@@ -92,6 +134,35 @@ export default function NotifyPrefsClient() {
         <div className="notif-prefs">
             {err ? <p className="notif-err">{err}</p> : null}
 
+            {/* ── THE FIRST QUESTION ───────────────────────────────────────────────────────────────────────
+                Thirty switches is not wrong — every one is enforced and somebody eventually wants each — it
+                is the wrong thing to ask FIRST. How much do you want to hear from us at all has three honest
+                answers, and almost everybody's is one of them. The matrix is still here, one tap down, for
+                the people whose answer is "it depends". */}
+            <div className="notif-modes" role="radiogroup" aria-label="How much should we send you?">
+                {NOTIFY_MODES.map((m) => (
+                    <button key={m.key} type="button" role="radio" aria-checked={mode === m.key}
+                        className={`notif-mode${mode === m.key ? " is-on" : ""}`}
+                        disabled={Boolean(busyKey)}
+                        onClick={() => chooseMode(m.key)}>
+                        <b>{m.label}</b>
+                        <em>{m.desc}</em>
+                    </button>
+                ))}
+            </div>
+            {/* CUSTOM IS A REAL STATE AND IT IS SAID OUT LOUD. Somebody who has tuned this by hand would
+                otherwise open the screen to three unselected buttons and reasonably conclude it had forgotten
+                them. It is derived from the switches, so it appears the instant one of them disagrees. */}
+            {mode === "custom" ? (
+                <p className="notif-custom" role="status">
+                    You have picked these by hand. Choosing one of the three above replaces the lot.
+                </p>
+            ) : null}
+
+            <details className="notif-detail" open={openDetail}
+                onToggle={(e) => setOpenDetail(e.currentTarget.open)}>
+                <summary>Choose exactly what reaches you</summary>
+
             {groups.map((g) => (
                 <div key={g.key} className="notif-group">
                     <div className="notif-group-head">
@@ -107,7 +178,7 @@ export default function NotifyPrefsClient() {
                             <span className="notif-row-switches">
                                 {k.channels.map((c) => (
                                     <span key={c.channel} className="notif-chan">
-                                        <span className="notif-chan-label" title={CHANNEL_META[c.channel]?.label}>{CHANNEL_META[c.channel]?.icon}</span>
+                                        <span className="notif-chan-label">{CHANNEL_META[c.channel]?.label}</span>
                                         <Switch
                                             on={c.on}
                                             busy={busyKey === `${c.channel}:${k.key}`}
@@ -135,12 +206,13 @@ export default function NotifyPrefsClient() {
                     </span>
                     <span className="notif-row-switches">
                         <span className="notif-chan">
-                            <span className="notif-chan-label">✉️</span>
+                            <span className="notif-chan-label">{CHANNEL_META.email.label}</span>
                             <Switch on={digest} busy={busyKey === "email:digest"} onToggle={toggleDigest} ariaLabel="Weekly recap email" />
                         </span>
                     </span>
                 </div>
             </div>
+            </details>
         </div>
     );
 }

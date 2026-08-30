@@ -70,6 +70,10 @@ const ICONS = {
     customize: "An ornate hand mirror with a scrolled metal frame, a paintbrush crossed behind it",
     fishing: "A wooden fishing rod angled across the frame with a taut line and a bright red-and-white float bobbing below it",
     profile: "A single hooded human adventurer shown from the chest up, framed inside a thick ornate circular ring like a portrait medallion",
+    // Notifications. A hand-bell rather than the usual round jingle bell: at 18px a jingle bell is a circle
+    // with a slot in it, which reads as a coin. A handle plus a flared skirt plus a clapper is a silhouette
+    // that survives the size, and the tilt says it is ringing without needing motion lines.
+    notifications: "An ornate bronze hand-bell tilted mid-swing, a wooden handle above a flared skirt with the clapper visible beneath it",
     // The Market must not be another storefront: `store` is ALREADY "a wooden market stall with a striped
     // awning", and at 18px two awnings are the same icon. So this one is the GOODS rather than the building —
     // which is also what the screen is actually about, members trading produce and catch between themselves.

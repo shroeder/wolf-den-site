@@ -85,11 +85,17 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], waiti
     if (!email) return false;
     const resend = getResendClient();
     const site = baseUrl();
-    // Two DIFFERENT destinations on purpose. The conversion CTA goes to the single-purpose opt-in landing (one
-    // button, works on first tap); the opt-out goes to the granular settings. Pointing both at /profile meant
-    // the "turn on alerts" click landed on a long page with notifications collapsed out of sight.
+    // ── BOTH POINT AT THE SAME PLACE NOW, AND THAT IS THE FIX ────────────────────────────────────────────
+    // They used to differ on purpose: the conversion CTA went to the one-button opt-in landing, the opt-out
+    // to the granular settings buried in the profile, because pointing both at /profile made the "turn on
+    // alerts" click land on a long page with notifications collapsed out of sight.
+    //
+    // /marketplace/notifications is now BOTH — the button and the all/some/none picker, in that order — so
+    // the split has nothing left to solve. It also means somebody who opened this email to turn things DOWN
+    // lands on three buttons instead of thirty switches, which is the difference between turning some of it
+    // off and unsubscribing from the lot.
     const enableUrl = `${site}/marketplace/notifications`;
-    const settingsUrl = `${site}/marketplace/profile`;
+    const settingsUrl = `${site}/marketplace/notifications`;
 
     const li = (rows) => rows
         .map((r) => `<tr><td style="padding:7px 0;vertical-align:top;width:30px;font-size:19px;">${r.icon}</td><td style="padding:7px 0;line-height:1.5;font-size:15px;">${r.text}</td></tr>`)
@@ -151,7 +157,8 @@ export async function sendPushWinbackEmail(email, { name = "", gold = 0 } = {}) 
     const resend = getResendClient();
     const site = baseUrl();
     const enableUrl = `${site}/marketplace/notifications`;
-    const settingsUrl = `${site}/marketplace/profile`;
+    // See the note above the other pair: one page does both jobs now.
+    const settingsUrl = `${site}/marketplace/notifications`;
 
     const html = `
         <div style="max-width:520px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#26221c;">
@@ -293,7 +300,8 @@ export async function sendBadgeAwardedEmail(email, { label, icon = "", descripti
     if (!process.env.RESEND_API_KEY) return false;
     const resend = getResendClient();
     const hi = name ? `Hey ${name},` : "Hey there,";
-    const profileUrl = `${baseUrl()}/marketplace/profile`;
+    // The badge email's "manage notifications" foot — the settings, not the account page.
+    const profileUrl = `${baseUrl()}/marketplace/notifications`;
     await resend.emails.send({
         from: "The Wolf Den <portal@wolfdengamingmn.com>",
         to: email,

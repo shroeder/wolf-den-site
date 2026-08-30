@@ -7210,6 +7210,36 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .notif-toggle.is-on .notif-knob { transform: translateX(18px); }
 .notif-toggle:disabled { opacity: 0.7; cursor: default; }
 
+/* ── ALL / SOME / NONE ────────────────────────────────────────────────────────────────────────────────────
+   Three stacked cards rather than a segmented pill. A pill is right when the options are one word each; these
+   have a sentence apiece and the sentence is the whole point — "just the important ones" means nothing until
+   you read which ones. Stacked also means the same layout on a phone and a laptop, and this screen is opened
+   on a phone. */
+.notif-modes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.notif-mode { display: block; width: 100%; text-align: left; cursor: pointer;
+    padding: 11px 13px; border-radius: 12px; border: 1px solid #2a2f37;
+    background: rgba(255,255,255,0.04); transition: border-color .14s ease, background .14s ease; }
+.notif-mode b { display: block; font-size: 0.95rem; font-weight: 800; color: #e8edf3; }
+.notif-mode em { display: block; margin-top: 2px; font-style: normal; font-size: 0.78rem;
+    color: #8b93a0; line-height: 1.35; }
+.notif-mode:hover:not(:disabled) { border-color: #46506080; }
+.notif-mode.is-on { border-color: rgba(255,215,94,0.6); background: rgba(255,215,94,0.09); }
+.notif-mode.is-on b { color: #ffd75e; }
+.notif-mode:disabled { opacity: 0.6; cursor: default; }
+.notif-mode:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
+.notif-custom { margin: 2px 2px 0; font-size: 0.76rem; color: #8b93a0; line-height: 1.35; }
+
+/* The matrix, folded. `summary` is the only control on the screen that is not a switch, so it is styled as a
+   link rather than as another card competing with the three above it. */
+.notif-detail { margin-top: 2px; }
+.notif-detail > summary { cursor: pointer; list-style: none; padding: 7px 2px; font-size: 0.8rem;
+    font-weight: 700; color: #8b93a0; }
+.notif-detail > summary::-webkit-details-marker { display: none; }
+.notif-detail > summary::before { content: "▸ "; color: #ffd75e; }
+.notif-detail[open] > summary::before { content: "▾ "; }
+.notif-detail > summary:hover { color: #c8cfd8; }
+.notif-detail[open] { display: flex; flex-direction: column; gap: 14px; }
+
 /* ── Granular per-kind × per-channel switch matrix ───────────────────────────────────────────────────────── */
 .notif-prefs { gap: 14px; }
 .notif-group { display: flex; flex-direction: column; gap: 2px; }
@@ -7223,7 +7253,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Channel switches stay on one line — on a phone the labels are the emoji alone. */
 .notif-row-switches { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .notif-chan { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.notif-chan-label { font-size: 0.78rem; line-height: 1; opacity: 0.85; }
+/* The channel NAME, not an icon — see the note above CHANNEL_META. Small caps, tracked, and the same colour
+   as a group heading so it reads as a label rather than as content. */
+.notif-chan-label { display: block; font-size: 0.58rem; font-weight: 800; line-height: 1;
+    text-transform: uppercase; letter-spacing: 0.06em; color: #8b93a0; }
 .notif-switch-btn { background: none; border: none; padding: 0; cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
 .notif-switch-btn .notif-switch { width: 38px; height: 22px; background: rgba(255,255,255,0.13); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
 .notif-switch-btn .notif-knob { width: 16px; height: 16px; top: 3px; left: 3px; }
@@ -7235,7 +7268,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* ── /marketplace/notifications — the single-purpose opt-in landing ──────────────────────────────────────── */
 .enotif { text-align: center; }
 .enotif-hero { padding: 4px 0 2px; }
-.enotif-bell { font-size: 44px; line-height: 1; animation: enotifRing 2.6s ease-in-out infinite; }
+/* Was an emoji at 44px; it is the nav's bell sprite now, so the size is on the image and the swing is on
+   its container. transform-origin at the top is what makes it swing from the handle rather than spin. */
+.enotif-bell { display: inline-block; line-height: 0; transform-origin: 50% 12%;
+    animation: enotifRing 2.6s ease-in-out infinite; }
+.enotif-bell > img { display: block; width: 64px; height: 64px; }
 @keyframes enotifRing { 0%, 62%, 100% { transform: rotate(0); } 68% { transform: rotate(13deg); } 74% { transform: rotate(-11deg); } 80% { transform: rotate(7deg); } 86% { transform: rotate(-4deg); } }
 .enotif-title { margin: 8px 0 4px; font-size: 1.32rem; }
 .enotif-sub { margin: 0 auto; max-width: 34ch; color: #b7c0cf; font-size: 0.9rem; line-height: 1.45; }

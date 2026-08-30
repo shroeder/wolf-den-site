@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import EnableNotificationsClient from "@/components/EnableNotificationsClient";
+import NotifyPrefsClient from "@/components/NotifyPrefsClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 
 export const runtime = "nodejs";
@@ -11,10 +12,16 @@ export const metadata = {
     robots: { index: false },
 };
 
-// Single-purpose opt-in landing. The recap email's "turn on instant alerts" CTA points HERE rather than at the
-// profile, where notifications live inside a collapsed section on a long page — that dead-end was quietly
-// wasting the one conversion we most want (an email reader becoming a push subscriber, after which they stop
-// needing the recap at all).
+// ── THE ONE PLACE NOTIFICATIONS LIVE ─────────────────────────────────────────────────────────────────────────
+// Started as the single-purpose opt-in landing: the recap email's "turn on instant alerts" CTA points HERE
+// rather than at the profile, where notifications sat inside a collapsed section on a long page and the one
+// conversion we most want dead-ended.
+//
+// Luke: "have it live in a place easier to find." So it is now the whole thing rather than the front door to
+// it — turn them on, then say how much you want, in that order, on a page that is one tap from the menu. The
+// profile keeps its own section (the recap's opt-OUT link still points there and a link that goes nowhere is
+// worse than a long page), and both mount the SAME component, so there is one settings screen with two doors
+// rather than two screens that will disagree by Christmas.
 export default async function NotificationsPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
 
@@ -38,6 +45,17 @@ export default async function NotificationsPage() {
         <div className="stack reveal">
             <section className="card">
                 <EnableNotificationsClient />
+            </section>
+            {/* ── AND THEN HOW MUCH ────────────────────────────────────────────────────────────────────────
+                Below the button, deliberately: the button is the thing somebody arrived to press, and a
+                settings matrix above it would bury the one action this page was built for. Somebody who has
+                already turned push on scrolls past a button that says so and lands here. */}
+            <section className="card" id="notify-settings">
+                <h2 style={{ margin: "0 0 4px" }}>How much should we send you?</h2>
+                <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.85rem" }}>
+                    Pick one. You can always open the list and change a single thing instead.
+                </p>
+                <NotifyPrefsClient />
             </section>
         </div>
     );

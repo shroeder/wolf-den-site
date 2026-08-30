@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 import { disableWebPush, enableWebPush, hasLocalSubscription, isWebPushSupported, pushPermission, registerPushServiceWorker } from "@/lib/web-push-client";
 import Coin from "@/components/Coin";
@@ -105,7 +104,12 @@ export default function EnableNotificationsClient() {
     return (
         <div className="enotif">
             <div className="enotif-hero">
-                <div className="enotif-bell" aria-hidden="true">🔔</div>
+                {/* The nav's own bell sprite, not an emoji — it is the icon this page is reached BY, so
+                    the hero and the menu entry are the same object. */}
+                <div className="enotif-bell" aria-hidden="true">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/nav/notifications.png" alt="" width={64} height={64} />
+                </div>
                 <h1 className="enotif-title">
                     {state === "on" ? "Notifications are on" : "Get pinged the moment it happens"}
                 </h1>
@@ -170,7 +174,7 @@ export default function EnableNotificationsClient() {
             </div>
 
             <p className="enotif-links">
-                <Link href="/marketplace/profile">Fine-tune which notifications you get →</Link>
+                <a href="#notify-settings">Choose how much we send you ↓</a>
             </p>
         </div>
     );
