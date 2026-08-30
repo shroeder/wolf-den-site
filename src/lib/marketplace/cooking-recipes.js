@@ -183,7 +183,38 @@ export const MASTER_RECIPES = [
     R("r_long_night",  "Feast of the Long Night", 6, { p_goldleaf: 1, p_wine: 3, p_syrup: 2, pumpkin: 4 }, "It is meant to take all night. That is the point."),
 ];
 
-const BOOK = [...RECIPES, ...MASTER_RECIPES];
+// ── SEASON EXCLUSIVES · THE LONG ROAD ────────────────────────────────────────────────────────────────────────
+// Pages won at a rung. They are in BOOK and in NOTHING ELSE, and that split is the whole gate:
+//
+//   recipeById   reads BOOK            → a member who owns one can render and cook it, forever
+//   rollRecipe   reads recipeBookFor() → which returns RECIPES or RECIPES+MASTER, never these
+//   cook_librarian counts RECIPES.length → so a season page cannot silently move the badge's goalposts
+//
+// That last one is why they are not simply appended to RECIPES with a flag. Every wheel, chest and quest that
+// hands out a recipe funnels through learnRecipe's roll, and the roll takes the book it is given — so being
+// absent from every book IS the exclusivity, enforced in one place rather than by a filter each source has to
+// remember. Compare MASTER_RECIPES, which is gated the same way but is reachable by a roll once you own the
+// unlock; these are reachable by no roll at all.
+//
+// Tier 5 rather than 6: a season prize you cannot cook is not a prize, and tier 6 needs the Master's book.
+// Their ingredients are all reachable without the deep-water charts, for exactly the reason MASTER_RECIPES
+// gives above its own list.
+export const SEASON_RECIPES = [
+    R("r_s1_walkers_stew", "Walker's Ember Stew",  5, { p_smoked: 2, potato: 3, p_chilli: 1 },
+      "Cooked on the coals you were already carrying."),
+    R("r_s1_nightwatch_board", "The Nightwatch Board", 5, { p_smoked: 1, p_wine: 2, starfruit: 1 },
+      "Cut cold, for people whose whole job is staying awake."),
+];
+
+// ── EVERY PAGE THAT EXISTS ───────────────────────────────────────────────────────────────────────────────────
+// EXPORTED, and the export is dangerous enough to be worth a warning: this is the RESOLUTION book, not a
+// rollable one. `recipeById` reads it so a member who owns a master or season page can render and cook it;
+// `recipeBookFor` is the thing every ROLL takes, and it never returns this.
+//
+// Use it only where the question is "what IS this id" or "what does this member already know". Handing it to
+// rollRecipe would put both gated tiers into every wheel, chest and quest in the game.
+export const FULL_BOOK = [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES];
+const BOOK = FULL_BOOK;
 // Resolves BOTH books. A member who owns a master page has it in mkt_recipe_known and needs it to render,
 // and a page nobody can cook is not protected by refusing to name it.
 export const recipeById = (id) => BOOK.find((r) => r.id === id) || null;

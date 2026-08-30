@@ -47,6 +47,11 @@ export const QUIET_HIDE = [
     // scrim removed the dimming and left the card sitting in the middle of the shot — which cost a whole
     // capture of the casino's bonus screen. Hide the wrap and both halves go.
     ".poll-wrap", ".svy-wrap",
+    // ── THE ARENA'S AWAY REPORT ──────────────────────────────────────────────────────────────────────
+    // Dismissed by TAPPING it, and it reappears the moment anybody challenges you while you are logged
+    // out — so on the owner's account, which the whole Den challenges, it is over the arena on nearly
+    // every capture. It covered the entire Road tab on the first shot of the season track.
+    ".ar-away",
     "div:has(> [aria-label='Happy Hour is live'])",
     // Not a modal, but it sits at the bottom of every page for five seconds after ANY mutating call — which
     // is exactly where a game's primary button lives. It ate the click on the casino's Pull button and the

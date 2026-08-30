@@ -88,6 +88,17 @@ export const PERK_META = {
 const PET_ENSHRINED_LEVEL = 6;
 
 export const PET_PERKS = {
+    // ── THE LONG ROAD'S TWO ───────────────────────────────────────────────────────────────────────────────
+    // A season pet has to be worth the climb without being a reason the climb is mandatory: somebody who never
+    // walks the Road must not end up behind. Both of these are keys that already exist and already have a
+    // tuned value curve, so neither is stronger than an equivalent-rarity pet from any other source — the
+    // exclusivity is that you cannot GET them, not that they hit harder.
+    //
+    // Checked against the twin report at the bottom of `npm run check:rewards` before shipping, which is the
+    // whole lesson from Sable's first two (they shipped as numeric copies of the Stormcrow and the Unicorn).
+    road_cur: { name: "Never Stops Walking", key: "onslaught" },
+    gate_moth: { name: "Finds the Latch", key: "chest_luck" },
+
     // ── THE CASINO'S FIVE ─────────────────────────────────────────────────────────────────────────────────
     // These had no entry, so petPerk() handed all five the "Companion" fallback and three of them the same
     // `fortune` key — the rarest pets on the floor, sharing one generic ability between them.

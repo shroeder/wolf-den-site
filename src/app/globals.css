@@ -16969,8 +16969,70 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-pip:hover { transform: translateY(-2px); border-color: var(--h); }
 .ar-pip.is-open { border-color: #ffd75e; box-shadow: 0 0 0 1px rgba(255,215,94,0.35); }
 .ar-pip.is-clear { box-shadow: 0 0 10px color-mix(in srgb, var(--h) 45%, transparent); }
-.ar-road-goal { margin-top: 9px; font-size: .74rem; color: #9aa2ae; line-height: 1.35; }
-.ar-road-goal b { color: #ffd75e; text-transform: capitalize; }
+/* ── THE EIGHT ───────────────────────────────────────────────────────────────────────────────────────────
+   Replaced .ar-road-goal, which pointed at the next chest — the Road pays no chests now. The rule is DELETED
+   rather than left orphaned: a stale selector on a reshaped element is how a background or a transform ends
+   up winning a fight nobody knew was happening.
+
+   Four states and each has to read at a glance without its label: CLAIMED is filled and lit, OWED pulses
+   because it is the only one that wants a tap, NEXT is outlined, and BEYOND is dashed and dimmed because it
+   is not far away — it is behind a different door. */
+.ar-road-track { margin-top: 12px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.09); }
+.ar-track-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    flex-wrap: wrap; margin-bottom: 9px; }
+.ar-track-head b { font-family: var(--font-display); font-size: .92rem; color: #ffd75e; letter-spacing: .01em; }
+.ar-track-head em { font-style: normal; font-size: .7rem; color: #9aa2ae; font-variant-numeric: tabular-nums; }
+
+.ar-track-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0; padding: 0;
+    list-style: none; }
+.ar-track-tile { position: relative; display: grid; gap: 2px; justify-items: center; text-align: center;
+    padding: 9px 5px 8px; border-radius: 11px; min-width: 0;
+    border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.30); }
+.ar-track-rung { font-size: .62rem; font-weight: 800; color: #6a727d; font-variant-numeric: tabular-nums;
+    letter-spacing: .03em; }
+.ar-track-icon { display: grid; place-items: center; font-size: 19px; line-height: 1; color: #8b93a0; }
+.ar-track-icon > svg { display: block; }
+.ar-track-name { font-size: .68rem; font-weight: 700; line-height: 1.2; color: #c8cfd8;
+    /* Two lines then ellipsis — "The Roadwarden's Mantle" must not push its neighbours out of alignment. */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ar-track-state { font-style: normal; font-size: .62rem; color: #7c8490; line-height: 1.2; }
+
+.ar-track-tile.is-got { border-color: color-mix(in srgb, var(--h) 52%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--h) 18%, transparent), rgba(0,0,0,0.30)); }
+.ar-track-tile.is-got .ar-track-icon { color: var(--h); }
+.ar-track-tile.is-got .ar-track-name { color: #eef2f6; }
+.ar-track-tile.is-got .ar-track-state { color: color-mix(in srgb, var(--h) 78%, white); font-weight: 700; }
+
+.ar-track-tile.is-next { border-color: rgba(255,215,94,0.44); }
+.ar-track-tile.is-next .ar-track-icon { color: #ffd75e; }
+.ar-track-tile.is-next .ar-track-name { color: #eef2f6; }
+
+.ar-track-tile.is-owed { border-color: rgba(255,215,94,0.75); background: rgba(255,215,94,0.10);
+    animation: ar-track-owed 1.9s ease-in-out infinite; }
+.ar-track-tile.is-owed .ar-track-icon,
+.ar-track-tile.is-owed .ar-track-state { color: #ffd75e; font-weight: 800; }
+@keyframes ar-track-owed {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,94,0.35); }
+    50% { box-shadow: 0 0 0 5px rgba(255,215,94,0); }
+}
+
+/* The owed tile's whole face is the button. Sat on top rather than wrapping the content so the tile's grid
+   layout is untouched — a button in the middle of a `display: grid` would become a row of it. */
+.ar-track-claim { position: absolute; inset: 0; border: 0; padding: 0; background: transparent;
+    border-radius: inherit; cursor: pointer; }
+.ar-track-claim:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
+.ar-track-claim:disabled { cursor: default; }
+
+.ar-track-tile.is-beyond { border-style: dashed; border-color: rgba(255,255,255,0.13); opacity: .55; }
+
+.ar-track-note { margin: 9px 0 0; font-size: .68rem; line-height: 1.4; color: #7c8490; }
+
+/* PHONE. Four across at 375px gives each tile about 80px, which clips "Milestone Stone" to one word and a
+   half. Two across, two rows deep — the track is a reference, not a control, so height is cheap here. */
+@media (max-width: 560px) {
+    .ar-track-row { grid-template-columns: repeat(2, 1fr); gap: 5px; }
+    .ar-track-name { font-size: .7rem; }
+}
 
 /* ── THE NEXT ONE STILL STANDING ─────────────────────────────────────────────────────────────────────────
    The whole job of this page is to get one more fight started, so exactly one control is allowed to shout.
@@ -17096,15 +17158,27 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ar-rung-who em { font-style: normal; font-size: .62rem; color: #8b93a0; font-weight: 700;
     font-variant-numeric: tabular-nums; }
+/* ── THE PADLOCK SAT ON TOP OF THIS ───────────────────────────────────────────────────────────────────────
+   `.ar-rung-lock` is absolutely positioned at right:6px bottom:3px, and the payout label ends in the same
+   corner — so every locked rung read "25 laure🔒s". It was survivable while the label was a varying number
+   that sometimes ended short of the lock; now every rung pays the same flat 25, so it collides on all of
+   them at once. Reserved room rather than moved: the lock belongs in that corner (it is the tile's status),
+   and the label is the thing that has to yield. */
 .ar-rung-prize { flex: 0 0 auto; align-self: flex-end; font-size: .68rem; color: #ffd75e; font-weight: 900;
     font-variant-numeric: tabular-nums; }
+.ar-rung.is-locked .ar-rung-prize { padding-right: 15px; }
 .ar-rung-prize i { font-style: normal; font-size: .56rem; font-weight: 700; color: #8b7a3d; }
 .ar-rung.is-done .ar-rung-prize { color: #6a727d; }
-/* THE CHEST IS THE POINT OF A CHAMPION, so it gets its own chip rather than a longer sentence. */
-.ar-rung-chest { position: absolute; left: 8px; bottom: 4px; font-size: .55rem; font-weight: 900;
+/* The bottom label on a rung tile. It used to read "gold chest" — two short words — and now carries a prize
+   NAME, which can be "The Roadwarden's Mantle". Uppercase at .55rem with 0.1em tracking, that is wider than
+   the tile, so it is clamped to the tile's own width and ellipsised rather than allowed to push the row. */
+.ar-rung-chest { position: absolute; left: 8px; right: 8px; bottom: 4px; font-size: .55rem; font-weight: 900;
     letter-spacing: .1em; text-transform: uppercase; color: #1a1408; padding: 1px 6px; border-radius: 99px;
-    background: linear-gradient(180deg, #ffe89a, #ffc93c); }
-.ar-rung.is-champ { padding-bottom: 18px; }
+    background: linear-gradient(180deg, #ffe89a, #ffc93c);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+/* Room for that label. `is-champ` used to be the only tile that needed it, because a chest only ever sat on a
+   tenth rung; a season prize sits on every twenty-fifth, and 25, 75, 125 and 175 are not tenths. */
+.ar-rung.is-champ, .ar-rung.is-prize { padding-bottom: 18px; }
 
 /* The beat between tapping a raider and the fight opening. Short on purpose — it is a claim on the shared
    roster and a page change, not a loading screen. */

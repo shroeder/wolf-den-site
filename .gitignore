@@ -36,3 +36,7 @@ scripts/_*.html
 .e/
 .shots/
 .env.local.rig
+
+# Pulled prod env for local gate scripts (vercel env pull). Never commit — it holds the Neon URL,
+# the Blob token and the OpenAI key.
+scripts/_venv

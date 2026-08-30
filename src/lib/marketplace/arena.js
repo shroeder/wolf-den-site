@@ -28,6 +28,7 @@ import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.j
 import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr,
     // Aliased: this file already has a local ladderFor() for the PvP gauntlet, and the two are unrelated.
     ladderFor as roadFoes, ladderHousesFor as roadHouses, ladderSize } from "@/lib/marketplace/arena-ladder.js";
+import { SEASON_PUBLIC, currentSeason, milestoneTrack, seasonEnds, trackSummary } from "@/lib/marketplace/arena-season.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -77,7 +78,12 @@ import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 //
 // Measured across six real loadouts afterwards: below every member’s wall the ladder is strictly monotonic,
 // and the walls now spread from rung 37 to rung 46 instead of everyone stopping at the same one.
-const ROAD_OPEN = true;
+// ── AND NOW IT IS THE SEASON'S SWITCH, NOT THE ROAD'S ────────────────────────────────────────────────────────
+// Assigned rather than declared, because the Road is now half of a feature: the door (this) and the shelf of
+// eight prizes the climb is FOR (four catalog files, all reading SEASON_HIDDEN). Two booleans would mean the
+// first mistake anybody makes is flipping one — a Road open onto prizes nobody can see, or the whole Den
+// browsing eight exclusives behind a door that is shut. See the note above SEASON_PUBLIC.
+const ROAD_OPEN = SEASON_PUBLIC;
 // ── SHUT TO THE DEN, OPEN TO THE OWNER ───────────────────────────────────────────────────────────────────────
 // The Road was closed because the new gear stats made it clearable overnight, and a rung once beaten cannot be
 // un-beaten without taking progress off people. That reasoning is about the ninety-odd members walking it, not
@@ -675,12 +681,86 @@ function mergeAdd(a = {}, b = {}) {
     return out;
 }
 
+// ── THE RECOVERY PATH FOR A PRIZE THAT WAS EARNED AND NOT PAID ───────────────────────────────────────────────
+// The eight are handed over on the winning bout, which is where they belong — reaching rung 100 and being
+// given the dog in the same breath is the moment. This is for the case where that failed: the pets table down
+// for a second, a decoration id that moved between deploys, a bout resolved by a path that predates seasons.
+//
+// It is not a second way to earn one. `settleRoadPrizes` pays only rungs that are IN this member's own beaten
+// set, and every payment still goes through the same (buyer, season, rung) primary key — so the worst this
+// can do when spammed is a refused INSERT.
+//
+// Deliberately a VERB rather than something the state read does on its way past. A read path that writes is a
+// read path that bills a write on every render, and the track already draws an owed prize as claimable, so
+// the member taps once and the repair happens where they can see it.
+export async function claimRoadPrizes(buyerId) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const row = await arenaRow(buyerId);
+    const beaten = new Set((row?.ladder_beaten || []).map(Number));
+    if (!beaten.size) return { ok: true, paid: [] };
+    const { settleRoadPrizes } = await import("@/lib/marketplace/road-prizes.js");
+    const paid = await settleRoadPrizes(buyerId, beaten).catch(() => []);
+    return { ok: true, paid };
+}
+
 async function arenaRow(buyerId) {
     await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     let row = await db.queryOne(
         `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text,
                 a.free_respec_day::text AS free_respec_day_text, b.gold AS gold_now
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
+    return rollRoadSeason(row);
+}
+
+// ── A NEW SEASON CLEARS THE ROAD ─────────────────────────────────────────────────────────────────────────────
+// Every path that touches the Road — the screen, the challenge refusal, the payout — reads its rungs off
+// `ladder_beaten`, so a rollover applied in some of them and not others would let a member fight a rung the
+// screen says is beaten. It happens HERE, in the one function all of them go through, and there is exactly
+// one copy of the rule.
+//
+// LAZY, AND ONE ROW AT A TIME. The alternative is a migration that empties ninety members' sets in a single
+// UPDATE, before the season is even open, with no transaction to take it back with (neon() is the HTTP driver).
+// Rows roll over when their owner turns up, which also means a member who never comes back is left exactly as
+// they were rather than silently reset in the dark.
+//
+// FREE WHEN THERE IS NOTHING TO DO, which matters because arenaNav calls this on every navigation in the game:
+// `road_season` rides along on the `SELECT a.*` that was already happening, so the steady state is an integer
+// comparison and no extra round trip. The two writes fire once per member per season.
+//
+// NOTHING IS LOST. `road_best_rung` only ever goes up, and mkt_arena_road_season keeps the per-season record —
+// the reset takes the RUNGS back, which is the point of a season, not the fact that you walked them.
+async function rollRoadSeason(row) {
+    if (!row) return row;
+    const season = currentSeason();
+    if (Number(row.road_season) === season.n) return row;
+
+    const beaten = (row.ladder_beaten || []).map(Number).filter(Boolean);
+    const best = beaten.length ? Math.max(...beaten) : 0;
+    // Season 0 with nothing in it is a member who has never touched the Road. Archiving a row of zeros for
+    // every one of them is noise in a table that exists to be read.
+    if (beaten.length) {
+        await db.query(
+            `INSERT INTO mkt_arena_road_season (buyer_id, season, best_rung, beaten)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (buyer_id, season) DO UPDATE
+                SET best_rung = GREATEST(mkt_arena_road_season.best_rung, EXCLUDED.best_rung),
+                    beaten = GREATEST(mkt_arena_road_season.beaten, EXCLUDED.beaten)`,
+            [row.buyer_id, Number(row.road_season) || 0, best, beaten.length],
+        ).catch((e) => console.error("arena.season.archive_failed", row.buyer_id, e?.message || e));
+    }
+    // Guarded on the stamp so two requests arriving together cannot both clear a set the other has refilled.
+    await db.query(
+        `UPDATE mkt_arena
+            SET ladder_beaten = '{}'::int[], road_season = $2,
+                road_best_rung = GREATEST(road_best_rung, $3)
+          WHERE buyer_id = $1 AND road_season <> $2`,
+        [row.buyer_id, season.n, best],
+    ).catch((e) => console.error("arena.season.roll_failed", row.buyer_id, e?.message || e));
+
+    // The row in hand is now stale in exactly three fields, and every caller below reads two of them.
+    row.ladder_beaten = [];
+    row.road_season = season.n;
+    row.road_best_rung = Math.max(Number(row.road_best_rung) || 0, best);
     return row;
 }
 
@@ -863,6 +943,15 @@ export async function getArenaState(buyerId, pre = {}) {
     // the next rung — is cut to this, so a member without The Long Road is not sent the back hundred at all.
     const roadLong = await hasUnlock(buyerId, "road_long").catch(() => false);
     const roadSize = ladderSize(roadLong);
+    // ── THE SEASON, AND WHICH OF THE EIGHT ARE ALREADY YOURS ─────────────────────────────────────────
+    // Read rather than inferred from `beaten`. Those two CAN disagree — a prize whose hand-over failed
+    // leaves a rung beaten and unpaid — and the difference is exactly what the track has to draw, because
+    // an owed prize is claimable and a claimed one is not. See road-prizes.js.
+    const season = currentSeason();
+    const roadClaimed = await (async () => {
+        const { roadPrizesClaimed } = await import("@/lib/marketplace/road-prizes.js");
+        return roadPrizesClaimed(buyerId, season);
+    })().catch(() => new Set());
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
@@ -1076,10 +1165,29 @@ export async function getArenaState(buyerId, pre = {}) {
             // screen can lock the rest off the SAME rule the server refuses them by — a screen that computed
             // its own idea of "next" would be a second copy of the rule, and the copies would drift.
             const next = nextRung(beaten, roadSize);
+            // THIS SEASON'S furthest rung, not the lifetime best — `owed` means "reached and not yet paid",
+            // and a veteran whose lifetime best is 99 would otherwise open a fresh season already owed three
+            // prizes they have not walked to yet. The lifetime number is published separately, below.
+            const seasonBest = beaten.size ? Math.max(...beaten) : 0;
+            const track = milestoneTrack({ season, beaten: seasonBest, claimed: roadClaimed, reach: roadSize });
             return {
                 size: roadSize,
                 beaten: beaten.size,
                 next,
+                // ── THE SEASON ───────────────────────────────────────────────────────────────────────
+                // The eight prizes are the whole reason to climb now, so they are published with the
+                // Road rather than fetched by a second call — a track the screen has to ask for
+                // separately is a track that is missing for the first second of every visit, which is
+                // the second somebody decides whether the Road is worth their evening.
+                season: {
+                    n: season.n, key: season.key, name: season.name, blurb: season.blurb,
+                    tint: season.tint, from: season.from, ends: seasonEnds(season),
+                    track, ...trackSummary(track),
+                    // The furthest they have EVER stood, across every season. The reset takes the rungs;
+                    // it does not take this, and saying so on the screen is what stops a cleared Road
+                    // reading as lost progress.
+                    bestEver: Number(row?.road_best_rung) || 0,
+                },
                 // Published off the SAME flag the challenge path refuses by, so the screen and the server can
                 // never disagree about whether the Road is walkable.
                 closed: !roadOpenFor(buyerId),
@@ -2300,15 +2408,32 @@ async function finishBout(buyerId, row, b, won) {
     // which does scale with how much harder they were — that is the right place for "who you beat" to matter,
     // because VP cannot be spent. The Road and the Gauntlet keep the curve: both are bounded (a rung pays once,
     // a tier is capped by the daily allowance) and neither compounds with gear.
-    const isPvp = Number(b.npcTier) === 0
-        && !(Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0));
+    // Which rung this was, if it was one. Read off the RIDER first — `b.foe` is an allowlist that has dropped
+    // `ladder` before now, and that is how every rung ever beaten once paid nothing at all.
+    const roadRung = Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0);
+    const isPvp = Number(b.npcTier) === 0 && !roadRung;
     let reward = null;
     if (won) {
-        const gold = mint(isPvp ? PVP_GOLD_MIN + Math.floor(Math.random() * (PVP_GOLD_MAX - PVP_GOLD_MIN + 1)) : arenaWinGold(theirPower), "arena_win");
+        // ── THE ROAD IS OUT OF THE MINT ──────────────────────────────────────────────────────────────────
+        // Luke: "the road will no longer reward each rungs completion with so many laurels and gold."
+        //
+        // Zero, not reduced. A rung can be beaten exactly once, so Road gold was never a wage — but it was
+        // still 27,825 coins of mint that had to be accounted for in a ledger where every other line can be
+        // repeated, and it made the Road something to be balanced against farming rather than something to be
+        // balanced against itself. The season's eight prizes are the payout now, and they are worth exactly
+        // what the climb is hard, which is a thing no amount of gold could be tuned to.
+        //
+        // XP is deliberately untouched. Member XP is not currency (it buys levels, and a level is a gate
+        // rather than a purchase) and class XP is the progression the Road exists to drive.
+        const gold = roadRung ? 0 : mint(isPvp ? PVP_GOLD_MIN + Math.floor(Math.random() * (PVP_GOLD_MAX - PVP_GOLD_MIN + 1)) : arenaWinGold(theirPower), "arena_win");
         const xp = isPvp ? PVP_XP_MIN + Math.floor(Math.random() * (PVP_XP_MAX - PVP_XP_MIN + 1)) : arenaWinXp(theirPower);
         reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
-        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
-        await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
+        // Guarded, so a Road win does not write a zero to the balance and a zero to the coin ledger. A ledger
+        // full of no-op lines is a ledger nobody can read a mint rate off — see the coin telemetry.
+        if (gold > 0) {
+            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+            await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
+        }
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
         await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
     } else {
@@ -2355,7 +2480,7 @@ async function finishBout(buyerId, row, b, won) {
     let ladderPrize = null;
     // Set when this win was a WORLD first — nobody in the Den had ever taken this rung. The recap reads it.
     let roadFirst = null;
-    const wonRung = Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0);
+    const wonRung = roadRung;
     if (won && wonRung > 0) {
         const marked = await db.queryOne(
             `UPDATE mkt_arena
@@ -2368,14 +2493,26 @@ async function finishBout(buyerId, row, b, won) {
             // Recomputed from the rung rather than read off the bout: `reward` is another field the allowlist
             // drops, so `b.foe.reward` was `{}` — meaning even if the gate above had passed, the prize was an
             // empty object and the payout would have been zero laurels and no chest.
-            const prize = ladderReward(wonRung);
+            const season = currentSeason();
+            const prize = ladderReward(wonRung, season);
             if (prize.laurels > 0) {
                 await db.query(`UPDATE mkt_arena SET laurels = laurels + $2, laurels_earned = laurels_earned + $2 WHERE buyer_id = $1`,
                     [buyerId, prize.laurels]).catch(() => {});
             }
-            if (prize.chest) {
-                const { addChests } = await import("@/lib/marketplace/chests.js");
-                await addChests(buyerId, { [prize.chest]: 1 }, { source: "arena_ladder", meta: { rung: wonRung } }).catch(() => {});
+            // ── AND THE HIGH-WATER MARK, WHICH THE SEASON RESET MUST NEVER TAKE BACK ─────────────────────
+            // Written on the win rather than worked out at rollover time, so it is right even for a member
+            // who never opens the Road again — the archive reads it, the trophy room reads it, and neither
+            // has to reconstruct a set that has since been cleared.
+            await db.query(`UPDATE mkt_arena SET road_best_rung = GREATEST(road_best_rung, $2) WHERE buyer_id = $1`,
+                [buyerId, wonRung]).catch(() => {});
+            // ── ONE OF THE EIGHT ────────────────────────────────────────────────────────────────────────
+            // Claimed and handed over inside grantRoadPrize, which is the only place either happens. It
+            // returns null when there is no prize on this rung OR when this member already has it, so the
+            // recap only ever announces something that actually moved.
+            if (prize.prize) {
+                const { grantRoadPrize } = await import("@/lib/marketplace/road-prizes.js");
+                const paid = await grantRoadPrize(buyerId, wonRung, season).catch(() => null);
+                if (paid) prize.paid = paid;
             }
             await trackActivity(buyerId, "arena_ladder", { rung: wonRung, foe: b.foe.name }).catch(() => {});
             ladderPrize = prize;

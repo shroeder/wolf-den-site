@@ -9,8 +9,17 @@ import FightInput from "@/components/arena/FightInput";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { createPortal } from "react-dom";
 import {
+    GiFlowerPot, GiCookingPot, GiBroadsword, GiPawPrint,
     GiAngryEyes, GiLaurelCrown, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiFastForwardButton, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
+
+// ── THE FOUR KINDS OF SEASON PRIZE, AS GLYPHS ────────────────────────────────────────────────────────────────
+// PRIZE_KINDS names the component; this resolves it. The name lives in the pure module so the server and the
+// gate script can read the table without pulling a React icon set in, and the components live here because
+// that is the only place they can.
+const PRIZE_GLYPH = {
+    decoration: GiFlowerPot, recipe: GiCookingPot, gear: GiBroadsword, pet: GiPawPrint,
+};
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
@@ -3264,9 +3273,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const beaten = st.ladder?.beaten || 0;
             const size = st.ladder?.size || 100;
             const pct = size ? Math.round((beaten / size) * 100) : 0;
-            // The next unbeaten CHEST, because "what am I working toward" is the question a ladder has to
-            // answer at a glance and a laurel count does not answer it.
-            const nextChest = foesAll.find((f) => !f.beaten && f.reward?.chest) || null;
+            // ── WHAT AM I CLIMBING FOR ────────────────────────────────────────────────────────────────
+            // This used to point at the next unbeaten CHEST, and chests are gone from the Road — a rung pays
+            // flat laurels and the eight season prizes are the reason to walk it. The question the banner has
+            // to answer is the same one it always did; the answer moved.
+            const season = st.ladder?.season || null;
+            const track = season?.track || [];
+            const nextPrize = track.find((t) => !t.claimed && !t.owed) || null;
             // Which house is open. `openHouse` is null until you tap one, so the screen opens on the house
             // you are actually standing in and a cleared house stays folded away.
             const openKey = openHouse ?? next?.house ?? houses[0]?.key;
@@ -3287,8 +3300,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 <div className="ar-road-hero">
                     <div className="ar-road-hero-top">
                         <div>
-                            <b>The Long Road</b>
-                            <em>A hundred fighters, each of them once. Nothing here comes back.</em>
+                            {/* The season is the headline. A member arriving at the Road needs to know two
+                                things before anything else — that the climb resets, and what the eight things
+                                at the top of it are — and burying that under "The Long Road" would leave the
+                                reset to be discovered as a bug. */}
+                            <b>{season ? season.name : "The Long Road"}</b>
+                            <em>{season
+                                ? `Season ${season.n} of the Long Road. ${season.blurb}`
+                                : "A hundred fighters, each of them once. Nothing here comes back."}</em>
                         </div>
                         <span className="ar-road-score">{beaten}<i>/{size}</i></span>
                     </div>
@@ -3309,11 +3328,58 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             );
                         })}
                     </div>
-                    {nextChest ? (
-                        <div className="ar-road-goal">
-                            Next chest at <b>#{nextChest.rung}</b> — {nextChest.name},
-                            {" "}{"aeiou".includes(nextChest.reward.chest[0]) ? "an" : "a"}
-                            {" "}<b>{nextChest.reward.chest}</b> chest.
+                    {/* ── THE EIGHT ────────────────────────────────────────────────────────────────────
+                        Every prize the season holds, all of them, always — including the ones that are a
+                        year away. A track that only showed the next one would be a progress bar, and the
+                        thing that makes somebody climb is seeing the moth at rung 200 on the day they beat
+                        rung 3. Four states, and each is a different sentence: yours, owed you, ahead of you,
+                        or behind a door you have not opened. */}
+                    {track.length ? (
+                        <div className="ar-road-track">
+                            <div className="ar-track-head">
+                                <b>Season rewards</b>
+                                <em>{season.claimed} of {season.total} claimed
+                                    {season.ends ? ` · season ends ${season.ends}` : ""}</em>
+                            </div>
+                            <ol className="ar-track-row">
+                                {track.map((t) => (
+                                    <li key={t.rung}
+                                        className={`ar-track-tile${t.claimed ? " is-got" : ""}${t.owed ? " is-owed" : ""}${t.beyond ? " is-beyond" : ""}${nextPrize?.rung === t.rung ? " is-next" : ""}`}
+                                        style={{ "--h": season.tint }}>
+                                        {/* OWED IS THE ONE STATE THAT WANTS A TAP. The prize was earned and
+                                            the hand-over did not land, so the tile becomes the repair — it
+                                            covers the whole tile rather than sitting under it, because a
+                                            small button inside a 90px tile is a target nobody hits on a
+                                            phone. Every other state has nothing to press. */}
+                                        {t.owed ? (
+                                            <button type="button" className="ar-track-claim" disabled={busy}
+                                                onClick={() => { Sfx.ui(); act("claim_road"); }}
+                                                aria-label={`Claim ${t.name}`} />
+                                        ) : null}
+                                        <span className="ar-track-rung">#{t.rung}</span>
+                                        <span className="ar-track-icon" aria-hidden="true">
+                                            {(PRIZE_GLYPH[t.kind] || GiLaurelCrown)({})}
+                                        </span>
+                                        <b className="ar-track-name">{t.name}</b>
+                                        <em className="ar-track-state">
+                                            {t.claimed ? "Yours"
+                                                : t.owed ? "Claim it"
+                                                : t.beyond ? "Behind The Long Road"
+                                                : `${t.rungsAway} rung${t.rungsAway === 1 ? "" : "s"} away`}
+                                        </em>
+                                    </li>
+                                ))}
+                            </ol>
+                            {/* THE RESET, SAID OUT LOUD, BESIDE THE THING IT AFFECTS. A season clears the
+                                rungs, and a member who finds that out by opening the Road one morning to a
+                                blank hundred has been robbed as far as they are concerned. It is also the
+                                one place to say what the reset does NOT take. */}
+                            <p className="ar-track-note">
+                                A new season clears the rungs and hangs eight new prizes.
+                                {season.bestEver > 0
+                                    ? ` Your furthest ever is rung ${season.bestEver}, and nothing takes that back.`
+                                    : " Everything you win stays yours."}
+                            </p>
                         </div>
                     ) : null}
                 </div>
@@ -3351,7 +3417,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-next-go">Fight</span>
                     </button>
                 ) : (
-                    <div className="ar-next is-done"><b>The road is walked.</b> All hundred, every one of them once.</div>
+                    <div className="ar-next is-done">
+                        <b>The road is walked.</b>{" "}
+                        {season ? `Every rung of Season ${season.n}, each of them once.` : "All hundred, every one of them once."}
+                    </div>
                 )}
 
                 {/* ── TEN HOUSES, ONE OPEN ── a hundred tiles at once is the scroll Luke called out on the
@@ -3391,7 +3460,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 <div className="ar-rungs">
                                     {foes.map((f) => (
                                         <button type="button" key={f.rung}
-                                            className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}${next?.rung === f.rung ? " is-next" : ""}${f.locked ? " is-locked" : ""}`}
+                                            className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}${f.reward?.prize && !f.beaten ? " is-prize" : ""}${next?.rung === f.rung ? " is-next" : ""}${f.locked ? " is-locked" : ""}`}
                                             disabled={busy || f.beaten || f.locked}
                                             onClick={() => { Sfx.ui(); act("start", { target: f.id }); }}
                                             title={f.beaten ? `${f.name} — already beaten`
@@ -3410,8 +3479,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             <span className="ar-rung-prize">
                                                 {f.beaten ? "beaten" : <>{f.reward.laurels.toLocaleString()}<i> laurels</i></>}
                                             </span>
-                                            {f.reward?.chest && !f.beaten
-                                                ? <span className="ar-rung-chest">{f.reward.chest} chest</span> : null}
+                                            {/* A MILESTONE RUNG SAYS WHAT IS ON IT. Replaced the chest label —
+                                                rungs pay no chests now — with the season prize, which is the
+                                                actual reason anybody is looking at this tile. Named rather
+                                                than labelled "prize": the whole point is that you can see
+                                                the dog at rung 100 from rung 3. */}
+                                            {f.reward?.prize && !f.beaten
+                                                ? <span className="ar-rung-chest">{f.reward.prize.name}</span> : null}
                                             {/* The prize stays legible on a locked rung — what is up the road is the
                                                 reason to walk it. Only the way in is closed. */}
                                             {f.locked ? <span className="ar-rung-lock" aria-hidden="true"><GiPadlock /></span> : null}

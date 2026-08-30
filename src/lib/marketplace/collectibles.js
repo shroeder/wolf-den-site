@@ -2,6 +2,7 @@
 // boss drops). Every pet OWNED adds a small passive account bonus (they stack); the one you EQUIP (feature)
 // gives a stronger themed active buff. Crisp vector game-icons (react-icons/gi, CC BY 3.0). Keep ids STABLE.
 // (Export names stay `collectible*` for back-compat with existing importers — conceptually these are pets.)
+import { SEASON_HIDDEN } from "@/lib/marketplace/arena-season.js";
 import { STAT_META } from "@/lib/marketplace/items.js";
 import {
     GiRabbit, GiFrog, GiChicken, GiCat, GiFox, GiWolfHead, GiOwl, GiBearFace, GiRaven, GiSnake, GiDeer,
@@ -353,7 +354,26 @@ export const COLLECTIBLES = [
     { id: "copper_kettle", name: "Copper Kettle", Icon: GiTeapot, color: "#e8a33d", rarity: "epic", source: "achievement", activeStat: "prep_cook", achievement: "Prep 25 ingredients", spritePrompt: "a small living copper kettle creature with stubby legs and a cheerful spout face, steam curling from its lid, polished dented copper" },
     { id: "hearth_cat", name: "Hearth Cat", Icon: GiCat, color: "#ff8a3c", rarity: "epic", source: "achievement", activeStat: "hot_hands", achievement: "Cook 100 dishes", spritePrompt: "a plump ginger cat curled up asleep, its fur glowing faintly like banked embers, warm orange light coming off its belly" },
     { id: "spice_moth", name: "Spice Moth", Icon: GiButterfly, color: "#c9a2ff", rarity: "legendary", source: "achievement", activeStat: "generous", achievement: "Cook a dish of every tier", spritePrompt: "a large velvety moth with wings patterned like ground spices in saffron, paprika and violet, trailing a fine shimmer of powder" },
-    { id: "gourmand_dragon", name: "Gourmand Dragon", Icon: GiDragonHead, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "kitchen_master", achievement: "Cook 500 dishes AND a flawless timing run", spritePrompt: "a small round gold dragon with an enormous well-fed belly, a napkin tucked under its chin, holding a tiny silver fork, extremely pleased with itself" },];
+    { id: "gourmand_dragon", name: "Gourmand Dragon", Icon: GiDragonHead, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "kitchen_master", achievement: "Cook 500 dishes AND a flawless timing run", spritePrompt: "a small round gold dragon with an enormous well-fed belly, a napkin tucked under its chin, holding a tiny silver fork, extremely pleased with itself" },
+
+    // ── SEASON EXCLUSIVES · THE LONG ROAD ─────────────────────────────────────────────────────────────
+    // `source: "road"` matches NO existing drop pool. Every pet source in pet-drops.js filters explicitly —
+    // `p.source === "chest"`, `=== "boss"`, `=== "raid"` and so on — so a new source is exclusive by
+    // construction rather than by a flag each of the six had to be taught. The wish power (wishedFrom) can
+    // only steer a pool it was already drawing from, so it cannot reach these either.
+    //
+    // `rung` is read by petUnlockText, so the locked card on the pets page names the rung rather than saying
+    // "special unlock" — a chase whose end nobody can see is not a chase.
+    //
+    // `ownerOnly` while the Road is gated, which is the display half: PUBLIC_COLLECTIBLES drops them, so the
+    // Den does not browse two pets behind a door that is shut. One switch drives it — see SEASON_PUBLIC.
+    { id: "road_cur", name: "Roadside Cur", Icon: GiWolfHead, color: "#b9a07a", rarity: "mythic", source: "road", season: 1, rung: 100,
+      ownerOnly: SEASON_HIDDEN, activeStat: "might", hint: "Started following you around rung nine and never stopped.",
+      spritePrompt: "a lean scruffy road-dog with a torn ear and dusty wiry fur, ribs just showing, head level and eyes forward, mid-stride" },
+    { id: "gate_moth", name: "The Doorward's Moth", Icon: GiButterfly, color: "#8fd0ff", rarity: "eternal", source: "road", season: 1, rung: 200,
+      ownerOnly: SEASON_HIDDEN, activeStat: "fortune", hint: "It was on the other side. Now it is on this one.",
+      spritePrompt: "an enormous pale moth with dusty blue-white wings marked like a keyhole, faintly luminous, wings held open and perfectly still" },
+];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
 
@@ -474,6 +494,7 @@ export function petPrice(pet) {
 // Human-readable "how to unlock" for a pet.
 export function petUnlockText(pet) {
     switch (pet.source) {
+        case "road": return pet.rung ? `Walk to rung ${pet.rung} of the Long Road` : "Won on the Long Road";
         case "level": return `Reach Level ${pet.level}`;
         case "shop": return `Buy for ${petPrice(pet).toLocaleString()} gold`;
         case "chest": return `Found in ${CHEST_LABEL[pet.chestTier] || "rare"}+ chests`;

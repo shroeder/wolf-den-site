@@ -63,7 +63,9 @@
     "check:feel": "node scripts/check-feel.mjs",
     "check:vercel": "node scripts/check-vercel-json.mjs",
     "check:polls": "node scripts/check-polls.mjs",
-    "check:chrome": "node scripts/check-chrome-fanout.mjs"
+    "check:chrome": "node scripts/check-chrome-fanout.mjs",
+    "check:season": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-season.mjs",
+    "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs"
   },
   "keywords": [],
   "author": "",

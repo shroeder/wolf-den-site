@@ -11,7 +11,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs.js";
-import { RECIPES, MASTER_RECIPES } from "@/lib/marketplace/cooking-recipes.js";
+import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooking-recipes.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -143,7 +143,10 @@ export const DISH_IDS = [];
 // Defining them here does not leak anything. CONSUMABLES is a table of what a thing IS, not a list of what you
 // may have — a member who has never bought the Master s Book cannot roll the recipe, cannot cook the dish and
 // will never hold one, and locked-content.js keeps the output off the market either way.
-for (const r of [...RECIPES, ...MASTER_RECIPES]) {
+// SEASON_RECIPES joins them for exactly the reason MASTER_RECIPES did: a dish with no consumable definition
+// cooks into an id that resolves to nothing. Same note applies — CONSUMABLES says what a thing IS, not what
+// you may have, and a member who never walked the Road can neither learn the page nor cook the dish.
+for (const r of [...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES]) {
     if (r.kind !== "dish") continue;
     if (CONSUMABLES[r.id]) throw new Error(`cooking recipe "${r.id}" collides with an existing consumable id`);
     const amount = DISH_PET_XP[r.tier] || DISH_PET_XP[1];

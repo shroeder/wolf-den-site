@@ -27,6 +27,15 @@ async function ownedPetSet(buyerId) {
     return new Set(rows.map((r) => r.ref));
 }
 
+// ── ONE PLACE A PET IS HANDED OVER ───────────────────────────────────────────────────────────────────────────
+// Exported so the Long Road's season prizes go through the same door every other pet source does — the unlock
+// row, the activity stamp and the shape the caller gets back are all rules that already exist here, and a
+// second grant path would be a second copy of them that drifts the first time one changes.
+//
+// The `maybeGrant*` functions above are the ROLLS; this is the grant they all end in. A caller that has
+// already decided (a season prize has no roll — you reached the rung or you did not) calls this directly.
+export const grantPet = (buyerId, pet, source, meta = {}) => grantDrop(buyerId, pet, source, meta);
+
 async function grantDrop(buyerId, pet, source, meta) {
     await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, pet.id]).catch(() => {});
     await trackActivity(buyerId, "pet_drop", { petId: pet.id, source, ...meta });

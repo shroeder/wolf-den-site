@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
-    actBout, clearBout, forfeitBout, getArenaState, seenArena, startBout,
+    actBout, claimRoadPrizes, clearBout, forfeitBout, getArenaState, seenArena, startBout,
 } from "@/lib/marketplace/arena.js";
 import {
     buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, refundSkill,
@@ -81,6 +81,10 @@ export async function POST(request) {
                 // piece, so this route never has to know which item grants what.
                 case "purser":
                     return noStore({ ...(await purserExchange(buyer.id, String(b?.from || ""), b?.amount)), ...(await getArenaState(buyer.id)) });
+                // A season prize that was earned and never arrived — see claimRoadPrizes. Returns the whole
+                // state so the track redraws off the server's own record rather than the screen's guess.
+                case "claim_road":
+                    return noStore({ ...(await claimRoadPrizes(buyer.id)), ...(await getArenaState(buyer.id)) });
                 case "arena_upgrade":
                     return noStore({ ...(await buyArenaUpgrade(buyer.id, String(b?.track || ""))), ...(await getArenaState(buyer.id)) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });

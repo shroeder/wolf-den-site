@@ -13,6 +13,7 @@
 //   petXp       → +X% pet XP from petting on your own farm
 //   fertPower   → fertilizer cuts +X% more of the remaining grow time
 //   goldHarvest → +X% gold from every harvest
+import { SEASON_HIDDEN } from "@/lib/marketplace/arena-season.js";
 import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { COIN_ICON } from "@/lib/coin-icon";
 import { textIcon } from "@/lib/coin-icon.js";
@@ -214,6 +215,25 @@ export const DECORATIONS = [
         // No leading article — `prompt()` prepends "A ", exactly as it does for every other entry above.
         prompt: prompt("ornate three-tiered carved stone display pedestal, each tier topped with a plush velvet cushion, garlanded with trailing flowers and gold filigree, built for small animals to sit and be admired"),
     },
+
+    // ── SEASON EXCLUSIVES · THE LONG ROAD ─────────────────────────────────────────────────────────────────
+    // Won at a rung and nowhere else. `source: "season"` matches none of the six hand-out paths listed above
+    // the Petting Stand (the wheel, the glint, both shops, the boss, a creation), so the source alone is the
+    // lock — and `price: null` is the second one, because the shop path also needs a price.
+    //
+    // They carry a real buff, deliberately. A prestige piece that only looks nice is a trophy, and eight
+    // trophies is not a season — the climb has to hand you something you would have wanted anyway. Pitched at
+    // the legendary band because that is what a farm can already reach; a season is a source of exclusives,
+    // not a source of power creep.
+    //
+    // `unreleased` while the Road is behind the owner gate, so the catalog drawer does not put two mythics
+    // nobody can obtain in front of the whole Den — see SEASON_PUBLIC, the one switch both halves read.
+    { ...deco("deco_s1_milestone", "Milestone Stone", "🪨", "legendary", "season", null, { stat: "harvestLuck", value: 11 },
+        "weathered roadside milestone of pale stone, its carved face worn smooth and unreadable, thick moss in the old chisel grooves, a chipped domed top, leaning very slightly"),
+      unreleased: SEASON_HIDDEN, season: 1 },
+    { ...deco("deco_s1_signpost", "The Turned Signpost", "🪧", "mythic", "season", null, { stat: "goldHarvest", value: 14 },
+        "tall wooden crossroads signpost whose every arm has been turned to point back the same way, iron-bound, hand-painted lettering worn to ghosts"),
+      unreleased: SEASON_HIDDEN, season: 1 },
 ];
 
 // The pool a claimed shiny glint draws its reward from (source-exclusive — see town-shiny.js).

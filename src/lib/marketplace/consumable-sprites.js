@@ -1,11 +1,15 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { RECIPES } from "@/lib/marketplace/cooking-recipes.js";
+import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooking-recipes.js";
 
 // The dish ids, straight off the recipe book — the kitchen sprite table also holds preps, baits and
 // crops, and none of those are consumables. Read from the book so it cannot fall behind a new recipe.
-const DISH_ID_SET = new Set(RECIPES.filter((r) => r.kind === "dish").map((r) => r.id));
+// EVERY book, not just the ordinary one. A dish whose id is missing here renders with no art wherever a
+// consumable is drawn — the pantry, the pet feeder, the reveal card — and the gated tiers are exactly the
+// dishes somebody worked hardest for.
+const DISH_ID_SET = new Set([...RECIPES, ...MASTER_RECIPES, ...SEASON_RECIPES]
+    .filter((r) => r.kind === "dish").map((r) => r.id));
 
 // Cached {consumableId → url} map of AI consumable sprites (static art). Mirrors item-sprites.js.
 let cache = null;

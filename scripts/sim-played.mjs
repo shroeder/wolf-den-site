@@ -1,0 +1,84 @@
+// ── THE ROAD, PLAYED RATHER THAN AUTO-RESOLVED ───────────────────────────────────────────────────────────────
+// Luke: "did you simulate it as if I had gone in and fought." No — check:road calls autoRing, which drives
+// BOTH sides with housePick. housePick is deliberately not a good player: it does not count beats ahead, does
+// not hold a cooldown, and cannot see what a skill will actually do before it spends it. So every number that
+// script has ever produced is a member's KIT played by the house, not by the member.
+//
+// This plays the member's side properly. Each beat it clones the ring, tries every command available — a plain
+// swing and each skill that is off cooldown — resolves one beat with a FIXED rng so the candidates are compared
+// on the same luck, scores what came back, and then spends the winner on the real ring with the real rng.
+//
+// That is a strong player, not a perfect one: one beat of lookahead, no baiting, no holding a finisher for a
+// kill two beats out. It is the honest upper bracket to check:road's lower one, and the truth is between them.
+//
+//   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-played.mjs [member] [maxRung] [tries]
+import { npcBuild } from "../src/lib/marketplace/arena-npc.js";
+import { fighterFrom, kitFor } from "../src/lib/marketplace/arena.js";
+import { openRing, act, ringResult, autoRing } from "../src/lib/marketplace/arena-ring.js";
+import { resolveSkill } from "../src/lib/marketplace/arena-skills.js";
+import { db } from "../src/lib/db.js";
+
+const WHO = process.argv[2] || "The Wolf Den";
+const MAX = Number(process.argv[3]) || 70;
+const TRIES = Number(process.argv[4]) || 30;
+
+const me = await db.queryOne(`SELECT id, display_name FROM mkt_buyer WHERE display_name = $1`, [WHO]);
+if (!me) throw new Error(`no member called ${WHO}`);
+const kit = await kitFor(me.id);
+const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
+
+// What a beat was worth: damage taken off them, less damage taken by me, with their death counted as the win
+// it is. Health is measured as a SHARE so a big foe and a small one are scored on the same scale.
+const score = (before, after) => {
+    const theirs = (before.B.hp - after.B.hp) / Math.max(1, before.B.maxHp);
+    const mine = (before.A.hp - after.A.hp) / Math.max(1, before.A.maxHp);
+    return theirs - mine + (after.B.hp <= 0 ? 10 : 0) - (after.A.hp <= 0 ? 10 : 0);
+};
+
+function playedBout(foe, seed) {
+    const rng = seeded(seed);
+    let ring = openRing({ ...kit }, { ...foe }, { rng, foeSkills: foe.skills || {} });
+    for (let guard = 0; guard < 400 && !ring.over && ring.awaiting === "act"; guard += 1) {
+        const deck = kit.skills || {};
+        const options = [null, ...Object.keys(deck).filter((id) => !(ring.cd?.[id] > 0))];
+        let best = null;
+        let bestScore = -Infinity;
+        for (const id of options) {
+            const skill = id ? resolveSkill(id, deck) : null;
+            if (id && !skill) continue;
+            // Same luck for every candidate, so the comparison is about the choice and not the dice.
+            const trial = structuredClone(ring);
+            const after = act(trial, { skill, rng: seeded(seed * 31 + guard) });
+            const s = score(ring, after);
+            if (s > bestScore) { bestScore = s; best = skill; }
+        }
+        ring = act(ring, { skill: best, rng });
+    }
+    return ringResult(ring).won;
+}
+
+console.log(`\n  ${me.display_name} — ${kit.classId}, damage ${Math.round(kit.damage)}, health ${kit.health}, armour ${kit.armor}`);
+console.log(`  auto = both sides on housePick (what check:road reports) · played = your side choosing properly\n`);
+console.log("  rung  build                    auto    played");
+let autoWall = 0;
+let playedWall = 0;
+for (let t = 1; t <= MAX; t += 1) {
+    const b = npcBuild(t, 0);
+    const foe = fighterFrom(b.stats, b.perks, null);
+    let a = 0;
+    let p = 0;
+    for (let s = 0; s < TRIES; s += 1) {
+        if (autoRing({ ...kit }, { ...foe }, { rng: seeded(9001 + s * 7919) }).won) a += 1;
+        if (playedBout(foe, 9001 + s * 7919)) p += 1;
+    }
+    const ar = a / TRIES;
+    const pr = p / TRIES;
+    if (ar >= 0.5) autoWall = t;
+    if (pr >= 0.5) playedWall = t;
+    if (t % 5 === 0 || t > MAX - 6) {
+        console.log(`  ${String(t).padStart(4)}  ${`${b.classId}:${b.archetype}`.padEnd(22)} ${(ar * 100).toFixed(0).padStart(5)}%  ${(pr * 100).toFixed(0).padStart(7)}%`);
+    }
+}
+console.log(`\n  auto-resolved, you beat outright to rung ${autoWall}`);
+console.log(`  PLAYED, you beat outright to rung ${playedWall}\n`);
+process.exit(0);

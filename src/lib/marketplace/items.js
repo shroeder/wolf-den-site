@@ -53,8 +53,15 @@ export const isRealMoneyItem = (i) => i?.source === "admin" || i?.source === "el
 export const isOwnerOnlyItem = (i) => Boolean(i?.ownerOnly);
 
 /** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
+// Won at a rung of the Long Road during one season, and obtainable by no other means for the rest of time.
+// Excluded from the random pool for the same reason ownerOnly is: every random reward path in the game builds
+// its pool by filtering ITEMS, so an exclusive that is merely "not granted anywhere" is an exclusive the
+// fishing rod hands out. See the note above isRealMoneyItem — the rule existed, it just was not shared.
+export const isSeasonItem = (i) => i?.source === "season";
+
+/** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
 export const randomDropPool = (predicate) =>
-    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && (typeof predicate === "function" ? predicate(i) : true));
+    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && !isSeasonItem(i) && (typeof predicate === "function" ? predicate(i) : true));
 
 /**
  * A feature's OWN unlaunched gear, for that feature's own reward code — and nothing else.
@@ -149,6 +156,7 @@ export const ITEM_SOURCE_LABEL = {
     elite: "The elite tiers — chests from Ascendant up",
     bounty_reward: "Paid out by a bounty",
     admin: "Handed over the counter in the shop",
+    season: "Won at a rung of the Long Road, in one season only",
 };
 
 export const REWARDS = {
@@ -781,6 +789,22 @@ export const ITEMS = [
     { id: "primordial_elder_waistguard", name: "Elder Waistguard", slot: "belt", rarity: "primordial", icon: "GiBelt", flavor: "It remembers the shape of the world underneath.", stats: { might: 78, ferocity: 52 }, reqLevel: 127, source: "elite", sort: 1115 },
     { id: "primordial_elder_tracks", name: "Elder Tracks", slot: "boots", rarity: "primordial", icon: "GiBoots", flavor: "Older than the stone it was found in.", stats: { crit_chance: 78, ferocity: 52 }, reqLevel: 127, source: "elite", sort: 1116 },
     { id: "primordial_elder_cloak", name: "Elder Cloak", slot: "back", rarity: "primordial", icon: "GiCondorEmblem", flavor: "From before there was a word for it.", stats: { fortune: 72, crit_chance: 59 }, reqLevel: 128, source: "elite", sort: 1117 },
+
+    // ── SEASON EXCLUSIVES · THE LONG ROAD ────────────────────────────────────────────────────────────────
+    // Won at rungs 75 and 175 of one season and by no other means ever again. `source: "season"` is what keeps
+    // them out of every random pool (see isSeasonItem above randomDropPool) — the same shape of lock the elite
+    // tiers and the real-money items use, applied to a third reason a piece must not fall out of a fish.
+    //
+    // NO reqLevel, on purpose. Nothing gates equipping any more (see equipItem — "own it, equip it"), so the
+    // number is display only, and printing "Level 128" on a piece somebody won at level 40 would be a lie in
+    // the direction that costs them the use of it. The rung IS the requirement, and the compendium says so
+    // through ITEM_SOURCE_LABEL rather than through a level they never had to reach.
+    //
+    // Pitched at eternal and primordial to match the height they are won at, and NOT above primordial: the
+    // gear ceiling is a balance fact the whole Arena is tuned against, and a season is a source of exclusive
+    // things rather than a source of stronger ones. Somebody who never walks the Road is not behind.
+    { id: "s1_roadwardens_mantle", name: "The Roadwarden's Mantle", slot: "back", rarity: "eternal", icon: "GiCape", flavor: "Heavy at the shoulder. It has been rained on for years.", stats: { ferocity: 44, might: 30 }, reqLevel: null, source: "season", season: 1, rung: 75, sort: 1200 },
+    { id: "s1_hinge_iron_greaves", name: "Hinge-Iron Greaves", slot: "boots", rarity: "primordial", icon: "GiGreaves", flavor: "Cut from the pin the door turned on.", stats: { ferocity: 74, might: 56 }, reqLevel: null, source: "season", season: 1, rung: 175, sort: 1201 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────

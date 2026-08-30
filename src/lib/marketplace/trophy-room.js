@@ -228,7 +228,13 @@ const WALLS = [
             rec("Best win streak", "best_streak", { rank: true }),
             rec("Current streak", "streak"),
             rec("Laurels earned", "laurels_earned", { rank: true }),
-            rec("Ladder rungs beaten", "ladder_beaten", { rank: true }),
+            // ── TWO ROAD RECORDS NOW, AND ONLY ONE OF THEM SURVIVES A SEASON ────────────────────────
+            // The Road resets every season, so `ladder_beaten` — which is this season's set — empties for
+            // everybody the day a season turns over. A wall of trophies that goes blank on a schedule is not
+            // a record of anything, and the member with the longest climb in the Den would find their name
+            // gone from it. So the RANKED record is the lifetime high-water mark, which only ever goes up.
+            rec("Furthest rung ever", "road_best_rung", { rank: true }),
+            rec("Rungs beaten this season", "ladder_beaten"),
             rec("Toughest NPC felled", "npc_best", { rank: true }),
             rec("Arena XP", "arena_xp", { rank: true }),
         ],
@@ -417,6 +423,8 @@ function derive(row, key) {
     // `best_rung` column that used to sit beside it is gone: nothing has ever written it, so it ranked a field
     // of zeroes, and the highest rung is this array's max anyway — which on a Road you climb in order is its
     // length. One honest record beats two, one of them dead.
+    // Now THIS SEASON's count. `road_best_rung` is the lifetime figure and is a plain int column, so it needs
+    // no derivation — see the two records above, and the season rollover in arena.js that clears this array.
     if (key === "ladder_beaten") return Array.isArray(row?.ladder_beaten) ? row.ladder_beaten.length : 0;
     return null;
 }

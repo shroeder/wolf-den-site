@@ -1,4 +1,5 @@
 import { ARCHETYPES, npcBuild } from "@/lib/marketplace/arena-npc.js";
+import { ROAD_LAURELS_PER_RUNG, currentSeason, prizeAt } from "@/lib/marketplace/arena-season.js";
 
 // ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────────────
 // A hundred named opponents, each beatable exactly ONCE, in whatever order you like.
@@ -244,39 +245,32 @@ const powerAt = (rung) => {
 // A champion (every tenth) is the house's name-bearer.
 const isChampion = (rung) => rung % 10 === 0;
 
-/**
- * What beating one pays.
- *
- * Laurels the whole way, because the Arena's own currency is the honest reward for an Arena fight and it now
- * has real sinks (crates, stones, a recipe). Every tenth also pays a chest, and the last one pays the best
- * chest in the game — once, ever, to whoever gets there.
- */
-// ── THE LAURELS WERE AN EXPONENTIAL AND IT RAN AWAY ──────────────────────────────────────────────────────────
-// The old curve was 60 x 1.055^(rung-1). That reads as a gentle 5.5% a rung and is nothing of the kind over
-// two hundred of them: rung 100 paid 12,027, rung 200 paid 2,543,260, and the Road as a whole paid 48,783,249
-// — of which 48,553,648 was rungs 101-200 alone. A recipe costs 2,500. Luke: "the road is way too rewarding
-// with laurels."
+// ── WHAT A RUNG PAYS, AFTER THE ROAD BECAME A SEASON ─────────────────────────────────────────────────────────
+// Luke: "the road will no longer reward each rungs completion with so many laurels and gold, it will still
+// award class exp on each rung. and the season will have season exclusive rewards for each 25 rungs."
 //
-// LINEAR now, and the point of linear is that it cannot do this. Fifty for the first rung and eight more for
-// every rung after: 842 at rung 100, 1,642 at rung 200, about 169,000 for the whole Road. The late rungs are
-// still worth more than the early ones, which is all the curve was ever for.
+// Two tombstones sit under this function and they are the same tombstone twice.
 //
-// ── AND THE CHESTS STOP AT MYTHIC ────────────────────────────────────────────────────────────────────────────
-// Luke: "it shouldn't give out the super high tier chests, if anything it should give out one Mythic chest at
-// the most." It was paying three Celestials, three Eternals, three Ascendants and two Primordials — more
-// top-tier chests than every other source in the game put together, on a Road where members are already at
-// rungs 99, 92 and 85 and which was meant to take a year.
+//   THE LAURELS WERE AN EXPONENTIAL. 60 x 1.055^(rung-1) reads as a gentle 5.5% a rung and is nothing of the
+//   kind over two hundred of them: rung 200 paid 2,543,260 and the Road as a whole paid 48,783,249, against a
+//   recipe costing 2,500. Replaced with a linear 50 + 8/rung, which paid 169,000 over the Road.
 //
-// One Mythic, at the true summit, and nothing above it anywhere. Rung 100 drops to a Gold, which does take
-// something back from the two people about to reach it — that IS the nerf, and grandfathering the old prize
-// would leave exactly the chests the complaint is about in exactly the accounts it is about.
-export function ladderReward(rung) {
-    const laurels = Math.round(50 + 8 * (rung - 1));
-    if (rung === LADDER_MAX) return { laurels, chest: "mythic", label: `${laurels} laurels + a Mythic chest` };
-    if (isChampion(rung)) {
-        const chest = rung >= 110 ? "gold" : rung >= 60 ? "iron" : "wooden";
-        return { laurels, chest, label: `${laurels} laurels + a ${chest[0].toUpperCase()}${chest.slice(1)} chest` };
-    }
+//   THE CHESTS WERE THE BEST IN THE GAME. Three Celestials, three Eternals, three Ascendants and two
+//   Primordials — more top-tier chests than every other source put together. Cut to one Mythic at the summit.
+//
+// Both were nerfs to a payout that kept growing back, because the underlying shape was wrong: the Road was
+// being asked to be an INCOME, and an income has to be re-balanced against every other income forever.
+//
+// A season does not. FLAT laurels — the same 25 at rung 3 and rung 197, which is the one curve that cannot run
+// away — no gold at all (see the Road branch in finishBout; it is out of the mint entirely), no chest, and the
+// eight things you actually climb for are named, exclusive and paid once each. Class XP is untouched and still
+// scales with the rung: that is the progression the Road is FOR, and it is not currency.
+export function ladderReward(rung, season = currentSeason()) {
+    const laurels = ROAD_LAURELS_PER_RUNG;
+    // The prize is looked up rather than derived from `rung % 25`, so a season is free to put its eight
+    // wherever it likes and the reward card can never promise one the grant code will not find.
+    const prize = prizeAt(rung, season);
+    if (prize) return { laurels, prize, label: `${laurels} laurels + ${prize.name}` };
     return { laurels, label: `${laurels} laurels` };
 }
 

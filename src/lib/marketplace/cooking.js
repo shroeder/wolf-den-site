@@ -5,7 +5,7 @@ import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantConsumable, CONSUMABLES, DISH_PET_XP } from "@/lib/marketplace/consumables.js";
-import { RECIPES, MASTER_RECIPES, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
+import { RECIPES, MASTER_RECIPES, SEASON_RECIPES, FULL_BOOK, recipeById, recipeBookFor } from "@/lib/marketplace/cooking-recipes.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { SEEDS } from "@/lib/marketplace/farm-crops.js";
@@ -759,7 +759,10 @@ export async function cookableNow(buyerId, kinds = new Set(["bait"])) {
     const have = new Map(pantry.map((r) => [r.ref, Number(r.qty) || 0]));
     const knownIds = new Set(known.map((r) => r.recipe_id));
     const out = [];
-    for (const r of RECIPES) {
+    // FULL_BOOK, not RECIPES. Every row here is already gated on knownIds, so widening the source cannot show
+    // anybody a page they do not hold — and narrowing it to the ordinary book meant a master or season recipe
+    // you own was missing from the one list that answers "what can I cook right now".
+    for (const r of FULL_BOOK) {
         if (!kinds.has(r.kind) || !knownIds.has(r.id)) continue;
         const need = Object.entries(r.need || {});
         if (!need.length) continue;
@@ -1096,7 +1099,16 @@ export async function getKitchenState(buyerId) {
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
     const usedToday = row?.cooked_today ? Number(row.cooks_today) || 0 : 0;
 
-    const recipes = RECIPES.map((r) => {
+    // ── THE ORDINARY BOOK, PLUS WHATEVER ELSE YOU ACTUALLY HOLD ─────────────────────────────────────────
+    // The kitchen lists every ordinary page whether you know it or not, because seeing what is still missing
+    // is most of what the screen is for. That is exactly wrong for the two GATED books: a master page you have
+    // not bought and a season page you have not climbed to must not be advertised (see casino-perks.js — "a
+    // locked feature must not appear in a list"). So they are added only when `cookedMap` already has them,
+    // which is the same known-set the rest of this function reads.
+    //
+    // Without this a recipe you own was not in your kitchen: learnable, cookable by id, and invisible.
+    const alsoKnown = [...MASTER_RECIPES, ...SEASON_RECIPES].filter((r) => cookedMap.has(r.id));
+    const recipes = [...RECIPES, ...alsoKnown].map((r) => {
         const known = cookedMap.has(r.id);
         const need = Object.entries(r.need).map(([ref, qty]) => {
             const m = ingredientMeta(ref, sprites);
