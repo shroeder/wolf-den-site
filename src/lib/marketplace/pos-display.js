@@ -102,6 +102,17 @@ export const POS_PITCH = {
 // — is not available to us: exactly ONE charged reward has ever been redeemed, and $1.00 of store credit has
 // ever been spent in the shop. Those numbers would argue against us. They are also the same disease as the
 // unscanned QRs: the machinery exists and nobody knows. This board is the cure, so it quotes the catalogue.
+/** The charged items with their real sprites, so the panel can SHOW the crown rather than name it. */
+export async function chargedGearArt() {
+    const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
+    const ids = chargedGearPitch().map((g) => g.id);
+    if (!ids.length) return {};
+    return shared("pos:gear-art", TTL.ART, async () => {
+        const rows = await db.query(`SELECT item_id, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [ids]).catch(() => []);
+        return Object.fromEntries((rows || []).filter((r) => r.url).map((r) => [r.item_id, r.url]));
+    });
+}
+
 export function chargedGearPitch() {
     return ITEMS
         .filter((i) => i.charged && i.chargeRewardLabel && !isOwnerOnlyItem(i))
@@ -143,17 +154,17 @@ export async function posCollage() {
     return shared("pos:collage", TTL.ART, async () => {
         const pick = (rows, n) => (rows || []).filter((r) => r?.url).slice(0, n).map((r) => r.url);
         const [pets, items, decos, dishes, town] = await Promise.all([
-            db.query(`SELECT url FROM mkt_pet_sprite ORDER BY random() LIMIT 6`).catch(() => []),
-            db.query(`SELECT url FROM mkt_item_sprite ORDER BY random() LIMIT 6`).catch(() => []),
-            db.query(`SELECT url FROM mkt_deco_sprite ORDER BY random() LIMIT 4`).catch(() => []),
-            db.query(`SELECT url FROM mkt_cooking_sprite ORDER BY random() LIMIT 3`).catch(() => []),
-            db.query(`SELECT url FROM mkt_town_art WHERE art_key LIKE 'crop_%_ripe' ORDER BY random() LIMIT 3`).catch(() => []),
+            db.query(`SELECT url FROM mkt_pet_sprite ORDER BY random() LIMIT 7`).catch(() => []),
+            db.query(`SELECT url FROM mkt_item_sprite ORDER BY random() LIMIT 7`).catch(() => []),
+            db.query(`SELECT url FROM mkt_deco_sprite ORDER BY random() LIMIT 5`).catch(() => []),
+            db.query(`SELECT url FROM mkt_cooking_sprite ORDER BY random() LIMIT 4`).catch(() => []),
+            db.query(`SELECT url FROM mkt_town_art WHERE art_key LIKE 'crop_%_ripe' ORDER BY random() LIMIT 4`).catch(() => []),
         ]);
         // Interleaved rather than grouped, so no two neighbours are the same KIND of thing — the point is
         // breadth, and six swords in a row reads as one feature however many pictures it is.
-        const groups = [pick(pets, 6), pick(items, 6), pick(decos, 4), pick(dishes, 3), pick(town, 3), STATIC_PICKS];
+        const groups = [pick(pets, 7), pick(items, 7), pick(decos, 5), pick(dishes, 4), pick(town, 4), STATIC_PICKS];
         const out = [];
-        for (let i = 0; i < 6; i += 1) for (const g of groups) if (g[i]) out.push(g[i]);
+        for (let i = 0; i < 7; i += 1) for (const g of groups) if (g[i]) out.push(g[i]);
         return out;
     });
 }

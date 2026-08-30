@@ -23213,39 +23213,60 @@ body.cas-seated .social-fab { display: none; }
 .pos-dots i.is-on { background: #ffd75e; }
 
 /* ── EVERYTHING THE GAME IS ───────────────────────────────────────────────────────────────────────────────
-   The sprites are the argument, so they get the room: a dense drift of them behind and around the copy. They
-   are die-cut on transparency, so they sit straight on the ground with a drop shadow and no plate.
+   Luke: "I want the art to pop ... like a real exciting brochure."
 
-   Staggered on --i so they do not all bob in unison, which reads as a carousel rather than as a world. */
-.pos-world { position: relative; display: flex; align-items: center; min-height: 0; }
-.pos-world-grid { position: absolute; inset: -4% -2%; display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(clamp(64px, 7vw, 108px), 1fr));
-    align-content: center; gap: clamp(6px, 1vw, 18px); pointer-events: none; }
-.pos-world-grid img { width: 100%; aspect-ratio: 1; object-fit: contain; opacity: .5;
-    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
-    animation: pos-bob 6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
-@keyframes pos-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
-/* The copy sits ON the drift, so it needs its own ground to stay readable — a scrim rather than a card,
-   because a card would look like a widget floating over wallpaper. */
-/* ⚠️ PIXELS, NOT `ch`. Third time in this file: `ch` resolves against the element's OWN font-size, and
-   every panel container here inherits ~16px — so `21ch` clamped this to about 170px and the headline inside
-   it wrapped one word per line. `ch` is only ever correct on the element whose type it is measuring, which
-   here is the h1 and nothing else. */
-.pos-world-copy { position: relative; z-index: 1; max-width: 460px; padding: clamp(18px, 2vw, 30px);
-    border-radius: 20px; background: rgba(9,10,12,0.82); backdrop-filter: blur(6px);
-    box-shadow: 0 0 70px 40px rgba(9,10,12,0.82); }
+   The first cut was a tidy auto-fill grid at 50% opacity behind a frosted card, which is wallpaper. This is a
+   composition: hand-placed sprites at four sizes, overlapping, tilted, running off three edges, at FULL
+   brightness. Nothing is aligned to anything — a grid reads as a catalogue, and a catalogue is the opposite
+   of exciting.
+
+   Positions come from SCATTER in the component as --x/--y/--s/--r. They are authored because a random
+   scatter reliably produces one clump and one hole. */
+.pos-world { position: relative; display: block; height: 100%; }
+.pos-world-art { position: absolute; inset: -6% -8% -6% -2%; pointer-events: none; }
+.pos-world-art img {
+    position: absolute; left: var(--x); top: var(--y);
+    /* Sized off the viewport so the composition holds at 1280 and at 1920 — the px in --s is the size at
+       1366 wide, which is the screen this was designed against. */
+    width: calc(var(--s) * 0.073vw);
+    aspect-ratio: 1; object-fit: contain;
+    transform: translate(-50%, -50%) rotate(var(--r));
+    /* Two shadows: a tight dark one to lift it off the ground, and a wide warm one so the brighter sprites
+       throw a little light. Without the second it looks like stickers on black paper. */
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.75)) drop-shadow(0 0 34px rgba(255,190,90,0.13));
+    animation: pos-bob 7s ease-in-out infinite;
+    animation-delay: calc(var(--i) * -0.41s);
+}
+@keyframes pos-bob {
+    0%, 100% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(0); }
+    50% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(-12px); }
+}
+
+/* The copy sits in the left third, over a gradient that fades the art out behind it rather than a card that
+   floats on top of it — a card says "widget", a fade says "these are the same picture". */
+.pos-world-copy { position: relative; z-index: 1; max-width: 460px; height: 100%;
+    display: flex; flex-direction: column; justify-content: center; padding-right: 40px; }
+.pos-world-copy::before { content: ""; position: absolute; inset: -40% -60% -40% -200%;
+    background: radial-gradient(70% 80% at 30% 50%, rgba(9,10,12,0.97) 42%, rgba(9,10,12,0.82) 62%, transparent 88%);
+    z-index: -1; }
 .pos-world-copy p { margin: 0; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4; color: #c8cfd8; }
 
 /* ── GEAR IS WORTH MONEY ── the number is the pitch, so it is the biggest thing here. */
-.pos-gear-hero { margin: 0 0 22px; font-size: clamp(18px, 1.9vw, 30px); color: #c8cfd8; }
+.pos-gear-hero { display: flex; align-items: center; gap: clamp(12px, 1.6vw, 26px); margin: 0 0 22px;
+    font-size: clamp(18px, 1.9vw, 30px); color: #c8cfd8; }
+/* The crown at a size you can actually see it — this is the panel's headline, not a bullet. */
+.pos-gear-heroart { width: clamp(84px, 9vw, 148px); height: auto; aspect-ratio: 1; object-fit: contain;
+    flex: 0 0 auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.7)) drop-shadow(0 0 30px rgba(255,215,94,0.3)); }
+.pos-gear-ico { width: clamp(30px, 3vw, 46px); height: clamp(30px, 3vw, 46px); flex: 0 0 auto;
+    object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
 .pos-gear-hero b { color: #fff; }
 .pos-gear-hero strong { color: #ffd75e; font-size: 1.9em; font-weight: 900; font-family: var(--font-display); }
 .pos-gear-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;
     max-width: 560px; }
-.pos-gear-list li { display: flex; justify-content: space-between; gap: 16px; padding: 9px 13px;
+.pos-gear-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 13px;
     border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
     font-size: clamp(14px, 1.35vw, 21px); }
-.pos-gear-name { color: #e8edf3; font-weight: 700; }
+.pos-gear-name { color: #e8edf3; font-weight: 700; flex: 1 1 auto; }
 .pos-gear-val { color: #ffd75e; font-weight: 800; white-space: nowrap; }
 .pos-gear-fine { margin: 18px 0 0; font-size: clamp(14px, 1.3vw, 21px); color: #7c8490; }
 

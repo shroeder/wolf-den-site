@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const POLL_MS = 4000;
 const SLIDE_MS = 11000;
 
-export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, collage, prizes, pinned, claimBase }) {
+export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, gearArt, collage, prizes, pinned, claimBase }) {
     const [claim, setClaim] = useState(null);
     const [mystery, setMystery] = useState(null);
     const [qr, setQr] = useState(null);
@@ -104,7 +104,7 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
         // The prize slide only exists once something has actually been given away — a panel that says "we
         // have given away nothing yet" is worse than one fewer panel.
         ...(prizes?.given?.length || prizes?.upNext ? [{ key: "prizes", render: () => <SlidePrizes p={prizes} /> }] : []),
-        ...(gear.length ? [{ key: "gear", render: () => <SlideGear gear={gear} /> }] : []),
+        ...(gear.length ? [{ key: "gear", render: () => <SlideGear gear={gear} art={gearArt} /> }] : []),
         ...(mystery?.remaining ? [{ key: "mystery", render: () => <SlideMystery m={mystery} /> }] : []),
         { key: "loop", render: () => <SlideLoop rate={pitch.rate} /> },
     ];
@@ -139,15 +139,39 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
     );
 }
 
-// ── WHAT THIS IS ── the breadth panel. The pictures do the whole job; the words just name it.
+// ── WHAT THIS IS ─────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I want the art to pop, and be read big and stuff, like a real exciting brochure."
+//
+// The first version was a tidy grid at half opacity behind a frosted card, which is wallpaper — the sprites
+// were present and said nothing. This is a COMPOSITION: hand-placed, deliberately uneven, sprites at four
+// different sizes overlapping each other and running off the edges, at full brightness with real shadows
+// under them.
+//
+// The positions are AUTHORED rather than generated. A random scatter reliably produces a clump and a hole,
+// and the one thing this panel has to do is look designed in the two seconds somebody glances at it. Sizes
+// alternate large/small so the eye has somewhere to land, and the biggest pieces sit on the right where the
+// copy is not.
+//
+// `--x/--y` are percentages of the stage, `--s` is the size in px at 1366 wide (it scales with the viewport),
+// `--r` the tilt. Nothing here is centred and nothing is aligned to anything, on purpose.
+const SCATTER = [
+    { x: 46, y: 12, s: 168, r: -8 }, { x: 66, y: 4, s: 116, r: 7 }, { x: 84, y: 16, s: 196, r: -5 },
+    { x: 38, y: 40, s: 132, r: 11 }, { x: 57, y: 33, s: 224, r: -3 }, { x: 78, y: 46, s: 140, r: 9 },
+    { x: 94, y: 38, s: 120, r: -11 }, { x: 44, y: 70, s: 188, r: 6 }, { x: 64, y: 66, s: 128, r: -9 },
+    { x: 82, y: 76, s: 172, r: 4 }, { x: 96, y: 66, s: 104, r: 12 }, { x: 34, y: 92, s: 120, r: -6 },
+    { x: 56, y: 95, s: 148, r: 8 }, { x: 74, y: 96, s: 108, r: -4 }, { x: 92, y: 94, s: 132, r: 10 },
+    { x: 30, y: 18, s: 96, r: 14 }, { x: 27, y: 58, s: 88, r: -13 }, { x: 88, y: 2, s: 92, r: 5 },
+];
+
 function SlideWorld({ collage }) {
     return (
         <div className="pos-slide pos-world">
-            <div className="pos-world-grid" aria-hidden="true">
-                {collage.map((src, i) => (
+            <div className="pos-world-art" aria-hidden="true">
+                {SCATTER.map((p, i) => collage[i] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={src} src={src} alt="" style={{ "--i": i }} />
-                ))}
+                    <img key={collage[i]} src={collage[i]} alt=""
+                        style={{ "--x": `${p.x}%`, "--y": `${p.y}%`, "--s": `${p.s}px`, "--r": `${p.r}deg`, "--i": i }} />
+                ) : null)}
             </div>
             <div className="pos-world-copy">
                 <span className="pos-kick">The Wolf Den</span>
@@ -194,21 +218,34 @@ function SlidePrizes({ p }) {
 }
 
 // ── WHAT IT IS WORTH ── the strongest thing the screen can say, so it gets the biggest number.
-function SlideGear({ gear }) {
+function SlideGear({ gear, art }) {
     const best = gear[0];
+    const bestArt = art?.[best?.id] || null;
     return (
         <div className="pos-slide pos-gear">
             <span className="pos-kick">Gear you can cash in</span>
             <h1>Some of it is worth real money at this counter</h1>
             {best?.dollars ? (
-                <p className="pos-gear-hero">
-                    The <b>{best.name}</b> is worth
-                    <strong> ${(best.dollars * best.charges).toLocaleString()}</strong> in store credit.
-                </p>
+                <div className="pos-gear-hero">
+                    {/* The crown, actual size. A sentence about a $200 crown is an argument; the crown is a
+                        picture of one, and this panel exists because pictures do the work. */}
+                    {bestArt ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="pos-gear-heroart" src={bestArt} alt="" />
+                    ) : null}
+                    <span>
+                        The <b>{best.name}</b> is worth
+                        <strong> ${(best.dollars * best.charges).toLocaleString()}</strong> in store credit.
+                    </span>
+                </div>
             ) : null}
             <ul className="pos-gear-list">
                 {gear.slice(0, 5).map((g) => (
                     <li key={g.id}>
+                        {art?.[g.id] ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="pos-gear-ico" src={art[g.id]} alt="" />
+                        ) : <span className="pos-gear-ico" aria-hidden="true" />}
                         <span className="pos-gear-name">{g.name}</span>
                         <span className="pos-gear-val">{g.reward}{g.charges > 1 ? ` ×${g.charges}` : ""}</span>
                     </li>
