@@ -23,12 +23,22 @@ function iosNeedsInstall() {
     return isIos && !standalone;
 }
 
+// ── THE FIVE, DRAWN RATHER THAN TYPED ────────────────────────────────────────────────────────────────────────
+// These were emoji, which the Den does not put in its interface: they render differently on every device and
+// carry Apple's art direction rather than ours, sitting beside real sprites everywhere else in the game
+// looking borrowed. That is the same argument gen-nav-icons.mjs makes at the top of itself.
+//
+// And the right pictures already exist. Every one of these lines is about a PLACE — the trade screen, the
+// plaza, the auction house, the farm, the badge wall — and every one of those places already has a drawn nav
+// icon that the member will see again in the menu two seconds later. So the bullet is the destination's own
+// icon rather than a new drawing of the same idea: nothing was generated for this, and the card teaches the
+// menu while it is asking for permission.
 const PERKS = [
-    { icon: "🎁", text: "Someone sends you a pet or a trade offer" },
-    { icon: "⚔️", text: "A raid hits the plaza (they only last minutes)" },
-    { icon: "💰", text: "Your auction listing sells" },
-    { icon: "🌾", text: "Your crops are ready to harvest" },
-    { icon: "🏅", text: "You earn a badge or level up" },
+    { icon: "trades", text: "Someone sends you a pet or a trade offer" },
+    { icon: "town", text: "A raid hits the plaza (they only last minutes)" },
+    { icon: "auction", text: "Your auction listing sells" },
+    { icon: "farm", text: "Your crops are ready to harvest" },
+    { icon: "badges", text: "You earn a badge or level up" },
 ];
 
 export default function EnableNotificationsClient() {
@@ -123,7 +133,11 @@ export default function EnableNotificationsClient() {
             {state !== "on" ? (
                 <ul className="enotif-perks">
                     {PERKS.map((p) => (
-                        <li key={p.text}><span aria-hidden="true">{p.icon}</span> {p.text}</li>
+                        <li key={p.text}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`/images/nav/${p.icon}.png`} alt="" aria-hidden="true" width={22} height={22} />
+                            {p.text}
+                        </li>
                     ))}
                 </ul>
             ) : null}
@@ -137,7 +151,12 @@ export default function EnableNotificationsClient() {
                             <p className="enotif-bounty"><Coin /> Turn them on and we&apos;ll drop <strong>{bounty.gold} gold</strong> in your pocket.</p>
                         ) : null}
                         <button type="button" className="btn-gold enotif-cta" onClick={turnOn} disabled={busy}>
-                            {busy ? "Turning on…" : bounty ? `🔔 Turn on · +${bounty.gold} gold` : "🔔 Turn on notifications"}
+                            {/* NO ICON HERE, deliberately. The emoji bell that used to sit in this label is
+                                gone with the rest of them, and the obvious swap — the bell sprite, as used by
+                                the hero and the menu — is dark bronze on a gold button and all but vanishes.
+                                There is a large bell four lines above this; the button only has to say what
+                                pressing it does. */}
+                            {busy ? "Turning on…" : bounty ? `Turn on · +${bounty.gold} gold` : "Turn on notifications"}
                         </button>
                         <p className="enotif-fine">Your browser will ask you to allow it. One tap, and you can turn any of it off later.</p>
                     </>

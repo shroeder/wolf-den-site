@@ -29,7 +29,9 @@ export default async function NotificationsPage() {
         return (
             <div className="stack reveal">
                 <section className="card" style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 40 }} aria-hidden="true">🔔</div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/nav/notifications.png" alt="" aria-hidden="true" width={56} height={56}
+                        style={{ display: "block", margin: "0 auto" }} />
                     <h1 style={{ margin: "6px 0 4px" }}>Turn on notifications</h1>
                     <p className="muted" style={{ margin: "0 0 14px" }}>
                         Sign in first — notifications are tied to your member account, so we know what&apos;s
