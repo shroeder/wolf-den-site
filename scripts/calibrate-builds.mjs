@@ -29,11 +29,13 @@ import { db } from "../src/lib/db.js";
 
 const WHO = process.argv[2] || "The Wolf Den";
 const ROUNDS = Number(process.argv[3]) || 4;
-const SAMPLES = 24;
+const SAMPLES = Number(process.env.CAL_SAMPLES) || 24;
 const RUNGS_PER_BUILD = 6;
 // How hard the whole ladder should sit at the rungs we calibrate over. The band either side of the wall, so
 // "as hard as each other" is measured where it is actually decided rather than where everything is 0% or 100%.
-const BAND = [45, 85];
+// Overridable, because the band that matters is wherever the member actually plays. Calibrating over rungs
+// they cannot reach measures nothing — every build reads 0% and the weights barely move.
+const BAND = [Number(process.env.CAL_FROM) || 45, Number(process.env.CAL_TO) || 85];
 // Damped, because win rate against stats is steep: a full correction overshoots and the next round undoes it.
 const DAMP = 0.55;
 
@@ -62,19 +64,38 @@ const sampleRungs = (list) => {
     return Array.from({ length: RUNGS_PER_BUILD }, (_, i) => list[Math.floor(i * step)]);
 };
 
+// Every (build, rung) pair, kept apart rather than averaged, because a build's rungs are not all the same
+// height and the whole question is how it compares to its NEIGHBOURS.
 const measure = () => {
     const out = [];
     for (const id of BUILD_IDS) {
         const rungs = sampleRungs(rungsOf.get(id) || []);
-        if (!rungs.length) { out.push({ id, rate: null, n: 0 }); continue; }
-        let acc = 0;
-        for (const t of rungs) {
+        if (!rungs.length) { out.push({ id, rate: null, n: 0, at: [] }); continue; }
+        const at = rungs.map((t) => {
             const b = npcBuild(t, 0);
-            acc += winRate(fighterFrom(b.stats, b.perks, null));
-        }
-        out.push({ id, rate: acc / rungs.length, n: rungs.length });
+            return { rung: t, rate: winRate(fighterFrom(b.stats, b.perks, null)) };
+        });
+        out.push({ id, rate: at.reduce((a, x) => a + x.rate, 0) / at.length, n: at.length, at });
     }
     return out;
+};
+
+// ── THE TARGET IS THE LOCAL TREND, NOT ONE NUMBER FOR THE WHOLE BAND ─────────────────────────────────────────
+// The first version compared every build to the band's mean, which equalises builds AND flattens the ladder:
+// run against a real member over rungs 36-70 it made rung 36 as hard as rung 63 — every rung a coin flip and
+// the climb gone. Luke had walked rungs 1-35 without losing; afterwards he was at 32% on rung 38.
+//
+// A build is only mis-weighted if it is out of step with the rungs AROUND it. So the expectation for a build
+// measured at rung r is what every OTHER build scores near r, and the correction is the gap between them.
+// Equalises the draw, leaves the trend alone.
+const NEAR = 6;
+const expectedAt = (rows, rung, selfId) => {
+    const near = [];
+    for (const r of rows) {
+        if (r.id === selfId) continue;
+        for (const x of r.at || []) if (Math.abs(x.rung - rung) <= NEAR) near.push(x.rate);
+    }
+    return near.length ? near.reduce((a, b) => a + b, 0) / near.length : null;
 };
 
 const spread = (rows) => {
@@ -87,16 +108,20 @@ const first = measure();
 const s0 = spread(first);
 console.log(`  before: ${(s0.lo * 100).toFixed(0)}% to ${(s0.hi * 100).toFixed(0)}%, mean ${(s0.mean * 100).toFixed(0)}%`);
 
-// Everything should be as hard as the ladder is on average, which is what "the height decides it, not the
-// draw" means. The mean is taken from the first pass so calibration does not also move the difficulty.
-const TARGET_RATE = s0.mean;
 let rows = first;
 for (let round = 1; round <= ROUNDS; round += 1) {
     for (const r of rows) {
         if (r.rate == null) continue;
+        // How far out of step with its neighbours this build is, averaged over the rungs it holds.
+        const gaps = (r.at || []).map((x) => {
+            const exp = expectedAt(rows, x.rung, r.id);
+            return exp == null ? 0 : x.rate - exp;
+        });
+        if (!gaps.length) continue;
+        const gap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
         const b = BUILDS_BY_ID[r.id];
-        // Wins too often -> it is too weak for its rung -> it should be worth MORE.
-        b.weight = Math.max(0.35, Math.min(3.0, (b.weight || 1) * (1 + DAMP * (r.rate - TARGET_RATE))));
+        // Wins more than its neighbours -> it is too weak for its rung -> it should be worth MORE.
+        b.weight = Math.max(0.35, Math.min(3.0, (b.weight || 1) * (1 + DAMP * gap)));
     }
     rows = measure();
     const s = spread(rows);
