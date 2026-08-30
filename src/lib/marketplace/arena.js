@@ -948,10 +948,12 @@ export async function getArenaState(buyerId, pre = {}) {
     // leaves a rung beaten and unpaid — and the difference is exactly what the track has to draw, because
     // an owed prize is claimable and a claimed one is not. See road-prizes.js.
     const season = currentSeason();
-    const roadClaimed = await (async () => {
-        const { roadPrizesClaimed } = await import("@/lib/marketplace/road-prizes.js");
-        return roadPrizesClaimed(buyerId, season);
-    })().catch(() => new Set());
+    // Fetched together: one dynamic import, and the art read is shared across every viewer (see
+    // seasonPrizeArt) so it costs one query per instance per five minutes rather than four per render.
+    const [roadClaimed, roadArt] = await (async () => {
+        const { roadPrizesClaimed, seasonPrizeArt } = await import("@/lib/marketplace/road-prizes.js");
+        return Promise.all([roadPrizesClaimed(buyerId, season), seasonPrizeArt(season)]);
+    })().catch(() => [new Set(), {}]);
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
@@ -1169,7 +1171,7 @@ export async function getArenaState(buyerId, pre = {}) {
             // and a veteran whose lifetime best is 99 would otherwise open a fresh season already owed three
             // prizes they have not walked to yet. The lifetime number is published separately, below.
             const seasonBest = beaten.size ? Math.max(...beaten) : 0;
-            const track = milestoneTrack({ season, beaten: seasonBest, claimed: roadClaimed, reach: roadSize });
+            const track = milestoneTrack({ season, beaten: seasonBest, claimed: roadClaimed, reach: roadSize, art: roadArt });
             return {
                 size: roadSize,
                 beaten: beaten.size,

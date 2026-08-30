@@ -3357,8 +3357,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                                 aria-label={`Claim ${t.name}`} />
                                         ) : null}
                                         <span className="ar-track-rung">#{t.rung}</span>
+                                        {/* THE PRIZE'S OWN PICTURE. The kind glyph is the fallback, not the
+                                            default — a paw print for both pets is a legend, and the reason
+                                            all eight are on screen from rung 1 is so the moth at rung 200 is
+                                            a thing you can SEE. An undrawn prize (or a dead url) falls back
+                                            to the glyph rather than to a gap. */}
                                         <span className="ar-track-icon" aria-hidden="true">
-                                            {(PRIZE_GLYPH[t.kind] || GiLaurelCrown)({})}
+                                            {t.art
+                                                ? <img src={t.art} alt="" draggable="false"
+                                                    onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                : (PRIZE_GLYPH[t.kind] || GiLaurelCrown)({})}
                                         </span>
                                         <b className="ar-track-name">{t.name}</b>
                                         <em className="ar-track-state">

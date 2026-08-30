@@ -16990,8 +16990,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid rgba(255,255,255,0.10); background: rgba(0,0,0,0.30); }
 .ar-track-rung { font-size: .62rem; font-weight: 800; color: #6a727d; font-variant-numeric: tabular-nums;
     letter-spacing: .03em; }
-.ar-track-icon { display: grid; place-items: center; font-size: 19px; line-height: 1; color: #8b93a0; }
+/* Sized for the SPRITE, with the glyph centred in the same box — so a tile with art and a tile without are
+   the same height and the row does not step. The sprites are die-cut on transparency, so they sit on the
+   tile's own ground with no plate behind them. */
+/* ── THE BOX IS FIXED; THE PICTURE FITS IT ────────────────────────────────────────────────────────────────
+   First cut sized the sprite with `max-height: 100%` against a 46px grid area, and every one of the eight
+   rendered at its natural ~1000px and spilled three tiles down the track — the moth covered the sentence
+   about the reset. A percentage max-height on a replaced element inside a grid area is exactly the place
+   that resolution goes wrong quietly, so the height is stated on the IMAGE in pixels instead, and the box
+   clips as well, so nothing here can ever paint over a neighbour again whatever the art turns out to be. */
+.ar-track-icon { display: grid; place-items: center; width: 100%; height: 52px; overflow: hidden;
+    font-size: 22px; line-height: 1; color: #8b93a0; }
 .ar-track-icon > svg { display: block; }
+.ar-track-icon > img { width: 52px; height: 52px; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
+/* A claimed prize is lit rather than dimmed — it is the one you already own, and the tile it sits in is the
+   only celebration this screen gives it. */
+.ar-track-tile.is-got .ar-track-icon > img { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--h) 60%, transparent)); }
+.ar-track-tile.is-beyond .ar-track-icon > img { filter: grayscale(0.7) brightness(0.75); }
 .ar-track-name { font-size: .68rem; font-weight: 700; line-height: 1.2; color: #c8cfd8;
     /* Two lines then ellipsis — "The Roadwarden's Mantle" must not push its neighbours out of alignment. */
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

@@ -151,12 +151,17 @@ export function nextPrizeAfter(rung, season = currentSeason()) {
  * show that as unpaid so the repair sweep has something to find. Inferring it from the rung would have drawn
  * a prize the member does not own.
  */
-export function milestoneTrack({ season = currentSeason(), beaten = 0, claimed = null, reach = 200 } = {}) {
+export function milestoneTrack({ season = currentSeason(), beaten = 0, claimed = null, reach = 200, art = null } = {}) {
     const got = claimed instanceof Set ? claimed : new Set((claimed || []).map(Number));
+    const pics = art || {};
     return (season.prizes || []).map((p) => ({
         ...p,
         ...PRIZE_KINDS[p.kind],
         kind: p.kind,
+        // The prize's OWN picture, when it has been drawn. Null falls the tile back to its kind glyph, which
+        // is what a season looks like between authoring its prizes and running gen:season-art — a legend
+        // rather than a preview, but never a gap.
+        art: pics[p.ref] || null,
         claimed: got.has(p.rung),
         // Reached but unpaid — see the note above. Drawn differently so it reads as owed, not as locked.
         owed: !got.has(p.rung) && Number(beaten) >= p.rung,

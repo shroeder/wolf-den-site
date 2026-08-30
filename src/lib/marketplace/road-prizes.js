@@ -115,3 +115,36 @@ export async function settleRoadPrizes(buyerId, beaten, seasonN = null) {
     }
     return paid;
 }
+
+// ── WHAT THE EIGHT ACTUALLY LOOK LIKE ────────────────────────────────────────────────────────────────────────
+// The track drew a glyph per KIND — a paw for both pets, a sword for both gear pieces — which is a legend, not
+// a preview. The whole reason to put all eight on the screen from rung 1 is so somebody can see the moth at
+// rung 200 on the day they beat rung 3, and a generic paw print does not do that.
+//
+// The art lives in four different tables because each kind is drawn by its own pipeline (mkt_deco_sprite,
+// mkt_item_sprite, mkt_cooking_sprite, mkt_pet_sprite). Four reads for eight pictures — on a screen every
+// member opens, that is exactly the kind of convenience call CLAUDE.md warns about.
+//
+// So it is SHARED and cached at the ART ttl, which is what every other sprite map in the game uses: these
+// change only when somebody runs `npm run gen:season-art`, and the whole point of the shared cache is that
+// sixty people opening the Road do one read between them rather than sixty. The key carries the season number,
+// so authoring a new season does not serve the old season's pictures for five minutes.
+export async function seasonPrizeArt(season = currentSeason()) {
+    const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
+    return shared(`road:prize-art:${season.n}`, TTL.ART, async () => {
+        const by = (kind) => (season.prizes || []).filter((p) => p.kind === kind).map((p) => p.ref);
+        const [deco, gear, dish, pet] = await Promise.all([
+            by("decoration").length
+                ? db.query(`SELECT deco_id AS ref, url FROM mkt_deco_sprite WHERE deco_id = ANY($1)`, [by("decoration")]).catch(() => []) : [],
+            by("gear").length
+                ? db.query(`SELECT item_id AS ref, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [by("gear")]).catch(() => []) : [],
+            by("recipe").length
+                ? db.query(`SELECT ref, url FROM mkt_cooking_sprite WHERE ref = ANY($1)`, [by("recipe")]).catch(() => []) : [],
+            by("pet").length
+                ? db.query(`SELECT pet_id AS ref, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [by("pet")]).catch(() => []) : [],
+        ]);
+        const out = {};
+        for (const row of [...deco, ...gear, ...dish, ...pet]) if (row?.url) out[row.ref] = row.url;
+        return out;
+    });
+}
