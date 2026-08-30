@@ -5,7 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, releaseEnemy, sharedHitFor, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
+import { CHIEFTAIN_WAVE, accrueSharedFoePassive, engageEnemy, liveFighterCount, partyOn, releaseEnemy, sharedHitFor, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds, grantSalvageFodder } from "@/lib/marketplace/inventory.js";
@@ -322,6 +322,14 @@ export async function getActiveTownEvent(buyerId) {
     // before this existed still gets a roster.
     let swarm = null;
     if (!isBoss) {
+        // ── STANDING AT THE CHIEFTAIN IS FIGHTING IT ─────────────────────────────────────────────────────
+        // Same rule the golem runs on, pointed at the shared foe instead of the event: the poll IS the proof
+        // you are in the square. It means nobody is idle at the boss — including somebody who just lost their
+        // bout and is waiting to go again — and it is what makes a full plaza feel like a full plaza.
+        if (buyerId) {
+            const blow = await computeRaidHit(buyerId).catch(() => null);
+            await accrueSharedFoePassive(buyerId, ev.id, blow?.damage || 1).catch(() => {});
+        }
         swarm = await swarmState(ev.id, buyerId, ev.kind).catch(() => null);
         if (!swarm || swarm.remaining === 0) {
             const fighters = await liveFighterCount(ev.id).catch(() => 1);
@@ -330,6 +338,10 @@ export async function getActiveTownEvent(buyerId) {
             swarm = await swarmState(ev.id, buyerId, ev.kind).catch(() => null);
         }
     }
+    // The pack on the boss. Only fetched when there IS one, so an ordinary wave costs nothing extra.
+    const party = swarm?.enemies?.some((x) => x.shared)
+        ? await partyOn(ev.id, buyerId).catch(() => [])
+        : [];
     const enemies = Number(ev.meta?.enemies) || 6;
     const [mine, top, count] = await Promise.all([
         buyerId ? db.queryOne(`SELECT damage, hits, passive_damage FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [ev.id, buyerId]).catch(() => null) : Promise.resolve(null),
@@ -360,6 +372,9 @@ export async function getActiveTownEvent(buyerId) {
         // Everyone swinging right now, boss or skirmish — the plaza reads this to label them as fighting.
         activeFighterIds: activeFighters.map((f) => String(f.id)),
         swarm, // shared foe roster (skirmishes only): positions, per-foe HP, and who's locked onto each
+        // Everyone who has landed something recently, for the pack drawn on a shared boss. Empty on an
+        // ordinary wave, so the plaza can just check whether it has one.
+        party,
         totalWaves: swarm?.totalWaves ?? null,
     };
 }

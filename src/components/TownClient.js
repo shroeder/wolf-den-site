@@ -1615,7 +1615,23 @@ export default function TownClient({ initial }) {
                             >
                                 {/* Who's locked onto this foe — the thing that makes the fight feel shared instead
                                     of everyone swinging at their own copy. Yours reads "you". */}
-                                {en.engagedBy ? (
+                                {/* ── A SHARED BOSS WEARS ITS PARTY, NOT AN OWNER ─────────────────────────
+                                    An ordinary foe shows who has claimed it, because that is the thing you
+                                    need to know. The chieftain has no owner by design — everyone fights it —
+                                    so it shows the pack instead: how many are on it and their sprites, which
+                                    is what makes a shared boss read as shared rather than as a bar going down
+                                    for no visible reason. */}
+                                {en.shared ? (
+                                    <span className="tw-enemy-party">
+                                        {(state?.event?.party || []).slice(0, 5).map((m) => (
+                                            <span key={m.id} className={`tw-enemy-partyhero${m.isYou ? " is-you" : ""}`} title={m.name}>
+                                                {m.sprite ? /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img src={m.sprite} alt="" /> : <span>🐺</span>}
+                                            </span>
+                                        ))}
+                                        <b>{(state?.event?.party || []).length || 1} on it</b>
+                                    </span>
+                                ) : en.engagedBy ? (
                                     <span className={`tw-enemy-lock${en.mine ? " is-mine" : ""}`}>
                                         {en.mine ? "⚔️ you" : `⚔️ ${en.engagedName}`}
                                     </span>
@@ -2463,6 +2479,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-online-badge .tw-online-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; animation: twOnlinePulse 2s ease-in-out infinite; }
 @keyframes twOnlinePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
 /* Enemy "fight me" crossed-swords hint */
+/* The pack drawn on a shared boss — sprites plus a count, above the foe where the owner badge sits on an
+   ordinary one. Small and crowded on purpose: it should read as "a lot of us are on this". */
+.tw-enemy-party { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center;
+    gap: 2px; padding: 2px 6px 2px 3px; border-radius: 999px; background: rgba(10,12,18,0.78);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,215,94,0.35); pointer-events: none; white-space: nowrap; }
+.tw-enemy-party b { font-size: 10px; font-weight: 800; color: #ffd75e; letter-spacing: .02em; }
+.tw-enemy-partyhero { width: 15px; height: 15px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.08);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 9px; }
+.tw-enemy-partyhero.is-you { box-shadow: 0 0 0 1.5px #ffd75e; }
+.tw-enemy-partyhero img { width: 100%; height: 100%; object-fit: cover; }
 .tw-enemy-crossed { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 15px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); pointer-events: none; opacity: 0.9; }
 /* ── BOSS RAID — a huge shared boss in the plaza ── */
 .tw-boss { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; animation: twBossLoom 3s ease-in-out infinite; }

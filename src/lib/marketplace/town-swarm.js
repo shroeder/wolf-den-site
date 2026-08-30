@@ -388,6 +388,8 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
                 mine: Boolean(mine),
                 // Free to take, or already yours. Drives whether the client offers it at all.
                 takeable: isSharedKind(r.kind) || !r.engaged_by || Boolean(mine),
+                // A shared foe is drawn as a boss with its party on it, not as a claimable mook.
+                shared: isSharedKind(r.kind),
             };
         }),
     };
@@ -481,6 +483,87 @@ export async function engageEnemy(buyerId, enemyId) {
         [Number(enemyId)],
     ).catch(() => null);
     return { ok: false, error: cur?.dead ? "already_dead" : "taken", who: who?.who || null };
+}
+
+// ── THE CHIEFTAIN IS A PARTY FIGHT, NOT A QUEUE ──────────────────────────────────────────────────────────────
+// Luke: "design him to be a shared party thing."
+//
+// Making it hittable by everyone was the mechanism; this is the fight. Two things turn "we all happen to be
+// swinging at the same bar" into something that reads as a party:
+//
+//   PRESENCE COUNTS. Standing in the plaza while the chieftain is up chips it, the same rule the Treasure
+//   Golem already runs on ("passive DPS — just being present chips away, so nobody has to grind taps"). It
+//   means nobody is ever idle at the boss, including somebody who has just lost their bout and is waiting to
+//   go again, and it is the reason a raid with twelve people feels like twelve people.
+//
+//   YOU CAN SEE THE PARTY. Everyone who has landed something on it in the last two minutes comes back with the
+//   foe, so the plaza can draw them on it — the pack view the golem already has. A shared boss with no visible
+//   party is just a health bar going down for no reason anybody can see.
+//
+// Both are recorded in mkt_town_event_hit, which is the table the raid's rewards are already computed from, so
+// helping to bring the chieftain down pays without a second ledger.
+const CHIEFTAIN_PASSIVE_PER_SEC = 0.9;   // share of one of your blows, a second
+const CHIEFTAIN_PASSIVE_MAX_S = 25;      // a poll gap longer than this is somebody coming back, not standing there
+const PARTY_WINDOW_S = 120;
+
+/**
+ * Chip the live shared foe for standing in the square. Returns what it took off, or null.
+ *
+ * Runs on the member's OWN poll, which is the proof they are actually in the plaza — the same reason
+ * accrueSquarePassive lives on the poll rather than a cron.
+ */
+export async function accrueSharedFoePassive(buyerId, eventId, perBlow = 1) {
+    if (!buyerId || !eventId) return null;
+    const foe = await db.queryOne(
+        `SELECT id, kind, hp FROM mkt_town_enemy
+          WHERE event_id = $1 AND died_at IS NULL AND kind = ANY($2::text[]) ORDER BY wave DESC LIMIT 1`,
+        [Number(eventId), [...SHARED_KINDS]],
+    ).catch(() => null);
+    if (!foe) return null;
+
+    const row = await db.queryOne(
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_passive_at)
+         VALUES ($1, $2, 0, 0, NOW())
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET last_passive_at = COALESCE(mkt_town_event_hit.last_passive_at, NOW())
+         RETURNING EXTRACT(EPOCH FROM (NOW() - last_passive_at))::float AS secs`,
+        [Number(eventId), buyerId],
+    ).catch(() => null);
+    const secs = Math.min(CHIEFTAIN_PASSIVE_MAX_S, Math.max(0, Number(row?.secs) || 0));
+    if (secs < 1) return null;
+
+    const dmg = Math.max(1, Math.round(Math.max(1, perBlow) * CHIEFTAIN_PASSIVE_PER_SEC * secs));
+    const hit = await db.queryOne(
+        `UPDATE mkt_town_enemy SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND died_at IS NULL RETURNING hp, hp_max`,
+        [foe.id, dmg],
+    ).catch(() => null);
+    if (!hit) return null;
+    await db.query(
+        `UPDATE mkt_town_event_hit SET damage = damage + $3, passive_damage = passive_damage + $3, last_passive_at = NOW()
+          WHERE event_id = $1 AND buyer_id = $2`,
+        [Number(eventId), buyerId, dmg],
+    ).catch(() => {});
+    // Whoever's chip takes it to zero ends it, exactly as a landed blow would.
+    if (Number(hit.hp) <= 0) {
+        await db.query(`UPDATE mkt_town_enemy SET died_at = NOW(), killed_by = $2 WHERE id = $1 AND died_at IS NULL`,
+            [foe.id, buyerId]).catch(() => {});
+    }
+    return { enemyId: Number(foe.id), damage: dmg, hp: Number(hit.hp), hpMax: Number(hit.hp_max) };
+}
+
+/** Everyone who has landed something on the raid recently — the pack drawn on a shared foe. */
+export async function partyOn(eventId, viewerId = null) {
+    if (!eventId) return [];
+    const rows = await db.query(
+        `SELECT h.buyer_id, COALESCE(NULLIF(b.display_name,''), b.alias) AS name, b.avatar_sprite_url AS sprite, h.damage
+           FROM mkt_town_event_hit h JOIN mkt_buyer b ON b.id = h.buyer_id
+          WHERE h.event_id = $1 AND h.last_hit_at > NOW() - ($2 || ' seconds')::interval
+          ORDER BY h.damage DESC LIMIT 12`,
+        [Number(eventId), String(PARTY_WINDOW_S)],
+    ).catch(() => []);
+    return rows.map((r) => ({
+        id: String(r.buyer_id), name: r.name || "A member", sprite: r.sprite || null,
+        damage: Number(r.damage) || 0, isYou: viewerId != null && String(r.buyer_id) === String(viewerId),
+    }));
 }
 
 // ── PUT A FOE BACK ON THE BOARD ──────────────────────────────────────────────────────────────────────────────
