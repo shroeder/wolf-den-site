@@ -1046,7 +1046,19 @@ export default function TownClient({ initial }) {
         }).then((x) => x.json()).catch(() => null);
         // `engage` hands back the whole arena state, which is what the fight renderer needs to draw YOUR
         // fighter and not just the foe.
-        if (r?.ok) { setSwing(null); setFight(r); return; }
+        if (r?.ok) {
+            setSwing(null);
+            // The foe you tapped was already claimed and the server handed you a free one instead. Said out
+            // loud, because otherwise you tap a bandit on the left and find yourself fighting one on the right.
+            // setRaidNote, not setNotice — that one belongs to BossRaidModal, a different component.
+            // Cleared on the same 2.6s timer every other raid message uses.
+            if (r.redirected) {
+                setRaidNote("That one was taken — you're on another.");
+                setTimeout(() => setRaidNote(null), 2600);
+            }
+            setFight(r);
+            return;
+        }
         setSwing(null);
         // ── WALKING BACK INTO A FIGHT YOU STEPPED OUT OF ─────────────────────────────────────────────────
         // The fight screen has an exit door, and out here it hands the street back with the bout still open

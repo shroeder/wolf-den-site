@@ -1737,14 +1737,19 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
     if (!claim?.ok) return { ok: false, error: claim?.error || "taken", who: claim?.who || null };
 
+    // ⚠️ EVERYTHING BELOW USES claim.enemyId, NOT THE ONE THAT WAS TAPPED. engageEnemy now hands over a free
+    // foe when the tapped one is already claimed, so those two are not always the same id — and building the
+    // bout from the tapped id would have claimed one bandit and fought a different one, with the kill landing
+    // on neither. The claim is the source of truth for which foe this is.
+    const foeId = Number(claim.enemyId) || Number(enemyId) || 0;
     const me = await kitFor(buyerId);
     const prof = enemyProfile(claim.kind, ev.kind);
-    const st = statsForPower(prof.power, prof.archetype, prof.element, Number(enemyId) || 0);
+    const st = statsForPower(prof.power, prof.archetype, prof.element, foeId);
     const art = prof.artKey
         ? await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = $1`, [prof.artKey]).catch(() => null)
         : null;
     const foe = {
-        id: `town:${enemyId}`, name: prof.name, sprite: art?.url || null, npc: true, town: true,
+        id: `town:${foeId}`, name: prof.name, sprite: art?.url || null, npc: true, town: true,
         blurb: prof.blurb, color: prof.tint, archetype: prof.archetype, archetypeName: prof.archetypeName,
         tell: prof.tell, level: null,
     };
@@ -1755,7 +1760,7 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         myDamageMult: TOWN_EDGE,
         // `townEdge` is stamped alongside the rider so a bout can say whether it has already been scaled —
         // see the repair in resolveBeat, which is what rescues the fights that were open when this shipped.
-        extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
+        extra: { town: { eventId: Number(eventId), enemyId: foeId }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
     // ── THE WHOLE STATE, NOT JUST THE BOUT ───────────────────────────────────────────────────────────────
@@ -1765,7 +1770,9 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     //
     // This return was already written, directly below a `return settle(...)` that was never removed, so it
     // has never once run. Unreachable code that looks like the fix is worse than no fix: it reads as solved.
-    return { ok: true, ...(await getArenaState(buyerId)) };
+    // `redirected` rides out so the plaza can say the tapped foe was taken and this is a different one —
+    // otherwise a member on a busy wave silently finds themselves fighting a bandit they did not pick.
+    return { ok: true, redirected: Boolean(claim.redirected), enemyId: foeId, ...(await getArenaState(buyerId)) };
 }
 
 /**
