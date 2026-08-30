@@ -349,22 +349,39 @@ const FEROCITY_USEFUL_CEILING = 260;
 // there. The anchor is the WALL — a rung the best real build stops beating — not a stat total in the abstract,
 // which is the mistake the first version made twice.
 export const TARGET_AT_RUNG_1 = 120;
-// 1198 was what rung 115 carried when the strongest kit stopped there, and it moved the wall to 88 rather
-// than 55 — the engine gets more out of a real kit than a stat total predicts, so solving for it kept
-// missing. 1569 is simply what rung 88 was worth under the old curve, measured rather than derived: make
-// rung 55 that, and the rung somebody stops at becomes 55.
-//
-// Luke: "would love to get to it so im challenged at 50 and cap out around 60. but no manual caps or
-// anything like that, just tuning."
-//
-// Nothing is capped. Rung 1 stays 120 so a thin wardrobe still wins its first fight, the exponent steepens
-// to 0.6415, and rung 200 lands near 3592 — still climbing, 2.3x rung 55, with a step between
-// every rung.
 export const TARGET_AT_RUNG_55 = 1569;
-const TARGET_EXPONENT = Math.log(TARGET_AT_RUNG_55 / TARGET_AT_RUNG_1) / Math.log(55);
+export const TARGET_AT_RUNG_200 = 20000;
+
+// ── THREE ANCHORS, BECAUSE TWO CANNOT DO IT ──────────────────────────────────────────────────────────────────
+// A plain power law is fixed by its two ends, and the two ends we need do not leave room for the third thing:
+// gentle at rung 1 so a thin wardrobe wins its first fight, biting at 55 so that is where a good kit stops,
+// and STEEP just after — Luke: "id like it to cap out around 60."
+//
+// It could not be steep. At exponent 0.64 rung 62 was only 8% harder than 55, so a rung a member wins one time
+// in six was still reachable with forty tries and grinding carried them to 92 and beyond.
+//
+// So the curve bends: a quadratic in log-rung, which is one smooth function with no segments, no clamp and no
+// special case — it is simply allowed to accelerate. Solved from the three anchors at load rather than written
+// as fitted constants, so moving an anchor moves the curve and nothing has to be recomputed by hand.
+//
+//     rung     1     30     55     60     70    100     200
+//     target 120    634   1569   1814   2369   4596   20000
+//                          wall   +16%   +51%
+//
+// A rung a member beats one time in fifty is not reachable in forty tries, which is what "caps out" means
+// without capping anything.
+const LN55 = Math.log(55);
+const LN200 = Math.log(200);
+const A0 = Math.log(TARGET_AT_RUNG_1);
+const Y55 = Math.log(TARGET_AT_RUNG_55) - A0;
+const Y200 = Math.log(TARGET_AT_RUNG_200) - A0;
+const DET = LN55 * (LN200 * LN200) - (LN55 * LN55) * LN200;
+const B1 = (Y55 * (LN200 * LN200) - (LN55 * LN55) * Y200) / DET;
+const B2 = (LN55 * Y200 - Y55 * LN200) / DET;
 export function targetTotal(tier) {
     const t = Math.max(1, Math.min(200, Math.round(tier)));
-    return TARGET_AT_RUNG_1 * Math.pow(t, TARGET_EXPONENT);
+    const l = Math.log(t);
+    return Math.exp(A0 + B1 * l + B2 * l * l);
 }
 
 // The stats the target is measured over: the six a fighter is built out of. Procs and fortune are deliberately

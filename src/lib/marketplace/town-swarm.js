@@ -162,12 +162,26 @@ export const enemyKind = (k, eventKind = null) => {
 // tier 20" is a claim you can check against where members actually are and "760" is not. scripts/check-raid-foes.mjs
 // simulates every one of these against four real loadouts and FAILS if any of them can take more than a third
 // of a starting member's health in one blow. Change a tier here, run that.
+// ── MEASURED AGAINST REAL MEMBERS, NOT PICKED ────────────────────────────────────────────────────────────────
+// Luke: "town raids need to be a bit easier."
+//
+// Swept the roster against three real kits. A geared member beat every foe 100% of the time, so nothing here
+// was hard for them — but Nynebreaker, whose wardrobe is thin, went 100% on the scrapper and the archer and
+// then ZERO on the shield-bearer, the elite AND the chieftain. Three fifths of the raid was not a fight she
+// could take part in, which is the opposite of what a shared raid is for.
+//
+// The outcomes are binary at that end of the ladder — she wins every bout or none — so easing it means
+// crossing her threshold rather than shaving a percentage. Swept: wall flips between 7 and 8, berserker
+// between 11 and 14, balanced between 7 and 10.
+//
+// So the roster is set so a thin wardrobe can clear everything EXCEPT the boss, which is what the chieftain's
+// own note already said it was for. A geared member is unaffected — they were at 100% before and after.
 const RAID_TIER = {
-    scrapper: 6,        // a mook. Everyone beats it; it should cost a few rounds, not a loadout.
-    archer: 7,          // squishier, bites harder — the duelist weights do that, not a bigger budget
-    shieldbearer: 10,   // the tanky one. Its bulk comes from the wall's ferocity weight and 1.35 tough
-    elite: 20,          // a real threat to a new member and a speed bump to a geared one
-    chieftain: 28,      // the raid's boss: the one foe a starting member should not expect to solo
+    scrapper: 5,        // a mook. Everyone beats it; it should cost a few rounds, not a loadout.
+    archer: 6,          // squishier, bites harder — the duelist weights do that, not a bigger budget
+    shieldbearer: 7,    // the tanky one. Its bulk comes from the wall's ferocity weight and 1.35 tough
+    elite: 11,          // a real threat to a new member and a speed bump to a geared one
+    chieftain: 20,      // the raid's boss: the one foe a starting member should not expect to solo
 };
 const ARENA_SHAPE = {
     scrapper: { archetype: "brute", power: npcPower(RAID_TIER.scrapper), kitTier: 4 },
