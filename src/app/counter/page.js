@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 
 import CounterDisplayClient from "@/components/CounterDisplayClient";
-import { POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
+import { bossPrizes, chargedGearPitch, posCollage, POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
 import { SITE_URL } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export const metadata = {
 const IDLE_URL = `${SITE_URL}/?utm_source=pos&utm_medium=qr&utm_campaign=counter-screen`;
 
 export default async function CounterPage({ searchParams }) {
-    const { key } = await searchParams;
+    const { key, slide } = await searchParams;
 
     if (!posDisplayKeyOk(key)) {
         return (
@@ -41,16 +41,30 @@ export default async function CounterPage({ searchParams }) {
         );
     }
 
-    const idleQr = await QRCode.toDataURL(IDLE_URL, {
-        width: 720, margin: 1, errorCorrectionLevel: "M",
-        color: { dark: "#101014", light: "#ffffff" },
-    }).catch(() => null);
+    // The QR and the collage are the two things the client cannot build for itself: one needs the qrcode
+    // encoder, the other needs four database tables. Both are effectively static for the life of the screen,
+    // so they are resolved once here rather than fetched on the poll. The mystery board is the exception and
+    // rides the poll, because it changes when a bag is sold.
+    const [idleQr, collage, prizes] = await Promise.all([
+        QRCode.toDataURL(IDLE_URL, {
+            width: 720, margin: 1, errorCorrectionLevel: "M",
+            color: { dark: "#101014", light: "#ffffff" },
+        }).catch(() => null),
+        posCollage().catch(() => []),
+        bossPrizes().catch(() => ({ given: [], upNext: null })),
+    ]);
 
+    // ?slide=world|prizes|gear|mystery|loop pins one panel instead of rotating — park it on the mystery
+    // board during a bag drop, or on the prizes the week a boss is up. No param and it cycles.
     return (
         <CounterDisplayClient
             displayKey={String(key)}
             idleQr={idleQr}
             pitch={POS_PITCH}
+            gear={chargedGearPitch()}
+            collage={collage}
+            prizes={prizes}
+            pinned={typeof slide === "string" ? slide : null}
             claimBase={`${SITE_URL}/marketplace/claim/`}
         />
     );

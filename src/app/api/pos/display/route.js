@@ -22,8 +22,34 @@ export async function GET(request) {
             // and is worth guessing at. Closed also means closed when no key is configured at all.
             if (!posDisplayKeyOk(key)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const claim = await latestCounterClaim();
-            return NextResponse.json({ claim }, { headers: { "Cache-Control": "no-store" } });
+            // ── THE MYSTERY BOARD RIDES THE SAME POLL ───────────────────────────────────────────────────
+            // Luke: "I don't want to have to flip between mystery packs and then this marketing thing."
+            // So it is a slide on this screen rather than a second URL somebody has to remember to open.
+            //
+            // Behind the shared cache at 60s — the poll runs every 4 seconds and this data changes when a
+            // bag is sold, so re-reading it fifteen times a minute would be fifteen times the work for the
+            // same answer. The claim above is NOT cached: that one has to be live to the second.
+            const [claim, mystery] = await Promise.all([
+                latestCounterClaim(),
+                (async () => {
+                    const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
+                    return shared("pos:mystery", TTL.SLOW * 2, async () => {
+                        const { getMysteryBagDashboardData } = await import("@/lib/mystery-bags.js");
+                        const d = await getMysteryBagDashboardData().catch(() => null);
+                        if (!d) return null;
+                        return {
+                            remaining: d.remainingPacks ?? null,
+                            price: d.bagPrice ?? null,
+                            marketTotal: d.metrics?.marketTotal ?? 0,
+                            average: d.averagePackValue ?? null,
+                            top: (d.topCards || []).slice(0, 3).map((c) => ({
+                                name: c.name, value: c.marketValue, image: c.imageUrl || null,
+                            })),
+                        };
+                    });
+                })().catch(() => null),
+            ]);
+            return NextResponse.json({ claim, mystery }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "pos.display.failure" });
         }

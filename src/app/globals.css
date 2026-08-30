@@ -23194,36 +23194,108 @@ body.cas-seated .social-fab { display: none; }
 .pos-break b { color: #e8edf3; font-variant-numeric: tabular-nums; }
 .pos-claim-right { flex: 0 0 auto; text-align: center; }
 
-/* ── IDLE ── the hook, for the sixty seconds before the sale finishes. */
-/* ⚠️ NO max-width IN `ch` ON THIS ELEMENT, and only a screenshot found out why. `ch` resolves against the
-   element's OWN font-size, and this container inherits ~16px — so a `max-width: 24ch` here clamped the copy
-   column to roughly 190px, wrapped the 74px headline one word per line, and pushed the whole thing off the
-   bottom of a 1366x768 laptop. Line length belongs on the h1 below, where `ch` measures the type it is
-   actually limiting. */
-.pos-idle-copy { flex: 1 1 auto; min-width: 0; }
-.pos-idle-copy h1 { margin: 10px 0 26px; font-family: var(--font-display); line-height: 1.04;
-    font-size: clamp(40px, 5.4vw, 104px); color: #fff; text-wrap: balance; max-width: 15ch; }
-.pos-pitch { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.pos-pitch li { position: relative; padding-left: 32px; font-size: clamp(19px, 2.1vw, 36px);
-    line-height: 1.35; color: #c8cfd8; }
-.pos-pitch li::before { content: ""; position: absolute; left: 0; top: .5em; width: 14px; height: 14px;
-    border-radius: 4px; background: linear-gradient(180deg, #ffe89a, #ffc93c); }
-.pos-rate { margin: 34px 0 0; font-size: clamp(18px, 1.9vw, 32px); color: #9aa2ae; }
-.pos-rate b { color: #ffd75e; font-size: 1.35em; font-weight: 900; }
-.pos-idle-qr { flex: 0 0 auto; text-align: center; }
+/* ── IDLE ── a rotating stage on the left, a QR rail on the right that never moves. ─────────────────────── */
+.pos-idle { align-items: stretch; }
+.pos-stage { flex: 1 1 auto; min-width: 0; display: flex; align-items: center;
+    animation: pos-in .5s cubic-bezier(.2,.8,.2,1); }
+@keyframes pos-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.pos-slide { width: 100%; min-width: 0; }
+.pos-slide h1 { margin: 8px 0 18px; font-family: var(--font-display); line-height: 1.04;
+    font-size: clamp(34px, 4.4vw, 78px); color: #fff; text-wrap: balance; max-width: 15ch; }
 
-.pos-offline { position: fixed; right: 10px; bottom: 8px; font-size: 12px; letter-spacing: .1em;
-    text-transform: uppercase; color: #6a727d; }
+/* The rail. Fixed width so the stage beside it never reflows between slides — a QR that shifts sideways
+   every eleven seconds is one somebody has to re-aim at. */
+.pos-rail { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding-left: clamp(20px, 3vw, 48px);
+    border-left: 1px solid rgba(255,255,255,0.1); }
+.pos-dots { display: flex; gap: 7px; margin-top: 22px; }
+.pos-dots i { width: 8px; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.2); }
+.pos-dots i.is-on { background: #ffd75e; }
 
-.pos-shut { flex-direction: column; text-align: center; gap: 8px; }
-.pos-shut b { font-family: var(--font-display); font-size: 28px; color: #ffd08a; }
-.pos-shut p { margin: 0; color: #9aa2ae; max-width: 44ch; }
+/* ── EVERYTHING THE GAME IS ───────────────────────────────────────────────────────────────────────────────
+   The sprites are the argument, so they get the room: a dense drift of them behind and around the copy. They
+   are die-cut on transparency, so they sit straight on the ground with a drop shadow and no plate.
+
+   Staggered on --i so they do not all bob in unison, which reads as a carousel rather than as a world. */
+.pos-world { position: relative; display: flex; align-items: center; min-height: 0; }
+.pos-world-grid { position: absolute; inset: -4% -2%; display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(64px, 7vw, 108px), 1fr));
+    align-content: center; gap: clamp(6px, 1vw, 18px); pointer-events: none; }
+.pos-world-grid img { width: 100%; aspect-ratio: 1; object-fit: contain; opacity: .5;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6));
+    animation: pos-bob 6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.37s); }
+@keyframes pos-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+/* The copy sits ON the drift, so it needs its own ground to stay readable — a scrim rather than a card,
+   because a card would look like a widget floating over wallpaper. */
+.pos-world-copy { position: relative; z-index: 1; max-width: 21ch; padding: clamp(18px, 2vw, 30px);
+    border-radius: 20px; background: rgba(9,10,12,0.82); backdrop-filter: blur(6px);
+    box-shadow: 0 0 70px 40px rgba(9,10,12,0.82); }
+.pos-world-copy p { margin: 0; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4; color: #c8cfd8; }
+
+/* ── GEAR IS WORTH MONEY ── the number is the pitch, so it is the biggest thing here. */
+.pos-gear-hero { margin: 0 0 22px; font-size: clamp(18px, 1.9vw, 30px); color: #c8cfd8; }
+.pos-gear-hero b { color: #fff; }
+.pos-gear-hero strong { color: #ffd75e; font-size: 1.9em; font-weight: 900; font-family: var(--font-display); }
+.pos-gear-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;
+    max-width: 30ch; }
+.pos-gear-list li { display: flex; justify-content: space-between; gap: 16px; padding: 9px 13px;
+    border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
+    font-size: clamp(14px, 1.35vw, 21px); }
+.pos-gear-name { color: #e8edf3; font-weight: 700; }
+.pos-gear-val { color: #ffd75e; font-weight: 800; white-space: nowrap; }
+.pos-gear-fine { margin: 18px 0 0; font-size: clamp(14px, 1.3vw, 21px); color: #7c8490; }
+
+/* ── MYSTERY PACKS ── the board this screen used to be, as one slide. */
+.pos-myst-stats { display: flex; gap: clamp(16px, 2.5vw, 44px); margin-bottom: 22px; }
+.pos-myst-stats div { display: flex; flex-direction: column; }
+.pos-myst-stats b { font-family: var(--font-display); font-size: clamp(26px, 3vw, 50px); color: #ffd75e;
+    line-height: 1; font-variant-numeric: tabular-nums; }
+.pos-myst-stats span { font-size: clamp(12px, 1.1vw, 17px); color: #9aa2ae; margin-top: 4px; }
+.pos-myst-kick { display: block; font-size: clamp(12px, 1.1vw, 17px); font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: #7c8490; margin-bottom: 9px; }
+.pos-myst-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px;
+    max-width: 34ch; }
+.pos-myst-top li { display: flex; align-items: center; gap: 11px; padding: 7px 12px; border-radius: 11px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.pos-myst-top img, .pos-myst-noart { width: 34px; height: 46px; object-fit: cover; border-radius: 4px;
+    flex: 0 0 auto; background: rgba(255,255,255,0.08); }
+.pos-myst-name { flex: 1 1 auto; min-width: 0; font-size: clamp(13px, 1.25vw, 19px); color: #e8edf3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-myst-top b { color: #ffd75e; font-size: clamp(14px, 1.35vw, 21px); font-variant-numeric: tabular-nums; }
+
+/* ── THE LOOP ── four steps, numbered, because the order is the argument. */
+.pos-loop-steps { list-style: none; margin: 0; padding: 0; display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); max-width: 34ch; }
+.pos-loop-steps li { display: flex; flex-direction: column; gap: 2px; padding: 13px 15px; border-radius: 13px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.pos-loop-steps b { font-family: var(--font-display); font-size: clamp(18px, 1.8vw, 28px); color: #ffd75e;
+    line-height: 1; }
+.pos-loop-t { font-size: clamp(15px, 1.5vw, 24px); font-weight: 800; color: #fff; margin-top: 4px; }
+.pos-loop-s { font-size: clamp(12px, 1.15vw, 18px); color: #9aa2ae; }
 
 /* A screen turned portrait, or a spare tablet doing the job. Stack rather than squeeze. */
 @media (max-aspect-ratio: 1/1) {
     .pos { flex-direction: column; justify-content: center; gap: 28px; }
-    .pos-claim-left, .pos-idle-copy { text-align: center; }
-    .pos-idle-copy h1 { max-width: none; }
+    .pos-claim-left, .pos-slide { text-align: center; }
+    .pos-slide h1 { max-width: none; margin-left: auto; margin-right: auto; }
     .pos-break { margin-left: auto; margin-right: auto; }
-    .pos-pitch { align-items: flex-start; max-width: 30ch; margin: 0 auto; }
+    /* The rail stops being a rail when the screen is taller than it is wide — it sits under the stage with a
+       rule above it instead of beside it. */
+    .pos-rail { padding-left: 0; padding-top: 24px; border-left: 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .pos-gear-list, .pos-myst-top, .pos-loop-steps, .pos-world-copy { margin-left: auto; margin-right: auto; }
 }
+
+/* ── REAL PRIZES ── product photos, so they get to be photographs rather than icons: a box shot at 96px with
+   a real border reads as a thing on a shelf, and that is the entire persuasive content of this panel. */
+.pos-prize-list { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column;
+    gap: 9px; max-width: 34ch; }
+.pos-prize-list li { display: flex; align-items: center; gap: 13px; padding: 8px 13px; border-radius: 12px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.pos-prize-list img, .pos-prize-noart { width: 52px; height: 52px; flex: 0 0 auto; object-fit: contain;
+    border-radius: 8px; background: rgba(255,255,255,0.07); }
+.pos-prize-meta { display: flex; flex-direction: column; min-width: 0; }
+.pos-prize-meta b { font-size: clamp(14px, 1.35vw, 21px); color: #e8edf3; line-height: 1.2;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pos-prize-meta em { font-style: normal; font-size: clamp(12px, 1.15vw, 18px); color: #ffd75e; margin-top: 2px; }
+.pos-prize-next { margin: 0; font-size: clamp(14px, 1.4vw, 22px); color: #9aa2ae; }
+.pos-prize-next b { color: #ffd75e; }

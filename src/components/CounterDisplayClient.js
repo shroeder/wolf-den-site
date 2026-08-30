@@ -4,40 +4,42 @@ import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── THE CUSTOMER-FACING SCREEN AT THE TILL ───────────────────────────────────────────────────────────────────
-// Two states and nothing else.
+// One screen doing every job that screen has, because Luke has exactly one of them: "I don't want to have to
+// flip between mystery packs and then this marketing thing."
 //
-//   IDLE  — the pitch. This is the hook that was missing: somebody paying has sixty seconds of nothing to do
-//           and a screen at eye level, and until now it told them nothing. It says what the points are, what
-//           they are for, and how long it takes.
-//   CLAIM — the sale that just landed, as a QR big enough to scan from arm's length across a counter, with
-//           the number they have just earned above it.
+//   THE RAIL never changes. The QR lives here and only here — it is not part of the slideshow, so a customer
+//   who decides to scan halfway through any slide is not waiting for the QR to come back around.
+//   THE STAGE rotates: what the game is, what the gear is worth in real money, the mystery board, the loop.
+//   A SALE interrupts all of it — their number and their QR, full width, until it is claimed or times out.
 //
-// The receipt is out of the loop. 600 of 687 codes were never scanned because they were on a piece of paper
-// going into a pocket; this one is in front of their face while their card is still in the reader.
-//
-// It never asks for anything and has no controls — it is a sign, not an app. Nobody touches it.
+// ── WHY THE PICTURES ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "text isn't going to do it." He is right, and the first version of this screen was three lines of copy
+// and a QR. Somebody who has never heard of any of this needs to SEE that there are pets and boats and gear
+// and a farm and a casino behind that code, and there is no sentence that does that job in the four seconds
+// they are looking.
 
 const POLL_MS = 4000;
+const SLIDE_MS = 11000;
 
-export default function CounterDisplayClient({ displayKey, idleQr, pitch, claimBase }) {
+export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, collage, prizes, pinned, claimBase }) {
     const [claim, setClaim] = useState(null);
+    const [mystery, setMystery] = useState(null);
     const [qr, setQr] = useState(null);
+    const [slide, setSlide] = useState(0);
     const [offline, setOffline] = useState(false);
-    // The token the QR currently shows, so a poll that returns the SAME claim does not redraw it — a QR that
-    // flickers every four seconds is a QR nobody manages to scan.
     const drawnFor = useRef(null);
 
     const poll = useCallback(async () => {
-        // ── STOPS WHEN NOBODY IS LOOKING ─────────────────────────────────────────────────────────────────
-        // The repo's own rule for any timer that talks to the server (see check:polls). A shop screen is
-        // usually the foreground tab all day, so this rarely fires — but a screen left on an unattended
-        // machine overnight should not be asking a question 21,600 times before opening.
+        // The repo's rule for any timer that talks to the server (check:polls). A shop screen is the
+        // foreground tab all day so this rarely fires — but a machine left on overnight should not ask a
+        // question 21,600 times before opening.
         if (typeof document !== "undefined" && document.hidden) return;
         const r = await fetch(`/api/pos/display?key=${encodeURIComponent(displayKey)}`, { cache: "no-store" }).catch(() => null);
         if (!r || !r.ok) { setOffline(true); return; }
         const d = await r.json().catch(() => null);
         setOffline(false);
         setClaim(d?.claim || null);
+        if (d?.mystery !== undefined) setMystery(d.mystery);
     }, [displayKey]);
 
     useEffect(() => {
@@ -46,8 +48,17 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, claimB
         return () => clearInterval(t);
     }, [poll]);
 
-    // Draw the claim QR only when the TOKEN changes. Big and high-contrast: this is read by a phone camera
-    // held a couple of feet away, across a counter, under shop lighting.
+    // Slides only advance while nothing is being claimed — a customer reading their own points must never
+    // have the screen change under them. `pinned` holds one panel up indefinitely: useful for a bag drop
+    // (park it on the mystery board for the afternoon) and for photographing a specific panel.
+    useEffect(() => {
+        if (claim || pinned) return undefined;
+        const t = setInterval(() => setSlide((n) => n + 1), SLIDE_MS);
+        return () => clearInterval(t);
+    }, [claim, pinned]);
+
+    // Redraw the claim QR only when the TOKEN changes. A QR that flickers every four seconds is one nobody
+    // manages to scan.
     useEffect(() => {
         const token = claim?.token || null;
         if (!token) { drawnFor.current = null; setQr(null); return; }
@@ -59,6 +70,7 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, claimB
         }).then(setQr).catch(() => setQr(null));
     }, [claim?.token, claimBase]);
 
+    // ── A SALE LANDED ── everything else gets out of the way.
     if (claim) {
         return (
             <div className="pos pos-claim">
@@ -84,27 +96,183 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, claimB
         );
     }
 
+    // Built here rather than as a constant because two of the four depend on live data — a mystery slide with
+    // no bags in the case is a slide about nothing, so it drops out of the rotation entirely rather than
+    // showing zeroes.
+    const slides = [
+        { key: "world", render: () => <SlideWorld collage={collage} /> },
+        // The prize slide only exists once something has actually been given away — a panel that says "we
+        // have given away nothing yet" is worse than one fewer panel.
+        ...(prizes?.given?.length || prizes?.upNext ? [{ key: "prizes", render: () => <SlidePrizes p={prizes} /> }] : []),
+        ...(gear.length ? [{ key: "gear", render: () => <SlideGear gear={gear} /> }] : []),
+        ...(mystery?.remaining ? [{ key: "mystery", render: () => <SlideMystery m={mystery} /> }] : []),
+        { key: "loop", render: () => <SlideLoop rate={pitch.rate} /> },
+    ];
+    // A pin that names a panel which is not currently in the rotation (no bags in the case, say) falls back
+    // to the rotation rather than showing a blank stage.
+    const pinnedAt = pinned ? slides.findIndex((s) => s.key === pinned) : -1;
+    const index = pinnedAt >= 0 ? pinnedAt : slide % slides.length;
+    const current = slides[index];
+
     return (
         <div className="pos pos-idle">
-            <div className="pos-idle-copy">
-                <span className="pos-kick">The Wolf Den</span>
-                <h1>{pitch.headline}</h1>
-                <ul className="pos-pitch">
-                    {pitch.lines.map((l) => <li key={l}>{l}</li>)}
-                </ul>
-                {/* Said out loud so the number on the next screen is not a surprise, and so somebody who is
-                    not buying anything today still knows what the rate is. */}
-                <p className="pos-rate"><b>{pitch.rate}</b> points per $1 · every purchase, every time</p>
+            {/* THE STAGE — keyed on the slide so each one re-mounts and replays its entrance. */}
+            <div className="pos-stage" key={current.key + index}>
+                {current.render()}
             </div>
-            <div className="pos-idle-qr">
+
+            {/* THE RAIL — never rotates. See the note at the top. */}
+            <aside className="pos-rail">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="pos-qr" src={idleQr} alt="" />
                 <b className="pos-scan">Scan to join</b>
-                <span className="pos-scan-sub">Free. Your points start on your next purchase.</span>
-            </div>
-            {/* A screen that has quietly lost the server must SAY so, or it sits there looking correct while
-                every sale goes unclaimed. Small, in a corner, for staff rather than customers. */}
+                <span className="pos-scan-sub">Free. {pitch.rate} points per $1, every purchase.</span>
+                <div className="pos-dots" aria-hidden="true">
+                    {slides.map((s, i) => (
+                        <i key={s.key} className={i === index ? "is-on" : ""} />
+                    ))}
+                </div>
+            </aside>
+
             {offline ? <span className="pos-offline">offline</span> : null}
+        </div>
+    );
+}
+
+// ── WHAT THIS IS ── the breadth panel. The pictures do the whole job; the words just name it.
+function SlideWorld({ collage }) {
+    return (
+        <div className="pos-slide pos-world">
+            <div className="pos-world-grid" aria-hidden="true">
+                {collage.map((src, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={src} src={src} alt="" style={{ "--i": i }} />
+                ))}
+            </div>
+            <div className="pos-world-copy">
+                <span className="pos-kick">The Wolf Den</span>
+                <h1>There is a whole game behind that code</h1>
+                <p>Pets, gear, a farm, a casino, dungeons, ships — and every dollar you spend in
+                    this shop levels you up in it.</p>
+            </div>
+        </div>
+    );
+}
+
+// ── REAL THINGS, REAL WINNERS ────────────────────────────────────────────────────────────────────────────────
+// The only panel on this screen that is not a promise. Product photos off the shelf and the name of the member
+// who took each one home — no prices, no odds, no "could be you". Somebody who does not believe a word of the
+// rest of this screen believes a photograph of a box that Alstier1 walked out with.
+function SlidePrizes({ p }) {
+    return (
+        <div className="pos-slide pos-prize">
+            <span className="pos-kick">Beat the boss, win the box</span>
+            <h1>We give a real one away every time</h1>
+            <ul className="pos-prize-list">
+                {p.given.map((g) => (
+                    <li key={g.name}>
+                        {g.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={g.image} alt="" />
+                        ) : <span className="pos-prize-noart" aria-hidden="true" />}
+                        <span className="pos-prize-meta">
+                            <b>{g.name}</b>
+                            <em>won by {g.winner}</em>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            {p.upNext ? (
+                <p className="pos-prize-next">
+                    Up for grabs right now: <b>{p.upNext.name}</b>
+                </p>
+            ) : (
+                <p className="pos-prize-next">Free to enter. You just have to be playing when the boss shows up.</p>
+            )}
+        </div>
+    );
+}
+
+// ── WHAT IT IS WORTH ── the strongest thing the screen can say, so it gets the biggest number.
+function SlideGear({ gear }) {
+    const best = gear[0];
+    return (
+        <div className="pos-slide pos-gear">
+            <span className="pos-kick">Gear you can cash in</span>
+            <h1>Some of it is worth real money at this counter</h1>
+            {best?.dollars ? (
+                <p className="pos-gear-hero">
+                    The <b>{best.name}</b> is worth
+                    <strong> ${(best.dollars * best.charges).toLocaleString()}</strong> in store credit.
+                </p>
+            ) : null}
+            <ul className="pos-gear-list">
+                {gear.slice(0, 5).map((g) => (
+                    <li key={g.id}>
+                        <span className="pos-gear-name">{g.name}</span>
+                        <span className="pos-gear-val">{g.reward}{g.charges > 1 ? ` ×${g.charges}` : ""}</span>
+                    </li>
+                ))}
+            </ul>
+            <p className="pos-gear-fine">Equip it, tap it, show the code at the till. That is the whole process.</p>
+        </div>
+    );
+}
+
+// ── THE MYSTERY BOARD ── the thing this screen already showed, folded in rather than replaced.
+function SlideMystery({ m }) {
+    const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    return (
+        <div className="pos-slide pos-myst">
+            <span className="pos-kick">Mystery packs</span>
+            <h1>{m.remaining} left in the case</h1>
+            <div className="pos-myst-stats">
+                {m.price ? <div><b>{money(m.price)}</b><span>a pack</span></div> : null}
+                <div><b>{money(m.marketTotal)}</b><span>still in there</span></div>
+                {m.average ? <div><b>{money(m.average)}</b><span>average pack</span></div> : null}
+            </div>
+            {m.top?.length ? (
+                <>
+                    <span className="pos-myst-kick">Biggest cards still unclaimed</span>
+                    <ul className="pos-myst-top">
+                        {m.top.map((c) => (
+                            <li key={c.name}>
+                                {c.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={c.image} alt="" />
+                                ) : <span className="pos-myst-noart" aria-hidden="true" />}
+                                <span className="pos-myst-name">{c.name}</span>
+                                <b>{money(c.value)}</b>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
+        </div>
+    );
+}
+
+// ── THE LOOP ── how the money becomes the thing. Four steps, because anybody can hold four.
+function SlideLoop({ rate }) {
+    const steps = [
+        { n: "1", t: "Spend here", s: `${rate} points per $1` },
+        { n: "2", t: "Level up", s: "Chests, gear, pets" },
+        { n: "3", t: "Equip it", s: "Some gear carries in-store perks" },
+        { n: "4", t: "Cash it in", s: "Store credit, free packs, entries" },
+    ];
+    return (
+        <div className="pos-slide pos-loop">
+            <span className="pos-kick">How it works</span>
+            <h1>Money in, money back out</h1>
+            <ol className="pos-loop-steps">
+                {steps.map((s) => (
+                    <li key={s.n}>
+                        <b>{s.n}</b>
+                        <span className="pos-loop-t">{s.t}</span>
+                        <span className="pos-loop-s">{s.s}</span>
+                    </li>
+                ))}
+            </ol>
         </div>
     );
 }
