@@ -70,119 +70,119 @@ import { isIntrinsicStat } from "@/lib/marketplace/items.js";
 // now, so it cannot happen again.
 const BUILDS = {
     // ── REAVER — bleed, tempo, crit, and drinking it back ────────────────────────────────────────────────
-    rv_exsang: { cls: "reaver", shape: "berserker", pet: "dragon_whelp",
+    rv_exsang: { cls: "reaver", shape: "berserker", pet: "dragon_whelp", weight: 1.00,
         tree: ["rv_rend", "rv_deep", "rv_letting", "rv_exsang", "rv_scent"],
         branches: ["sanguine", "frenzy", "laststand"], wants: { haste: 4, lifesteal: 3, might: 2 },
         idea: "It bleeds you, drinks the bleed, and hastes itself into doing it again." },
-    rv_scent: { cls: "reaver", shape: "berserker", pet: "elder_dragon",
+    rv_scent: { cls: "reaver", shape: "berserker", pet: "elder_dragon", weight: 0.87,
         tree: ["rv_quick", "rv_frenzy", "rv_scent", "rv_rend"],
         branches: ["hemorrhage", "frenzy", "predator"], wants: { ferocity: 4, haste: 3, might: 2 },
         idea: "Two bars to your one, and it never stops to think." },
-    rv_guillotine: { cls: "reaver", shape: "duelist", pet: "chameleon",
+    rv_guillotine: { cls: "reaver", shape: "duelist", pet: "chameleon", weight: 0.91,
         tree: ["rv_edge", "rv_savage", "rv_deep"],
         branches: ["butcher", "weight", "guillotine"], wants: { crit_chance: 4, crit_power: 3, pierce: 2 },
         idea: "Fishing for the one blow that ends you, and ignoring your plate to land it." },
-    rv_harvest: { cls: "reaver", shape: "brute", pet: "gorilla",
+    rv_harvest: { cls: "reaver", shape: "brute", pet: "gorilla", weight: 1.00,
         tree: ["rv_edge", "rv_savage", "rv_harvest"],
         branches: ["hemorrhage", "storm", "predator"], wants: { might: 4, crit_chance: 3, haste: 2 },
         idea: "Extra blows out of nowhere, each rolling its own critical." },
-    rv_riposte: { cls: "reaver", shape: "wall", pet: "lion_cub",
+    rv_riposte: { cls: "reaver", shape: "wall", pet: "lion_cub", weight: 0.87,
         tree: ["rv_rend", "rv_letting", "rv_riposte", "rv_deep"],
         branches: ["sanguine", "weight", "laststand"], wants: { counter: 4, lifesteal: 3, vitality: 2 },
         idea: "Hitting it is the mistake. It answers, and the answer opens a wound that feeds it." },
-    rv_concuss: { cls: "reaver", shape: "brute", pet: "griffin",
+    rv_concuss: { cls: "reaver", shape: "brute", pet: "griffin", weight: 1.51,
         tree: ["rv_edge", "rv_savage", "rv_concuss"],
         branches: ["butcher", "weight", "guillotine"], wants: { stun: 4, might: 3, crit_power: 2 },
         idea: "Every heavy blow is a chance you lose the next one." },
-    rv_laststand: { cls: "reaver", shape: "wall", pet: "bear_cub",
+    rv_laststand: { cls: "reaver", shape: "wall", pet: "bear_cub", weight: 0.65,
         tree: ["rv_rend", "rv_letting", "rv_exsang"],
         branches: ["sanguine", "frenzy", "laststand"], wants: { vitality: 4, lifesteal: 3, might: 2 },
         idea: "It gets stronger the worse the fight is going for it. Do not let it get low." },
-    rv_butcher: { cls: "reaver", shape: "duelist", pet: "baby_rex",
+    rv_butcher: { cls: "reaver", shape: "duelist", pet: "baby_rex", weight: 0.87,
         tree: ["rv_edge", "rv_deep", "rv_savage"],
         branches: ["butcher", "storm", "guillotine"], wants: { pierce: 4, crit_power: 3, might: 2 },
         idea: "Straight through the plate, twice, and the cut keeps cutting." },
-    rv_balanced: { cls: "reaver", shape: "balanced", pet: "tiger_cub",
+    rv_balanced: { cls: "reaver", shape: "balanced", pet: "tiger_cub", weight: 0.76,
         tree: ["rv_rend", "rv_edge", "rv_quick", "rv_savage"],
         branches: ["hemorrhage", "storm", "guillotine"], wants: { might: 3, crit_chance: 3, vitality: 2 },
         idea: "No weakness and no lever. Out-build it." },
 
     // ── WARDEN — the guard, the grudge, and making your own swing the problem ────────────────────────────
-    wd_thorns: { cls: "warden", shape: "wall", pet: "gorilla",
+    wd_thorns: { cls: "warden", shape: "wall", pet: "gorilla", weight: 0.75,
         tree: ["wd_bulwark", "wd_deflect", "wd_thorns", "wd_ironhide"],
         branches: ["reprisal", "ledger", "standard"], wants: { counter: 4, vitality: 3, tenacity: 2 },
         idea: "The guard is not the win condition. What comes back off it is." },
-    wd_ledger: { cls: "warden", shape: "brute", pet: "griffin",
+    wd_ledger: { cls: "warden", shape: "brute", pet: "griffin", weight: 0.62,
         tree: ["wd_const", "wd_ironhide", "wd_grudge"],
         branches: ["fortress", "ledger", "medic"], wants: { vitality: 4, might: 3, tenacity: 2 },
         idea: "It banks everything you do to it and spends the lot on one swing." },
-    wd_bloodprice: { cls: "warden", shape: "berserker", pet: "lion_cub",
+    wd_bloodprice: { cls: "warden", shape: "berserker", pet: "lion_cub", weight: 1.00,
         tree: ["wd_const", "wd_blood", "wd_grudge"],
         branches: ["fortress", "bloodprice", "medic"], wants: { lifesteal: 4, might: 3, vitality: 2 },
         idea: "It pays its own health for the blow and takes back more than it spent." },
-    wd_unbreak: { cls: "warden", shape: "wall", pet: "bear_cub",
+    wd_unbreak: { cls: "warden", shape: "wall", pet: "bear_cub", weight: 1.00,
         tree: ["wd_bulwark", "wd_bastion", "wd_unbreak", "wd_const"],
         branches: ["fortress", "ledger", "standard"], wants: { vitality: 4, tenacity: 4 },
         idea: "A guard the size of a health bar, raised most beats. Strip it or wait it out." },
-    wd_concuss: { cls: "warden", shape: "duelist", pet: "eagle",
+    wd_concuss: { cls: "warden", shape: "duelist", pet: "eagle", weight: 0.72,
         tree: ["wd_bulwark", "wd_retrib", "wd_concuss"],
         branches: ["reprisal", "punish", "warcry"], wants: { stun: 4, counter: 3, vitality: 2 },
         idea: "It wants you to swing. You lose the turn and it keeps its own." },
-    wd_medic: { cls: "warden", shape: "wall", pet: "wolf_pup",
+    wd_medic: { cls: "warden", shape: "wall", pet: "wolf_pup", weight: 1.10,
         tree: ["wd_const", "wd_mend", "wd_ironhide"],
         branches: ["fortress", "bloodprice", "medic"], wants: { vitality: 4, tenacity: 3, lifesteal: 2 },
         idea: "It out-heals you. Bring more than you think you need." },
-    wd_reprisal: { cls: "warden", shape: "balanced", pet: "tiger_cub",
+    wd_reprisal: { cls: "warden", shape: "balanced", pet: "tiger_cub", weight: 0.98,
         tree: ["wd_bulwark", "wd_deflect", "wd_retrib", "wd_thorns"],
         branches: ["reprisal", "ledger", "standard"], wants: { counter: 3, tenacity: 3, vitality: 3 },
         idea: "Patient. Every exchange is slightly in its favour and it never needs to hurry." },
-    wd_resolve: { cls: "warden", shape: "berserker", pet: "hydra",
+    wd_resolve: { cls: "warden", shape: "berserker", pet: "hydra", weight: 0.94,
         tree: ["wd_const", "wd_bastion", "wd_blood"],
         branches: ["resolve", "punish", "warcry"], wants: { ferocity: 4, vitality: 3, haste: 2 },
         idea: "Nothing holds it — not ice, not a stun — and it comes round faster than a Warden should." },
 
     // ── RUNECALLER — burn, ice, the ward, and the fifth swing ────────────────────────────────────────────
-    rc_frostbite: { cls: "runecaller", shape: "wall", pet: "elder_dragon",
+    rc_frostbite: { cls: "runecaller", shape: "wall", pet: "elder_dragon", weight: 0.83,
         tree: ["rc_frost", "rc_chill", "rc_ward"],
         branches: ["lance", "winter", "cataclysm"], wants: { ferocity: 4, vitality: 3, might: 2 },
         idea: "It takes your beats away and its own bar keeps filling. End it before it is your turn again." },
-    rc_pyre: { cls: "runecaller", shape: "brute", pet: "griffin",
+    rc_pyre: { cls: "runecaller", shape: "brute", pet: "griffin", weight: 0.86,
         tree: ["rc_kindle", "rc_ember", "rc_might"],
         branches: ["pyre", "shatter", "cataclysm"], wants: { might: 4, ferocity: 2, crit_power: 2 },
         idea: "It sets you alight and then hits the burning thing harder." },
-    rc_emberdrink: { cls: "runecaller", shape: "berserker", pet: "dragon_whelp",
+    rc_emberdrink: { cls: "runecaller", shape: "berserker", pet: "dragon_whelp", weight: 0.77,
         tree: ["rc_kindle", "rc_immolate", "rc_ember"],
         branches: ["emberdrink", "rimeguard", "reclaim"], wants: { lifesteal: 4, might: 3, ferocity: 2 },
         idea: "The fire on you is what heals it. Putting it out is your problem." },
-    rc_rimeguard: { cls: "runecaller", shape: "wall", pet: "turtle",
+    rc_rimeguard: { cls: "runecaller", shape: "wall", pet: "turtle", weight: 1.00,
         tree: ["rc_rime", "rc_ward", "rc_reservoir"],
         branches: ["emberdrink", "rimeguard", "reclaim"], wants: { counter: 4, vitality: 3, tenacity: 2 },
         idea: "A wall of ice that bites the hand — it answers every blow, not only the blocked ones." },
-    rc_surge: { cls: "runecaller", shape: "balanced", pet: "hydra",
+    rc_surge: { cls: "runecaller", shape: "balanced", pet: "hydra", weight: 0.82,
         tree: ["rc_overflow", "rc_might", "rc_ward"],
         branches: ["lance", "shatter", "wellspring"], wants: { might: 4, ferocity: 3, crit_chance: 2 },
         idea: "Every fifth swing is enormous, counted and not rolled. You can see it coming." },
-    rc_soulfire: { cls: "runecaller", shape: "duelist", pet: "baby_rex",
+    rc_soulfire: { cls: "runecaller", shape: "duelist", pet: "baby_rex", weight: 1.20,
         tree: ["rc_kindle", "rc_soulfire", "rc_might"],
         branches: ["lance", "shatter", "cataclysm"], wants: { crit_chance: 4, crit_power: 3, might: 2 },
         idea: "Part of every blow is magic that your armour and your ward both ignore." },
-    rc_ward: { cls: "runecaller", shape: "wall", pet: "gorilla",
+    rc_ward: { cls: "runecaller", shape: "wall", pet: "gorilla", weight: 1.07,
         tree: ["rc_ward", "rc_reservoir", "rc_rime"],
         branches: ["pyre", "rimeguard", "wellspring"], wants: { vitality: 4, tenacity: 3, ferocity: 2 },
         idea: "It fights behind a shield that refills. You are on a clock and it is not." },
-    rc_shatter: { cls: "runecaller", shape: "brute", pet: "croc",
+    rc_shatter: { cls: "runecaller", shape: "brute", pet: "croc", weight: 1.24,
         tree: ["rc_frost", "rc_might", "rc_soulfire"],
         branches: ["lance", "shatter", "cataclysm"], wants: { pierce: 4, might: 3, ferocity: 2 },
         idea: "The ice finds the seams. Half your plate is not there." },
-    rc_cataclysm: { cls: "runecaller", shape: "berserker", pet: "runebound_drake",
+    rc_cataclysm: { cls: "runecaller", shape: "berserker", pet: "runebound_drake", weight: 0.95,
         tree: ["rc_kindle", "rc_frost", "rc_cata"],
         branches: ["pyre", "winter", "cataclysm"], wants: { might: 3, ferocity: 3, crit_chance: 2 },
         idea: "Burning and frozen at once off one cast, and the cast comes round often." },
-    rc_chill: { cls: "runecaller", shape: "duelist", pet: "chameleon",
+    rc_chill: { cls: "runecaller", shape: "duelist", pet: "chameleon", weight: 1.97,
         tree: ["rc_chill", "rc_frost", "rc_overflow"],
         branches: ["emberdrink", "winter", "wellspring"], wants: { ferocity: 4, crit_chance: 3, haste: 2 },
         idea: "Your bar runs slow and its does not. Every exchange it is further ahead." },
-    rc_balanced: { cls: "runecaller", shape: "balanced", pet: "eagle",
+    rc_balanced: { cls: "runecaller", shape: "balanced", pet: "eagle", weight: 0.66,
         tree: ["rc_kindle", "rc_frost", "rc_ward", "rc_might"],
         branches: ["lance", "winter", "cataclysm"], wants: { might: 3, ferocity: 3, vitality: 2 },
         idea: "Fire, ice and a shield. It always has something ready." },
@@ -269,14 +269,51 @@ export function npcCasino(tier, wants = {}, override = null) {
     let total = Object.values(w).reduce((a, n) => a + n, 0);
     // A build that wants nothing purchasable still spends — evenly, the way somebody with chips and no plan does.
     if (total <= 0) { for (const s of sellable) w[s] = 1; total = sellable.length; }
+    // ── NOBODY SPENDS EVERY CHIP ON ONE TRACK ────────────────────────────────────────────────────────────
+    // This split the whole gap by the build's `wants`, which for a narrow build meant one stat in the
+    // THOUSANDS and nothing else. Measured: rc_chill at rung 47 came out with ferocity 3,930 against might 83
+    // and vitality 88 — a tempo of 10.56 that the foe clamp cuts to 3.42, so almost all of it did nothing and
+    // the fighter was made of paper. rv_concuss came out with might 3,156 and vitality 91: enormous damage
+    // that dies to the first exchange.
+    //
+    // That is the whole reason the ladder's difficulty was a lottery. A build whose lean pointed somewhere
+    // useful became brutal and one whose lean pointed at a saturating stat became free, at the same total.
+    //
+    // A share cap keeps the lean without letting it become a spike: no single track takes more than
+    // MAX_TRACK_SHARE, and what will not fit spills to the others. A member with chips buys what they favour
+    // and still puts some in the rest.
+    const MAX_TRACK_SHARE = 0.45;
+    const shares = {};
+    let spill = 0;
+    for (const s of sellable) {
+        const want = w[s] / total;
+        const take = Math.min(want, MAX_TRACK_SHARE);
+        shares[s] = take;
+        spill += want - take;
+    }
+    if (spill > 0) {
+        const room = sellable.filter((s) => shares[s] < MAX_TRACK_SHARE);
+        const each = spill / Math.max(1, room.length);
+        for (const s of room) shares[s] = Math.min(MAX_TRACK_SHARE, shares[s] + each);
+    }
+
     const out = {};
     for (const s of sellable) {
         const per = STAT_TRACKS.find((t) => t.stat === s)?.per || 1;
-        const lv = Math.round(points * (w[s] / total));
+        let lv = Math.round(points * shares[s]);
+        // ── AND NOBODY KEEPS BUYING A STAT THAT HAS STOPPED WORKING ──────────────────────────────────────
+        // A foe's tempo is clamped to TEMPO_RATIO x the member's (see foeTempo), so ferocity past roughly
+        // 2.6 tempo is bought and thrown away. FEROCITY_TO_DOUBLE is 200 on a 0.75 curve, so this is the
+        // points that get there — a ceiling on a purchase, not on the stat.
+        if (s === "ferocity") lv = Math.min(lv, FEROCITY_USEFUL_CEILING);
         if (lv > 0) out[s] = lv * per;
     }
     return out;
 }
+
+// tempo 2.6 is comfortably above anything a member reaches (measured max 1.83) and comfortably under the
+// 1.9x clamp, so it is the last point of Ferocity that can still change a bout.
+const FEROCITY_USEFUL_CEILING = 260;
 
 // ── WHAT A RUNG IS SUPPOSED TO BE WORTH ──────────────────────────────────────────────────────────────────────
 // Every rung is now its own fighter drawn from its own hash — no cycle to learn, no shape held for a stretch.
@@ -312,7 +349,18 @@ export function npcCasino(tier, wants = {}, override = null) {
 // there. The anchor is the WALL — a rung the best real build stops beating — not a stat total in the abstract,
 // which is the mistake the first version made twice.
 export const TARGET_AT_RUNG_1 = 120;
-export const TARGET_AT_RUNG_55 = 1198;
+// 1198 was what rung 115 carried when the strongest kit stopped there, and it moved the wall to 88 rather
+// than 55 — the engine gets more out of a real kit than a stat total predicts, so solving for it kept
+// missing. 1569 is simply what rung 88 was worth under the old curve, measured rather than derived: make
+// rung 55 that, and the rung somebody stops at becomes 55.
+//
+// Luke: "would love to get to it so im challenged at 50 and cap out around 60. but no manual caps or
+// anything like that, just tuning."
+//
+// Nothing is capped. Rung 1 stays 120 so a thin wardrobe still wins its first fight, the exponent steepens
+// to 0.6415, and rung 200 lands near 3592 — still climbing, 2.3x rung 55, with a step between
+// every rung.
+export const TARGET_AT_RUNG_55 = 1569;
 const TARGET_EXPONENT = Math.log(TARGET_AT_RUNG_55 / TARGET_AT_RUNG_1) / Math.log(55);
 export function targetTotal(tier) {
     const t = Math.max(1, Math.min(200, Math.round(tier)));
@@ -332,7 +380,16 @@ export const totalOf = (stats = {}) => TARGET_KEYS.reduce((a, k) => a + (Number(
  * simply better than their rung, the way some members are.
  */
 export function casinoTrim(tier, have, wants) {
-    const gap = targetTotal(tier) - have;
+    // ── AND WHAT A BUILD IS WORTH IS NOT WHAT ITS STATS ARE ──────────────────────────────────────────────
+    // The target normalises a rung's stat TOTAL. It does not normalise how hard the rung is, and those turned
+    // out to be very different things: measured against a real member at identical totals, the builds ranged
+    // from an 83% win rate to 0%. A Warden Duelist carrying 1569 is unbeatable where a Runecaller Duelist
+    // carrying 1569 is free, so the ladder's difficulty was decided by WHICH BUILD a rung drew rather than by
+    // how high it was — rung 100 sat at 16% while rung 70 sat at 0.3%.
+    //
+    // `weight` is that difference, measured and written down: how much more or less a build needs to be worth
+    // for it to be as hard as the others. Calibrated by scripts/calibrate-builds.mjs, not chosen.
+    const gap = targetTotal(tier) * (wants.__weight || 1) - have;
     if (!(gap > 0)) return {};
     return npcCasino(tier, wants, Math.round(gap));
 }
@@ -407,7 +464,7 @@ export function npcExtras(tier, classId, archetype, gearStats = null) {
     // whatever more it takes to make this particular build worth its rung. See casinoTrim.
     const base = npcCasino(tier, build.wants);
     const have = totalOf(gearStats) + totalOf(pet) + totalOf(badges) + totalOf(base);
-    const trim = gearStats ? casinoTrim(tier, have, build.wants) : {};
+    const trim = gearStats ? casinoTrim(tier, have, { ...build.wants, __weight: build.weight || 1 }) : {};
     const out = {};
     const keys = new Set([...Object.keys(pet), ...Object.keys(badges), ...Object.keys(base), ...Object.keys(trim)]);
     for (const k of keys) {
