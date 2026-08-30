@@ -5,7 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, releaseEnemy, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
+import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, releaseEnemy, sharedHitFor, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds, grantSalvageFodder } from "@/lib/marketplace/inventory.js";
@@ -990,7 +990,11 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
             const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
             if (claim?.ok) {
                 foeKind = claim.kind || null;
-                const st = await strikeEnemy(buyerId, enemyId, claim.hpMax).catch(() => null); // a won duel drops it
+                // A won duel drops an ordinary foe outright. A SHARED boss takes one unit instead — see
+                // sharedHitFor — because otherwise the first bout to finish kills it whatever its health is,
+                // and everybody else's fight was decoration.
+                const share = sharedHitFor(claim.kind);
+                const st = await strikeEnemy(buyerId, enemyId, share || claim.hpMax).catch(() => null);
                 if (st?.ok && st.waveCleared) {
                     // Wave down. Next wave, or the chieftain, or — after the chieftain — the raid is WON.
                     if (st.wave >= CHIEFTAIN_WAVE) {

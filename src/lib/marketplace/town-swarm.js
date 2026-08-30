@@ -254,10 +254,15 @@ export function waveSize(wave, fighters) {
 export async function spawnWave(eventId, wave, fighters = 1) {
     if (wave === CHIEFTAIN_WAVE) {
         const d = KINDS.chieftain;
+        // ── AND IT IS SIZED FOR THE ROOM ─────────────────────────────────────────────────────────────────
+        // A flat 260 HP was a fight for one person, which is what it used to be. Now that everyone hits it at
+        // once (see SHARED_KINDS) a raid with eight fighters would delete it in a beat, so it grows with
+        // turnout — enough that it is still the wall the raid ends on rather than a formality.
+        const hp = Math.round(d.hp * (1 + 0.7 * Math.max(0, Math.min(12, fighters) - 1)));
         await db.query(
             `INSERT INTO mkt_town_enemy (event_id, wave, slot, kind, hp, hp_max, x, y, flip)
              VALUES ($1, $2, 0, 'chieftain', $3, $3, 50, 74, FALSE) ON CONFLICT DO NOTHING`,
-            [eventId, wave, d.hp]
+            [eventId, wave, hp]
         ).catch(() => {});
         return { wave, spawned: 1, chieftain: true };
     }
@@ -382,15 +387,52 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
                 engagedSprite: r.engaged_sprite || null,
                 mine: Boolean(mine),
                 // Free to take, or already yours. Drives whether the client offers it at all.
-                takeable: !r.engaged_by || Boolean(mine),
+                takeable: isSharedKind(r.kind) || !r.engaged_by || Boolean(mine),
             };
         }),
     };
 }
 
+// ── THE FOES EVERYBODY FIGHTS AT ONCE ────────────────────────────────────────────────────────────────────────
+// Every raid ends on wave 6, which is ONE chieftain in the middle of the plaza — one row, one exclusive claim.
+// So the climax of a raid was one member fighting it while everybody else stood watching with nothing to hit,
+// and the reinforcement rule that rescues every other wave deliberately skips this one because that wave is
+// meant to be a single boss.
+//
+// Luke: "I feel like bosses of raids should always include everyone."
+//
+// It is a single boss AND everyone fights it. The row already holds shared hp that any bout drains, so the
+// only thing making it solo was the holder guard — a claim on a boss is the one place exclusivity buys
+// nothing, because nobody is being cheated out of a kill they were working on.
+//
+// Everyone's bout runs against the same row, the HP comes down from all of them, and whoever lands the last
+// blow gets the kill credit exactly as before.
+const SHARED_KINDS = new Set(["chieftain"]);
+const isSharedKind = (kind) => SHARED_KINDS.has(String(kind || ""));
+
+// ── WHAT ONE WON BOUT TAKES OFF A SHARED BOSS ────────────────────────────────────────────────────────────────
+// A won duel deals the foe's whole hpMax — one win, one dead goblin, which is right for a goblin. Applied to a
+// shared boss it means the FIRST person to finish their bout deletes it however much health it has, and
+// scaling the chieftain with turnout would have bought exactly nothing.
+//
+// So a win against a shared foe takes off ONE UNIT: the kind's own base HP, which is what the boss used to be
+// worth in total. The chieftain now has that much per fighter, so a full plaza has to land a win each. Whoever
+// takes it below zero gets the kill.
+export const sharedHitFor = (kind) => (isSharedKind(kind) ? (KINDS[String(kind)]?.hp || null) : null);
+
 // Claim a foe. Atomic: the guarded WHERE means two people tapping the same goblin at once can't both win it.
 export async function engageEnemy(buyerId, enemyId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // A shared foe is never claimed, so it can never be taken. `engaged_by` is left alone deliberately: it is
+    // what the plaza draws the "somebody is on this" badge from, and a boss everybody is on has no such owner.
+    const shared = await db.queryOne(
+        `SELECT id, kind, hp, hp_max FROM mkt_town_enemy WHERE id = $1 AND died_at IS NULL`,
+        [Number(enemyId)],
+    ).catch(() => null);
+    if (shared && isSharedKind(shared.kind)) {
+        return { ok: true, enemyId: Number(shared.id), kind: shared.kind,
+            hp: Number(shared.hp), hpMax: Number(shared.hp_max), shared: true };
+    }
     const got = await db.queryOne(
         `UPDATE mkt_town_enemy SET engaged_by = $2, engaged_at = NOW()
           WHERE id = $1 AND died_at IS NULL AND (engaged_by IS NULL OR engaged_by = $2)
@@ -468,12 +510,15 @@ export async function releaseEnemy(buyerId, enemyId) {
 export async function strikeEnemy(buyerId, enemyId, damage) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const dmg = Math.max(1, Math.round(Number(damage) || 1));
-    // Only the holder can hit it — enforced in the WHERE so it can't be raced or spoofed.
+    // Only the holder can hit it — enforced in the WHERE so it can't be raced or spoofed. A SHARED foe has no
+    // holder by design (see SHARED_KINDS), so the guard there is simply that it is alive; the GREATEST(0, ...)
+    // clamp and the died_at check below already make concurrent killing blows safe.
     const hit = await db.queryOne(
         `UPDATE mkt_town_enemy SET hp = GREATEST(0, hp - $3)
-          WHERE id = $1 AND died_at IS NULL AND engaged_by = $2
+          WHERE id = $1 AND died_at IS NULL
+            AND (engaged_by = $2 OR kind = ANY($4::text[]))
           RETURNING id, event_id, wave, kind, hp, hp_max`,
-        [Number(enemyId), buyerId, dmg]
+        [Number(enemyId), buyerId, dmg, [...SHARED_KINDS]]
     ).catch(() => null);
     if (!hit) return { ok: false, error: "not_yours" };
 
