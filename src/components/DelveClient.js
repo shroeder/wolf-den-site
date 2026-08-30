@@ -7,6 +7,7 @@ import { useCallback, useRef, useState } from "react";
 import DelveRun from "@/components/delves/DelveRun";
 import DelveHall from "@/components/delves/DelveHall";
 import DelveWrap from "@/components/delves/DelveWrap";
+import ConsumableShelf from "@/components/ConsumableShelf";
 
 // ── DUNGEON DELVES ───────────────────────────────────────────────────────────────────────────────────────────
 // Two screens and a card. The HALL is the dungeon picker plus your upgrades; the RUN is the floor you are
@@ -68,6 +69,13 @@ export default function DelveClient({ initial }) {
             {run
                 ? <DelveRun run={run} busy={busy} onAct={act} />
                 : <DelveHall state={state} busy={busy} onAct={act} />}
+
+            {/* ── THE PACK, IN THE HALL ONLY ───────────────────────────────────────────────────────────────
+                Deliberately not while you are down there. The one thing that lives on this shelf clears
+                today's runs, which does nothing you can act on until you are back at the doors — and a shelf
+                offering an item that cannot help you on the floor you are dying on is worse than no shelf.
+                `onAct("state")` re-reads the hall so the four doors reopen the moment one is spent. */}
+            {!run ? <ConsumableShelf feature="delve" title="In your pack" onUsed={() => act("state")} /> : null}
 
             {finished ? <DelveWrap finished={finished} onClose={dismiss} /> : null}
 

@@ -98,7 +98,10 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
         } else {
             setMsg({ ok: false, text: d?.error === "none_owned" ? "You don't have one of those."
                 : d?.error === "strikes_capped" ? "You already hold the most bonus strikes a day can (8)."
-                    : "Couldn't use that." });
+                    // Not an error so much as "not yet" — kept out of the generic branch because a rare item
+                    // refusing with "Couldn't use that" reads as broken rather than as saved for later.
+                    : d?.error === "no_delves_used" ? "You have not been down today — nothing to reset yet."
+                        : "Couldn't use that." });
         }
     }, [load, onUsed]);
 

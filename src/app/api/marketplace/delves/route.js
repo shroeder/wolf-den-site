@@ -42,6 +42,10 @@ export async function POST(request) {
                 case "onward": return noStore(await delveAct(buyer.id, action, body?.choice ?? null));
                 case "upgrade": return noStore(await upgradeDelve(buyer.id, String(body?.track || "")));
                 case "dismiss": return noStore(await clearDelveRun(buyer.id));
+                // A read, not a verb. The hall needs to redraw after something OUTSIDE this route changes it
+                // — spending a Second Descent from the pack shelf reopens all four doors, and without this
+                // the screen kept showing them shut until a reload. Writes nothing.
+                case "state": return noStore(await getDelveState(buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

@@ -25,6 +25,7 @@ import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooki
 //   pet_level      → instantly bump the equipped pet up one level
 //   spin_token     → grant N daily-wheel spins
 //   spin_reset     → refresh the free daily spin (spin again today)
+//   delve_reset    → clear today's dungeon runs, so all four are walkable again
 // Non-combat ACTIVITY effects (farming / petting / liking / sailing) — applied via the helpers in
 // farm-consumables.js and the sail_* block:
 //   farm_grow         → speed up your slowest-growing crop by `cut`
@@ -73,6 +74,20 @@ export const CONSUMABLES = {
     spin_lucky_coin: { name: "Lucky Coin", emoji: "🎟️", kind: "spin", desc: "Gain +2 wheel spins.", price: 1500, effect: { type: "spin_token", amount: 2 } },
     spin_golden_ticket: { name: "Golden Ticket", emoji: "🎫", kind: "spin", price: null, desc: "Gain +5 wheel spins.", effect: { type: "spin_token", amount: 5 } },
     spin_rewind: { name: "Wheel Rewind", emoji: "⏪", kind: "spin", price: null, desc: "Refresh your FREE daily spin — spin again now.", effect: { type: "spin_reset" } },
+
+    // ── THE SECOND DESCENT ───────────────────────────────────────────────────────────────────────────
+    // Clears today's dungeon runs — all four, not one. One dungeon would be the fiddlier item AND the worse
+    // one: it needs a picker, and the answer is always "the deepest one I can clear", so the choice is not a
+    // choice. All four is one tap and one sentence.
+    //
+    // `price: null` — it is never sold. A daily reset you can buy is not a daily limit, and the shop is where
+    // rare things go to stop being rare. It drops from a dungeon BOSS and nowhere else (see FIGHT_DROPS
+    // .descent), which means the only way to earn another descent is to finish the one you are on.
+    delve_second_descent: {
+        name: "Second Descent", emoji: "🕳️", kind: "relic", price: null,
+        desc: "Clears today's dungeon runs — walk back into all four.",
+        effect: { type: "delve_reset" },
+    },
     // FARM supplies — buyable boosts for the garden loop. Growth Tonic / Fertilizer Crate speed crops; Seed
     // Packet restocks the seed bag; Harvest Charm sweetens the next few harvests' loot rolls.
     farm_growth_tonic: { name: "Growth Tonic", emoji: "🧴", kind: "farm", desc: "Speed up your slowest-growing crop by 60%.", price: 600, effect: { type: "farm_grow", cut: 0.6 } },
@@ -267,6 +282,7 @@ const FEATURE_BY_EFFECT = {
     forge_enhance: "forge", forge_enchant: "forge",
     pet_xp: "pets", pet_level: "pets",
     spin_token: "spin", spin_reset: "spin",
+    delve_reset: "delve",
 };
 
 /** Which feature screen this consumable belongs on, or null for one that belongs to no screen in particular. */
@@ -657,6 +673,12 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         const held = await memberBonusStrikes(buyerId).catch(() => 0);
         if (held >= MAX_POTION_STRIKES) return { ok: false, error: "strikes_capped" };
     }
+    // Same rule, same reason: a Second Descent used on a day you have not been down is a rare item destroyed
+    // for nothing. Asked BEFORE it is spent, which is the end Alyssa's vials were asked at the wrong one of.
+    if (e.type === "delve_reset") {
+        const { delvesUsedToday } = await import("@/lib/marketplace/delves.js");
+        if (!(await delvesUsedToday(buyerId).catch(() => 0))) return { ok: false, error: "no_delves_used" };
+    }
     const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
     if (!dec) return { ok: false, error: "none_owned" };
     let applied = "";
@@ -666,6 +688,15 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
     } else if (e.type === "spin_reset") {
         await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
         applied = "free daily spin refreshed — spin again!";
+    } else if (e.type === "delve_reset") {
+        // Through the delve module rather than an UPDATE written here. The stamp lives in runs_json and the
+        // rule for what counts as "today" is Chicago-midnight arithmetic that delves.js already owns — a
+        // second copy of it here would be right until one of them moved.
+        const { resetDailyDelves } = await import("@/lib/marketplace/delves.js");
+        const n = await resetDailyDelves(buyerId).catch(() => 0);
+        applied = n === 1
+            ? "The way down opens again — that dungeon is walkable."
+            : `The way down opens again — all ${n} dungeons are walkable.`;
     } else if (e.type === "xp") {
         // gold: 0 — XP ONLY. awardXp defaults gold to track XP 1:1, so an XP scroll paid GOLD back on top of
         // the XP, and with the town/market/hangout multipliers it paid back more than the scroll cost:

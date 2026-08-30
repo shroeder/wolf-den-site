@@ -59,7 +59,7 @@ const SYSTEMS = [
     { key: "arena", label: "The Arena", area: "Combat", events: ["arena_start", "arena_win", "arena_loss", "arena_ladder"] },
     { key: "arena_build", label: "Class & skills", area: "Combat", events: ["arena_class", "arena_class_respec", "arena_skill", "arena_skill_node", "arena_respec", "arena_armoury", "purser_exchange"] },
     { key: "boss", label: "Weekly boss", area: "Combat", events: ["boss_attack", "cheer"] },
-    { key: "delves", label: "Delves", area: "Combat", events: ["delve_start", "delve_clear", "delve_end", "delve_upgrade"] },
+    { key: "delves", label: "Delves", area: "Combat", events: ["delve_start", "delve_clear", "delve_end", "delve_upgrade", "delve_reset"] },
     { key: "ascension_powers", label: "Signature powers", area: "Combat", events: ["power_use"] },
 
     // ── SEA ──────────────────────────────────────────────────────────────────────────────────────────────

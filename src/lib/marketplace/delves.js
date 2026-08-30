@@ -291,6 +291,45 @@ export async function startDelve(buyerId, dungeonId) {
     return { ok: true, ...(await getDelveState(buyerId)) };
 }
 
+// ── THE SECOND DESCENT ───────────────────────────────────────────────────────────────────────────────────────
+// Luke: "lets make a consumable that resets your daily dungeons. its fairly rare."
+//
+// `runs_json` is { dungeonId: the day you last walked in }, and the day is claimed AT THE DOOR (see the note
+// in startDelve — otherwise dying and restarting is free). So resetting is deleting today's stamps, and
+// nothing else: the upgrades, the counters and any run in progress are untouched.
+//
+// ── AN UNFINISHED RUN IS NOT AFFECTED, AND MUST NOT BE ───────────────────────────────────────────────────────
+// startDelve refuses while `run_json` is unfinished, and that check is separate from the once-a-day one — so
+// somebody who resets mid-run still cannot open a second door until the one they are in is over. That is the
+// right behaviour and it falls out of the existing guard rather than needing one here. What they get is what
+// the item says: when this run ends, all four are open again, including the one they are standing in.
+//
+// Returns how many dungeons were actually freed, so the item can say what it did rather than a fixed sentence.
+
+/** How many dungeons this member has already walked into today. The pre-check the consumable spends on. */
+export async function delvesUsedToday(buyerId) {
+    if (!buyerId) return 0;
+    const row = await delveRow(buyerId);
+    const runs = row?.runs_json || {};
+    return Object.values(runs).filter((d) => d === row?.today).length;
+}
+
+/** Clear today's stamps. Returns the number of dungeons freed — 0 if there was nothing to free. */
+export async function resetDailyDelves(buyerId) {
+    if (!buyerId) return 0;
+    const row = await delveRow(buyerId);
+    const runs = row?.runs_json || {};
+    // Only TODAY's stamps are removed. Yesterday's are already spent by the calendar and rewriting them to
+    // nothing would be the same thing done less honestly — the column is a record of when, not a flag.
+    const kept = Object.fromEntries(Object.entries(runs).filter(([, day]) => day !== row?.today));
+    const freed = Object.keys(runs).length - Object.keys(kept).length;
+    if (!freed) return 0;
+    await db.query(`UPDATE mkt_delve SET runs_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
+        [buyerId, JSON.stringify(kept)]).catch(() => {});
+    await trackActivity(buyerId, "delve_reset", { freed }).catch(() => {});
+    return freed;
+}
+
 const saveRun = (buyerId, run) =>
     db.query(`UPDATE mkt_delve SET run_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
 
@@ -355,6 +394,20 @@ async function rollFightLoot(buyerId, run, d, { mult = 1, boss = false } = {}) {
     if (hit(FIGHT_DROPS.potion)) { got.potion = 1; run.potions += 1; }
     if (boss || hit(FIGHT_DROPS.chest)) { got.chest = boss ? L.bigChest : L.chest; bank(run, { chest: got.chest }); }
 
+    // ── ANOTHER DESCENT, OFF THE BOSS ONLY ───────────────────────────────────────────────────────────────
+    // The only source of the Second Descent in the game. It is granted HERE rather than banked, for the same
+    // reason a potion is: banking it would mean dying on the way back up costs you the rarest thing the
+    // dungeon can give, and you had already killed the boss.
+    //
+    // A PLAIN ROLL, not `hit()`. Every other line above runs through luckyChance, and this is the one that
+    // must not: it hands back the DAY, so a lucky member getting more of them would compound into more boss
+    // fights and therefore more chances at more of them. Fortune is worth a great deal in this table already.
+    if (boss && Math.random() < FIGHT_DROPS.descent) {
+        const { grantConsumable } = await import("@/lib/marketplace/consumables.js");
+        await grantConsumable(buyerId, "delve_second_descent", 1).catch(() => null);
+        got.descent = 1;
+    }
+
     // GEAR. Granted immediately so the result card can show the real piece, and recorded on the run so the wrap
     // can list it. The general drop pool only — the Depths sets belong to the mine, which is the feature built
     // to hand them out.
@@ -394,6 +447,9 @@ function lootLine(got, partName) {
     if (got.potion) bits.push("a potion");
     if (got.chest) bits.push(`a ${got.chest} chest`);
     if (got.gear) bits.push(got.gear.name);
+    // Named in full. It is the rarest thing on this table and "a relic" would be the one line somebody had to
+    // go and look up afterwards.
+    if (got.descent) bits.push("a Second Descent");
     return bits;
 }
 

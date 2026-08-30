@@ -144,6 +144,20 @@ export const FIGHT_DROPS = {
     // 0.06 -> 0.02. A run is many fights deep, so six percent a fight was a chest most runs and often two;
     // the dungeon was the second biggest source in the game at 572 a month across 27 people.
     chest: 0.02,     // a whole loot chest
+    // ── THE SECOND DESCENT ───────────────────────────────────────────────────────────────────────────
+    // BOSS ONLY — this line is never rolled on an ordinary kill, which is why it can afford to be a real
+    // number. A run is many fights deep, so anything rolled per-fight has to be tiny (see the chest
+    // tombstone above); a boss is at most four rolls a day and only if you actually finish.
+    //
+    // AND IT FEEDS ITSELF, WHICH IS THE THING TO SIZE FOR. Spending one buys four more boss rolls, so the
+    // real rate is the sum of the series: at 6% over four bosses the expected haul is 0.24 a day, and the
+    // chain multiplies that by 1/(1 - 0.24) ≈ 1.3. Bounded, and nowhere near a member who never stops
+    // delving. At 20% it would be 1/(1-0.8) = five times, which is a different game.
+    //
+    // Fortune is deliberately NOT applied to it — see rollFightLoot. Every other line here scales with luck
+    // and should; a line that hands back the DAY is the one place where a lucky member getting more of them
+    // compounds into more chances at more of them.
+    descent: 0.06,   // another go at all four dungeons
 };
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────

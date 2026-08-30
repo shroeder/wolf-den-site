@@ -51,6 +51,7 @@ const SUBJECTS = {
     sail_tailwind_charm: "A carved pale-wood wind CHARM shaped like a curling gust, hung with three small silver bells and a white feather, wisps of air curling around it",
     sail_prospectors_charm: "A weathered brass PROSPECTOR'S CHARM — a tiny crossed pick and pan on a leather thong, with a small raw gold nugget wired to it",
     sail_raiding_horn: "A curved ox HORN banded with dark iron and bound in leather cord, a war-worn drinking-and-signalling horn",
+    delve_second_descent: "A heavy antique BRASS KEY, warm golden metal with dark tarnish in the crevices, its bow a circle of four interlocking rings and its bit cut with four distinct wards, bright cyan light burning in the cuts and along the shaft, strong highlights down one edge, older than any lock still standing",
 };
 
 const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
