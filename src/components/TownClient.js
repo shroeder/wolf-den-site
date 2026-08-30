@@ -591,7 +591,12 @@ const QuestIcon = ({ name }) => {
     return <span className="tw-quest-emoji" aria-hidden="true"><C /></span>;
 };
 
-export default function TownClient({ initial }) {
+// `frozen` is the lab's doing: the plaza polls itself every couple of seconds, so a fixture handed in as
+// `initial` is overwritten before anyone can look at it. With it set, the poll never runs and the state stays
+// exactly as it was passed. Production never sets it — see /marketplace/town/lab.
+const NOOP_POLL = async () => {};
+
+export default function TownClient({ initial, frozen = false }) {
     const [state, setState] = useState(initial || null);
     // The street's width, and everything that measures against it. Declared HERE because the camera below
     // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
@@ -837,7 +842,7 @@ export default function TownClient({ initial }) {
     // reload landing mid-bout re-renders the whole scene behind the overlay for a picture nobody is looking
     // at. The way out of the fight reloads once, which is the only refresh that matters.
     const townPollMs = fight ? null : (state?.event ? 6000 : 15000);
-    useVisiblePoll(load, townPollMs);
+    useVisiblePoll(frozen ? NOOP_POLL : load, townPollMs);
 
     // Ambient wander for idle players.
     useEffect(() => {
@@ -2481,9 +2486,15 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 /* Enemy "fight me" crossed-swords hint */
 /* The pack drawn on a shared boss — sprites plus a count, above the foe where the owner badge sits on an
    ordinary one. Small and crowded on purpose: it should read as "a lot of us are on this". */
-.tw-enemy-party { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center;
-    gap: 2px; padding: 2px 6px 2px 3px; border-radius: 999px; background: rgba(10,12,18,0.78);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,215,94,0.35); pointer-events: none; white-space: nowrap; }
+/* ⚠️ CLEARS THE HP BAR AND THE BADGE. Filmed at 375x667 the first version sat at -20px, which is the same
+   strip as .tw-enemy-hp (-10px) and the kind badge — the sprites, a health bar and the count all landed on top
+   of each other and the label read "...n it". It sits above both now, and it is CENTRED as a block rather than
+   stretched, so the count cannot be clipped by the foe's own width. */
+.tw-enemy-party { position: absolute; bottom: 100%; margin-bottom: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 3px; padding: 3px 8px 3px 4px; border-radius: 999px;
+    background: rgba(10,12,18,0.86);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,215,94,0.4); pointer-events: none;
+    white-space: nowrap; z-index: 3; }
 .tw-enemy-party b { font-size: 10px; font-weight: 800; color: #ffd75e; letter-spacing: .02em; }
 .tw-enemy-partyhero { width: 15px; height: 15px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.08);
     display: inline-flex; align-items: center; justify-content: center; font-size: 9px; }
