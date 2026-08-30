@@ -542,12 +542,35 @@ export async function accrueSharedFoePassive(buyerId, eventId, perBlow = 1) {
           WHERE event_id = $1 AND buyer_id = $2`,
         [Number(eventId), buyerId, dmg],
     ).catch(() => {});
-    // Whoever's chip takes it to zero ends it, exactly as a landed blow would.
+    // ── AND A CHIP THAT KILLS IT HAS TO END THE RAID, NOT JUST THE FOE ───────────────────────────────────
+    // This marked died_at and stopped there, which is the whole story of a live raid I stood up to photograph:
+    // my own page loads chipped the chieftain to zero (1,610 passive damage), the boss died, and NOTHING
+    // resolved the fight. The refill machinery then found an empty wave and wandered past the chieftain into
+    // a wave 7 that does not exist, freshly populated with wave-1 goblins. The event's own meta said `wave: 7`.
+    //
+    // A won duel has always run this branch (see duelRaidEnemy); the passive path never did, because until the
+    // chieftain became shared, passive damage could not land the killing blow on anything.
+    //
+    // `resolved` is the atomic claim — the same rule strikeEnemy uses. Exactly one caller may end it.
+    let resolved = false;
     if (Number(hit.hp) <= 0) {
-        await db.query(`UPDATE mkt_town_enemy SET died_at = NOW(), killed_by = $2 WHERE id = $1 AND died_at IS NULL`,
-            [foe.id, buyerId]).catch(() => {});
+        const first = await db.queryOne(
+            `UPDATE mkt_town_enemy SET died_at = NOW(), killed_by = $2 WHERE id = $1 AND died_at IS NULL RETURNING wave`,
+            [foe.id, buyerId],
+        ).catch(() => null);
+        resolved = Boolean(first);
+        if (resolved) {
+            const left = await db.queryOne(
+                `SELECT COUNT(*)::int n FROM mkt_town_enemy WHERE event_id = $1 AND wave = $2 AND died_at IS NULL`,
+                [Number(eventId), Number(first.wave)],
+            ).catch(() => null);
+            return { enemyId: Number(foe.id), damage: dmg, hp: 0, hpMax: Number(hit.hp_max),
+                killed: true, resolved: true, wave: Number(first.wave),
+                waveCleared: Number(left?.n ?? 0) === 0 };
+        }
     }
-    return { enemyId: Number(foe.id), damage: dmg, hp: Number(hit.hp), hpMax: Number(hit.hp_max) };
+    return { enemyId: Number(foe.id), damage: dmg, hp: Number(hit.hp), hpMax: Number(hit.hp_max),
+        killed: Number(hit.hp) <= 0, resolved: false };
 }
 
 /** Everyone who has landed something on the raid recently — the pack drawn on a shared foe. */

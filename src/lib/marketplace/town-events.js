@@ -328,7 +328,15 @@ export async function getActiveTownEvent(buyerId) {
         // bout and is waiting to go again — and it is what makes a full plaza feel like a full plaza.
         if (buyerId) {
             const blow = await computeRaidHit(buyerId).catch(() => null);
-            await accrueSharedFoePassive(buyerId, ev.id, blow?.damage || 1).catch(() => {});
+            const chip = await accrueSharedFoePassive(buyerId, ev.id, blow?.damage || 1).catch(() => null);
+            // A chip can land the killing blow, and then it owes the raid the same ending a won duel gives it.
+            // Without this the boss dies and the fight just carries on — measured on a live raid: meta.wave
+            // went to 7, a wave that does not exist, repopulated with wave-1 goblins.
+            if (chip?.waveCleared) {
+                if (chip.wave >= CHIEFTAIN_WAVE) { await resolveTownEvent(ev.id, "defeated").catch(() => {}); return null; }
+                const fighters = await liveFighterCount(ev.id).catch(() => 1);
+                await spawnWave(ev.id, chip.wave + 1, fighters).catch(() => {});
+            }
         }
         swarm = await swarmState(ev.id, buyerId, ev.kind).catch(() => null);
         if (!swarm || swarm.remaining === 0) {
