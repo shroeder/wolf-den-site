@@ -330,7 +330,12 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
     //     and the (event_id, wave, slot) unique index turns the loser into a no-op
     //   · MAX_FOES_PER_WAVE caps the wave however many times this fires
     //   · the chieftain is exempt — that wave is one boss on purpose
-    if (wave != null && wave !== CHIEFTAIN_WAVE && alive.length && !alive.some((r) => !r.engaged_by)) {
+    // ⚠️ THE TRIGGER IS "FEWER FREE THAN FIGHTERS", NOT "NONE FREE". Waiting for zero meant the last person to
+    // tap always got turned away first and reinforcements only arrived after somebody had already been told
+    // no. One free bandit and four idle members is the same problem as none.
+    const freeNow = alive.filter((r) => !r.engaged_by).length;
+    const idleNow = Math.max(0, (await liveFighterCount(eventId).catch(() => 1)) - (alive.length - freeNow));
+    if (wave != null && wave !== CHIEFTAIN_WAVE && alive.length && freeNow < idleNow) {
         const fighters = await liveFighterCount(eventId).catch(() => 1);
         const room = Math.min(fighters, MAX_FOES_PER_WAVE) - alive.length;
         if (room > 0) {
@@ -392,16 +397,48 @@ export async function engageEnemy(buyerId, enemyId) {
           RETURNING id, event_id, kind, hp, hp_max`,
         [Number(enemyId), buyerId]
     ).catch(() => null);
-    if (!got) {
-        // Either it died or somebody else already has it — say which, so the UI can be honest.
-        const cur = await db.queryOne(
-            `SELECT died_at IS NOT NULL AS dead, COALESCE(NULLIF(b.display_name,''), b.alias) AS who
-               FROM mkt_town_enemy e LEFT JOIN mkt_buyer b ON b.id = e.engaged_by WHERE e.id = $1`,
-            [Number(enemyId)]
+    if (got) return { ok: true, enemyId: Number(got.id), kind: got.kind, hp: Number(got.hp), hpMax: Number(got.hp_max) };
+
+    // ── A TAP THAT LANDS ON A TAKEN FOE STILL STARTS A FIGHT ─────────────────────────────────────────────
+    // Luke: "I think the fights that reserve enemies in town are annoying."
+    //
+    // It used to answer "taken" and name whoever got there first, which is honest and useless: you are stood
+    // in a plaza full of bandits being told you may not hit that one. Claims are worth keeping — a raid foe
+    // is a whole arena bout now, and two people swinging at one bandit would each be fighting half a fight —
+    // but the rejection is not. Nobody cares WHICH bandit.
+    //
+    // So it hands over a free one instead, claimed by the same guarded UPDATE, and the caller is told it
+    // redirected so the screen can pan to the foe it actually got. Same wave, because a wave has to be
+    // cleared before the next arrives.
+    const cur = await db.queryOne(
+        `SELECT event_id, wave, died_at IS NOT NULL AS dead FROM mkt_town_enemy WHERE id = $1`,
+        [Number(enemyId)],
+    ).catch(() => null);
+    if (cur) {
+        const other = await db.queryOne(
+            `UPDATE mkt_town_enemy SET engaged_by = $3, engaged_at = NOW()
+              WHERE id = (
+                SELECT id FROM mkt_town_enemy
+                 WHERE event_id = $1 AND wave = $2 AND died_at IS NULL AND engaged_by IS NULL
+                 ORDER BY slot LIMIT 1
+                 FOR UPDATE SKIP LOCKED
+              ) RETURNING id, kind, hp, hp_max`,
+            [cur.event_id, cur.wave, buyerId],
         ).catch(() => null);
-        return { ok: false, error: cur?.dead ? "already_dead" : "taken", who: cur?.who || null };
+        if (other) {
+            return { ok: true, redirected: true, enemyId: Number(other.id), kind: other.kind,
+                hp: Number(other.hp), hpMax: Number(other.hp_max) };
+        }
     }
-    return { ok: true, enemyId: Number(got.id), kind: got.kind, hp: Number(got.hp), hpMax: Number(got.hp_max) };
+
+    // Genuinely nothing free — which the reinforcement rule in swarmState exists to make rare. Say which it
+    // was, so the UI can still be honest on the one occasion it matters.
+    const who = await db.queryOne(
+        `SELECT COALESCE(NULLIF(b.display_name,''), b.alias) AS who
+           FROM mkt_town_enemy e LEFT JOIN mkt_buyer b ON b.id = e.engaged_by WHERE e.id = $1`,
+        [Number(enemyId)],
+    ).catch(() => null);
+    return { ok: false, error: cur?.dead ? "already_dead" : "taken", who: who?.who || null };
 }
 
 // ── PUT A FOE BACK ON THE BOARD ──────────────────────────────────────────────────────────────────────────────

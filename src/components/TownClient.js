@@ -1586,8 +1586,20 @@ export default function TownClient({ initial }) {
                                 // Each foe roams on its OWN clock (per-enemy delay/duration/sway) so they move independently,
                                 // sit low in the foreground, and draw above the buildings (z well over the ~192 building band).
                                 style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 240 + Math.round(en.y), animationDelay: `${((i * 0.83) % 2.6).toFixed(2)}s`, animationDuration: `${(3 + (i % 4) * 0.7).toFixed(2)}s`, "--sway": `${9 + (i % 3) * 6}px` }}
-                                onClick={(e) => { e.stopPropagation(); if (!en.dying && en.takeable !== false) startDuel(en.id, foeUrl(en)); }}
-                                aria-label={en.takeable === false ? `${en.engagedName} is fighting this one` : `Fight the ${en.label || ev.name}`}
+                                // ── A TAP ON A TAKEN FOE IS STILL A TAP ─────────────────────────────────
+                                // This refused to fire at all when somebody else had the foe, so tapping a
+                                // bandit in a plaza full of bandits did NOTHING — no fight, no message, no
+                                // reason. Luke: "I think the fights that reserve enemies in town are annoying."
+                                //
+                                // The claim itself is worth keeping: a raid foe is a whole arena bout now, and
+                                // two people on one bandit would each be fighting half a fight. What is not
+                                // worth keeping is the dead tap. engageEnemy hands over a FREE foe on the same
+                                // wave instead (see the redirect there), so the tap always starts something —
+                                // nobody cares which bandit it was.
+                                onClick={(e) => { e.stopPropagation(); if (!en.dying) startDuel(en.id, foeUrl(en)); }}
+                                aria-label={en.takeable === false
+                                    ? `${en.engagedName} is fighting this one — tap to take another`
+                                    : `Fight the ${en.label || ev.name}`}
                             >
                                 {/* Who's locked onto this foe — the thing that makes the fight feel shared instead
                                     of everyone swinging at their own copy. Yours reads "you". */}
