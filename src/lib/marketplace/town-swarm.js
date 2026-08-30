@@ -605,9 +605,40 @@ export async function strikeEnemy(buyerId, enemyId, damage) {
     ).catch(() => null);
     if (!hit) return { ok: false, error: "not_yours" };
 
+    // ── THE KILL BELONGS TO WHOEVER'S UPDATE WINS, NOT TO EVERYONE WHO SAW ZERO ──────────────────────────
+    // ── EVERYONE SHARES THE KILL; ONE CALLER RESOLVES IT ─────────────────────────────────────────────────
+    // The simulation caught this: six members striking at once and the last TWO both came back killed: true,
+    // because GREATEST(0, ...) clamps and each saw zero after its own blow. I had written in the previous
+    // commit that the died_at guard already made this safe — it protects the ROW, not the ANSWER, so both
+    // would have run the wave-clear branch and resolveTownEvent would have fired twice on one chieftain.
+    // Luke: "dont they all share in the kill" — yes, and that is the point of a party boss. Everyone whose
+    // blow landed on a foe that is now down helped bring it down and is told so.
+    //
+    // What may NOT happen six times is the CONSEQUENCE. So the two are separated: `killed` is shared, and
+    // `resolved` is the atomic claim — true for exactly one caller, and the only thing that advances the wave
+    // or ends the raid.
     const killed = Number(hit.hp) <= 0;
+    let resolved = false;
     if (killed) {
-        await db.query(`UPDATE mkt_town_enemy SET died_at = NOW(), killed_by = $2 WHERE id = $1 AND died_at IS NULL`, [hit.id, buyerId]).catch(() => {});
+        const first = await db.queryOne(
+            `UPDATE mkt_town_enemy SET died_at = NOW(), killed_by = $2 WHERE id = $1 AND died_at IS NULL RETURNING id`,
+            [hit.id, buyerId],
+        ).catch(() => null);
+        resolved = Boolean(first);
+    }
+
+    // ── AND A BLOW ON A SHARED FOE IS RECORDED ───────────────────────────────────────────────────────────
+    // An ordinary foe's spoils are paid by duelRaidEnemy, which keeps its own ledger. A shared boss is hit by
+    // people who are not in that flow at all, and partyOn reads last_hit_at — so without this the pack on the
+    // boss was empty and helping to bring it down paid nothing. Measured: 0 members credited.
+    if (isSharedKind(hit.kind)) {
+        await db.query(
+            `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at)
+             VALUES ($1, $2, $3, 1, NOW())
+             ON CONFLICT (event_id, buyer_id) DO UPDATE
+               SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()`,
+            [hit.event_id, buyerId, dmg],
+        ).catch(() => {});
     }
     const left = await db.queryOne(
         `SELECT COUNT(*)::int AS n FROM mkt_town_enemy WHERE event_id = $1 AND wave = $2 AND died_at IS NULL`,
@@ -618,7 +649,10 @@ export async function strikeEnemy(buyerId, enemyId, damage) {
         ok: true, damage: dmg, killed,
         enemyId: Number(hit.id), kind: hit.kind, hp: Number(hit.hp), hpMax: Number(hit.hp_max),
         waveRemaining: Number(left?.n ?? 0),
-        waveCleared: killed && Number(left?.n ?? 0) === 0,
+        // `resolved`, not `killed`: everyone shares the kill, but only the caller that atomically claimed the
+        // corpse advances the wave — otherwise six members each spawn the next one.
+        waveCleared: resolved && Number(left?.n ?? 0) === 0,
+        resolved,
         wave: Number(hit.wave),
     };
 }
