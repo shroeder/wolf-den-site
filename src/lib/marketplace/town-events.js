@@ -508,6 +508,36 @@ export async function townEventsLive() {
     return String((await getSetting("town_events_live", "")) || "").trim() === "1";
 }
 
+// ── A BOSS IS NOT A COIN TOSS ────────────────────────────────────────────────────────────────────────────────
+// Both spawn paths picked uniformly out of TOWN_EVENT_TYPES, so the Treasure Golem was one roll in six and
+// nothing guaranteed it ever came up. It did not: the last boss raid was #37 on 9 August and the twenty-seven
+// events after it were all skirmishes. Simulated, a golem-free run that long is a 0.73% outcome — improbable
+// enough to be worth not leaving to chance, whether this one was luck or a stretch of hand-picked spawns.
+//
+// Luke: "I feel like bosses of raids should always include everyone" — and the golem is the raid that does.
+// It is the one with passive DPS for simply being in the square, so nobody has to out-tap anybody to take
+// part. A raid type with that property should not be able to go three weeks without appearing.
+//
+// So it is a CADENCE, not a roll: if no boss has run in BOSS_EVERY_DAYS, the next spawn is the boss. Otherwise
+// the ordinary kinds roll among themselves and the golem stays out of the draw, so it never doubles up.
+const BOSS_EVERY_DAYS = 7;
+
+async function pickSpawnKind() {
+    const kinds = Object.keys(TOWN_EVENT_TYPES);
+    const bosses = kinds.filter((k) => TOWN_EVENT_TYPES[k].boss);
+    const ordinary = kinds.filter((k) => !TOWN_EVENT_TYPES[k].boss);
+    if (bosses.length) {
+        const recent = await db.queryOne(
+            `SELECT id FROM mkt_town_event
+              WHERE (meta->>'boss') = 'true' AND started_at > NOW() - ($1 || ' days')::interval LIMIT 1`,
+            [String(BOSS_EVERY_DAYS)],
+        ).catch(() => null);
+        if (!recent) return bosses[Math.floor(Math.random() * bosses.length)];
+    }
+    const pool = ordinary.length ? ordinary : kinds;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
 // Cron tick: right after the shop physically OPENS (Thu–Sun), auto-spawn a town event so members get pinged
 // to come down while the Den is open — a foot-traffic driver. DORMANT until the owner flips town_events_live,
 // because the Town is owner-gated during the build and we must not push the membership to a town they can't enter.
@@ -520,8 +550,7 @@ export async function runTownHoursTick() {
         db.queryOne(`SELECT id FROM mkt_town_event WHERE started_at > NOW() - INTERVAL '30 minutes' LIMIT 1`).catch(() => null),
     ]);
     if (active || recent) return { skipped: "event_recent" };
-    const kinds = Object.keys(TOWN_EVENT_TYPES);
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const kind = await pickSpawnKind();
     const res = await spawnTownEvent(kind);
     return { spawned: res.ok ? kind : null, push: res.push || null, error: res.error || null };
 }
@@ -552,8 +581,7 @@ export async function maybeSpawnRandomEvent() {
     const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "2-digit", hour12: false })) % 24;
     const chance = spawnChanceForHour(h);
     if (!chance || Math.random() >= chance) return { skipped: "no_roll", hour: h, chance };
-    const kinds = Object.keys(TOWN_EVENT_TYPES);
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const kind = await pickSpawnKind();
     const res = await spawnTownEvent(kind);
     return { spawned: res.ok ? kind : null, hour: h, chance, push: res.push || null, error: res.error || null };
 }
