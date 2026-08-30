@@ -23112,3 +23112,47 @@ body.cas-seated .social-fab { display: none; }
 .cas-bpat.is-won .cas-bpat-what i { color: #d9c188; }
 .cas-bpat.is-won .cas-bpat-grid i.is-on { background: #ffd75e; box-shadow: 0 0 7px rgba(255,215,94,.85); }
 @keyframes casPatWon { from { transform: scale(.94); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* ── THE COUNTER CLAIM ────────────────────────────────────────────────────────────────────────────────────
+   Read at a till, on a phone, with a queue behind them — so the prize is the biggest thing on the screen and
+   the ask is one field and one button. Nothing here scrolls; if it does not fit above the fold it has failed
+   at the only job it has. */
+.cclaim { display: flex; flex-direction: column; gap: 16px; }
+.cclaim-prize { display: flex; flex-direction: column; align-items: center; text-align: center;
+    padding: 18px 14px 16px; border-radius: 16px;
+    border: 1px solid rgba(255,215,94,0.34);
+    background: radial-gradient(120% 140% at 50% -30%, rgba(255,215,94,0.18), transparent 62%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.3)); }
+.cclaim-kicker { font-size: .68rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
+    color: #b9a05a; }
+.cclaim-points { display: block; margin-top: 2px; font-family: var(--font-display); font-weight: 900;
+    font-size: 3.4rem; line-height: 1; color: #ffd75e; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 26px rgba(255,215,94,0.42); }
+.cclaim-unit { font-size: .8rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: #9aa2ae; margin-top: 2px; }
+/* The breakdown is what makes the number believable — a bare "260" reads as marketing, three lines that add
+   up to it read as a receipt. */
+.cclaim-break { list-style: none; margin: 12px 0 0; padding: 10px 0 0; width: 100%; max-width: 260px;
+    display: flex; flex-direction: column; gap: 5px; border-top: 1px solid rgba(255,255,255,0.09); }
+.cclaim-break li { display: flex; justify-content: space-between; gap: 10px; font-size: .76rem; color: #9aa2ae; }
+.cclaim-break b { color: #e8edf3; font-variant-numeric: tabular-nums; }
+
+.cclaim-form { display: flex; flex-direction: column; gap: 9px; }
+.cclaim-form label { font-size: .84rem; font-weight: 800; color: #e8edf3; }
+.cclaim-form input { width: 100%; padding: 14px 14px; border-radius: 12px; font-size: 1rem;
+    border: 1px solid #2a2f37; background: rgba(255,255,255,0.05); color: #e8edf3; }
+.cclaim-form input:focus { outline: 2px solid rgba(255,215,94,0.55); outline-offset: 1px; border-color: transparent; }
+.cclaim-form .btn-gold { width: 100%; padding: 14px; font-size: 1rem; }
+.cclaim-fine { margin: 2px 0 0; font-size: .72rem; line-height: 1.4; color: #7c8490; }
+
+.cclaim-known { display: flex; flex-direction: column; gap: 7px; padding: 13px 14px; border-radius: 13px;
+    border: 1px solid rgba(111,208,255,0.4); background: rgba(111,208,255,0.09); }
+.cclaim-known b { font-size: .92rem; color: #9fd8ff; }
+.cclaim-known span { font-size: .78rem; color: #b6c2ce; line-height: 1.4; }
+.cclaim-known .btn-gold { margin-top: 4px; text-align: center; }
+.cclaim-err { margin: 0; font-size: .8rem; font-weight: 700; color: #ff9aa6; }
+.cclaim-alt { margin: 0; text-align: center; font-size: .78rem; color: #7c8490; }
+.cclaim-alt a { color: #ffd75e; }
+
+.cclaim-dead { text-align: center; }
+.cclaim-dead b { display: block; font-size: 1.05rem; color: #ffd08a; margin-bottom: 5px; }

@@ -83,6 +83,36 @@ export async function awardOnce(buyerId, action, meta = null) {
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.
 export const SPEND_XP_PER_DOLLAR = 5;
 
+// ── WHAT A RECEIPT IS WORTH, BEFORE ANYBODY HAS SIGNED IN ────────────────────────────────────────────────────
+// The claim page has to say what you have won BEFORE it asks you for anything — a signup form with nothing on
+// the other side of it is the reason 31 of 80 counter scans walked away. But the page cannot call
+// awardPurchaseXp to find out, because awarding is the thing it is trying to persuade you to do.
+//
+// So the preview is computed from the SAME three constants the award uses, right beside them, because the one
+// way this card can do damage is by promising a number the claim then does not pay. If those constants move,
+// this moves with them or the diff is obviously wrong.
+//
+// `firstEver` is true for anybody scanning without an account — they cannot have bought anything before, so
+// the first-purchase bonus is certain rather than a guess. For a signed-in member we do not know, so it is
+// left out.
+//
+// ── THIS IS A FLOOR, AND IT CAN ONLY EVER BE BEATEN ──────────────────────────────────────────────────────────
+// awardXp multiplies the base by Happy Hour, the market buff, the town hangout buff and the member's own
+// xp_gain (see the `pts` line below), and none of those is knowable at the moment the card is drawn — the
+// scan and the redemption are different requests, and Happy Hour can start between them. Measured on a live
+// claim: the card said 260 and 309 landed, because a ~1.19x buff was running.
+//
+// So the promise is deliberately the UNMULTIPLIED base. Every one of those multipliers is a bonus, never a
+// penalty, so this number is the worst case — the card can only ever under-promise, which is the one
+// direction a number on a signup screen is allowed to be wrong in.
+export function previewPurchaseXp({ amountCents = 0, firstEver = false } = {}) {
+    const dollars = Math.max(0, Math.round((Number(amountCents) || 0) / 100));
+    const spend = dollars * SPEND_XP_PER_DOLLAR;
+    const flat = dollars > 0 ? XP_ACTIONS.purchase_flat : 0;
+    const first = firstEver ? XP_ACTIONS.first_purchase : 0;
+    return { dollars, spend, flat, first, total: spend + flat + first };
+}
+
 // The curve itself now lives in xp-curve.js — a pure module, so unlocks.js/track.js/the HUD route can
 // import the SAME table instead of re-deriving it. Re-exported here because half the codebase already reaches
 // for these through xp.js.

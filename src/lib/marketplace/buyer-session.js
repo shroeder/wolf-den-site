@@ -29,7 +29,7 @@ function hashToken(token) {
     return createHash("sha256").update(token).digest("hex");
 }
 
-function normalizeEmail(email) {
+export function normalizeEmail(email) {
     return String(email || "").trim().toLowerCase();
 }
 
