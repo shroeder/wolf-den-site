@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
+import { shopIsOpenNow } from "@/lib/marketplace/store-hours.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
 import { baitById, spendFromPantry } from "@/lib/marketplace/cooking.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -404,15 +405,12 @@ async function seaPetPerks(buyerId) {
 // the member's — gating on a member's own weather needs a location grant most people never give, and two
 // members fishing "together" seeing different weather reads as a bug.
 const DEN_LAT = 44.4383, DEN_LON = -93.5836;
-// Thu/Fri 15:00-21:00, Sat 10:00-21:00, Sun 10:00-15:00, closed Mon-Wed (matches the site's opening hours).
-const STORE_HOURS = { 0: [10, 15], 4: [15, 21], 5: [15, 21], 6: [10, 21] };
-function shopIsOpen(now = new Date()) {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", hour12: false }).formatToParts(now);
-    const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.find((p) => p.type === "weekday")?.value || "");
-    const hr = Number(parts.find((p) => p.type === "hour")?.value ?? 12);
-    const span = STORE_HOURS[wd];
-    return Boolean(span && hr >= span[0] && hr < span[1]);
-}
+// ── THE SHOP'S OWN HOURS, NOT A COPY OF THEM ─────────────────────────────────────────────────────────────────
+// This carried its own STORE_HOURS table, with a comment claiming it "matches the site's opening hours". It
+// did not: it had Sunday closing at 3 PM while store-hours.js had 5 PM, so the angling perks ran on a shop
+// that shut two hours before the real one. A copied constant runs a second, wrong game — and this one was
+// wrong for as long as it existed.
+const shopIsOpen = (now = new Date()) => shopIsOpenNow(now);
 // Rain/drizzle/showers/thunder in the WMO code table open-meteo returns.
 const RAINY = (code) => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99);
 async function denIsRaining() {

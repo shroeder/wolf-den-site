@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { hoursSummary } from "@/lib/marketplace/store-hours.js";
+
 export default function SiteFooter() {
     return (
         <footer className="site-footer">
@@ -49,7 +51,7 @@ export default function SiteFooter() {
                 <div>
                     <h3>Visit</h3>
                     <p>300 1st St S, Montgomery, MN 56069</p>
-                    <p>Thu &amp; Fri 3–9pm · Sat 10am–9pm · Sun 10am–3pm</p>
+                    <p>{hoursSummary()}</p>
                     <p><strong>Grand opening: May 21, 2026</strong></p>
                     <p>Serving Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, Le Sueur, and Belle Plaine.</p>
                     <p className="footer-secret-wrap">

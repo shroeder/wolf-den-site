@@ -2,6 +2,7 @@ import "./globals.css";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
+import { openingHoursSpecification } from "@/lib/marketplace/store-hours.js";
 import Telemetry from "@/components/Telemetry";
 import ChunkRecovery from "@/components/ChunkRecovery";
 
@@ -112,12 +113,9 @@ const localBusinessSchema = {
         { "@type": "City", name: "Belle Plaine" },
     ],
     knowsAbout: ["Pokemon cards", "Magic: The Gathering", "trading card singles", "sealed product", "Commander", "local play"],
-    openingHoursSpecification: [
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "15:00", closes: "21:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "15:00", closes: "21:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "10:00", closes: "21:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "10:00", closes: "17:00" },
-    ],
+    // DERIVED. This is the copy Google reads onto the business listing, so it is the one that must never
+    // drift from the sign on the door — and it is exactly the copy nobody thinks to update. See store-hours.js.
+    openingHoursSpecification: openingHoursSpecification(),
     sameAs: [
         "https://discord.gg/Pad8U2KVsD",
         "https://www.facebook.com/WolfDenGamesMN",
