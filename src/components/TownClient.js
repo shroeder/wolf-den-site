@@ -2981,6 +2981,16 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-enemy { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; animation: twEnemyRoam 3.4s ease-in-out infinite; }
 .tw-enemy img { height: 76px; width: auto; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)); transition: filter .08s; }
 .tw-enemy-emoji { font-size: 48px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+/* ── THE NAME SITS UNDER THE FOE, NOT THROUGH IT ─────────────────────────────────────────────────────────
+   .tw-enemy-tag had NO rule at all — only an inline background — so it laid out in normal flow inside the
+   button and the sprite drew straight over it. Photographed at 375x667 the chieftain read "GOBLI[skull]EFTAIN".
+   Worst on the big ones, because scale() grows the art without moving anything around it: the chieftain is
+   1.55 and an Elite 1.25, which are exactly the foes whose names are worth reading.
+   Pinned below the sprite's feet, centred, and above it in z so nothing can cover it again. */
+.tw-enemy-tag { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 3px;
+    padding: 1px 7px 2px; border-radius: 999px; font-size: 9px; font-weight: 900; letter-spacing: .06em;
+    text-transform: uppercase; white-space: nowrap; pointer-events: none; z-index: 4;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.55); }
 .tw-enemy:active img, .tw-enemy:active .tw-enemy-emoji { filter: drop-shadow(0 0 10px rgba(255,120,80,0.95)) brightness(1.4); }
 .tw-enemy.is-cd { cursor: default; }
 .tw-enemy.is-cd img { filter: drop-shadow(0 5px 7px rgba(0,0,0,0.55)) grayscale(0.35) brightness(0.8); }

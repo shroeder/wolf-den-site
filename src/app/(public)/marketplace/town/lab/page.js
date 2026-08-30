@@ -16,17 +16,22 @@ const PARTY = [
 
 // One shared chieftain, mid-fight, with the pack on it — plus two ordinary foes for contrast: one free, one
 // already claimed by somebody else. Those three side by side are the whole point of the screenshot.
+//
+// ⚠️ x IS A PERCENT OF THE WORLD, NOT OF THE SCREEN, and the world is WORLD_MIN 2900px wide with the camera
+// following the player. The first fixture put these at 22 and 78, i.e. 638px and 2262px — both outside a
+// 1280px viewport, so only the chieftain was ever in shot and it looked like they had failed to render.
+// Bunched around the middle so all three are on camera at once.
 const ENEMIES = [
     { id: 901, kind: "chieftain", label: "Goblin Chieftain", emoji: "💀", art: null, tint: "#e05b6a", scale: 1.55,
       badge: "💀", hint: "The Chieftain. Drop it and the raid is won.", hp: 620, hpMax: 1170, hpPct: 53,
       x: 50, y: 74, flip: false, elite: false, chieftain: true,
       engagedBy: null, engagedName: null, engagedSprite: null, mine: false, takeable: true, shared: true },
     { id: 902, kind: "scrapper", label: "Goblin Scrapper", emoji: "👺", art: null, tint: null, scale: 1,
-      badge: null, hint: null, hp: 40, hpMax: 60, hpPct: 67, x: 22, y: 78, flip: false,
+      badge: null, hint: null, hp: 40, hpMax: 60, hpPct: 67, x: 46, y: 78, flip: false,
       elite: false, chieftain: false, engagedBy: null, engagedName: null, engagedSprite: null,
       mine: false, takeable: true, shared: false },
     { id: 903, kind: "archer", label: "Goblin Archer", emoji: "🏹", art: null, tint: null, scale: 1,
-      badge: null, hint: null, hp: 30, hpMax: 55, hpPct: 55, x: 78, y: 79, flip: true,
+      badge: null, hint: null, hp: 30, hpMax: 55, hpPct: 55, x: 54, y: 79, flip: true,
       elite: false, chieftain: false, engagedBy: "other", engagedName: "Nynebreaker", engagedSprite: null,
       mine: false, takeable: false, shared: false },
 ];
