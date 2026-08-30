@@ -23156,3 +23156,69 @@ body.cas-seated .social-fab { display: none; }
 
 .cclaim-dead { text-align: center; }
 .cclaim-dead b { display: block; font-size: 1.05rem; color: #ffd08a; margin-bottom: 5px; }
+
+/* ── THE POINT-OF-SALE SCREEN ─────────────────────────────────────────────────────────────────────────────
+   A PC monitor turned to face the customer, read from about two feet away while they pay. Everything here is
+   sized for that: nothing is smaller than 18px, the QR is 300px+ square, and the whole thing fits 1080p with
+   no scrolling ever. It is a SIGN — no controls, nothing to tap, nothing that can be left in a bad state.
+
+   Full-bleed: this route lives outside the (public) group so it gets no site header or footer. `position:
+   fixed` rather than min-height so a browser chrome bar or an odd resolution cannot introduce a scrollbar. */
+.pos { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    gap: clamp(24px, 5vw, 80px); padding: clamp(24px, 4vw, 64px);
+    background:
+        radial-gradient(90% 120% at 15% -20%, rgba(255,215,94,0.13), transparent 60%),
+        linear-gradient(180deg, #14161a, #090a0c);
+    color: #e8edf3; overflow: hidden; }
+
+.pos-kick { display: block; font-size: clamp(15px, 1.6vw, 26px); font-weight: 900; letter-spacing: .18em;
+    text-transform: uppercase; color: #b9a05a; }
+.pos-qr { display: block; width: clamp(280px, 28vw, 470px); height: auto; border-radius: 16px;
+    background: #fff; padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.pos-qr-wait { aspect-ratio: 1; background: rgba(255,255,255,0.08); }
+.pos-scan { display: block; margin-top: 20px; font-family: var(--font-display);
+    font-size: clamp(26px, 2.9vw, 48px); color: #ffd75e; }
+.pos-scan-sub { display: block; margin-top: 6px; font-size: clamp(15px, 1.4vw, 24px); color: #9aa2ae; }
+
+/* ── A SALE JUST LANDED ── the number on the left, the QR on the right, nothing else on the screen. */
+.pos-claim-left { flex: 0 1 auto; min-width: 0; text-align: right; }
+.pos-points { display: block; font-family: var(--font-display); font-weight: 900; line-height: .95;
+    font-size: clamp(90px, 15vw, 240px); color: #ffd75e; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 60px rgba(255,215,94,0.4); }
+.pos-unit { display: block; font-size: clamp(20px, 2vw, 32px); font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: #9aa2ae; }
+.pos-break { list-style: none; margin: 22px 0 0 auto; padding: 16px 0 0; max-width: 420px;
+    display: flex; flex-direction: column; gap: 7px; border-top: 1px solid rgba(255,255,255,0.12); }
+.pos-break li { display: flex; justify-content: space-between; gap: 20px;
+    font-size: clamp(15px, 1.4vw, 22px); color: #9aa2ae; }
+.pos-break b { color: #e8edf3; font-variant-numeric: tabular-nums; }
+.pos-claim-right { flex: 0 0 auto; text-align: center; }
+
+/* ── IDLE ── the hook, for the sixty seconds before the sale finishes. */
+.pos-idle-copy { flex: 1 1 auto; min-width: 0; max-width: 24ch; }
+.pos-idle-copy h1 { margin: 10px 0 26px; font-family: var(--font-display); line-height: 1.04;
+    font-size: clamp(40px, 5.4vw, 104px); color: #fff; text-wrap: balance; max-width: 15ch; }
+.pos-pitch { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pos-pitch li { position: relative; padding-left: 32px; font-size: clamp(19px, 2.1vw, 36px);
+    line-height: 1.35; color: #c8cfd8; }
+.pos-pitch li::before { content: ""; position: absolute; left: 0; top: .5em; width: 14px; height: 14px;
+    border-radius: 4px; background: linear-gradient(180deg, #ffe89a, #ffc93c); }
+.pos-rate { margin: 34px 0 0; font-size: clamp(18px, 1.9vw, 32px); color: #9aa2ae; }
+.pos-rate b { color: #ffd75e; font-size: 1.35em; font-weight: 900; }
+.pos-idle-qr { flex: 0 0 auto; text-align: center; }
+
+.pos-offline { position: fixed; right: 10px; bottom: 8px; font-size: 12px; letter-spacing: .1em;
+    text-transform: uppercase; color: #6a727d; }
+
+.pos-shut { flex-direction: column; text-align: center; gap: 8px; }
+.pos-shut b { font-family: var(--font-display); font-size: 28px; color: #ffd08a; }
+.pos-shut p { margin: 0; color: #9aa2ae; max-width: 44ch; }
+
+/* A screen turned portrait, or a spare tablet doing the job. Stack rather than squeeze. */
+@media (max-aspect-ratio: 1/1) {
+    .pos { flex-direction: column; justify-content: center; gap: 28px; }
+    .pos-claim-left, .pos-idle-copy { text-align: center; }
+    .pos-idle-copy h1 { max-width: none; }
+    .pos-break { margin-left: auto; margin-right: auto; }
+    .pos-pitch { align-items: flex-start; max-width: 30ch; margin: 0 auto; }
+}
