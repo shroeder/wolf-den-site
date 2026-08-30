@@ -23195,7 +23195,12 @@ body.cas-seated .social-fab { display: none; }
 .pos-claim-right { flex: 0 0 auto; text-align: center; }
 
 /* ── IDLE ── the hook, for the sixty seconds before the sale finishes. */
-.pos-idle-copy { flex: 1 1 auto; min-width: 0; max-width: 24ch; }
+/* ⚠️ NO max-width IN `ch` ON THIS ELEMENT, and only a screenshot found out why. `ch` resolves against the
+   element's OWN font-size, and this container inherits ~16px — so a `max-width: 24ch` here clamped the copy
+   column to roughly 190px, wrapped the 74px headline one word per line, and pushed the whole thing off the
+   bottom of a 1366x768 laptop. Line length belongs on the h1 below, where `ch` measures the type it is
+   actually limiting. */
+.pos-idle-copy { flex: 1 1 auto; min-width: 0; }
 .pos-idle-copy h1 { margin: 10px 0 26px; font-family: var(--font-display); line-height: 1.04;
     font-size: clamp(40px, 5.4vw, 104px); color: #fff; text-wrap: balance; max-width: 15ch; }
 .pos-pitch { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
