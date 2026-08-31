@@ -68,6 +68,7 @@ const bandFor = (gaff = 0) => BAND_H + Math.max(0, Math.min(0.25, Number(gaff) |
 //
 // Three now, and the gap between them is what makes chasing the centre worth doing: drifting inside the bar
 // banks a third, the inner ring two thirds, dead centre the lot. Same total, three times the resolution.
+const RING_HYST = 0.06;          // dead zone either side of a ring edge, so a boundary does not strobe
 const CORE_SHARE = 0.30;         // the bullseye, as a fraction of the bar's height, centred
 const INNER_SHARE = 0.62;        // the ring around it
 const BAND_CREDIT = 0.34;        // banked per frame inside the bar but outside the inner ring
@@ -222,6 +223,9 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
     const HOLD = holdFor(baitRarity);
     const runCount = RUNS[fight] || 1;
     const [tick, setTick] = useState(0);          // repaint pulse
+    // Which rings were lit on the previous frame, for the hysteresis below. A ref rather than state: it must
+    // not itself cause a render, and it is read during the same render it is written in.
+    const ringRef = useRef({ inside: false, inner: false, core: false });
     const holdRef = useRef(false);
     const posRef = useRef(0.5);                   // THE FISH, 0 (bottom) .. 1 (top). Swims itself.
     const velRef = useRef(0);
@@ -376,10 +380,21 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const half = BAND / 2;
-    const inside = Math.abs(pos - band) <= half;
+    // ── HYSTERESIS, SO A BOUNDARY DOES NOT STROBE ────────────────────────────────────────────────────────
+    // This scene re-renders on EVERY animation frame (setTick, ~60/s), and each of these three booleans drives
+    // a class with a 90ms background transition behind it. A fish drifting along a threshold therefore flips
+    // its class sixty times a second while the transition never settles, and the whole gauge shimmers.
+    // Luke: "when fishing it flickers the bar a lot when the reel is midway."
+    //
+    // Each edge now has a small dead zone: you must be a little further in to light up and a little further
+    // out to go dark. Scoring is untouched — that is computed in the loop above off the raw offset, and it
+    // should stay exact. This is only what the eye is told.
     const offNow = Math.abs(pos - band);
-    const inInner = offNow <= (BAND * INNER_SHARE) / 2;
-    const inCore = offNow <= (BAND * CORE_SHARE) / 2;
+    const edge = (limit, was) => (was ? offNow <= limit * (1 + RING_HYST) : offNow <= limit * (1 - RING_HYST));
+    const inside = edge(half, ringRef.current.inside);
+    const inInner = edge((BAND * INNER_SHARE) / 2, ringRef.current.inner);
+    const inCore = edge((BAND * CORE_SHARE) / 2, ringRef.current.core);
+    ringRef.current = { inside, inner: inInner, core: inCore };
     const scoreNow = scoreOf(bankRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
     const title = warming ? "GET READY…"
@@ -387,8 +402,14 @@ export function ReelStruggle({ onDone, sfx, fight = "common", gaff = 0, baitRari
         : mood === "tired" ? "IT'S TIRING — NOW!"
         : inCore ? "PERFECT" : inside ? "ON IT" : "KEEP IT IN THE BAR";
 
+    // ── THE MIDDLE RING WAS NEVER LIT ────────────────────────────────────────────────────────────────────
+    // .fwreel.is-inner exists in the stylesheet and nothing has ever added the class, so the three rings Luke
+    // asked for — "make the bar have more sections" — rendered as three shapes with only two states. The inner
+    // ring banks 0.68 a frame against the band's 0.34, and the player had no way to see they were in it.
     return (
-        <div ref={rootRef} className={`fwreel${inside ? " is-on" : ""}${inCore ? " is-core" : ""}`} data-mood={mood} data-tick={tick}>
+        <div ref={rootRef}
+            className={`fwreel${inside ? " is-on" : ""}${inInner ? " is-inner" : ""}${inCore ? " is-core" : ""}`}
+            data-mood={mood} data-tick={tick}>
             {/* The rod gauge, against the right edge — it leaves the boat, the hero and the water visible,
                 which is the whole reason the reel lives in the frame instead of over it. */}
             {/* ── THE ROD IS A GAUGE, NOT A BUTTON ────────────────────────────────────────────────────────

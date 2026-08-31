@@ -17407,7 +17407,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    surface, and drawing the real fish here would give the whole reveal away six seconds early. */
 /* THE FISH ON THE LINE. A sprite, not a ball -- the glow is a halo BEHIND it now rather than the thing
    itself, so it still reads as a position at a glance and looks like a fish when you look at it. */
-.fwreel-fish { position: absolute; left: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px;
+/* ⚠️ THE FISH IS ANCHORED BY ITS BOTTOM, SO IT CENTRES WITH margin-bottom.
+   This read `margin: -17px 0 0 -17px` — margin-TOP — which centres an element positioned with `top`. This one
+   is positioned with `bottom: <pos>%`, so the negative top margin did not move its centre onto its coordinate:
+   the scored point was the sprite's BOTTOM EDGE while its body sat 17px above. The band's core, meanwhile, is
+   centred exactly on its own coordinate. So the perfect zone scored 17 pixels away from where it was drawn.
+   Luke: "the bars perfect area seems to be higher than it visually reflects." Seventeen pixels of it. */
+.fwreel-fish { position: absolute; left: 50%; width: 34px; height: 34px; margin: 0 0 -17px -17px;
     display: grid; place-items: center;
     filter: drop-shadow(0 0 8px rgba(140,215,255,0.75)); transition: filter 90ms linear; }
 .fwreel-fish img { width: 100%; height: 100%; object-fit: contain; }
