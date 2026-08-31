@@ -1,6 +1,5 @@
 import "server-only";
 
-import { mint } from "@/lib/marketplace/gold-rate.js";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 // ── A CLAIM DOES NOT PAY A CHEST ─────────────────────────────────────────────────────────────────────────────
@@ -147,7 +146,7 @@ export async function claimFeatureDaily(buyerId, feature, key) {
         `INSERT INTO mkt_feature_daily (buyer_id, feature, day, claimed) VALUES ($1,$2,${DAY},$3::jsonb) ON CONFLICT (buyer_id, feature, day) DO UPDATE SET claimed = $3::jsonb`,
         [buyerId, feature, JSON.stringify([...claimed])]
     ).catch(() => {});
-    if (t.reward.gold) { const g = mint(t.reward.gold, `${feature}_daily`); const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null); await logCoin(buyerId, g, `${feature}_daily`, { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
+    if (t.reward.gold) { const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, t.reward.gold]).catch(() => null); await logCoin(buyerId, t.reward.gold, `${feature}_daily`, { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
     if (t.reward.chest) await addChests(buyerId, { [t.reward.chest]: 1 }, { source: "feature_daily", meta: { key: t.key } }).catch(() => {});
     await awardXp(buyerId, `${feature}_daily`, { points: 20, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "feature_daily", { feature, key, gold: t.reward.gold || 0, chest: t.reward.chest || null }).catch(() => {});

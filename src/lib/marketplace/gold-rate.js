@@ -65,15 +65,7 @@ const MINT_REASONS = new Set([
     // -- collection and progression --
     "badge_reward", "badge_milestone", "loot_pig", "chest_reward", "pet_income",
     // -- guided play --
-    "merchant_minigame",
-    // ── NOT guide_step, guide_chapter OR onboarding ──────────────────────────────────────────────────────────
-    // They were on this list and never passed through mint(), which read as three broken faucets. Luke's call
-    // is that they should be EXEMPT rather than minted: they are one-time newcomer rewards, and cutting
-    // somebody's welcome purse by 60% is the opposite of what that money is for. Taking them off the list says
-    // so out loud — the list now means "these are rate-controlled", and anything absent is a deliberate
-    // exception rather than an oversight waiting to be found.
-    //
-    // They were 23,825 gold over seven days, so this is a small exception as well as a considered one.
+    "guide_step", "guide_chapter", "onboarding", "merchant_minigame",
 ]);
 
 // -- AND WHY THE GAMBLING PAYOUTS ARE NOT IN THAT LIST ------------------------------------------------------
@@ -84,12 +76,12 @@ const MINT_REASONS = new Set([
 // against a house-edge ceiling of 95% and check:casino would fail, correctly, because that machine is a scam
 // rather than a nerf. The tavern gambit is the same shape (89k paid out against 70k staked, net +14.8k).
 //
-// ⚠️ THAT NET IS NOT ACTUALLY MEASURABLE TODAY. Luke: "gambit doesnt track loses so its not usable to report
-// on currently." The ledger records what the gambit PAYS and not what it takes, so every "paid out X against
-// Y staked" figure above is an estimate standing on a number the ledger cannot produce. The argument for
-// leaving gambling payouts out of the rate is still the right shape — a payout against a stake is not a
-// faucet — but it cannot be checked until the losing side is written down too. Treat the gambit's line in
-// any minting report as an upper bound, not a net.
+// ⚠️ THAT NET IS NOT MEASURABLE TODAY. Luke: "gambit doesnt track loses so its not usable to report on
+// currently." The ledger records what the gambit PAYS and not what it takes, so every "paid out X against Y
+// staked" figure above stands on a number the ledger cannot produce. The argument for leaving gambling
+// payouts outside the rate is still the right shape — a payout against a stake is not a faucet — it simply
+// cannot be checked until the losing side is written down too. Treat the gambit's line in any minting report
+// as an upper bound, not a net.
 //
 // If those need tuning it is done in the paytable, where the gate can see it, and it is measured on the net.
 // See the memory note: nerf by daily total, not per event.
@@ -130,6 +122,28 @@ const HEAVY_FAUCETS = new Set([
 // on the net, which is the rule this file already states for the casino.
 
 /** Is this reason a faucet? Exported so a test — or the coin-economy screen — can ask without re-listing. */
+// ── ⚠️ TWELVE OF THESE NEVER REACH mint(), AND THAT IS NOT CURRENTLY A BUG TO FIX ────────────────────────────
+// Audited 2026-08-31 by walking every mint() call in the codebase. Twenty reasons genuinely pass through this
+// file. These twelve are declared here and pay their full amount:
+//
+//   farm_daily  sailing_daily  cooking_daily  casino_daily  forge_daily  (all from feature-dailies.js)
+//   town_quest  badge_reward  badge_milestone  wishing_well
+//   guide_step  guide_chapter  onboarding
+//
+// Together they are 218,485 gold a week — 22% of all minting — and routing them through the rate would cut
+// 12.2% off the game's entire gold supply overnight.
+//
+// IT WAS DONE, AND IT WAS REVERTED. Luke: "why did we nerf gold when we were simply trying to fix labels?"
+// He is right, and the distinction matters. A wheel labelled 250 that pays 50 is LYING — the screen and the
+// payout disagree, and that is a bug. These twelve are not lying to anybody: the number shown is the number
+// paid, and has been for months, so the game has been balanced around what they actually hand over. They are
+// inconsistent with a list nobody outside this file reads.
+//
+// So changing them is an ECONOMY DECISION with its own numbers, not a tidy-up to be done in passing. If the
+// lever is ever made to mean what it says, the right move is deciding what these nine repeatable ones SHOULD
+// pay and setting them there — not halving them as a side effect. The three newcomer one-offs (guide and
+// onboarding) should probably come off the list instead, since cutting a welcome purse by 60% is the opposite
+// of what that money is for.
 export const mints = (reason) => MINT_REASONS.has(reason);
 
 /** Is this one of the named heavy faucets that pays half again? Exported for the same reason as `mints`. */

@@ -356,9 +356,8 @@ export const BADGE_REWARD = { xp: BADGE_REWARD_XP, gold: BADGE_REWARD_GOLD };
 async function rewardBadgeEarned(buyerId, slug) {
     // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
     await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});
-    const bg = mint(BADGE_REWARD_GOLD, "badge_reward");
-    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, bg]).catch(() => {});
-    await logCoin(buyerId, bg, "badge_reward", { meta: { slug } }).catch(() => {});
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, BADGE_REWARD_GOLD]).catch(() => {});
+    await logCoin(buyerId, BADGE_REWARD_GOLD, "badge_reward", { meta: { slug } }).catch(() => {});
 }
 
 // ── PER-BADGE BONUSES ── every badge grants a bonus, in the vocabulary of the SYSTEM it belongs to, scaled by
