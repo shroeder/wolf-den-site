@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import CookingClient from "@/components/CookingClient";
 import FishingScene from "@/components/FishingScene";
@@ -48,9 +48,10 @@ const TIER_META = { 1: { name: "Simple", color: "#cfd8e3" }, 2: { name: "Hearty"
     3: { name: "Fine", color: "#c9a2ff" }, 4: { name: "Exquisite", color: "#ffd75e" }, 5: { name: "Legendary", color: "#ff9ec4" } };
 
 export default function KitchenLab({ kitchen, baits = [], sprites = {}, farm = null, stash = [] }) {
-    const scene = typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("scene") || "craft"
-        : "craft";
+    // Read AFTER hydration, not during render. Computed inline, the server renders "craft" and React keeps that
+    // subtree — every `?scene=` other than craft silently showed the Kitchen instead of what you asked for.
+    const [scene, setScene] = useState("craft");
+    useEffect(() => { setScene(new URLSearchParams(window.location.search).get("scene") || "craft"); }, []);
 
     // Which bait the stubbed cook hands back. Defaults to a mid-tier one so the reveal shows a real rarity
     // colour rather than the plainest possible row.

@@ -989,6 +989,14 @@ export default function FarmClient({ initial, viewingAlias }) {
     const CTRL_PILL = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 999, fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 3px 12px rgba(0,0,0,0.4)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent", whiteSpace: "nowrap" };
     const sceneControls = (
         <>
+            {/* The same door as the floating button, in the toolbar. The floater is reachable from anywhere on a
+                long page; this one is where you already are when you have just switched pasture and are looking
+                at what needs doing. Same handler, so there is one panel and no second copy of its state. */}
+            {farm.mine ? (
+                <button type="button" onClick={() => setQuickOpen(true)} title="Quick actions" style={{ ...CTRL_PILL, border: "1px solid rgba(255,215,110,0.65)", background: "linear-gradient(180deg, rgba(255,215,94,0.96), rgba(243,178,58,0.96))", color: "#241806" }}>
+                    <GiLightningTrio size={15} aria-hidden="true" />Quick
+                </button>
+            ) : null}
             {farm.mine && view === "outside" ? (
                 <button type="button" onClick={() => setBgOpen(true)} title="Custom farm background" style={{ ...CTRL_PILL, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff" }}>
                     <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
