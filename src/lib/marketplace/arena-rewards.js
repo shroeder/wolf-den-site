@@ -47,6 +47,43 @@ export function vpFor({ won, myPower = 1, theirPower = 1 }) {
     return Math.round(20 + 60 * ratio);
 }
 
+// ── VICTORY POINTS ARE A RATING NOW, AND THEY COME OUT OF SOMEBODY ───────────────────────────────────────────
+// Luke: "you can only get them from opponents who have them. And if you lose, you lose some of your victory
+// points, and they get those... if you're fighting someone who is above you in victory points you should be
+// taking some of theirs, and you should earn more than if you were to fight someone who's lower. It's
+// basically matchmaking ranking. So it's MMR."
+//
+// vpFor above only ever ADDED, so the board ranked how much somebody had played rather than how well. That is
+// why SoullessShiitake sat fourth on points and tenth on power, and it is why the five-neighbour board I built
+// on top of it could not correct itself — an over-ranked member simply stopped climbing while others passed
+// them, which takes weeks.
+//
+// This is Elo, with the two knobs sized for the range the Den actually occupies (about 6,000 to 24,000):
+//
+//   VP_SCALE  the gap at which the higher-rated fighter is expected to win about ten times out of eleven
+//   VP_K      the most a single bout can move, split between the two of them by how surprising it was
+//
+// Even match: 150 each way. Beating somebody 3,000 above you: 273. Beating somebody 3,000 below: 27. So
+// punching up is worth ten times punching down, and losing to someone far below you costs the same ten times.
+//
+// IT IS A PUNISHMENT AND THAT IS DELIBERATE, in one place only. Luke: "this is one of the only areas where we
+// have player risk player, so it has unique rules... the truth is they don't do anything, so there's nothing
+// to really get mad about. Losing victory points brings you down to a point where you can fight people that
+// are easier." Nothing else in the Den takes anything back.
+export const VP_SCALE = 3000;
+export const VP_K = 300;
+
+/** What a bout moves between two members. Always a positive number — the caller decides the signs. */
+export function vpTransfer({ myVp = 0, theirVp = 0, won = false }) {
+    const expected = 1 / (1 + Math.pow(10, ((Number(theirVp) || 0) - (Number(myVp) || 0)) / VP_SCALE));
+    // The winner takes K x (1 - their expected share). A shock is worth more to both of them.
+    const move = won ? VP_K * (1 - expected) : VP_K * expected;
+    return Math.max(1, Math.round(move));
+}
+
+/** What beating them would move, shown on the challenge list BEFORE you commit. */
+export const vpStakePreview = (myVp, theirVp) => vpTransfer({ myVp, theirVp, won: true });
+
 /** What you'd get for beating them — shown on the challenge list BEFORE you commit. */
 export const vpPreview = (myPower, theirPower) => vpFor({ won: true, myPower, theirPower });
 

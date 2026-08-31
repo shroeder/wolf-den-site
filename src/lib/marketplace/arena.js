@@ -22,6 +22,7 @@ import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower
 import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.js";
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
+    vpTransfer,
     lossLaurels, vpFor, vpPreview,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
@@ -2430,7 +2431,24 @@ async function finishBout(buyerId, row, b, won) {
         ? boutLaurels({ won, myPower, theirPower, kind })
         : Math.round(lossLaurels({ myPower, theirPower, kind }) * lossEffort(b));
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
-    const vp = baseVp + (won ? featVp : 0);
+    // ── VICTORY POINTS COME OUT OF THE OTHER FIGHTER ─────────────────────────────────────────────────────
+    // Luke: "you can only get them from opponents who have them." So a Gauntlet tier and a Road rung move
+    // nothing at all — they have no points to lose, and minting points for beating a dummy is what made the
+    // board a record of attendance. Between two members it is Elo, and it is zero-sum: whatever is added here
+    // is taken from them below, capped at what they actually hold so nobody is driven below zero.
+    //
+    // Feats still pay on top of a win. They are a flourish rather than a rating, and taking a feat bonus off
+    // the loser would mean a member losing points because somebody else fought well.
+    const isMemberBout = Number(b.npcTier) === 0 && !roadRung
+        && boutKindOf(b) === "member" && UUID_RE.test(String(b.foe?.id || ""));
+    const theirVp = isMemberBout
+        ? Number((await db.queryOne(`SELECT vp FROM mkt_arena WHERE buyer_id = $1`, [b.foe.id]).catch(() => null))?.vp) || 0
+        : 0;
+    const myVp = Number(row?.vp) || 0;
+    const stake = isMemberBout ? vpTransfer({ myVp, theirVp, won }) : 0;
+    // Never take more than the loser has. That keeps it exactly zero-sum and keeps the floor at zero.
+    const moved = isMemberBout ? Math.min(stake, won ? theirVp : myVp) : 0;
+    const vp = (isMemberBout ? (won ? moved : -moved) : 0) + (won ? featVp : 0);
     // RENOWN. The track says "every bout pays more laurels" and nothing read it — fifteen levels of a gold
     // sink that changed no number anywhere. Applied to the feats as well as the base, because a feat is a
     // bout's payout too and splitting them would be a rule nobody could guess from the card.
@@ -2501,7 +2519,7 @@ async function finishBout(buyerId, row, b, won) {
     await db.query(
         `UPDATE mkt_arena SET bout_json = $2::jsonb,
             wins = wins + $3, losses = losses + $4,
-            vp = vp + $5, best_vp = GREATEST(best_vp, vp + $5),
+            vp = GREATEST(0, vp + $5), best_vp = GREATEST(best_vp, vp + $5),
             laurels = laurels + $6, laurels_earned = laurels_earned + $6,
             npc_best = GREATEST(npc_best, $7),
             arena_xp = arena_xp + $8,
@@ -2595,6 +2613,22 @@ async function finishBout(buyerId, row, b, won) {
     //
     // Conditional inside the UPDATE and capped in the same statement — neon() has no transactions, so two
     // challengers finishing at once must not both see room under the cap and both take it.
+    // ── THE OTHER HALF OF THE TRANSFER ───────────────────────────────────────────────────────────────────
+    // Points moved off this member have to land on the other one, or the board inflates and the rating means
+    // nothing. Applied whichever way the bout went — Luke: "when I'm not online and people are fighting me, if
+    // I beat nine out of ten of them I would expect to have grown my victory points. And if I lost nine out of
+    // ten, I would expect to have less."
+    //
+    // best_vp is left alone on the way down, so the highest a member has ever stood is never taken back.
+    if (isMemberBout && moved > 0 && b.foe?.id) {
+        await db.query(
+            `UPDATE mkt_arena
+                SET vp = GREATEST(0, vp + $2), best_vp = GREATEST(best_vp, vp + $2), updated_at = NOW()
+              WHERE buyer_id = $1`,
+            [b.foe.id, won ? -moved : moved],
+        ).catch((e) => console.error("arena.vp.transfer_failed", b.foe.id, e?.message || e));
+    }
+
     let defencePaid = 0;
     if (npcTier === 0 && !won && b.foe?.id) {
         const cut = defenceLaurels({ myPower: theirPower, theirPower: myPower });
