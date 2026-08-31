@@ -1276,13 +1276,28 @@ export function describeDepth(depth = {}) {
 // The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
 // why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
 // ── THE DRAW ORDER IS FROZEN, INCLUDING A STAT NOTHING CAN BE GRANTED ANY MORE ───────────────────────────────
-// `doublestrike` is retired (see RETIRED_AFFIX) but it stays in THIS list, because the seeded draw below reads
-// each affix's INDEX into it: `w` is `hash(id:key) ^ (seed + i)`. Take one entry out and every affix after it
-// shifts its i, its weight, and therefore where it lands in the sort — so removing the retired stat from the
-// ordering would silently redraw stun and haste across the whole catalogue and change gear members are already
-// wearing. The retirement is applied to what is GRANTED, not to what is drawn.
+// ── THE DRAW READS A FROZEN INDEX, NOT AN ARRAY POSITION ─────────────────────────────────────────────────────
+// The draw weight is `hash(id:key) ^ (seed + i)`, and `i` used to be the position in the array below. That
+// made the array impossible to edit: taking one entry out shifted every affix after it, silently redrawing
+// stun and haste across the whole catalogue and changing gear members are already wearing. So `doublestrike`
+// had to stay in the list long after the mechanic it was named for was gone.
+//
+// AFFIX_INDEX freezes each affix's `i` at the value it has always had. The order is now data rather than
+// geometry: an affix can be removed, and every OTHER affix draws exactly as it did before.
+//
+// Luke: "we need to fully retire that." Doublestrike is now gone from the draw entirely rather than drawn and
+// relabelled. Twenty-one pieces used to win a slot with it and take the points as Ferocity; those twenty-one
+// now draw the next affix in their own order instead. Nothing else in the catalogue moves — verified by
+// diffing every stat on all 425 items before and after.
+const AFFIX_INDEX = {
+    might: 0, crit_chance: 1, crit_power: 2, ferocity: 3, fortune: 4,
+    vitality: 5, tenacity: 6, pierce: 7, lifesteal: 8, counter: 9,
+    doublestrike: 10,   // ⚠️ KEEP THIS ENTRY. Nothing draws it any more, but the numbers below are the
+                        // historical indices of stun and haste and they must not shift.
+    stun: 11, haste: 12,
+};
 const AFFIX_DRAW_ORDER = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
-    "vitality", "tenacity", "pierce", "lifesteal", "counter", "doublestrike", "stun", "haste"];
+    "vitality", "tenacity", "pierce", "lifesteal", "counter", "stun", "haste"];
 
 // ── AND WHAT A RETIRED AFFIX BECOMES ─────────────────────────────────────────────────────────────────────────
 // Luke: "I feel like we should try to get rid of double strike entirely even under the hood. That way the
@@ -1299,7 +1314,9 @@ const AFFIX_DRAW_ORDER = ["might", "crit_chance", "crit_power", "ferocity", "for
 //
 // Keyed on the ORIGINAL stat when the value is rolled, so a retired affix keeps its own point-style size
 // rather than inheriting Ferocity's larger BIG_STATS roll. Same points, different name.
-const RETIRED_AFFIX = { doublestrike: "ferocity" };
+// Nothing is retired-but-drawn any more — doublestrike is out of AFFIX_DRAW_ORDER entirely. Kept as an
+// empty map because grant() still reads it, and the next stat to be retired will want it.
+const RETIRED_AFFIX = {};
 
 // What can still be GRANTED — by the seeded draw, and by the Forge, which draws from this same list.
 export const AFFIX_POOL = AFFIX_DRAW_ORDER.filter((k) => !RETIRED_AFFIX[k]);
@@ -1324,7 +1341,7 @@ export const affixCeiling = (rarity) => affixesBornWith(rarity) + FORGE_SLOTS;
 // lifesteal is next, then pierce. Everything above them is ordinary. Higher = scarcer.
 const AFFIX_RARITY = {
     might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1,
-    tenacity: 1.5, pierce: 3, lifesteal: 5, counter: 7, doublestrike: 7,
+    tenacity: 1.5, pierce: 3, lifesteal: 5, counter: 7,
     // The two effect affixes sit level with the rarest of the rest.
     stun: 7, haste: 7,
 };
@@ -1374,7 +1391,7 @@ for (const it of ITEMS) {
     // AFFIX_DRAW_ORDER, not AFFIX_POOL — see the note on it. The draw is unchanged by a retirement; only the
     // name the points land under is.
     const order = AFFIX_DRAW_ORDER
-        .map((k, i) => ({ k, w: (affixSeed(`${it.id}:${k}`) ^ (seed + i)) / (AFFIX_RARITY[k] || 1) }))
+        .map((k) => ({ k, w: (affixSeed(`${it.id}:${k}`) ^ (seed + AFFIX_INDEX[k])) / (AFFIX_RARITY[k] || 1) }))
         .sort((a, b) => b.w - a.w)
         .map((x) => x.k)
         // ⚠️ NOT ALSO FILTERED ON WHAT A RETIRED AFFIX CONVERTS TO. Doing that dropped the retired draw
