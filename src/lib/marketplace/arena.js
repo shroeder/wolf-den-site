@@ -19,7 +19,7 @@ import {
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower, npcClassFor} from "@/lib/marketplace/arena-npc.js";
 // A rung's three skill paths are part of its BUILD, not a lookup by shape. See BUILDS in arena-npc-build.js.
-import { buildForTier } from "@/lib/marketplace/arena-npc-build.js";
+import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.js";
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
     lossLaurels, vpFor, vpPreview,
@@ -37,7 +37,7 @@ import {
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 import {
-    npcSkills, resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
+    npcSkills, npcClassForArchetype, resolveSkill, skillPointsFrom, skillPointsSpent, skillState, skillsForClass,
 } from "@/lib/marketplace/arena-skills.js";
 import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 // The beat's arithmetic, in a file with no database in it, so the balance simulator can run the SAME code
@@ -2046,8 +2046,26 @@ export async function startBout(buyerId, targetId = null) {
         // strikes", never a named move, because `skills` was never on the kit and `abilities` is a list the
         // ring does not read. Read at the RUNG, so the depth of the deck climbs the Road with everything
         // else; a champion is read a band up, same as its abilities are.
+        // ── AND THE DECK BELONGS TO THE FIGHTER WEARING IT ───────────────────────────────────────────────
+        // This passed npcClassFor(kitTier) — the class off a hash of the TIER — while f.archetype had already
+        // decided the stats, the wardrobe and the loadout. Two different functions choosing what one fighter
+        // is, and measured across the Road they DISAGREED ON ELEVEN OF THIRTEEN RUNGS: rung 75 and 80 were
+        // "berserkers" holding Bastion, Retribution and Rally, so they spent every beat raising a guard and
+        // had no way to win at all; rung 50 was a "brute" holding the player's own runecaller deck, which is
+        // a mirror match rather than a puzzle; rung 100 was a brute with a warden deck.
+        //
+        // arena-skills.js already documents this exact bug being found and fixed — "no member can be two
+        // classes, and the tree a fighter bought is the one its skills come from", Luke: "they must comply
+        // with the players same constraints." That fix landed in npcClassForArchetype and the ROAD never
+        // received it, because this line kept asking the tier instead. One map, one class, as intended.
+        // The class comes from the ARCHETYPE — the thing that already decided this fighter's stats, wardrobe
+        // and name — and the build is then drawn from inside that class, so the branches belong to the deck.
+        // Passing the archetype's class with buildForTier's branches is what emptied most decks when I first
+        // tried this: the two were describing different fighters, so npcSkills had nothing legal to hand back.
+        const foeClass = npcClassForArchetype(f.archetype);
+        const foeBuild = buildForClass(kitTier, foeClass);
         foeKit = { ...f, ...st, ...fighterFrom(st, {}, null), abilities: npcAbilities(kitTier, f.archetype),
-            skills: npcSkills(kitTier, f.archetype, npcClassFor(kitTier), buildForTier(kitTier)?.branches) };
+            skills: npcSkills(kitTier, f.archetype, foeClass, foeBuild?.branches) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.

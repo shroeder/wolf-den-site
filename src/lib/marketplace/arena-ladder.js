@@ -275,16 +275,38 @@ export function ladderReward(rung, season = currentSeason()) {
 }
 
 /** One rung, fully resolved. `rung` is 1-based and matches the id, so nothing has to be looked up twice. */
+// Deterministic per rung and stable across processes — the same reason vary() in items.js and hashBuild() in
+// arena-npc-build.js hash rather than using Math.random. A rung must be the same opponent every time or a
+// rematch is a reroll instead of a plan.
+const hashRung = (str) => {
+    let h = 2166136261;
+    for (const ch of String(str)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+};
+
 export function ladderFoe(rung) {
     const n = Math.max(1, Math.min(LADDER_MAX, Math.round(rung)));
     const house = HOUSES[Math.floor((n - 1) / 10)];
     const within = ((n - 1) % 10);
     const champion = isChampion(n);
-    // The archetype rotates through the catalog rather than being random, so a given rung always fights the
-    // same way and can be planned against — and a champion always takes the house's hardest shape.
-    // The house index rides along for CHAMPIONS so they are not all the same shape. `within + 3` is constant
-    // at the tenth of every house, so every champion on the road was a Wall — ten boss fights with one answer.
-    const arch = ARCHETYPES[(champion ? within + 3 + Math.floor((n - 1) / 10) : within) % ARCHETYPES.length];
+    // ── THE ARCHETYPE IS DRAWN, NOT ROTATED ──────────────────────────────────────────────────────────────
+    // This was `ARCHETYPES[within % 5]` with `within = (rung - 1) % 10`, and five archetypes — so the Road
+    // ran balanced, brute, wall, duelist, berserker, over and over, for all two hundred rungs. The comment
+    // defended it as "so a given rung always fights the same way and can be planned against", which conflated
+    // two different things: DETERMINISM is worth keeping and a learnable ORDER is not.
+    //
+    // It was not a cosmetic pattern. Measured against a real member, the `wall` slot is a free win at every
+    // height (80-100%) and the `duelist` slot is near-0% at every height, so a rung's difficulty was a
+    // function of `rung mod 5` rather than of how high it was: rung 97 was 0% and rung 98 was 73%. A player
+    // who noticed could read every rung off its number, and one build answered the whole ladder because there
+    // were only ever five fights.
+    //
+    // Hashed instead, the same way buildForTier draws a build. Rung 47 is still always the same opponent and
+    // can still be planned against; it is simply no longer predictable from rung 42. A champion still takes a
+    // shape of its own — the house index keeps riding along so the tenth fight of a house is not the same one
+    // every time.
+    const archSeed = hashRung(champion ? `champ:${n}` : `arch:${n}`);
+    const arch = ARCHETYPES[archSeed % ARCHETYPES.length];
     // The whole character behind this rung, so the card can name what it carries rather than only its shape.
     const build = npcBuild(n);
     // ── A CHAMPION IS NOT A POWER SPIKE ──────────────────────────────────────────────────────────────

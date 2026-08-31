@@ -196,6 +196,23 @@ const hashBuild = (str) => { let h = 2166136261; for (const ch of String(str)) {
 // than two next to each other. Deterministic, so a rung is the same opponent every time you meet it and can be
 // planned against.
 export const buildForTier = (tier) => BUILDS[BUILD_IDS[hashBuild(`build:${Math.max(1, Math.round(tier))}`) % BUILD_IDS.length]];
+
+// ── AND THE SAME DRAW, HELD TO ONE CLASS ─────────────────────────────────────────────────────────────────────
+// buildForTier draws from all 28 builds regardless of class, which is right for the Gauntlet — a tier is
+// whatever it is. The ROAD is different: a rung has an authored ARCHETYPE that already decided its stats, its
+// wardrobe and its name, and the class is not free once that is chosen. Drawing the build from the whole table
+// gave rung 75 a "berserker" holding Bastion, Retribution and Rally — a fighter built to attack, carrying
+// three defensive moves and no way to win at all.
+//
+// Same hash, so a rung is still the same opponent every time and can still be planned against; it just draws
+// from the nine reaver builds, the eight warden ones or the eleven runecaller ones rather than from all of
+// them. Falls back to the open draw if a class ever has no builds, so this cannot return nothing.
+export const buildForClass = (tier, cls) => {
+    const ids = BUILD_IDS.filter((id) => BUILDS[id]?.cls === cls);
+    if (!ids.length) return buildForTier(tier);
+    return BUILDS[ids[hashBuild(`build:${Math.max(1, Math.round(tier))}`) % ids.length]];
+};
+
 // Exported for check:npc-legal, which asserts every id in every build against the table it points into —
 // STAT_META for `wants`, treeFor for `tree`, the class's own skills for `branches`, COLLECTIBLES for the
 // pet. All four fail silently when wrong, so none of them would ever surface on their own.
