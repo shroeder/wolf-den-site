@@ -93,7 +93,7 @@ const RARITY_RING = {
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const FARM_PAD = 6; // % margin so pets (anchored by their center) never clip off the field edges
-// Fixed ring of coins that burst outward behind the pig on the haul modal (deterministic → SSR-safe).
+// Fixed ring of coins that burst outward behind the box as it opens (deterministic → SSR-safe).
 const PIG_BURST = Array.from({ length: 12 }, (_, i) => ({ a: i * 30, d: 74 + (i % 3) * 16, t: 0.7 + (i % 4) * 0.12 }));
 // ── Procedural sound (Web Audio, no asset files → CSP-safe) ─────────────────────────────────────────────────
 // A tiny synth: the Loot Pig event gets a squeal, a coin-jingle per drop, a bouncy chase loop while he rampages,
@@ -124,7 +124,6 @@ function tone(freq, at, dur, type = "sine", peak = 0.14) {
     o.start(at);
     o.stop(at + dur + 0.03);
 }
-let _pigMusic = null;
 const SFX = {
     prime() { audioCtx(); },
     coin() {
@@ -157,27 +156,6 @@ const SFX = {
         const t = a.currentTime;
         [0, 4, 7, 12].forEach((s, i) => tone(523.25 * Math.pow(2, s / 12), t + i * 0.11, 0.34, "triangle", 0.13));
         tone(1046.5, t + 0.52, 0.55, "triangle", 0.1);
-    },
-    startPigMusic() {
-        SFX.stopPigMusic();
-        const a = audioCtx();
-        if (!a) return;
-        const bass = [130.81, 130.81, 196.0, 174.61]; // bouncy C–C–G–F chase motif
-        let i = 0;
-        const beat = () => {
-            const c = audioCtx();
-            if (!c) return;
-            const t = c.currentTime;
-            const f = bass[i % bass.length];
-            tone(f, t, 0.15, "triangle", 0.05);
-            tone(f * 2, t + 0.085, 0.09, "square", 0.028);
-            i += 1;
-        };
-        beat();
-        _pigMusic = setInterval(beat, 250);
-    },
-    stopPigMusic() {
-        if (_pigMusic) { clearInterval(_pigMusic); _pigMusic = null; }
     },
 };
 
@@ -280,13 +258,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [inspect, setInspect] = useState(null); // the pet whose detail card is open
     const [ownerMenu, setOwnerMenu] = useState(false); // farmer character tapped → connect menu
     const [customOpen, setCustomOpen] = useState(false); // custom-decoration creator
-    const [pig, setPig] = useState(null); // "running" while the loot pig is on screen
-    const [pigToast, setPigToast] = useState(false);
+    const [pigBusy, setPigBusy] = useState(false); // one tap on the box at a time
     const [pigResult, setPigResult] = useState(null); // the haul modal after he leaves
+    const [harvestRecap, setHarvestRecap] = useState(null); // the sweep card after a harvest-all
 
     // ── Garden (crops live IN the pasture) ── state is lifted up here so the growing plots render inside the
     // scrolling field, while a compact controls panel below shares the exact same live garden.
     const [garden, setGarden] = useState(initial.garden || null);
+    // A mirror of the garden that a stable useCallback can read without going stale. The replant sheet plants
+    // one bed per tap and never re-creates its handler, so a captured `garden` would send every tap at the
+    // slot that happened to be empty when the sheet opened.
+    const gardenRef = useRef(garden);
+    useEffect(() => { gardenRef.current = garden; }, [garden]);
     // ── WHICH PANEL IS OPEN, AND WHAT THE CLOSED ONES ARE HIDING ────────────────────────────────────────────
     // Tabs only stop being a filing cabinet if the closed drawers can still shout. Today counts the daily
     // charges you have not spent (ratings + a neighbour's pettings); Garden counts crops standing ready. Both
@@ -311,31 +294,17 @@ export default function FarmClient({ initial, viewingAlias }) {
         fetch("/api/marketplace/pet-income/recap", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.show && (d.xp > 0 || d.gold > 0)) setRecap(d); }).catch(() => {});
     }, [farm?.mine]);
 
-    // ── THE WILD LOOT PIG ────────────────────────────────────────────────────────────────────────────────
-    // WHEN he turns up is decided on the server now (see pigHourFor in farm.js): a different hour every day,
-    // per member, unknowable in advance. `pigAvailable` already means "unclaimed AND he has arrived", so this
-    // only stages the entrance.
+    // ── THE HOG'S GIFT BOX ───────────────────────────────────────────────────────────────────────────────
+    // He used to RUN. `pig === "running"` mounted a pig that ambled across the pasture for eight waypoints
+    // dropping coins you had to tap, over chase music, and then left — and the whole performance sat behind an
+    // arrival hour you could not know, so the usual way to experience the daily reward was to open the farm and
+    // find nothing there.
     //
-    // The 70% coin flip that used to live here is GONE. It was a second layer of randomness on top of the
-    // first, and once the arrival time is the surprise, a roll that sometimes eats him as well just reads as
-    // the game being arbitrary — you cannot learn a rule that fails three visits in ten for no reason. If
-    // he is on the farm, you see him.
-    // Reads the LIVE farm state, not `initial`. It used to key off the mount payload, which never changes —
-    // so the second visit the Truffle Hog turns around had nowhere to appear even once the server offered it,
-    // and the pigAvailable the claim handler sets was read by nothing at all.
-    useEffect(() => {
-        if (!farm?.mine || !farm?.pigAvailable) return undefined;
-        const t = setTimeout(() => {
-            setPig("running");
-            setPigToast(true);
-            SFX.oink();
-            SFX.startPigMusic();
-            setTimeout(() => setPigToast(false), 4200);
-        }, 2500 + Math.random() * 5000);
-        return () => clearTimeout(t);
-    }, [farm?.mine, farm?.pigAvailable]);
-    // Kill the pig chase-music if we unmount mid-rampage.
-    useEffect(() => () => SFX.stopPigMusic(), []);
+    // Luke: "maybe we just have him leave you a gift box every day that you get to open."
+    //
+    // So there is no entrance to stage and nothing to catch. `pigAvailable` now means the box is sitting on the
+    // farm, and it sits there until it is opened. Everything the chase needed — the timers, the coin lifespans,
+    // the music, the "he slipped away" case — is gone with it.
     // Prime the audio context on the visitor's first interaction (browsers gate Web Audio behind a gesture).
     useEffect(() => {
         const prime = () => SFX.prime();
@@ -343,11 +312,11 @@ export default function FarmClient({ initial, viewingAlias }) {
         window.addEventListener("keydown", prime, { once: true });
         return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
     }, []);
-    // Lock the page behind an open modal (pet detail or pig haul). `overflow:hidden` alone doesn't hold on
+    // Lock the page behind an open modal (pet detail or the gift box). `overflow:hidden` alone doesn't hold on
     // mobile — the background still scrolls under a fixed overlay — so we pin the body with position:fixed and
     // restore the exact scroll position on close.
     useEffect(() => {
-        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || encounter || planting != null || upgradePlot != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
+        if (typeof document === "undefined" || !(inspect || pigResult || harvestToast || harvestRecap || encounter || planting != null || upgradePlot != null || inspectSlot != null || inspectDeco || customOpen)) return undefined;
         const scrollY = window.scrollY;
         const body = document.body;
         const prev = { position: body.style.position, top: body.style.top, left: body.style.left, right: body.style.right, width: body.style.width };
@@ -364,7 +333,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             body.style.width = prev.width;
             window.scrollTo(0, scrollY);
         };
-    }, [inspect, pigResult, harvestToast, encounter, planting, upgradePlot, inspectSlot, inspectDeco, customOpen]);
+    }, [inspect, pigResult, harvestToast, harvestRecap, encounter, planting, upgradePlot, inspectSlot, inspectDeco, customOpen]);
     // Real-world sky + weather. Starts as a plain daytime sky (matches SSR), then fills in from the device clock
     // and — if the visitor allows location — live conditions (rain / snow / fog + day-night) via Open-Meteo.
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
@@ -497,22 +466,26 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) setFarm((f) => ({ ...f, treats: r.treats, treatShop: r.treatShop, wallet: r.wallet }));
     }, [busy, post]);
 
-    // The pig ran off screen → claim the haul (server-guarded once/day) and show the juiced modal.
+    // ── OPEN THE BOX ─────────────────────────────────────────────────────────────────────────────────────
+    // One tap on the box on the farm. The claim is guarded once a day on the server, so the tap cannot pay
+    // twice however many times it lands.
+    //
     // ── A REFUSED CLAIM USED TO BE COMPLETELY SILENT ─────────────────────────────────────────────────
     // `if (r?.ok)` with no else: the pig ran the length of the farm, vanished, and nothing happened — no
     // reward, no message, no reason. Members reported exactly that ("the second time he comes around you
-    // don't actually get anything"), and it is also what a stale tab looks like when the pig was already
-    // claimed on another device. Whatever the cause, the screen has to say something.
-    const onPigFinish = useCallback(async () => {
-        setPig(null);
-        SFX.stopPigMusic();
+    // don't actually get anything"). There is no chase to lose one to any more, but a stale tab whose box was
+    // opened on another device still has to say so rather than swallowing the tap.
+    const openPigBox = useCallback(async () => {
+        if (pigBusy) return;
+        setPigBusy(true);
         const r = await post({ action: "pig_claim" });
+        setPigBusy(false);
         if (r?.ok) {
             setPigResult(r);
+            SFX.oink();      // he is not on the farm any more, but the box is his
             SFX.fanfare();
-            // `again` means the Truffle Hog turned him around — clearing pigAvailable here and letting the
-            // next state read put him back would lose the moment, so it stays true and the effect above
-            // stages a second entrance off the live state.
+            // `again` means the Truffle Hog turned him around — there is a second box on the farm, so
+            // pigAvailable stays true and the box is simply still there when the modal closes.
             setFarm((f) => ({
                 ...f,
                 pigAvailable: Boolean(r.again),
@@ -525,10 +498,10 @@ export default function FarmClient({ initial, viewingAlias }) {
         setPigResult({
             missed: true,
             why: r?.error === "already_claimed"
-                ? "You have already caught him today. He is done until tomorrow."
-                : "He got away this time — give it a moment and check back.",
+                ? "You have already opened today's box. There will be another one tomorrow."
+                : "That box would not open — give it a moment and check back.",
         });
-    }, [post]);
+    }, [post, pigBusy]);
 
     // Feed a treat (consumable) to a specific pet.
     const feedTreat = useCallback(async (pet, consumableId) => {
@@ -646,17 +619,25 @@ export default function FarmClient({ initial, viewingAlias }) {
         const r = await gardenAct({ action: "harvest_all" }, "hall");
         if (r?.ok) {
             SFX.coin();
-            // One toast for the sweep rather than a dozen — the numbers are already summed by the server.
-            setHarvestToast({ name: r.harvested === 1 ? r.names?.[0] : `${r.harvested} crops`, emoji: "🌾",
-                gold: r.gold, xp: r.xp, chest: r.chests?.[0] || null, bulk: r.harvested });
-            // A harvest can raise a farm encounter, and the sweep stops at the first one so the fight is not
-            // lost. Hand it to the same handler a single harvest uses.
-            if (r.encounter) setEncounter(r.encounter);
+            // One card for the whole sweep. The critters it turned up are rows inside it — their rewards were
+            // paid as they spawned, so there is nothing left to claim and nothing to interrupt for.
+            setHarvestRecap(r);
         }
         return r;
     }, [gardenAct]);
+    // ONE seed into the next empty bed. The sheet stays open — the slot is read fresh off `gardenRef` each
+    // time rather than captured, so twelve taps in a row walk twelve different plots instead of fighting over
+    // whichever one was empty when the modal was first drawn.
+    const plantOneNext = useCallback(async (seedId) => {
+        const next = (gardenRef.current?.plots || []).find((p) => !p.seedId);
+        if (!next) return { ok: false, error: "no_empty_plots" };
+        const r = await gardenAct({ action: "plant", slot: next.slot, seedId }, `p-${next.slot}`);
+        if (r?.ok) SFX?.coin?.();
+        return r;
+    }, [gardenAct]);
+    // The shortcut: every remaining empty bed in one crop. Also leaves the sheet open, because it can run out
+    // of seed before it runs out of plots and the count is the only way to see that happen.
     const plantAllWith = useCallback(async (seedId) => {
-        setPlantingAll(false);
         const r = await gardenAct({ action: "plant_all", seedId }, "pall");
         if (r?.ok) SFX?.coin?.();
         return r;
@@ -1063,6 +1044,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 @keyframes farmFog { from { transform: translateX(-5%) } to { transform: translateX(5%) } }
                 @keyframes farmFlash { 0%,90%,100% { opacity: 0 } 91% { opacity: .55 } 93% { opacity: 0 } 95% { opacity: .38 } 96% { opacity: 0 } }
                 @keyframes pigBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+                @keyframes boxGlow { 0%,100% { opacity: .45; transform: scale(.94); } 50% { opacity: .85; transform: scale(1.06); } }
+                @keyframes boxOpen { 0% { transform: scale(.5) rotate(-9deg); opacity: 0; } 55% { transform: scale(1.14) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
                 @keyframes crownJiggle { 0%,100% { transform: translateX(-50%) rotate(-11deg); } 50% { transform: translateX(-50%) rotate(11deg); } }
                 @keyframes coinPop { 0% { opacity: 0; transform: translate(-50%, -22px) scale(.4) rotate(0deg); } 25% { opacity: 1; } 100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(360deg); } }
                 @keyframes pigPop { 0% { opacity: 0; transform: scale(.82); } 60% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
@@ -1437,8 +1420,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {/* The farmer strolls the Outside & Inside (not the tidy Garden) — tap to connect */}
                         {view !== "garden" && farm.owner?.avatarUrl ? <OwnerWalker owner={farm.owner} mine={farm.mine} minX={petMinX} groundShift={groundShift} brightness={farm.spriteBrightness ?? 1} onTap={() => setOwnerMenu(true)} /> : null}
 
-                        {/* Wild Loot Pig only shows up Outside in the open pasture */}
-                        {view === "outside" && pig === "running" ? <LootPig onFinish={onPigFinish} crown={farm.crownCfg} /> : null}
+                        {/* The hog's box is left Outside in the open pasture, and it waits. */}
+                        {view === "outside" && farm.mine && farm.pigAvailable ? <GiftBox busy={pigBusy} onOpen={openPigBox} /> : null}
 
                         </div>{/* /world-objects tint layer */}
 
@@ -1630,24 +1613,17 @@ export default function FarmClient({ initial, viewingAlias }) {
                 />
             ) : null}
 
-            {/* Wild Loot Pig announce banner — rendered at the ROOT (outside the pasture's overflow:hidden scene) as a
-                position:fixed, FLEX-centered overlay. Centering lives on the outer wrapper so the pill's own pigPop
-                scale animation can never knock it off-center or clip it (the old bug). */}
-            {pig === "running" && view !== "outside" ? (
-                // Pig's loose but you're not looking at the pasture — a persistent, TAPPABLE banner that takes you there.
+            {/* ── THE BOX IS WAITING, AND YOU ARE LOOKING AT SOMETHING ELSE ──────────────────────────────
+                Rendered at the ROOT (outside the pasture's overflow:hidden scene) as a position:fixed,
+                FLEX-centered overlay. Centering lives on the outer wrapper so the pill's own pigPop scale
+                animation can never knock it off-center or clip it (the old bug). */}
+            {farm.mine && farm.pigAvailable && view !== "outside" ? (
                 <div style={{ position: "fixed", top: 72, left: 0, right: 0, zIndex: 9998, display: "flex", justifyContent: "center", padding: "0 12px" }}>
-                    <button type="button" onClick={() => { setView("outside"); setPigToast(false); }}
+                    <button type="button" onClick={() => setView("outside")}
                         style={{ maxWidth: "min(94vw, 470px)", display: "inline-flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.2, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", cursor: "pointer", animation: "pigPop .4s ease both", WebkitTapHighlightColor: "transparent" }}>
-                        🐷👑 The Loot Pig&apos;s in the pasture!
-                        <span style={{ padding: "4px 12px", borderRadius: 999, background: "#ffd75e", color: "#2a2410", fontWeight: 900, fontSize: 13, whiteSpace: "nowrap" }}>Go catch it →</span>
+                        🎁 {farm.pigSecond ? "He came back and left another box" : "The Loot Pig left you a box"}
+                        <span style={{ padding: "4px 12px", borderRadius: 999, background: "#ffd75e", color: "#2a2410", fontWeight: 900, fontSize: 13, whiteSpace: "nowrap" }}>Open it →</span>
                     </button>
-                </div>
-            ) : pigToast ? (
-                // You're already on the pasture — tell you what to do.
-                <div style={{ position: "fixed", top: 72, left: 0, right: 0, zIndex: 9998, display: "flex", justifyContent: "center", padding: "0 12px", pointerEvents: "none" }}>
-                    <div style={{ maxWidth: "min(92vw, 460px)", textAlign: "center", padding: "9px 18px", borderRadius: 999, background: "rgba(20,16,6,0.96)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 14, lineHeight: 1.25, boxShadow: "0 10px 30px rgba(0,0,0,0.55)", animation: "pigPop .4s ease both" }}>
-                        🐷👑 The Loot Pig appeared — grab the coins he drops!
-                    </div>
                 </div>
             ) : null}
 
@@ -1724,16 +1700,10 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* The SAME picker, asked once for the whole garden. Reused rather than rebuilt so the seed list,
                 the counts, the buy-a-pack path and the empty state are all the ones already tested. */}
-            {/* ── THE QUICK PANEL ── opened by a button that floats over the farm rather than sitting in the
-                tab bar. None of what is inside it is a destination; it is the set of chores you do on the way
-                past, so it should be reachable from wherever you already are. */}
-            {farm.mine ? (
-                <button type="button" className="qp-open" onClick={() => setQuickOpen(true)} aria-label="Quick actions">
-                    {/* A gi glyph, never an emoji — a device's own emoji font is not ours to design with. */}
-                    <GiLightningTrio aria-hidden="true" />
-                </button>
-            ) : null}
-
+            {/* ── THE QUICK PANEL ── opened by the Quick pill in the toolbar, up with Backdrop and Decorate.
+                It had a floating twin over the pasture as well; that put a second gold circle directly above
+                the chat bubble, and two unrelated things wearing the same clothes in the same corner reads as
+                one control that has grown a second head. One door. */}
             {quickOpen && farm.mine ? (
                 <QuickPanel farm={farm} garden={garden} busy={gardenBusy}
                     onHarvestAll={harvestAllNow}
@@ -1744,8 +1714,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {plantingAll && garden ? (
-                <SeedPickerModal garden={garden} slot={-1} busy={gardenBusy} gold={farm.wallet?.gold || 0}
-                    onPick={(_slot, seedId) => plantAllWith(seedId)} onOpenPack={openPack} onBuyPack={buySeedPack}
+                <ReplantModal garden={garden} busy={gardenBusy}
+                    onPlantOne={plantOneNext} onFillAll={plantAllWith}
                     onClose={() => setPlantingAll(false)} />
             ) : null}
 
@@ -1767,6 +1737,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             ) : null}
 
             {harvestToast ? <HarvestToast toast={harvestToast} onClose={() => setHarvestToast(null)} /> : null}
+
+            {harvestRecap ? <HarvestRecap recap={harvestRecap} onClose={() => setHarvestRecap(null)} /> : null}
 
             {encounter ? <EncounterModal encounter={encounter} onResolve={resolveEncounterAt} onClose={() => setEncounter(null)} /> : null}
 
@@ -1796,120 +1768,95 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {ownerMenu ? <OwnerMenu owner={farm.owner} mine={farm.mine} onClose={() => setOwnerMenu(false)} /> : null}
 
-            {pigResult ? (
-                <div onClick={() => setPigResult(null)} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "radial-gradient(120% 100% at 50% 40%, rgba(60,45,8,0.72), rgba(0,0,0,0.7))", display: "grid", placeItems: "center", padding: 16, animation: "overlayFade .25s ease both", overflow: "hidden" }}>
-                    <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Loot pig haul" style={{ position: "relative", width: "100%", maxWidth: 340, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 18, border: "2px solid #ffd75e", background: "linear-gradient(180deg, #2a2410, #17181c)", boxShadow: "0 20px 70px rgba(0,0,0,0.6), 0 0 40px rgba(255,215,94,0.25)", animation: "pigPop .5s cubic-bezier(.2,1.2,.3,1) both, haulShake .6s ease .12s both", textAlign: "center" }}>
-                        {/* shimmer sweep across the card */}
-                        <div aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, width: "60%", height: "100%", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)", animation: "haulSweep 1.1s ease .3s both", pointerEvents: "none", zIndex: 3 }} />
-                        <div style={{ position: "relative", padding: "22px 18px 6px", background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,94,0.28), transparent 70%)" }}>
-                            {/* radial glow pulse + coin burst behind the pig */}
-                            <div aria-hidden="true" style={{ position: "absolute", top: 34, left: "50%", width: 90, height: 90, marginLeft: -45, marginTop: -45, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,94,0.6), transparent 60%)", animation: "haulGlow .8s ease-out both", pointerEvents: "none" }} />
-                            {PIG_BURST.map((b, i) => (
-                                <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}><Coin /></span>
-                            ))}
-                            <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>{pigResult.missed ? "🐷💨" : "🐷👑"}</div>
-                            <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>{pigResult.missed ? "He slipped away" : "The Wild Loot Pig!"}</div>
-                            <div className="muted" style={{ position: "relative", fontSize: 13, zIndex: 2 }}>{pigResult.missed ? pigResult.why : "He rampaged through and left this behind:"}</div>
-                        </div>
-                        <div style={{ position: "relative", padding: "4px 18px 20px", zIndex: 2 }}>
-                            {/* Nothing below this belongs on a miss — a "+0 gold" line reads as a reward of
-                                nothing rather than as an explanation. */}
-                            {pigResult.missed ? null : (
-                            <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(pigResult.gold || 0).toLocaleString()} <Coin /></div>
-                            )}
-                            {pigResult.item ? (
-                                <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[pigResult.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
-                                    <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>✨ Rare drop{pigResult.item.isNew ? " · NEW" : ""}!</div>
-                                    {pigResult.item.image ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={pigResult.item.image} alt={pigResult.item.name} width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain" }} />
-                                    ) : <div style={{ fontSize: 40 }}>🎁</div>}
-                                    <div style={{ fontWeight: 800 }}>{pigResult.item.name}</div>
-                                    <div style={{ fontSize: 12, color: RARITY_RING[pigResult.item.rarity] || "#9aa0a6", textTransform: "capitalize" }}>{pigResult.item.rarity}{pigResult.item.slot ? ` · ${String(pigResult.item.slot).replace("_", " ")}` : ""}</div>
-                                </div>
-                            ) : null}
-                            <button type="button" onClick={() => setPigResult(null)} style={{ width: "100%", marginTop: 16, padding: "11px", fontWeight: 800, background: "#ffd75e", color: "#2a2410", border: "none", borderRadius: 10, cursor: "pointer" }}>Collect the loot!</button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
+            {pigResult ? <GiftBoxModal result={pigResult} onClose={() => setPigResult(null)} /> : null}
         </div>
     );
 }
 
-// The Wild Loot Pig sprite (crown overlaid separately). Generated once via /api/admin/loot-pig-sprite.
-const PIG_SPRITE_URL = "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/farm/1784834882238-913206.png";
-
-// The Wild Loot Pig: a crowned pig that MEANDERS around the pasture (inside the scrolling field) dropping
-// COINS you TAP to grab. A HUD tells you what to do; the guaranteed daily haul is claimed server-side in
-// onFinish when he wanders off. (Grabbing coins is the active bit — the reward is guaranteed either way.)
-function LootPig({ onFinish, crown }) {
-    const cw = crown || { top: 9, side: 8, size: 22 };
-    const [pos, setPos] = useState({ x: 4, y: 84, flip: false, dur: 1.6 });
-    const [moving, setMoving] = useState(false); // true only while ambling between waypoints (gates the crown shake)
-    const [coins, setCoins] = useState([]);
-    const [collected, setCollected] = useState(0);
-    const coinId = useRef(0);
-    const timers = useRef([]);
-    useEffect(() => {
-        let alive = true;
-        const t = timers.current;
-        let step = 0;
-        const MAX_STEPS = 8; // meander waypoints before he leaves
-        const drop = (x, y) => {
-            SFX.coin();
-            const id = ++coinId.current;
-            setCoins((c) => [...c, { id, x: x + rand(-4, 4), y: y + rand(-1, 6) }]);
-            t.push(setTimeout(() => { if (alive) setCoins((c) => c.filter((k) => k.id !== id)); }, 6500)); // coin lifespan → grab it before it's gone
-        };
-        const glide = (dur) => { setMoving(true); t.push(setTimeout(() => { if (alive) setMoving(false); }, dur * 1000)); };
-        const move = () => {
-            if (!alive) return;
-            step += 1;
-            if (step > MAX_STEPS) {
-                setPos((p) => { const exitX = Math.random() < 0.5 ? -12 : 112; return { x: exitX, y: 84, flip: exitX < p.x, dur: 2.4 }; });
-                glide(2.4);
-                t.push(setTimeout(() => { if (alive) onFinish(); }, 2500));
-                return;
-            }
-            const nx = rand(8, 90);
-            const ny = 80 + rand(0, 10);
-            const dur = rand(1.4, 2.4);
-            setPos((p) => ({ x: nx, y: ny, flip: nx < p.x, dur }));
-            glide(dur);
-            drop(nx, ny);
-            t.push(setTimeout(move, dur * 1000 + rand(300, 800))); // amble, then pause, then wander again
-        };
-        drop(6, 84);
-        t.push(setTimeout(move, 1400));
-        return () => { alive = false; t.forEach(clearTimeout); timers.current = []; };
-    }, [onFinish]);
-    const collect = (id) => { setCoins((c) => c.filter((k) => k.id !== id)); setCollected((n) => n + 1); SFX.coin(); };
+// ── OPENING THE BOX ──────────────────────────────────────────────────────────────────────────────────────────
+// Exported so the lab can mount it against a fixture. Everything in here is a reveal of something the server
+// has ALREADY granted — the burst, the count-up and the stagger are pacing, not suspense, so nothing in this
+// component can change what was won and closing it early cannot cost anything.
+export function GiftBoxModal({ result, onClose }) {
     return (
-        <>
-            {/* what-to-do HUD */}
-            <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 120, pointerEvents: "none", padding: "6px 14px", borderRadius: 999, background: "rgba(20,16,6,0.92)", border: "1px solid #ffd75e", color: "#ffe27a", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 6px 20px rgba(0,0,0,0.5)" }}>
-                🐷 Grab the coins! <span style={{ color: "#fff" }}>· {collected} grabbed</span>
-            </div>
-            {coins.map((c) => (
-                <button key={c.id} type="button" onClick={() => collect(c.id)} aria-label="Grab coin"
-                    style={{ position: "absolute", left: `${c.x}%`, top: `${c.y}%`, transform: "translate(-50%, -50%)", zIndex: 110, background: "none", border: "none", padding: 8, margin: -8, cursor: "pointer", fontSize: 26, lineHeight: 1, WebkitTapHighlightColor: "transparent", animation: "coinPop .4s ease-out both", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))" }}><Coin /></button>
-            ))}
-            <div style={{ position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -100%)", transition: `left ${pos.dur}s ease-in-out, top ${pos.dur}s ease-in-out`, zIndex: 96, pointerEvents: "none" }}>
-                <div style={{ position: "relative", animation: moving ? "pigBob .55s ease-in-out infinite" : "none" }}>
-                    {/* Crown rests ON the head: lowered onto the crown of the skull and nudged toward the facing
-                        side (the head, away from the rump). Positioned via top/left — NOT transform — so
-                        crownJiggle can't reset it. */}
-                    <span style={{ position: "absolute", left: pos.flip ? `${50 + cw.side}%` : `${50 - cw.side}%`, top: cw.top, fontSize: cw.size, zIndex: 2, transformOrigin: "bottom center", transform: "translateX(-50%)", animation: moving ? "crownJiggle .34s ease-in-out infinite" : "none", filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.4))" }}>👑</span>
-                    {PIG_SPRITE_URL ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={PIG_SPRITE_URL} alt="Wild Loot Pig" width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain", transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }} />
-                    ) : (
-                        <span style={{ display: "block", fontSize: 58, lineHeight: 1, transform: pos.flip ? "scaleX(-1)" : "none", filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }}>🐷</span>
-                    )}
+            <div onClick={() => onClose()} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "radial-gradient(120% 100% at 50% 40%, rgba(60,45,8,0.72), rgba(0,0,0,0.7))", display: "grid", placeItems: "center", padding: 16, animation: "overlayFade .25s ease both", overflow: "hidden" }}>
+                <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="The Loot Pig’s gift box" style={{ position: "relative", width: "100%", maxWidth: 340, maxHeight: "90dvh", overflowY: "auto", overflowX: "hidden", borderRadius: 18, border: "2px solid #ffd75e", background: "linear-gradient(180deg, #2a2410, #17181c)", boxShadow: "0 20px 70px rgba(0,0,0,0.6), 0 0 40px rgba(255,215,94,0.25)", animation: "pigPop .5s cubic-bezier(.2,1.2,.3,1) both, haulShake .6s ease .12s both", textAlign: "center" }}>
+                    {/* shimmer sweep across the card */}
+                    <div aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, width: "60%", height: "100%", background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)", animation: "haulSweep 1.1s ease .3s both", pointerEvents: "none", zIndex: 3 }} />
+                    <div style={{ position: "relative", padding: "22px 18px 6px", background: "radial-gradient(120% 90% at 50% 0%, rgba(255,215,94,0.28), transparent 70%)" }}>
+                        {/* radial glow pulse + coin burst behind the box */}
+                        <div aria-hidden="true" style={{ position: "absolute", top: 34, left: "50%", width: 90, height: 90, marginLeft: -45, marginTop: -45, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,94,0.6), transparent 60%)", animation: "haulGlow .8s ease-out both", pointerEvents: "none" }} />
+                        {PIG_BURST.map((b, i) => (
+                            <span key={i} aria-hidden="true" style={{ position: "absolute", top: 40, left: "50%", fontSize: 16, "--r": `${b.a}deg`, "--d": `${b.d}px`, animation: `haulBurst ${b.t}s ease-out ${0.05 * (i % 4)}s both`, pointerEvents: "none", zIndex: 2 }}><Coin /></span>
+                        ))}
+                        {result.missed ? (
+                            <div style={{ position: "relative", fontSize: 52, lineHeight: 1, zIndex: 2, filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))" }}>🐷💨</div>
+                        ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={GIFT_BOX_URL} alt="" width={86} height={86} style={{ position: "relative", zIndex: 2, width: 86, height: 86, objectFit: "contain", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.45))", animation: "boxOpen .55s cubic-bezier(.2,1.5,.3,1) both" }} />
+                        )}
+                        <div style={{ position: "relative", fontSize: 20, fontWeight: 900, marginTop: 4, zIndex: 2 }}>{result.missed ? "The box is empty" : "The Loot Pig's box!"}</div>
+                        <div className="muted" style={{ position: "relative", fontSize: 13, zIndex: 2 }}>{result.missed ? result.why : "He came by while you were out and left this:"}</div>
+                    </div>
+                    <div style={{ position: "relative", padding: "4px 18px 20px", zIndex: 2 }}>
+                        {/* Nothing below this belongs on a miss — a "+0 gold" line reads as a reward of
+                            nothing rather than as an explanation. */}
+                        {result.missed ? null : (
+                        <div style={{ display: "inline-block", fontSize: 40, fontWeight: 900, color: "#ffd75e", textShadow: "0 2px 12px rgba(255,215,94,0.55)", animation: "goldCount .5s cubic-bezier(.2,1.4,.3,1) .25s both" }}>+{(result.gold || 0).toLocaleString()} <Coin /></div>
+                        )}
+                        {/* ── WHAT ELSE WAS IN IT ── the two stacks, staggered in behind the gold so the
+                            box reads as unpacking rather than as a receipt that was always there. */}
+                        {result.crops || result.seeds ? (
+                            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                                {[result.crops, result.seeds].map((g, i) => (g ? (
+                                    <div key={i} style={{ flex: 1, minWidth: 0, padding: "10px 8px", borderRadius: 12, border: `1px solid ${(RARITY_RING[g.rarity] || "#9aa0a6")}66`, background: "rgba(255,255,255,0.04)", animation: `pigPop .45s cubic-bezier(.2,1.3,.3,1) ${0.35 + i * 0.12}s both` }}>
+                                        <div style={{ fontSize: 26, lineHeight: 1 }}>{g.emoji}</div>
+                                        <div style={{ fontWeight: 900, fontSize: 15, color: "#ffe6a6", marginTop: 2 }}>×{g.qty}</div>
+                                        <div style={{ fontSize: 11.5, fontWeight: 700 }}>{g.name}</div>
+                                        <div className="muted" style={{ fontSize: 10.5 }}>{i === 0 ? "to the pantry" : "seeds for the garden"}</div>
+                                    </div>
+                                ) : null))}
+                            </div>
+                        ) : null}
+                        {result.item ? (
+                            <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: `2px solid ${RARITY_RING[result.item.rarity] || "#9aa0a6"}`, background: "rgba(255,255,255,0.04)" }}>
+                                <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>✨ Rare drop{result.item.isNew ? " · NEW" : ""}!</div>
+                                {result.item.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={result.item.image} alt={result.item.name} width={68} height={68} style={{ width: 68, height: 68, objectFit: "contain" }} />
+                                ) : <div style={{ fontSize: 40 }}>🎁</div>}
+                                <div style={{ fontWeight: 800 }}>{result.item.name}</div>
+                                <div style={{ fontSize: 12, color: RARITY_RING[result.item.rarity] || "#9aa0a6", textTransform: "capitalize" }}>{result.item.rarity}{result.item.slot ? ` · ${String(result.item.slot).replace("_", " ")}` : ""}</div>
+                            </div>
+                        ) : null}
+                        <button type="button" onClick={() => onClose()} style={{ width: "100%", marginTop: 16, padding: "11px", fontWeight: 800, background: "#ffd75e", color: "#2a2410", border: "none", borderRadius: 10, cursor: "pointer" }}>Take it all</button>
+                    </div>
                 </div>
             </div>
-        </>
+    );
+}
+
+// The box he leaves behind. Generated by scripts/gen-gift-box.mjs, in the house style, off the same shelf as
+// the chests — see the note in that file for why this is a repo constant and not a mkt_town_art row.
+const GIFT_BOX_URL = "/images/farm/gift-box.webp";
+
+// ── THE BOX ON THE PASTURE ───────────────────────────────────────────────────────────────────────────────────
+// What used to be here was a whole performance: a pig that ambled through eight waypoints dropping coins on a
+// timer you had to beat, with its own music, its own HUD, and a "he slipped away" ending. All of it was staging
+// for a reward that was never actually in doubt.
+//
+// This is what replaced it. It sits still, it is the size of a decoration, it bobs so it reads as something and
+// not as scenery, and one tap opens it. The only state it has is whether the tap is in flight.
+function GiftBox({ busy, onOpen }) {
+    return (
+        <button type="button" onClick={onOpen} disabled={busy} aria-label="Open the Loot Pig's gift box"
+            style={{ position: "absolute", left: "22%", bottom: "6%", zIndex: 118, width: 92, height: 92, padding: 0, border: "none", background: "none", cursor: busy ? "wait" : "pointer", WebkitTapHighlightColor: "transparent", animation: "pigBob 2.4s ease-in-out infinite" }}>
+            {/* The glow is what makes it read as "open me" rather than as another decoration somebody placed. */}
+            <span aria-hidden="true" style={{ position: "absolute", inset: "12% 12% 4%", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,215,94,0.5), transparent 65%)", animation: "boxGlow 1.9s ease-in-out infinite" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={GIFT_BOX_URL} alt="" width={92} height={92}
+                style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 5px 7px rgba(0,0,0,0.45))" }} />
+        </button>
     );
 }
 
@@ -2602,7 +2549,7 @@ function FarmBulkBar({ garden, busy, onHarvestAll, onPlantAll, onFertilizeAll })
             </button>
             <button type="button" className="farm-bulk-btn is-plant" disabled={busy === "pall" || !empty || !seeds}
                 onClick={onPlantAll}>
-                <b>{busy === "pall" ? "Planting…" : "Replant all"}</b>
+                <b>{busy === "pall" ? "Planting…" : "Replant"}</b>
                 <em>{!empty ? "no empty plots" : !seeds ? "no seeds" : `${empty} empty · ${seeds} seeds`}</em>
             </button>
             <button type="button" className="farm-bulk-btn is-fert" disabled={busy === "fall" || !growing || !fert}
@@ -2746,6 +2693,61 @@ function GardenPanel({ garden, busy, onBuyFertilizer, onUpgrade, onOpenPack }) {
 }
 
 // Centered "pick a seed" modal, opened by tapping an empty plot out in the field.
+// ── REPLANT ──────────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "replanting should be its own modal that lets you fill plots quickly, otherwise it ends up just closing
+// the modal whenever I tap a seed, the plants all modal should be closeable."
+//
+// It used to borrow SeedPickerModal, which is built for ONE plot: picking a seed is the last thing you do in it,
+// so it closes on the tap. Pointed at a whole garden that is exactly wrong — one tap plants twelve plots with
+// one crop and puts you back on the farm, and there is no way to plant six of one and six of another at all.
+//
+// So: the tap plants ONE, into the next empty bed, and the sheet stays open with the count going down. `Fill`
+// on a row is the old behaviour kept as a shortcut for when you do want the whole garden in one crop. It closes
+// when YOU close it — including once the garden is full, because looking at "every plot is planted" and pressing
+// Done is a better ending than a modal that vanishes out from under the thumb.
+export function ReplantModal({ garden, busy, onPlantOne, onFillAll, onClose }) {
+    const empty = (garden.plots || []).filter((p) => !p.seedId);
+    const bag = (garden.seedBag || []).filter((s) => s.count > 0);
+    const none = empty.length === 0;
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Replant the garden" style={{ position: "relative", width: "100%", maxWidth: 340, maxHeight: "85dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #7ed57e", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 18, animation: "pigPop .35s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 8, right: 10, background: "none", border: "none", color: "inherit", fontSize: 22, lineHeight: 1, cursor: "pointer", opacity: 0.7 }}>×</button>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>🌱 Replant</div>
+                <div className="muted" style={{ fontSize: 12, margin: "2px 0 12px" }}>
+                    {none ? "Every plot is planted." : <>Tap a seed to fill the next empty bed — <b style={{ color: "#8fe39a" }}>{empty.length} left</b>. Tap again for the next one.</>}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {bag.length ? bag.map((sd) => {
+                        const cap = Math.min(sd.count, empty.length);
+                        return (
+                            <div key={sd.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <button type="button" disabled={Boolean(busy) || none} onClick={() => onPlantOne(sd.id)}
+                                    style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: `1px solid ${(RARITY_RING[sd.rarity] || "rgba(255,255,255,0.18)")}66`, background: "rgba(255,255,255,0.05)", color: "inherit", cursor: none ? "default" : "pointer", textAlign: "left", opacity: none ? 0.5 : 1 }}>
+                                    <span style={{ fontSize: 24 }}>{sd.emoji}</span>
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ display: "block", fontSize: 13.5, fontWeight: 800 }}>{sd.name} <span className="muted" style={{ fontWeight: 400 }}>×{sd.count}</span></span>
+                                        <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 8px", marginTop: 3, fontSize: 11.5 }}>
+                                            <span style={{ color: "#8fe39a", fontWeight: 700 }}>✨ {sd.xp} XP</span>
+                                            <span className="muted">⏳ {Math.round(sd.growMin / 60)}h</span>
+                                        </span>
+                                    </span>
+                                </button>
+                                {/* The whole garden in one crop, for when that is what you wanted all along. */}
+                                <button type="button" disabled={Boolean(busy) || none} onClick={() => onFillAll(sd.id)}
+                                    style={{ flex: "0 0 auto", padding: "10px 11px", borderRadius: 12, border: "1px solid rgba(126,213,126,0.5)", background: "rgba(126,213,126,0.12)", color: "#c8f0c8", fontWeight: 800, fontSize: 12.5, cursor: none ? "default" : "pointer", opacity: none ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                                    Fill {cap ? `×${cap}` : ""}
+                                </button>
+                            </div>
+                        );
+                    }) : <div className="muted" style={{ fontSize: 12.5 }}>No seeds in your bag — open or buy a pack from any empty plot.</div>}
+                </div>
+                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: none ? "#2fae72" : "rgba(255,255,255,0.09)", color: none ? "#fff" : "inherit", border: "none", borderRadius: 10, cursor: "pointer" }}>Done</button>
+            </div>
+        </div>
+    );
+}
+
 function SeedPickerModal({ garden, slot, busy, gold = 0, onPick, onOpenPack, onBuyPack, onSpecialize, onClose }) {
     const plotSpec = (garden.plots || []).find((x) => x.slot === slot)?.specLevel || 0;
     const bag = garden.seedBag || [];
@@ -3165,6 +3167,70 @@ function HarvestToast({ toast, onClose }) {
                         <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>{toast.doubled ? "×2 " : ""}+{(toast.gold || 0).toLocaleString()} <Coin /> sold</div>
                     </>
                 )}
+                <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
+            </div>
+        </div>
+    );
+}
+
+// ── THE SWEEP RECAP ──────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "can we make it harvest all, and auto do the encounters, then show you a recap?"
+//
+// One harvest gets a toast because there is one thing to say. A dozen plots at once is a LIST — crops, XP, the
+// pet you fed, whatever critters wandered in and what each of them handed over — and a toast that summed all of
+// that into two numbers threw away the only part anybody reads it for. So the bulk path gets its own card, and
+// the critters are rows in it rather than a modal each.
+export function HarvestRecap({ recap, onClose }) {
+    const encounters = recap.encounters || [];
+    const seeds = recap.seeds || [];
+    const chests = recap.chests || [];
+    const row = { marginTop: 8, padding: 8, borderRadius: 10, fontWeight: 800, fontSize: 13, textAlign: "left" };
+    return (
+        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.55)", display: "grid", placeItems: "center", padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Harvest recap" style={{ width: "100%", maxWidth: 340, maxHeight: "88dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #2fae72", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", padding: 20, textAlign: "center", animation: "pigPop .4s cubic-bezier(.2,1.2,.3,1) both" }}>
+                <div style={{ fontSize: 44 }}>🌾</div>
+                <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>
+                    Harvested {recap.harvested} crop{recap.harvested === 1 ? "" : "s"}
+                </div>
+                {recap.xp ? <div style={{ fontSize: 26, fontWeight: 900, color: "#8fe39a", marginTop: 6 }}>✨ +{recap.xp.toLocaleString()} XP</div> : null}
+                {recap.petFed ? (
+                    <div style={{ ...row, textAlign: "center", background: recap.petFed.leveled ? "rgba(255,210,90,0.16)" : "rgba(180,150,255,0.12)", border: `1px solid ${recap.petFed.leveled ? "rgba(255,210,90,0.55)" : "rgba(180,150,255,0.4)"}` }}>
+                        {recap.petFed.leveled
+                            ? `★ ${recap.petFed.emoji} ${recap.petFed.name} reached Lv ${recap.petFed.level}!`
+                            : `${recap.petFed.emoji} ${recap.petFed.name} +${(recap.petFed.xp || 0).toLocaleString()} pet XP`}
+                    </div>
+                ) : null}
+
+                {/* ── WHO TURNED UP ── the reward was paid the moment each one spawned; this is the telling. */}
+                {encounters.length ? (
+                    <>
+                        <div className="muted" style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", marginTop: 14, textAlign: "left" }}>
+                            {encounters.length === 1 ? "A visitor" : `${encounters.length} visitors`}
+                        </div>
+                        {encounters.map((e, i) => (
+                            <div key={`${e.key}-${i}`} style={{ ...row, display: "flex", alignItems: "center", gap: 9, background: "rgba(255,210,90,0.10)", border: "1px solid rgba(255,210,90,0.4)" }}>
+                                {e.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={e.sprite} alt="" width={34} height={34} style={{ objectFit: "contain", flex: "0 0 auto" }} />
+                                ) : <span style={{ fontSize: 26, flex: "0 0 auto" }}>{e.emoji}</span>}
+                                <span style={{ minWidth: 0 }}>
+                                    <span style={{ display: "block" }}>{e.name}</span>
+                                    <span className="muted" style={{ display: "block", fontWeight: 600, fontSize: 12 }}>
+                                        +{e.reward?.xp || 0} XP{e.reward?.loot?.label ? ` · ${e.reward.loot.label}` : ""}
+                                    </span>
+                                </span>
+                            </div>
+                        ))}
+                    </>
+                ) : null}
+
+                {(recap.newPets || []).map((p) => (
+                    <div key={p.id} style={{ ...row, textAlign: "center", background: "rgba(255,210,90,0.16)", border: "1px solid rgba(255,210,90,0.55)" }}>🎉 New farm pet unlocked: {p.name}!</div>
+                ))}
+                {chests.length ? <div style={{ ...row, textAlign: "center", background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)" }}>🧰 {chests.length} chest{chests.length === 1 ? "" : "es"} found</div> : null}
+                {seeds.length ? <div style={{ ...row, textAlign: "center", background: "rgba(143,227,154,0.12)", border: "1px solid rgba(143,227,154,0.45)" }}>🌱 {seeds.length} seed{seeds.length === 1 ? "" : "s"} back in the bag</div> : null}
+
+                <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>+{(recap.gold || 0).toLocaleString()} <Coin /> sold</div>
                 <button type="button" onClick={onClose} style={{ width: "100%", marginTop: 16, padding: 11, fontWeight: 800, background: "#2fae72", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer" }}>Nice!</button>
             </div>
         </div>

@@ -811,7 +811,7 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
 //   THE FEATS    — named things you did, which is the only place performance is ever acknowledged.
 //   THE FIGHT    — damage dealt and taken, your biggest blow, crits, what your guard actually stopped.
 // Nothing in here may throw: a crash while this is mounted leaves a scroll-locked overlay with no way off it.
-function Recap({ bout, busy, onClose, away = [] }) {
+function Recap({ bout, busy, onClose, away = null }) {
     const r = bout?.recap || null;
     useScrollLock(true);
     const won = Boolean(bout?.won);
@@ -1070,20 +1070,34 @@ function Recap({ bout, busy, onClose, away = [] }) {
 
                     Compact on purpose: the headline number and who came at you. The full report is still its
                     own card when you arrive without having just fought. */}
-                {away.length ? (
-                    <div className="ar-recap-away">
-                        <span className="ar-recap-kick">While you were away</span>
-                        <b>{away.reduce((n, x) => n + (x.bouts || 0), 0)} bout
-                            {away.reduce((n, x) => n + (x.bouts || 0), 0) === 1 ? "" : "s"}
-                            {away.reduce((n, x) => n + (x.held || 0), 0)
-                                ? ` · you held ${away.reduce((n, x) => n + (x.held || 0), 0)}` : ""}
-                            {away.reduce((n, x) => n + (x.laurels || 0), 0)
-                                ? ` · +${money(away.reduce((n, x) => n + (x.laurels || 0), 0))} laurels` : ""}
-                        </b>
-                        <em>{away.slice(0, 3).map((x) => x.them?.name).filter(Boolean).join(", ")}
-                            {away.length > 3 ? ` and ${away.length - 3} more` : ""} came at your build</em>
-                    </div>
-                ) : null}
+                {away?.per?.length ? (() => {
+                    const rows = away.per;
+                    const bouts = rows.reduce((n, x) => n + (x.bouts || 0), 0);
+                    const held = rows.reduce((n, x) => n + (x.held || 0), 0);
+                    const laurels = rows.reduce((n, x) => n + (x.laurels || 0), 0);
+                    const dv = Number(away.vp) || 0;
+                    return (
+                        <div className="ar-recap-away">
+                            <span className="ar-recap-kick">While you were away</span>
+                            <b>{bouts} bout{bouts === 1 ? "" : "s"}
+                                {held ? ` · you held ${held}` : ""}
+                                {laurels ? ` · +${money(laurels)} laurels` : ""}
+                            </b>
+                            {/* The standing, in the compact version too — it is the answer to "did I slip
+                                overnight", which is the only reason to read this at all. */}
+                            {away.vpNow != null ? (
+                                <em>
+                                    <span className={dv > 0 ? "is-up" : dv < 0 ? "is-down" : ""}>
+                                        {dv > 0 ? "+" : dv < 0 ? "−" : ""}{money(Math.abs(dv))} VP
+                                    </span>
+                                    {" · "}{money(away.vpNow)} total{away.rank ? ` · #${away.rank}` : ""}
+                                </em>
+                            ) : null}
+                            <em>{rows.slice(0, 3).map((x) => x.them?.name).filter(Boolean).join(", ")}
+                                {rows.length > 3 ? ` and ${rows.length - 3} more` : ""} came at your build</em>
+                        </div>
+                    );
+                })() : null}
 
                 <div className="ar-recap-foot">
                     <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
@@ -3011,8 +3025,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     so the user immediately sees relevant info."
                     So the away rows are handed to the recap and drawn inside it, and leaving marks them seen. */}
                 {bout.over && recapReady ? (
-                    <Recap bout={bout} busy={busy} away={st.away || []}
-                        onClose={() => { if (st.away?.length) act("seen"); leaveBout(); }} />
+                    <Recap bout={bout} busy={busy} away={st.away || null}
+                        onClose={() => { if (st.away?.per?.length) act("seen"); leaveBout(); }} />
                 ) : null}
 
                 {/* ── WHAT THE FIGHT IS ASKING YOU FOR ────────────────────────────────────────────────────
@@ -3068,8 +3082,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             {/* what happened while you were asleep */}
             {/* Only when there is no recap to fold it into — a fight that has just ended carries these rows
                 inside its own card instead, so the two never stack. */}
-            {st.away?.length && !bout?.over ? (
-                <AwayReport rows={st.away} onClose={() => act("seen")} />
+            {st.away?.per?.length && !bout?.over ? (
+                <AwayReport away={st.away} onClose={() => act("seen")} />
             ) : null}
 
             {/* ── YOUR CARD ── this used to be a rung ("Cub · #41 of 84") and a named band, both of them
@@ -3765,7 +3779,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     // that is not on screen is a badge that lies.
                     const best = Math.max(0, ...opts.map((o) => o.reward?.laurels || 0));
                     return opts.map((o, i) => {
-                        const ratio = o.power / Math.max(1, st.me?.power || 1);
+                        // ── THE BAND, OFF THE AXIS THE BOARD ACTUALLY CARRIES ────────────────────────
+                        // This read `o.power`, and the board stopped computing every member's fighter when it
+                        // stopped printing damage and health — so for a MEMBER row `o.power` is undefined, the
+                        // ratio is NaN, and NaN fails every one of these comparisons in turn. The whole list
+                        // therefore fell through to "easier", including the members ranked twice as high as
+                        // the person reading it. It is the same undefined-power bug that once printed
+                        // "0 dmg · 0 hp", surviving in the one place that did not print a number.
+                        //
+                        // A member is banded on VICTORY POINTS, which is what the row already shows and what
+                        // matchmaking and the ladder both use. A Gauntlet tier has no standing, so it keeps
+                        // the power ratio — that one was never broken.
+                        const mine = o.vp != null ? (Number(st.me?.vp) || 0) : (Number(st.me?.power) || 0);
+                        const theirs = o.vp != null ? (Number(o.vp) || 0) : (Number(o.power) || 0);
+                        const ratio = theirs / Math.max(1, mine);
                         const band = ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy";
                         const top = (o.reward?.laurels || 0) === best && best > 0;
                         return (
@@ -3797,8 +3824,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 <span className="ar-pick-pay">
                                     {top ? <s className="ar-pick-best">Best purse</s> : null}
                                     <b><GiLaurelCrown aria-hidden="true" />{money(o.reward?.laurels || 0)}</b>
-                                    <em>{o.reward?.vp ? `${o.reward.vp} VP at stake` : "laurels only"}</em>
-                                    {o.reward?.lossLaurels ? <i>{money(o.reward.lossLaurels)} even if you lose</i> : null}
+                                    {/* ── BOTH SIDES OF THE BET ────────────────────────────────────────
+                                        This used to read "215 VP at stake" over "84 even if you lose" — two
+                                        numbers in two different currencies stacked as though they were a pair.
+                                        The 84 was LAURELS, so the line under a VP number was answering a
+                                        question nobody had asked, and the VP you actually risked appeared
+                                        nowhere at all.
+                                        Luke: "I would expect to see just the vp I would earn or lose if I
+                                        choose to fight them." So: the two VP numbers, won and lost, and the
+                                        laurel purse stays the headline above them. */}
+                                    {o.reward?.vp ? (
+                                        <em className="ar-pick-vp">
+                                            <span className="is-win">+{money(o.reward.vp)}</span>
+                                            <span className="is-lose">−{money(o.reward.vpLoss || 0)}</span>
+                                            <span className="is-unit">VP</span>
+                                        </em>
+                                    ) : <em>laurels only</em>}
                                 </span>
                             </button>
                         );
@@ -3911,11 +3952,13 @@ export function PurserPanel({ st, busy, act }) {
     );
 }
 
-function AwayReport({ rows, onClose }) {
+function AwayReport({ away, onClose }) {
     useScrollLock(true);
+    const rows = away?.per || [];
     const earned = rows.reduce((n, r) => n + (r.laurels || 0), 0);
     const held = rows.reduce((n, r) => n + (r.held || 0), 0);
     const bouts = rows.reduce((n, r) => n + (r.bouts || 0), 0);
+    const vp = Number(away?.vp) || 0;
     return (
         <Portal>
             <div className="ar-away" role="dialog" aria-modal="true">
@@ -3929,6 +3972,23 @@ function AwayReport({ rows, onClose }) {
                         <div className="ar-away-earned">
                             <img src={LAUREL} alt="" className="ar-laurel" draggable="false" />
                             <b>+{money(earned)}</b> laurels — your build fought for you
+                        </div>
+                    ) : null}
+                    {/* ── AND WHERE IT LEFT YOU ────────────────────────────────────────────────────────
+                        Luke: "I need this to show me how much vp I went up or down and what my new vp point
+                        total is and my new ranking in vp."
+                        The laurels are the wage; THIS is the scoreboard, and it was the part missing. The
+                        delta is signed and coloured, and the two facts under it are what the delta did — a
+                        number with no total beside it cannot tell you whether the night went well. */}
+                    {away?.vpNow != null ? (
+                        <div className="ar-away-vp">
+                            <span className={`ar-away-vpd ${vp > 0 ? "is-up" : vp < 0 ? "is-down" : "is-flat"}`}>
+                                {vp > 0 ? "+" : vp < 0 ? "−" : ""}{money(Math.abs(vp))} VP
+                            </span>
+                            <span className="ar-away-vps">
+                                <b>{money(away.vpNow)}</b> total
+                                {away.rank ? <> · <b>#{away.rank}</b>{away.rankTotal ? ` of ${away.rankTotal}` : ""}</> : null}
+                            </span>
                         </div>
                     ) : null}
                     <div className="ar-away-list">
@@ -3949,7 +4009,10 @@ function AwayReport({ rows, onClose }) {
                                             : (r.lost > 1 ? `beat you ${r.lost} times` : "beat you")}
                                     </em>
                                 </span>
-                                {r.laurels > 0 ? <span className="ar-away-pos">+{r.laurels}</span> : null}
+                                <span className="ar-away-pos">
+                                    {r.laurels > 0 ? <b>+{r.laurels}</b> : null}
+                                    {r.vp ? <i className={r.vp > 0 ? "is-up" : "is-down"}>{r.vp > 0 ? "+" : "−"}{money(Math.abs(r.vp))} VP</i> : null}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -5172,7 +5235,21 @@ function Styles() {
             .ar-away-row.is-loss { border-left-color: #ff6f7d; }
             .ar-away-text b { display: block; font-size: 12.5px; color: #e9eef3; }
             .ar-away-text em { font-style: normal; font-size: 11px; color: #9a8fb5; }
-            .ar-away-pos { font-size: 12px; font-weight: 900; color: #cdb894; font-variant-numeric: tabular-nums; }
+            .ar-away-pos { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: none;
+                font-size: 12px; font-weight: 900; color: #cdb894; font-variant-numeric: tabular-nums; }
+            .ar-away-pos i { font-style: normal; font-size: 10px; font-weight: 800; }
+            .ar-away-pos i.is-up, .ar-away-vpd.is-up, .ar-recap-away em .is-up { color: #7effb2; }
+            .ar-away-pos i.is-down, .ar-away-vpd.is-down, .ar-recap-away em .is-down { color: #ff8f9c; }
+            /* ── THE STANDING ── the delta big, and what it did to the total under it. Sits directly beneath
+               the laurel payout because the two together are the whole answer to "what happened overnight". */
+            .ar-away-vp { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0 0 12px;
+                padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,0.04);
+                border: 1px solid rgba(255,255,255,0.09); }
+            .ar-away-vpd { font-family: var(--font-display); font-size: 1.5rem; font-weight: 900; line-height: 1;
+                font-variant-numeric: tabular-nums; }
+            .ar-away-vpd.is-flat { color: #98a0aa; }
+            .ar-away-vps { font-size: 11.5px; color: #a4adb7; font-variant-numeric: tabular-nums; }
+            .ar-away-vps b { color: #fff; font-weight: 800; }
 
             .ar-clash { margin: 8px 0 0; font-size: 12.5px; font-weight: 800; text-align: center; }
             .ar-clash.is-good { color: #8bf0b4; }
@@ -5741,6 +5818,13 @@ function Styles() {
             .ar-pick-pay b svg { width: 15px; height: 15px; opacity: .9; }
             .ar-pick-pay em { display: block; font-style: normal; font-size: 9.5px; color: #98a0aa; margin-top: 1px; }
             .ar-pick-pay i { display: block; font-style: normal; font-size: 9px; color: #7d858f; margin-top: 2px; }
+            /* The stake, both ways. Green over red so the sign is read from the colour before the glyph is,
+               and tabular figures so the two numbers line up under each other down the whole list. */
+            .ar-pick-vp { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px;
+                font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+            .ar-pick-vp .is-win { color: #7effb2; }
+            .ar-pick-vp .is-lose { color: #ff8f9c; }
+            .ar-pick-vp .is-unit { color: #7d858f; font-weight: 700; font-size: 9px; }
             /* The one worth taking, said out loud. A sheen crosses it every few seconds — the only animated
                thing in the list, so it is the only thing that pulls the eye. */
             .ar-pick-best { display: block; text-decoration: none; font-size: 8px; font-weight: 900;

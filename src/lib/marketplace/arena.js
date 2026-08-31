@@ -22,7 +22,7 @@ import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower
 import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.js";
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
-    vpTransfer, vpStakePreview,
+    vpTransfer, vpStakePreview, vpLossPreview,
     lossLaurels, vpFor,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
@@ -807,6 +807,31 @@ async function standings() {
           ORDER BY a.vp DESC, a.wins DESC, b.alias ASC`
     ).catch(() => []);
     if (!rows.length) return [];
+    // ── THE RECORD IS AGAINST PEOPLE ─────────────────────────────────────────────────────────────────────
+    // Luke: "is their win loss record against people or does that include the road? it should just be against
+    // people."
+    //
+    // It included the road. `mkt_arena.wins/losses` increments on EVERY settle — a rung, a Gauntlet tier and a
+    // real member all land in the same two counters — so a card reading "345W/338L" was mostly somebody's
+    // Long Road, and two members with identical PvP records read completely differently depending on how much
+    // solo content each had ground. That is the one number on the card that is supposed to tell you what
+    // happens when this person fights a person.
+    //
+    // Counted off mkt_arena_bout, which has carried `kind` since the telemetry went in. BOTH SIDES: a defence
+    // you were not present for is still a fight against a person, and it is already reported as one in the
+    // while-you-were-away recap. ONE aggregate for the whole board (5.5k rows, 3.1k of them member) — a single
+    // round trip, not a return of the three bulk reads the note below is about.
+    const recs = await db.query(
+        `WITH m AS (
+             SELECT challenger_id AS id, challenger_won AS won FROM mkt_arena_bout WHERE kind = 'member'
+             UNION ALL
+             SELECT defender_id AS id, NOT challenger_won AS won FROM mkt_arena_bout
+              WHERE kind = 'member' AND defender_id IS NOT NULL
+         )
+         SELECT id::text AS id, COUNT(*) FILTER (WHERE won)::int AS w, COUNT(*) FILTER (WHERE NOT won)::int AS l
+           FROM m GROUP BY id`
+    ).catch(() => []);
+    const rec = new Map((recs?.rows || recs || []).map((r) => [String(r.id), r]));
     // ── THE BOARD IS A LADDER, NOT A STAT SHEET ──────────────────────────────────────────────────────────
     // This used to assemble every member's fighter — equipped stats in bulk, badge passives in bulk, and a
     // primePowers pass over everyone with XP — purely so the board could print a damage and health number
@@ -831,8 +856,10 @@ async function standings() {
         name: r.display_name || r.alias || "A member",
         sprite: r.avatar_sprite_url || null,
         level: levelForXp(Number(r.xp) || 0).level,
-        wins: r.wins,
-        losses: r.losses,
+        // Against people only — see the note above. Falls back to nothing rather than to the all-content
+        // counters, because a number that silently means something else is worse than a blank.
+        wins: Number(rec.get(String(r.buyer_id))?.w) || 0,
+        losses: Number(rec.get(String(r.buyer_id))?.l) || 0,
     }));
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
@@ -1039,8 +1066,10 @@ export async function getArenaState(buyerId, pre = {}) {
     const targets = board
         .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)))
         .map((o) => ({ ...o, reward: {
-            // What the bout would actually move, from the same function the settle uses.
+            // What the bout would actually move, from the same function the settle uses — both ways.
+            // Luke: "I would expect to see just the vp I would earn or lose if I choose to fight them."
             vp: vpStakePreview(myVp, Number(o.vp) || 0),
+            vpLoss: vpLossPreview(myVp, Number(o.vp) || 0),
             // A member, so the PvP premium applies — the card must promise what finishBout will pay.
             laurels: boutLaurels({ won: true, myPower: Math.max(1, myVp), theirPower: Math.max(1, Number(o.vp) || 0), kind: "member" }),
             // What a defeat is worth at best and at worst, so "challenge upward" is a visible offer rather
@@ -1323,6 +1352,8 @@ async function awayReport(buyerId, row) {
                 SUM(CASE WHEN ab.challenger_won THEN 1 ELSE 0 END)::int AS lost,
                 SUM(CASE WHEN ab.challenger_won THEN 0 ELSE 1 END)::int AS held,
                 SUM(COALESCE(ab.defender_laurels, 0))::int AS laurels,
+                -- The defender's own change. COALESCE to -vp for rows written before migration 421.
+                SUM(COALESCE(ab.defender_vp, -ab.vp))::int AS vp,
                 COUNT(*)::int AS bouts,
                 MAX(ab.created_at) AS last_at,
                 bc.display_name AS c_name, bc.alias AS c_alias, bc.avatar_sprite_url AS c_sprite
@@ -1335,13 +1366,38 @@ async function awayReport(buyerId, row) {
         [buyerId, since]
     ).catch(() => []);
     if (!rows.length) return null;
-    return rows.map((r) => ({
+    const per = rows.map((r) => ({
         them: { name: r.c_name || r.c_alias, sprite: r.c_sprite },
         bouts: r.bouts,
         held: r.held,          // times your loadout turned them away
         lost: r.lost,          // times they beat it
         laurels: r.laurels,    // what defending earned you, already paid
+        vp: Number(r.vp) || 0, // and what each of them cost or paid you in standing
     }));
+    // ── AND WHERE THAT LEFT YOU ──────────────────────────────────────────────────────────────────────────
+    // Luke: "I need this to show me how much vp I went up or down and what my new vp point total is and my
+    // new ranking in vp."
+    //
+    // The recap told you that five people came for your spot and what the laurels were, and then stopped —
+    // which is the half that does not matter. The reason to care that somebody attacked you overnight is
+    // whether you are still where you were, and that answer was nowhere on the screen.
+    //
+    // The rank is counted, not looked up: one COUNT of the members standing above you, which is the same
+    // ordering `standings()` uses. `total` is the field it is out of, so "7th" has a denominator.
+    const place = await db.queryOne(
+        `SELECT (SELECT COUNT(*) FROM mkt_arena a2 JOIN mkt_buyer b2 ON b2.id = a2.buyer_id
+                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > $1)::int + 1 AS rank,
+                (SELECT COUNT(*) FROM mkt_arena a3 JOIN mkt_buyer b3 ON b3.id = a3.buyer_id
+                  WHERE COALESCE(b3.xp,0) > 0)::int AS total`,
+        [Number(row?.vp) || 0]
+    ).catch(() => null);
+    return {
+        per,
+        vp: per.reduce((n, x) => n + x.vp, 0),        // what the whole night moved
+        vpNow: Number(row?.vp) || 0,                  // and where it left you
+        rank: place?.rank ?? null,
+        rankTotal: place?.total ?? null,
+    };
 }
 
 /** Mark the away report read, so it is shown once and not on every visit. */
@@ -2678,11 +2734,14 @@ async function finishBout(buyerId, row, b, won) {
     const boutKind = boutKindOf(b);
     const isMemberFoe = boutKind === "member" && UUID_RE.test(String(b.foe?.id || ""));
     await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels, telemetry, kind, rung)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12)`,
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels, telemetry, kind, rung, defender_vp)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13)`,
         [buyerId, isMemberFoe ? b.foe.id : null, npcTier || null, won, (b.log || []).length, vp, laurels,
             JSON.stringify(feats.map((f) => f.id)), defencePaid, JSON.stringify(boutTelemetry(b, won)),
-            boutKind, boutRungOf(b) || null]
+            boutKind, boutRungOf(b) || null,
+            // The OTHER side's change, not the negation of this one: `vp` above carries the attacker's feat
+            // bonus, which is minted rather than taken off the defender. See migration 421.
+            isMemberFoe && moved > 0 ? (won ? -moved : moved) : null]
         // NOT swallowed. A telemetry write that fails silently is worse than no telemetry, because the empty
         // table reads as "this never happens" instead of "this is broken".
     ).catch((e) => console.error("arena.bout.telemetry_failed", buyerId, boutKind, e?.message || e));

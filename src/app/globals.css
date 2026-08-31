@@ -23589,15 +23589,8 @@ body.cas-seated .social-fab { display: none; }
 .farm-bulk-btn.is-fert { border-color: rgba(140,200,255,0.45); color: #bfe0ff; }
 
 /* ── THE QUICK PANEL ──────────────────────────────────────────────────────────────────────────────────────────
-   Chores gathered into one sheet, opened from a button that floats over the farm rather than living in the tab
-   bar — none of this is a destination, it is what you do on the way past. */
-.qp-open { position: fixed; right: 14px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 60;
-  width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-  color: #1a1206; background: linear-gradient(180deg, #ffd75e, #e8a92c);
-  border: 1px solid rgba(255,240,190,0.7); box-shadow: 0 6px 18px rgba(0,0,0,0.5), 0 0 22px -6px rgba(255,215,94,0.7); }
-.qp-open svg { width: 24px; height: 24px; }
-.qp-open:active { transform: translateY(1px); }
-
+   Chores gathered into one sheet, opened by the Quick pill in the scene toolbar — none of this is a
+   destination, it is what you do on the way past. */
 .qp-back { position: fixed; inset: 0; z-index: 400; display: grid; place-items: end center; padding: 12px;
   background: rgba(4,6,12,0.72); backdrop-filter: blur(3px); }
 .qp { width: min(460px, 100%); max-height: min(84dvh, 760px); overflow-y: auto; padding: 14px 14px 18px;

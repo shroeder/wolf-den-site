@@ -1,0 +1,13 @@
+-- ── WHAT THE DEFENDER'S SIDE OF A BOUT ACTUALLY MOVED ────────────────────────────────────────────────────────
+-- Luke: "I need this to show me how much vp I went up or down and what my new vp point total is and my new
+-- ranking in vp."
+--
+-- The while-you-were-away recap reports fights the member was not present for, and until now it could only
+-- report LAURELS. The VP was there in mkt_arena_bout all along — but `vp` is the CHALLENGER's change, and on a
+-- bout the challenger won it is `moved + featVp`, where the feat bonus is minted rather than taken off the
+-- defender. So negating it overstates every defeat by whatever feats the attacker happened to land.
+--
+-- This is the defender's own number, written at the same moment the transfer is applied. Old rows stay NULL and
+-- the recap falls back to -vp for them, which is exact on a defence you held and slightly pessimistic on one
+-- you lost — for bouts that happened before this column existed and will never happen again.
+ALTER TABLE mkt_arena_bout ADD COLUMN IF NOT EXISTS defender_vp integer;

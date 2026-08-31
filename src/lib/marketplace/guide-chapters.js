@@ -173,7 +173,7 @@ export const GUIDE_CHAPTERS = [
         id: "jeweller", name: "The Jeweller", minLevel: 12, tint: "#4fd18b", icon: "/images/guide/ch-jeweller.webp",
         blurb: "A reason to keep the piece you already like.",
         steps: [
-            { key: "jewel_socket", label: "Cut a socket", why: "One socket per item, permanent, and priced off the item's rarity — 1,500 gold into a common is a cheap experiment, 20,000 into a mythic is a commitment. Cut it into something you actually intend to keep wearing.", href: "/marketplace/jeweller", cta: "Open the bench", gold: 125, events: ["socket_cut"] },
+            { key: "jewel_socket", label: "Cut a socket", why: "One socket per item, permanent, and priced off the item's rarity — 250 gold into a common, 3,333 into a mythic. Cut it into something you actually intend to keep wearing.", href: "/marketplace/jeweller", cta: "Open the bench", gold: 125, events: ["socket_cut"] },
             { key: "jewel_set", label: "Set a gem in it", why: "Five kinds, one per combat stat, five tiers each. The gem is separate from the item, so a lucky drop is useful the moment it lands instead of only if it happens to beat what you are already wearing.", href: "/marketplace/jeweller", cta: "Set a stone", gold: 175, events: ["gem_set"] },
         ],
         reward: { gold: 350, chest: "gold" },

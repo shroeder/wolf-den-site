@@ -108,6 +108,9 @@ export const SEED_BANDS = {
     spin_mini: { rare: 30, epic: 51, legendary: 16, mythic: 3 },
     // A cast. The haul table decides; this decides which.
     fishing: { common: 26, rare: 44, epic: 24, legendary: 6 },
+    // The hog's daily box. Every member opens one every day, so it sits BELOW a cast — it is the floor under
+    // a seed bag, not a reason to stop fishing — and it never reaches legendary.
+    loot_pig: { common: 34, rare: 46, epic: 20 },
     // A won ship battle is not farming, so it reaches past what a cast can.
     ship_battle: { rare: 40, epic: 46, legendary: 12, mythic: 2 },
     // The mine, by depth. The deep card is one of only two places a Star Fruit can come from.
@@ -654,10 +657,16 @@ export async function applyFertilizer(buyerId, slot) {
 // on its own, because it IS the same call. A bulk action that grew its own copy of the payout would be a
 // second farm to keep in step.
 //
-// ⚠️ ENCOUNTERS STOP THE RUN. maybeStartEncounter parks a pending fight on the row, and a second harvest while
-// one is parked would either overwrite it or be refused — either way somebody loses a fight they were owed. So
-// the first harvest that raises one ends the sweep and hands it back; the rest of the garden is still standing
-// and one more tap finishes it after the fight.
+// ENCOUNTERS NO LONGER STOP THE RUN. They used to: the sweep broke on the first critter so the pending fight
+// could not be overwritten by the next harvest. But an encounter has not been a fight for a long time —
+// maybeStartEncounter GRANTS the whole reward at spawn and parks the row purely as a reveal (see the note above
+// grantEncounterReward). So the parked row is a message, not an entitlement, and dropping one costs nothing.
+//
+// Luke: "when i harvest all it stops and makes me do the farm encounter, can we make it harvest all, and auto
+// do the encounters, then show you a recap?"
+//
+// So the sweep runs the whole garden, collects every critter it turned up, and clears the parked row itself —
+// otherwise a leftover pending would pop the single-harvest modal on top of the recap that already reported it.
 export async function harvestAll(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     const ready = await db.query(
@@ -665,24 +674,41 @@ export async function harvestAll(buyerId) {
     ).catch(() => []);
     const slots = (ready?.rows || ready || []).map((r) => Number(r.slot));
     if (!slots.length) return { ok: false, error: "nothing_ready" };
-    let gold = 0, xp = 0, encounter = null;
+    let gold = 0, xp = 0, petXp = 0, goldAfter = null, petFed = null;
     const names = [];
     const chests = [];
     const seeds = [];
+    const encounters = [];
+    const newPets = [];
     for (const slot of slots) {
         const r = await harvestPlot(buyerId, slot).catch(() => null);
         if (!r?.ok) continue;
         gold += Number(r.gold) || 0;
         xp += Number(r.xp) || 0;
+        if (r.goldAfter != null) goldAfter = r.goldAfter;
+        // `petFed` is the whole feed — {petId, name, emoji, xp, level, leveled} — not a number. Every plot
+        // feeds the SAME equipped pet, so the recap wants one line with the total on it, and it should say
+        // "levelled" if any plot in the sweep was the one that did it.
+        if (r.petFed) {
+            petXp += Number(r.petFed.xp) || 0;
+            petFed = { ...r.petFed, xp: petXp, leveled: Boolean(petFed?.leveled) || Boolean(r.petFed.leveled) };
+        }
         if (r.name) names.push(r.name);
         if (r.chest) chests.push(r.chest);
         if (r.savedSeed) seeds.push(r.savedSeed);
         if (r.foundSeed) seeds.push(r.foundSeed);
-        if (r.encounter) { encounter = r.encounter; break; }   // see the note above — the fight is owed now
+        if (r.newPet) newPets.push(r.newPet);
+        // The critter's XP, gold and loot were already paid inside harvestPlot. Keep the announcement.
+        if (r.encounter) encounters.push(r.encounter);
     }
-    if (!names.length && !encounter) return { ok: false, error: "nothing_ready" };
-    return { ok: true, harvested: names.length, names, gold, xp, chests, seeds, encounter,
-        garden: await getGarden(buyerId) };
+    if (!names.length) return { ok: false, error: "nothing_ready" };
+    // Every critter in `encounters` has been reported here, so nothing is left parked to pop a second modal
+    // over the recap. Clearing it is also what makes the sweep safe to run again immediately.
+    if (encounters.length) {
+        await db.query(`UPDATE mkt_buyer SET farm_encounter = NULL WHERE id = $1`, [buyerId]).catch(() => {});
+    }
+    return { ok: true, harvested: names.length, names, gold, xp, petFed, chests, seeds, encounters, newPets,
+        goldAfter, garden: await getGarden(buyerId) };
 }
 
 // Fill every empty plot with one seed. The seed list the member picks from is their own bag, so `seedId` is
@@ -807,12 +833,13 @@ export async function buyUpgrade(buyerId, key) {
 
 // Grant a seed (or a random weighted one) to a member. Called by other game systems when they "find" a seed;
 // the drop chance passed in is scaled by the member's Forager upgrade.
-export async function grantSeed(buyerId, seedId) {
+export async function grantSeed(buyerId, seedId, qty = 1) {
+    const n = Math.max(1, Math.round(Number(qty) || 1));
     if (!buyerId || !SEEDS[seedId]) return;
     await db.query(
-        `INSERT INTO mkt_farm_seed (buyer_id, seed_id, count) VALUES ($1, $2, 1)
-         ON CONFLICT (buyer_id, seed_id) DO UPDATE SET count = mkt_farm_seed.count + 1`,
-        [buyerId, seedId]
+        `INSERT INTO mkt_farm_seed (buyer_id, seed_id, count) VALUES ($1, $2, $3)
+         ON CONFLICT (buyer_id, seed_id) DO UPDATE SET count = mkt_farm_seed.count + EXCLUDED.count`,
+        [buyerId, seedId, n]
     ).catch(() => {});
 }
 

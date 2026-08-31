@@ -24,17 +24,8 @@ import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js"
 import { getStandState } from "@/lib/marketplace/petting-stand.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { getSetting } from "@/lib/settings.js";
 import { powerRoll, hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
-
-// Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
-const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
-export async function getCrownConfig() {
-    const raw = await getSetting("loot_pig_crown", null).catch(() => null);
-    if (!raw) return CROWN_DEFAULT;
-    try { const c = JSON.parse(raw); return { top: Number(c.top ?? CROWN_DEFAULT.top), side: Number(c.side ?? CROWN_DEFAULT.side), size: Number(c.size ?? CROWN_DEFAULT.size) }; } catch { return CROWN_DEFAULT; }
-}
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -43,35 +34,15 @@ export async function getCrownConfig() {
 // is TEXT → ::text.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, matches the rest of the game
 
-// ── WHEN THE PIG COMES ROUND ─────────────────────────────────────────────────────────────────────────────────
-// The pig used to be available from midnight, which in practice meant it charged through on the FIRST time you
-// opened your farm that day, every day, for everybody. Once you have seen that twice it is not a rampaging
-// animal any more, it is a login bonus with hooves — the surprise was spent on the most predictable moment in
-// the day.
+// ── WHEN THE PIG COMES ROUND: HE DOESN'T, ANY MORE ───────────────────────────────────────────────────────────
+// There used to be an arrival hour here — a per-member, per-day hash so "is he there today?" had no answer you
+// could be sure of before you looked. It was answering a real problem (from midnight, he charged through on the
+// first farm visit of the day, every day, for everybody, which is a login bonus with hooves) but it answered it
+// by making a guaranteed daily reward MISSABLE, and then the chase made it missable twice.
 //
-// So each member gets their own arrival TIME, different every day and unknowable in advance: visit before it
-// and the field is empty, visit after and he may be waiting. The point is that "is he there today?" stops
-// having an answer you can be sure of before you look.
-//
-// Derived from a hash of (member, date) rather than stored, so there is no column, no cron, no row to go
-// stale — and it is stable within the day, so two page loads a minute apart cannot roll different answers and
-// make him flicker in and out.
-const PIG_FROM = 6;    // earliest arrival, store-local hour
-const PIG_UNTIL = 18;  // and the latest, so an evening visit always catches a pig you have not claimed
-function pigHourFor(buyerId, ymd) {
-    let h = 2166136261;
-    for (const ch of `${buyerId}:${ymd}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-    // ── AND THEN MIX IT PROPERLY ─────────────────────────────────────────────────────────────────────────
-    // FNV alone is not enough here. Consecutive dates differ by one character, and the raw hash walks in
-    // step with them: the first cut gave one member 10:01, 13:00, 15:59, 06:58 — exactly three hours later
-    // every day, which is a schedule anybody would spot inside a week and the opposite of the point. This is
-    // the standard 32-bit avalanche finaliser; after it, one character of input changes half the output bits.
-    h ^= h >>> 16; h = Math.imul(h, 2246822507);
-    h ^= h >>> 13; h = Math.imul(h, 3266489909);
-    h ^= h >>> 16;
-    // >>> 0 first: Math.imul returns a SIGNED int, and a negative modulo would put the pig before dawn.
-    return PIG_FROM + ((h >>> 0) % ((PIG_UNTIL - PIG_FROM) * 60)) / 60;
-}
+// Luke: "can we make it so the loot pig event is less annoying." The fix is the other direction — he calls while
+// you are out and leaves a box. There is nothing to be early for and nothing to catch, so there is nothing left
+// for an arrival hour to schedule. PIG_FROM, PIG_UNTIL and pigHourFor went with the chase.
 export const PET_PET_XP = 30; // pet XP the fed pet gains per petting
 const PET_PET_GOLD = 12; // gold YOU earn per petting (petting is rewarding, not just chores)
 const PET_PET_PLAYER_XP = 5; // player XP you earn per petting
@@ -93,7 +64,13 @@ const PET_RECHARGE_AMOUNT = 3; // extra pettings granted per paid recharge
 const PET_RECHARGE_BASE = 500; // gold cost of the FIRST recharge each day; doubles every recharge (500 → 1000 → 2000 …), resets daily
 const rechargeCost = (n) => PET_RECHARGE_BASE * 2 ** n;
 // Wild Loot Pig
-const PIG_GOLD_MIN = 100, PIG_GOLD_MAX = 250;
+// ── THE BOX'S GOLD ───────────────────────────────────────────────────────────────────────────────────────
+// Luke: "100 to 500 gold". This is the roll BEFORE mint(), which is the same place the old 100–250 was read —
+// so the top of the band doubles and the faucet rate stays the one lever it has always been. What lands in
+// the wallet is GOLD_MINT_RATE of this (0.4 today), i.e. 40–200.
+const PIG_GOLD_MIN = 100, PIG_GOLD_MAX = 500;
+// How many of the one crop and the one seed. Luke: "1 to 5 of a random crop, 1 to 5 of a random seed."
+const PIG_STACK_MIN = 1, PIG_STACK_MAX = 5;
 const PIG_ITEM_CHANCE = 0.2; // chance the pig drops an item at all
 const PIG_RARITY_WEIGHTS = { common: 65, rare: 28, epic: 7 }; // up to 3rd tier, weighted toward the low end
 const PIG_PET_CHANCE = 0.03; // rare chance the pig gifts the farm-only Golden Goose pet
@@ -283,17 +260,12 @@ function flatBudget(b, own) {
 async function farmMineBits(buyerId, mine = true) {
     const [cons, wallet, rawBudget] = await Promise.all([
         listConsumables(buyerId).catch(() => ({ stash: [], shop: [] })),
-        // `pig_hour` is the store-local time NOW, so the arrival check below can be made in JS against the
-        // member's own hash-derived hour without a second round trip or a clock that disagrees with the DAY.
         db.queryOne(
             `SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc,
                     (pig_day IS DISTINCT FROM ${DAY}) AS pig_unclaimed,
                     -- The hog turned him around today and that second visit is still unspent. Without this
                     -- the pig vanished the instant the first was claimed, and the perk could never fire.
-                    (pig_again_day = ${DAY} AND pig_second_day IS DISTINCT FROM ${DAY}) AS pig_again,
-                    ${DAY}::text AS today,
-                    EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'America/Chicago'))
-                      + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE 'America/Chicago')) / 60.0 AS local_hour
+                    (pig_again_day = ${DAY} AND pig_second_day IS DISTINCT FROM ${DAY}) AS pig_again
                FROM mkt_buyer WHERE id = $1`, [buyerId]
         ).catch(() => null),
         pettingBudget(buyerId),
@@ -325,19 +297,26 @@ async function farmMineBits(buyerId, mine = true) {
     const treatShop = (cons.shop || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), price: o.effectivePrice ?? o.price, canAfford: o.canAfford }));
-    // He is only about once he has ARRIVED — see pigHourFor. Unclaimed is necessary and no longer sufficient.
-    const arrived = wallet
-        ? Number(wallet.local_hour) >= pigHourFor(buyerId, wallet.today)
-        : false;
-    // ── AND A SECOND VISIT PUTS HIM BACK ON THE FARM ─────────────────────────────────────────────────
-    // A turned-around pig does NOT wait for the arrival hour again — that hour is about when he first shows
-    // up, and making the member wait a second unknowable stretch for a bonus they already earned would read
-    // as the perk not working. He comes back the same day, once, and this is what says so.
+    // ── THE BOX IS THERE ALL DAY ─────────────────────────────────────────────────────────────────────────
+    // Luke: "can we make it so the loot pig event is less annoying. maybe we just have him leave you a gift
+    // box every day that you get to open."
+    //
+    // He used to turn up at an hour picked per member per day and unknowable in advance, and you had to be
+    // looking at the farm when he did, and then CHASE him — he ambled off after eight waypoints and took the
+    // coins with him. Three ways to miss a daily reward that was never in doubt.
+    //
+    // Now he comes by while you are not looking and leaves the box behind. It sits on the farm from the start
+    // of the day until you open it, which is the whole of what a daily should ask of anybody. The arrival hour
+    // is gone with the chase; the atomic once-a-day claim on `pig_day` is what actually guards the reward, and
+    // it always was.
+    //
+    // ── AND A SECOND VISIT PUTS A SECOND BOX DOWN ────────────────────────────────────────────────────
+    // The Truffle Hog perk turns him around for another one the same day.
     const again = Boolean(wallet?.pig_again);
     return {
         treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting,
-        pigAvailable: (Boolean(wallet?.pig_unclaimed) && arrived) || again,
-        // The client says something different for a return visit, so it needs to know which one this is.
+        pigAvailable: Boolean(wallet?.pig_unclaimed) || again,
+        // The client says something different for a second box, so it needs to know which one this is.
         pigSecond: again && !wallet?.pig_unclaimed,
     };
 }
@@ -345,17 +324,8 @@ async function farmMineBits(buyerId, mine = true) {
 // The Wild Loot Pig payout — once per store-local day, guarded atomically. Rolls gold + a rare item drop.
 export async function claimPig(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
-    // ── HE HAS TO HAVE TURNED UP ─────────────────────────────────────────────────────────────────────────
-    // The arrival time is enforced HERE as well as in the view. Gating it only where the pig is drawn would
-    // make the whole schedule a client-side suggestion: a crafted POST at 00:01 would collect every day.
-    const clock = await db.queryOne(
-        `SELECT ${DAY}::text AS today,
-                EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'America/Chicago'))
-                  + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE 'America/Chicago')) / 60.0 AS local_hour`
-    ).catch(() => null);
-    if (clock && Number(clock.local_hour) < pigHourFor(buyerId, clock.today)) {
-        return { ok: false, error: "no_pig" };
-    }
+    // No arrival hour any more — the box is on the farm from the start of the day (see the note in the view).
+    // What guards the reward is the atomic claim below, which is the only thing that ever did.
     const claim = await db.queryOne(`UPDATE mkt_buyer SET pig_day = ${DAY} WHERE id = $1 AND pig_day IS DISTINCT FROM ${DAY} RETURNING id`, [buyerId]).catch(() => null);
 
     // ── THE HOG DECIDES AT THE FIRST CLAIM, NOT AT THE SECOND ────────────────────────────────────────
@@ -390,6 +360,32 @@ export async function claimPig(buyerId) {
     const gold = mint(PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1), "loot_pig");
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
+
+    // ── WHAT IS ACTUALLY IN THE BOX ──────────────────────────────────────────────────────────────────────
+    // Luke: "it has random amounts of money and seeds and crops in it. 1 to 5 of a random crop, 1 to 5 of a
+    // random seed, and 100 to 500 gold."
+    //
+    // One KIND of each, several of it — a stack you can see the point of, rather than five singles of five
+    // things. Both kinds are drawn from the same `loot_pig` band, which sits below a fishing cast because
+    // every member opens one of these every day.
+    //
+    // Crops go to the PANTRY, which is where a harvested crop goes, so the box feeds the kitchen the same way
+    // the garden does rather than inventing a second kind of crop.
+    const { SEEDS, SEED_BANDS, grantSeed } = await import("@/lib/marketplace/farm-crops.js");
+    const { addToPantry } = await import("@/lib/marketplace/cooking.js");
+    const pickBanded = () => {
+        const rarity = weightedPick(SEED_BANDS.loot_pig);
+        const pool = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === rarity);
+        return pool.length ? pool[randInt(pool.length)] : "wheat";
+    };
+    const seedId = pickBanded();
+    const seedQty = PIG_STACK_MIN + randInt(PIG_STACK_MAX - PIG_STACK_MIN + 1);
+    await grantSeed(buyerId, seedId, seedQty).catch(() => {});
+    const cropId = pickBanded();
+    const cropQty = PIG_STACK_MIN + randInt(PIG_STACK_MAX - PIG_STACK_MIN + 1);
+    await addToPantry(buyerId, "crop", cropId, cropQty).catch(() => {});
+    const seeds = { id: seedId, name: SEEDS[seedId]?.name || seedId, emoji: SEEDS[seedId]?.emoji || "🌱", rarity: SEEDS[seedId]?.rarity || "common", qty: seedQty };
+    const crops = { id: cropId, name: SEEDS[cropId]?.name || cropId, emoji: SEEDS[cropId]?.emoji || "🌾", rarity: SEEDS[cropId]?.rarity || "common", qty: cropQty };
     // The hog's pockets, and the goose. Asked once and used twice — the two rolls are one visit.
     const pigFortune = await fortuneFor(buyerId).catch(() => 0);
     let item = null;
@@ -409,11 +405,11 @@ export async function claimPig(buyerId) {
         const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', 'golden_goose') ON CONFLICT DO NOTHING RETURNING ref`, [buyerId]).catch(() => []);
         if (ins.length) { const def = collectibleById("golden_goose"); pet = { id: "golden_goose", name: def?.name || "Golden Goose", rarity: def?.rarity || "epic", hint: def?.hint || null }; }
     }
-    await trackActivity(buyerId, "loot_pig", { gold, item: item?.name || null, pet: pet?.name || null }).catch(() => {});
+    await trackActivity(buyerId, "loot_pig", { gold, seed: `${seedId}x${seedQty}`, crop: `${cropId}x${cropQty}`, item: item?.name || null, pet: pet?.name || null }).catch(() => {});
     await syncEarnedBadges(buyerId).catch(() => {}); // Pig Whisperer / Pig Tycoon
     // `again` tells the screen the hog turned him around, so the moment can be announced when it is earned
     // rather than leaving the member to notice a pig they were not expecting.
-    return { ok: true, gold, goldAfter: paid?.gold ?? null, item, pet, again: turnedAround };
+    return { ok: true, gold, goldAfter: paid?.gold ?? null, seeds, crops, item, pet, again: turnedAround };
 }
 
 // A member's farm state. viewerId === ownerId ⟺ it's your farm (petting enabled + per-pet "petted today" flags).
@@ -522,12 +518,11 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const [garden, ratingBits, placements, decorations, crownCfg, neighbours, collections, loveBoard] = await Promise.all([
+    const [garden, ratingBits, placements, decorations, neighbours, collections, loveBoard] = await Promise.all([
         mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
         mine ? decoState(viewerId).catch(() => null) : Promise.resolve(null), // your inventory — manage on your own farm only
-        getCrownConfig().catch(() => null), // loot-pig crown placement (owner-calibrated)
         // Only on your OWN farm: the "who haven't I visited today" strip. On someone else's you are already
         // doing the visiting, and a list of other people to go and see is the last thing that screen needs.
         mine ? farmNeighbours(viewerId, { limit: 8 }).catch(() => []) : Promise.resolve([]),
@@ -576,7 +571,6 @@ export async function getFarm(ownerId, viewerId) {
             stones: await (await import("@/lib/marketplace/pet-ascension.js")).getStones(ownerId).catch(() => ({})),
         } : null,
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
-        crownCfg, // loot-pig crown placement
         neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
         collections, // own farm only: the Harvester / Forager chases, always visible
         loveBoard, // own farm only: { top, mine } — the most-loved farms, for the Standing tab

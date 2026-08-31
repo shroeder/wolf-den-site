@@ -81,8 +81,22 @@ export function vpTransfer({ myVp = 0, theirVp = 0, won = false }) {
     return Math.max(1, Math.round(move));
 }
 
-/** What beating them would move, shown on the challenge list BEFORE you commit. */
-export const vpStakePreview = (myVp, theirVp) => vpTransfer({ myVp, theirVp, won: true });
+/**
+ * BOTH SIDES OF THE BET, shown on the challenge list BEFORE you commit.
+ *
+ * Luke: "I would expect to see just the vp I would earn or lose if I choose to fight them."
+ *
+ * CAPPED THE SAME WAY THE SETTLE CAPS IT. finishBout moves `Math.min(stake, won ? theirVp : myVp)` — you
+ * cannot take more than they have and you cannot lose more than you own — so a preview that quoted the raw
+ * transfer would promise a number the payout does not honour. That is a bug this game has shipped seven times
+ * in other places; it does not need an eighth.
+ */
+export const vpStakePreview = (myVp, theirVp) => Math.min(
+    vpTransfer({ myVp, theirVp, won: true }), Math.max(0, Number(theirVp) || 0),
+);
+export const vpLossPreview = (myVp, theirVp) => Math.min(
+    vpTransfer({ myVp, theirVp, won: false }), Math.max(0, Number(myVp) || 0),
+);
 
 /** What you'd get for beating them — shown on the challenge list BEFORE you commit. */
 export const vpPreview = (myPower, theirPower) => vpFor({ won: true, myPower, theirPower });

@@ -105,11 +105,19 @@ export function sumGemStats(gemIds = [], powers = null) {
 }
 
 // ── THE BENCH ────────────────────────────────────────────────────────────────────────────────────────────────
-// Cutting a socket is meant to be a real decision about a piece you intend to keep, so it is priced like one
-// and it scales with the item's rarity: putting a socket in a mythic is a commitment, putting one in a common
-// is a cheap experiment that teaches you what sockets do.
+// Cutting a socket scales with the item's rarity: a socket in a mythic is a commitment, a socket in a common is
+// a cheap experiment that teaches you what sockets do.
+//
+// ── SIX TIMES CHEAPER, 2026-08-31 ────────────────────────────────────────────────────────────────────────
+// Luke: "lower the cost of socketing items by 6x as well."
+//
+// The old ladder was written when it was meant to be "a real decision about a piece you intend to keep", and
+// priced that sentiment rather than the game: 20,000 into a mythic is most of a week against what the faucets
+// actually pay, so the bench read as a wall and the top half of the table was never bought at all. A socket is
+// not supposed to be the expensive part — the GEM is. Divided straight through so the shape of the ladder is
+// unchanged and only its height moves.
 export const SOCKET_COST = {
-    common: 1500, rare: 3000, epic: 6000, legendary: 12000, mythic: 20000, ascendant: 30000, eternal: 40000,
+    common: 250, rare: 500, epic: 1000, legendary: 2000, mythic: 3333, ascendant: 5000, eternal: 6667,
 };
 export const socketCost = (rarity) => SOCKET_COST[rarity] || SOCKET_COST.common;
 
