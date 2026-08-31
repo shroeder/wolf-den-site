@@ -12,6 +12,15 @@
 
 export const CHANGELOG = [
     {
+        key: "crit-reads-true",
+        date: "2026-08-30",
+        tag: "improved",
+        title: "Crit chance now says what it means",
+        blurb: "If you stacked crit and then watched the fight screen tell you six percent, you were not imagining it — and the stat was not broken. Gear was quoting crit chance in points while the ring quoted it as a percentage, and a thousand points is one hundred percent. So sixty points on your gear really was six percent in the ring; the two screens were describing the same number in two different units, and only one of them told you which. Every item card, stat sheet and comparison now prints crit chance as the percentage you will actually see when you swing, so what your gear promises and what the ring gives you finally match. Nothing about how often you crit has changed. What changed is that you can now tell what a piece is worth before you equip it — and if you have been passing over crit gear because it looked like it did nothing, it is worth another look.",
+        href: "/marketplace/inventory",
+        askedBy: ["GrayKitsune"],
+    },
+    {
         key: "fortune-is-luck",
         date: "2026-08-28",
         tag: "improved",

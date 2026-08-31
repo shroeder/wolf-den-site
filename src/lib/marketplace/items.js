@@ -115,7 +115,7 @@ export const STAT_META = {
     tenacity: { label: "Tenacity", icon: "🛡️", desc: "Multiplies the armour you are wearing. 500 tenacity doubles it.", suffix: "" },
 
     // ── THE CRITS ────────────────────────────────────────────────────────────────────────────────────────
-    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical. Past 100% every swing crits and the surplus doubles it.", suffix: "" },
+    crit_chance: { label: "Crit Chance", icon: "🎯", desc: "How often you land a critical. 1000 points is 100% — a point is a tenth of a percent.", suffix: "" },
     crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra a critical deals. Each point is +1%.", suffix: "" },
 
     // ── THE RARE ONES ────────────────────────────────────────────────────────────────────────────────────
@@ -1062,9 +1062,21 @@ export const STAT_SHORT = Object.fromEntries(
     Object.entries(STAT_META).map(([k, m]) => [k, m.short || m.label])
 );
 
+// ── WHAT ONE POINT OF CRIT IS WORTH ──────────────────────────────────────────────────────────────────────────
+// 1000 points = 100%, so a point is 0.1%. Gear carries crit_chance in POINTS (the Overlord Helm has 12) and
+// the ring works in a fraction, and until now the item card printed the raw point count. A member stacking
+// crit read "60" off their gear, saw "6%" in the fight, and reasonably concluded the stat did nothing.
+// Nothing was broken: 60 points IS 6%. The card was quoting a different unit from the ring.
+//
+// Lives here rather than in arena-kit because arena-kit imports THIS file, so the dependency only runs one
+// way. arena-kit re-exports it, and the two surfaces can no longer drift apart.
+export const CRIT_PER_POINT = 1000;
+
 export function statValue(k, v) {
     const n = Number(v) || 0;
     if (FRACTION.has(k)) return `${Math.round(n * 100)}%`;
+    // Points, not a fraction — but shown in the same unit the fight screen uses, so a card and a bout agree.
+    if (k === "crit_chance") return `${Math.round((n / CRIT_PER_POINT) * 1000) / 10}%`;
     if (k === "speed") return `${n.toFixed(2)}`;
     return String(Math.round(n * 100) / 100);
 }

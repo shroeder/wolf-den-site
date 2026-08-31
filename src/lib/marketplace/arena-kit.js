@@ -13,7 +13,7 @@
 // This maps those into moves. Every ability names the item it came from, because an ability you cannot trace
 // to a piece of gear is magic, and you cannot build toward magic.
 
-import { itemById } from "@/lib/marketplace/items.js";
+import { itemById, CRIT_PER_POINT } from "@/lib/marketplace/items.js";
 import { ELEMENTS, itemElement } from "@/lib/marketplace/boss-weakness.js";
 
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
@@ -590,7 +590,11 @@ export const SWING_BASE = 11;
 // At 75 crit stat — the best loadout in the Den — that is 20 + 37.5 = 57.5%, under the cap with headroom left.
 // The median 16 goes from 41% to 28%. Nobody is pinned, and the spread is thirty points wide instead of four.
 export const CRIT_BASE = 0.0;      // nobody crits for free any more
-export const CRIT_PER_POINT = 1000;   // 1 point of gear crit_chance = 0.1%
+// CRIT_PER_POINT now lives in items.js and is re-exported here: the number that decides what a crit point is
+// WORTH and the number the item card prints have to be the same one, or gear says 60 and the ring says 6%
+// with nothing to connect them — which is exactly what members hit. Re-exported so every existing importer
+// of arena-kit keeps working.
+export { CRIT_PER_POINT } from "@/lib/marketplace/items.js";
 // ── BOTH HALVES OF CRIT ARE CAPPED, AND THE SECOND ONE NEVER WAS ─────────────────────────────────────────────
 // Chance was capped at 0.9 and power was capped at nothing at all, which is the combination that makes a fight
 // stop being a fight: at 90% every swing is effectively a critical, so the multiplier is not a spike any more,
