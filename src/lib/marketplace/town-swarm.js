@@ -30,9 +30,23 @@ export const CHIEFTAIN_WAVE = WAVES + 1;
 //
 // The cap still exists because the plaza has to stay readable — it just now sits above the crowd that actually
 // turns up rather than below it.
-const BASE_FOES = 5;                    // wave 1 with a lone fighter
-const FOES_PER_FIGHTER = 3;             // each extra body on the field adds this many
-const MAX_FOES_PER_WAVE = 24;           // keep the plaza readable — but not below a real turnout
+// ── THE PLAZA IS STOCKED, NOT RATIONED ───────────────────────────────────────────────────────────────────────
+// Luke, on a live raid: "there's literally only one thing live and only one dude can attack it ... we need to
+// spawn a bunch for everyone to fight, like at least 20 to 25. We can't have it be this thing where everyone's
+// trying to get one."
+//
+// BASE_FOES was 5, and worse than the number was the DEADLOCK behind it. `fighters` counts people who have
+// landed a hit in the last three minutes — so somebody who walks into the plaza and finds nothing to attack is
+// invisible to the spawner. No foes to hit, so no hits; no hits, so no fighters counted; no fighters counted,
+// so no reinforcements. A raid that opens short can never dig itself out, which is exactly the state he found.
+//
+// The fix is to stop rationing. A wave now OPENS with enough for a full turnout instead of growing into one:
+// the floor is what a busy Friday needs, and the per-fighter growth is a bonus on top rather than the only way
+// to get a second foe. Foes are cheap — they are rows with a sprite — and the failure mode of too many is that
+// the plaza looks busy, while the failure mode of too few is the one he is describing.
+const BASE_FOES = 20;                   // a wave opens stocked for a crowd, not for one person
+const FOES_PER_FIGHTER = 3;             // each extra body on the field adds this many on top
+const MAX_FOES_PER_WAVE = 30;           // keep the plaza readable — but not below a real turnout
 const ABANDON_AFTER_S = 45;             // no heartbeat for this long = they've left, free their claim
 
 // Foe archetypes. They differ in what they demand of your gear and timing, so a wave has texture without
@@ -341,8 +355,11 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
     const freeNow = alive.filter((r) => !r.engaged_by).length;
     const idleNow = Math.max(0, (await liveFighterCount(eventId).catch(() => 1)) - (alive.length - freeNow));
     if (wave != null && wave !== CHIEFTAIN_WAVE && alive.length && freeNow < idleNow) {
+        // ⚠️ TOPPED UP TO THE WAVE'S OWN SIZE, NOT TO `fighters`. Capping the room at the fighter count meant
+        // reinforcements could only ever restore the plaza to the number of people who had ALREADY managed to
+        // hit something — the same undercount that caused the shortage, applied again to the cure.
         const fighters = await liveFighterCount(eventId).catch(() => 1);
-        const room = Math.min(fighters, MAX_FOES_PER_WAVE) - alive.length;
+        const room = Math.min(waveSize(wave, fighters), MAX_FOES_PER_WAVE) - alive.length;
         if (room > 0) {
             const maxSlot = Math.max(...alive.map((r) => Number(r.slot) || 0));
             for (let i = 1; i <= room; i += 1) {

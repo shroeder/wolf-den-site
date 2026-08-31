@@ -129,43 +129,45 @@ export function chargedGearPitch() {
 }
 
 // ── EVERYTHING THE GAME IS, AS PICTURES ──────────────────────────────────────────────────────────────────────
-// Luke: "text isn't going to do it ... decorate the boundaries of the page with sprites of weapons and enemies
-// and bosses and pets and boats and skill trees and the farm and decorations and seeds and casino slots ...
-// we need to communicate everything it encompasses in a small screen space."
+// Luke: "over complicating it with the art rotating. I want groomed sprites. The sprites that I want are only
+// the most badass."
 //
-// So the collage is deliberately ONE OF EACH FEATURE rather than a random draw from the biggest table. A
-// random pull from 471 items is a wall of swords, which says "this is a game about swords"; a pet, a boat, a
-// foe, a gem, a dish, a decoration and a slot symbol side by side says "there is a lot here", which is the
-// only thing this panel has to communicate before somebody looks away.
+// So this is a HAND-PICKED list, not a draw. The rotating version pulled at random from 471 items and 118
+// pets, which meant the screen was as likely to show a garden snail and a bowl of porridge as a kraken — and
+// a shop window does not gamble on what it puts in the window. Every id below was chosen off a contact sheet
+// of the whole top-rarity catalogue.
 //
-// Shared-cached at the ART ttl like every other sprite map — the screen redraws all day and these change only
-// when somebody runs a generator.
-const STATIC_PICKS = [
+// ⚠️ ADDING ONE MEANS LOOKING AT IT. The point of the list is that somebody's eye has been over every entry.
+// `npm run check:season`-style gates cannot tell you a sprite is ugly.
+const GROOMED = [
+    // The monsters — the strongest art in the game and the reason this panel works at all.
+    "pet:kraken", "pet:elder_dragon", "pet:sea_wyrm", "pet:deep_golem", "pet:midnight_crane", "pet:gate_moth",
+    // The best gear in the game: blackened metal shot with molten orange.
+    "item:primordial_primordial_blade", "item:primordial_primordial_bulwark", "item:primordial_elder_scale",
+    "item:primordial_elder_waistguard", "item:eternal_timeless_cloak", "item:ascendant_uplifted_coronet",
+];
+// A ghost ship, a raid boat and the wheel — the three features the gear and the monsters do not cover.
+const GROOMED_STATIC = [
     "/images/sailing/boat-tier10-leviathan.png",
     "/images/gems/ruby_t5.png",
-    "/images/casino/blackjack.webp",
-    "/images/trophy/tool-forge.webp",
-    "/images/elements/fire.png",
     "/images/spin/wheel-disc.png",
+    "/images/trophy/tool-forge.webp",
 ];
 
 export async function posCollage() {
     const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
-    return shared("pos:collage", TTL.ART, async () => {
-        const pick = (rows, n) => (rows || []).filter((r) => r?.url).slice(0, n).map((r) => r.url);
-        const [pets, items, decos, dishes, town] = await Promise.all([
-            db.query(`SELECT url FROM mkt_pet_sprite ORDER BY random() LIMIT 7`).catch(() => []),
-            db.query(`SELECT url FROM mkt_item_sprite ORDER BY random() LIMIT 7`).catch(() => []),
-            db.query(`SELECT url FROM mkt_deco_sprite ORDER BY random() LIMIT 5`).catch(() => []),
-            db.query(`SELECT url FROM mkt_cooking_sprite ORDER BY random() LIMIT 4`).catch(() => []),
-            db.query(`SELECT url FROM mkt_town_art WHERE art_key LIKE 'crop_%_ripe' ORDER BY random() LIMIT 4`).catch(() => []),
+    return shared("pos:collage:groomed", TTL.ART, async () => {
+        const petIds = GROOMED.filter((g) => g.startsWith("pet:")).map((g) => g.slice(4));
+        const itemIds = GROOMED.filter((g) => g.startsWith("item:")).map((g) => g.slice(5));
+        const [pets, items] = await Promise.all([
+            db.query(`SELECT pet_id AS id, url FROM mkt_pet_sprite WHERE pet_id = ANY($1)`, [petIds]).catch(() => []),
+            db.query(`SELECT item_id AS id, url FROM mkt_item_sprite WHERE item_id = ANY($1)`, [itemIds]).catch(() => []),
         ]);
-        // Interleaved rather than grouped, so no two neighbours are the same KIND of thing — the point is
-        // breadth, and six swords in a row reads as one feature however many pictures it is.
-        const groups = [pick(pets, 7), pick(items, 7), pick(decos, 5), pick(dishes, 4), pick(town, 4), STATIC_PICKS];
-        const out = [];
-        for (let i = 0; i < 7; i += 1) for (const g of groups) if (g[i]) out.push(g[i]);
-        return out;
+        const by = Object.fromEntries([...(pets || []), ...(items || [])].filter((r) => r.url).map((r) => [r.id, r.url]));
+        // Kept in GROOMED's order, so the composition is the same every time somebody looks at it. A shop
+        // window that rearranges itself is a shop window nobody learns to read.
+        const out = GROOMED.map((g) => by[g.split(":")[1]]).filter(Boolean);
+        return [...out, ...GROOMED_STATIC];
     });
 }
 
@@ -186,7 +188,7 @@ export async function bossPrizes() {
     return shared("pos:prizes", TTL.SLOW * 2, async () => {
         const { isHouse } = await import("@/lib/marketplace/owner.js");
         const rows = await db.query(
-            `SELECT b.prize_name, b.prize_image_url, b.defeated_at, b.status, b.winner_buyer_id,
+            `SELECT b.prize_name, b.prize_image_url, b.defeated_at, b.status, b.winner_buyer_id, b.name, b.image_url,
                     COALESCE(NULLIF(w.display_name,''), w.alias) AS winner
                FROM boss_event b
                LEFT JOIN mkt_buyer w ON w.id = b.winner_buyer_id
@@ -202,10 +204,31 @@ export async function bossPrizes() {
 
         // The one currently stubbed to go out, if a boss is standing. Named separately because "you can still
         // win this" and "somebody already won this" are different sentences and the panel says both.
-        const liveRow = (rows || []).find((r) => r.status === "active" && r.prize_name);
+        // ⚠️ THE STATUS IS "live", NOT "active". This read `=== "active"`, which matches nothing in the
+        // table — the only two values boss_event ever holds are `live` and `ended` — so the "up for grabs
+        // right now" line could never appear, however many bosses were standing.
+        const liveRow = (rows || []).find((r) => r.status === "live");
         return {
             given,
-            upNext: liveRow ? { name: liveRow.prize_name, image: liveRow.prize_image_url || null } : null,
+            upNext: liveRow?.prize_name ? { name: liveRow.prize_name, image: liveRow.prize_image_url || null } : null,
+            boss: liveRow ? { name: liveRow.name, image: liveRow.image_url || null } : null,
         };
+    });
+}
+
+// ── WHAT IS ON THE SHELF TO BE WON ───────────────────────────────────────────────────────────────────────────
+// Luke: "just show a picture of a Prismatic Evolution's booster bundle."
+//
+// Read from the SQUARE catalogue rather than hard-coded, so the picture on the screen is the product the shop
+// actually stocks — and it goes quiet on its own if the item is ever delisted, rather than advertising a box
+// nobody can win.
+export async function shelfPrize() {
+    const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
+    return shared("pos:shelf-prize", TTL.ART, async () => {
+        const row = await db.queryOne(
+            `SELECT name, image_url FROM inventory_feed
+              WHERE name ILIKE '%prismatic evolutions%bundle%' AND image_url IS NOT NULL LIMIT 1`,
+        ).catch(() => null);
+        return row ? { name: row.name, image: row.image_url } : null;
     });
 }
