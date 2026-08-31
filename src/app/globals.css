@@ -23251,76 +23251,58 @@ body.cas-seated .social-fab { display: none; }
 .pos-world-copy p { margin: 0 auto; max-width: 34ch; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4;
     color: #c8cfd8; }
 
-/* ── GEAR IS WORTH MONEY ── the number is the pitch, so it is the biggest thing here. */
-.pos-gear-hero { display: flex; align-items: center; gap: clamp(12px, 1.6vw, 26px); margin: 0 0 22px;
-    font-size: clamp(18px, 1.9vw, 30px); color: #c8cfd8; }
-/* The crown at a size you can actually see it — this is the panel's headline, not a bullet. */
-.pos-gear-heroart { width: clamp(84px, 9vw, 148px); height: auto; aspect-ratio: 1; object-fit: contain;
-    flex: 0 0 auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.7)) drop-shadow(0 0 30px rgba(255,215,94,0.3)); }
-.pos-gear-ico { width: clamp(30px, 3vw, 46px); height: clamp(30px, 3vw, 46px); flex: 0 0 auto;
-    object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
-.pos-gear-hero b { color: #fff; }
-.pos-gear-hero strong { color: #ffd75e; font-size: 1.9em; font-weight: 900; font-family: var(--font-display); }
-.pos-gear-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;
-    max-width: 560px; }
-.pos-gear-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 13px;
-    border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
-    font-size: clamp(14px, 1.35vw, 21px); }
-.pos-gear-name { color: #e8edf3; font-weight: 700; flex: 1 1 auto; }
-.pos-gear-val { color: #ffd75e; font-weight: 800; white-space: nowrap; }
-.pos-gear-fine { margin: 18px 0 0; font-size: clamp(14px, 1.3vw, 21px); color: #7c8490; }
+/* ── THE TWO PROOF POINTS ─────────────────────────────────────────────────────────────────────────────────
+   Under the pitch on slide one, one line each, with the real object beside them: the crown that is worth $200
+   and the box we actually give away. They are evidence, so they are small — an argument that shouts as loud
+   as its own headline is an argument nobody finishes reading. */
+.pos-proof { list-style: none; margin: 18px 0 0; padding: 16px 0 0; display: flex; flex-direction: column;
+    gap: 12px; border-top: 1px solid rgba(255,255,255,0.12); text-align: left; }
+.pos-proof li { display: flex; align-items: center; gap: 13px; font-size: clamp(13px, 1.25vw, 19px);
+    line-height: 1.38; color: #9aa2ae; }
+.pos-proof b { color: #ffd75e; font-weight: 800; }
+.pos-proof img { width: clamp(42px, 4.4vw, 68px); height: clamp(42px, 4.4vw, 68px); flex: 0 0 auto;
+    object-fit: contain; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.75)); }
+/* A product photo is a photograph, so it gets a corner and a border rather than a die-cut drop shadow. */
+.pos-proof .pos-proof-box { border-radius: 7px; object-fit: cover;
+    box-shadow: 0 5px 12px rgba(0,0,0,0.7); filter: none; }
 
-/* ── MYSTERY PACKS ── the board this screen used to be, as one slide. */
-.pos-myst-stats { display: flex; gap: clamp(16px, 2.5vw, 44px); margin-bottom: 22px; }
-.pos-myst-stats div { display: flex; flex-direction: column; }
-.pos-myst-stats b { font-family: var(--font-display); font-size: clamp(26px, 3vw, 50px); color: #ffd75e;
-    line-height: 1; font-variant-numeric: tabular-nums; }
-.pos-myst-stats span { font-size: clamp(12px, 1.1vw, 17px); color: #9aa2ae; margin-top: 4px; }
-.pos-myst-kick { display: block; font-size: clamp(12px, 1.1vw, 17px); font-weight: 800; letter-spacing: .1em;
+/* ── THE CASE ─────────────────────────────────────────────────────────────────────────────────────────────
+   The whole slide is the five cards, so they get the room: a numbered ladder with real card images and the
+   price hard right, where a column of numbers reads as a column. */
+.pos-myst-head { display: flex; gap: clamp(14px, 2.2vw, 38px); margin: 0 0 20px; flex-wrap: wrap; }
+.pos-myst-head span { font-size: clamp(13px, 1.25vw, 20px); color: #9aa2ae; }
+.pos-myst-head b { color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pos-myst h1 em { font-style: normal; color: #ffd75e; }
+.pos-myst-kick { display: block; font-size: clamp(11px, 1.05vw, 16px); font-weight: 800; letter-spacing: .1em;
     text-transform: uppercase; color: #7c8490; margin-bottom: 9px; }
 .pos-myst-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px;
-    max-width: 620px; }
-.pos-myst-top li { display: flex; align-items: center; gap: 11px; padding: 7px 12px; border-radius: 11px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
-.pos-myst-top img, .pos-myst-noart { width: 34px; height: 46px; object-fit: cover; border-radius: 4px;
-    flex: 0 0 auto; background: rgba(255,255,255,0.08); }
-.pos-myst-name { flex: 1 1 auto; min-width: 0; font-size: clamp(13px, 1.25vw, 19px); color: #e8edf3;
+    max-width: 640px; counter-reset: chase; }
+.pos-myst-top li { display: flex; align-items: center; gap: 12px; padding: 7px 14px 7px 10px;
+    border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+/* The rank is the ladder. Tabular so 1-5 sit in a column rather than drifting with the glyph width. */
+.pos-myst-top i { font-style: normal; font-weight: 900; font-size: clamp(13px, 1.2vw, 19px); color: #6a727d;
+    width: 1.2em; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.pos-myst-top img, .pos-myst-noart { width: 38px; height: 52px; object-fit: cover; border-radius: 5px;
+    flex: 0 0 auto; background: rgba(255,255,255,0.08); box-shadow: 0 3px 8px rgba(0,0,0,0.6); }
+.pos-myst-name { flex: 1 1 auto; min-width: 0; font-size: clamp(13px, 1.3vw, 20px); color: #e8edf3;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pos-myst-top b { color: #ffd75e; font-size: clamp(14px, 1.35vw, 21px); font-variant-numeric: tabular-nums; }
+.pos-myst-top b { color: #ffd75e; font-size: clamp(15px, 1.5vw, 24px); font-variant-numeric: tabular-nums;
+    flex: 0 0 auto; }
 
-/* ── THE LOOP ── four steps, numbered, because the order is the argument. */
-.pos-loop-steps { list-style: none; margin: 0; padding: 0; display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); max-width: 640px; }
-.pos-loop-steps li { display: flex; flex-direction: column; gap: 2px; padding: 13px 15px; border-radius: 13px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
-.pos-loop-steps b { font-family: var(--font-display); font-size: clamp(18px, 1.8vw, 28px); color: #ffd75e;
-    line-height: 1; }
-.pos-loop-t { font-size: clamp(15px, 1.5vw, 24px); font-weight: 800; color: #fff; margin-top: 4px; }
-.pos-loop-s { font-size: clamp(12px, 1.15vw, 18px); color: #9aa2ae; }
-
-/* A screen turned portrait, or a spare tablet doing the job. Stack rather than squeeze. */
-@media (max-aspect-ratio: 1/1) {
-    .pos { flex-direction: column; justify-content: center; gap: 28px; }
-    .pos-claim-left, .pos-slide { text-align: center; }
-    .pos-slide h1 { max-width: none; margin-left: auto; margin-right: auto; }
-    .pos-break { margin-left: auto; margin-right: auto; }
-    /* The rail stops being a rail when the screen is taller than it is wide — it sits under the stage with a
-       rule above it instead of beside it. */
-    .pos-rail { padding-left: 0; padding-top: 24px; border-left: 0; border-top: 1px solid rgba(255,255,255,0.1); }
-    .pos-gear-list, .pos-myst-top, .pos-loop-steps, .pos-world-copy { margin-left: auto; margin-right: auto; }
-}
-
-/* ── REAL PRIZES ── product photos, so they get to be photographs rather than icons: a box shot at 96px with
-   a real border reads as a thing on a shelf, and that is the entire persuasive content of this panel. */
-.pos-prize-list { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column;
-    gap: 9px; max-width: 620px; }
-.pos-prize-list li { display: flex; align-items: center; gap: 13px; padding: 8px 13px; border-radius: 12px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
-.pos-prize-list img, .pos-prize-noart { width: 52px; height: 52px; flex: 0 0 auto; object-fit: contain;
-    border-radius: 8px; background: rgba(255,255,255,0.07); }
-.pos-prize-meta { display: flex; flex-direction: column; min-width: 0; }
-.pos-prize-meta b { font-size: clamp(14px, 1.35vw, 21px); color: #e8edf3; line-height: 1.2;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.pos-prize-meta em { font-style: normal; font-size: clamp(12px, 1.15vw, 18px); color: #ffd75e; margin-top: 2px; }
-.pos-prize-next { margin: 0; font-size: clamp(14px, 1.4vw, 22px); color: #9aa2ae; }
-.pos-prize-next b { color: #ffd75e; }
+/* ── THE CALL ─────────────────────────────────────────────────────────────────────────────────────────────
+   Boss on the left, champion on the right, facing each other across a "vs". Both are large: this slide is a
+   poster, and the only two things on it are the monster and the person who is going to hit it. */
+.pos-call { display: flex; align-items: center; gap: clamp(20px, 3vw, 56px); height: 100%; }
+.pos-call-copy { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+.pos-call-copy p { margin: 0 0 10px; font-size: clamp(15px, 1.5vw, 24px); line-height: 1.4; color: #c8cfd8; }
+.pos-call-copy b { color: #fff; }
+.pos-call-ask { font-family: var(--font-display); color: #ffd75e !important; font-size: clamp(18px, 1.9vw, 30px) !important; }
+.pos-call-fight { flex: 0 0 auto; display: flex; align-items: center; gap: clamp(6px, 1vw, 18px); }
+/* Mirrored: the boss art faces right by default and the champion is drawn facing right, so without this they
+   both look the same way and it reads as a queue rather than a fight. */
+.pos-call-boss { width: clamp(150px, 17vw, 280px); height: auto; transform: scaleX(-1);
+    filter: drop-shadow(0 14px 26px rgba(0,0,0,0.85)) drop-shadow(0 0 40px rgba(150,90,255,0.28)); }
+.pos-call-hero { width: clamp(150px, 17vw, 280px); height: auto;
+    filter: drop-shadow(0 14px 26px rgba(0,0,0,0.85)) drop-shadow(0 0 40px rgba(255,150,60,0.3)); }
+.pos-call-vs { font-family: var(--font-display); font-size: clamp(15px, 1.5vw, 24px); color: #6a727d;
+    text-transform: uppercase; letter-spacing: .1em; }

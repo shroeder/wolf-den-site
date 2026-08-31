@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 
 import CounterDisplayClient from "@/components/CounterDisplayClient";
-import { bossPrizes, chargedGearArt, chargedGearPitch, posCollage, POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
+import { bossPrizes, chargedGearArt, chargedGearPitch, posCollage, shelfPrize, POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
 import { SITE_URL } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -45,7 +45,7 @@ export default async function CounterPage({ searchParams }) {
     // encoder, the other needs four database tables. Both are effectively static for the life of the screen,
     // so they are resolved once here rather than fetched on the poll. The mystery board is the exception and
     // rides the poll, because it changes when a bag is sold.
-    const [idleQr, collage, prizes, gearArt] = await Promise.all([
+    const [idleQr, collage, prizes, gearArt, shelf] = await Promise.all([
         QRCode.toDataURL(IDLE_URL, {
             width: 720, margin: 1, errorCorrectionLevel: "M",
             color: { dark: "#101014", light: "#ffffff" },
@@ -53,6 +53,7 @@ export default async function CounterPage({ searchParams }) {
         posCollage().catch(() => []),
         bossPrizes().catch(() => ({ given: [], upNext: null })),
         chargedGearArt().catch(() => ({})),
+        shelfPrize().catch(() => null),
     ]);
 
     // ?slide=world|prizes|gear|mystery|loop pins one panel instead of rotating — park it on the mystery
@@ -64,6 +65,7 @@ export default async function CounterPage({ searchParams }) {
             pitch={POS_PITCH}
             gear={chargedGearPitch()}
             gearArt={gearArt}
+            shelf={shelf}
             collage={collage}
             prizes={prizes}
             pinned={typeof slide === "string" ? slide : null}

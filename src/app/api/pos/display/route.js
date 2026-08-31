@@ -39,10 +39,18 @@ export async function GET(request) {
                         if (!d) return null;
                         return {
                             remaining: d.remainingPacks ?? null,
-                            price: d.bagPrice ?? null,
+                            // Square carries no price for the bag, so the board falls back the same way
+                            // /mystery-bags does — env first, then the shelf price Luke quoted ("mystery
+                            // packs that are twenty bucks a piece"). Never the computed average: that is
+                            // what a pack is WORTH, and printing it as the price would be a lie in our
+                            // favour on a screen a customer is reading.
+                            price: d.bagPrice || Number(process.env.MYSTERY_BAG_PRICE) || 20,
                             marketTotal: d.metrics?.marketTotal ?? 0,
                             average: d.averagePackValue ?? null,
-                            top: (d.topCards || []).slice(0, 3).map((c) => ({
+                            // FIVE, not three. Luke: "it needs to render the top five chase cards and their
+                            // price ... it really needs to sell the mystery packs." topCards is only ever
+                            // three, so this reads the full sorted list.
+                            top: (d.cards || []).slice(0, 5).map((c) => ({
                                 name: c.name, value: c.marketValue, image: c.imageUrl || null,
                             })),
                         };

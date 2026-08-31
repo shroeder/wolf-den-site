@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const POLL_MS = 4000;
 const SLIDE_MS = 11000;
 
-export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, gearArt, collage, prizes, pinned, claimBase }) {
+export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, gearArt, collage, prizes, shelf, pinned, claimBase }) {
     const [claim, setClaim] = useState(null);
     const [mystery, setMystery] = useState(null);
     const [qr, setQr] = useState(null);
@@ -99,18 +99,19 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
     // Built here rather than as a constant because two of the four depend on live data — a mystery slide with
     // no bags in the case is a slide about nothing, so it drops out of the rotation entirely rather than
     // showing zeroes.
+    // THREE SLIDES. Luke: "we can probably fit all of that on one slide."
+    //
+    // What the game IS, what is in the case, and the call to arms. The gear-for-store-credit fact and the real
+    // prizes are one LINE each on the first slide now rather than two slides of their own — they are proof
+    // points for "this is worth your time", not chapters of their own.
     const slides = [
-        { key: "world", render: () => <SlideWorld collage={collage} /> },
-        // The prize slide only exists once something has actually been given away — a panel that says "we
-        // have given away nothing yet" is worse than one fewer panel.
-        ...(prizes?.given?.length || prizes?.upNext ? [{ key: "prizes", render: () => <SlidePrizes p={prizes} /> }] : []),
-        ...(gear.length ? [{ key: "gear", render: () => <SlideGear gear={gear} art={gearArt} /> }] : []),
+        { key: "world", render: () => <SlideWorld collage={collage} gear={gear} gearArt={gearArt} prizes={prizes} shelf={shelf} /> },
         ...(mystery?.remaining ? [{ key: "mystery", render: () => <SlideMystery m={mystery} /> }] : []),
-        { key: "loop", render: () => <SlideLoop rate={pitch.rate} /> },
+        { key: "call", render: () => <SlideCall prizes={prizes} /> },
     ];
-    // A pin that names a panel which is not currently in the rotation (no bags in the case, say) falls back
-    // to the rotation rather than showing a blank stage.
-    const pinnedAt = pinned ? slides.findIndex((s) => s.key === pinned) : -1;
+    // A pin naming a panel that is not currently in the rotation (no bags in the case, say) falls back to the
+    // rotation rather than showing a blank stage.
+    const pinnedAt = pinned ? slides.findIndex((x) => x.key === pinned) : -1;
     const index = pinnedAt >= 0 ? pinnedAt : slide % slides.length;
     const current = slides[index];
 
@@ -139,186 +140,143 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
     );
 }
 
-// ── WHAT THIS IS ─────────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "I want info in the middle, sprites packed together in all 4 corners, clustered together so it looks
-// like groupings of sprites."
+// ── SLIDE 1 · DEN QUEST ──────────────────────────────────────────────────────────────────────────────────────
+// Luke: "the whole thing needs to have lore, it needs to feel like the tale of the Wolf Den, and Den Quest
+// needs to be front and centre ... it's obviously a loyalty program but we want it to feel like you're calling
+// heroes to action."
 //
-// Four PILES, one per corner, with the message sitting in the hole between them. That is a different idea
-// from the even scatter it replaces, and a better one: an evenly-spread field reads as wallpaper because the
-// eye has nowhere to rest, whereas four dense clumps read as four HOARDS — which is what the game actually
-// is, four or five features' worth of stuff — and they frame the words instead of competing with them.
+// So the frame is not "join our rewards programme", it is "there is a game here and your receipts are already
+// part of it". The two proof points — gear that cashes out at this counter, and a real box given away every
+// boss — sit UNDER the pitch as one line each, because they are evidence rather than the argument.
 //
-// Each cluster is an anchor plus tight local offsets in percent, deliberately overlapping. Sizes alternate
-// big/small INSIDE a cluster so it piles rather than tiles, and the rotations are uneven for the same reason.
-// ⚠️ THE OFFSETS ARE SMALL ON PURPOSE. The first attempt used ±26–34%, which on a 764px-wide stage is a
-// 200px gap — the five sprites drifted apart and the four clusters merged into one scattered border, which
-// is the wallpaper this was meant to replace. A PILE needs the pieces to overlap, so the spread has to be
-// less than a sprite wide.
-//
-// x and y percentages are NOT the same distance: the stage is wider than it is tall, so a 10% x offset is
-// ~76px and a 10% y offset is ~66px. The y numbers run larger to compensate.
+// Four corner piles of hand-picked sprites with the message in the hole between them. See GROOMED in
+// pos-display.js: every one of those was chosen off a contact sheet rather than drawn at random.
 const CLUSTERS = [
-    // top-left
-    { at: [15, 20], items: [[0, 0, 178, -8], [13, 9, 124, 9], [-9, 13, 112, 5], [10, -11, 98, 14], [1, 22, 90, -13]] },
-    // top-right
-    { at: [85, 19], items: [[0, 0, 186, 7], [-13, 10, 126, -9], [9, 14, 110, -4], [-11, -10, 100, 12], [0, 23, 88, 11]] },
-    // bottom-left
-    { at: [15, 81], items: [[0, 0, 172, 6], [13, -9, 128, -9], [-9, -13, 114, -5], [11, 11, 96, 13], [1, -22, 92, 10]] },
-    // bottom-right
-    { at: [85, 82], items: [[0, 0, 182, -6], [-13, -10, 122, 10], [9, -14, 116, 4], [-11, 10, 98, -12], [0, -23, 90, -9]] },
+    { at: [15, 20], items: [[0, 0, 178, -8], [13, 9, 124, 9], [-9, 13, 112, 5], [10, -11, 98, 14]] },
+    { at: [85, 19], items: [[0, 0, 186, 7], [-13, 10, 126, -9], [9, 14, 110, -4], [-11, -10, 100, 12]] },
+    { at: [15, 81], items: [[0, 0, 172, 6], [13, -9, 128, -9], [-9, -13, 114, -5], [11, 11, 96, 13]] },
+    { at: [85, 82], items: [[0, 0, 182, -6], [-13, -10, 122, 10], [9, -14, 116, 4], [-11, 10, 98, -12]] },
 ];
-// Flattened once at module scope — the render just walks it against the sprite list.
-const PILE = CLUSTERS.flatMap((c) => c.items.map(([dx, dy, s, r]) => ({
-    x: c.at[0] + dx, y: c.at[1] + dy, s, r,
-})));
+const PILE = CLUSTERS.flatMap((c) => c.items.map(([dx, dy, sz, r]) => ({ x: c.at[0] + dx, y: c.at[1] + dy, s: sz, r })));
 
-function SlideWorld({ collage }) {
+function SlideWorld({ collage, gear, gearArt, prizes, shelf }) {
+    const best = gear?.[0];
+    const bestWorth = best?.dollars ? best.dollars * best.charges : null;
     return (
         <div className="pos-slide pos-world">
             <div className="pos-world-art" aria-hidden="true">
-                {PILE.map((p, i) => collage[i % Math.max(1, collage.length)] ? (
+                {PILE.map((p, i) => (collage[i % Math.max(1, collage.length)] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={`${i}-${collage[i % collage.length]}`} src={collage[i % collage.length]} alt=""
                         style={{ "--x": `${p.x}%`, "--y": `${p.y}%`, "--s": p.s, "--r": `${p.r}deg`, "--i": i }} />
-                ) : null)}
+                ) : null))}
             </div>
             <div className="pos-world-copy">
-                <span className="pos-kick">The Wolf Den</span>
-                <h1>There is a whole game behind that code</h1>
-                <p>Pets, gear, a farm, a casino, dungeons, ships — and every dollar you spend in
-                    this shop levels you up in it.</p>
+                <span className="pos-kick">Den Quest</span>
+                <h1>Every dollar you spend here arms a hero</h1>
+                <p>The Wolf Den has a game inside it — gear, pets, dungeons, ships, a farm, a casino.
+                    Your receipts are what level you up in it.</p>
+                <ul className="pos-proof">
+                    {bestWorth ? (
+                        <li>
+                            {gearArt?.[best.id] ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={gearArt[best.id]} alt="" />
+                            ) : null}
+                            <span>Some of the gear cashes in <b>at this counter</b> — the {best.name} is
+                                worth <b>${bestWorth.toLocaleString()}</b> in store credit.</span>
+                        </li>
+                    ) : null}
+                    {(prizes?.given?.length || shelf) ? (
+                        <li>
+                            {shelf?.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="pos-proof-box" src={shelf.image} alt="" />
+                            ) : null}
+                            <span>Every boss the pack brings down, we give away <b>a real box off the
+                                shelf</b>{prizes?.given?.[0] ? <> — {prizes.given[0].winner} took the last one</> : null}.</span>
+                        </li>
+                    ) : null}
+                </ul>
             </div>
         </div>
     );
 }
 
-// ── REAL THINGS, REAL WINNERS ────────────────────────────────────────────────────────────────────────────────
-// The only panel on this screen that is not a promise. Product photos off the shelf and the name of the member
-// who took each one home — no prices, no odds, no "could be you". Somebody who does not believe a word of the
-// rest of this screen believes a photograph of a box that Alstier1 walked out with.
-function SlidePrizes({ p }) {
-    return (
-        <div className="pos-slide pos-prize">
-            <span className="pos-kick">Beat the boss, win the box</span>
-            <h1>We give a real one away every time</h1>
-            <ul className="pos-prize-list">
-                {p.given.map((g) => (
-                    <li key={g.name}>
-                        {g.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={g.image} alt="" />
-                        ) : <span className="pos-prize-noart" aria-hidden="true" />}
-                        <span className="pos-prize-meta">
-                            <b>{g.name}</b>
-                            <em>won by {g.winner}</em>
-                        </span>
-                    </li>
-                ))}
-            </ul>
-            {p.upNext ? (
-                <p className="pos-prize-next">
-                    Up for grabs right now: <b>{p.upNext.name}</b>
-                </p>
-            ) : (
-                <p className="pos-prize-next">Free to enter. You just have to be playing when the boss shows up.</p>
-            )}
-        </div>
-    );
-}
-
-// ── WHAT IT IS WORTH ── the strongest thing the screen can say, so it gets the biggest number.
-function SlideGear({ gear, art }) {
-    const best = gear[0];
-    const bestArt = art?.[best?.id] || null;
-    return (
-        <div className="pos-slide pos-gear">
-            <span className="pos-kick">Gear you can cash in</span>
-            <h1>Some of it is worth real money at this counter</h1>
-            {best?.dollars ? (
-                <div className="pos-gear-hero">
-                    {/* The crown, actual size. A sentence about a $200 crown is an argument; the crown is a
-                        picture of one, and this panel exists because pictures do the work. */}
-                    {bestArt ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="pos-gear-heroart" src={bestArt} alt="" />
-                    ) : null}
-                    <span>
-                        The <b>{best.name}</b> is worth
-                        <strong> ${(best.dollars * best.charges).toLocaleString()}</strong> in store credit.
-                    </span>
-                </div>
-            ) : null}
-            <ul className="pos-gear-list">
-                {gear.slice(0, 5).map((g) => (
-                    <li key={g.id}>
-                        {art?.[g.id] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="pos-gear-ico" src={art[g.id]} alt="" />
-                        ) : <span className="pos-gear-ico" aria-hidden="true" />}
-                        <span className="pos-gear-name">{g.name}</span>
-                        <span className="pos-gear-val">{g.reward}{g.charges > 1 ? ` ×${g.charges}` : ""}</span>
-                    </li>
-                ))}
-            </ul>
-            <p className="pos-gear-fine">Equip it, tap it, show the code at the till. That is the whole process.</p>
-        </div>
-    );
-}
-
-// ── THE MYSTERY BOARD ── the thing this screen already showed, folded in rather than replaced.
+// ── SLIDE 2 · THE CASE ───────────────────────────────────────────────────────────────────────────────────────
+// Luke: "render the top five chase cards and their price. It needs to be up to date since people are constantly
+// buying them ... it really needs to sell the mystery packs that are twenty bucks a piece, and you have such a
+// good chance of finding a card that is fifteen times your money."
+//
+// The multiple is COMPUTED from the real top card against the real price rather than asserted, so the number on
+// the screen is one the case can actually pay. It moves down as the good cards get pulled, which is honest and
+// is also the urgency: what is on this screen is what is still in there right now.
 function SlideMystery({ m }) {
     const money = (n) => `$${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    const best = m.top?.[0]?.value || 0;
+    const mult = m.price > 0 && best > 0 ? Math.floor(best / m.price) : 0;
     return (
         <div className="pos-slide pos-myst">
-            <span className="pos-kick">Mystery packs</span>
-            <h1>{m.remaining} left in the case</h1>
-            <div className="pos-myst-stats">
-                {m.price ? <div><b>{money(m.price)}</b><span>a pack</span></div> : null}
-                <div><b>{money(m.marketTotal)}</b><span>still in there</span></div>
-                {m.average ? <div><b>{money(m.average)}</b><span>average pack</span></div> : null}
+            <span className="pos-kick">Mystery packs · {money(m.price)} each</span>
+            <h1>{mult ? <>One card in there is worth <em>{mult}&times;</em> a pack</> : <>{m.remaining} left in the case</>}</h1>
+            <div className="pos-myst-head">
+                <span><b>{m.remaining}</b> packs left</span>
+                <span><b>{money(m.marketTotal)}</b> still in the case</span>
+                {m.average ? <span><b>{money(m.average)}</b> average pack</span> : null}
             </div>
-            {m.top?.length ? (
-                <>
-                    <span className="pos-myst-kick">Biggest cards still unclaimed</span>
-                    <ul className="pos-myst-top">
-                        {m.top.map((c) => (
-                            <li key={c.name}>
-                                {c.image ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={c.image} alt="" />
-                                ) : <span className="pos-myst-noart" aria-hidden="true" />}
-                                <span className="pos-myst-name">{c.name}</span>
-                                <b>{money(c.value)}</b>
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            ) : null}
-        </div>
-    );
-}
-
-// ── THE LOOP ── how the money becomes the thing. Four steps, because anybody can hold four.
-function SlideLoop({ rate }) {
-    const steps = [
-        { n: "1", t: "Spend here", s: `${rate} points per $1` },
-        { n: "2", t: "Level up", s: "Chests, gear, pets" },
-        { n: "3", t: "Equip it", s: "Some gear carries in-store perks" },
-        { n: "4", t: "Cash it in", s: "Store credit, free packs, entries" },
-    ];
-    return (
-        <div className="pos-slide pos-loop">
-            <span className="pos-kick">How it works</span>
-            <h1>Money in, money back out</h1>
-            <ol className="pos-loop-steps">
-                {steps.map((s) => (
-                    <li key={s.n}>
-                        <b>{s.n}</b>
-                        <span className="pos-loop-t">{s.t}</span>
-                        <span className="pos-loop-s">{s.s}</span>
+            <span className="pos-myst-kick">The five biggest still unclaimed</span>
+            <ol className="pos-myst-top">
+                {(m.top || []).map((c, i) => (
+                    <li key={c.name}>
+                        <i>{i + 1}</i>
+                        {c.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={c.image} alt="" />
+                        ) : <span className="pos-myst-noart" aria-hidden="true" />}
+                        <span className="pos-myst-name">{c.name}</span>
+                        <b>{money(c.value)}</b>
                     </li>
                 ))}
             </ol>
+        </div>
+    );
+}
+
+// ── SLIDE 3 · THE CALL ───────────────────────────────────────────────────────────────────────────────────────
+// Luke: "show a picture of the boss and then a picture of one of our heroes ... like this could be you. We need
+// heroes to help battle the boss. You could be next. Do you have what it takes?"
+//
+// The hero is a PURPOSE-BUILT asset in the repo (scripts/gen-counter-hero.mjs) rather than a member's avatar.
+// Luke spotted the reason himself: "we throw away generated sprites, so we would need to enshrine it so that we
+// don't get it lost from underneath us." A member's sprite is REDRAWN every time they change gear — point a
+// shop screen at one and the picture changes when somebody swaps a hat, then eventually 404s. It is also
+// somebody else's likeness, which is not ours to spend on a marketing screen.
+//
+// This champion belongs to nobody and wears the best gear in the game, and the helm hides the face on purpose:
+// "this could be you" only works if it could.
+function SlideCall({ prizes }) {
+    const boss = prizes?.boss;
+    return (
+        <div className="pos-slide pos-call">
+            <div className="pos-call-copy">
+                <span className="pos-kick">Den Quest</span>
+                <h1>The Den needs heroes</h1>
+                <p>
+                    {boss?.name
+                        ? <><b>{boss.name}</b> is standing in the plaza right now, and the pack is already swinging.</>
+                        : <>Something crawls out of the dark every week, and the pack goes at it together.</>}
+                </p>
+                <p className="pos-call-ask">You could be next. Do you have what it takes?</p>
+            </div>
+            <div className="pos-call-fight" aria-hidden="true">
+                {boss?.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="pos-call-boss" src={boss.image} alt="" />
+                ) : null}
+                <span className="pos-call-vs">vs</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="pos-call-hero" src="/images/counter/hero.webp" alt="" />
+            </div>
         </div>
     );
 }
