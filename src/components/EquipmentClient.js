@@ -13,7 +13,7 @@ import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { GiOpenBook } from "react-icons/gi";
 
-import { EQUIP_SLOTS, STAT_META, describeStat, describeStats, sortStatKeys, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { describeDepth, describeFarm, describeSea, describeStat, describeStats, EQUIP_SLOTS, itemFitsSlot, sortStatKeys, STAT_META, statValue } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { scoreStats, statDelta, PRIORITY_STATS } from "@/lib/marketplace/item-value.js";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
@@ -963,14 +963,22 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                     </div>
                                                     {keys.map((k) => {
                                                         const a = mineStats[k] || 0; const b = curStats[k] || 0;
-                                                        const d = a - b; const suf = STAT_META[k].suffix || "";
+                                                        const d = a - b;
+                                                        // ⚠️ THROUGH statValue, NOT `${v}${suffix}`. Block
+                                                        // chance is stored 0..1 and its meta suffix is "%",
+                                                        // so building the string by hand printed a 35% block
+                                                        // as "0.35%" — a hundred times too small, on the one
+                                                        // screen a member uses to decide what to wear. This
+                                                        // was the seventh surface to hand-roll the same
+                                                        // string; statValue is the renderer that knows a
+                                                        // fraction from a count.
                                                         return (
                                                             <div key={k} className={`eqcmp-row${d > 0 ? " is-up" : d < 0 ? " is-down" : ""}`}>
                                                                 <span className="eqcmp-stat">{STAT_META[k].icon} {STAT_META[k].label}</span>
-                                                                <span className="eqcmp-was">{b}{suf}</span>
+                                                                <span className="eqcmp-was">{statValue(k, b)}</span>
                                                                 <span className="eqcmp-arrow" aria-hidden="true">&rarr;</span>
-                                                                <span className="eqcmp-now">{a}{suf}</span>
-                                                                <span className="eqcmp-delta">{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</span>
+                                                                <span className="eqcmp-now">{statValue(k, a)}</span>
+                                                                <span className="eqcmp-delta">{d > 0 ? "+" : d === 0 ? "±" : "−"}{statValue(k, Math.abs(d))}</span>
                                                             </div>
                                                         );
                                                     })}

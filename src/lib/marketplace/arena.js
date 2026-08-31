@@ -731,6 +731,18 @@ async function arenaRow(buyerId) {
 // the reset takes the RUNGS back, which is the point of a season, not the fact that you walked them.
 async function rollRoadSeason(row) {
     if (!row) return row;
+    // ── THE RESET FOLLOWS THE DOOR ───────────────────────────────────────────────────────────────────────────
+    // This hangs off arenaRow, which is the base read for the WHOLE arena — a challenge, the Gauntlet, a plaza
+    // skirmish, the nav badge. So on the day seasons deployed it fired for every member who opened the arena
+    // at all, and cleared the Road of twenty people who could not even SEE the season: `roadOpenFor` shuts the
+    // door on walking a rung, and there was nothing at all standing in front of the reset. Eric D lost 100
+    // rungs, JT 86, Kaishiern 72 — restored from the archive by migration 417, which is only possible because
+    // every set turned out to be contiguous.
+    //
+    // A member's rungs are cleared when the new season is OPEN TO THEM, never merely because the code that
+    // knows about seasons is deployed. Same rule the Road screen reads, so the two cannot disagree about
+    // whether a member is in the season yet.
+    if (!roadOpenFor(row.buyer_id)) return row;
     const season = currentSeason();
     if (Number(row.road_season) === season.n) return row;
 

@@ -883,7 +883,10 @@ const VITALITY_SHARE_OF_FEROCITY = 0.6;
 //   speed          main hand only. Every weapon has one. It is the bar's fill rate — see tempoOf.
 //   armor          every worn piece that is not a weapon, ring or amulet. A plain integer. A common chest is
 //                  ~40 and a primordial chest ~850; the other slots are a share of the chest by coverage.
-//   block_chance   shields only. Ranges to 0.75 on the best shield in the game, with most sitting near 0.30.
+//   block_chance   EVERY off-hand, floored at BLOCK_CHANCE_MIN. The 0.75 in the clamp is a ceiling, not
+//                  a real value — FLAT 0.31 x the 1.25 variance cap tops out at 0.39, so the live spread
+//                  is 0.35-0.39. (This line used to claim "ranges to 0.75, most near 0.30", which was
+//                  never true of any shield in the catalogue.)
 //
 // THE VARIETY IS DETERMINISTIC. A hash of the item id gives each piece a spread of +/-25% around the flat
 // number below, so the catalogue has texture but a given item is the same every time the server starts and
@@ -928,6 +931,9 @@ const PIERCE_FLAT = 7;
 const HASTE_FLAT = 7;
 const ARMOR_FLAT = 220;          // at slot weight 1.0 (chest); the other slots are a share by coverage
 const BLOCK_CHANCE_FLAT = 0.31;
+// The floor Luke set: "every shield should have at least .35 block chance". Applied AFTER the roll, so the
+// variance still gives the good shields their spread up to 0.75 — it only lifts the bottom.
+const BLOCK_CHANCE_MIN = 0.35;
 
 (() => {
     for (const it of ITEMS) {
@@ -969,8 +975,22 @@ const BLOCK_CHANCE_FLAT = 0.31;
             // Slot weight is COVERAGE, not rarity — a breastplate covers more of you than a belt, and that
             // is true of a common one and a primordial one alike. It stays.
             stats.armor = Math.max(1, Math.round(ARMOR_FLAT * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
-            if (it.slot === "off_hand" && isShield(it)) {
-                stats.block_chance = Math.min(0.75, Math.round(BLOCK_CHANCE_FLAT * vary(it.id, "blk") * 100) / 100);
+            // ── EVERY OFF-HAND BLOCKS, AND NONE OF THEM BLOCKS LESS THAN THE FLOOR ───────────────────
+            // Luke, looking at a Mythic off-hand: "every shield should have at least .35 block chance, this
+            // one has 0?"
+            //
+            // It had 0 because `isShield` was a REGEX OVER THE NAME — shield|bulwark|aegis|barrier|wall|
+            // rampart|targe — and "Void Maelstrom" matches none of them. The results were arbitrary rather
+            // than wrong-in-one-place: Buckler blocked and Oak Buckler did not, Aegis blocked and Sun's Ward
+            // did not, and ten of the forty-four off-hands silently carried no block at all. Nothing in the
+            // UI said so; the compare panel just printed a zero.
+            //
+            // A name is not a type. What decides whether a thing goes on your off arm is the SLOT, which the
+            // catalogue already states, so that is what decides this — and the floor is Luke's number, which
+            // also means no off-hand can roll into being pointless.
+            if (it.slot === "off_hand") {
+                const rolled = Math.round(BLOCK_CHANCE_FLAT * vary(it.id, "blk") * 100) / 100;
+                stats.block_chance = Math.min(0.75, Math.max(BLOCK_CHANCE_MIN, rolled));
             }
         }
         it.stats = stats;
