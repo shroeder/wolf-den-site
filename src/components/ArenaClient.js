@@ -3088,6 +3088,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 {[
                     ["fight", "Fight", null],
                     ["road", "Road", st.ladder ? `${st.ladder.beaten}` : null],
+                    // The badge counts prizes EARNED BUT NOT IN HAND — the only state on that screen
+                    // that wants a tap. A "3 of 8 claimed" badge would be decoration; this is an errand.
+                    ...(st.ladder?.season
+                        ? [["season", "Season", st.ladder.season.track?.filter((t) => t.owed).length || null]]
+                        : []),
                     // ── CLASS AND SKILLS ARE TWO TABS ────────────────────────────────────────────────
                     // Luke: "we should have 2 tabs instead of 1 here, one for class, one for skills."
                     //
@@ -3254,86 +3259,25 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 </div>
             ) : null}
 
-{tab === "road" ? (() => {
-            // ── THE ROAD IS A ROAD NOW, NOT A LIST ────────────────────────────────────────────────────────
-            // It shipped as a hundred identical grey text tiles under ten text headings, and every fight
-            // underneath it is different: ten places, ten looks, a champion every tenth, a chest on every one
-            // of those, and a curve that runs from a tavern brawler to something that is not sport. None of
-            // that reached the eye, so the screen read as homework.
-            //
-            // Three things carry it: the FACES (a house plate on every rung, a champion portrait on the
-            // tenth), the NEXT FIGHT (the lowest one still standing, pulled out and made the loudest thing on
-            // the screen), and PROGRESS THAT MOVES (a house meter, ten pips across the top, and a stamp on
-            // everything you have put down). Nothing is locked — it never was — this only says where you are.
-            const foesAll = st.ladder?.foes || [];
-            const houses = st.ladder?.houses || [];
-            // Off the SERVER's `next`, not recomputed here. It is the rung the server will actually accept, and
-            // the screen having its own opinion about which one that is would be the same rule written twice.
-            const next = foesAll.find((f) => f.rung === st.ladder?.next) || null;
-            const beaten = st.ladder?.beaten || 0;
-            const size = st.ladder?.size || 100;
-            const pct = size ? Math.round((beaten / size) * 100) : 0;
-            // ── WHAT AM I CLIMBING FOR ────────────────────────────────────────────────────────────────
-            // This used to point at the next unbeaten CHEST, and chests are gone from the Road — a rung pays
-            // flat laurels and the eight season prizes are the reason to walk it. The question the banner has
-            // to answer is the same one it always did; the answer moved.
+{tab === "season" ? (() => {
+            // ── THE SEASON, ON ITS OWN SCREEN ─────────────────────────────────────────────────────────────
+            // This used to hang off the bottom of the Road's banner, which put the eight prizes below the
+            // hundred-rung ladder — so the thing a member is climbing FOR sat underneath the climb, and on a
+            // phone it was three flicks down. Luke: "the season rewards and info should be in a tab."
             const season = st.ladder?.season || null;
             const track = season?.track || [];
             const nextPrize = track.find((t) => !t.claimed && !t.owed) || null;
-            // Which house is open. `openHouse` is null until you tap one, so the screen opens on the house
-            // you are actually standing in and a cleared house stays folded away.
-            const openKey = openHouse ?? next?.house ?? houses[0]?.key;
+            if (!season) return null;
             return (
             <section className="card ar-road">
-                {/* ── CLOSED, AND SAID OUT LOUD ────────────────────────────────────────────────────────────
-                    Read off the server's own flag, so this notice and the refusal can never disagree. Said
-                    HERE, at the top of the Road, because the alternative is somebody tapping a rung and
-                    getting an error — which reads as broken rather than deliberate. It leads with the thing
-                    people will actually worry about: their rungs are safe. */}
-                {st.ladder?.closed ? (
-                    <div className="ar-road-closed" role="status">
-                        <b>The Road is closed for now</b>
-                        <em>{st.ladder.closedNote}</em>
-                    </div>
-                ) : null}
-                {/* ── THE BANNER ── one number, the ten houses as pips, and the thing you are climbing for. */}
                 <div className="ar-road-hero">
                     <div className="ar-road-hero-top">
                         <div>
-                            {/* The season is the headline. A member arriving at the Road needs to know two
-                                things before anything else — that the climb resets, and what the eight things
-                                at the top of it are — and burying that under "The Long Road" would leave the
-                                reset to be discovered as a bug. */}
-                            <b>{season ? season.name : "The Long Road"}</b>
-                            <em>{season
-                                ? `Season ${season.n} of the Long Road. ${season.blurb}`
-                                : "A hundred fighters, each of them once. Nothing here comes back."}</em>
+                            <b>{season.name}</b>
+                            <em>Season {season.n} of the Long Road. {season.blurb}</em>
                         </div>
-                        <span className="ar-road-score">{beaten}<i>/{size}</i></span>
+                        <span className="ar-road-score">{season.claimed}<i>/{season.total}</i></span>
                     </div>
-                    <div className="ar-road-meter" role="img" aria-label={`${beaten} of ${size} beaten`}>
-                        <span style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="ar-road-pips">
-                        {houses.map((h) => {
-                            const hf = foesAll.filter((f) => f.rung >= h.from && f.rung <= h.to);
-                            const d = hf.filter((f) => f.beaten).length;
-                            return (
-                                <button type="button" key={h.key} style={{ "--h": h.tint }}
-                                    className={`ar-pip${d === hf.length && hf.length ? " is-clear" : ""}${d ? " is-part" : ""}${openKey === h.key ? " is-open" : ""}`}
-                                    onClick={() => { Sfx.ui(); setOpenHouse(h.key); }}
-                                    title={`${h.name} — ${d}/${hf.length}`}>
-                                    <i style={{ height: `${hf.length ? (d / hf.length) * 100 : 0}%` }} />
-                                </button>
-                            );
-                        })}
-                    </div>
-                    {/* ── THE EIGHT ────────────────────────────────────────────────────────────────────
-                        Every prize the season holds, all of them, always — including the ones that are a
-                        year away. A track that only showed the next one would be a progress bar, and the
-                        thing that makes somebody climb is seeing the moth at rung 200 on the day they beat
-                        rung 3. Four states, and each is a different sentence: yours, owed you, ahead of you,
-                        or behind a door you have not opened. */}
                     {track.length ? (
                         <div className="ar-road-track">
                             <div className="ar-track-head">
@@ -3390,6 +3334,92 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             </p>
                         </div>
                     ) : null}
+                </div>
+            </section>
+            );
+        })() : null}
+
+        {tab === "road" ? (() => {
+            // ── THE ROAD IS A ROAD NOW, NOT A LIST ────────────────────────────────────────────────────────
+            // It shipped as a hundred identical grey text tiles under ten text headings, and every fight
+            // underneath it is different: ten places, ten looks, a champion every tenth, a chest on every one
+            // of those, and a curve that runs from a tavern brawler to something that is not sport. None of
+            // that reached the eye, so the screen read as homework.
+            //
+            // Three things carry it: the FACES (a house plate on every rung, a champion portrait on the
+            // tenth), the NEXT FIGHT (the lowest one still standing, pulled out and made the loudest thing on
+            // the screen), and PROGRESS THAT MOVES (a house meter, ten pips across the top, and a stamp on
+            // everything you have put down). Nothing is locked — it never was — this only says where you are.
+            const foesAll = st.ladder?.foes || [];
+            const houses = st.ladder?.houses || [];
+            // Off the SERVER's `next`, not recomputed here. It is the rung the server will actually accept, and
+            // the screen having its own opinion about which one that is would be the same rule written twice.
+            const next = foesAll.find((f) => f.rung === st.ladder?.next) || null;
+            const beaten = st.ladder?.beaten || 0;
+            const size = st.ladder?.size || 100;
+            const pct = size ? Math.round((beaten / size) * 100) : 0;
+            // ── WHAT AM I CLIMBING FOR ────────────────────────────────────────────────────────────────
+            // This used to point at the next unbeaten CHEST, and chests are gone from the Road — a rung pays
+            // flat laurels and the eight season prizes are the reason to walk it. The question the banner has
+            // to answer is the same one it always did; the answer moved.
+            const season = st.ladder?.season || null;
+            const track = season?.track || [];
+            const nextPrize = track.find((t) => !t.claimed && !t.owed) || null;
+            // Which house is open. `openHouse` is null until you tap one, so the screen opens on the house
+            // you are actually standing in and a cleared house stays folded away.
+            const openKey = openHouse ?? next?.house ?? houses[0]?.key;
+            return (
+            <section className="card ar-road">
+                {/* ── CLOSED, AND SAID OUT LOUD ────────────────────────────────────────────────────────────
+                    Read off the server's own flag, so this notice and the refusal can never disagree. Said
+                    HERE, at the top of the Road, because the alternative is somebody tapping a rung and
+                    getting an error — which reads as broken rather than deliberate. It leads with the thing
+                    people will actually worry about: their rungs are safe. */}
+                {st.ladder?.closed ? (
+                    <div className="ar-road-closed" role="status">
+                        <b>The Road is closed for now</b>
+                        <em>{st.ladder.closedNote}</em>
+                    </div>
+                ) : null}
+                {/* ── THE BANNER ── one number, the ten houses as pips, and the thing you are climbing for. */}
+                <div className="ar-road-hero">
+                    <div className="ar-road-hero-top">
+                        <div>
+                            {/* Luke: "the season rewards and info should be in a tab." So this is the CLIMB
+                                and nothing else. The season still has to be discoverable from here — a
+                                member who never finds the tab never learns the rungs reset — so the one
+                                line that matters points at it rather than burying the whole track inline. */}
+                            <b>The Long Road</b>
+                            <em>{season
+                                ? `Season ${season.n}: ${season.name}. The rungs reset each season — see the Season tab.`
+                                : "A hundred fighters, each of them once. Nothing here comes back."}</em>
+                        </div>
+                        <span className="ar-road-score">{beaten}<i>/{size}</i></span>
+                    </div>
+                    <div className="ar-road-meter" role="img" aria-label={`${beaten} of ${size} beaten`}>
+                        <span style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="ar-road-pips">
+                        {houses.map((h) => {
+                            const hf = foesAll.filter((f) => f.rung >= h.from && f.rung <= h.to);
+                            const d = hf.filter((f) => f.beaten).length;
+                            return (
+                                <button type="button" key={h.key} style={{ "--h": h.tint }}
+                                    className={`ar-pip${d === hf.length && hf.length ? " is-clear" : ""}${d ? " is-part" : ""}${openKey === h.key ? " is-open" : ""}`}
+                                    onClick={() => { Sfx.ui(); setOpenHouse(h.key); }}
+                                    title={`${h.name} — ${d}/${hf.length}`}>
+                                    <i style={{ height: `${hf.length ? (d / hf.length) * 100 : 0}%` }} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {/* ── THE EIGHT ────────────────────────────────────────────────────────────────────
+                        Every prize the season holds, all of them, always — including the ones that are a
+                        year away. A track that only showed the next one would be a progress bar, and the
+                        thing that makes somebody climb is seeing the moth at rung 200 on the day they beat
+                        rung 3. Four states, and each is a different sentence: yours, owed you, ahead of you,
+                        or behind a door you have not opened. */}
+
                 </div>
 
                 {/* ── THE NEXT ONE STILL STANDING ── the single loudest thing on the screen, because the whole
@@ -4961,8 +4991,10 @@ function Styles() {
             /* SIX now that Class and Skills are separate. Six across a 375px phone is 58px a tab, which
                truncates "Training" and "Armoury"; two rows of three keeps every label a whole word, which
                is the thing this strip was rebuilt around in the first place. */
-            .ar-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; margin: 0 0 16px; }
-            @media (min-width: 560px) { .ar-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+            /* Seven tabs since the season got its own. Four across on a phone (4+3) rather than three,
+               because 3+3+1 leaves a single tab stranded on a row of its own. */
+            .ar-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 0 0 16px; }
+            @media (min-width: 560px) { .ar-tabs { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
             .ar-tab { position: relative; padding: 9px 2px; border-radius: 11px; cursor: pointer;
                 font-size: 10.5px; font-weight: 900; letter-spacing: -.01em; color: #9aa2ab;
                 white-space: nowrap;
