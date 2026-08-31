@@ -159,13 +159,26 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
     useEffect(() => { loopRef.current = loop; }, [loop]);
 
     const start = useCallback(() => {
+        // ── PLAYED IS PLAYED, WHATEVER THE HISTORY STACK SAYS ────────────────────────────────────────────
+        // Luke: "if you get the coin catch minigame, finish it, click get gold, click browser back, you can
+        // do it again."
+        //
+        // The SERVER has always been safe — merchantMinigame pays under an atomic guard on minigamePlayed, and
+        // 65 payouts over ten days show no member ever collecting twice. So nothing was ever double-paid. But
+        // going back re-mounted this component with a stale `merchant` prop, `phase` initialised to "intro"
+        // off it, and the whole catch played again for a reward the server would refuse — a minute of somebody's
+        // evening spent on a result that could not exist.
+        //
+        // Guarded here rather than by hiding the button, because the history stack can put you in front of any
+        // button it likes; the refusal has to sit on the thing that starts the game.
+        if (merchant.minigamePlayed) { setPhase("done"); return; }
         const s = gs.current;
         s.entities = []; s.playerX = 0.5; s.targetX = 0.5; s.lives = 3; s.score = 0; s.missed = 0;
         s.combo = 0; s.bestCombo = 0; s.floaters = []; s.running = true;
         s.last = performance.now(); s.lastSpawn = performance.now(); s.spawnGap = 500; s.endAt = performance.now() + GAME_MS;
         setLives(3); setScore(0); setTimeLeft(GAME_MS / 1000); setPhase("playing");
         raf.current = requestAnimationFrame((t) => loopRef.current && loopRef.current(t));
-    }, []);
+    }, [merchant.minigamePlayed]);
 
     // Move by an absolute clientX relative to a control element (the pad OR the arena — either works).
     const moveByEl = useCallback((el, clientX) => {
