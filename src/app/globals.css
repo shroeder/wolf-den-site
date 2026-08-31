@@ -23235,9 +23235,10 @@ body.cas-seated .social-fab { display: none; }
     width: calc(var(--s) * 0.068vw);
     aspect-ratio: 1; object-fit: contain;
     transform: translate(-50%, -50%) rotate(var(--r));
-    /* Two shadows: a tight dark one to lift it off the ground, and a wide warm one so the brighter sprites
-       throw a little light. Without the second it looks like stickers on black paper. */
-    filter: drop-shadow(0 10px 18px rgba(0,0,0,0.75)) drop-shadow(0 0 34px rgba(255,190,90,0.13));
+    /* ONE SHADOW ONLY. A second, wide warm glow looked right on a single sprite and wrong on eighteen: the
+       glows accumulated across the layer and the clip cut the result into a hard-edged lighter rectangle
+       spanning the whole stage — a seam that read as a rendering bug. */
+    filter: drop-shadow(0 12px 20px rgba(0,0,0,0.85));
     animation: pos-bob 7s ease-in-out infinite;
     animation-delay: calc(var(--i) * -0.41s);
 }
