@@ -823,13 +823,33 @@ export async function dropSeedFrom(buyerId, source) {
 
 // Crops-ready push: web-push each member whose crop(s) just finished and haven't been announced yet (guarded
 // by notified_at so it fires once per crop). Called by the crops-ready cron.
+// ── ONE NUDGE, NOT ONE PER PLOT ──────────────────────────────────────────────────────────────────────────────
+// Luke: "it reminds you every 15 minutes which gets super annoying."
+//
+// The cron runs on the half hour and `notified_at` deduped PER PLOT — so a farm whose plots ripen at different
+// times fired a fresh push every time the next one came up. Plant eight things over an evening and the phone
+// buzzes eight times, each one technically about something new and all of them saying the same thing.
+//
+// A member now hears about their farm at most once every NUDGE_COOLDOWN_H. Everything ready by then is still
+// counted in the one message, which is what somebody wants to know anyway: how much is waiting, not which
+// plot crossed the line most recently.
+const NUDGE_COOLDOWN_H = 8;
+
 export async function runCropsReadyNudge() {
     const rows = await db
         .query(
             `SELECT p.buyer_id, p.seed_id FROM mkt_farm_plot p
               WHERE p.ready_at <= NOW() AND p.notified_at IS NULL
                 AND EXISTS (SELECT 1 FROM mkt_web_push w WHERE w.buyer_id = p.buyer_id)
-              ORDER BY p.buyer_id`
+                -- Nothing on this farm may have been announced in the cooldown window. Read off the plots
+                -- themselves so there is no second place to keep this and no migration to run.
+                AND NOT EXISTS (
+                    SELECT 1 FROM mkt_farm_plot q
+                     WHERE q.buyer_id = p.buyer_id
+                       AND q.notified_at > NOW() - ($1 || ' hours')::interval
+                )
+              ORDER BY p.buyer_id`,
+            [String(NUDGE_COOLDOWN_H)],
         )
         .catch(() => []);
     const byBuyer = new Map();
@@ -843,7 +863,23 @@ export async function runCropsReadyNudge() {
         await sendWebPush(buyerId, { kind: "crops", title: "🌾 Harvest time!", body, url: "/marketplace/farm", tag: "crops-ready" }).catch(() => {});
         sent += 1;
     }
-    // Mark every ready-but-unannounced plot as notified so we never re-push it (even for members with no sub).
-    await db.query(`UPDATE mkt_farm_plot SET notified_at = NOW() WHERE ready_at <= NOW() AND notified_at IS NULL`).catch(() => {});
+    // ⚠️ ONLY THE FARMS WE ACTUALLY SPOKE TO, PLUS EVERY MEMBER WITH NO SUBSCRIPTION. This used to stamp
+    // EVERY ready plot in the game, which silently consumed the plots being held back by the cooldown above —
+    // so a farm that ripened during a quiet window would never be announced at all. A held plot keeps its null
+    // and is announced when the window opens.
+    const spoke = [...byBuyer.keys()];
+    if (spoke.length) {
+        await db.query(
+            `UPDATE mkt_farm_plot SET notified_at = NOW()
+              WHERE ready_at <= NOW() AND notified_at IS NULL AND buyer_id = ANY($1::uuid[])`, [spoke],
+        ).catch(() => {});
+    }
+    // Members with no push subscription can never be told, so their plots are stamped rather than accumulating
+    // forever as a queue of announcements nobody will ever receive.
+    await db.query(
+        `UPDATE mkt_farm_plot p SET notified_at = NOW()
+          WHERE p.ready_at <= NOW() AND p.notified_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM mkt_web_push w WHERE w.buyer_id = p.buyer_id)`,
+    ).catch(() => {});
     return { sent, plots: rows.length };
 }
