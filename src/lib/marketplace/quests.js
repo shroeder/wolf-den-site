@@ -128,9 +128,16 @@ function eligibleTemplates(buyerId) {
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
 // paid re-roll produces a different set.
-function pickDaily(buyerId, day, reset = false, count = 3) {
+function pickDaily(buyerId, day, reset = false, count = 3, exclude = null) {
     const salt = reset ? ":r" : "";
+    const skip = exclude instanceof Set ? exclude : new Set(exclude || []);
     return eligibleTemplates(buyerId)
+        // ── A REROLL MUST NOT HAND BACK WHAT YOU HAVE ALREADY DONE ───────────────────────────────────────
+        // ValkyrieSylve: "sometimes I'll get the same quest back to back after rerolling. Some quests can only
+        // be completed once a day. Can we exclude any previously completed quests done that day on the
+        // reroll." Without this the draw is over the whole pool every time, so a bounty you finished this
+        // morning can come back as a card with no way to clear it — you have paid 1,500 gold for a dead slot.
+        .filter((t) => !skip.has(t.key))
         .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
         .slice(0, count)
@@ -185,10 +192,32 @@ export async function resetDailyQuests(buyerId) {
     }
     await logCoin(buyerId, -QUEST_RESET_COST, "cooldown_skip", { meta: { kind: "quest_reroll" }, balanceAfter: paid.gold }).catch(() => {});
     await trackActivity(buyerId, "cooldown_skip", { kind: "quest_reroll", cost: QUEST_RESET_COST }).catch(() => {});
-    await db.query(`DELETE FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => {});
+    // ── WHAT YOU FINISHED TODAY STAYS FINISHED ───────────────────────────────────────────────────────────
+    // This deleted every row for the day, claimed ones included, and then drew from the whole pool again. Two
+    // things went wrong with that: a completed bounty could be handed straight back (and several of them can
+    // only be done once a day, so the card was unclearable), and wiping a claimed row throws away the record
+    // that it was ever claimed.
+    //
+    // So the finished ones are READ FIRST, kept on the board, and excluded from the draw. Only the unfinished
+    // slots are replaced — which is what a reroll means.
+    const doneRows = await db.query(
+        `SELECT quest_key FROM mkt_daily_quest
+          WHERE buyer_id = $1 AND day = $2 AND (claimed_at IS NOT NULL OR progress >= target)`,
+        [buyerId, day],
+    ).catch(() => []);
+    const done = new Set((doneRows || []).map((r) => r.quest_key));
+    await db.query(
+        `DELETE FROM mkt_daily_quest
+          WHERE buyer_id = $1 AND day = $2 AND claimed_at IS NULL AND progress < target`,
+        [buyerId, day],
+    ).catch(() => {});
     const rerollPowers = await equippedPowers(buyerId);
-    await insertQuests(buyerId, day, pickDaily(buyerId, day, true, rerollPowers.has("bounty_board_rights") ? 4 : 3),
-        rerollPowers.has("quartermaster_s_round"));
+    // Draw enough to refill only the empty slots, and never draw something already sitting on the board.
+    const want = (rerollPowers.has("bounty_board_rights") ? 4 : 3) - done.size;
+    if (want > 0) {
+        await insertQuests(buyerId, day, pickDaily(buyerId, day, true, want, done),
+            rerollPowers.has("quartermaster_s_round"));
+    }
     return { ok: true, gold: paid.gold, ...(await getDailyQuests(buyerId)) };
 }
 
