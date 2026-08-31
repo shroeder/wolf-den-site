@@ -97,7 +97,27 @@ export async function maybeSpawnShiny() {
 // Claim the glint — atomic first-tap-wins. Grants a random source-exclusive "glint" decoration to the winner.
 export async function claimShiny(buyerId, shinyId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const reward = GLINT_DECOS[Math.floor(Math.random() * GLINT_DECOS.length)];
+    // ── A COLLECTIBLE SHOULD TRY TO GIVE YOU ONE YOU HAVEN'T GOT ─────────────────────────────────────────
+    // The draw was uniform over all eight with no regard for what you already own, so the rarest thing a
+    // member can do in a day could hand back a duplicate — and duplicates just increment a quantity on a
+    // decoration you can only place once.
+    //
+    // Kaishiern: "The glimmer has given me only wishing stars for the last four times I've found it. Is it
+    // broken or am I just really unlucky all of a sudden?" Checked against every glint ever claimed: twelve
+    // draws, five of them the Wishing Star, three of the eight never seen. That is a 1.5% run rather than a
+    // fault — he was unlucky — but the shape of the draw is what let a 1.5% run cost him four prizes instead
+    // of one.
+    //
+    // So it prefers what you do not own, exactly as a chest does, and falls back to the full pool only when
+    // you hold all eight — at which point a duplicate is the honest answer.
+    const ownedRows = await db.query(
+        `SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = ANY($2::text[]) AND qty > 0`,
+        [buyerId, GLINT_DECOS],
+    ).catch(() => []);
+    const held = new Set((ownedRows || []).map((r) => r.deco_id));
+    const fresh = GLINT_DECOS.filter((id) => !held.has(id));
+    const pool = fresh.length ? fresh : GLINT_DECOS;
+    const reward = pool[Math.floor(Math.random() * pool.length)];
     const claimed = await db.queryOne(
         `UPDATE mkt_town_shiny SET claimed_by = $1, claimed_at = NOW(), reward_deco = $2
           WHERE id = $3 AND claimed_by IS NULL AND expires_at > NOW() RETURNING reward_deco`,
