@@ -1,5 +1,6 @@
 "use client";
 
+import { DELVE_SHARD_DOUBLOONS } from "@/lib/marketplace/delve-catalog.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── THE RUN ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -66,7 +67,13 @@ const REWARD_ART = {
     gold: "/images/spin/prizes/coins-big.png",
     xp: "/images/spin/prizes/xp-orb.png",
     potion: "/images/delves/ev-potion.webp",
-    frags: "/images/sailing/fragment-wooden.png",
+    // ── SHARDS PAY DOUBLOONS, SO THE CHIP SHOWS DOUBLOONS ────────────────────────────────────────────────
+    // Chest shards stopped fusing into chests when chests became something you dig up; a delve converts them
+    // to coin at DELVE_SHARD_DOUBLOONS. The run log was fixed to say so months ago and this chip was not, so
+    // the floor card announced "3 shards" over a wooden-fragment sprite while the wrap card beside it showed
+    // doubloons. SoullessShiitake: "dungeons are still showing shards as drops rather than the dubloons that
+    // actually pay out in their place."
+    frags: "/images/sailing/doubloon.png",
 };
 const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const CHEST_ART = {
@@ -147,7 +154,7 @@ export default function DelveRun({ run, busy, onAct }) {
         result.xp ? { k: "xp", art: REWARD_ART.xp, text: `+${result.xp.toLocaleString()} XP` } : null,
         result.chest ? { k: "chest", art: CHEST_ART[result.chest] || CHEST_ART.wooden, text: `${result.chest} chest` } : null,
         result.parts ? { k: "parts", art: null, text: `${result.parts.n}× ${result.parts.name}` } : null,
-        result.frags ? { k: "frags", art: REWARD_ART.frags, text: `${result.frags} shards` } : null,
+        result.frags ? { k: "frags", art: REWARD_ART.frags, text: `${result.frags * DELVE_SHARD_DOUBLOONS} doubloons` } : null,
         result.potion ? { k: "potion", art: REWARD_ART.potion, text: `+${result.potion} potion${result.potion === 1 ? "" : "s"}` } : null,
         result.healed ? { k: "heal", art: REWARD_ART.potion, text: `+${result.healed} health` } : null,
         result.damage ? { k: "dmg", art: null, text: `-${result.damage} health` } : null,
