@@ -356,11 +356,29 @@ const CHEST_TIER = { common: "wooden", rare: "wooden", epic: "iron", legendary: 
 // potions — fishing shouldn't be a route to boss damage, and every one of these feeds a loop fishing touches.
 // Rarer fish draw from the back of this list, so a mythic hands out a Kraken Bait rather than a Pet Treat.
 const FISH_CONSUMABLES = [
-    "treat_bone", "farm_growth_tonic", "treat_snack", "farm_harvest_charm",
-    "sail_lucky_lure", "sail_war_drum", "sail_treasure_map", "sail_storm_bottle", "sail_kraken_bait",
+    "treat_bone", "farm_growth_tonic", "treat_snack", "farm_fertilizer_crate", "spin_lucky_coin",
+    "farm_harvest_charm", "sail_lucky_lure", "treat_feast", "farm_fertilizer_haul", "sail_war_drum",
+    "sail_treasure_map", "sail_storm_bottle", "treat_mythic", "sail_kraken_bait",
 ];
+// ── WHY THE LIST GOT LONGER ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "fishing seems to give a lot of harvest charms, honestly we should get a little more variety when it's
+// a non fish."
+//
+// He is describing the arithmetic exactly. The reach for an ordinary catch capped this list at five, and the
+// pick is uniform — so the Harvest Charm was a flat one-in-five of every consumable haul, forever. Five things
+// is not a table, it is a rotation you notice within a week.
+//
+// Five more are threaded in at the tiers they belong to rather than appended at the end, so the good relics
+// stay attached to the good fish and it is the SHALLOW end that gets most of the new variety, which is where
+// the repetition was being felt.
 // How far up that list a rarity can reach (index cap), so the good relics stay attached to the good fish.
-const CONSUMABLE_REACH = { common: 2, rare: 4, epic: 6, legendary: 8, mythic: 9 };
+// Widened with the list, so every rarity draws from a genuinely bigger pool than it did: a common cast now
+// picks one of five rather than one of three, and a mythic reaches the whole table.
+const CONSUMABLE_REACH = { common: 4, rare: 7, epic: 9, legendary: 11, mythic: 13 };
+// How many seeds a treasure haul brings up, and the band it draws them from. Starts at rare — the floor of a
+// once-in-twenty-casts haul should not be a Corn.
+const SEED_HAUL = 4;
+const FISHING_SEED_BAND = { rare: 42, epic: 40, legendary: 15, mythic: 3 };
 
 // One weighted pick off any of the tables above.
 function pickWeighted(table) {
@@ -523,15 +541,40 @@ export async function grantHaul(buyerId, kind, tier = "common") {
         // The haul table has ALREADY decided this cast is a seed, so this only picks which one. It used to
         // call dropSeedFrom("fishing") — a source the seed table never declared — so it returned null every
         // single time and the haul paid nothing at all.
+        // ── A BAG, NOT A SINGLE SEED ─────────────────────────────────────────────────────────────────────
+        // Luke: "fishing should have a higher floor. getting corn is weak sauce, it should give you like a bag
+        // of mid tier seeds."
+        //
+        // A treasure haul is one cast in five, and a quarter of THOSE are seeds — so this line fires about
+        // once in twenty casts, and paying it a single Corn made the rarest ordinary outcome in fishing feel
+        // like nothing happened. It hands over SEED_HAUL of them now, drawn from a band that starts at rare
+        // rather than at common: the floor is a handful of middling seeds instead of one weak one.
+        //
+        // Rolled individually rather than as N of one kind, because a bag of five different seeds is a thing
+        // to go and plant and a bag of five Corn is still Corn.
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
-        const seed = await grantSeedFromBand(buyerId, "fishing").catch(() => null);
+        const bag = [];
+        for (let i = 0; i < SEED_HAUL; i += 1) {
+            const one = await grantSeedFromBand(buyerId, FISHING_SEED_BAND).catch(() => null);
+            if (one) bag.push(one);
+        }
+        const seed = bag[0] || null;
         // `seedId`, NOT `id`. grantSeedFromBand returns { seedId, name, emoji, rarity } and this read `seed.id`,
         // which is undefined on every seed it has ever paid — so the sprite lookup was handed nothing and came
         // back null. What the member then watched was the RISE's no-sprite fallback, which is a treasure chest:
         // a chest came up out of the water and the card underneath it said "Potato", drawn as the bare emoji.
         // Luke: "it shows a potato but I reeled up a chest?". The art was there the whole time.
         const seedId = seed?.seedId || seed?.id || null;
-        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seedId, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seedId) } : null;
+        if (!seed) return null;
+        // Named in full when the bag holds more than one kind, so the card says what was actually hauled up
+        // rather than naming the first and quietly adding four more.
+        const names = [...new Set(bag.map((b) => b.name).filter(Boolean))];
+        const label = bag.length > 1
+            ? `${bag.length} seeds — ${names.slice(0, 3).join(", ")}${names.length > 3 ? " and more" : ""}`
+            : (seed.name || "Seed");
+        return { kind: "seed", label, emoji: seed.emoji || "🌱", id: seedId, n: bag.length,
+            where: bag.length > 1 ? `${bag.length} added to your seed bag` : "Added to your seed bag",
+            spriteUrl: await haulSprite("seed", seedId) };
     }
     if (kind === "consumable") {
         const pool = FISH_CONSUMABLES.slice(0, (CONSUMABLE_REACH[tier] ?? 2) + 1);
