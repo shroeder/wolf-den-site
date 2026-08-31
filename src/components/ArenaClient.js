@@ -1857,7 +1857,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             fxRef.current?.play({ kind: won ? "surge" : "hurt", element: won ? "light" : "shadow",
                 side: won ? "them" : "you", big: 1.4 });
         }, 520);
-        const card = setTimeout(() => setRecapReady(true), 1900);
+        // Shortened with the verdict's button. 1,900ms was a screen you looked at and could act on; without
+        // anything to press it is a flourish, and a flourish that outlasts its welcome reads as a hang. Long
+        // enough for the sting at 420 and the burst at 520 to land, and no longer.
+        const card = setTimeout(() => setRecapReady(true), 950);
         return () => { clearTimeout(sting); clearTimeout(burst); clearTimeout(card); };
     }, [bout?.over, bout?.won]);
 
@@ -2887,13 +2890,18 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {bout.won ? <span className="ar-cele" aria-hidden="true" /> : null}
                             <b>{bout.won ? "Victory" : "You fall"}</b>
                             {bout.won && bout.foe?.name ? <em className="ar-verdict-sub">{bout.foe.name} is down</em> : null}
-                            {/* Present whether or not the recap modal renders. A finished fight must always
-                                have a visible way out somewhere on the screen — and it has to lead back to the
-                                room you came from, which for a raider is the plaza. */}
-                            <button type="button" className="ar-btn is-sm" disabled={busy}
-                                onClick={leaveBout}>
-                                {bout.fishing ? "Back to the water" : bout.town ? "Back to the plaza" : "Back to the ladder"}
-                            </button>
+                            {/* ── NO BUTTON HERE. THIS IS A BEAT, NOT A SCREEN. ───────────────────────────
+                                This carried its own "Back to the water", which made a finished fight TWO
+                                modals with two ways out: the word across the ring, and then the recap card
+                                with the gold, the chest and the tally on it. Pressing the first one left
+                                before the second existed, so the entire payout screen was skippable — and it
+                                is the only place a member is told what the fight actually paid.
+                                Luke: "those should just be one modal with a button. The first victory and
+                                button can get replaced by having the 2nd modal show straight away."
+                                So the word stays as the flourish it was written to be, the recap follows a
+                                beat later and carries the only way out. The escape hatch has not gone: the
+                                recap's corner Close still arrives on its own timer for a screen that fails to
+                                render, which is the case that button was really guarding. */}
                         </div>
                     ) : null}
 
