@@ -584,7 +584,7 @@ export function npcStats(power, archKey, seed = 0, tier = null) {
     // ⚠️ THE LADDER NOW ENDS WHERE THE CATALOGUE DOES. Rungs past the top rarity band wear the same wardrobe
     // as the band below and only the forge and the tree keep climbing. That is the honest consequence of the
     // rule and it is left visible rather than papered over: the fix is more gear, authored as real items, not
-    // a second number system. Nobody is near it — one member has ever climbed the Road and reached rung 48.
+    // a second number system.
     // The rung's own class, drawn from its hash — the same one npcBuild spends tree points in and the same
     // one its deck comes from. npcClassForArchetype is only a fallback for a caller with no rung.
     const classId = t ? npcClassFor(t) : npcClassForArchetype(arch.key);
