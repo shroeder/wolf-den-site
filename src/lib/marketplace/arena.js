@@ -2439,7 +2439,13 @@ async function finishBout(buyerId, row, b, won) {
     //
     // Feats still pay on top of a win. They are a flourish rather than a rating, and taking a feat bonus off
     // the loser would mean a member losing points because somebody else fought well.
-    const isMemberBout = Number(b.npcTier) === 0 && !roadRung
+    // ⚠️ THE RUNG IS READ OFF THE BOUT HERE, NOT BORROWED FROM BELOW. `roadRung` is declared forty lines
+    // further down with `const`, so referencing it from here is a temporal dead zone ReferenceError — which
+    // threw on EVERY settle and left members stuck mid-fight on an internal server error. ValkyrieSylve: "it
+    // wont let me land the final blow... I am trapped." Same shape as the isMemberFoe slip in the first draft
+    // of this block, and the reason both happened is reaching forward in a 200-line function.
+    const rungOfBout = Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0);
+    const isMemberBout = Number(b.npcTier) === 0 && !rungOfBout
         && boutKindOf(b) === "member" && UUID_RE.test(String(b.foe?.id || ""));
     const theirVp = isMemberBout
         ? Number((await db.queryOne(`SELECT vp FROM mkt_arena WHERE buyer_id = $1`, [b.foe.id]).catch(() => null))?.vp) || 0
