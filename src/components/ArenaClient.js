@@ -1147,6 +1147,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // The ladder screen carries three jobs now — who to fight, how you fight, and what you have trained. One
     // scroll for all three was already long before the tree existed.
     const [tab, setTab] = useState("fight");
+    // Which season prize is open for inspection, by rung. A hook cannot live inside the season panel — that
+    // panel is an IIFE behind a tab test, so it does not run on every render.
+    const [prizeRung, setPrizeRung] = useState(null);
     // Which stretch of the Road is unfolded. NULL rather than a key, deliberately: the ladder arrives with the
     // state, so seeding a house here would seed it from data that has not landed yet and leave the wrong one
     // open forever (a `defaultOpen` prop only ever seeds useState once, on mount). Null means "wherever I am",
@@ -3295,11 +3298,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             covers the whole tile rather than sitting under it, because a
                                             small button inside a 90px tile is a target nobody hits on a
                                             phone. Every other state has nothing to press. */}
-                                        {t.owed ? (
-                                            <button type="button" className="ar-track-claim" disabled={busy}
-                                                onClick={() => { Sfx.ui(); act("claim_road"); }}
-                                                aria-label={`Claim ${t.name}`} />
-                                        ) : null}
+                                        {/* EVERY tile opens, not just the owed one. Luke: "season rewards should
+                                            be inspectable." The claim moved into the panel that opens — a
+                                            full-width labelled button there rather than an invisible one
+                                            covering a 90px tile, so an owed prize costs one more tap and is
+                                            impossible either to miss or to hit by accident. */}
+                                        <button type="button" className="ar-track-open"
+                                            onClick={() => { Sfx.ui(); setPrizeRung(t.rung); }}
+                                            aria-label={`Inspect ${t.name}`} />
                                         <span className="ar-track-rung">#{t.rung}</span>
                                         {/* THE PRIZE'S OWN PICTURE. The kind glyph is the fallback, not the
                                             default — a paw print for both pets is a legend, and the reason
@@ -3326,6 +3332,58 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 rungs, and a member who finds that out by opening the Road one morning to a
                                 blank hundred has been robbed as far as they are concerned. It is also the
                                 one place to say what the reset does NOT take. */}
+                            {/* ── WHAT IT ACTUALLY IS ──────────────────────────────────────────────────
+                                Resolved on the SERVER off the four catalogues that own these things, because
+                                every season prize is hidden from the normal browse paths until the season is
+                                public — so a member cannot go and look one up, which is exactly why a name and
+                                a picture were not enough to decide whether the climb was worth an evening. */}
+                            {(() => {
+                                const t = track.find((x) => x.rung === prizeRung);
+                                if (!t) return null;
+                                return (
+                                    <Portal>
+                                        <div className="ar-prize" role="dialog" aria-modal="true"
+                                            onClick={() => setPrizeRung(null)}>
+                                            <div className="ar-prize-card" style={{ "--h": season.tint }}
+                                                onClick={(e) => e.stopPropagation()}>
+                                                <span className="ar-prize-rung">Rung {t.rung}</span>
+                                                <span className="ar-prize-art" aria-hidden="true">
+                                                    {t.art
+                                                        ? <img src={t.art} alt="" draggable="false"
+                                                            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                                        : (PRIZE_GLYPH[t.kind] || GiLaurelCrown)({})}
+                                                </span>
+                                                <b className="ar-prize-name">{t.name}</b>
+                                                <em className="ar-prize-kind">
+                                                    {t.detail?.rarity ? `${t.detail.rarity} ` : ""}{t.label || t.kind}
+                                                </em>
+                                                {t.blurb ? <p className="ar-prize-blurb">{t.blurb}</p> : null}
+                                                {t.detail?.lines?.length ? (
+                                                    <dl className="ar-prize-stats">
+                                                        {t.detail.lines.map((l) => (
+                                                            <div key={l.label}><dt>{l.label}</dt><dd>{l.value}</dd></div>
+                                                        ))}
+                                                    </dl>
+                                                ) : null}
+                                                <p className="ar-prize-state">
+                                                    {t.claimed ? "Yours."
+                                                        : t.owed ? "Earned and waiting."
+                                                        : t.beyond ? "Behind The Long Road."
+                                                        : `${t.rungsAway} rung${t.rungsAway === 1 ? "" : "s"} away.`}
+                                                </p>
+                                                {t.owed ? (
+                                                    <button type="button" className="ar-prize-claim" disabled={busy}
+                                                        onClick={() => { Sfx.ui(); act("claim_road"); setPrizeRung(null); }}>
+                                                        Claim it
+                                                    </button>
+                                                ) : null}
+                                                <button type="button" className="ar-prize-close"
+                                                    onClick={() => { Sfx.ui(); setPrizeRung(null); }}>Close</button>
+                                            </div>
+                                        </div>
+                                    </Portal>
+                                );
+                            })()}
                             <p className="ar-track-note">
                                 A new season clears the rungs and hangs eight new prizes.
                                 {season.bestEver > 0

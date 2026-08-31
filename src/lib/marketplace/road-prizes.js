@@ -148,3 +148,77 @@ export async function seasonPrizeArt(season = currentSeason()) {
         return out;
     });
 }
+
+// ── WHAT A PRIZE ACTUALLY IS ─────────────────────────────────────────────────────────────────────────────────
+// Luke: "season rewards should be inspectable."
+//
+// The track drew a name, a picture and how far away it was, which answers "what is it called" and not "is it
+// worth walking to". A member deciding whether to spend an evening on the Road is asking the second question,
+// and the answer lived in four different catalogues they cannot open, because every one of these prizes is
+// hidden from the normal browse paths until the season is public.
+//
+// So the details are resolved HERE, next to the code that hands the prize over — the same four catalogues,
+// looked up the same four ways. If a prize's ref ever stops resolving, this returns nothing for it rather than
+// inventing a line, and the tile falls back to the blurb it always had.
+//
+// Dynamic imports for the same reason the grant path uses them: collectibles.js and decorations.js both import
+// arena-season.js, so a static import here would close a cycle.
+export async function seasonPrizeDetails(prizes = []) {
+    if (!prizes.length) return {};
+    const [{ itemById, statParts, sortStatKeys }, { collectibleById }, deco, recipes] = await Promise.all([
+        import("@/lib/marketplace/items.js"),
+        import("@/lib/marketplace/collectibles.js"),
+        import("@/lib/marketplace/decorations.js").catch(() => null),
+        import("@/lib/marketplace/cooking-recipes.js").catch(() => null),
+    ]);
+    const decoList = deco ? (deco.DECORATIONS || deco.DECOS || []) : [];
+    const recipeList = recipes
+        ? [...(recipes.RECIPES || []), ...(recipes.MASTER_RECIPES || []), ...(recipes.SEASON_RECIPES || [])]
+        : [];
+    // Catalogue keys are camelCase identifiers (`harvestLuck`, `goldHarvest`) and a pet's bonus is a bare
+    // stat id. Neither is a label, and printing one to a member is the same class of thing as printing a
+    // crit chance in points: technically the value, in a language nobody outside the code speaks.
+    const nice = (k) => String(k || "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/^./, (c) => c.toUpperCase());
+    const out = {};
+    for (const p of prizes) {
+        const lines = [];
+        let rarity = null;
+        if (p.kind === "gear") {
+            const it = itemById(p.ref);
+            if (it) {
+                rarity = it.rarity;
+                // Same renderer the Armoury and the compare panel use, so a stat cannot read one way here and
+                // another way on the item card — that split is what made crit chance print as "0.35%".
+                for (const k of sortStatKeys(Object.keys(it.stats || {}))) {
+                    const part = statParts(k, it.stats[k]);
+                    lines.push({ label: part.label, value: part.value });
+                }
+                lines.unshift({ label: "Slot", value: String(it.slot || "").replace(/_/g, " ") });
+            }
+        } else if (p.kind === "pet") {
+            const c = collectibleById ? collectibleById(p.ref) : null;
+            if (c) {
+                rarity = c.rarity;
+                if (c.activeStat) lines.push({ label: "Bonus while equipped", value: nice(c.activeStat) });
+            }
+        } else if (p.kind === "decoration") {
+            const d = decoList.find((x) => x.id === p.ref);
+            if (d) {
+                rarity = d.rarity;
+                if (d.buff?.stat) lines.push({ label: nice(d.buff.stat), value: `+${d.buff.value}` });
+                else if (d.stat) lines.push({ label: nice(d.stat), value: `+${d.value}` });
+            }
+        } else if (p.kind === "recipe") {
+            const r = recipeList.find((x) => x.id === p.ref);
+            if (r) {
+                if (r.tier) lines.push({ label: "Tier", value: String(r.tier) });
+                const need = r.need || {};
+                const ing = Object.keys(need).map((k) => `${need[k]} ${k.replace(/^p_/, "").replace(/_/g, " ")}`);
+                if (ing.length) lines.push({ label: "Needs", value: ing.join(", ") });
+            }
+        }
+        if (lines.length || rarity) out[p.ref] = { rarity, lines };
+    }
+    return out;
+}

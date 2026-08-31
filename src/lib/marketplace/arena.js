@@ -944,6 +944,14 @@ export async function recentNpcBands(buyerId, limit = REMATCH_BLOCK) {
 }
 
 export async function getArenaState(buyerId, pre = {}) {
+    // ── WHAT EACH SEASON PRIZE ACTUALLY IS ───────────────────────────────────────────────────────────────
+    // At the top of the function because the `ladder:` block that publishes it is a SYNCHRONOUS IIFE, and
+    // this needs the four prize catalogues, which are dynamically imported to avoid an import cycle.
+    // Published WITH the track rather than fetched when a tile is tapped: eight small objects off catalogues
+    // already in memory, and a detail panel that has to ask the server is a panel that is empty for the first
+    // second of every tap.
+    const { seasonPrizeDetails } = await import("@/lib/marketplace/road-prizes.js");
+    const prizeDetail = await seasonPrizeDetails(currentSeason()?.prizes || []).catch(() => ({}));
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([
         pre.me ?? arenaPower(buyerId),
@@ -1079,7 +1087,7 @@ export async function getArenaState(buyerId, pre = {}) {
         // because it was reading fields that only exist after this conversion.
         const f = fighterFrom(n, {}, null);
         const power = arenaRating(f);
-        return {
+     return {
             ...n,
             power,
             damage: f.damage,
@@ -1196,7 +1204,8 @@ export async function getArenaState(buyerId, pre = {}) {
                 season: {
                     n: season.n, key: season.key, name: season.name, blurb: season.blurb,
                     tint: season.tint, from: season.from, ends: seasonEnds(season),
-                    track, ...trackSummary(track),
+                    track: track.map((t) => ({ ...t, detail: prizeDetail[t.ref] || null })),
+                    ...trackSummary(track),
                     // The furthest they have EVER stood, across every season. The reset takes the rungs;
                     // it does not take this, and saying so on the screen is what stops a cleared Road
                     // reading as lost progress.
