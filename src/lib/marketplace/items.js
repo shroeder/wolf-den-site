@@ -879,14 +879,12 @@ const VITALITY_SHARE_OF_FEROCITY = 0.6;
 // bottom-tier one before a single affix is rolled — and VARIED per item, because a tier where every sword is
 // the same sword is a tier with one sword in it.
 //
-//   base_damage    main hand only. Common ~10 up to primordial ~100.
+//   base_damage    main hand only. Common ~18 up to primordial ~60, authored per tier.
 //   speed          main hand only. Every weapon has one. It is the bar's fill rate — see tempoOf.
-//   armor          every worn piece that is not a weapon, ring or amulet. A plain integer. A common chest is
-//                  ~40 and a primordial chest ~850; the other slots are a share of the chest by coverage.
-//   block_chance   EVERY off-hand, floored at BLOCK_CHANCE_MIN. The 0.75 in the clamp is a ceiling, not
-//                  a real value — FLAT 0.31 x the 1.25 variance cap tops out at 0.39, so the live spread
-//                  is 0.35-0.39. (This line used to claim "ranges to 0.75, most near 0.30", which was
-//                  never true of any shield in the catalogue.)
+//   armor          every worn piece that is not a weapon, ring or amulet. A plain integer, off the authored
+//                  ladder: a common chest is ~105 and a primordial ~440, the other slots a share by coverage.
+//   block_chance   EVERY off-hand, authored per tier from the floor Luke set (0.35 on a common) up to
+//                  0.73 on a primordial. No variance on it — see the note on the table.
 //
 // THE VARIETY IS DETERMINISTIC. A hash of the item id gives each piece a spread of +/-25% around the flat
 // number below, so the catalogue has texture but a given item is the same every time the server starts and
@@ -925,12 +923,63 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
 //
 // vary() STAYS. It hashes the item's ID, not its rarity, so two swords still differ from each other — the
 // texture the catalogue was given is untouched. Only the tier slope is gone.
-const BASE_DAMAGE_FLAT = 32;
-const WEAPON_SPEED_FLAT = 1.0;
-const PIERCE_FLAT = 7;
-const HASTE_FLAT = 7;
-const ARMOR_FLAT = 220;          // at slot weight 1.0 (chest); the other slots are a share by coverage
-const BLOCK_CHANCE_FLAT = 0.31;
+// ── RARITY IS AUTHORED, NOT CALCULATED ───────────────────────────────────────────────────────────────────────
+// Luke: "we used to use rarity in the actual damage and armor and all the other calculations. We just blindly
+// modified everything up by the tier number. Apparently, you interpreted that as go ahead and make all of the
+// items the exact same."
+//
+// That is exactly what happened, and it is the wrong half of the instruction. What was wrong with
+// `lerpGeo(lo, hi, tier)` was that ONE number silently multiplied six different stats, compounding on top of
+// authored stats that already climbed — rarity paid four times, which is what put the gear ceiling out of
+// reach. What was never wrong is that a primordial chest should stop more blows than a common one.
+//
+// So the ladder is back and it is a TABLE rather than a formula. Every number below was chosen and can be
+// edited on its own: raising eternal armour does not touch celestial, and no stat moves because a different
+// stat did. That is the whole difference between this and what it replaces.
+//
+// WHAT THE FLATTENING ACTUALLY DID, measured across the 425-item catalogue before this went back:
+//   · a common chest ran 176-274 armour and a PRIMORDIAL chest 178-206 — the top tier was the worst in the
+//     game, because 60 commons draw 60 samples from the variance and 26 primordials draw 26, so the low
+//     tiers simply won the high-roll lottery on volume
+//   · weapon damage was 25-40 at every one of the nine tiers
+//   · authored Might still climbed 5 -> 53, so it was the only thing left carrying rarity at all
+//
+// THE CEILING IS DELIBERATELY LOWER THAN THE OLD ONE. Armour used to run 40 -> 850 (21x) and damage 10 -> 100
+// (10x), stacked on authored stats climbing 10x on the same item. These run about 4x, so a primordial is
+// unmistakably better than a common without being worth sixty rungs of the Road on its own. Each column's
+// catalogue-weighted mean is held near the flat value it replaces, so the middle of the game does not move —
+// only the ends, which is where the whole problem was.
+const RARITY_TIERS = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+const RARITY_INTRINSICS = {
+    //              common  rare  epic  legend  mythic  ascend  eternal  celest  primord
+    armor:        [   105,  130,  160,   195,    235,    280,     330,    385,     440],
+    base_damage:  [    18,   22,   26,    30,     35,     40,      46,     53,      60],
+    pierce:       [     3,    4,    5,     6,      8,     10,      12,     14,      16],
+    haste:        [     4,    5,    6,     7,      8,     10,      12,     14,      16],
+    // Exact, no variance: both are bounded stats whose tier steps are smaller than the variance band, so a
+    // nudge on either would put a common above a legendary again — the precise bug this is undoing.
+    // BLOCK RUNS 0.35 TO 0.45 AND NO FURTHER. 0.35 is Luke's floor ("every shield should have at least .35
+    // block chance") and 0.45 is his ceiling. It is a narrow band ON PURPOSE: block takes a whole blow off,
+    // so a tier ladder scaled like armour's put primordial at 0.73 — near three blows in four stopped, which
+    // is not a shield, it is immunity. Rarity is worth ten points of block across the entire game.
+    block_chance: [  0.35, 0.363, 0.375, 0.388, 0.40, 0.413, 0.425, 0.438, 0.45],
+    speed:        [  0.85, 0.90, 0.95,  1.00,   1.06,   1.12,    1.18,   1.25,    1.32],
+};
+const tierOf = (it) => Math.max(0, RARITY_TIERS.indexOf(String(it.rarity || "common")));
+const rar = (it, stat) => RARITY_INTRINSICS[stat][tierOf(it)];
+
+// ── VARIANCE THAT CANNOT CROSS A TIER ────────────────────────────────────────────────────────────────────────
+// vary() spans 0.75-1.25 and is still what DECIDES things — which items carry haste, which non-weapons roll
+// pierce — so it is untouched and those selectors keep picking the same pieces. But +/-25% on a VALUE is wider
+// than the gap between two tiers, and that is precisely how a common chest came to out-armour a legendary one.
+// Values get this instead: +/-6%, narrow enough that the smallest step in the table above (celestial to
+// primordial, 14.3%) still clears it, so two items of the same tier differ and two items of different tiers
+// never trade places. check:rarity proves it rather than trusting this note.
+const nudge = (id, salt) => {
+    let h = 2166136261;
+    for (const ch of `${id}:${salt}:n`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return 0.94 + ((h >>> 0) % 1000) / 1000 * 0.12;   // 0.94 .. 1.06
+};
 // The floor Luke set: "every shield should have at least .35 block chance". Applied AFTER the roll, so the
 // variance still gives the good shields their spread up to 0.75 — it only lifts the bottom.
 const BLOCK_CHANCE_MIN = 0.35;
@@ -946,8 +995,8 @@ const BLOCK_CHANCE_MIN = 0.35;
         // kept; what changed is who decides. It used to be "mythic through eternal", which is rarity picking
         // the winners — it is the item's own hash now, so the same handful of pieces carry it and none of
         // them carry it because of what tier they are.
-        if (vary(it.id, "haste") > 1.205 && vary(it.id, "hasteroll") > 1.10) {
-            stats.haste = Math.max(1, Math.round(HASTE_FLAT * vary(it.id, "hasteval")));
+        if ((vary(it.id, "haste") > 1.205 && vary(it.id, "hasteroll") > 1.10) || stats.haste != null) {
+            stats.haste = Math.max(1, Math.round(rar(it, "haste") * nudge(it.id, "hasteval")));
         }
         // ── NO STAT IS SECRETLY ANOTHER STAT ─────────────────────────────────────────────────────────
         // 45% of every item's authored Might used to be moved into Vitality here, and 40% of an armour
@@ -962,19 +1011,20 @@ const BLOCK_CHANCE_MIN = 0.35;
         // Going through armour is what a weapon is FOR, so every main hand carries it — that used to start
         // at rare and it starts at all of them now. A minority of non-weapons still roll it, decided by the
         // item's hash rather than by its tier, so it stays a thing you notice on a chest piece.
-        if (it.slot === "main_hand") {
-            stats.pierce = Math.max(1, Math.round(PIERCE_FLAT * vary(it.id, "prc")));
-        } else if (vary(it.id, "prcroll") > 1.175) {
-            stats.pierce = Math.max(1, Math.round(PIERCE_FLAT * vary(it.id, "prc")));
+        // Any item that carries pierce takes its tier's value: a main hand always, a minority of other pieces
+        // by the item's own hash, and anything that already had one typed on it (five charms and passes did,
+        // as low as 1 on an epic, which is exactly the inversion check:rarity now refuses).
+        if (it.slot === "main_hand" || vary(it.id, "prcroll") > 1.175 || stats.pierce != null) {
+            stats.pierce = Math.max(1, Math.round(rar(it, "pierce") * nudge(it.id, "prc")));
         }
         if (it.slot === "main_hand") {
-            stats.base_damage = Math.max(1, Math.round(BASE_DAMAGE_FLAT * vary(it.id, "dmg")));
-            stats.speed = Math.round(WEAPON_SPEED_FLAT * vary(it.id, "spd") * 100) / 100;
+            stats.base_damage = Math.max(1, Math.round(rar(it, "base_damage") * nudge(it.id, "dmg")));
+            stats.speed = rar(it, "speed");
         }
         if (ARMOR_SLOT_WEIGHT[it.slot]) {
             // Slot weight is COVERAGE, not rarity — a breastplate covers more of you than a belt, and that
             // is true of a common one and a primordial one alike. It stays.
-            stats.armor = Math.max(1, Math.round(ARMOR_FLAT * ARMOR_SLOT_WEIGHT[it.slot] * vary(it.id, "arm")));
+            stats.armor = Math.max(1, Math.round(rar(it, "armor") * ARMOR_SLOT_WEIGHT[it.slot] * nudge(it.id, "arm")));
             // ── EVERY OFF-HAND BLOCKS, AND NONE OF THEM BLOCKS LESS THAN THE FLOOR ───────────────────
             // Luke, looking at a Mythic off-hand: "every shield should have at least .35 block chance, this
             // one has 0?"
@@ -989,8 +1039,7 @@ const BLOCK_CHANCE_MIN = 0.35;
             // catalogue already states, so that is what decides this — and the floor is Luke's number, which
             // also means no off-hand can roll into being pointless.
             if (it.slot === "off_hand") {
-                const rolled = Math.round(BLOCK_CHANCE_FLAT * vary(it.id, "blk") * 100) / 100;
-                stats.block_chance = Math.min(0.75, Math.max(BLOCK_CHANCE_MIN, rolled));
+                stats.block_chance = Math.min(0.75, Math.max(BLOCK_CHANCE_MIN, rar(it, "block_chance")));
             }
         }
         it.stats = stats;
