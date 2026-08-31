@@ -560,6 +560,21 @@ export async function getFarm(ownerId, viewerId) {
         // THE PETTING STAND, for the OWNER of this farm — so a visitor sees whose pets are on display and how
         // rare each one is, which is the entire point of putting them there. Keyed off ownerId, never viewerId.
         stand: await getStandState(ownerId).catch(() => ({ placed: false, slots: [] })),
+        // ── WHAT THE QUICK PANEL NEEDS AND NOTHING ELSE ──────────────────────────────────────────────────
+        // Three facts the farm already had no reason to publish: which pet is equipped, which pets have been
+        // enshrined, and which stones are in the bag. Together they let the panel sort a pet list the way a
+        // member thinks about it — the one that is working for you first — and tell somebody they are holding
+        // a stone for a level-six pet they have not used it on, which is the one reminder in the game nobody
+        // can currently get.
+        //
+        // Own farm only. On somebody else's these are none of your business, and the panel is not drawn.
+        quick: mine ? {
+            equippedPetId: (await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [ownerId])
+                .catch(() => null))?.featured_collectible || null,
+            enshrined: (await (await import("@/lib/marketplace/pet-ascension.js")).getEnshrined(ownerId)
+                .catch(() => [])).map((e) => e.petId),
+            stones: await (await import("@/lib/marketplace/pet-ascension.js")).getStones(ownerId).catch(() => ({})),
+        } : null,
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
         crownCfg, // loot-pig crown placement
         neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)

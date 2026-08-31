@@ -17,7 +17,7 @@ import CollectionPanel from "@/components/CollectionPanel";
 import TrophyRoom from "@/components/TrophyRoom";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
-import { GiPawPrint, GiTrophyCup } from "react-icons/gi";
+import { GiPawPrint, GiTrophyCup, GiLightningTrio } from "react-icons/gi";
 
 import PettingStand from "@/components/PettingStand";
 import PackageBanner from "@/components/PackageBanner";
@@ -621,6 +621,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // Which seed to fill every empty plot with — the same picker a single plot uses, asked once.
     const [plantingAll, setPlantingAll] = useState(false);
+    const [quickOpen, setQuickOpen] = useState(false);   // the quality-of-life panel
     const gardenAct = useCallback(async (body, key) => {
         setGardenBusy(key);
         const r = await post(body);
@@ -661,6 +662,16 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [gardenAct]);
     const fertilizeAllNow = useCallback(async () => gardenAct({ action: "fertilizer_all" }, "fall"), [gardenAct]);
+    // One tap feeds one pet. feedPetBulk already walks the bag cheapest-first, stops the moment the pet is
+    // full and never touches Ambrosia — so the button means "top this one up with the plates I do not care
+    // about", which is exactly what somebody looking at a list of forty treats wants.
+    const feedPetNow = useCallback(async (petId) => {
+        setGardenBusy(`feed-${petId}`);
+        const r = await post({ action: "feed_bulk", petId });
+        setGardenBusy(null);
+        if (r?.ok) { SFX?.coin?.(); setFarm((f) => (r.farm ? r.farm : f)); }
+        return r;
+    }, [post]);
     const openPack = useCallback(async (packId) => {
         const r = await gardenAct({ action: "pack_open", packId }, `pk-${packId}`);
         if (r?.ok) SFX?.coin?.();
@@ -1602,11 +1613,6 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* GARDEN — plots, bag, supplies and the upgrade tree, which is most of the page's length on its own. */}
             {farm.mine && garden && panel === "garden" ? (
-                <FarmBulkBar garden={garden} busy={gardenBusy}
-                    onHarvestAll={harvestAllNow} onPlantAll={() => setPlantingAll(true)} onFertilizeAll={fertilizeAllNow} />
-            ) : null}
-
-            {farm.mine && garden && panel === "garden" ? (
                 <GardenPanel
                     garden={garden}
                     busy={gardenBusy}
@@ -1710,6 +1716,25 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* The SAME picker, asked once for the whole garden. Reused rather than rebuilt so the seed list,
                 the counts, the buy-a-pack path and the empty state are all the ones already tested. */}
+            {/* ── THE QUICK PANEL ── opened by a button that floats over the farm rather than sitting in the
+                tab bar. None of what is inside it is a destination; it is the set of chores you do on the way
+                past, so it should be reachable from wherever you already are. */}
+            {farm.mine ? (
+                <button type="button" className="qp-open" onClick={() => setQuickOpen(true)} aria-label="Quick actions">
+                    {/* A gi glyph, never an emoji — a device's own emoji font is not ours to design with. */}
+                    <GiLightningTrio aria-hidden="true" />
+                </button>
+            ) : null}
+
+            {quickOpen && farm.mine ? (
+                <QuickPanel farm={farm} garden={garden} busy={gardenBusy}
+                    onHarvestAll={harvestAllNow}
+                    onPlantAll={() => { setQuickOpen(false); setPlantingAll(true); }}
+                    onFertilizeAll={fertilizeAllNow}
+                    onFeed={feedPetNow}
+                    onClose={() => setQuickOpen(false)} />
+            ) : null}
+
             {plantingAll && garden ? (
                 <SeedPickerModal garden={garden} slot={-1} busy={gardenBusy} gold={farm.wallet?.gold || 0}
                     onPick={(_slot, seedId) => plantAllWith(seedId)} onOpenPack={openPack} onBuyPack={buySeedPack}
@@ -2452,6 +2477,103 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
 // Each button knows whether it has anything to do, and says so on its face rather than being disabled with no
 // explanation — "nothing ready" is an answer, a dead grey button is not. Counts come off the garden the panel
 // already has, so this costs no extra read.
+// ── THE QUALITY-OF-LIFE PANEL ────────────────────────────────────────────────────────────────────────────────
+// Luke: "I want it to all be in a quality of life modal that you open with a button outside the tabs." And,
+// for the pets half: "a pet button that lets me see a list of my pets exp sorted started with equipped and
+// stand pets where I can simply tap them and feed them... it should also show lvl 6 pets not enshrined in its
+// own category if you havent enshrined them yet and have a stone in your possession as a reminder."
+//
+// Everything here is a chore the game already made you do one item at a time, gathered into one place you can
+// open from anywhere on the farm. It is deliberately NOT a tab: a tab is a place you go, and none of this is a
+// destination — it is the set of things you do on the way past.
+//
+// THE ORDER OF THE PET LIST IS THE POINT. Equipped first because it is the one actually working for you, then
+// whatever is on the stand because that is the other thing you chose, then everything else by XP. A pet that
+// is full is greyed and says so rather than being hidden — knowing a pet is done is as useful as feeding it.
+function QuickPanel({ farm, garden, busy, onHarvestAll, onPlantAll, onFertilizeAll, onFeed, onClose }) {
+    const q = farm?.quick || {};
+    const pets = farm?.pets || [];
+    const standIds = new Set(((farm?.stand?.slots) || []).map((sl) => sl?.pet?.id).filter(Boolean));
+    const equippedId = q.equippedPetId || null;
+    const enshrined = new Set(q.enshrined || []);
+    const stones = Number(q.stones?.light || 0) + Number(q.stones?.dark || 0);
+
+    // The reminder. A level-six pet you have not enshrined, while a stone is sitting in your bag — the one
+    // nudge the game could never give you, because nothing has ever held both halves of it at once.
+    const readyToEnshrine = stones > 0 ? pets.filter((x) => (x.level || 0) >= 6 && !enshrined.has(x.id)) : [];
+
+    const rank = (x) => (x.id === equippedId ? 0 : standIds.has(x.id) ? 1 : 2);
+    const sorted = [...pets].sort((a, b) => rank(a) - rank(b) || (b.xp || 0) - (a.xp || 0));
+    const treats = (farm?.treats || []).reduce((n, t) => n + (t.count || 0), 0);
+
+    return (
+        <div className="qp-back" role="dialog" aria-modal="true" onClick={onClose}>
+            <div className="qp" onClick={(e) => e.stopPropagation()}>
+                <div className="qp-head">
+                    <b>Quick actions</b>
+                    <button type="button" className="qp-x" onClick={onClose} aria-label="Close">×</button>
+                </div>
+
+                {garden ? (
+                    <>
+                        <span className="qp-sec">The garden</span>
+                        <FarmBulkBar garden={garden} busy={busy}
+                            onHarvestAll={onHarvestAll} onPlantAll={onPlantAll} onFertilizeAll={onFertilizeAll} />
+                    </>
+                ) : null}
+
+                {readyToEnshrine.length ? (
+                    <>
+                        <span className="qp-sec is-warn">Ready to enshrine · {stones} stone{stones === 1 ? "" : "s"} in your bag</span>
+                        <div className="qp-ensh">
+                            {readyToEnshrine.map((x) => (
+                                <span key={x.id} className="qp-ensh-pet">
+                                    {x.spriteUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={x.spriteUrl} alt="" draggable="false" />
+                                    ) : null}
+                                    <b>{x.name}</b>
+                                    <em>level {x.level}</em>
+                                </span>
+                            ))}
+                        </div>
+                        <p className="qp-note">These are at level six and have never been enshrined. A stone changes
+                            what they are and makes the ability permanent — it is not spent by accident, so it is
+                            worth choosing rather than forgetting.</p>
+                    </>
+                ) : null}
+
+                <span className="qp-sec">Your pets · {treats} treat{treats === 1 ? "" : "s"} in the bag</span>
+                <div className="qp-pets">
+                    {sorted.map((x) => {
+                        const full = x.maxed || (x.level || 0) >= 6;
+                        const tag = x.id === equippedId ? "equipped" : standIds.has(x.id) ? "on the stand" : null;
+                        return (
+                            <button key={x.id} type="button" className={`qp-pet${full ? " is-full" : ""}`}
+                                disabled={busy === `feed-${x.id}` || full || !treats}
+                                onClick={() => onFeed(x.id)}>
+                                <span className="qp-pet-art">
+                                    {x.spriteUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={x.spriteUrl} alt="" draggable="false" />
+                                    ) : null}
+                                </span>
+                                <span className="qp-pet-who">
+                                    <b>{x.name}{tag ? <i className="qp-tag">{tag}</i> : null}</b>
+                                    <em>level {x.level || 1}{full ? " · maxed" : ` · ${Math.round(x.into || 0)}/${Math.round(x.span || 0)} xp`}</em>
+                                </span>
+                                <span className="qp-pet-do">
+                                    {busy === `feed-${x.id}` ? "…" : full ? "done" : treats ? "Feed" : "no treats"}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function FarmBulkBar({ garden, busy, onHarvestAll, onPlantAll, onFertilizeAll }) {
     // Off the SERVER's own flags — getGarden already decides `ready` and `empty` for every plot and publishes
     // readyCount beside them. Re-deriving those from readyAt here would be the same rule written twice, and
