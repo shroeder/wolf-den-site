@@ -259,7 +259,7 @@ export async function activeBoosts(buyerId) {
     for (const [m, info] of damage) {
         const isTop = m === applied;
         out.push({ kind: "damage", magnitude: m, expiresAt: info.expiresAt,
-            label: `${m}× damage${isTop ? "" : " (waiting — a stronger one is running)"}${info.count > 1 && isTop ? ` — ${info.count} bottles, only the strongest applies` : ""}` });
+            label: `${m}× damage${isTop ? "" : " (waiting — a stronger one is running)"}` });
     }
     return out;
 }
@@ -732,8 +732,32 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         ).catch(() => {});
         applied = `+${e.amount} manual daily strikes today`;
     } else if (e.type === "damage") {
-        await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
-        applied = `${e.mult}× boss damage for ${e.hours}h`;
+        // ── A SECOND BOTTLE BUYS TIME, NOT A BIGGER NUMBER ───────────────────────────────────────────────
+        // Every use used to INSERT its own row, and memberDamageMult takes the STRONGEST of them — so a
+        // second bottle of the same strength did nothing whatsoever. That made "use all" a shredder: the
+        // shelf offers it (damage is in BULK_USABLE, cap 25) and Nicholas pressed it, spending twenty-five
+        // bottles for the effect of one. His words: "It took 25 bottles of my double daily strike for 24
+        // hours when I hit use one... just about over it with this."
+        //
+        // Luke: "I'm not sure what it's supposed to do when you stack them, but I would think it would just
+        // extend the duration." So it does. Same strength extends the clock; a DIFFERENT strength still gets
+        // its own row, because those are genuinely different effects and the strongest should still win
+        // rather than a x3 being diluted into a x2's timer.
+        const ext = await db.queryOne(
+            `UPDATE mkt_user_boost
+                SET expires_at = expires_at + ($3 || ' hours')::interval
+              WHERE ctid = (SELECT ctid FROM mkt_user_boost
+                             WHERE buyer_id = $1 AND kind = 'damage' AND magnitude = $2 AND expires_at > NOW()
+                             ORDER BY expires_at DESC LIMIT 1)
+              RETURNING expires_at`,
+            [buyerId, e.mult, String(e.hours)],
+        ).catch(() => null);
+        if (!ext) {
+            await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
+        }
+        applied = ext
+            ? `${e.mult}× boss damage extended by ${e.hours}h`
+            : `${e.mult}× boss damage for ${e.hours}h`;
     }
     // Every other branch above tracks its use; this one never did, so spin tokens, XP scrolls, strike potions
     // and damage potions were all invisible to telemetry. That's how 1,213 XP-scroll uses in 90 minutes left no

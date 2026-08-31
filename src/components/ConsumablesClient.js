@@ -108,16 +108,17 @@ export default function ConsumablesClient() {
             <p className="muted" style={{ marginTop: 8 }}>One-shot boosts you use yourself. Potions &amp; stones buff the boss fight; scrolls give XP; relics restore charged gear.</p>
             {/* HOW THEY COMBINE. A member asked whether hoarding these wastes them — she had four damage
                 potions and no way to tell whether a second one doubled her damage again or just overwrote the
-                first. The cards each describe themselves and nothing described the stack, which is the one
-                thing you need to know before spending six of them at once. Damage MULTIPLIES
-                (memberDamageMult reduces by product), strikes ADD (a SUM over the boost rows), and every
-                timer starts the moment you tap Use — so two 12-hour stones are 4x for twelve hours, never 2x
-                for twenty-four. */}
+                first. This paragraph has been wrong twice since: it promised that two x2 bottles made x4,
+                which the engine never did (memberDamageMult takes the STRONGEST, not the product), and then
+                it stayed wrong after the strongest-wins rule shipped. Both times a member found it before we
+                did, and the second time it cost Nicholas twenty-five bottles to "use all" for the effect of
+                one. Damage boosts of the SAME strength now extend each other's clock, a stronger one still
+                wins outright, and strikes still ADD (a SUM over the boost rows, capped at MAX_POTION_STRIKES). */}
             <p className="muted" style={{ marginTop: 6, fontSize: "0.82rem" }}>
-                <strong>They stack.</strong> Damage boosts <strong>multiply</strong> each other (a ×2 and a ×3
-                together is ×6), extra strikes <strong>add up</strong>, and each one&rsquo;s timer starts the
-                moment you use it — so two 12-hour boosts give you ×4 for twelve hours, not ×2 for
-                twenty-four. Save them, then use them together right before you swing.
+                <strong>How they stack.</strong> Two damage boosts of the <strong>same strength</strong> add
+                their time together — a second 12-hour ×2 gives you twenty-four hours of ×2, not ×4. A
+                <strong> stronger</strong> one takes over while it lasts, so a ×3 beats a ×2 and the ×2 waits
+                its turn. Extra strikes <strong>add up</strong>. Nothing is wasted by using them early.
             </p>
 
             {active.length ? (
