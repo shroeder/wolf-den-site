@@ -140,36 +140,38 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
 }
 
 // ── WHAT THIS IS ─────────────────────────────────────────────────────────────────────────────────────────────
-// Luke: "I want the art to pop, and be read big and stuff, like a real exciting brochure."
+// Luke: "I want info in the middle, sprites packed together in all 4 corners, clustered together so it looks
+// like groupings of sprites."
 //
-// The first version was a tidy grid at half opacity behind a frosted card, which is wallpaper — the sprites
-// were present and said nothing. This is a COMPOSITION: hand-placed, deliberately uneven, sprites at four
-// different sizes overlapping each other and running off the edges, at full brightness with real shadows
-// under them.
+// Four PILES, one per corner, with the message sitting in the hole between them. That is a different idea
+// from the even scatter it replaces, and a better one: an evenly-spread field reads as wallpaper because the
+// eye has nowhere to rest, whereas four dense clumps read as four HOARDS — which is what the game actually
+// is, four or five features' worth of stuff — and they frame the words instead of competing with them.
 //
-// The positions are AUTHORED rather than generated. A random scatter reliably produces a clump and a hole,
-// and the one thing this panel has to do is look designed in the two seconds somebody glances at it. Sizes
-// alternate large/small so the eye has somewhere to land, and the biggest pieces sit on the right where the
-// copy is not.
-//
-// `--x/--y` are percentages of the stage, `--s` is the size in px at 1366 wide (it scales with the viewport),
-// `--r` the tilt. Nothing here is centred and nothing is aligned to anything, on purpose.
-const SCATTER = [
-    { x: 46, y: 12, s: 168, r: -8 }, { x: 66, y: 4, s: 116, r: 7 }, { x: 84, y: 16, s: 196, r: -5 },
-    { x: 38, y: 40, s: 132, r: 11 }, { x: 57, y: 33, s: 224, r: -3 }, { x: 78, y: 46, s: 140, r: 9 },
-    { x: 94, y: 38, s: 120, r: -11 }, { x: 44, y: 70, s: 188, r: 6 }, { x: 64, y: 66, s: 128, r: -9 },
-    { x: 82, y: 76, s: 172, r: 4 }, { x: 96, y: 66, s: 104, r: 12 }, { x: 34, y: 92, s: 120, r: -6 },
-    { x: 56, y: 95, s: 148, r: 8 }, { x: 74, y: 96, s: 108, r: -4 }, { x: 92, y: 94, s: 132, r: 10 },
-    { x: 30, y: 18, s: 96, r: 14 }, { x: 27, y: 58, s: 88, r: -13 }, { x: 88, y: 2, s: 92, r: 5 },
+// Each cluster is an anchor plus tight local offsets in percent, deliberately overlapping. Sizes alternate
+// big/small INSIDE a cluster so it piles rather than tiles, and the rotations are uneven for the same reason.
+const CLUSTERS = [
+    // top-left
+    { at: [7, 12], items: [[0, 0, 176, -9], [26, -6, 116, 8], [12, 22, 132, 5], [34, 18, 100, -14], [-8, 26, 96, 11]] },
+    // top-right
+    { at: [93, 11], items: [[0, 0, 184, 7], [-27, -5, 120, -8], [-11, 21, 140, -4], [-33, 17, 104, 12], [8, 25, 92, -12]] },
+    // bottom-left
+    { at: [7, 89], items: [[0, 0, 168, 6], [27, 5, 124, -9], [11, -20, 136, -5], [33, -17, 100, 13], [-8, -25, 92, 9]] },
+    // bottom-right
+    { at: [93, 90], items: [[0, 0, 180, -6], [-26, 6, 118, 10], [-12, -19, 138, 4], [-34, -16, 102, -11], [7, -24, 94, 13]] },
 ];
+// Flattened once at module scope — the render just walks it against the sprite list.
+const PILE = CLUSTERS.flatMap((c) => c.items.map(([dx, dy, s, r]) => ({
+    x: c.at[0] + dx, y: c.at[1] + dy, s, r,
+})));
 
 function SlideWorld({ collage }) {
     return (
         <div className="pos-slide pos-world">
             <div className="pos-world-art" aria-hidden="true">
-                {SCATTER.map((p, i) => collage[i] ? (
+                {PILE.map((p, i) => collage[i % Math.max(1, collage.length)] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={collage[i]} src={collage[i]} alt=""
+                    <img key={`${i}-${collage[i % collage.length]}`} src={collage[i % collage.length]} alt=""
                         style={{ "--x": `${p.x}%`, "--y": `${p.y}%`, "--s": p.s, "--r": `${p.r}deg`, "--i": i }} />
                 ) : null)}
             </div>

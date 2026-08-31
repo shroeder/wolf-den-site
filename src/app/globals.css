@@ -23213,48 +23213,43 @@ body.cas-seated .social-fab { display: none; }
 .pos-dots i.is-on { background: #ffd75e; }
 
 /* ── EVERYTHING THE GAME IS ───────────────────────────────────────────────────────────────────────────────
-   Luke: "I want the art to pop ... like a real exciting brochure."
+   Luke: "info in the middle, sprites packed together in all 4 corners, clustered together so it looks like
+   groupings of sprites."
 
-   The first cut was a tidy auto-fill grid at 50% opacity behind a frosted card, which is wallpaper. This is a
-   composition: hand-placed sprites at four sizes, overlapping, tilted, running off three edges, at FULL
-   brightness. Nothing is aligned to anything — a grid reads as a catalogue, and a catalogue is the opposite
-   of exciting.
-
-   Positions come from SCATTER in the component as --x/--y/--s/--r. They are authored because a random
-   scatter reliably produces one clump and one hole. */
-/* Clipped HERE rather than on the stage — the art runs off the edges on purpose, but a clip on the stage
-   also cut the copy's soft scrim into a visible rectangle. */
-.pos-world { position: relative; display: block; height: 100%; width: 100%; overflow: hidden; }
-.pos-world-art { position: absolute; inset: -8% -4% -8% -2%; pointer-events: none; }
+   Four piles, one per corner, with the copy in the hole between them. An evenly spread field reads as
+   wallpaper — the eye has nowhere to rest — whereas four dense clumps read as four HOARDS and frame the
+   words rather than competing with them. Positions come from CLUSTERS in the component. */
+.pos-world { position: relative; display: grid; place-items: center; height: 100%; width: 100%;
+    overflow: hidden; }
+.pos-world-art { position: absolute; inset: 0; pointer-events: none; }
 .pos-world-art img {
     position: absolute; left: var(--x); top: var(--y);
-    /* Sized off the viewport so the composition holds at 1280 and at 1920 — the px in --s is the size at
-       1366 wide, which is the screen this was designed against. */
-    /* --s is UNITLESS and multiplied by a vw unit here: `168px * 0.073vw` is not a length, and the browser
-       rendered it enormous rather than refusing it. Unitless times vw is the only form that works. */
-    width: calc(var(--s) * 0.068vw);
+    /* --s is UNITLESS and multiplied by a vw unit: `176px * 0.06vw` is not a length, and the browser renders
+       it enormous rather than refusing it. Unitless times vw is the only form that works. */
+    width: calc(var(--s) * 0.062vw);
     aspect-ratio: 1; object-fit: contain;
     transform: translate(-50%, -50%) rotate(var(--r));
-    /* ONE SHADOW ONLY. A second, wide warm glow looked right on a single sprite and wrong on eighteen: the
-       glows accumulated across the layer and the clip cut the result into a hard-edged lighter rectangle
-       spanning the whole stage — a seam that read as a rendering bug. */
+    /* One shadow. A second wide warm glow accumulated across the layer and the clip cut the result into a
+       hard-edged lighter rectangle. */
     filter: drop-shadow(0 12px 20px rgba(0,0,0,0.85));
     animation: pos-bob 7s ease-in-out infinite;
-    animation-delay: calc(var(--i) * -0.41s);
+    animation-delay: calc(var(--i) * -0.29s);
 }
 @keyframes pos-bob {
     0%, 100% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(0); }
-    50% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(-12px); }
+    50% { transform: translate(-50%, -50%) rotate(var(--r)) translateY(-10px); }
 }
 
-/* The copy sits in the left third, over a gradient that fades the art out behind it rather than a card that
-   floats on top of it — a card says "widget", a fade says "these are the same picture". */
-.pos-world-copy { position: relative; z-index: 1; max-width: 460px; height: 100%;
-    display: flex; flex-direction: column; justify-content: center; padding-right: 40px; }
-.pos-world-copy::before { content: ""; position: absolute; top: 0; bottom: 0; left: -60px; right: -140px;
-    background: linear-gradient(90deg, #090a0c 0%, rgba(9,10,12,0.96) 46%, rgba(9,10,12,0.72) 72%, transparent 100%);
+/* THE MESSAGE, IN THE HOLE. Centred, with a soft oval of ground under it so the piles can crowd right up to
+   the text without the text getting lost in them. */
+.pos-world-copy { position: relative; z-index: 1; max-width: 480px; text-align: center;
+    padding: clamp(16px, 2vw, 30px); }
+.pos-world-copy::before { content: ""; position: absolute; inset: -18% -22%;
+    background: radial-gradient(58% 62% at 50% 50%, #090a0c 0%, rgba(9,10,12,0.94) 52%, rgba(9,10,12,0.66) 74%, transparent 100%);
     z-index: -1; }
-.pos-world-copy p { margin: 0; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4; color: #c8cfd8; }
+.pos-world-copy h1 { max-width: none; }
+.pos-world-copy p { margin: 0 auto; max-width: 34ch; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4;
+    color: #c8cfd8; }
 
 /* ── GEAR IS WORTH MONEY ── the number is the pitch, so it is the biggest thing here. */
 .pos-gear-hero { display: flex; align-items: center; gap: clamp(12px, 1.6vw, 26px); margin: 0 0 22px;
