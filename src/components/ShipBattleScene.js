@@ -16,6 +16,10 @@ const REWARD_ART = {
     // one reward that got MORE common after the change would have rendered with no art at all.
     doubloons: "/images/sailing/doubloon.png",
     gold: "/images/ui/coin.png",
+    // Experience had no entry, so every winning recap drew two rewards with art and one with an empty box —
+    // the placeholder <i> still takes its 22px grid column, so the row stayed aligned and looked broken rather
+    // than looking absent. Same orb the wheel and the dungeons use.
+    xp: "/images/spin/prizes/xp-orb.png",
     goldLost: "/images/ui/coin.png",
     chest: "/images/ui/chest.png",
     parts: "/images/ui/parts.png",

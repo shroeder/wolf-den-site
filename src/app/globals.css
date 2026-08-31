@@ -13912,8 +13912,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-size: 1.15rem; font-weight: 900; color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.9);
     animation: sbtNote 2.4s ease-out forwards; }
 
-.sbt-result { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 18px;
-    background: rgba(3,9,15,0.62); }
+/* ⚠️ ABOVE THE CHROME, WHICH IS z-index 20. This was 6, and .sbt-chrome — the Leave, Recap and Log pills —
+   is 20 on the same stacking context, so the buttons floated ON TOP of the finished-battle card and outside
+   its scrim. Luke, with a screenshot of exactly that: "modal needs polish margin alignment sprites and z
+   index." A terminal card is the last thing on the screen and should be the top of it.
+   The extra top padding keeps the card clear of the two ship plates even on a short phone, so it reads as
+   centred in the space that is left rather than centred in the viewport and colliding with them. */
+.sbt-result { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center;
+    padding: 84px 18px 24px; background: rgba(3,9,15,0.72); }
 /* THE RECAP. It was a card that simply existed: no arrival, no weight, and the same flat treatment whether you
    had just sunk the flagship or been sent to the bottom. Now the card drops in, and the verdict punches. */
 .sbt-result-card { position: relative; overflow: hidden; width: 100%; max-width: 380px; text-align: center;
@@ -13942,13 +13948,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    put every sprite on one left edge and every number on one right edge, which is also the only arrangement
    with room to spell out what a thing is called. */
 .sbt-rewards { display: grid; gap: 6px; margin-bottom: 14px; text-align: left; }
-.sbt-reward { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 9px; padding: 7px 12px; border-radius: 12px;
+.sbt-reward { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 10px; padding: 8px 13px; border-radius: 12px;
     font-size: 0.78rem; font-weight: 900; color: #ffd75e;
     background: linear-gradient(180deg, rgba(255,215,94,0.24), rgba(255,170,40,0.1));
     border: 1px solid rgba(255,215,94,0.55); box-shadow: 0 3px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,240,190,0.3);
     animation: sbtSpoil .5s cubic-bezier(.2,1.6,.4,1) both; }
 @keyframes sbtSpoil { 0% { opacity: 0; transform: scale(.4) translateY(10px); } 100% { opacity: 1; transform: none; } }
-.sbt-reward-art { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 0 5px rgba(255,200,80,0.6)); }
+.sbt-reward-art { width: 24px; height: 24px; object-fit: contain; filter: drop-shadow(0 0 5px rgba(255,200,80,0.6)); }
 .sbt-reward-name { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The numbers are the column you read down, so they get the tabular figures and the weight. */
 .sbt-reward-n { font-style: normal; font-size: 0.92rem; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
