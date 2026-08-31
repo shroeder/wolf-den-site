@@ -806,63 +806,33 @@ async function standings() {
           ORDER BY a.vp DESC, a.wins DESC, b.alias ASC`
     ).catch(() => []);
     if (!rows.length) return [];
-    const ids = rows.map((r) => r.buyer_id);
-    // ── THE BOARD RANKS ON WHAT PEOPLE ACTUALLY FIGHT WITH ───────────────────────────────────────────────
-    // Gear and badges, both in bulk — two queries for the badges rather than two per member, which is the
-    // only thing that was ever stopping the board from counting them.
+    // ── THE BOARD IS A LADDER, NOT A STAT SHEET ──────────────────────────────────────────────────────────
+    // This used to assemble every member's fighter — equipped stats in bulk, badge passives in bulk, and a
+    // primePowers pass over everyone with XP — purely so the board could print a damage and health number
+    // beside each name. That was three fan-out reads over ~90 members on a screen that is opened constantly,
+    // and it was WRONG: pets were never batched, so the numbers it printed were 41-153% under what those
+    // members actually fight with, unevenly enough to reorder them. ValkyrieSylve found it by losing fights
+    // that looked even.
     //
-    // Pets are still absent here and that is a real gap, not a considered exclusion: getPetCombatBonus
-    // assembles a companion's contribution from five sources (owned collectibles, the equipped one, a per-pet
-    // XP map, enshrinements and ascension powers) and there is no bulk form of it yet. So the board still
-    // under-rates a member with a strong pet. Worth writing when the ranking matters enough.
-    const [{ getEquippedStatsForMembers }, { getBadgePassivesForMembers }] = await Promise.all([
-        import("@/lib/marketplace/inventory.js"),
-        import("@/lib/marketplace/badges.js"),
-    ]);
-    // ── ONE QUERY FOR EVERYONE'S POWERS, BEFORE ANYTHING ASKS PER MEMBER ─────────────────────────────────
-    // Measured: a single getArenaState asked "what is this member wearing" about SEVENTY DISTINCT buyers, one
-    // query each, because the fan-out is over the leaderboard and a per-buyer memo cannot help a list. The
-    // stats and badges beside it were already batched for exactly this reason; powers were not. See
-    // primePowers — it fills the same memo `equippedPowers` reads, so nothing downstream changes shape.
-    const { primePowers } = await import("@/lib/marketplace/ascension-powers.js");
-    const [stats, badges] = await Promise.all([
-        primePowers(ids).catch(() => {}),
-        getEquippedStatsForMembers(ids).catch(() => new Map()),
-        getBadgePassivesForMembers(ids).catch(() => new Map()),
-    ]).then(([, a, b]) => [a, b]);
-    return rows.map((r) => {
-        const level = levelForXp(Number(r.xp) || 0).level;
-        const g = stats.get(r.buyer_id) || {};
-        const bs = badges.get(r.buyer_id) || {};
-        // ── EVERY BADGE STAT, NOT THREE OF THEM ──────────────────────────────────────────────────────────
-        // This merged might, crit_chance and crit_power and dropped everything else the call had already
-        // fetched — vitality, ferocity, tenacity, pierce and fortune were all sitting in `bs` and thrown
-        // away. Vitality is the expensive one: it is where health comes from, so the board showed people at
-        // roughly HALF the health they fight with.
-        //
-        // ValkyrieSylve, in the plaza: "when selecting people to fight in arena, the stats shown do not match
-        // what they actually have. This is leading to losses from those that appear to be closer to a match
-        // but are instead much stronger." Measured against what kitFor actually builds, the board was
-        // under-rating the twelve most active members by 55% to 153% — and unevenly, so it did not merely
-        // shrink everyone, it REORDERED them. JT read third and was second; GrayKitsune read sixth and was
-        // fourth.
-        //
-        // Spread rather than named, so a stat added to a badge tomorrow reaches the board without a second
-        // edit here. That is the mistake this replaces.
-        const merged = { ...g };
-        for (const [k, v] of Object.entries(bs)) merged[k] = (Number(merged[k]) || 0) + (Number(v) || 0);
-        const gearPower = Object.values(merged).reduce((n, v) => n + (Number(v) || 0), 0);
-        const ring = fighterFrom(merged, {}, null);
-        return {
-            id: r.buyer_id,
-            vp: Number(r.vp) || 0,
-            name: r.display_name || r.alias || "A member",
-            sprite: r.avatar_sprite_url || null,
-            level, gearPower, wins: r.wins, losses: r.losses,
-            ...ring,
-            power: arenaRating(ring),
-        };
-    });
+    // Luke: "do you really need to show all of their stats while we rank the leaderboard? I would rather just
+    // show it based on who has the most victory points... it helps simplify it from a code perspective and a
+    // user perspective."
+    //
+    // So the board carries what it is actually FOR — who is above you and who is below — and nothing it
+    // cannot state truthfully. Victory points are earned by winning, which already folds in gear, build and
+    // play, and they self-correct: somebody ranked above their weight loses and slides back down. A gear
+    // total cannot do that.
+    //
+    // The three bulk reads are gone with it.
+    return rows.map((r) => ({
+        id: r.buyer_id,
+        vp: Number(r.vp) || 0,
+        name: r.display_name || r.alias || "A member",
+        sprite: r.avatar_sprite_url || null,
+        level: levelForXp(Number(r.xp) || 0).level,
+        wins: r.wins,
+        losses: r.losses,
+    }));
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
 // The allowance INCLUDING the Stamina track. Read by the screen and by the gate that refuses a fight — those
@@ -1284,10 +1254,23 @@ export async function getArenaState(buyerId, pre = {}) {
         // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
         // No rung goes out with a member any more. What they bring is their CARD — the same two numbers you
         // read off a Gauntlet tier — plus the VP they have earned, which is a score and not a position.
-        board: board.slice(0, 10).map((o) => ({
-            id: o.id, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level,
-            damage: o.damage, health: o.health, you: o.id === buyerId,
-        })),
+        // ── FIVE NEIGHBOURS, NOT THE TOP TEN ─────────────────────────────────────────────────────────────
+        // The top ten is a hall of fame; it is not a list of people you can fight. Luke: "I would rather just
+        // show five people that are close to you in victory points — that way you're always fighting someone
+        // around your level." Centred on you and clamped at both ends, so the newest member sees the five
+        // above them and the leader sees the five below rather than a window half full of nothing.
+        //
+        // No damage or health on the row any more: the board has never been able to state them correctly
+        // (pets were never batched) and a number that is wrong is worse than no number at the moment somebody
+        // is deciding who to walk up to.
+        board: (() => {
+            const i = board.findIndex((o) => String(o.id) === String(buyerId));
+            const from = i < 0 ? 0 : Math.max(0, Math.min(i - 2, board.length - 5));
+            return board.slice(from, from + 5).map((o) => ({
+                id: o.id, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level,
+                wins: o.wins, losses: o.losses, you: o.id === buyerId,
+            }));
+        })(),
         bout: bout ? publicBout(bout) : null,
         away: await awayReport(buyerId, row),
     };
@@ -1487,6 +1470,9 @@ const TARGET_RATIO = 0.95;   // their power against yours: a shade in your favou
 const FAIR_GAP = 0.5;
 const SHORTLIST = 7;         // how many of the closest go in the hat
 const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your size
+// How many places up or down the ladder still counts as your neighbourhood. Five either side is the same
+// window the board now draws, so the people you can SEE are the people you can be matched with.
+const MEMBER_SPAN = 5;
 
 // ── BOTH KINDS, ALWAYS ───────────────────────────────────────────────────────────────────────────────────────
 // This used to rank members and Gauntlet tiers in one pile by closeness and take the seven nearest, which made
@@ -1528,21 +1514,33 @@ const GAUNTLET_SHARE = 0;
 
 function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set(), blockedBands = new Set()) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
+    // ── PEOPLE ARE MATCHED BY THE LADDER, TIERS BY POWER ─────────────────────────────────────────────────
+    // The Gauntlet still uses power because a tier's power is known exactly and costs nothing to read. MEMBERS
+    // no longer carry one — see standings — so they are matched by how far apart you sit on the ladder, which
+    // is what the board is ordered by and what Luke asked for: "just show five people that are close to you in
+    // victory points, that way you're always fighting someone around your level."
+    //
+    // Distance is in PLACES, scaled so FAIR_GAP means the same thing to both pools: MEMBER_SPAN places away
+    // is exactly as unfair as being FAIR_GAP off someone's power.
+    const myIdx = board.findIndex((o) => String(o.id) === String(buyerId));
+    const rankDist = (i) => (myIdx < 0 ? 0 : Math.abs(i - myIdx) / MEMBER_SPAN * FAIR_GAP);
     const members = [];
     const npcs = [];
-    for (const o of board) {
+    for (let i = 0; i < board.length; i += 1) {
+        const o = board[i];
         if (String(o.id) === String(buyerId)) continue;
         // Silently skipped here, unlike the board — matchmaking picks FOR you, so there is nothing to explain.
         if (blocked.has(String(o.id))) continue;
-        members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
+        members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: rankDist(i) });
     }
     // ── THE BLOCK IS A PREFERENCE, NOT A WALL ────────────────────────────────────────────────────────────
     // "Do not rematch" must never become "there is nobody to fight". On a quiet board — or one where you
     // have already fought everyone present — the five-bout rule would empty the list entirely.
     if (!members.length && blocked.size) {
-        for (const o of board) {
+        for (let i = 0; i < board.length; i += 1) {
+            const o = board[i];
             if (String(o.id) === String(buyerId)) continue;
-            members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
+            members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: rankDist(i) });
         }
     }
     // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can

@@ -1155,7 +1155,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // open forever (a `defaultOpen` prop only ever seeds useState once, on mount). Null means "wherever I am",
     // resolved at render off the live data; the empty string means "I folded them all up".
     const [openHouse, setOpenHouse] = useState(null);
-    const [boardAll, setBoardAll] = useState(false);
     // How many pages of opponents are on screen. Reset whenever the roster changes underneath, so beating
     // somebody does not leave you looking at a page that no longer exists.
     const [fightPage, setFightPage] = useState(1);
@@ -3772,23 +3771,24 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 </button>
             </div>
 
-            {/* The standings are context, not the job. Three rows, and the rest on request. */}
+            {/* ── THE FIVE AROUND YOU ──────────────────────────────────────────────────────────────────────
+                The server sends your neighbours on the ladder rather than the top ten, so all five rows are
+                people you could actually be matched against — and all five fit without a "show all".
+
+                The damage and health that used to sit on each row are gone. The board could never state them
+                correctly (a member's pets were never counted) and it was under-reading people by up to 153%,
+                which is how somebody picked a fight that looked even and was not. A win-loss record is a
+                thing the board knows for certain. */}
             {st.board?.length ? (
                 <div className="ar-board">
-                    <span className="ar-up-head">Who else fights</span>
-                    {(boardAll ? st.board : st.board.slice(0, 3)).map((r) => (
+                    <span className="ar-up-head">Around you</span>
+                    {st.board.map((r) => (
                         <div key={r.id} className={`ar-up-row${r.you ? " is-you" : ""}`}>
-                            {/* No rung. What a member brings is their card, the same as everybody else's. */}
                             <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
-                            <span className="ar-up-card">{Math.round(r.damage || 0)} dmg · {Math.round(r.health || 0)} hp</span>
+                            <span className="ar-up-card">{Math.round(r.wins || 0)}W · {Math.round(r.losses || 0)}L</span>
                             <span className="ar-up-lvl">{money(r.vp)} VP</span>
                         </div>
                     ))}
-                    {st.board.length > 3 ? (
-                        <button type="button" className="ar-more" onClick={() => setBoardAll((v) => !v)}>
-                            {boardAll ? "Show less" : `Show all ${st.board.length}`}
-                        </button>
-                    ) : null}
                 </div>
             ) : null}
             </>) : null}
