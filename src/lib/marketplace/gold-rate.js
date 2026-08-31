@@ -65,7 +65,15 @@ const MINT_REASONS = new Set([
     // -- collection and progression --
     "badge_reward", "badge_milestone", "loot_pig", "chest_reward", "pet_income",
     // -- guided play --
-    "guide_step", "guide_chapter", "onboarding", "merchant_minigame",
+    "merchant_minigame",
+    // ── NOT guide_step, guide_chapter OR onboarding ──────────────────────────────────────────────────────────
+    // They were on this list and never passed through mint(), which read as three broken faucets. Luke's call
+    // is that they should be EXEMPT rather than minted: they are one-time newcomer rewards, and cutting
+    // somebody's welcome purse by 60% is the opposite of what that money is for. Taking them off the list says
+    // so out loud — the list now means "these are rate-controlled", and anything absent is a deliberate
+    // exception rather than an oversight waiting to be found.
+    //
+    // They were 23,825 gold over seven days, so this is a small exception as well as a considered one.
 ]);
 
 // -- AND WHY THE GAMBLING PAYOUTS ARE NOT IN THAT LIST ------------------------------------------------------
@@ -75,6 +83,13 @@ const MINT_REASONS = new Set([
 // it is a sink. Halving only the wins does not halve a faucet, it halves the RTP -- the slots would pay ~46%
 // against a house-edge ceiling of 95% and check:casino would fail, correctly, because that machine is a scam
 // rather than a nerf. The tavern gambit is the same shape (89k paid out against 70k staked, net +14.8k).
+//
+// ⚠️ THAT NET IS NOT ACTUALLY MEASURABLE TODAY. Luke: "gambit doesnt track loses so its not usable to report
+// on currently." The ledger records what the gambit PAYS and not what it takes, so every "paid out X against
+// Y staked" figure above is an estimate standing on a number the ledger cannot produce. The argument for
+// leaving gambling payouts out of the rate is still the right shape — a payout against a stake is not a
+// faucet — but it cannot be checked until the losing side is written down too. Treat the gambit's line in
+// any minting report as an upper bound, not a net.
 //
 // If those need tuning it is done in the paytable, where the gate can see it, and it is measured on the net.
 // See the memory note: nerf by daily total, not per event.

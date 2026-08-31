@@ -1,5 +1,6 @@
 import "server-only";
 
+import { mint } from "@/lib/marketplace/gold-rate.js";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -202,8 +203,9 @@ export async function claimWishingWell(buyerId) {
     if (gold <= 0) return { ok: false, error: "not_built" };
     if (await wellClaimedToday(buyerId)) return { ok: false, error: "already_claimed" };
     const xp = Math.max(0, Number(bonuses.wellXp) || 0);
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
-    await logCoin(buyerId, gold, "wishing_well", { balanceAfter: paid?.gold }).catch(() => {});
+    const wgold = mint(gold, "wishing_well");
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, wgold]).catch(() => null);
+    await logCoin(buyerId, wgold, "wishing_well", { balanceAfter: paid?.gold }).catch(() => {});
     if (xp > 0) await awardXp(buyerId, "wishing_well", { points: xp, gold: 0 }).catch(() => {});
     checkWellBadges(buyerId).catch(() => {}); // Well Wisher / Fountain Faithful (daily claims)
     bumpTownQuest(buyerId, "well", 1).catch(() => {}); // "Make a Wish" town quest

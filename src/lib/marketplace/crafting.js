@@ -1,5 +1,6 @@
 import "server-only";
 
+import { mint } from "@/lib/marketplace/gold-rate.js";
 import { db } from "@/lib/db";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
@@ -254,7 +255,7 @@ export async function claimForgeDaily(buyerId, key) {
     if (claimed.has(key)) return { ok: false, error: "claimed", ...(await getForgeState(buyerId)) };
     claimed.add(key);
     await db.query(`UPDATE mkt_forge_daily SET claimed = $2::jsonb WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId, JSON.stringify([...claimed])]).catch(() => {});
-    if (q.reward.gold) { const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, q.reward.gold]).catch(() => null); await logCoin(buyerId, q.reward.gold, "forge_daily", { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
+    if (q.reward.gold) { const g = mint(q.reward.gold, "forge_daily"); const p = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null); await logCoin(buyerId, g, "forge_daily", { balanceAfter: p?.gold, meta: { key } }).catch(() => {}); }
     if (q.reward.partTier) await addParts(buyerId, q.reward.partTier, q.reward.partN || 1);
     await awardXp(buyerId, "forge_daily", { points: 20, gold: 0 }).catch(() => {});
     await logCraft(buyerId, "daily", { meta: { key } });

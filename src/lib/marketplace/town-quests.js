@@ -166,8 +166,9 @@ export async function claimTownQuest(buyerId, key) {
     // NOT minted here - the board shows each quest's gold on the card before you claim it, so the table
     // itself is halved (see gold-rate.js for which sources are tuned where).
     const qGold = q.gold;
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, qGold]).catch(() => null);
-    await logCoin(buyerId, qGold, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
+    const qPaid = mint(qGold, "town_quest");
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, qPaid]).catch(() => null);
+    await logCoin(buyerId, qPaid, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
     // The Pathfinder waits on this. Claiming a town quest had no activity event at all, so the guide step for it
     // was hung off `town_merchant` and `tavern_barkeep` — two names inherited from the old onboarding list that
     // NOTHING in the codebase has ever emitted — plus `buy_upgrade`, which is a sailing event.
