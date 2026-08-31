@@ -834,13 +834,23 @@ async function standings() {
         const level = levelForXp(Number(r.xp) || 0).level;
         const g = stats.get(r.buyer_id) || {};
         const bs = badges.get(r.buyer_id) || {};
-        // Same field-for-field merge combatStats does, minus the pet half it cannot batch yet.
-        const merged = {
-            ...g,
-            might: (g.might || 0) + (bs.might || 0),
-            crit_chance: (g.crit_chance || 0) + (bs.crit_chance || 0),
-            crit_power: (g.crit_power || 0) + (bs.crit_power || 0),
-        };
+        // ── EVERY BADGE STAT, NOT THREE OF THEM ──────────────────────────────────────────────────────────
+        // This merged might, crit_chance and crit_power and dropped everything else the call had already
+        // fetched — vitality, ferocity, tenacity, pierce and fortune were all sitting in `bs` and thrown
+        // away. Vitality is the expensive one: it is where health comes from, so the board showed people at
+        // roughly HALF the health they fight with.
+        //
+        // ValkyrieSylve, in the plaza: "when selecting people to fight in arena, the stats shown do not match
+        // what they actually have. This is leading to losses from those that appear to be closer to a match
+        // but are instead much stronger." Measured against what kitFor actually builds, the board was
+        // under-rating the twelve most active members by 55% to 153% — and unevenly, so it did not merely
+        // shrink everyone, it REORDERED them. JT read third and was second; GrayKitsune read sixth and was
+        // fourth.
+        //
+        // Spread rather than named, so a stat added to a badge tomorrow reaches the board without a second
+        // edit here. That is the mistake this replaces.
+        const merged = { ...g };
+        for (const [k, v] of Object.entries(bs)) merged[k] = (Number(merged[k]) || 0) + (Number(v) || 0);
         const gearPower = Object.values(merged).reduce((n, v) => n + (Number(v) || 0), 0);
         const ring = fighterFrom(merged, {}, null);
         return {
