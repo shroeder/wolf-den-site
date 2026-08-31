@@ -140,6 +140,14 @@ export default function ConsumablesClient() {
                                 <ConsumableArt id={i.id} emoji={i.emoji} className="badge-tile-icon" />
                                 <span className="badge-tile-label">{i.name} ×{i.count}</span>
                                 <span className="badge-tile-desc muted">{i.desc}</span>
+                                {/* WHAT A SECOND ONE DOES, ON THE THING ITSELF. This lived only in a paragraph
+                                    at the top of the shelf, which was wrong for months while every card stayed
+                                    silent — and that is what cost a member twenty-five bottles to a "use all"
+                                    on an effect that could not stack. Shown only when you hold more than one,
+                                    because that is the only moment the question exists. */}
+                                {i.count > 1 && i.stackNote ? (
+                                    <span className="cons-stack muted">{i.stackNote}</span>
+                                ) : null}
                                 <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "center", flexWrap: "wrap" }}>
                                     <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => consumeItem(i)}>
                                         {busy === `use:${i.id}` ? "Using…" : "Use"}

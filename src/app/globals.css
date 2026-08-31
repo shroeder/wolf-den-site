@@ -23537,3 +23537,9 @@ body.cas-seated .social-fab { display: none; }
         font-size: 0.85rem;
     }
 }
+
+/* The stacking rule, on the consumable card itself — only drawn when a member holds more than one, which is
+   the only moment the question exists. Deliberately quieter than the description above it: it answers a
+   follow-up question rather than introducing the item. */
+.cons-stack { display: block; margin-top: 4px; font-size: 0.72rem; line-height: 1.35; opacity: 0.8;
+  border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }

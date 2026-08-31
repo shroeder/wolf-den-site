@@ -315,7 +315,8 @@ export async function featureConsumables(buyerId, feature) {
             return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc,
                 // Whether the shelf may offer "Use all". Decided here, from the same allow-list the POST
                 // enforces, so the button and the door can never disagree about what is bulk-usable.
-                count: Number(r.count) || 0, target: c.target || null, bulk: canBulkUse(r.consumable_id) };
+                count: Number(r.count) || 0, target: c.target || null, bulk: canBulkUse(r.consumable_id),
+                    stackNote: stackNote(r.consumable_id) };
         })
         // Cheapest-feeling first is wrong here; what you want at a glance is the thing you have most of, then
         // by name so the shelf does not reshuffle itself between visits.
@@ -390,7 +391,8 @@ export async function listConsumables(buyerId) {
         return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, count: r.count,
             // `bulk` is the same question for everything that ISN'T pet food, answered by the one allow-list
             // the POST enforces — so the button and the door cannot disagree.
-            target: c.target || null, feedable: c.effect?.type === "pet_xp", bulk: canBulkUse(r.consumable_id) };
+            target: c.target || null, feedable: c.effect?.type === "pet_xp", bulk: canBulkUse(r.consumable_id),
+            stackNote: stackNote(r.consumable_id) };
     }).filter(Boolean);
     // The member's charged gear, for the recharge / cooldown-reset target pickers.
     const now = Date.now();
@@ -458,6 +460,28 @@ export async function buyConsumable(buyerId, id) {
 //   sail_*                      situational one-shots mid-voyage; dumping a stack burns the lot for one leg
 //
 // The allow-list lives HERE and not in the UI, so a client cannot ask for a bulk it was never meant to have.
+// ── WHAT HAPPENS IF YOU USE MORE THAN ONE ────────────────────────────────────────────────────────────────────
+// Luke: "we need to be clear with the consumables that you can use more than one of. What happens when you use
+// more than one of them? Maybe for consumables we have some text in them that says what happens when they
+// stack."
+//
+// It was explained once, in a paragraph at the top of the shelf, and that paragraph was wrong for months while
+// every card sat silent. A member reading the Ember Stone had no way to know a second one was wasted — which
+// is what cost Nicholas twenty-five bottles. So the rule is written on the THING, next to the button that
+// spends it, and it is derived from the effect rather than authored per item so it cannot drift out of step
+// with what the code does.
+export function stackNote(id) {
+    const e = CONSUMABLES[id]?.effect || {};
+    if (e.type === "damage") {
+        return `Using another of the same strength adds ${e.hours}h to the clock rather than raising the multiplier. A stronger boost takes over while it lasts.`;
+    }
+    if (e.type === "strikes") return `Extra strikes add up, to a maximum of ${MAX_POTION_STRIKES} a day from potions.`;
+    if (e.type === "xp") return "Each one pays its own XP. Using several is the same as using them one at a time.";
+    if (e.type === "spin_token") return "Tokens add to your pile. Nothing is lost by holding them.";
+    if (e.type === "pet_xp") return "Each one feeds its own XP to the pet.";
+    return null;   // one-shots and targeted items: there is no stack to describe
+}
+
 export const BULK_USE_CAP = 25;
 const BULK_USABLE = new Set(["xp", "strikes", "damage", "spin_token"]);
 
