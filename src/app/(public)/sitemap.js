@@ -60,6 +60,13 @@ export default async function sitemap() {
             priority: 0.8,
         },
         {
+            // Live only while we're gathering interest for a D&D table; drop it when the group is running.
+            url: `${BASE_URL}/dnd`,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 0.6,
+        },
+        {
             url: `${BASE_URL}/marketplace`,
             lastModified: new Date(),
             changeFrequency: "daily",

@@ -23332,3 +23332,208 @@ body.cas-seated .social-fab { display: none; }
     filter: drop-shadow(0 14px 26px rgba(0,0,0,0.85)) drop-shadow(0 0 40px rgba(255,150,60,0.3)); }
 .pos-call-vs { font-family: var(--font-display); font-size: clamp(15px, 1.5vw, 24px); color: #6a727d;
     text-transform: uppercase; letter-spacing: .1em; }
+
+/* ── THE D&D INTEREST SURVEY (/dnd) ─────────────────────────────────────────────────────────────────────────
+   Chips, not selects. This form arrives almost entirely from a phone off a Facebook post, and every question
+   is a short closed list — a native <select> would cost a tap and a scroll wheel per answer where a chip costs
+   one thumb press. The multi-answer questions (day, time) use the same chip with aria-pressed rather than a
+   second control, so the whole form is one interaction to learn. */
+.dnd-form {
+    gap: 0.9rem;
+}
+
+.dnd-question {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.9rem 1rem 1rem;
+    margin: 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.dnd-question legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.4rem;
+    font-weight: 700;
+}
+
+.dnd-question-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    color: var(--accent-hover);
+    font-size: 0.8rem;
+}
+
+.dnd-question-note {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+.dnd-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+}
+
+/* Seven days will not sit sensibly in 180px columns on a phone; they want to be small and square-ish. */
+.dnd-options-tight {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+
+.dnd-option {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.dnd-option strong {
+    font-size: 0.95rem;
+}
+
+.dnd-option span {
+    font-size: 0.78rem;
+    color: var(--ink-secondary);
+}
+
+.dnd-option-active {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    background: rgba(212, 175, 55, 0.08);
+}
+
+.dnd-send-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.dnd-send-row .button {
+    gap: 0.45rem;
+}
+
+.dnd-send-note {
+    font-size: 0.85rem;
+}
+
+.dnd-error {
+    margin: 0;
+    color: #ff9d9d;
+    font-weight: 600;
+}
+
+.dnd-done {
+    text-align: center;
+}
+
+.dnd-done-icon {
+    font-size: 2rem;
+    color: var(--accent);
+}
+
+/* Owner-only results view (/dnd/results). */
+.dnd-result-heading {
+    margin-top: 0;
+}
+
+.dnd-result-bars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.45rem;
+}
+
+.dnd-result-row {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 9rem) 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+}
+
+.dnd-result-track {
+    height: 0.65rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+.dnd-result-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e);
+}
+
+.dnd-result-count {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.dnd-response-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+}
+
+.dnd-response {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.6rem 0.75rem;
+    display: grid;
+    gap: 0.25rem;
+}
+
+.dnd-response-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.dnd-response-contact {
+    color: var(--accent-hover);
+    font-size: 0.85rem;
+}
+
+.dnd-response-answers {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ink-secondary);
+}
+
+.dnd-response-notes {
+    margin: 0;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 520px) {
+    .dnd-result-row {
+        grid-template-columns: minmax(5.5rem, 7rem) 1fr auto;
+        font-size: 0.85rem;
+    }
+}
