@@ -23196,7 +23196,7 @@ body.cas-seated .social-fab { display: none; }
 
 /* ── IDLE ── a rotating stage on the left, a QR rail on the right that never moves. ─────────────────────── */
 .pos-idle { align-items: stretch; }
-.pos-stage { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; overflow: hidden;
+.pos-stage { flex: 1 1 auto; min-width: 0; display: flex; align-items: center;
     animation: pos-in .5s cubic-bezier(.2,.8,.2,1); }
 @keyframes pos-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .pos-slide { width: 100%; min-width: 0; }
@@ -23222,7 +23222,9 @@ body.cas-seated .social-fab { display: none; }
 
    Positions come from SCATTER in the component as --x/--y/--s/--r. They are authored because a random
    scatter reliably produces one clump and one hole. */
-.pos-world { position: relative; display: block; height: 100%; }
+/* Clipped HERE rather than on the stage — the art runs off the edges on purpose, but a clip on the stage
+   also cut the copy's soft scrim into a visible rectangle. */
+.pos-world { position: relative; display: block; height: 100%; width: 100%; overflow: hidden; }
 .pos-world-art { position: absolute; inset: -8% -4% -8% -2%; pointer-events: none; }
 .pos-world-art img {
     position: absolute; left: var(--x); top: var(--y);
@@ -23230,7 +23232,7 @@ body.cas-seated .social-fab { display: none; }
        1366 wide, which is the screen this was designed against. */
     /* --s is UNITLESS and multiplied by a vw unit here: `168px * 0.073vw` is not a length, and the browser
        rendered it enormous rather than refusing it. Unitless times vw is the only form that works. */
-    width: calc(var(--s) * 0.058vw);
+    width: calc(var(--s) * 0.068vw);
     aspect-ratio: 1; object-fit: contain;
     transform: translate(-50%, -50%) rotate(var(--r));
     /* Two shadows: a tight dark one to lift it off the ground, and a wide warm one so the brighter sprites
@@ -23248,8 +23250,8 @@ body.cas-seated .social-fab { display: none; }
    floats on top of it — a card says "widget", a fade says "these are the same picture". */
 .pos-world-copy { position: relative; z-index: 1; max-width: 460px; height: 100%;
     display: flex; flex-direction: column; justify-content: center; padding-right: 40px; }
-.pos-world-copy::before { content: ""; position: absolute; inset: -40% -60% -40% -200%;
-    background: radial-gradient(70% 80% at 30% 50%, rgba(9,10,12,0.97) 42%, rgba(9,10,12,0.82) 62%, transparent 88%);
+.pos-world-copy::before { content: ""; position: absolute; top: 0; bottom: 0; left: -60px; right: -140px;
+    background: linear-gradient(90deg, #090a0c 0%, rgba(9,10,12,0.96) 46%, rgba(9,10,12,0.72) 72%, transparent 100%);
     z-index: -1; }
 .pos-world-copy p { margin: 0; font-size: clamp(16px, 1.6vw, 25px); line-height: 1.4; color: #c8cfd8; }
 
