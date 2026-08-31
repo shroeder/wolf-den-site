@@ -193,7 +193,15 @@ export const trackSummary = (track) => ({
 //
 // The owner is exempt from the door regardless (roadOpenFor), which is what makes it testable: Luke can walk
 // the Road and collect prizes on the live site while it reads as not existing to everybody else.
-export const SEASON_PUBLIC = false;
+// OPEN 2026-08-31. One flip does all of it: the Road becomes walkable by the whole Den, the eight prizes come
+// out of hiding in four catalogues, and every member's rungs roll into Season 1 the first time they open the
+// Arena (see rollRoadSeason — lazily, one row at a time, archiving as it goes so nobody's climb is lost).
+//
+// Checked before flipping, because this is the whole Den rather than one account: all eight prizes resolve,
+// all eight are drawn, all eight have inspect details. The ladder itself was rebuilt the same night — coherent
+// fighters, a height-weighted archetype draw — and measured across the three best-geared members, every band
+// is harder than the one below it for all three.
+export const SEASON_PUBLIC = true;
 
 /** `unreleased` for a season-exclusive catalog row. Kept here so the four catalogs cannot drift apart. */
 export const SEASON_HIDDEN = !SEASON_PUBLIC;
