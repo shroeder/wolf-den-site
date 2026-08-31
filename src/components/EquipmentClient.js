@@ -935,7 +935,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             {showStatChips ? (
                                 <div className="eqstats">
                                     {statKeys.length ? statKeys.map((k) => (
-                                        <span key={k} className="eqstat">{STAT_META[k].icon} <b>+{it.stats[k]}{STAT_META[k].suffix || ""}</b> {STAT_META[k].label}</span>
+                                        <span key={k} className="eqstat">{STAT_META[k].icon} <b>+{statValue(k, it.stats[k])}</b> {STAT_META[k].label}</span>
                                     )) : <span className="muted" style={{ fontSize: "0.82rem" }}>No combat stats</span>}
                                 </div>
                             ) : null}

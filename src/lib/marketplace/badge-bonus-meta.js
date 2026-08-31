@@ -8,6 +8,8 @@ import { COIN_ICON } from "@/lib/coin-icon";
 // stat the way its own system names it.
 export const BONUS_DOMAINS = ["combat", "sea", "farm", "forge", "depth"];
 
+import { statValue } from "@/lib/marketplace/items.js";
+
 export const BONUS_META = {
     combat: {
         // The domain head reuses a representative sprite from the same family — one look, no extra art.
@@ -96,6 +98,15 @@ export const BONUS_META = {
 };
 
 // A badge's bonus object → flat list of chips [{ domain, icon, label, text }]. Empty when the badge has none.
+// ── ONE RENDERER FOR CRIT, EVERYWHERE ────────────────────────────────────────────────────────────────────────
+// crit_chance is stored in POINTS — 1,000 of them is 100%, so a point is a tenth of a percent. Four separate
+// surfaces each kept their own little table saying `suffix: "%"` and pasted it onto the raw number, so 10
+// points of badge crit rendered as "+10% Crit Chance" when it is 1%. GrayKitsune, in the plaza: "on badges
+// page it lists +10% crit chance.. is that +10 crit chance so 1% or actually +100 so correctly +10%?"
+//
+// He is right, and this is the same defect as the fight card printing 0.35 block as "0.35%" — a stat rendered
+// by a hand-rolled string instead of by the one function that knows its unit. statValue in items.js is that
+// function; every surface below now calls it.
 export function bonusChips(bonus) {
     const out = [];
     if (!bonus) return out;
@@ -106,7 +117,7 @@ export function bonusChips(bonus) {
         for (const [k, v] of Object.entries(block)) {
             const sm = meta.stats[k];
             if (!sm || !v) continue;
-            out.push({ domain: dom, icon: sm.icon, label: sm.label, text: `+${v}${sm.suffix} ${sm.label}` });
+            out.push({ domain: dom, icon: sm.icon, label: sm.label, text: `+${statValue(k, v)} ${sm.label}` });
         }
     }
     return out;

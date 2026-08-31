@@ -1126,6 +1126,10 @@ export function statValue(k, v) {
     if (FRACTION.has(k)) return `${Math.round(n * 100)}%`;
     // Points, not a fraction — but shown in the same unit the fight screen uses, so a card and a bout agree.
     if (k === "crit_chance") return `${Math.round((n / CRIT_PER_POINT) * 1000) / 10}%`;
+    // Crit POWER is already a percentage — one point is one point of multiplier, which is why STAT_META
+    // says "each point is +1%". It reads with its sign here so the four surfaces that used to paste on
+    // their own "%" can stop doing that and still be right.
+    if (k === "crit_power") return `${Math.round(n)}%`;
     if (k === "speed") return `${n.toFixed(2)}`;
     return String(Math.round(n * 100) / 100);
 }

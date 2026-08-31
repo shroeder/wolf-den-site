@@ -7,6 +7,7 @@ import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import { bandTable, GRADE_COLOR } from "@/lib/marketplace/timing.js";
+import { statValue } from "@/lib/marketplace/items.js";
 import CoinCta from "@/components/CoinCta";
 import Coin from "@/components/Coin";
 import Glyph from "@/components/Glyph";
@@ -1113,10 +1114,10 @@ export function EnhanceResultModal({ res, onClose }) {
                                             says so rather than being one row among eight. */}
                                         {s.intrinsic && s.gained ? <span className="forge-er-uptag">SHARPER</span> : null}</span>
                                     <span className="forge-er-stat-calc">
-                                        <span className="base">{s.base}{s.suffix}</span>
-                                        {s.forge > 0 ? <span className="add">+{s.forge}{s.suffix}</span> : null}
+                                        <span className="base">{statValue(s.key, s.base)}</span>
+                                        {s.forge > 0 ? <span className="add">+{statValue(s.key, s.forge)}</span> : null}
                                         <span className="eq">=</span>
-                                        <b className="total">{s.base + s.forge}{s.suffix}</b>
+                                        <b className="total">{statValue(s.key, s.base + s.forge)}</b>
                                     </span>
                                 </div>
                             ))}
