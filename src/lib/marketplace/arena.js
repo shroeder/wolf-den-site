@@ -2448,7 +2448,10 @@ async function finishBout(buyerId, row, b, won) {
     const stake = isMemberBout ? vpTransfer({ myVp, theirVp, won }) : 0;
     // Never take more than the loser has. That keeps it exactly zero-sum and keeps the floor at zero.
     const moved = isMemberBout ? Math.min(stake, won ? theirVp : myVp) : 0;
-    const vp = (isMemberBout ? (won ? moved : -moved) : 0) + (won ? featVp : 0);
+    // Feats pay their VP bonus only in a MEMBER bout. Luke: "we shouldn't award victory points for pve."
+    // Leaving them on a Gauntlet or Road win would have kept a small mint open on the exact axis this
+    // change closed — you could still farm rating off things that have none to give.
+    const vp = isMemberBout ? ((won ? moved : -moved) + (won ? featVp : 0)) : 0;
     // RENOWN. The track says "every bout pays more laurels" and nothing read it — fifteen levels of a gold
     // sink that changed no number anywhere. Applied to the feats as well as the base, because a feat is a
     // bout's payout too and splitting them would be a rule nobody could guess from the card.

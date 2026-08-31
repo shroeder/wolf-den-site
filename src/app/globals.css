@@ -23549,3 +23549,13 @@ body.cas-seated .social-fab { display: none; }
    follow-up question rather than introducing the item. */
 .cons-stack { display: block; margin-top: 4px; font-size: 0.72rem; line-height: 1.35; opacity: 0.8;
   border-top: 1px solid rgba(255,255,255,0.08); padding-top: 4px; }
+
+/* Victory points move both ways now, so a loss reads as a loss rather than as a smaller win. */
+.ar-vp-num.is-down { color: #ff9a9a; }
+
+/* The away report, folded into the recap so a fight ends on ONE card. Set apart with a rule and its own
+   ground so it reads as a second subject rather than more of the fight's own numbers. */
+.ar-recap-away { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; padding: 9px 11px;
+  border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.ar-recap-away b { font-size: 0.94rem; }
+.ar-recap-away em { font-size: 0.78rem; opacity: 0.78; font-style: normal; }

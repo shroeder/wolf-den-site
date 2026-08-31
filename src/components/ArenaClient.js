@@ -811,7 +811,7 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
 //   THE FEATS    — named things you did, which is the only place performance is ever acknowledged.
 //   THE FIGHT    — damage dealt and taken, your biggest blow, crits, what your guard actually stopped.
 // Nothing in here may throw: a crash while this is mounted leaves a scroll-locked overlay with no way off it.
-function Recap({ bout, busy, onClose }) {
+function Recap({ bout, busy, onClose, away = [] }) {
     const r = bout?.recap || null;
     useScrollLock(true);
     const won = Boolean(bout?.won);
@@ -887,6 +887,11 @@ function Recap({ bout, busy, onClose }) {
     // gold, XP and a chest, and the recap said "+0 Victory Points · Streak 0" over it.
     const haul = r?.fishing ? (r.haul || null) : null;
     const reward = raid ? raid.reward : haul || r?.reward || bout?.reward || null;
+    // ── WHICH ECONOMY PAID FOR THIS FIGHT ────────────────────────────────────────────────────────────────
+    // A Gauntlet tier and a Road rung have no victory points to give, so they move none — see the settle. The
+    // recap has to know that or it promises a currency the fight cannot pay.
+    const isPve = !raid && !haul && !r?.fishing && (Number(r?.npcTier) > 0 || Number(r?.rung) > 0);
+    const vpMoved = Number(r?.reward?.vp ?? reward?.vp ?? 0);
     const loot = raid ? (raid.loot || [])
         : haul?.chest ? [{ kind: "chest", label: `${haul.chest[0].toUpperCase()}${haul.chest.slice(1)} Chest`, rarity: "off the line" }]
             : [];
@@ -961,12 +966,25 @@ function Recap({ bout, busy, onClose }) {
                         <span className="ar-vp-num">{haul?.gold ? `+${money(haul.gold)}` : "—"}</span>
                         <span className="ar-vp-lab">{haul?.gold ? "Gold" : "It slipped the line"}</span>
                     </div>
-                ) : (
-                    /* THE POINTS. */
+                ) : isPve ? (
+                    /* ── A PVE FIGHT PAYS LAURELS, AND NOW SAYS SO ───────────────────────────────────────
+                       Victory points stopped being minted by anything without points of its own, so a
+                       Gauntlet tier and a Road rung move exactly zero — and this panel went on promising
+                       them, which meant every PvE win ended on "+0 Victory Points". Luke: "if the recap modal
+                       is promised on VP in pve we should have a new pve recap that focuses on laurels or
+                       something more relevant." Laurels are what those fights actually pay. */
                     <div className="ar-vp">
-                        <span className="ar-vp-num">+{money(shown)}</span>
+                        <span className="ar-vp-num">{reward?.laurels ? `+${money(reward.laurels)}` : "—"}</span>
+                        <span className="ar-vp-lab">{reward?.laurels ? "Laurels" : "No laurels this time"}</span>
+                    </div>
+                ) : (
+                    /* THE POINTS — and they move BOTH WAYS now, so the sign is read off the number rather
+                       than assumed. A member who has just lost rating should see that, not a "+0". */
+                    <div className="ar-vp">
+                        <span className={`ar-vp-num${vpMoved < 0 ? " is-down" : ""}`}>
+                            {vpMoved < 0 ? "−" : "+"}{money(Math.abs(vpMoved < 0 ? vpMoved : shown))}
+                        </span>
                         <span className="ar-vp-lab">Victory Points</span>
-
                     </div>
                 )}
 
@@ -1044,6 +1062,28 @@ function Recap({ bout, busy, onClose }) {
                         <span><i>Streak</i><b>{r?.streak || 0}{(r?.streak || 0) > 0 && r.streak >= (r.bestStreak || 0) ? " · best" : ""}</b></span>
                     )}
                 </div>
+
+                {/* ── WHAT HAPPENED WHILE YOU WERE AWAY, IN THE SAME CARD ─────────────────────────────
+                    This was its own dialog on the screen behind, so it arrived the instant this one closed
+                    and got dismissed by the tap that was still travelling. Folded in here it is read rather
+                    than skipped, and the button below marks it seen on the way out.
+
+                    Compact on purpose: the headline number and who came at you. The full report is still its
+                    own card when you arrive without having just fought. */}
+                {away.length ? (
+                    <div className="ar-recap-away">
+                        <span className="ar-recap-kick">While you were away</span>
+                        <b>{away.reduce((n, x) => n + (x.bouts || 0), 0)} bout
+                            {away.reduce((n, x) => n + (x.bouts || 0), 0) === 1 ? "" : "s"}
+                            {away.reduce((n, x) => n + (x.held || 0), 0)
+                                ? ` · you held ${away.reduce((n, x) => n + (x.held || 0), 0)}` : ""}
+                            {away.reduce((n, x) => n + (x.laurels || 0), 0)
+                                ? ` · +${money(away.reduce((n, x) => n + (x.laurels || 0), 0))} laurels` : ""}
+                        </b>
+                        <em>{away.slice(0, 3).map((x) => x.them?.name).filter(Boolean).join(", ")}
+                            {away.length > 3 ? ` and ${away.length - 3} more` : ""} came at your build</em>
+                    </div>
+                ) : null}
 
                 <div className="ar-recap-foot">
                     <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
@@ -2955,7 +2995,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     Off the bout's own `town` flag rather than the query string: the flag is true for the
                     fight that IS a raid, which survives a reload, a re-entry and a link with no `?from` on
                     it. A hard nav, because the town page loads its own state and must not inherit this one's. */}
-                {bout.over && recapReady ? <Recap bout={bout} busy={busy} onClose={leaveBout} /> : null}
+                {/* ── ONE MODAL, NOT TWO ──────────────────────────────────────────────────────────────
+                    The recap used to close onto the ladder, where the away report then popped as a SECOND
+                    dialog. Two cards back to back, and a second tap aimed at the recap's button landed on the
+                    away report's and dismissed it unread. Luke: "post fight has two modals, one of which is
+                    showing a button that when clicked skips past the second modal. Ideally we combine the two
+                    so the user immediately sees relevant info."
+                    So the away rows are handed to the recap and drawn inside it, and leaving marks them seen. */}
+                {bout.over && recapReady ? (
+                    <Recap bout={bout} busy={busy} away={st.away || []}
+                        onClose={() => { if (st.away?.length) act("seen"); leaveBout(); }} />
+                ) : null}
 
                 {/* ── WHAT THE FIGHT IS ASKING YOU FOR ────────────────────────────────────────────────────
                     Mounted off `bout.awaiting` and nothing else. A finished bout, or a transcript from before
@@ -3008,7 +3058,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     return (
         <section className="card ar">
             {/* what happened while you were asleep */}
-            {st.away?.length ? (
+            {/* Only when there is no recap to fold it into — a fight that has just ended carries these rows
+                inside its own card instead, so the two never stack. */}
+            {st.away?.length && !bout?.over ? (
                 <AwayReport rows={st.away} onClose={() => act("seen")} />
             ) : null}
 
