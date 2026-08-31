@@ -275,6 +275,47 @@ export function ladderReward(rung, season = currentSeason()) {
 }
 
 /** One rung, fully resolved. `rung` is 1-based and matches the id, so nothing has to be looked up twice. */
+// ── THE ARCHETYPE IS THE DIFFICULTY DIAL ─────────────────────────────────────────────────────────────────────
+// Measured across all 200 rungs, three real members, every fight rebuilt at ONE fixed power so the archetype
+// is the only thing varying:
+//
+//     wall  +0.408   balanced  -0.122   berserker  -0.422   duelist  -0.448   brute  -0.492
+//                                                             (margin; higher = easier for the member)
+//
+// The eight mildest fights on the Road are all Walls and the eight nastiest are all Brutes, Duelists and
+// Berserkers. Within an archetype there is spread, but the archetype decides most of it — a Wall spends its
+// beats guarding and a Brute spends them killing you, and at equal stats that is the whole fight.
+//
+// Luke: "take the super easy fights and just move them towards the beginning of the road, take super hard
+// fights and move them towards the end... I'm starting to lean more towards prioritising the difficulty curve
+// than the uniqueness of each fight."
+//
+// A literal sort does that and overshoots: it would put all 43 Walls at rungs 1-43 and then 120 rungs with no
+// Wall in them at all. So the DRAW is weighted by height instead. The low Road leans on Wall and Balanced, the
+// high Road on Brute and Duelist, and every archetype stays reachable at every height — the mix slides rather
+// than the list being cut into blocks. Still hashed, so a rung is the same opponent every time and still not
+// readable off its neighbours.
+const ARCH_BY_DIFFICULTY = ["wall", "balanced", "berserker", "duelist", "brute"];
+// How tightly the draw sits on the height. Lower is a harder sort and less variety; this leaves every
+// archetype possible everywhere while still moving the centre of the distribution from Wall to Brute.
+const ARCH_SPREAD = 1.35;
+function archetypeFor(rung, seed) {
+    const order = ARCH_BY_DIFFICULTY
+        .map((key) => ARCHETYPES.find((a) => a.key === key))
+        .filter(Boolean);
+    // Anything not named above still draws — the table is a preference, never a filter, so a new archetype
+    // added to the catalogue appears on the Road instead of silently vanishing from it.
+    for (const a of ARCHETYPES) if (!order.includes(a)) order.push(a);
+    // Where on the easy-to-hard axis this rung wants to sit, 0..(n-1).
+    const centre = (Math.max(1, Math.min(LADDER_MAX, rung)) - 1) / Math.max(1, LADDER_MAX - 1) * (order.length - 1);
+    const weights = order.map((_, i) => Math.exp(-((i - centre) ** 2) / (2 * ARCH_SPREAD * ARCH_SPREAD)));
+    const total = weights.reduce((a, b) => a + b, 0);
+    // The hash picks a point in the weighted range — deterministic, and no learnable order.
+    let r = ((seed >>> 0) % 100000) / 100000 * total;
+    for (let i = 0; i < order.length; i += 1) { r -= weights[i]; if (r <= 0) return order[i]; }
+    return order[order.length - 1];
+}
+
 // Deterministic per rung and stable across processes — the same reason vary() in items.js and hashBuild() in
 // arena-npc-build.js hash rather than using Math.random. A rung must be the same opponent every time or a
 // rematch is a reroll instead of a plan.
@@ -306,7 +347,7 @@ export function ladderFoe(rung) {
     // shape of its own — the house index keeps riding along so the tenth fight of a house is not the same one
     // every time.
     const archSeed = hashRung(champion ? `champ:${n}` : `arch:${n}`);
-    const arch = ARCHETYPES[archSeed % ARCHETYPES.length];
+    const arch = archetypeFor(n, archSeed);
     // The whole character behind this rung, so the card can name what it carries rather than only its shape.
     const build = npcBuild(n);
     // ── A CHAMPION IS NOT A POWER SPIKE ──────────────────────────────────────────────────────────────
