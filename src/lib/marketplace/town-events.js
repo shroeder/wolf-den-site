@@ -284,7 +284,14 @@ export async function resolveExpiredEvents() {
 // A raid runs for its FULL duration — clearing a wave NEVER ends it; reinforcements always arrive (refill hp +
 // bump the wave counter) until the timer (`ends_at`) expires. Returns { hp, wave }.
 async function refillWave(ev) {
-    const wave = (Number(ev.meta?.wave) || 1) + 1;
+    // ⚠️ TWO THINGS CALL THEMSELVES "wave" AND THIS IS THE OLD ONE. meta.wave is the pre-swarm boss counter —
+    // a raid ran its full duration and this ticked up forever as the hp bar refilled. The SWARM has its own
+    // wave (mkt_town_enemy.wave, 1..CHIEFTAIN_WAVE) and that is the one the fight actually runs on.
+    //
+    // Left unbounded it reached 31 on a live raid while every foe was still in swarm wave 5, and the plaza
+    // header dutifully printed "wave 31" — a number that meant nothing to anybody reading it. Clamped so the
+    // two counters cannot disagree by more than the swarm's own length.
+    const wave = Math.min(CHIEFTAIN_WAVE, (Number(ev.meta?.wave) || 1) + 1);
     const row = await db.queryOne(
         `UPDATE mkt_town_event SET hp = hp_max, meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{wave}', to_jsonb($2::int))
           WHERE id = $1 AND status = 'active' RETURNING hp`,

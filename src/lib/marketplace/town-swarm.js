@@ -358,8 +358,22 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
         // ⚠️ TOPPED UP TO THE WAVE'S OWN SIZE, NOT TO `fighters`. Capping the room at the fighter count meant
         // reinforcements could only ever restore the plaza to the number of people who had ALREADY managed to
         // hit something — the same undercount that caused the shortage, applied again to the cure.
+        // ── ⚠️ A WAVE HAS A BUDGET, AND REINFORCEMENTS SPEND IT DOWN ────────────────────────────────────
+        // This measured `room` against how many are ALIVE, which meant every poll topped the plaza back up
+        // to a full wave — so wave 5 could never be emptied, `waveCleared` never fired, the chieftain never
+        // spawned and the raid could not end. Luke, an hour in: "does this thing ever end?" A live raid had
+        // 227 foes spawned into one wave and meta.wave at 31.
+        //
+        // The budget is measured against EVERYTHING EVER SPAWNED in this wave instead. Reinforcements still
+        // arrive while people are being turned away, but only until the wave's own size is spent — after
+        // that the plaza empties as it is cleared, which is the whole shape of a raid.
         const fighters = await liveFighterCount(eventId).catch(() => 1);
-        const room = Math.min(waveSize(wave, fighters), MAX_FOES_PER_WAVE) - alive.length;
+        const spawned = await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_town_enemy WHERE event_id = $1 AND wave = $2`,
+            [eventId, wave],
+        ).catch(() => null);
+        const budget = Math.min(waveSize(wave, fighters), MAX_FOES_PER_WAVE);
+        const room = budget - Math.max(Number(spawned?.n) || 0, alive.length);
         if (room > 0) {
             const maxSlot = Math.max(...alive.map((r) => Number(r.slot) || 0));
             for (let i = 1; i <= room; i += 1) {
