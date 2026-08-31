@@ -2664,11 +2664,25 @@ async function finishBout(buyerId, row, b, won) {
         }
     }
 
-    const after = await db.queryOne(`SELECT vp FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // ── WHERE THAT LEFT YOU ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "it doesnt show my new total and new rank."
+    //
+    // `vp` was already read back here (assuming the total rather than reading it is how a recap ends up
+    // reporting a number the row does not hold) — it just never reached the screen. The rank goes with it: a
+    // swing with no standing beside it cannot tell you whether the fight was worth taking. Counted in the
+    // SAME round trip, and ordered the way standings() orders, so the two can never disagree.
+    const after = await db.queryOne(
+        `SELECT a.vp,
+                (SELECT COUNT(*) FROM mkt_arena a2 JOIN mkt_buyer b2 ON b2.id = a2.buyer_id
+                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > a.vp)::int + 1 AS rank,
+                (SELECT COUNT(*) FROM mkt_arena a3 JOIN mkt_buyer b3 ON b3.id = a3.buyer_id
+                  WHERE COALESCE(b3.xp,0) > 0)::int AS rank_total
+           FROM mkt_arena a WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
 
     b.recap = {
         won, foe: b.foe, reward, feats,
         vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
+        rank: after?.rank ?? null, rankTotal: after?.rank_total ?? null,
         npcTier: npcTier || null,
         ladder: wonRung ? { rung: wonRung, prize: ladderPrize } : null,
         // THE PERSON WHO DID IT GETS TOLD. The first cut announced a world-first to global chat and to nobody

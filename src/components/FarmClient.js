@@ -431,7 +431,9 @@ export default function FarmClient({ initial, viewingAlias }) {
         return () => { alive = false; clearInterval(t); };
     }, [post, farm.mine, farm.owner?.alias]);
 
-    const petIt = useCallback(async (pet) => {
+    // `floater` is off when the tap came from the Quick panel — the +XP floats are positioned over the pet's
+    // spot in the PASTURE, and from inside a modal that draws them at a meaningless place on top of the sheet.
+    const petIt = useCallback(async (pet, { floater = true } = {}) => {
         if (!farm.canPet || pet.petted || busy) return;
         const i = pets.findIndex((p) => p.id === pet.id);
         setBusy(pet.id);
@@ -442,7 +444,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             const patch = { petted: true, level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed };
             setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)), wallet: f.wallet ? { ...f.wallet, gold: f.wallet.gold + (r.goldGained || 0) } : f.wallet }));
             setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
-            if (i >= 0) addFloater(i, `+${r.xpGained} XP · +${r.goldGained}g`, "#ffe27a");
+            if (floater && i >= 0) addFloater(i, `+${r.xpGained} XP · +${r.goldGained}g`, "#ffe27a");
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } // update the nav farm badge
         } else if (r?.error === "already_petted") {
             setFarm((f) => ({ ...f, pets: f.pets.map((p) => (p.id === pet.id ? { ...p, petted: true } : p)) }));
@@ -1705,7 +1707,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                 the chat bubble, and two unrelated things wearing the same clothes in the same corner reads as
                 one control that has grown a second head. One door. */}
             {quickOpen && farm.mine ? (
-                <QuickPanel farm={farm} garden={garden} busy={gardenBusy}
+                <QuickPanel farm={farm} garden={garden} busy={gardenBusy} petBusy={busy}
+                    onPet={(pet) => petIt(pet, { floater: false })}
                     onHarvestAll={harvestAllNow}
                     onPlantAll={() => { setQuickOpen(false); setPlantingAll(true); }}
                     onFertilizeAll={fertilizeAllNow}
@@ -2445,7 +2448,7 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
 // THE ORDER OF THE PET LIST IS THE POINT. Equipped first because it is the one actually working for you, then
 // whatever is on the stand because that is the other thing you chose, then everything else by XP. A pet that
 // is full is greyed and says so rather than being hidden — knowing a pet is done is as useful as feeding it.
-function QuickPanel({ farm, garden, busy, onHarvestAll, onPlantAll, onFertilizeAll, onFeed, onClose }) {
+function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onFertilizeAll, onFeed, onPet, onClose }) {
     const q = farm?.quick || {};
     const pets = farm?.pets || [];
     const standIds = new Set(((farm?.stand?.slots) || []).map((sl) => sl?.pet?.id).filter(Boolean));
@@ -2460,6 +2463,13 @@ function QuickPanel({ farm, garden, busy, onHarvestAll, onPlantAll, onFertilizeA
     const rank = (x) => (x.id === equippedId ? 0 : standIds.has(x.id) ? 1 : 2);
     const sorted = [...pets].sort((a, b) => rank(a) - rank(b) || (b.xp || 0) - (a.xp || 0));
     const treats = (farm?.treats || []).reduce((n, t) => n + (t.count || 0), 0);
+    // ── AND PETTING, WHICH IS THE FREE ONE ───────────────────────────────────────────────────────────────
+    // Luke: "I cant pet from here."
+    //
+    // The panel opened as a FEEDING list, and feeding costs a treat — so with an empty bag every row read "no
+    // treats" and the sheet was a wall of things you could not do. Petting costs nothing, pays XP and gold,
+    // and is the daily chore this panel exists to gather up; leaving it out was the one real omission.
+    const petsLeft = farm?.mine ? Number(farm?.petting?.left) || 0 : 0;
 
     return (
         <div className="qp-back" role="dialog" aria-modal="true" onClick={onClose}>
@@ -2498,15 +2508,18 @@ function QuickPanel({ farm, garden, busy, onHarvestAll, onPlantAll, onFertilizeA
                     </>
                 ) : null}
 
-                <span className="qp-sec">Your pets · {treats} treat{treats === 1 ? "" : "s"} in the bag</span>
+                <span className="qp-sec">Your pets · {petsLeft} petting{petsLeft === 1 ? "" : "s"} left · {treats} treat{treats === 1 ? "" : "s"}</span>
                 <div className="qp-pets">
                     {sorted.map((x) => {
                         const full = x.maxed || (x.level || 0) >= 6;
                         const tag = x.id === equippedId ? "equipped" : standIds.has(x.id) ? "on the stand" : null;
+                        // A maxed pet can still be PETTED — the gold and the player XP are paid whatever its
+                        // level is, and only the pet's own XP has nowhere to go. So the two buttons disable on
+                        // different rules, which is why the row stopped being one button.
+                        const canPetThis = farm.canPet && farm.mine && !x.petted && petsLeft > 0;
+                        const petting = petBusy === x.id;
                         return (
-                            <button key={x.id} type="button" className={`qp-pet${full ? " is-full" : ""}`}
-                                disabled={busy === `feed-${x.id}` || full || !treats}
-                                onClick={() => onFeed(x.id)}>
+                            <div key={x.id} className={`qp-pet${full ? " is-full" : ""}`}>
                                 <span className="qp-pet-art">
                                     {x.spriteUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -2517,10 +2530,17 @@ function QuickPanel({ farm, garden, busy, onHarvestAll, onPlantAll, onFertilizeA
                                     <b>{x.name}{tag ? <i className="qp-tag">{tag}</i> : null}</b>
                                     <em>level {x.level || 1}{full ? " · maxed" : ` · ${Math.round(x.into || 0)}/${Math.round(x.span || 0)} xp`}</em>
                                 </span>
-                                <span className="qp-pet-do">
-                                    {busy === `feed-${x.id}` ? "…" : full ? "done" : treats ? "Feed" : "no treats"}
+                                <span className="qp-pet-acts">
+                                    <button type="button" className="qp-act is-pet" disabled={!canPetThis || petting}
+                                        onClick={() => onPet(x)}>
+                                        {petting ? "…" : x.petted ? "petted" : "Pet"}
+                                    </button>
+                                    <button type="button" className="qp-act is-feed" disabled={busy === `feed-${x.id}` || full || !treats}
+                                        onClick={() => onFeed(x.id)}>
+                                        {busy === `feed-${x.id}` ? "…" : full ? "maxed" : treats ? "Feed" : "no treats"}
+                                    </button>
                                 </span>
-                            </button>
+                            </div>
                         );
                     })}
                 </div>

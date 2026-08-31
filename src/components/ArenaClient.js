@@ -985,6 +985,16 @@ function Recap({ bout, busy, onClose, away = null }) {
                             {vpMoved < 0 ? "−" : "+"}{money(Math.abs(vpMoved < 0 ? vpMoved : shown))}
                         </span>
                         <span className="ar-vp-lab">Victory Points</span>
+                        {/* ── AND WHAT THAT MADE IT ────────────────────────────────────────────────────
+                            Luke: "it doesnt show my new total and new rank."
+                            A swing on its own is half a sentence. +188 is a good night or a bad one
+                            depending entirely on the two numbers under it, and neither was on the screen. */}
+                        {r?.vpTo != null ? (
+                            <span className="ar-vp-now">
+                                <b>{money(r.vpTo)}</b> total
+                                {r.rank ? <> · <b>#{r.rank}</b>{r.rankTotal ? ` of ${r.rankTotal}` : ""}</> : null}
+                            </span>
+                        ) : null}
                     </div>
                 )}
 
@@ -5085,6 +5095,11 @@ function Styles() {
             .ar-vp-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase;
                 color: #8a7fae; }
             .ar-vp-rank { font-style: normal; margin-top: 4px; font-size: 12px; color: #c9d2db; }
+            /* The standing, directly under the swing — display:block so it takes its own line rather than
+               running on after the VICTORY POINTS label, which is a flex/inline sibling. */
+            .ar-vp-now { display: block; margin-top: 6px; font-size: 12px; color: #a4adb7;
+                font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
+            .ar-vp-now b { color: #fff; font-weight: 800; }
             .ar-unlock { position: relative; margin: 0 0 13px; padding: 7px 12px; border-radius: 10px;
                 font-size: 12px; font-weight: 900; color: #8bf0b4;
                 background: rgba(139,240,180,0.12); border: 1px solid rgba(139,240,180,0.45); }
@@ -5820,8 +5835,10 @@ function Styles() {
             .ar-pick-pay i { display: block; font-style: normal; font-size: 9px; color: #7d858f; margin-top: 2px; }
             /* The stake, both ways. Green over red so the sign is read from the colour before the glyph is,
                and tabular figures so the two numbers line up under each other down the whole list. */
-            .ar-pick-vp { display: flex; align-items: baseline; justify-content: flex-end; gap: 4px;
-                font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+            /* The .ar-pick-pay em rule above sets display:block and outranks a bare class, so this needs the
+               element in the selector or the flex never applies — the gap collapses and it reads +215-85VP. */
+            .ar-pick-pay em.ar-pick-vp { display: flex; align-items: baseline; justify-content: flex-end;
+                gap: 6px; font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
             .ar-pick-vp .is-win { color: #7effb2; }
             .ar-pick-vp .is-lose { color: #ff8f9c; }
             .ar-pick-vp .is-unit { color: #7d858f; font-weight: 700; font-size: 9px; }
