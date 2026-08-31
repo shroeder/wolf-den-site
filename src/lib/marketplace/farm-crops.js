@@ -641,6 +641,68 @@ export async function applyFertilizer(buyerId, slot) {
 // same plots twice. Then it updates only the slots it named, guarded by the same conditions again -- and if
 // fewer rows come back than were paid for, the difference is handed straight back. Spending first and refunding
 // the shortfall can cost a member nothing; updating first and charging after can hand out free fertilizer.
+// ── THE WHOLE GARDEN IN ONE TAP ──────────────────────────────────────────────────────────────────────────────
+// Luke: "the farm needs a harvest and replant all, and you simply select from a seed list n times to fill the
+// plots. and it also needs a fertilizer all button after you harvest replant."
+//
+// A farm at full size is a dozen plots, and clearing it was a dozen taps, then a dozen more to replant, then a
+// dozen more to fertilise. That is not depth, it is arithmetic done with a thumb — and it is the reason people
+// stop planting the slower crops, because the tax is per plot rather than per visit.
+//
+// Composed from the SINGLE-PLOT functions rather than reimplementing them. Everything a harvest does — the
+// gold, the XP, the seed-save luck, the pet perks, the chest roll, the encounter — happens exactly as it does
+// on its own, because it IS the same call. A bulk action that grew its own copy of the payout would be a
+// second farm to keep in step.
+//
+// ⚠️ ENCOUNTERS STOP THE RUN. maybeStartEncounter parks a pending fight on the row, and a second harvest while
+// one is parked would either overwrite it or be refused — either way somebody loses a fight they were owed. So
+// the first harvest that raises one ends the sweep and hands it back; the rest of the garden is still standing
+// and one more tap finishes it after the fight.
+export async function harvestAll(buyerId) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    const ready = await db.query(
+        `SELECT slot FROM mkt_farm_plot WHERE buyer_id = $1 AND ready_at <= NOW() ORDER BY slot`, [buyerId],
+    ).catch(() => []);
+    const slots = (ready?.rows || ready || []).map((r) => Number(r.slot));
+    if (!slots.length) return { ok: false, error: "nothing_ready" };
+    let gold = 0, xp = 0, encounter = null;
+    const names = [];
+    const chests = [];
+    const seeds = [];
+    for (const slot of slots) {
+        const r = await harvestPlot(buyerId, slot).catch(() => null);
+        if (!r?.ok) continue;
+        gold += Number(r.gold) || 0;
+        xp += Number(r.xp) || 0;
+        if (r.name) names.push(r.name);
+        if (r.chest) chests.push(r.chest);
+        if (r.savedSeed) seeds.push(r.savedSeed);
+        if (r.foundSeed) seeds.push(r.foundSeed);
+        if (r.encounter) { encounter = r.encounter; break; }   // see the note above — the fight is owed now
+    }
+    if (!names.length && !encounter) return { ok: false, error: "nothing_ready" };
+    return { ok: true, harvested: names.length, names, gold, xp, chests, seeds, encounter,
+        garden: await getGarden(buyerId) };
+}
+
+// Fill every empty plot with one seed. The seed list the member picks from is their own bag, so `seedId` is
+// whatever they chose and plantSeed refuses anything they do not hold — this only decides HOW MANY times.
+export async function plantAll(buyerId, seedId) {
+    if (!buyerId || !seedId) return { ok: false, error: "bad_request" };
+    const g = await getGarden(buyerId).catch(() => null);
+    const empty = (g?.plots || []).filter((p) => !p.seedId).map((p) => p.slot);
+    if (!empty.length) return { ok: false, error: "no_empty_plots" };
+    let planted = 0;
+    for (const slot of empty) {
+        const r = await plantSeed(buyerId, slot, seedId).catch(() => null);
+        // Out of that seed is the ordinary way this ends, not a failure: plant what they have and say how many.
+        if (!r?.ok) break;
+        planted += 1;
+    }
+    if (!planted) return { ok: false, error: "no_seeds" };
+    return { ok: true, planted, seedId, garden: await getGarden(buyerId) };
+}
+
 export async function fertilizeAll(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     const [plots, me] = await Promise.all([

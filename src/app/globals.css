@@ -23571,3 +23571,19 @@ body.cas-seated .social-fab { display: none; }
   border-radius: 11px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
 .ar-recap-away b { font-size: 0.94rem; }
 .ar-recap-away em { font-size: 0.78rem; opacity: 0.78; font-style: normal; }
+
+/* ── HARVEST / REPLANT / FERTILIZE, ALL OF IT ─────────────────────────────────────────────────────────────────
+   Three across on a phone, because the three of them are one errand and splitting them over two rows makes the
+   third look optional. Each carries its own count so the button says what it is about to do. */
+.farm-bulk { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 14px; }
+.farm-bulk-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 10px 6px; border-radius: 13px; cursor: pointer; text-align: center; line-height: 1.15;
+  color: #f3e8d6; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16);
+  transition: transform .1s ease, background .1s ease; }
+.farm-bulk-btn:active:not(:disabled) { transform: translateY(1px); }
+.farm-bulk-btn:disabled { opacity: 0.5; cursor: default; }
+.farm-bulk-btn b { font-size: 0.82rem; font-weight: 900; }
+.farm-bulk-btn em { font-size: 0.66rem; font-style: normal; opacity: 0.75; }
+.farm-bulk-btn.is-harvest { border-color: rgba(126,255,178,0.45); color: #b7ffd5; }
+.farm-bulk-btn.is-plant { border-color: rgba(255,215,94,0.45); color: #ffe6a3; }
+.farm-bulk-btn.is-fert { border-color: rgba(140,200,255,0.45); color: #bfe0ff; }

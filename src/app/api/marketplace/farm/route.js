@@ -7,7 +7,7 @@ import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, re
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, saveDraftNote, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
 import { setStandPet, clearStandPet } from "@/lib/marketplace/petting-stand.js";
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, equipFarmBg, unequipFarmBg, deleteFarmBg } from "@/lib/marketplace/farm-bg.js";
-import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
+import { plantSeed, harvestPlot, harvestAll, plantAll, fertilizeAll, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { upgradePlotTrack } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { resolveEncounter, maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -93,6 +93,12 @@ export async function POST(request) {
             else if (b?.action === "harvest") res = await harvestPlot(buyer.id, Number(b?.slot));
             else if (b?.action === "fertilizer_buy") res = await buyFertilizer(buyer.id);
             else if (b?.action === "fertilizer_use") res = await applyFertilizer(buyer.id, Number(b?.slot));
+            // ── THE WHOLE GARDEN, THREE TAPS ────────────────────────────────────────────────────────────
+            // fertilizeAll already existed and was reachable only by burning a Bumper Fertilizer Haul, so
+            // the cheapest thing a member could want — "do that to all of them" — was locked behind an item.
+            else if (b?.action === "harvest_all") res = await harvestAll(buyer.id);
+            else if (b?.action === "plant_all") res = await plantAll(buyer.id, String(b?.seedId || ""));
+            else if (b?.action === "fertilizer_all") res = await fertilizeAll(buyer.id);
             else if (b?.action === "farm_upgrade") res = await buyUpgrade(buyer.id, String(b?.key || ""));
             else if (b?.action === "plot_move") res = await movePlot(buyer.id, Number(b?.slot), b?.x, b?.y);
             else if (b?.action === "plot_upgrade") { res = await upgradePlotTrack(buyer.id, Number(b?.slot), String(b?.key || "")); if (res?.ok) res = { ...res, garden: await getGarden(buyer.id) }; }

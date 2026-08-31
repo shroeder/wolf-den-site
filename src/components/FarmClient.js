@@ -619,6 +619,8 @@ export default function FarmClient({ initial, viewingAlias }) {
         try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
     }, []);
 
+    // Which seed to fill every empty plot with — the same picker a single plot uses, asked once.
+    const [plantingAll, setPlantingAll] = useState(false);
     const gardenAct = useCallback(async (body, key) => {
         setGardenBusy(key);
         const r = await post(body);
@@ -632,6 +634,33 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [post]);
     const plantSeedAt = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "plant", slot, seedId }, `p-${slot}`); }, [gardenAct]);
+    // ── THE WHOLE GARDEN, THREE TAPS ─────────────────────────────────────────────────────────────────────
+    // Luke: "the farm needs a harvest and replant all, and you simply select from a seed list n times to fill
+    // the plots. and it also needs a fertilizer all button after you harvest replant."
+    //
+    // A full farm is a dozen plots, so clearing it was a dozen taps, replanting a dozen more, fertilising a
+    // dozen more again. That is not depth, it is arithmetic done with a thumb, and it is why the slower crops
+    // stop getting planted: the tax is per plot rather than per visit.
+    const harvestAllNow = useCallback(async () => {
+        const r = await gardenAct({ action: "harvest_all" }, "hall");
+        if (r?.ok) {
+            SFX.coin();
+            // One toast for the sweep rather than a dozen — the numbers are already summed by the server.
+            setHarvestToast({ name: r.harvested === 1 ? r.names?.[0] : `${r.harvested} crops`, emoji: "🌾",
+                gold: r.gold, xp: r.xp, chest: r.chests?.[0] || null, bulk: r.harvested });
+            // A harvest can raise a farm encounter, and the sweep stops at the first one so the fight is not
+            // lost. Hand it to the same handler a single harvest uses.
+            if (r.encounter) setEncounter(r.encounter);
+        }
+        return r;
+    }, [gardenAct]);
+    const plantAllWith = useCallback(async (seedId) => {
+        setPlantingAll(false);
+        const r = await gardenAct({ action: "plant_all", seedId }, "pall");
+        if (r?.ok) SFX?.coin?.();
+        return r;
+    }, [gardenAct]);
+    const fertilizeAllNow = useCallback(async () => gardenAct({ action: "fertilizer_all" }, "fall"), [gardenAct]);
     const openPack = useCallback(async (packId) => {
         const r = await gardenAct({ action: "pack_open", packId }, `pk-${packId}`);
         if (r?.ok) SFX?.coin?.();
@@ -1573,6 +1602,11 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* GARDEN — plots, bag, supplies and the upgrade tree, which is most of the page's length on its own. */}
             {farm.mine && garden && panel === "garden" ? (
+                <FarmBulkBar garden={garden} busy={gardenBusy}
+                    onHarvestAll={harvestAllNow} onPlantAll={() => setPlantingAll(true)} onFertilizeAll={fertilizeAllNow} />
+            ) : null}
+
+            {farm.mine && garden && panel === "garden" ? (
                 <GardenPanel
                     garden={garden}
                     busy={gardenBusy}
@@ -1672,6 +1706,14 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {planting != null && garden ? (
                 <SeedPickerModal garden={garden} slot={planting} busy={gardenBusy} gold={farm.wallet?.gold || 0} onPick={plantSeedAt} onOpenPack={openPack} onBuyPack={buySeedPack} onSpecialize={() => { setUpgradePlot(planting); setPlanting(null); }} onClose={() => setPlanting(null)} />
+            ) : null}
+
+            {/* The SAME picker, asked once for the whole garden. Reused rather than rebuilt so the seed list,
+                the counts, the buy-a-pack path and the empty state are all the ones already tested. */}
+            {plantingAll && garden ? (
+                <SeedPickerModal garden={garden} slot={-1} busy={gardenBusy} gold={farm.wallet?.gold || 0}
+                    onPick={(_slot, seedId) => plantAllWith(seedId)} onOpenPack={openPack} onBuyPack={buySeedPack}
+                    onClose={() => setPlantingAll(false)} />
             ) : null}
 
             {inspectSlot != null && garden ? (
@@ -2402,6 +2444,42 @@ function GardenStat({ icon, value, label, accent = "#ffe27a" }) {
                 <span style={{ fontWeight: 900, fontSize: "1rem", color: accent, fontVariantNumeric: "tabular-nums" }}>{value}</span>
                 <span className="muted" style={{ fontSize: "0.68rem" }}>{label}</span>
             </span>
+        </div>
+    );
+}
+
+// ── THE THREE TAPS ───────────────────────────────────────────────────────────────────────────────────────────
+// Each button knows whether it has anything to do, and says so on its face rather than being disabled with no
+// explanation — "nothing ready" is an answer, a dead grey button is not. Counts come off the garden the panel
+// already has, so this costs no extra read.
+function FarmBulkBar({ garden, busy, onHarvestAll, onPlantAll, onFertilizeAll }) {
+    // Off the SERVER's own flags — getGarden already decides `ready` and `empty` for every plot and publishes
+    // readyCount beside them. Re-deriving those from readyAt here would be the same rule written twice, and
+    // the two would disagree the first time one of them learned about a buff the other did not.
+    const plots = garden?.plots || [];
+    const ready = Number(garden?.readyCount) || plots.filter((p) => p.ready).length;
+    const empty = plots.filter((p) => p.empty).length;
+    // Only a plot still GROWING can take fertilizer — a ripe one has nothing left to hurry.
+    const growing = plots.filter((p) => !p.empty && !p.ready && !p.fertilized).length;
+    const seeds = (garden?.seedBag || []).reduce((n, x) => n + (x.count || 0), 0);
+    const fert = Number(garden?.fertilizer) || 0;
+    return (
+        <div className="farm-bulk">
+            <button type="button" className="farm-bulk-btn is-harvest" disabled={busy === "hall" || !ready}
+                onClick={onHarvestAll}>
+                <b>{busy === "hall" ? "Harvesting…" : "Harvest all"}</b>
+                <em>{ready ? `${ready} ready` : "nothing ready"}</em>
+            </button>
+            <button type="button" className="farm-bulk-btn is-plant" disabled={busy === "pall" || !empty || !seeds}
+                onClick={onPlantAll}>
+                <b>{busy === "pall" ? "Planting…" : "Replant all"}</b>
+                <em>{!empty ? "no empty plots" : !seeds ? "no seeds" : `${empty} empty · ${seeds} seeds`}</em>
+            </button>
+            <button type="button" className="farm-bulk-btn is-fert" disabled={busy === "fall" || !growing || !fert}
+                onClick={onFertilizeAll}>
+                <b>{busy === "fall" ? "Feeding…" : "Fertilize all"}</b>
+                <em>{!growing ? "nothing growing" : !fert ? "none left" : `${Math.min(growing, fert)} of ${growing}`}</em>
+            </button>
         </div>
     );
 }
