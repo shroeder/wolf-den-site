@@ -53,6 +53,14 @@ export default function NoticeBody({ body, className = "" }) {
                         </span>
                     );
                 }
+                if (b.kind === "image") {
+                    // The Arbiter alone can reach this branch — parseNotice is only run on its messages. The
+                    // src is a path this codebase produced, never member input, and it is rendered as an
+                    // <img> with no interpolation into markup.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    return <img key={i} className="wd-notice-img" src={b.src} alt="" draggable="false"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }} />;
+                }
                 return <span key={i} className="wd-notice-p">{b.text}</span>;
             })}
             {short ? null : (

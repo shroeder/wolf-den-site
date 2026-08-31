@@ -10,6 +10,7 @@
 //
 //   # Heading          a line starting with "# " is a section head
 //   - bullet           a line starting with "- " or "• " is a list item
+//   /images/x.webp     a bare image path or https URL, alone on its line, is a picture
 //   (blank line)       ends a paragraph
 //   anything else      a paragraph
 //
@@ -19,6 +20,15 @@
 //
 // It applies to the Arbiter alone. A member's message stays exactly what they typed, because a formatter that
 // eats somebody's "- - -" and turns it into a bullet is a formatter that edits people's words.
+//
+// ── AND THE ARBITER MAY SHOW A PICTURE ───────────────────────────────────────────────────────────────────────
+// Luke: "the arbiter only can put images and sprites in his chat messages." A patch note about a coin, a pet or
+// a piece of gear is doing its work with the thing on screen rather than described, and the Den's sprites
+// already exist for every one of them.
+//
+// The syntax is a bare path on its own line, because that is what somebody pastes anyway. It is recognised
+// only for the Arbiter — the same restriction the rest of this grammar has — and only for a path or an https
+// URL with no spaces in it, so a sentence can never turn into an image by accident.
 
 /** The Arbiter's buyer row, which is a row and not code — see the memory note. Matched on alias, never on id. */
 export const NOTICE_ALIAS = "arbiter";
@@ -26,8 +36,13 @@ export const NOTICE_ALIAS = "arbiter";
 /**
  * Parse an announcement into blocks.
  *
- * @returns {Array<{kind: "head"|"text", text: string} | {kind: "list", items: string[]}>}
+ * @returns {Array<{kind: "head"|"text", text: string} | {kind: "list", items: string[]} | {kind: "image", src: string}>}
  */
+// One line, no spaces, and either a site-relative path or an https URL. Anything else is prose.
+export const isNoticeImage = (line = "") =>
+    /^(\/[\w\-./]+|https:\/\/[^\s]+)$/.test(String(line).trim())
+    && /\.(webp|png|jpe?g|gif|svg)$/i.test(String(line).trim());
+
 export function parseNotice(body = "") {
     const lines = String(body || "").replace(/\r\n?/g, "\n").split("\n");
     const blocks = [];
@@ -41,6 +56,13 @@ export function parseNotice(body = "") {
         if (line.startsWith("# ")) {
             flushPara(); flushList();
             blocks.push({ kind: "head", text: line.slice(2).trim() });
+            continue;
+        }
+        // A picture: a lone path or URL, no spaces. Checked before the bullet and paragraph rules so a
+        // filename with a dash in it cannot be read as a list item.
+        if (isNoticeImage(line)) {
+            flushPara(); flushList();
+            blocks.push({ kind: "image", src: line });
             continue;
         }
         if (line.startsWith("- ") || line.startsWith("• ")) {

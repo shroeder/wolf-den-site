@@ -7071,7 +7071,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .wd-notice-head { font-size: 12px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase;
     color: #8fd8ff; margin-top: 2px; }
 .wd-notice-head:first-child { margin-top: 0; }
-.wd-notice-p { display: block; }
+/* Paragraphs get real air between them. Luke: "make sure there's enough space between the paragraphs" — the
+   flex `gap` above sets the rhythm and this keeps a long one from running into the next. */
+.wd-notice-p { display: block; line-height: 1.5; max-width: 62ch; }
+/* A sprite in an announcement. Capped so a 1024px source cannot take over the plaza, and centred with room
+   around it so it reads as an illustration rather than an attachment. */
+.wd-notice-img { display: block; align-self: center; max-width: min(220px, 100%); max-height: 220px;
+    width: auto; height: auto; object-fit: contain; margin: 2px 0; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.45)); }
 .wd-notice-list { display: flex; flex-direction: column; gap: 5px; }
 .wd-notice-item { display: grid; grid-template-columns: 12px 1fr; align-items: start; gap: 6px; }
 .wd-notice-item i { width: 5px; height: 5px; margin-top: 7px; border-radius: 50%; background: #8fd8ff; }
