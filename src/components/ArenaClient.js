@@ -276,9 +276,9 @@ const FIGHT_PAGE = 8;
 function FIGHT_OPTIONS(st) {
     return (st?.targets || [])
         .map((t) => ({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
-            damage: t.damage, health: t.health, reward: t.reward }))
-        // Hardest first — the fight worth having should be the one under your thumb, not the safest one.
-        .sort((x, y) => (y.power || 0) - (x.power || 0));
+            vp: t.vp, wins: t.wins, losses: t.losses, reward: t.reward }))
+        // Highest-ranked first — the fight worth having should be the one under your thumb, not the safest.
+        .sort((x, y) => (y.vp || 0) - (x.vp || 0));
 }
 
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
@@ -3779,13 +3779,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 </span>
                                 <span className="ar-pick-who">
                                     <b>{o.name}</b>
-                                    <em>{Math.round(o.damage || 0)} dmg · {Math.round(o.health || 0)} hp</em>
+                                    {/* Standing and record, not damage and health. The board stopped
+                                        computing everyone's fighter, so those two read 0 for every opponent
+                                        — and they were never trustworthy anyway, because a member's pets
+                                        could not be counted in bulk. These two are exact. */}
+                                    <em>{money(o.vp || 0)} VP · {Math.round(o.wins || 0)}W/{Math.round(o.losses || 0)}L</em>
                                     <span className={`ar-pick-band is-${band}`}>{BAND_WORD[band]}</span>
                                 </span>
                                 <span className="ar-pick-pay">
                                     {top ? <s className="ar-pick-best">Best purse</s> : null}
                                     <b><GiLaurelCrown aria-hidden="true" />{money(o.reward?.laurels || 0)}</b>
-                                    <em>{o.reward?.vp ? `+${o.reward.vp} vp` : "laurels"}</em>
+                                    <em>{o.reward?.vp ? `${o.reward.vp} VP at stake` : "laurels only"}</em>
                                     {o.reward?.lossLaurels ? <i>{money(o.reward.lossLaurels)} even if you lose</i> : null}
                                 </span>
                             </button>

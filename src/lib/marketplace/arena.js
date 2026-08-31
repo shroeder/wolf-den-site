@@ -22,8 +22,8 @@ import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower
 import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.js";
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
-    vpTransfer,
-    lossLaurels, vpFor, vpPreview,
+    vpTransfer, vpStakePreview,
+    lossLaurels, vpFor,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr,
@@ -1026,18 +1026,29 @@ export async function getArenaState(buyerId, pre = {}) {
     // small Den notices when a specific person is missing, and the only reason he got an answer is that Luke
     // happened to be in chat at the time. The board carries the count so the list can account for itself.
     const hiddenRecent = board.filter((o) => o.id !== buyerId && blocked.has(String(o.id))).length;
+    // ── THE FIGHT LIST RUNS ON STANDING NOW ──────────────────────────────────────────────────────────────
+    // These rows are the board's rows, and the board stopped carrying damage, health and power when it stopped
+    // computing every member's fighter. This list went on reading all three: the cards printed "0 dmg · 0 hp"
+    // (ValkyrieSylve: "everyone says 0 dmg and 0 hp now on the arena page when selecting an opponent"), and
+    // worse, every reward preview was computed against an undefined power and the list was sorted by it.
+    //
+    // So the offer is priced off VICTORY POINTS, the same axis the ladder and matchmaking now use. The laurel
+    // helpers take a ratio, so handing them standings instead of gear scores keeps their shape: challenging
+    // upward still pays more, and it now pays more for the reason the board actually shows you.
+    const myVp = Number(row?.vp) || 0;
     const targets = board
         .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)))
         .map((o) => ({ ...o, reward: {
-            vp: vpPreview(myPower, o.power),
+            // What the bout would actually move, from the same function the settle uses.
+            vp: vpStakePreview(myVp, Number(o.vp) || 0),
             // A member, so the PvP premium applies — the card must promise what finishBout will pay.
-            laurels: boutLaurels({ won: true, myPower, theirPower: o.power, kind: "member" }),
+            laurels: boutLaurels({ won: true, myPower: Math.max(1, myVp), theirPower: Math.max(1, Number(o.vp) || 0), kind: "member" }),
             // What a defeat is worth at best and at worst, so "challenge upward" is a visible offer rather
             // than something a member only discovers by losing.
-            lossLaurels: Math.round(lossLaurels({ myPower, theirPower: o.power, kind: "member" }) * LOSS_EFFORT_CEIL),
+            lossLaurels: Math.round(lossLaurels({ myPower: Math.max(1, myVp), theirPower: Math.max(1, Number(o.vp) || 0), kind: "member" }) * LOSS_EFFORT_CEIL),
         } }))
-        // Hardest first: the interesting fight should be the one you see, not the safest one.
-        .sort((x, y) => y.power - x.power);
+        // Hardest first, which is now highest-ranked first.
+        .sort((x, y) => (Number(y.vp) || 0) - (Number(x.vp) || 0));
 
     // THE GAUNTLET — endless NPC challengers, so there is always something to fight even when the Den is
     // asleep and always something harder to aspire to.
@@ -1077,11 +1088,12 @@ export async function getArenaState(buyerId, pre = {}) {
             // `won: true` — this is a PREVIEW of what winning pays, and boutLaurels has no default for it:
             // without the flag it answers the loss question instead, and a Gauntlet loss pays nothing by
             // design, so the card promised zero.
-            reward: { vp: vpPreview(myPower, power), laurels: boutLaurels({ won: true, myPower, theirPower: power }) },
+            // NO VP. A Gauntlet tier has none to give, so the bout moves none — see the settle. Promising
+            // some here is the same lie the recap was telling with "+0 Victory Points" on every PvE win.
+            reward: { vp: 0, laurels: boutLaurels({ won: true, myPower, theirPower: power }) },
         };
     });
 
-    const myVp = Number(row?.vp) || 0;
 
     // ── PROGRESSION ── arena XP, the level it buys, the class, and the state of every node. treeState is the
     // SAME function the server validates a spend against, so the screen can never offer a node the server
