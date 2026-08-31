@@ -150,15 +150,22 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
 //
 // Each cluster is an anchor plus tight local offsets in percent, deliberately overlapping. Sizes alternate
 // big/small INSIDE a cluster so it piles rather than tiles, and the rotations are uneven for the same reason.
+// ⚠️ THE OFFSETS ARE SMALL ON PURPOSE. The first attempt used ±26–34%, which on a 764px-wide stage is a
+// 200px gap — the five sprites drifted apart and the four clusters merged into one scattered border, which
+// is the wallpaper this was meant to replace. A PILE needs the pieces to overlap, so the spread has to be
+// less than a sprite wide.
+//
+// x and y percentages are NOT the same distance: the stage is wider than it is tall, so a 10% x offset is
+// ~76px and a 10% y offset is ~66px. The y numbers run larger to compensate.
 const CLUSTERS = [
     // top-left
-    { at: [7, 12], items: [[0, 0, 176, -9], [26, -6, 116, 8], [12, 22, 132, 5], [34, 18, 100, -14], [-8, 26, 96, 11]] },
+    { at: [15, 20], items: [[0, 0, 178, -8], [13, 9, 124, 9], [-9, 13, 112, 5], [10, -11, 98, 14], [1, 22, 90, -13]] },
     // top-right
-    { at: [93, 11], items: [[0, 0, 184, 7], [-27, -5, 120, -8], [-11, 21, 140, -4], [-33, 17, 104, 12], [8, 25, 92, -12]] },
+    { at: [85, 19], items: [[0, 0, 186, 7], [-13, 10, 126, -9], [9, 14, 110, -4], [-11, -10, 100, 12], [0, 23, 88, 11]] },
     // bottom-left
-    { at: [7, 89], items: [[0, 0, 168, 6], [27, 5, 124, -9], [11, -20, 136, -5], [33, -17, 100, 13], [-8, -25, 92, 9]] },
+    { at: [15, 81], items: [[0, 0, 172, 6], [13, -9, 128, -9], [-9, -13, 114, -5], [11, 11, 96, 13], [1, -22, 92, 10]] },
     // bottom-right
-    { at: [93, 90], items: [[0, 0, 180, -6], [-26, 6, 118, 10], [-12, -19, 138, 4], [-34, -16, 102, -11], [7, -24, 94, 13]] },
+    { at: [85, 82], items: [[0, 0, 182, -6], [-13, -10, 122, 10], [9, -14, 116, 4], [-11, 10, 98, -12], [0, -23, 90, -9]] },
 ];
 // Flattened once at module scope — the render just walks it against the sprite list.
 const PILE = CLUSTERS.flatMap((c) => c.items.map(([dx, dy, s, r]) => ({
