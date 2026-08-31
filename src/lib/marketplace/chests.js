@@ -507,5 +507,24 @@ export async function openChest(buyerId, tier) {
         const { partName, partSprite } = await import("@/lib/marketplace/forge-parts.js");
         parts = { tier: partTier, n: partQty, name: partName(partTier), sprite: partSprite(partTier) };
     } catch { /* the Forge is optional — a chest never fails for it */ }
-    return { ok: true, remaining: dec.count, gold, rarity, parts, doubled: twinHinges };
+    // ── WHY THERE WAS NO ITEM, SAID OUT LOUD ─────────────────────────────────────────────────────────────
+    // SoullessShiitake, four times over two days: "chests are giving a notice saying you only got salvage
+    // materials and gold since you own everything it could've possibly given you, but that's definitely not
+    // true according to the compendium... I just would definitely appreciate better explanation of how exactly
+    // that works and maybe some better messaging when it happens."
+    //
+    // He is right that the old message was wrong, and right about why it confused him. A chest does not roll
+    // an item and find you own it — it rolls a RARITY, and pays dust only when it can find no un-owned item at
+    // that rarity OR at any rarity beneath it. So "you own everything it could have given you" is true of the
+    // rarities it reached and false of the compendium as a whole, which is exactly the contradiction he saw.
+    //
+    // There is no single dupe to name, so this names the thing that IS true: which rarity ran dry, and how far
+    // along he is in it. That answers the question underneath the complaint — am I close? — which a generic
+    // sentence never could.
+    const searched = RARITY_LADDER.slice(0, RARITY_LADDER.indexOf(rarity) + 1).filter(Boolean);
+    const exhausted = searched.map((r) => {
+        const all = pool.filter((x) => x.rarity === r);
+        return { rarity: r, owned: all.filter((x) => owned.has(x.id)).length, total: all.length };
+    }).filter((x) => x.total > 0);
+    return { ok: true, remaining: dec.count, gold, rarity, parts, doubled: twinHinges, exhausted };
 }

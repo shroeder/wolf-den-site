@@ -274,9 +274,28 @@ function bulkLine(o) {
         return { name: o.seeds.length === 1 ? `${o.seeds[0].name} seed` : `${o.seeds.length} seeds`, sub: "for the farm", rarity: rarityOf(o) };
     }
     if (o.piece) return { name: "A set piece", sub: "gear", rarity: rarityOf(o) };
-    if (o.parts) return { name: `${o.parts.n} ${o.parts.name}`, sub: "you own every piece it could have given", rarity: "common" };
-    if (o.gold) return { name: `+${Number(o.gold).toLocaleString()} gold`, sub: "already owned the gear", rarity: "common" };
+    // ── SAY WHICH POOL RAN DRY, NOT "YOU OWN EVERYTHING" ─────────────────────────────────────────────────
+    // "You own every piece it could have given" is true of the rarities this chest REACHED and false of the
+    // compendium, and a member reading his own compendium can see it is false. SoullessShiitake asked four
+    // times for a better sentence: "I would definitely appreciate better explanation of how exactly that works
+    // and maybe some better messaging when it happens."
+    //
+    // The server now sends which rarities were searched and how many of each are owned, so the card can name
+    // the pool and the count instead of making a claim the member can disprove.
+    if (o.parts) return { name: `${o.parts.n} ${o.parts.name}`, sub: dustReason(o), rarity: "common" };
+    if (o.gold) return { name: `+${Number(o.gold).toLocaleString()} gold`, sub: dustReason(o), rarity: "common" };
     return { name: "Something", sub: "", rarity: rarityOf(o) };
+}
+
+// The honest version of "there was nothing for you in here". A chest rolls a RARITY and pays dust only when
+// it can find no un-owned item at that rarity or beneath it — so the thing to name is the pool it searched,
+// with the count, which also answers the question underneath the complaint: am I close?
+function dustReason(o) {
+    const ex = Array.isArray(o.exhausted) ? o.exhausted.filter((x) => x && x.total) : [];
+    if (!ex.length) return o.rarity ? `no ${o.rarity} gear left for you` : "already owned the gear";
+    const top = ex[ex.length - 1];
+    if (ex.length === 1) return `you own all ${top.total} ${top.rarity} pieces`;
+    return `you own every ${ex.map((x) => x.rarity).join(", ")} piece it can give (${top.owned}/${top.total} ${top.rarity})`;
 }
 
 function BulkReveal({ bulk, onClose, onAgain }) {
