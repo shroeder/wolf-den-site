@@ -74,6 +74,10 @@ export function refundWouldOrphanSkills(r, back = 1) {
 }
 
 async function spendGold(buyerId, amount, reason, meta) {
+    // Free is free: no balance read, no UPDATE, and no ledger line. Respec costs are all zero now (see
+    // RESPEC_ONE/TREE/CLASS), and without this every rebuild would write a -0 row — a ledger full of
+    // no-op lines is a ledger nobody can read a rate off.
+    if (!(Number(amount) > 0)) return { ok: true, free: true };
     const have = await gold(buyerId);
     if (have < amount) return { ok: false, error: "poor", need: amount - have };
     const g = await db.queryOne(

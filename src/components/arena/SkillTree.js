@@ -113,12 +113,13 @@ function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, readOnly
                 )}
                 {/* THE FIRST THREE OF THE DAY ARE FREE, and the button says so — a price you have to discover
                     by tapping is a price that stops people tapping. */}
+                {/* Every refund is free now, so the daily allowance is not worth mentioning either — a
+                    counter that only ever counts down from three is one more thing to worry about on a
+                    button that should be the easiest tap on the screen. */}
                 {n.rank > 0 && !readOnly ? (
-                    <button type="button" className="skt-refund" disabled={busy || (freeLeft <= 0 && !canAfford)}
+                    <button type="button" className="skt-refund" disabled={busy}
                         onClick={() => onRefund(n.id)}>
-                        {freeLeft > 0
-                            ? <>Refund one · <u>free · {freeLeft} left today</u></>
-                            : <>Refund one · <Coin /> {money(refundCost)}</>}
+                        Refund one
                     </button>
                 ) : null}
             </div>
@@ -360,7 +361,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                         </div>
                         {picked && picked.tier === t ? (
                             <Detail n={picked} busy={busy} points={viewing ? 0 : pts.available} readOnly={Boolean(viewing)}
-                                refundCost={p.respec?.one || 0} canAfford={gold >= (p.respec?.one || 0)}
+                                refundCost={p.respec?.one || 0} canAfford
                                 freeLeft={p.respec?.free || 0}
                                 onClose={() => setSel(null)}
                                 onTake={(id) => onAct("take_node", { nodeId: id })}
@@ -370,7 +371,11 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                 ))}
             </div>
 
-            {/* ── RESPEC ── three prices, because they are three different decisions. */}
+            {/* ── RESPEC ── FREE, all three of them. Luke: "let's make rerolling classes and points free
+                entirely." The coin was still on every one of these buttons, and a price on a button is a
+                reason to hesitate even when the price is small — which is the opposite of what a skill tree
+                is for. The cost functions still exist and still return a number, so if a price ever comes
+                back these read it again without another edit here. */}
             <div className="skt-respec">
                 <span className="skt-up-head"><GiUpgrade aria-hidden="true" /> Re-specialise</span>
                 {confirm === "tree" ? (
@@ -379,23 +384,23 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                         <div>
                             <button type="button" className="skt-danger" disabled={busy}
                                 onClick={() => { setConfirm(null); onAct("respec_tree"); }}>
-                                Yes · <Coin /> {money(p.respec?.tree)}
+                                Yes, empty it
                             </button>
                             <button type="button" className="skt-cancel" onClick={() => setConfirm(null)}>Keep it</button>
                         </div>
                     </div>
                 ) : (
                     <button type="button" className="skt-respec-btn"
-                        disabled={busy || pts.spent <= 0 || gold < (p.respec?.tree || 0)}
+                        disabled={busy || pts.spent <= 0}
                         onClick={() => setConfirm("tree")}>
-                        Refund the whole tree <u><Coin /> {money(p.respec?.tree)}</u>
+                        Refund the whole tree <u>free</u>
                     </button>
                 )}
 
                 <span className="skt-up-head" style={{ marginTop: 12 }}>
                     <GiLaurelCrown aria-hidden="true" /> Change discipline
                 </span>
-                <p className="skt-note">Refunds every point. Your level and arena XP are untouched.</p>
+                <p className="skt-note">Free. Refunds every point — your level and arena XP are untouched.</p>
                 <div className="skt-swap">
                     {(p.classes || []).filter((c) => c.id !== cls.id).map((c) => (
                         confirm === c.id ? (
@@ -404,14 +409,14 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                 <div>
                                     <button type="button" className="skt-danger" disabled={busy}
                                         onClick={() => { setConfirm(null); onAct("respec_class", { classId: c.id }); }}>
-                                        Yes · <Coin /> {money(p.respec?.klass)}
+                                        Yes, change
                                     </button>
                                     <button type="button" className="skt-cancel" onClick={() => setConfirm(null)}>Cancel</button>
                                 </div>
                             </div>
                         ) : (
                             <button key={c.id} type="button" className="skt-swap-btn" style={{ "--c": c.color }}
-                                disabled={busy || gold < (p.respec?.klass || 0)}
+                                disabled={busy}
                                 onClick={() => setConfirm(c.id)}>
                                 {c.emblem ? (
                                     // eslint-disable-next-line @next/next/no-img-element

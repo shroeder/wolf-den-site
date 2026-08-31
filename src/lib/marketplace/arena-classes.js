@@ -110,15 +110,25 @@ export function arenaXpFor({ won, myPower = 1, theirPower = 1, kind = "gauntlet"
 // Three prices, because they are three different decisions. Pulling one point back is a tweak; emptying the
 // tree is a rebuild; changing class is starting again. Each scales with how invested you are.
 //
-// A TENTH OF WHAT THEY WERE (2026-08-10), plus three free point-refunds a day. The old numbers priced a
-// mistake like a punishment: 150 + 60/point meant a level-20 build cost 1,350 gold to adjust by ONE point and
-// 3,200 to empty. At that price you do not experiment with a tree, you go and look up somebody's build — which
-// is the opposite of what a tree is for. Trying things out should be the cheap part; the cost is only here so
-// that swapping your whole kit per opponent isn't free.
+// ── AND NOW THEY ARE FREE ────────────────────────────────────────────────────────────────────────────────────
+// Luke, 2026-08-31: "let's make rerolling classes and points free entirely."
+//
+// They were cut to a tenth on 2026-08-10 for the right reason — "at that price you do not experiment with a
+// tree, you go and look up somebody's build, which is the opposite of what a tree is for" — and the remaining
+// price was doing the same job more quietly. A level-20 rebuild still cost a few hundred gold, which is enough
+// to make somebody think twice before trying the thing they were curious about.
+//
+// The argument FOR a price was that swapping your whole kit per opponent should not be free. That argument is
+// weaker than it looks: a member who wants to counter-pick already can, three times a day, for nothing — and
+// the ones who do not know that are exactly the ones the price was discouraging from learning their own tree.
+//
+// So all three are zero and the free-refund allowance is irrelevant. The functions stay rather than being
+// deleted: every caller prices its button off them and the shapes are the record of what this used to cost, so
+// putting a price back is one line here rather than an archaeology exercise across four screens.
 export const FREE_REFUNDS_PER_DAY = 3;
-export const RESPEC_ONE = (spent = 0) => 15 + spent * 6;
-export const RESPEC_TREE = (spent = 0) => 40 + spent * 14;
-export const RESPEC_CLASS = (spent = 0) => 120 + spent * 22;
+export const RESPEC_ONE = () => 0;
+export const RESPEC_TREE = () => 0;
+export const RESPEC_CLASS = () => 0;
 
 // ── THE THREE CLASSES ────────────────────────────────────────────────────────────────────────────────────────
 // One per way of winning a bout, drawn from the eleven kinds the engine already has: hit harder, outlast, or
