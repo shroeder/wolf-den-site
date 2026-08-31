@@ -23196,7 +23196,7 @@ body.cas-seated .social-fab { display: none; }
 
 /* ── IDLE ── a rotating stage on the left, a QR rail on the right that never moves. ─────────────────────── */
 .pos-idle { align-items: stretch; }
-.pos-stage { flex: 1 1 auto; min-width: 0; display: flex; align-items: center;
+.pos-stage { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; overflow: hidden;
     animation: pos-in .5s cubic-bezier(.2,.8,.2,1); }
 @keyframes pos-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .pos-slide { width: 100%; min-width: 0; }
@@ -23223,12 +23223,14 @@ body.cas-seated .social-fab { display: none; }
    Positions come from SCATTER in the component as --x/--y/--s/--r. They are authored because a random
    scatter reliably produces one clump and one hole. */
 .pos-world { position: relative; display: block; height: 100%; }
-.pos-world-art { position: absolute; inset: -6% -8% -6% -2%; pointer-events: none; }
+.pos-world-art { position: absolute; inset: -8% -4% -8% -2%; pointer-events: none; }
 .pos-world-art img {
     position: absolute; left: var(--x); top: var(--y);
     /* Sized off the viewport so the composition holds at 1280 and at 1920 — the px in --s is the size at
        1366 wide, which is the screen this was designed against. */
-    width: calc(var(--s) * 0.073vw);
+    /* --s is UNITLESS and multiplied by a vw unit here: `168px * 0.073vw` is not a length, and the browser
+       rendered it enormous rather than refusing it. Unitless times vw is the only form that works. */
+    width: calc(var(--s) * 0.058vw);
     aspect-ratio: 1; object-fit: contain;
     transform: translate(-50%, -50%) rotate(var(--r));
     /* Two shadows: a tight dark one to lift it off the ground, and a wide warm one so the brighter sprites

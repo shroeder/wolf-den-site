@@ -170,7 +170,7 @@ function SlideWorld({ collage }) {
                 {SCATTER.map((p, i) => collage[i] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={collage[i]} src={collage[i]} alt=""
-                        style={{ "--x": `${p.x}%`, "--y": `${p.y}%`, "--s": `${p.s}px`, "--r": `${p.r}deg`, "--i": i }} />
+                        style={{ "--x": `${p.x}%`, "--y": `${p.y}%`, "--s": p.s, "--r": `${p.r}deg`, "--i": i }} />
                 ) : null)}
             </div>
             <div className="pos-world-copy">
