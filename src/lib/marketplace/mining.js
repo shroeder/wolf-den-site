@@ -1086,7 +1086,14 @@ export async function getMiningState(buyerId) {
             const sw = Number(current.my_swings) || 0;
             return {
                 id: Number(current.id), tier: current.tier, name: o.name, color: o.color, art: oreArt(current.tier),
-                partTier: o.part, gold: o.gold, xp: o.xp,
+                // ── WHAT THE SEAM PAYS, NOT WHAT IT IS WORTH BEFORE THE RATE ─────────────────────────
+                // The payout mints this (see the break below: mint(..., "mining")), so a seam declared at 22
+                // gold hands over about 9. This published the raw number and the screen quoted it.
+                // Eric D: "the mine does the same thing the dungeons did about not giving out the gold amount
+                // that it says it will." ValkyrieSylve: "I noticed the mine thing yesterday too."
+                // Through mint() rather than a copied rate, so it follows GOLD_MINT_RATE rather than drifting
+                // from it — the same reason the wheel's labels now do.
+                partTier: o.part, gold: mint(o.gold, "mining"), xp: o.xp,
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
                 mySwings: sw,
                 // How much wider Endurance has made every band, so the bar can DRAW what it grades.

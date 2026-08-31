@@ -67,11 +67,30 @@ const PARTS_WEDGE_SPRITE = partSprite(3); // the wedge face; the RESULT card sho
 // One-line explainer for a wheel prize — powers the "tap a reward to inspect it" card in the legend.
 const SEED_RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"];
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+// ── WHAT THE WEDGE ACTUALLY PAYS ─────────────────────────────────────────────────────────────────────────────
+// Every gold wedge is minted on the way out (see the payout below: mint(..., "spin_prize")), and spin_prize is
+// one of the named heavy faucets — so the effective rate is GOLD_MINT_RATE x 0.5, today 0.2. A wedge holding
+// `amount: 250` pays FIFTY, and the label and the description both quoted the 250.
+//
+// Eric D: "the wheel prize descriptions still show the old gold amount for winnings instead of the newer
+// lowered rates." Kaishiern, from the other end of the same fact: "the lowest you can win on the wheel is 50
+// gold." Those are the same wedge — one of them read the label and the other read his balance.
+//
+// So the wheel quotes what it pays. Run through mint() rather than a copied 0.2, because a second copy of the
+// rate is a second game: change GOLD_MINT_RATE and this follows it.
+const goldShown = (n) => mint(Math.round(Number(n) || 0), "spin_prize");
+
+// The face of the wedge, for the same reason as the description above it. A jackpot keeps its own name — it is
+// a name rather than an amount — and everything that is not gold is untouched.
+const goldLabel = (p) => (p.kind === "gold" && !p.mini && Number(p.amount) > 0
+    ? `${goldShown(p.amount).toLocaleString()} gold`
+    : p.label);
+
 function prizeDesc(p) {
     switch (p.kind) {
         case "gold": return p.mini
-            ? `The MINI JACKPOT — instantly bank ${(p.amount || 0).toLocaleString()} gold.`
-            : `Instantly bank ${(p.amount || 0).toLocaleString()} gold.`;
+            ? `The MINI JACKPOT — instantly bank ${goldShown(p.amount).toLocaleString()} gold.`
+            : `Instantly bank ${goldShown(p.amount).toLocaleString()} gold.`;
         case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level.`;
         case "consumable": return CONSUMABLES[p.consumable]?.desc || p.label;
         case "seed": return "A random farm seed to plant and grow in your pasture.";
@@ -656,7 +675,7 @@ export async function getSpinState(buyerId) {
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
-            return { id: wheel.id, name: wheel.name, disc: wheel.disc || null, prizes: wheel.prizes.map((p) => ({ label: p.label, sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
+            return { id: wheel.id, name: wheel.name, disc: wheel.disc || null, prizes: wheel.prizes.map((p) => ({ label: goldLabel(p), sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
         })(),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,
