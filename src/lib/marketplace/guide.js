@@ -26,7 +26,7 @@ async function trueSteps(buyerId, steps) {
     if (!steps.length) return new Set();
     const wanted = [...new Set(steps.flatMap((s) => s.events || []))];
     const needs = (v) => steps.some((s) => s.verify === v);
-    const [events, avatar, wish, push, purchase, shopVisit] = await Promise.all([
+    const [events, avatar, table, wish, push, purchase, shopVisit] = await Promise.all([
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
@@ -41,6 +41,26 @@ async function trueSteps(buyerId, steps) {
         // nearly uncompletable: a member with a card already on their list was told to add one, added a second,
         // and it still didn't tick. Adding a card while signed in awards `first_wishlist` exactly once, which is
         // both recorded and precisely what the step is asking for. 16 members already have it.
+        // ── SITTING AT A TABLE ───────────────────────────────────────────────────────────────────────
+        // The step used to watch for the event `casino_bet`, which is emitted from ONE place: the round
+        // system that placed bets into mkt_casino_bet. Nothing has placed a bet there since the tables
+        // started settling in the request that opens them, so `casino_bet` has been fired exactly zero
+        // times in the life of this database — a 175 gold step nobody could ever tick.
+        //
+        // SoullessShiitake: "Guide seems to still be broken for the casino btw, I have sat at the table a
+        // handful of times with each game but its still not updating for me." He had, and it could not.
+        //
+        // Read off `casino_play` instead, which all three tables DO write, and narrow it by the game in the
+        // meta so a slot pull does not tick a step about tables. Done as a verify rather than by adding a
+        // second event to the three table handlers: no extra write on every deal, and — the part that
+        // matters here — everyone who has already sat down gets credited the moment this ships, rather than
+        // being told to go and do again the thing they had been doing all week.
+        needs("casinotable")
+            ? db.queryOne(
+                `SELECT 1 AS x FROM mkt_activity_event
+                  WHERE buyer_id = $1 AND event = 'casino_play'
+                    AND meta->>'game' IN ('blackjack','keno','bingo') LIMIT 1`, [buyerId]).catch(() => null)
+            : null,
         needs("wishlist")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'first_wishlist' LIMIT 1`, [buyerId]).catch(() => null)
             : null,
@@ -81,6 +101,7 @@ async function trueSteps(buyerId, steps) {
     for (const s of steps) {
         if (s.events?.some((e) => seen.has(e))) out.add(s.key);
         else if (s.verify === "avatar" && avatar) out.add(s.key);
+        else if (s.verify === "casinotable" && table) out.add(s.key);
         else if (s.verify === "wishlist" && wish) out.add(s.key);
         else if (s.verify === "push" && push) out.add(s.key);
         else if (s.verify === "purchase" && purchase) out.add(s.key);
