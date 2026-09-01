@@ -4153,8 +4153,16 @@ function Styles() {
                in the page whose height was measured once, which meant one swipe (or a phone browser hiding its
                own address bar) slid the HP bars off the top while the command deck stayed pinned to the
                bottom — the bars or the buttons, never both, for the whole fight.
-               100svh is the SMALL viewport: the one that is still there when the browser chrome comes back. */
-            .ar.ar-fight { position: fixed; inset: 0; height: 100svh; z-index: 4000;
+               ── AND svh WAS THE WRONG HALF OF THAT ────────────────────────────────────────────────────
+               100svh is the SMALL viewport — the height that survives the browser chrome COMING BACK. It was
+               chosen so the action bar could never be pushed under a re-appearing URL bar, and it does that.
+               What it also does is stop the overlay short whenever the chrome is HIDDEN, which on a phone is
+               most of the time: the panel is sized to the small viewport, the real one is taller, and the
+               shop's own footer shows through the gap underneath. Luke, twice now: "whenever I enter a fight
+               it's not showing the full screen, the bottom is showing behind it."
+               100dvh is the DYNAMIC viewport. It tracks the chrome in both directions, which is the actual
+               requirement — fill what is on screen right now, whatever that currently is. */
+            .ar.ar-fight { position: fixed; inset: 0; height: 100dvh; z-index: 4000;
                 margin: 0; padding: 0; border: 0; border-radius: 0; max-width: none;
                 display: flex; flex-direction: column; overflow: hidden;
                 background: #0b0910; }

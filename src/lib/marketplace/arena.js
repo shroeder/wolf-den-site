@@ -832,6 +832,23 @@ async function standings() {
            FROM m GROUP BY id`
     ).catch(() => []);
     const rec = new Map((recs?.rows || recs || []).map((r) => [String(r.id), r]));
+    // ── AND WHO HAS EVER ACTUALLY FOUGHT ─────────────────────────────────────────────────────────────────
+    // Luke, looking at his own list: "all these default people are 1200 vp, seems wrong."
+    //
+    // They are not wrong, they are UNPLAYED. 1200 is the seed every member starts at, 61 of the 105 on the
+    // board are still sitting on it, and 41 of those have never been in a single bout on either side. That
+    // was survivable while the list was sorted hardest-first and they sat at the bottom of it; sorting by
+    // NEAREST RATING put sixty-one identical opponents in a dead heat and they filled the screen.
+    //
+    // Any bout, either side, any kind — a member who has walked the Road but never taken a PvP fight has
+    // still turned up, and excluding them would be a second, harsher rule than the one this is for.
+    const ever = await db.query(
+        `SELECT DISTINCT id FROM (
+             SELECT challenger_id AS id FROM mkt_arena_bout
+             UNION SELECT defender_id AS id FROM mkt_arena_bout WHERE defender_id IS NOT NULL
+         ) q WHERE id IS NOT NULL`
+    ).catch(() => []);
+    const fought = new Set((ever?.rows || ever || []).map((r) => String(r.id)));
     // ── THE BOARD IS A LADDER, NOT A STAT SHEET ──────────────────────────────────────────────────────────
     // This used to assemble every member's fighter — equipped stats in bulk, badge passives in bulk, and a
     // primePowers pass over everyone with XP — purely so the board could print a damage and health number
@@ -860,6 +877,8 @@ async function standings() {
         // counters, because a number that silently means something else is worse than a blank.
         wins: Number(rec.get(String(r.buyer_id))?.w) || 0,
         losses: Number(rec.get(String(r.buyer_id))?.l) || 0,
+        // Read by the challenge list, not shown anywhere: an opponent who has never fought is not offered.
+        fought: fought.has(String(r.buyer_id)),
     }));
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
@@ -1064,7 +1083,10 @@ export async function getArenaState(buyerId, pre = {}) {
     // upward still pays more, and it now pays more for the reason the board actually shows you.
     const myVp = Number(row?.vp) || 0;
     const targets = board
-        .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)))
+        // `fought` drops the 41 members who have never been in a bout on either side — see standings(). They
+        // are still on the leaderboard and can still start fights; they are simply not offered as one until
+        // they have taken a single swing at anything.
+        .filter((o) => o.id !== buyerId && !blocked.has(String(o.id)) && o.fought)
         .map((o) => ({ ...o, reward: {
             // What the bout would actually move, from the same function the settle uses — both ways.
             // Luke: "I would expect to see just the vp I would earn or lose if I choose to fight them."
