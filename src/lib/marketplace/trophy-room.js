@@ -106,7 +106,9 @@ const RECORD_HINT = {
     "Waves ridden": "Passing sailors greeted at sea for XP and coin.",
     "Wind recharges": "Times you paid to refill the wind and sail again the same day.",
     "Boat XP": "Experience the boat itself has earned — what raises its form.",
-    "Chests forged": "Chests assembled from dug-up fragments, back when chests were forged rather than dug up whole.",
+    // Renamed with the column's meaning. It counted fuse-ten-fragments assemblies, was written by nothing
+    // after that screen was removed, and so read zero for all 76 diggers. It counts chests DUG now.
+    "Chests found": "Treasure chests you have taken out of the sand — one for every dig you have finished.",
     "Chest points": "Chest value banked, weighted by tier. This is what unlocks the dig tools.",
     "Fragments held": "Shards left over when fragments were retired. They were paid out as chests and doubloons.",
     "Line recharges": "Times you paid for more casts after the day's ran out.",
@@ -286,7 +288,7 @@ const WALLS = [
             // Both of these are now HISTORICAL — nothing increments them since chests became something you
             // dig up whole. Left on the wall on purpose: they are a record of what people did, and deleting a
             // stat quietly rewrites everyone's history. The copy above says so rather than implying they are live.
-            rec("Chests forged", "chests_forged", { rank: true }),
+            rec("Chests found", "chests_forged", { rank: true }),
             rec("Chest points", "chest_points", { rank: true }),
         ],
     },

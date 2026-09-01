@@ -153,6 +153,10 @@ const BADGE_RAID_DEFENDER = 10, BADGE_RAID_BASTION = 50;
 // Milestone thresholds for the newer sailing badges (waving, marine encounters, early voyages).
 const BADGE_WAVE_FRIENDLY = 25, BADGE_WAVE_AMBASSADOR = 100, BADGE_WAVE_BELOVED = 500;
 const BADGE_ENC_TESTED = 10, BADGE_ENC_VETERAN = 50, BADGE_FIRST_VOYAGE = 1, BADGE_SAIL_REGULAR = 25;
+// Master Excavator. Kept at the 50 its description already promised — the badge is being pointed at a new
+// mechanic, not made easier, and the old target was written for a model that took TEN fragments per chest.
+// Against digging, where one finished dig is one chest, 50 is a real haul without being a grind.
+const BADGE_CHESTS_FOUND = 50;
 // Activity-earned COSMETICS (granted into mkt_cosmetic_unlock, idempotent). Kept modest — the owner dislikes
 // grind — so they land well before the hard achievement badges. Art (CSS) is added in a later pass by id.
 const COSMETIC_SAILOR_VOYAGES = 10;  // "Seasoned Sailor" border
@@ -3827,8 +3831,16 @@ async function finishDig(buyerId, board) {
     if (chestWon) {
         await addChests(buyerId, { [chestWon]: chestCount }, { source: "sail_dig", meta: { tier: chestWon, twin: chestCount > 1 } }).catch(() => {});
         // The diggers board ranks on this. Nothing wrote it between forging being removed and here.
-        await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`,
-            [buyerId, CHEST_POINT_WEIGHT(chestWon) * chestCount]).catch(() => {});
+        //
+        // `chests_forged` is written in the SAME statement, and it counts chests FOUND now. It was written by
+        // the old fuse-ten-fragments screen and by nothing since that screen was removed — so it was read in
+        // three places and incremented in none, which left the Trophy Room's "Chests forged" record sitting at
+        // zero for all 76 diggers and left two badges hanging off a number that could never move.
+        await db.query(
+            `UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2,
+                                    chests_forged = COALESCE(chests_forged, 0) + $3
+              WHERE buyer_id = $1`,
+            [buyerId, CHEST_POINT_WEIGHT(chestWon) * chestCount, chestCount]).catch(() => {});
     }
     // Trove (sea affinity), Lucky Lure and Maw (the Leviathan's perk) used to swell the shard count. There is
     // no shard count any more, so they swell the CONSOLATION instead — the only number a dig still pays by
@@ -3901,6 +3913,26 @@ async function finishDig(buyerId, board) {
     // Earned cosmetic: the "Seasoned Sailor" border for sticking with voyages (idempotent).
     if (voyagesNow >= COSMETIC_SAILOR_VOYAGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'sailor') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
+    // ── THE THREE THAT WERE STILL WAITING FOR THE FORGE ──────────────────────────────────────────────────
+    // Luke: "for the 3 that dont apply. rework to be find chest centric."
+    //
+    // dig_excavator, dig_goldtouch and raid_plunderer were the only three badges in the game that NOTHING
+    // granted. All three were written for the old model — dig up fragments, fuse ten of a tier into a chest on
+    // a second screen — and when that was replaced by "uncover the chest and it IS yours", the mechanic their
+    // descriptions named stopped existing. They kept their holders and lost their route.
+    //
+    // Pointed at the thing that replaced forging, which is this function. Their labels survive the move
+    // intact: you still excavate, the touch is still golden, and a mythic chest out of the sand is still
+    // plunder. Descriptions updated to match in migration 423.
+    if (chestWon) {
+        const rank = CHEST_ORDER.indexOf(chestWon);
+        if (rank >= CHEST_ORDER.indexOf("gold")) await grantEventBadge(buyerId, "dig_goldtouch").catch(() => {});
+        if (rank >= CHEST_ORDER.indexOf("mythic")) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
+        // Read back rather than added up here: the UPDATE above is the one place the count moves, so asking it
+        // what the number now is cannot disagree with what was stored.
+        const found = await db.queryOne(`SELECT COALESCE(chests_forged, 0)::int AS n FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        if ((Number(found?.n) || 0) >= BADGE_CHESTS_FOUND) await grantEventBadge(buyerId, "dig_excavator").catch(() => {});
+    }
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
     await trackActivity(buyerId, "sail_dig", { chest: chestWon, doubloons: doubloonsWon, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
     const state = await getSailingState(buyerId);
