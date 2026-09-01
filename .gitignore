@@ -40,3 +40,6 @@ scripts/_*.html
 # Pulled prod env for local gate scripts (vercel env pull). Never commit — it holds the Neon URL,
 # the Blob token and the OpenAI key.
 scripts/_venv
+
+# one-off measurement scratch (scripts/casino-sim.mjs is the kept tool)
+/measure*.mjs
