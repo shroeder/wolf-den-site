@@ -963,7 +963,6 @@ export default function TownClient({ initial, frozen = false }) {
         walkToWorld(worldX, worldY);
     }, [cameraPx, followCam, maxScroll, walkToWorld]);
 
-    const wave = useCallback(() => { setMe((m) => ({ ...m, wave: true })); setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600); }, []);
 
     // Fire-and-forget town action (chat / typing).
     const postAction = useCallback((payload) => {
@@ -975,6 +974,25 @@ export default function TownClient({ initial, frozen = false }) {
         clearTimeout(chatClear.current);
         chatClear.current = setTimeout(() => setMyChat(null), 7000);
     }, []);
+    // ── AND THE PLAZA SEES IT ────────────────────────────────────────────────────────────────────────────
+    // SoullessShiitake: "ive always found it kind of odd that pressing the wave button, doesnt wave to
+    // another player, you have to press their name."
+    //
+    // It waved at nobody. This set a flag on your own avatar for 1.6 seconds and stopped there — no post, no
+    // message, nothing that left the browser — so you waved, watched yourself wave, and everybody else in the
+    // room saw a person standing still. The seven emoji buttons sitting immediately beside it in the same row
+    // all go through quickEmote and DO reach the plaza; the wave was the odd one out, which is exactly why it
+    // reads as broken rather than as decoration.
+    //
+    // It sends the same 👋 the emoji row would, so the room gets a bubble, and it still plays the animation
+    // on your own hero because that part was never wrong. Waving at a PERSON by tapping their name is a
+    // different, more pointed thing and is untouched.
+    const wave = useCallback(() => {
+        setMe((m) => ({ ...m, wave: true }));
+        setTimeout(() => setMe((m) => ({ ...m, wave: false })), 1600);
+        showMyChat("👋");
+        postAction({ action: "chat", body: "👋" });
+    }, [showMyChat, postAction]);
     const sendChat = useCallback((e) => {
         if (e) e.preventDefault();
         const body = chatText.trim();

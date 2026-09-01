@@ -494,7 +494,20 @@ function TurnTimer({ from, to, ms, foe = false, waiting = false }) {
     useEffect(() => {
         const at = painted.current;
         const start = from?.fill ?? 0;
-        const end = held ? start : (to?.fill ?? start);
+        // ── A HOLD IS NOT A SPEND ────────────────────────────────────────────────────────────────────
+        // Sunflower Jinxx: "one of the Bastion guys uses the shield and then your turn bar goes backwards
+        // instead of filling."
+        //
+        // The rule above — forward only, a spend the one exception — was not being kept on the beat a bar
+        // gets STOPPED. `held` pinned the target to `start`, the server's stored fill for the line the hold
+        // arrived on, and the bar on screen has usually travelled past that: it has been gliding toward the
+        // next line's value for most of the beat. So the moment something froze it, the width jumped back
+        // to where the fill had been when the line was stamped, which reads as the bar losing progress for
+        // being hit — the opposite of what a stun does. Nothing on the server moves backwards; fillTo only
+        // ever adds.
+        //
+        // Held means STOPPED, so it holds where it is drawn, and never below the server's own figure.
+        const end = held ? Math.max(start, at) : (to?.fill ?? start);
         const spent = start < at - 0.02;
         // The emptying is paid for out of the beat rather than added to it, so the bar still arrives at
         // `end` exactly when the stepper moves on.
