@@ -8,7 +8,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel, getPetLevelSprite } from "@/lib/marketplace/pet-sprite.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
-import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
+import { petLevelInfo, petMaxXp, addPetXp, levelUpPet, earningPetIds } from "@/lib/marketplace/pet-level.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -606,6 +606,31 @@ export async function getFarm(ownerId, viewerId) {
  * `pet_level` grants a whole level outright. Nobody pressing "feed everything" means "and my one instant
  * level, too". Bulk moves pet_xp only; Ambrosia keeps its own deliberate tap.
  */
+/**
+ * Spill a treat's XP onto every other pet that earns for this owner — the featured pet and the Petting Stand.
+ *
+ * THE SAME RULE THE SINGLE-TREAT PATH ALREADY USES (see the long note above the `pet_xp` branch in useTreat):
+ * it pays whichever pet was fed AND the rest, rather than only firing when the featured pet is the one fed,
+ * because an asymmetry there quietly makes "always feed the equipped one" the correct play. Bulk feeding was
+ * simply never taught it — the farm, the character-XP share, the trickle and a single plate all pay every
+ * earning pet, and the Feed-all button paid exactly one.
+ *
+ * `known` caches the list across a bulk feed's several steps, so a dozen plates cost one lookup rather than a
+ * dozen. Returns the list so the caller can thread it through. Never throws — a treat must not fail over a
+ * bonus that is on top of it.
+ */
+async function shareToStand(feederId, petId, amount, known = null) {
+    try {
+        if (!(Number(amount) > 0)) return known || [];
+        const ids = known?.length ? known : await earningPetIds(feederId);
+        for (const other of ids) {
+            if (String(other) === String(petId)) continue;   // already paid directly
+            await addPetXp(feederId, other, amount).catch(() => {});
+        }
+        return ids;
+    } catch { return known || []; }
+}
+
 export async function feedPetBulk(feederId, petId, consumableId = null) {
     if (!feederId || !petId) return { ok: false, error: "bad_request" };
     const state = await petsState(feederId).catch(() => null);
@@ -646,7 +671,10 @@ export async function feedPetBulk(feederId, petId, consumableId = null) {
     }
     if (!plan.length) return { ok: false, error: "nothing_to_feed" };
 
-    let fed = 0, gained = 0;
+    // Every plate feeds the stand as well — see shareToStand. A SINGLE treat has done this since the stand
+    // shipped; the bulk button never did, so the fastest way to feed was also the only way that wasted three
+    // quarters of the food.
+    let fed = 0, gained = 0, shared = [];
     for (const step of plan) {
         // Conditional decrement: another tab feeding the same stack cannot take the count negative.
         const dec = await db.queryOne(
@@ -658,6 +686,7 @@ export async function feedPetBulk(feederId, petId, consumableId = null) {
         if (!res?.ok) continue;
         fed += step.n;
         gained += step.amount * step.n;
+        shared = await shareToStand(feederId, petId, step.amount * step.n, shared);
     }
     if (!fed) return { ok: false, error: "nothing_to_feed" };
 

@@ -511,6 +511,10 @@ export default function SocialHub() {
                                 {[
                                     ["global", "Global", "social-global", room("global")],
                                     ["announce", "News", "social-news", room("announce")],
+                                    // Everybody has this one, like the plaza and the noticeboard — see
+                                    // channelsFor. Luke, in the plaza: "Ill make a new channel for bugs
+                                    // separate from global chat."
+                                    ["bugs", "Bugs", "social-bugs", room("bugs")],
                                     ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", room("vip")]] : []),
                                     ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", room("staff")]] : []),
                                     ["messages", "Messages", "social-messages", unread > 0 ? unread : null],
@@ -529,7 +533,7 @@ export default function SocialHub() {
                             </div>
 
                             <div className="social-body">
-                                {tab === "global" || tab === "announce" || tab === "vip" || tab === "staff" ? (
+                                {tab === "global" || tab === "announce" || tab === "bugs" || tab === "vip" || tab === "staff" ? (
                                     // One component, keyed by room — remounting on a change is what makes a
                                     // room open on its own newest message rather than inheriting the last
                                     // room's feed for a frame.
@@ -1012,8 +1016,11 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={channel === "vip" ? "Message the VIP room…"
                         : channel === "staff" ? "Message the back room…"
+                        // A bug report needs the screen, what you did and what happened instead — asking for
+                        // those three here costs nothing and saves the follow-up question every time.
+                        : channel === "bugs" ? "What screen, what you did, what happened…"
                         : "Message the whole Den…"}
-                    maxLength={200}
+                    maxLength={channel === "bugs" ? 400 : 200}
                     autoCapitalize="sentences"
                 />
                 <button type="submit" className="btn-gold" disabled={sending || !input.trim()}>Send</button>

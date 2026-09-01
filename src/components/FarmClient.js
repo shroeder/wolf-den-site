@@ -14,10 +14,9 @@ import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import CollectionPanel from "@/components/CollectionPanel";
-import TrophyRoom from "@/components/TrophyRoom";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
-import { GiPawPrint, GiTrophyCup, GiLightningTrio } from "react-icons/gi";
+import { GiPawPrint, GiLightningTrio } from "react-icons/gi";
 
 import PettingStand from "@/components/PettingStand";
 import PackageBanner from "@/components/PackageBanner";
@@ -1211,14 +1210,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                 Art is a real VIEW now, not a button that opened a sheet on top of the farm — a modal over a
                 tab row reads as an interruption, while the other three swap the panel underneath. Same tab,
                 same behaviour, no exception to learn. */}
+            {/* ── THE TROPHY ROOM MOVED OUT ────────────────────────────────────────────────────────────────
+                Luke: "trophy room needs to be its own thing, out of the farm, and have its own menu sprite and
+                location." It is /marketplace/trophies now, in the menu beside Rewards and Badges. Nothing in
+                it was ever about crops or pets — eleven walls filled by upgrades bought all over the game —
+                and as a farm tab it was reachable only by people already tending a garden, while showing it
+                meant hiding the whole pasture underneath. */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"],
-                  // Sized up a touch: a monochrome line glyph at the emoji's 15px reads thinner than its four
-                  // full-colour neighbours. It inherits currentColor, so it tracks the tab's selected state.
-                  ["trophy", <GiTrophyCup key="t" size={18} />, "Trophies"]]
-                    // The Garden, your Art and your Trophy Room are yours alone. The room is gated on the SERVER
-                    // too — /farm/trophies takes no owner parameter — so this filter is presentation, not the lock.
-                    .filter(([v]) => farm.mine || (v !== "garden" && v !== "art" && v !== "trophy"))
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"]]
+                    // The Garden and your Art are yours alone. Gated on the SERVER too, so this is presentation.
+                    .filter(([v]) => farm.mine || (v !== "garden" && v !== "art"))
                     .map(([v, ico, label]) => {
                     // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
@@ -1262,14 +1263,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 below a scene roughly a phone-screen tall, so you scrolled past the whole farm
                 to reach the buttons that change how the farm looks. Above it, nothing is covered and nothing
                 has to be hunted. */}
-            {view !== "art" && view !== "trophy" ? (
+            {view !== "art" ? (
                 <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>{sceneControls}</div>
             ) : null}
-            {/* TROPHIES — like Art, a real VIEW that swaps the panel underneath rather than a sheet over it.
-                `active` is what triggers its one fetch, so switching tabs back and forth never refetches. */}
-            {view === "trophy" ? <TrophyRoom active /> : null}
-
-            <div ref={sceneWrapRef} hidden={view === "art" || view === "trophy"} style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
+            <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
@@ -2509,6 +2506,16 @@ function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onF
                 ) : null}
 
                 <span className="qp-sec">Your pets · {petsLeft} petting{petsLeft === 1 ? "" : "s"} left · {treats} treat{treats === 1 ? "" : "s"}</span>
+                {/* Luke: "ensure to call out that feeding equipped pet gives stand pets the exp too."
+                    It is true of every pet-XP source and it is invisible in every one of them — the result
+                    that comes back names the featured pet, and the three on the stand are credited silently.
+                    Somebody who does not know that is rationing treats across four animals one plate at a
+                    time for no reason. */}
+                {standIds.size ? (
+                    <p className="qp-note is-tip">A treat fed to any of these also feeds your equipped pet and
+                        everyone on the Petting Stand — the same plate, four animals. Petting one on the stand
+                        pays double.</p>
+                ) : null}
                 <div className="qp-pets">
                     {sorted.map((x) => {
                         const full = x.maxed || (x.level || 0) >= 6;
@@ -2527,7 +2534,7 @@ function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onF
                                     ) : null}
                                 </span>
                                 <span className="qp-pet-who">
-                                    <b>{x.name}{tag ? <i className="qp-tag">{tag}</i> : null}</b>
+                                    <b><span className="qp-pet-name">{x.name}</span>{tag ? <i className="qp-tag">{tag}</i> : null}</b>
                                     <em>level {x.level || 1}{full ? " · maxed" : ` · ${Math.round(x.into || 0)}/${Math.round(x.span || 0)} xp`}</em>
                                 </span>
                                 <span className="qp-pet-acts">

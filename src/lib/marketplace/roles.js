@@ -150,8 +150,14 @@ export const CHANNELS = {
 /** Which channels a member may read and write. Global is everybody, including signed-out readers. */
 export function channelsFor(buyerId, roles = []) {
     const has = (k) => roles.some((r) => r.key === k);
-    // Announcements sit beside the plaza: no gate, no join window, and everybody has it.
-    const out = ["global", "announce"];
+    // Announcements and the bug room sit beside the plaza: no gate, no join window, everybody has both.
+    //
+    // ── WHY BUGS IS ITS OWN ROOM ─────────────────────────────────────────────────────────────────────────
+    // Luke, in the plaza: "Ill make a new channel for bugs separate from global chat." The Den reports a lot
+    // of them, and every report was landing in the same stream as the chat — so a bug scrolled away in
+    // minutes, three people would report the same one without seeing each other, and asking a follow-up
+    // question meant scrolling back through a conversation to find what it was about.
+    const out = ["global", "announce", "bugs"];
     // Owners and staff are in the VIP room by default, on Luke's call — the room is a perk, and the people
     // running the shop being absent from it would make it a room the shop cannot hear.
     if (has("vip") || has("staff") || has("owner")) out.push("vip");

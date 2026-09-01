@@ -94,10 +94,18 @@ const ICONS = {
     // The announcements room. A proclamation, not a megaphone: what goes in here is the house writing things
     // down — records broken, patch notes — and a scroll is the shape of a thing that was WRITTEN.
     "social-news": "A rolled parchment proclamation scroll, partly unfurled, with a red wax seal and a short blue ribbon hanging from its lower edge",
+    // The bug room. A BEETLE under glass rather than a wrench or a warning triangle: the room is for members
+    // REPORTING things they have found, which is closer to collecting specimens than to repairing machinery,
+    // and neither a tool nor a triangle would be told apart from the shield or the scroll at 18px.
+    "social-bugs": "A large iridescent green-and-teal beetle with a hard shell and dark legs, seen from directly above, caught under a round brass-rimmed magnifying lens tilted over it",
     // The Casino. A CABINET rather than cards or dice: the floor is nine slot machines and one card table, so
     // the machine is what the place actually is — and at 18px a fanned hand of cards is a smudge while a lit
     // box with three symbols in a window is a silhouette. Deliberately not a die (the Daily Spin owns
     // "gambling shape") and not a coin (the store and the credit screen both already lean on gold discs).
+    // The Trophy Room. Not a cup — /marketplace/track already owns the trophy shape, and the room is not a
+    // prize you won, it is a WALL you fill. So: the wall itself, with mounted pieces on it, which is also the
+    // only honest picture of what the screen contains.
+    trophies: "A dark polished wooden wall panel with ornate gold trim, three small mounted trophies fixed to it in a row — a crossed pair of swords, a ship's wheel and a miner's lantern — each on its own little gold plaque",
     casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
 };
 

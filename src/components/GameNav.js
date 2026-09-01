@@ -48,6 +48,7 @@ const NAV_SPRITE = {
     // it looked like: the one tile in the grid with nothing above its label.
     "/marketplace/compendium": "compendium",
     "/marketplace/market": "market",
+    "/marketplace/trophies": "trophies",
     "/marketplace/casino": "casino",
 };
 
@@ -360,6 +361,10 @@ export default function GameNav() {
         { title: "Progress & Social", items: [
             { href: "/marketplace/track", emoji: "🏆", label: "Rewards", sub: "Reward track" },
             { href: "/marketplace/badges", emoji: "🎖️", label: "Badges", sub: "Earn & show off" },
+            // Out of the farm and into its own room. Luke: "trophy room needs to be its own thing, out of the
+            // farm, and have its own menu sprite and location." It belongs beside Rewards and Badges — all
+            // three are things that fill up as you play the whole game, not one corner of it.
+            { href: "/marketplace/trophies", emoji: "🏛️", label: "Trophy Room", sub: "Eleven walls" },
             { href: "/marketplace/leaderboard", emoji: "🥇", label: "Ranks", sub: "Leaderboard" },
             { href: "/marketplace/invite", emoji: "🎁", label: "Invite", sub: "500 gold each" },
             { href: "/marketplace/friends", emoji: "👥", label: "Friends", sub: "Add & message" },

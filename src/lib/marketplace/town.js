@@ -677,11 +677,13 @@ export async function sendTownChat(buyerId, body, channel = "global") {
     // A tab that only renders for VIPs is a hidden door, and a hidden door is not a locked one — this
     // endpoint takes a channel name from a POST body. Every write is authorised against what the server says
     // the member has earned, the same list the tab was drawn from.
-    const chan = ["global", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    // `bugs` is writable by everybody, like the plaza — a bug room only members with a role can post in is a
+    // suggestion box with the lid welded on.
+    const chan = ["global", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
     // Nobody writes to the noticeboard but the house. postSystemChat inserts directly and never comes
     // through here, so this needs no exception for the Arbiter — it just closes the room to members.
     if (String(channel) === "announce") return { ok: false, error: "read_only" };
-    if (chan !== "global") {
+    if (chan !== "global" && chan !== "bugs") {
         const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);
         if (!channelsFor(buyerId, roles).includes(chan)) return { ok: false, error: "not_in_channel" };
@@ -693,7 +695,10 @@ export async function sendTownChat(buyerId, body, channel = "global") {
         // before the message it is arriving with.
         await joinedAt(buyerId, chan);
     }
-    const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
+    // The plaza is a conversation and 200 characters keeps it one. A BUG REPORT is not a conversation — it
+    // needs the screen, the steps and what happened instead, and 200 characters is where the useful half of
+    // that gets cut off. The client's maxLength matches; this is the one that is enforced.
+    const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, chan === "bugs" ? 400 : 200);
     if (!text) return { ok: false, error: "empty" };
 
     // ── SAYING THE SAME THING OVER AND OVER ──────────────────────────────────────────────────────────────
@@ -748,7 +753,7 @@ export async function sendTownChat(buyerId, body, channel = "global") {
  * carries the seen mark, so a member who is not in a room cannot be given a count for it — the badge cannot
  * leak the existence of a conversation the tab is hiding.
  */
-export async function channelUnread(buyerId, channels = ["global", "announce"]) {
+export async function channelUnread(buyerId, channels = ["global", "announce", "bugs"]) {
     if (!buyerId) return {};
     const rows = await db.query(
         `SELECT c.channel, COUNT(*)::int AS n
@@ -767,7 +772,7 @@ export async function channelUnread(buyerId, channels = ["global", "announce"]) 
             -- global and announce are NOT windowed (see the note by since in the feed query) and nobody
             -- gets a member row for them, so they keep the old meaning or every badge in the plaza goes to
             -- zero.
-            AND (c.channel IN ('global', 'announce')
+            AND (c.channel IN ('global', 'announce', 'bugs')
                  OR (m.joined_at IS NOT NULL AND c.created_at >= m.joined_at))
           GROUP BY c.channel`,
         [buyerId, channels],
@@ -807,7 +812,7 @@ export async function channelUnread(buyerId, channels = ["global", "announce"]) 
 // ONLINE IS THE SAME 90-SECOND WINDOW THE PLAZA USES. One definition of "here" in the whole game; a rail
 // that called somebody online while the plaza did not would be two answers to one question.
 export async function channelRoster(buyerId, channel = "global") {
-    const chan = ["global", "announce", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const chan = ["global", "announce", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
     const gated = chan === "vip" || chan === "staff";
 
     // AUTHORISED SERVER-SIDE, against the earned list rather than the tab that was asked for — the same rule
@@ -905,7 +910,7 @@ export async function markGlobalChatSeen(buyerId) {
 
 export async function getGlobalChat(buyerId = null, limit = 40, channel = "global") {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
-    const chan = ["global", "announce", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const chan = ["global", "announce", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
 
     // ── A PRIVATE ROOM IS AUTHORISED AND WINDOWED ────────────────────────────────────────────────────────
     // Two separate rules, and they are not the same rule. AUTHORISED: you are in the room or you get nothing,
@@ -914,7 +919,7 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
     // to see messages from after your join date" — so a new VIP opens a door rather than being handed a
     // transcript of a conversation they were not part of.
     let since = null;
-    if (chan !== "global" && chan !== "announce") {
+    if (chan !== "global" && chan !== "announce" && chan !== "bugs") {
         if (!buyerId) return [];
         const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);

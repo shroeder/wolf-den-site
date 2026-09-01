@@ -274,11 +274,24 @@ const BAND_WORD = { brutal: "brutal", hard: "harder", even: "even", easy: "easie
 const FIGHT_PAGE = 8;
 
 function FIGHT_OPTIONS(st) {
+    // ── THE PEOPLE AROUND YOU, NEAREST FIRST ─────────────────────────────────────────────────────────────
+    // Luke: "the choose your fight should be the ones around you, not a tack on info section below."
+    //
+    // It was sorted highest-VP-first over the whole roster, on the theory that the fight worth having should
+    // be under your thumb. In practice that put the same handful of leaders at the top of everybody's list —
+    // the top of the board is the one fight most members cannot win — and the opponents actually worth taking
+    // were somewhere behind a "load more". The five people nearest you in standing were already computed and
+    // shown as a read-only strip UNDER the list, which is the answer sitting next to the question.
+    //
+    // So the list IS that: sorted by distance from your own rating, closest first, and "load more" widens the
+    // ring outward rather than walking down from the top. The strip is gone with it.
+    const mine = Number(st?.me?.vp) || 0;
     return (st?.targets || [])
         .map((t) => ({ key: `m:${t.id}`, target: t.id, name: t.name, power: t.power, sprite: t.sprite,
             vp: t.vp, wins: t.wins, losses: t.losses, reward: t.reward }))
-        // Highest-ranked first — the fight worth having should be the one under your thumb, not the safest.
-        .sort((x, y) => (y.vp || 0) - (x.vp || 0));
+        .sort((x, y) => Math.abs((x.vp || 0) - mine) - Math.abs((y.vp || 0) - mine)
+            // Level pegging on distance: the harder of the two first, so a tie breaks upward.
+            || (y.vp || 0) - (x.vp || 0));
 }
 
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
@@ -3866,7 +3879,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     if (seen >= total) return null;
                     return (
                         <button type="button" className="ar-more" onClick={() => { Sfx.ui(); setFightPage((n) => n + 1); }}>
-                            Load more — {total - seen} further down the board
+                            Load more — {total - seen} further from your rating
                         </button>
                     );
                 })()}
@@ -3886,26 +3899,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 </button>
             </div>
 
-            {/* ── THE FIVE AROUND YOU ──────────────────────────────────────────────────────────────────────
-                The server sends your neighbours on the ladder rather than the top ten, so all five rows are
-                people you could actually be matched against — and all five fit without a "show all".
-
-                The damage and health that used to sit on each row are gone. The board could never state them
-                correctly (a member's pets were never counted) and it was under-reading people by up to 153%,
-                which is how somebody picked a fight that looked even and was not. A win-loss record is a
-                thing the board knows for certain. */}
-            {st.board?.length ? (
-                <div className="ar-board">
-                    <span className="ar-up-head">Around you</span>
-                    {st.board.map((r) => (
-                        <div key={r.id} className={`ar-up-row${r.you ? " is-you" : ""}`}>
-                            <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
-                            <span className="ar-up-card">{Math.round(r.wins || 0)}W · {Math.round(r.losses || 0)}L</span>
-                            <span className="ar-up-lvl">{money(r.vp)} VP</span>
-                        </div>
-                    ))}
-                </div>
-            ) : null}
             </>) : null}
             <Styles />
         </section>

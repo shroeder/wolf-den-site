@@ -1297,22 +1297,11 @@ export async function getArenaState(buyerId, pre = {}) {
         // No rung goes out with a member any more. What they bring is their CARD — the same two numbers you
         // read off a Gauntlet tier — plus the VP they have earned, which is a score and not a position.
         // ── FIVE NEIGHBOURS, NOT THE TOP TEN ─────────────────────────────────────────────────────────────
-        // The top ten is a hall of fame; it is not a list of people you can fight. Luke: "I would rather just
-        // show five people that are close to you in victory points — that way you're always fighting someone
-        // around your level." Centred on you and clamped at both ends, so the newest member sees the five
-        // above them and the leader sees the five below rather than a window half full of nothing.
-        //
-        // No damage or health on the row any more: the board has never been able to state them correctly
-        // (pets were never batched) and a number that is wrong is worse than no number at the moment somebody
-        // is deciding who to walk up to.
-        board: (() => {
-            const i = board.findIndex((o) => String(o.id) === String(buyerId));
-            const from = i < 0 ? 0 : Math.max(0, Math.min(i - 2, board.length - 5));
-            return board.slice(from, from + 5).map((o) => ({
-                id: o.id, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level,
-                wins: o.wins, losses: o.losses, you: o.id === buyerId,
-            }));
-        })(),
+        // ── THE FIVE AROUND YOU ARE THE FIGHT LIST NOW ───────────────────────────────────────────────────
+        // A `board` of your five nearest neighbours used to ship with every state and render as a read-only
+        // strip under the challenge list. Luke: "the choose your fight should be the ones around you, not a
+        // tack on info section below." The list itself is sorted by distance from your rating now, so the
+        // strip was the same five names printed twice — once you could fight and once you could not.
         bout: bout ? publicBout(bout) : null,
         away: await awayReport(buyerId, row),
     };
