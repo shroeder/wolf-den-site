@@ -600,6 +600,17 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             for (const other of others) await addPetXp(buyerId, other, e.amount).catch(() => {});
         }
         await trackActivity(buyerId, "use_consumable", { id, name: c.name, petId }).catch(() => {});
+        // ── AND THE BOUNTY COUNTS IT ─────────────────────────────────────────────────────────────────
+        // GrayKitsune: "I have a daily quest - feed a pet a treat - feeding pets treats from
+        // gear/consumable inventory apparently doesnt finish the quest, its asking me to visit pets at my
+        // farm." It was. The three feeding paths in farm.js all bump `feed_pet`; this one — the bag, which
+        // is where a treat actually LIVES — only tracked activity and never told the bounty board. So the
+        // card sent him to the farm to do the thing he had just done, and doing it again from the bag would
+        // not have worked either.
+        //
+        // The bounty asks you to feed a pet a treat. This feeds a pet a treat.
+        const { bumpQuestProgress } = await import("@/lib/marketplace/quests.js");
+        await bumpQuestProgress(buyerId, "feed_pet", 1).catch(() => {});
         const leveled = e.type === "pet_level" ? Boolean(res?.ok) : Boolean(res?.leveled);
         const applied = e.type === "pet_level"
             ? (res?.ok ? `${petName} leveled up to Lv ${res.level}! ⬆️` : `${petName} is already max level`)

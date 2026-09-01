@@ -179,7 +179,17 @@ export async function getMemberMetrics(buyerId) {
     // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
     // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
     const [ratingRow, creationRow, referralRow, playerTradeRow] = await Promise.all([
-        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [buyerId]).catch(() => null),
+        // ── VOTES, NOT RATERS ────────────────────────────────────────────────────────────────────────
+        // Eric D: "the adored badge says I only have 29 farm ratings, when my farm shows that I have 69."
+        // Both numbers were real and neither was the one the badge promises. This counted ROWS — one per
+        // person who has ever rated you — while the farm screen sums `votes`, because a member can rate you
+        // again on a later day. Two definitions of "ratings" on two screens, and the badge's own words pick
+        // a side: "Your farm earned 50 ratings from the pack."
+        //
+        // Counting people also made Adored unreachable. The busiest farm in the Den has 29 distinct raters
+        // out of 111 members, most of whom have never opened a farm, and nobody holds the badge. Read as
+        // votes, four members have already earned it — which is what a popularity badge is supposed to do.
+        db.queryOne(`SELECT COALESCE(SUM(votes),0)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'final'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE referred_by = $1 AND referral_reward_at IS NOT NULL`, [buyerId]).catch(() => null),
         // ── A TRADE IS A TRADE ───────────────────────────────────────────────────────────────────────

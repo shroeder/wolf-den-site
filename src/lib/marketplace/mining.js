@@ -1592,10 +1592,22 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     // A FLAWLESS pour means every one of the five phases landed in the tightest band — 4.4% of a bar that is
     // under 600ms by the last phase. Counted per RUN, not per phase, which is why 25 is a real number.
     const allFlawless = bands.length === SMELT_PHASES && bands.every((b) => b.key === "pixel");
+    // ── BY THE BATCH, LIKE EVERYTHING ELSE THIS POUR PAYS ────────────────────────────────────────────────
+    // GrayKitsune: "the badges that track pours at the furnace, they don't count multiple for the pours where
+    // you pour everything you have of one kind of ore in at a time, making you have to pour 1 at a time to go
+    // for the 500 pour badge."
+    //
+    // The rule was already written twice in this file — thirty lines up ("ten batches on one pour must come
+    // out the same as ten single smelts"), and again over the quest bump immediately above ("batching must
+    // never be a way to do less quest progress for the same ore"). These two counters were the only things in
+    // the pour that did not follow it, so bulk-smelting cost you 499 of the 500, and the only way to chase
+    // the badge was to undo the feature that exists to save your thumb.
+    //
+    // `n` is the batch count the quest bump above uses — the same number, so they cannot drift apart.
     const pours = await db.queryOne(
-        `UPDATE mkt_mining SET smelts_poured = COALESCE(smelts_poured, 0) + 1,
+        `UPDATE mkt_mining SET smelts_poured = COALESCE(smelts_poured, 0) + $3,
              flawless_pours = COALESCE(flawless_pours, 0) + $2 WHERE buyer_id = $1
-         RETURNING smelts_poured, flawless_pours`, [buyerId, allFlawless ? 1 : 0]).catch(() => null);
+         RETURNING smelts_poured, flawless_pours`, [buyerId, allFlawless ? n : 0, n]).catch(() => null);
     if ((Number(pours?.smelts_poured) || 0) >= 100) await grantEventBadge(buyerId, "mine_poursteady").catch(() => {});
     if ((Number(pours?.smelts_poured) || 0) >= 500) await grantEventBadge(buyerId, "mine_ladle").catch(() => {});
     if ((Number(pours?.flawless_pours) || 0) >= 25) await grantEventBadge(buyerId, "mine_notadrop").catch(() => {});

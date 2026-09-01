@@ -524,7 +524,15 @@ export async function delveAct(buyerId, action, choice = null) {
                     ? `It was carrying something. ${got.gear.name}.`
                     : isBoss ? "The dungeon is quiet. Take what it owes you." : "It does not get up.",
                 art: felled.sprite,
-                gold, xp, stone,
+                // ── paid.gold, NOT gold ───────────────────────────────────────────────────────────
+                // SoullessShiitake: "the dungeon seems to not be giving the correct gold amounts as what the
+                // payouts are claiming. It matches the log underneath, but not the rewards screen itself."
+                // Precisely that, and the two numbers were three lines apart: the log line above prints
+                // `paid.gold` — what bank() actually put in the run — and this card was handed the raw roll
+                // that went INTO bank(). Every other settle on this floor already passes paid.gold; the fight
+                // was the one that did not, which is why the card and the line under it disagreed.
+                // This is the same fault Kaishiern reported at the surface, one room further in.
+                gold: paid.gold, xp, stone,
                 chest: got.chest, potion: got.potion,
                 parts: got.parts ? { ...got.parts, name: partName(got.parts.tier) } : null,
                 frags: got.frags, gear: got.gear,
