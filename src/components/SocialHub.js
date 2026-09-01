@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
+
+// The broadcast half of the hub. One list, read by the section split, the top-tab badge and the room strip —
+// so a new channel is added HERE and in channelsFor on the server, and nothing else has to be remembered.
+const ROOM_TABS = ["global", "announce", "bugs", "vip", "staff"];
 import { borderClass } from "@/lib/marketplace/borders.js";
 import NoticeBody from "@/components/NoticeBody";
 
@@ -227,6 +231,10 @@ export default function SocialHub() {
     const prevTotalRef = useRef(-1);
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState("messages");
+    // The last room and the last people-tab you were on, so the top-level switch returns you where you were
+    // rather than resetting to the first of each.
+    const lastRoom = useRef("global");
+    const lastPeople = useRef("messages");
     const [thread, setThread] = useState(null);
 
     const [inbox, setInbox] = useState(null);
@@ -409,6 +417,17 @@ export default function SocialHub() {
     if (!authed) return null;
 
     const incomingCount = requests || friends?.incoming?.length || 0;
+    // ── WHICH HALF OF THE HUB YOU ARE IN ─────────────────────────────────────────────────────────────────
+    // Derived from `tab`, never stored: a second piece of state that has to agree with the first is a second
+    // piece of state that eventually will not, and the failure looks like the wrong row being highlighted.
+    const section = ROOM_TABS.includes(tab) ? "rooms" : "people";
+    // Where each half was left, so switching back does not dump you at the top of it. Refs rather than state
+    // — nothing renders off them, they only decide where the next tap lands.
+    if (section === "rooms") lastRoom.current = tab; else lastPeople.current = tab;
+    // The top tabs carry the SUM of what is under them, or a room filling up behind a collapsed half would
+    // have nothing anywhere on the screen to say so — which is the whole reason the per-room badges exist.
+    const roomsBadge = ROOM_TABS.reduce((n, k) => n + (tab === k ? 0 : roomNew[k] || 0), 0);
+    const peopleBadge = (unread || 0) + (incomingCount || 0);
     const totalNotif = (unread || 0) + (requests || 0);
     const openTo = (t) => { setBubble(false); setTab(t); setThread(null); setOpen(true); };
     // A room's badge, hidden while you are in it — a count of what you are currently reading is noise.
@@ -490,37 +509,58 @@ export default function SocialHub() {
                         <Thread thread={thread} onActivity={refreshUnread} />
                     ) : (
                         <>
-                            {/* ── SIX TABS, DRAWN ────────────────────────────────────────────────────
-                                Luke: "in social tabs we probably want to switch to generated sprites instead
-                                of text to save room." Four words already crowded a phone; VIP and Staff make
-                                six, which does not fit at any size worth reading. Drawn icons (gen-nav-icons)
-                                with the label kept underneath at a size that is a hint rather than the
-                                control — the icon is what you aim at, the word is what confirms it.
+                            {/* ── TWO KINDS OF THING, TWO LEVELS ──────────────────────────────────────
+                                Luke: "the channels are becoming untenable."
 
-                                The two private rooms are rendered only for members who are in them, which
-                                the SERVER decides and sends back with the feed. That is a courtesy, not the
-                                lock: the feed itself refuses a room you are not in, so a hidden tab is not
-                                what is keeping anybody out. */}
+                                He was right, and the reason is that one row was carrying two different kinds
+                                of destination. ROOMS are broadcast — the plaza, the noticeboard, the bug room,
+                                the two private ones — and PEOPLE is one-to-one: your inbox, your friends, and
+                                the search that finds more of them. You never switch between a room and your
+                                inbox for the same reason, and yet they were competing for the same eight slots
+                                on a 375px screen. Every new room made every other destination smaller.
+
+                                So the top row is those two, and the row under it is whichever set you are in.
+                                A ninth channel now adds a pill to a strip of five instead of a tab to a row of
+                                eight — which is the part that was actually breaking.
+
+                                `tab` is unchanged and still the single source of truth; only the chrome moved.
+                                The section is DERIVED from it rather than stored beside it, because two pieces
+                                of state that must agree are two pieces of state that will not. */}
+                            <div className="social-top">
+                                {[["rooms", "Rooms", "social-global", roomsBadge],
+                                  ["people", "People", "social-messages", peopleBadge]].map(([key, label, icon, badge]) => (
+                                    <button key={key} type="button"
+                                        className={`social-top-tab${section === key ? " is-active" : ""}`}
+                                        onClick={() => setTab(key === "rooms" ? lastRoom.current : lastPeople.current)}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={`/images/nav/${icon}.png`} alt="" width={20} height={20} draggable="false" />
+                                        <i>{label}</i>
+                                        {badge ? <span className="social-tab-badge is-chat">{badge > 99 ? "99+" : badge}</span> : null}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* ── AND THE SET YOU ARE IN ───────────────────────────────────────────────
+                                The two private rooms are rendered only for members who are in them, which the
+                                SERVER decides and sends back with the feed. That is a courtesy, not the lock:
+                                the feed itself refuses a room you are not in, so a hidden pill is not what is
+                                keeping anybody out.
+
+                                Badges on every one of them. Luke: "ensure badges work for each tab." Only
+                                Global, Messages and Friends ever had one, so a room could fill up with nothing
+                                to say so — and a room you have to remember to check is a room nobody checks. */}
                             <div className="social-tabs">
-                                {/* ── A BADGE ON EVERY TAB ────────────────────────────────────────────
-                                    Luke: "ensure badges work for each tab." Only Global, Messages and
-                                    Friends ever had one, so the two private rooms and the news could fill
-                                    up with nothing to say so — a room you have to remember to check is a
-                                    room nobody checks. `roomNew` is keyed by channel and a tab shows its
-                                    own count, suppressed while you are standing in it. */}
-                                {[
+                                {(section === "rooms" ? [
                                     ["global", "Global", "social-global", room("global")],
                                     ["announce", "News", "social-news", room("announce")],
-                                    // Everybody has this one, like the plaza and the noticeboard — see
-                                    // channelsFor. Luke, in the plaza: "Ill make a new channel for bugs
-                                    // separate from global chat."
                                     ["bugs", "Bugs", "social-bugs", room("bugs")],
                                     ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", room("vip")]] : []),
                                     ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", room("staff")]] : []),
+                                ] : [
                                     ["messages", "Messages", "social-messages", unread > 0 ? unread : null],
                                     ["friends", "Friends", "social-friends", incomingCount > 0 ? incomingCount : null],
                                     ["discover", "Discover", "social-discover", null],
-                                ].map(([key, label, icon, badge]) => (
+                                ]).map(([key, label, icon, badge]) => (
                                     <button key={key} type="button" title={label} aria-label={label}
                                         className={`social-tab${tab === key ? " is-active" : ""}`}
                                         onClick={() => setTab(key)}>
@@ -533,7 +573,7 @@ export default function SocialHub() {
                             </div>
 
                             <div className="social-body">
-                                {tab === "global" || tab === "announce" || tab === "bugs" || tab === "vip" || tab === "staff" ? (
+                                {section === "rooms" ? (
                                     // One component, keyed by room — remounting on a change is what makes a
                                     // room open on its own newest message rather than inheriting the last
                                     // room's feed for a frame.

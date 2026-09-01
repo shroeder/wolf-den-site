@@ -6826,6 +6826,35 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     transition: background 140ms ease;
 }
 .social-exit:hover { background: rgba(255, 255, 255, 0.13); }
+/* ── THE TOP HALF: ROOMS OR PEOPLE ────────────────────────────────────────────────────────────────────
+   Two destinations, so they get room to be pressed and read rather than being squeezed to a glyph. The
+   segmented look — a filled pill inside a track — says "one of these two" in a way an underline does not,
+   which matters because the row underneath uses the underline for a different question. */
+.social-top {
+    display: flex; align-items: stretch; gap: 4px; flex: 0 0 auto;
+    /* Width stated rather than left to cross-axis stretch. .social-panel is a column flex and the stretch was
+       sizing this to the FULL panel width and then adding the margins on top of it, so the track ran 8px off
+       the right edge — with the panel's overflow:hidden clipping the second pill rather than showing it. */
+    width: calc(100% - 16px); box-sizing: border-box;
+    margin: 8px 8px 0; padding: 3px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.social-top-tab {
+    /* min-width:0 or a flex item refuses to shrink below its content — icon + word + badge — which is the
+       other half of the same overflow. */
+    position: relative; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center;
+    justify-content: center; gap: 7px; padding: 9px 8px; border: none; border-radius: 9px; cursor: pointer;
+    background: none; color: var(--muted, #b9b4c8); font-weight: 800;
+    -webkit-tap-highlight-color: transparent;
+}
+.social-top-tab i { font-style: normal; font-size: 0.86rem; }
+.social-top-tab img { opacity: 0.65; }
+.social-top-tab.is-active { color: #1c1608; background: linear-gradient(180deg, #ffd75e, #f0b73c); }
+.social-top-tab.is-active img { opacity: 1; }
+/* The base rule leaves it in the flow; `.social-tab` lifts it. This one has its own anchor (position:
+   relative above) so it needs the same lift, or the badge lands inline and stretches the pill. */
+.social-top-tab .social-tab-badge { position: absolute; top: 3px; right: 6px; }
+
 .social-tabs {
     display: flex;
     align-items: center;
