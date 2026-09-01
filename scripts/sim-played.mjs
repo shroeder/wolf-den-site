@@ -74,6 +74,8 @@ console.log(`  auto = both sides on housePick (what check:road reports) · playe
 console.log("  rung  build                    auto    played");
 let autoWall = 0;
 let playedWall = 0;
+let autoBest = 0;
+let playedBest = 0;
 for (let t = 1; t <= MAX; t += 1) {
     // Mirrors arena.js's ladder branch line for line — statsForPower, the Road's own damage reduction, the
     // kit tier, the class off the ARCHETYPE (never the tier), and the deck drawn from inside that class.
@@ -94,12 +96,26 @@ for (let t = 1; t <= MAX; t += 1) {
     }
     const ar = a / TRIES;
     const pr = p / TRIES;
-    if (ar >= 0.5) autoWall = t;
-    if (pr >= 0.5) playedWall = t;
+    // ── HOW FAR YOU GET IS WHERE YOU STOP, NOT THE LAST RUNG YOU EVER CLEAR ──────────────────────────
+    // These were `if (rate >= 0.5) wall = t`, overwritten every time — so the headline reported the HIGHEST
+    // rung anywhere above 50%, not how far you can actually walk. One lucky rung at 96 printed "you beat
+    // outright to rung 96" over a road that was 0% at 60, 70 and 75. That is almost certainly where "me and
+    // Eric could get to rung 100" came from: the number was never measuring a run.
+    //
+    // The wall is the FIRST rung you fail and do not recover from — tracked as the last rung of an unbroken
+    // run from the bottom. `best` keeps the old meaning alongside it, named honestly.
+    if (ar >= 0.5 && autoWall === t - 1) autoWall = t;
+    if (pr >= 0.5 && playedWall === t - 1) playedWall = t;
+    if (ar >= 0.5) autoBest = t;
+    if (pr >= 0.5) playedBest = t;
     if (t % 5 === 0 || t > MAX - 6) {
         console.log(`  ${String(t).padStart(4)}  ${`${foeClass}:${f.archetype}`.padEnd(22)} ${(ar * 100).toFixed(0).padStart(5)}%  ${(pr * 100).toFixed(0).padStart(7)}%`);
     }
 }
-console.log(`\n  auto-resolved, you beat outright to rung ${autoWall}`);
-console.log(`  PLAYED, you beat outright to rung ${playedWall}\n`);
+console.log("");
+console.log(`  auto-resolved  walk to rung ${autoWall} unbroken   (highest above 50% anywhere: ${autoBest})`);
+console.log(`  PLAYED         walk to rung ${playedWall} unbroken   (highest above 50% anywhere: ${playedBest})`);
+console.log("  walk = last rung of an unbroken run from 1. The two differ when the Road goes back up");
+console.log("  after a wall, which it does — read the column, not the headline.");
+console.log("");
 process.exit(0);
