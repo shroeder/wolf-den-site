@@ -3,7 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 // Gold in, chips out — the same one-way conversion every slot machine on this floor already runs. See the
-// long note in blackjack.js: the stake is still gold because gold staked is what chips are MADE of, and a
+// long note in blackjack.js. (That note's premise changed on 2026-09-01: the stake is CHIPS now, bought at
+// the cage, and gold no longer touches the floor.) The original read: the stake is still gold because a
 // table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";

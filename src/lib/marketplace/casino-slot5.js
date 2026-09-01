@@ -23,11 +23,16 @@
 // Here the base game pays about half, and the rest is in the Hunt Moon free spins and the Chest pick.
 //
 // ── WHY THERE IS NO RTP CEILING IN THIS FILE ─────────────────────────────────────────────────────────────────
-// Because there is no gold coming back. You stake GOLD and the machine pays CHIPS, so every gold piece staked
+// ⚠️ SUPERSEDED 2026-09-01: the floor takes CHIPS now, bought at the cage one for one, and every cabinet is
+// tuned to 0.95 rather than 1.00 — the edge moved from the conversion into the machines. The reasoning below
+// is kept because it is why there is no RTP CEILING here, which is still true; the 1.00x target is not.
+//
+// Because there was no gold coming back. You staked GOLD and the machine paid CHIPS, so every gold piece staked
 // is destroyed and the casino is a pure sink; a chip is a ticket, not money. That makes "returns 88%"
 // meaningless here, and it frees the paytable completely — a 4,000x line hit prints no gold whatsoever.
 //
-// What replaces the ceiling is stricter, not looser: every machine returns exactly 1.00x in CHIPS on average
+// What replaced the ceiling is stricter, not looser: every machine returns the SAME as its neighbours — 0.95
+// today, measured by scripts/casino-sim.mjs against the real engine (it was 1.00x before 2026-09-01)
 // (see check:slot5), so no cabinet is ever the smart pick and the only thing separating them is volatility.
 // The whole economy is then two numbers that live somewhere else — chips minted per gold staked, and what the
 // chip store charges — instead of five paytables each fighting a ceiling.
@@ -271,7 +276,7 @@ const HUNT = {
 //
 // The two hold-and-spins differ in what locks and what it pays; the two picks differ in what ends them. Every
 // one of them is checked by check:slot5, which enforces the only rule that matters: every machine returns
-// 1.00x in chips, so none of them is the smart pick and volatility is genuinely all that separates them.
+// the same return as each other, so none of them is the smart pick and volatility is all that separates them.
 
 const HARVEST = {
     id: "slot2",

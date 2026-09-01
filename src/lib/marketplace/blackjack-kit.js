@@ -17,9 +17,13 @@
 //
 // Those two are ONE change and the second is why the first is safe. A rake existed because this table paid
 // GOLD, so its return had to fight the gold economy's RTP ceiling like any other gold faucet. It does not pay
-// gold any more. You stake gold and the table pays CHIPS, at CHIP_RATE per gold, which is exactly the deal
-// every slot machine on this floor already offers — and the slots are enforced at 1.00x in chips, not at the
-// gold ceiling, precisely because the gold never comes back.
+// gold any more. The table is staked and paid in CHIPS, which is exactly the deal every machine on this floor
+// offers — and the cabinets are held to one shared return, 0.95 today, rather than to the gold ceiling.
+//
+// ⚠️ THE SENTENCE BELOW WAS TRUE UNTIL 2026-09-01 AND IS NOT NOW. The edge used to BE the conversion: you
+// staked gold, chips came back, and the gold was destroyed. Chips are bought at the cage now, so the
+// conversion is no longer an edge and the machines carry one instead. Blackjack is the exception that keeps
+// its 99% — see the note on the retune — because it is the one table where playing well is the point.
 //
 // So the edge is not a cut of your winnings; the edge is the conversion. Gold in, chips out, and chips buy
 // chests and nothing else. A basic-strategy player getting 99.5% of their stake back IN CHIPS is the same

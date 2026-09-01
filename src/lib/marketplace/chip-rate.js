@@ -16,7 +16,10 @@
 //   THE MACHINES, unchanged: chips.js re-exports both, so every existing import still resolves there.
 //
 // ── WHY 1 ────────────────────────────────────────────────────────────────────────────────────────────────────
-// A chip is paid at CHIP_RATE per gold of a machine's own payout, and the machines return about 1.00x on
+// A chip is paid at CHIP_RATE per gold of a machine's own payout. The machines returned about 1.00x when this
+// was written; they return 0.95 now and the floor is staked in CHIPS, not gold — see the note in chips.js. So
+// this rate is no longer where the house edge lives, and moving it does not move the edge. What it still does
+// is decide the RESOLUTION of a payout, which is the reason it is 1 and not 0.25. The old sentence read:
 // average, so a member who stakes 10,000 gold walks away with roughly 10,000 x CHIP_RATE chips however the
 // spins fell. Everything about what a chip is WORTH is then decided by the Counter's prices and nowhere else.
 //

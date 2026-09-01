@@ -20,7 +20,8 @@ const VIP_GEMS = GEM_KINDS.map((k) => ({
 }));
 
 // ── CHIPS ────────────────────────────────────────────────────────────────────────────────────────────────────
-// The casino's own currency. You stake GOLD at a machine and the machine pays CHIPS; chips buy things at the
+// The casino's own currency. You BUY chips with gold at the cage and stake chips at every machine; chips buy
+// things at the
 // counter on the floor and are good for nothing else. See migrations/398-casino-chips.sql for why this exists
 // at all — the short version is that paying gold forced every paytable to fight an RTP ceiling, and the
 // machines were unplayable as a result.
