@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 import ItemArt from "@/components/ItemArt";
 import { Img, KIND_ART, money, ToolPanel } from "@/components/mining/kit";
 
@@ -42,6 +44,46 @@ export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goD
     const run = s.run;
     const tripsLeft = s.trips?.left ?? 0;
     const recharge = s.trips?.recharge;
+
+    // ── A TAP THAT WAS MEANT FOR THE BUTTON THAT WAS THERE A MOMENT AGO ──────────────────────────────────
+    // Kaishiern: "I accidentally closed one of my mine runs before digging at all. Can we get a button to
+    // confirm when we want to stop and dig? Preferable in a spot we can't accidentally/mindlessly click lol"
+    // GrayKitsune: "I started and stopped a mine in the same double tap on my screen."
+    //
+    // Two reports, one cause, and it is not a mis-aimed thumb. Starting a trip REPLACES the big start button
+    // with this two-button row, and "Stop & dig" lands in roughly the same place — so the second tap of a
+    // double-tap goes to a control that did not exist when the first one was sent. Same for a step down: the
+    // row re-renders under a finger that is already on its way back.
+    //
+    // So STOP is dead for a moment whenever the row appears or the depth changes. 450ms is longer than a
+    // double-tap (~300ms) and shorter than a deliberate second tap, so it costs a real decision nothing.
+    //
+    // Only Stop. Deeper stays live, because nobody has ever lost a run by descending one step more than they
+    // meant to — the stray tap always lands on the button that ENDS things, and arming both would tax the one
+    // action people deliberately repeat fast.
+    const [armed, setArmed] = useState(false);
+    const depth = run?.depth ?? null;
+    useEffect(() => {
+        if (depth == null) return undefined;
+        setArmed(false);
+        const t = setTimeout(() => setArmed(true), 450);
+        return () => clearTimeout(t);
+    }, [depth]);
+
+    // ── AND THE CASE THAT ACTUALLY COST SOMETHING ────────────────────────────────────────────────────────
+    // Stopping is the NORMAL move — "stopping IS the digging" — so a confirm on every stop would tax the one
+    // thing everybody does every run. What Kaishiern lost was a run with nothing in the bag yet, which is the
+    // only stop that is never what you meant. That one asks; every other stop is still one tap.
+    const emptyBag = !(run?.haul?.length);
+    const [confirmStop, setConfirmStop] = useState(false);
+    const stopRef = useRef(null);
+    stopRef.current = surface;
+    const onStop = () => {
+        if (emptyBag && !confirmStop) { setConfirmStop(true); return; }
+        setConfirmStop(false);
+        stopRef.current?.();
+    };
+    useEffect(() => { setConfirmStop(false); }, [depth]);
 
     return (
         <>
@@ -109,9 +151,11 @@ export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goD
                         <button type="button" className="mine-prospect" onClick={goDeeper} disabled={busy}>
                             <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Deeper <em>{run.risk}% risk</em>
                         </button>
-                        <button type="button" className="mine-prospect is-ghost" onClick={surface} disabled={busy}>
-                            <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Stop &amp; dig
-                            <em>{run.haul.length ? `keep ${run.haul.length}` : "empty bag"}</em>
+                        <button type="button" className={`mine-prospect is-ghost${confirmStop ? " is-confirm" : ""}`}
+                            onClick={onStop} disabled={busy || !armed}>
+                            <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" />
+                            {confirmStop ? "Stop anyway?" : "Stop & dig"}
+                            <em>{confirmStop ? "nothing in the bag" : run.haul.length ? `keep ${run.haul.length}` : "empty bag"}</em>
                         </button>
                     </div>
                     <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Stop and the bag is yours to keep and the seam is yours to dig. Push too far and the bag is gone and the vein with it — you&rsquo;ll still have rock to swing at, just the worst there is.</p>

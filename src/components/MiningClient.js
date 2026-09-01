@@ -153,6 +153,11 @@ export default function MiningClient({ initial }) {
                 .mine-prospect:disabled { filter: saturate(0.7) brightness(0.9); cursor: default; }
                 .mine-prospect.is-ghost { margin-top: 8px; padding: 9px; font-size: 0.84rem; font-weight: 700; color: #cdb894;
                     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); box-shadow: none; }
+                /* Asking, not warning — you are allowed to walk out with an empty bag, you just rarely mean to.
+                   Amber rather than red: nothing is being destroyed, and a red button on the only other move
+                   available would read as "do not do this" when the answer is often yes. */
+                .mine-prospect.is-ghost.is-confirm { color: #ffd9a0; background: rgba(255,176,32,0.14);
+                    border-color: rgba(255,176,32,0.55); }
 
                 .mine-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
                 /* min-width:0 is load-bearing. Flex items default to min-width:auto, so these buttons refused to
