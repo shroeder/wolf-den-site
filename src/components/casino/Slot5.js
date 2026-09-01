@@ -159,7 +159,7 @@ const RUN_CELLS = 6;
 // the note in measureBrake for why this is above 1.
 const BRAKE = 1.45;
 
-export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -324,7 +324,13 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     // NOTHING: the reels sat still, no sound, no message, and the only way to work out why was to look at
     // the balance and do the arithmetic yourself. A control that is live and does nothing is worse than one
     // that is plainly off — the second tells you something, the first reads as a broken machine.
-    const broke = Number(gold ?? 0) < Number(bet ?? 0);
+    // ── AFFORDABILITY IS A CHIP QUESTION ─────────────────────────────────────────────────────────────────
+    // This read GOLD, and the machine charges CHIPS. On a chips-only floor that is not a cosmetic mismatch:
+    // `locked` includes `broke`, so the spin button went disabled and said NOT ENOUGH to anybody whose gold
+    // had run down, no matter how many chips they were holding. Brecken22 was sitting on 4,114 chips and 92
+    // gold — the floor's heaviest player that day, locked out of every machine on it.
+    // The number the button asks about must be the number the server subtracts.
+    const broke = Number(chips ?? 0) < Number(bet ?? 0);
     // ── AND NOT WHILE ANYTHING IS STILL PLAYING ──────────────────────────────────────────────────────────
     // Luke: "You shouldn't be able to spin while it's spinning or counting up after the spin."
     //
@@ -342,6 +348,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
     const counting = celebrating;
     const atRest = phase === "idle" || (phase === "done" && !counting);
     const locked = busy || spinning || !atRest || broke;
+    // ── BEING BROKE MUST NOT FREEZE THE STEPPER ──────────────────────────────────────────────────────────
+    // `locked` disabled the − and + as well as SPIN, so a player short of chips could not step DOWN to a
+    // stake they COULD afford — while the message directly above the panel said "or step the bet down".
+    // The stepper is the way out of the state; locking it makes the machine's own advice impossible to take.
+    // Mid-spin still freezes it: changing the stake while the reels are turning changes what is being paid.
+    const stepLocked = busy || spinning || !atRest;
     const step = (d) => {
         const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
         if (next !== bet) { onBet?.(next); Cas.chips(); }
@@ -971,7 +983,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     style={{ "--mast": `url(/images/casino/mast/${machineId}.webp)`,
                         "--room": `url(/images/casino/room/${machineId}.webp)` }}>
                     <ColossalReels machineId={machineId} art={art} bet={bet} data={result?.colossal}
-                        gold={gold} chips={chips}
+                        chips={chips}
                         playing={Boolean(result?.colossal)} pressed={phase === "spin"}
                         onReadout={setColReadout} onDone={() => setPhase("done")} />
                 </div>
@@ -995,7 +1007,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                     <button type="button" className="s5-pays is-tile" onClick={() => setPays(true)}
                         aria-label="What this machine pays">PAYS</button>
                     <div className="s5-stepper">
-                        <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
+                        <button type="button" aria-label="Lower the bet" disabled={stepLocked || betIndex <= 0}
                             onClick={() => step(-1)}>−</button>
                         {/* ── BET DOES NOT MOVE OVER FOR THE WIN ───────────────────────────────────────
                             "I can't even see the bet amount now that you shoved one in there." Fair — the
@@ -1017,7 +1029,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                                 </span>
                             ) : null}
                         </span>
-                        <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
+                        <button type="button" aria-label="Raise the bet" disabled={stepLocked || betIndex >= stakes.length - 1}
                             onClick={() => step(1)}>+</button>
                     </div>
                     <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}
@@ -1522,7 +1534,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                 either lower the bet or go and earn, and both need the size of the gap. */}
             {broke ? (
                 <p className="s5-short">
-                    {(Number(bet) - Number(gold ?? 0)).toLocaleString()} more gold for a {Number(bet).toLocaleString()} spin
+                    {(Number(bet) - Number(chips ?? 0)).toLocaleString()} more chips for a {Number(bet).toLocaleString()} spin
                     {bet > (stakes[0] ?? 0) ? <> — or step the bet down</> : null}
                 </p>
             ) : null}
@@ -1541,22 +1553,23 @@ export default function Slot5({ machineId = "slot", lines, onSpin, gold, chips, 
                   number of stakes without growing, and it puts the amount itself on screen as a value rather
                   than as the selected one of a row. The spin button is then the only large thing in the
                   panel, which is exactly the hierarchy — there is one thing you press over and over. */}
-            <div className="s5-readout">
-                <span><i>Balance</i><b>{Number(gold || 0).toLocaleString()}</b></span>
-                {/* BET IS NOT HERE. The stepper below prints it, larger, next to the controls that change
-                    it — the same number twice on one screen is one of them being ignored. */}
-                {/* CHIPS, not "win". What the last spin paid is already announced above the panel and then
-                    gone; the number worth a permanent slot is the pile you are building, because that is the
-                    one you are playing FOR and the one the counter charges against. */}
+            {/* ── ONE NUMBER, AND IT IS THE ONE THE MACHINE SPENDS ────────────────────────────────────
+                Luke: "balance still showing coin for many slots when it isnt relevant."
+                This was two cells, Balance and Chips, and Balance was GOLD — which the floor stopped taking
+                when every machine moved to chips. A second figure beside the one that matters is not extra
+                information, it is a question about which of them the bet comes out of, asked on every spin.
+                BET IS STILL NOT HERE: the stepper below prints it, larger, next to the controls that change
+                it, and the same number twice on one screen is one of them being ignored. */}
+            <div className="s5-readout is-one">
                 <span className="s5-ro-chips"><i>Chips</i><b>{Number(chips || 0).toLocaleString()}</b></span>
             </div>
 
             <div className="s5-panel">
                 <div className="s5-stepper">
-                    <button type="button" aria-label="Lower the bet" disabled={locked || betIndex <= 0}
+                    <button type="button" aria-label="Lower the bet" disabled={stepLocked || betIndex <= 0}
                         onClick={() => step(-1)}>−</button>
                     <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
-                    <button type="button" aria-label="Raise the bet" disabled={locked || betIndex >= stakes.length - 1}
+                    <button type="button" aria-label="Raise the bet" disabled={stepLocked || betIndex >= stakes.length - 1}
                         onClick={() => step(1)}>+</button>
                 </div>
                 <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}

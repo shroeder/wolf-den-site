@@ -86,18 +86,27 @@ export const QUEST_TEMPLATES = [
     { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
     { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
 
-    // ── The Casino. ownerOnly while the floor is gated, because eligibleTemplates is the ONLY thing that
-    // keeps a bounty off a member who cannot open the page it points at — and one of those is worse than one
-    // fewer bounty. When the casino opens, this flag comes off IN THE SAME CHANGE. The Kitchen's four sat
-    // gated for nine days after it opened because nobody came back for them; that is the mistake to not
-    // repeat, and it is written here rather than in a note somewhere because this is where it gets fixed.
+    // ── The Casino. UNGATED 2026-08-31, and late. ────────────────────────────────────────────────────────
+    // These four were ownerOnly while the floor was closed, with a comment directly above them saying the
+    // flag "comes off IN THE SAME CHANGE" when the casino opened — written specifically so this would not
+    // repeat the Kitchen, whose four bounties sat gated for nine days after it opened because nobody came
+    // back for them.
     //
+    // It repeated anyway. The floor opened to every member, five of them cleared its bounties on the day,
+    // and `eligibleTemplates` still handed these four to nobody but the owner — one row, `casino_sit 0/1`,
+    // on the owner's account, for weeks. Reported as "casino quests not working", which is exactly what it
+    // looked like from the board.
+    //
+    // The lesson the comment already contained and did not enforce: a launch flag is not documentation, it
+    // is a dated obligation, and prose is a terrible place to keep one. Check `ownerOnly` against what is
+    // actually open whenever a feature ships.
+
     // Paid low on purpose: the floor is a gold sink, and a bounty that pays more than the house keeps turns
     // the machines into a way of farming the bounty.
-    { key: "casino_sit", label: "Play a machine in the Casino", metric: "casino_play", target: 1, gold: 110, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
-    { key: "casino_ten", label: "Play 10 times in the Casino", metric: "casino_play", target: 10, gold: 250, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
-    { key: "casino_win", label: "Win on any Casino machine", metric: "casino_win", target: 1, gold: 160, area: "/marketplace/casino", cta: "Hit the floor", ownerOnly: true },
-    { key: "casino_ticket", label: "Play a Keno ticket", metric: "casino_keno", target: 1, gold: 120, area: "/marketplace/casino", cta: "Buy a ticket", ownerOnly: true },
+    { key: "casino_sit", label: "Play a machine in the Casino", metric: "casino_play", target: 1, gold: 110, area: "/marketplace/casino", cta: "Hit the floor" },
+    { key: "casino_ten", label: "Play 10 times in the Casino", metric: "casino_play", target: 10, gold: 250, area: "/marketplace/casino", cta: "Hit the floor" },
+    { key: "casino_win", label: "Win on any Casino machine", metric: "casino_win", target: 1, gold: 160, area: "/marketplace/casino", cta: "Hit the floor" },
+    { key: "casino_ticket", label: "Play a Keno ticket", metric: "casino_keno", target: 1, gold: 120, area: "/marketplace/casino", cta: "Buy a ticket" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

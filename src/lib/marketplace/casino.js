@@ -3,7 +3,6 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { CHIP_RATE, DAILY_CHIPS, chipBalance, chipsFor, moveChips } from "@/lib/marketplace/chips.js";
 
 import { db } from "@/lib/db";
-import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
@@ -1145,8 +1144,11 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     }
 
     const prize = await rollCasinoPrize(buyerId, { jackpot: hits.length === KENO_PICKS, perks });
-    await tickCasinoQuests(buyerId, "keno", 0);
-    if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
+    // ONE call per ticket. This was two — `("keno", 0)` and then `("keno_win", won)` on a win — and
+    // tickCasinoQuests bumps `casino_play` unconditionally, so a winning ticket counted as two plays toward
+    // "Play 5 times on the floor" while a losing one counted as one. The second call also invented the
+    // metric `casino_keno_win`, which no bounty and no quest has ever asked for.
+    await tickCasinoQuests(buyerId, "keno", won);
     if (chips == null) chips = await chipBalance(buyerId);
 
     return {
@@ -1219,14 +1221,16 @@ export async function settleKeno(buyerId) {
         const lost = done.reduce((n, d) => n + (Number(d.stake) || 0), 0);
         if (lost > 0 && Math.random() < REFUND_CHANCE) {
             refund = Math.max(1, Math.round(lost * Math.min(1, perks.lossRefund / REFUND_CHANCE)));
-            const back = await db.queryOne(
-                `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, refund],
-            ).catch(() => null);
-            if (back) await logCoin(buyerId, refund, "casino_cat_refund", { balanceAfter: back.gold, meta: { game: "keno" } });
-            else refund = 0;
+            // CHIPS, not gold. The stake was taken in chips; refunding it in gold would make the cat's
+            // perk a way of converting chips BACK into money, and the floor is a one-way sink by design —
+            // gold buys chips at the cage and nothing carries the other way. The live keno path (which
+            // settles a ticket in the same request that buys it) already refunds chips; this is the older
+            // round-settling path, which was left behind when the floor converted.
+            const back = await moveChips(buyerId, refund, "casino_cat_refund", { meta: { game: "keno" } });
+            if (back == null) refund = 0;
         }
     }
-    if (won > 0) await tickCasinoQuests(buyerId, "keno_win", won);
+    if (won > 0) await tickCasinoQuests(buyerId, "keno", won);
     return done.map((d, i) => (i === 0 ? { ...d, prize, refund } : d));
 }
 

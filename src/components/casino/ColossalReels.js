@@ -66,7 +66,7 @@ const MAX_HOLDS = 3;
 // The count plus its held beat — what a paying spin costs in time before the machine moves on.
 const holdFor = (multiple) => { const t = tierFor(multiple); return t.ms + t.hold + 160; };
 
-export default function ColossalReels({ machineId, art, bet, data, onDone, onReadout, playing, pressed = false, gold, chips }) {
+export default function ColossalReels({ machineId, art, bet, data, onDone, onReadout, playing, pressed = false, chips }) {
     const m = slot5(machineId);
     const rows = data?.rows || 12;
 

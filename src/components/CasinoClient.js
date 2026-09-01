@@ -1845,16 +1845,14 @@ export default function CasinoClient({ initial }) {
                         <button type="button" className="cas-leave" onClick={() => setSeated(false)}
                             aria-label="Leave this machine">Leave</button>
                         <b>{st?.slots?.[at.id]?.label || at.label}</b>
-                        {/* ── BOTH PURSES, WITH THEIR OWN COINS ────────────────────────────────────
-                            Luke: "since we already showed coins at the top, just show the coin amount with
-                            the coin sprite and the chip amount with the chip sprite... that way we can free
-                            up that entire row." The machine below had a whole strip spending 86px on two
-                            numbers already half-shown up here. Two 15px sprites say which is which without
-                            the words, and the strip is gone. */}
+                        {/* ── THE PURSE THE MACHINE ACTUALLY SPENDS ────────────────────────────────
+                            Luke asked for both here — "just show the coin amount with the coin sprite and
+                            the chip amount with the chip sprite" — and that was right while the floor took
+                            gold. It does not any more. Gold buys chips AT THE CAGE, which is on the floor
+                            page and unreachable from a seat, so the coin figure up here answered a question
+                            nobody sitting down can act on. "balance still showing coin for many slots when
+                            it isnt relevant." One sprite, one number, and it is the one the bet comes from. */}
                         <span className="cas-purse-sm">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/images/casino/hud-coin.webp" alt="" width={15} height={15} />
-                            {money(st?.gold)}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/hud-chip.webp" alt="" width={15} height={15} />
                             <b className="cas-purse-chips">{money(st?.chips)}</b>
@@ -2091,7 +2089,6 @@ export default function CasinoClient({ initial }) {
                             machineId={at.id}
                             lines={SLOT5_LINES}
                             onSpin={spin5}
-                            gold={st?.gold}
                             chips={st?.chips}
                             bet={bet}
                             onBet={setBet}
@@ -2564,11 +2561,11 @@ export default function CasinoClient({ initial }) {
                                     <button type="button" className="cas-act" disabled={busy} onClick={() => table("bj_hit")}>Hit</button>
                                     <button type="button" className="cas-act is-stand" disabled={busy} onClick={() => table("bj_stand")}>Stand</button>
                                     <button type="button" className="cas-act is-double"
-                                        disabled={busy || !hand.hands?.[hand.active]?.canDouble || (st?.gold || 0) < hand.stake}
+                                        disabled={busy || !hand.hands?.[hand.active]?.canDouble || (st?.chips || 0) < hand.stake}
                                         onClick={() => table("bj_double")}>Double</button>
                                     {hand.hands?.[hand.active]?.canSplit ? (
                                         <button type="button" className="cas-act is-split"
-                                            disabled={busy || (st?.gold || 0) < hand.stake}
+                                            disabled={busy || (st?.chips || 0) < hand.stake}
                                             onClick={() => table("bj_split")}>Split</button>
                                     ) : null}
                                 </div>
@@ -2581,9 +2578,15 @@ export default function CasinoClient({ initial }) {
                                     Double or nothing · {money(meters[at.id].pending)}
                                 </button>
                             ) : null}
+                            {/* ── EVERY GATE ON THIS SCREEN COUNTS CHIPS ───────────────────────────────
+                                All five of these read `st.gold` until now, and the server takes chips at
+                                every machine — so the Deal / Pull / Buy-a-card button disabled itself and
+                                said "Not enough gold" to players holding thousands of chips. It is not a
+                                label bug: `disabled` was set from the wrong purse, so the floor was shut to
+                                anyone who had spent their gold buying the chips they were trying to play. */}
                             {at.id === "blackjack" && hand?.open ? null : (
                             <button type="button" className="cas-pull"
-                                disabled={busy || (st?.gold || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
+                                disabled={busy || (st?.chips || 0) < bet || (at.id === "keno" && ticket.length !== 5)}
                                 onClick={() => {
                                     if (SLOTS.has(at.id)) return pull();
                                     if (at.id === "blackjack") return table("bj_deal", { bet });
@@ -2595,7 +2598,7 @@ export default function CasinoClient({ initial }) {
                                 {busy ? "…"
                                     : SLOTS.has(at.id) && (meters[at.id]?.freePulls || 0) > 0
                                         ? `Free pull · ${meters[at.id].freePulls} left`
-                                        : (st?.gold || 0) < bet ? "Not enough gold"
+                                        : (st?.chips || 0) < bet ? "Not enough chips"
                                         : at.id === "keno" && ticket.length !== 5 ? "Pick five numbers"
                                             : `${SLOTS.has(at.id) ? "Pull" : at.id === "blackjack" ? "Deal" : at.id === "bingo" ? "Buy a card" : "Play"} · ${money(bet)}`}
                             </button>
@@ -2614,7 +2617,7 @@ export default function CasinoClient({ initial }) {
                             {at.id === "bingo" && st?.owner ? (
                                 <div className="cas-owner">
                                     <span>Owner</span>
-                                    <button type="button" disabled={busy || (st?.gold || 0) < bet}
+                                    <button type="button" disabled={busy || (st?.chips || 0) < bet}
                                         onClick={() => buyCard("dragon")}>Force the dragon</button>
                                 </div>
                             ) : null}

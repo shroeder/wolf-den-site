@@ -13,7 +13,8 @@ import { getCasinoState } from "@/lib/marketplace/casino.js";
 // The fixture is not hand-written. `getCasinoState(null)` returns the whole real shape — every paytable, the
 // resolved reel art, the live pot — and simply has no member on it, so this is the actual server payload
 // rather than my guess at what it looks like. Only the purse is overridden, so the chip strip can be seen in
-// each state it has: ?claimed=1 for after today's free thousand is gone, ?broke=1 for no gold to convert.
+// each state it has: ?claimed=1 for after today's free thousand is gone, ?broke=1 for no gold to convert,
+// ?chips=N for any purse — ?chips=10 is the one that proves a machine still refuses a bet it cannot cover.
 //
 // ⚠ THE BIG YELLOW DISC ON THE FLOOR IS NOT A BUG. It is `.cas-blank.is-you`, the deliberate stand-in for a
 // member with no avatar sprite, and there is no member here. A real player has a sprite and never sees it.
@@ -29,7 +30,7 @@ export default async function Page({ searchParams }) {
     return (
         <CasinoClient initial={{
             ...floor, blackjack: table, bingo: hall,
-            gold: q?.broke ? 40 : 25000, chips: 4820, dailyChips: !q?.claimed,
+            gold: q?.broke ? 40 : 25000, chips: q?.chips != null ? Number(q.chips) : 4820, dailyChips: !q?.claimed,
             vip: { allowed: false, shadows: [] },
         }} />
     );

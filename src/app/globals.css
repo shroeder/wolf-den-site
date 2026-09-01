@@ -19824,6 +19824,9 @@ body.cas-seated .social-fab { display: none; }
 .s5-readout > span { display: grid; gap: 1px; justify-items: center; padding: 7px 4px;
     border-right: 1px solid rgba(255, 255, 255, .07); }
 .s5-readout > span:last-child { border-right: none; }
+/* One cell since the gold half came off — without this the lone Chips figure sits in the left half of a
+   two-column grid with an empty square beside it, which reads as a number that failed to load. */
+.s5-readout.is-one { grid-template-columns: 1fr; }
 .s5-readout i { font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: #7d8792; }
 .s5-readout b { font-size: 15px; font-weight: 800; color: #eaf1f8; font-variant-numeric: tabular-nums; }
