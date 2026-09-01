@@ -906,6 +906,12 @@ export default function CasinoClient({ initial }) {
         } : p));
     }, []);
 
+    // ── AND A HELD WIN IS ALWAYS RELEASED WHEN YOU STAND UP ──────────────────────────────────────────────
+    // Walking away mid-spin unmounts the machine, so the callback that would have released the balance never
+    // fires — and because the poll now defers to the hold, the purse would sit on a stale figure for as long
+    // as you stayed on the floor. Standing up is the end of the reveal whether the reels agreed or not.
+    useEffect(() => { if (!seated) settleChips(); }, [seated, settleChips]);
+
     const absorb = useCallback((r) => {
         // The reveal is over, so the win can be paid into the number at the top. Every game that ends with a
         // celebration calls absorb at exactly that moment, which is why this lives here rather than in five
@@ -926,8 +932,10 @@ export default function CasinoClient({ initial }) {
     // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
     // response shape. Two games behind one verb is how a payout path gets confused about which table it is
     // paying from. Returns the raw response to the component, which does all the revealing.
-    const spin5 = useCallback(async (offerId, force) => {
-        const r = await casPost({ action: "spin5", bet, machine: at?.id, offer: offerId, force: force || undefined });
+    // `stake` overrides `bet` for exactly one pull — the stake buttons set the bet and fire in the same tick,
+    // so `bet` in this closure is still the previous one. The server is told the amount that was pressed.
+    const spin5 = useCallback(async (offerId, force, stake = null) => {
+        const r = await casPost({ action: "spin5", bet: Number(stake) > 0 ? Number(stake) : bet, machine: at?.id, offer: offerId, force: force || undefined });
         if (!r?.ok) {
             setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
                 : r?.error === "closed" ? "This machine is not open yet."
@@ -1214,8 +1222,19 @@ export default function CasinoClient({ initial }) {
                 // `vip` rides along so the silhouettes behind the rope move as people come and go — and so
                 // the door notices the moment somebody's standing changes. Forgetting it here is half of why
                 // the rope told the owner "members only": the API had the answer and nothing merged it.
+                // ── BUT NOT THE PURSE, IF A MACHINE IS STILL MID-SENTENCE ────────────────────────
+                // Luke: "when we are low on chips it still tends to reveal the final number early."
+                // This is why, and it had nothing to do with being low — it is a six-second timer against a
+                // reveal that runs three to six, so it landed inside one about half the time. The poll asks
+                // the server for the truth, and the server's truth INCLUDES the win the reels have not shown
+                // you yet, so a tick arriving mid-spin printed the ending. Holding the win in the client is
+                // no use if something else goes and fetches it.
+                //
+                // Everything else on the poll still merges — the poll exists for the other people in the
+                // room and they must keep moving. Only the balance waits, and only while one is held.
                 setSt((p) => ({
-                    ...p, others: r.others, gold: r.gold, chips: r.chips ?? p?.chips, vip: r.vip ?? p?.vip,
+                    ...p, others: r.others, gold: r.gold, vip: r.vip ?? p?.vip,
+                    chips: heldChips.current != null ? p?.chips : (r.chips ?? p?.chips),
                 }));
                 if (r.pot) setPot(r.pot.amount);
             }

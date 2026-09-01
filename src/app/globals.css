@@ -19845,16 +19845,22 @@ body.cas-seated .social-fab { display: none; }
    controls size themselves and the panel is as tall as the disc alone. 56px is still a comfortable thumb
    target and it hands roughly a whole reel row back to the glass. */
 .s5-panel { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
-.s5-stepper { display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; border-radius: 10px;
-    background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); overflow: hidden; }
-.s5-stepper button { border: none; background: rgba(255, 255, 255, .05); color: #e8dcc6; cursor: pointer;
-    font-size: 17px; font-weight: 700; line-height: 1; height: 100%; }
-.s5-stepper button:active { background: rgba(255, 255, 255, .12); }
-.s5-stepper button:disabled { color: #4a525b; cursor: default; background: rgba(255, 255, 255, .02); }
-.s5-stepper > span { display: grid; gap: 0; justify-items: center; padding: 3px 2px; }
-.s5-stepper i { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .12em;
-    text-transform: uppercase; color: #7d8792; }
-.s5-stepper b { font-size: 14px; font-weight: 800; color: #ffd75e; font-variant-numeric: tabular-nums; }
+/* ── FOUR STAKES, EACH OF THEM A SPIN ──
+   Replaced a −/+ stepper. That was two taps to change a stake and a third to play it, on the one control a
+   player touches two hundred times an evening. `1fr` each so the row is four equal targets whatever the
+   numbers are — 25 and 2,500 must not have different sized buttons, or the reach changes with the stake. */
+.s5-stakes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; min-width: 0; }
+.s5-stake { border-radius: 10px; padding: 9px 2px; cursor: pointer; font-size: 12.5px; font-weight: 800;
+    font-variant-numeric: tabular-nums; color: #e8dcc6; background: rgba(255, 255, 255, .05);
+    border: 1px solid rgba(255, 255, 255, .12); -webkit-tap-highlight-color: transparent; }
+.s5-stake:active { transform: translateY(1px); }
+/* The one you last played stays lit, because the row is also the readout the BET cell used to be — without
+   it, pressing 500 and watching it spin leaves you guessing what SPIN will cost next. */
+.s5-stake.is-on { color: #1c1608; background: linear-gradient(180deg, #ffd75e, #f0b73c);
+    border-color: rgba(255, 240, 190, .7); }
+.s5-stake:disabled { color: #4a525b; cursor: default; background: rgba(255, 255, 255, .02);
+    border-color: rgba(255, 255, 255, .06); }
+.s5-stake.is-on:disabled { color: #6b5a2a; background: rgba(255, 215, 94, .18); }
 
 
 /* AND ONE BIG BUTTON. Round, because the thing you press a hundred times should be a target rather than a
@@ -20804,6 +20810,9 @@ body.cas-seated .social-fab { display: none; }
 
 /* Three things in the row now: the paytable, the stake, the disc. */
 .s5-panel.is-colossal { grid-template-columns: auto 1fr auto; }
+/* The colossal cabinet stacks its live win readout over the stake row, because the reels above it are two
+   boards deep and the payout has to stay visible while you pick the next stake. */
+.s5-colcol { display: grid; gap: 5px; min-width: 0; }
 
 /* ── BET AND WON, SIDE BY SIDE ────────────────────────────────────────────────────────────────────────
    "I can't even see the bet amount now that you shoved one in there." The first cut swapped the stake out
@@ -21820,6 +21829,14 @@ body.cas-seated .social-fab { display: none; }
    tells you something. It goes grey, says what it is, and the line above says how far short. */
 .s5-spin.is-broke { background: linear-gradient(180deg, #4a4a52, #2c2c33); box-shadow: 0 4px 0 #1b1b20,
     0 8px 18px rgba(0, 0, 0, .5); color: #9aa0aa; cursor: not-allowed; }
+/* ── THE SAME BUTTON, CUTTING THE PAYOUT SHORT ──
+   Cool rather than gold, and it says SKIP, because it is doing the opposite of what the gold one does: this
+   press spends nothing. A button that looks identical in both states would eventually take a hundred chips
+   off somebody who meant "hurry up" — the two presses are a fifth of a second apart. Same size and position
+   so the thumb does not have to move. */
+.s5-spin.is-skip { background: linear-gradient(180deg, #6f7b8c, #4a5464); box-shadow: 0 4px 0 #2c3340,
+  0 6px 16px rgba(0, 0, 0, .45); color: #f2f6fb; font-size: 12px; letter-spacing: .06em; }
+.s5-spin.is-skip:active { box-shadow: 0 1px 0 #2c3340, 0 4px 12px rgba(0, 0, 0, .5); }
 .s5-spin-broke { display: block; font-family: var(--font-body, inherit); font-size: 11px; font-weight: 800;
     line-height: 1.15; letter-spacing: .06em; }
 .s5-short { margin: 0 0 2px; text-align: center; font-size: 12px; color: #ffb4a4; }
@@ -23668,6 +23685,10 @@ body.cas-seated .social-fab { display: none; }
   text-transform: uppercase; opacity: 0.72; }
 .qp-sec.is-warn { color: #ffd75e; opacity: 1; }
 .qp-note { margin: 6px 0 0; font-size: 0.72rem; line-height: 1.4; opacity: 0.72; }
+/* Why a press did nothing. It is a warning rather than an error colour — running out of treats is an ordinary
+   state of the game, not a fault, and it should not read like something broke. */
+.qp-note.is-warn { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; opacity: 1; color: #ffd9a8;
+    background: rgba(255, 176, 60, .1); border: 1px solid rgba(255, 176, 60, .28); }
 /* A fact worth reading, not a caption — the whole point is that it is easy to miss, so it gets a box. */
 .qp-note.is-tip { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; opacity: 1; color: #cfe3d2;
   background: rgba(126,213,126,0.10); border: 1px solid rgba(126,213,126,0.28); }

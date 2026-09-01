@@ -647,11 +647,38 @@ export default function FarmClient({ initial, viewingAlias }) {
     // One tap feeds one pet. feedPetBulk already walks the bag cheapest-first, stops the moment the pet is
     // full and never touches Ambrosia — so the button means "top this one up with the plates I do not care
     // about", which is exactly what somebody looking at a list of forty treats wants.
+    // ── THE FEED THAT LOOKED BROKEN AND WAS NOT ──────────────────────────────────────────────────────────
+    // Luke: "feed doesnt seem to work ive clicked it like 12 times."
+    //
+    // It worked. The FIRST click spent his last treat and fed the pet; the other eleven were the server
+    // correctly answering "nothing_to_feed" to an empty bag. Nothing on the screen moved for any of the
+    // twelve, because this read `r.farm` — a key feed_bulk has never returned. The response carries exactly
+    // what the panel needs (the pet's new level and xp, the rebuilt treat bag, the wallet) and all of it was
+    // being dropped on the floor in favour of a field that does not exist, so the panel redrew the state it
+    // already had. A write whose result is invisible is indistinguishable from a dead button, and the player
+    // pays for the difference in treats.
+    //
+    // The sibling path in PetInspect merges `r.treats || f.treats` and has always been right; this one was
+    // written separately and never matched. Now it merges the same way AND updates the fed pet in place.
     const feedPetNow = useCallback(async (petId) => {
         setGardenBusy(`feed-${petId}`);
         const r = await post({ action: "feed_bulk", petId });
         setGardenBusy(null);
-        if (r?.ok) { SFX?.coin?.(); setFarm((f) => (r.farm ? r.farm : f)); }
+        if (r?.ok) {
+            SFX?.coin?.();
+            setFarm((f) => ({
+                ...f,
+                treats: r.treats || f.treats,
+                treatShop: r.treatShop || f.treatShop,
+                wallet: r.wallet || f.wallet,
+                // The fed pet's own row, so the level and the xp bar move on the same frame the treat leaves.
+                pets: (f.pets || []).map((x) => (x.id === r.petId
+                    ? { ...x, level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed }
+                    : x)),
+            }));
+        }
+        // AND IT HAS TO SAY SO WHEN IT CANNOT. Twelve silent refusals is the actual defect here; the dropped
+        // merge only hid the one press that worked. The caller renders the reason next to the button.
         return r;
     }, [post]);
     const openPack = useCallback(async (packId) => {
@@ -2457,8 +2484,24 @@ function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onF
     // nudge the game could never give you, because nothing has ever held both halves of it at once.
     const readyToEnshrine = stones > 0 ? pets.filter((x) => (x.level || 0) >= 6 && !enshrined.has(x.id)) : [];
 
-    const rank = (x) => (x.id === equippedId ? 0 : standIds.has(x.id) ? 1 : 2);
-    const sorted = [...pets].sort((a, b) => rank(a) - rank(b) || (b.xp || 0) - (a.xp || 0));
+    // ── WHO IS ON THIS LIST, AND IN WHAT ORDER ───────────────────────────────────────────────────────────
+    // Luke: "we can hide enshrined pets from here" and "the pet area here should show equipped then stand
+    // then non max level pets by exp highest first."
+    //
+    // An enshrined pet is FINISHED — its ability runs from the box forever and there is no level left to feed
+    // it to. It was taking a row on the one screen whose whole job is the chores still outstanding, and with
+    // a big collection those finished rows are most of the list you have to scroll past to reach the pets
+    // that still want something. Gone from here; they are still on the Pets page, which is where a collection
+    // is looked at rather than worked.
+    //
+    // Maxed-but-not-enshrined pets stay, at the bottom: they cannot be fed either, but they are the ones a
+    // stone is waiting for, so hiding them would hide the nudge.
+    const shown = pets.filter((x) => !enshrined.has(x.id));
+    const rank = (x) => (x.id === equippedId ? 0
+        : standIds.has(x.id) ? 1
+        : (x.maxed || (x.level || 0) >= 6) ? 3
+        : 2);
+    const sorted = [...shown].sort((a, b) => rank(a) - rank(b) || (b.xp || 0) - (a.xp || 0));
     const treats = (farm?.treats || []).reduce((n, t) => n + (t.count || 0), 0);
     // ── AND PETTING, WHICH IS THE FREE ONE ───────────────────────────────────────────────────────────────
     // Luke: "I cant pet from here."
@@ -2467,6 +2510,16 @@ function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onF
     // treats" and the sheet was a wall of things you could not do. Petting costs nothing, pays XP and gold,
     // and is the daily chore this panel exists to gather up; leaving it out was the one real omission.
     const petsLeft = farm?.mine ? Number(farm?.petting?.left) || 0 : 0;
+    // Why a press did nothing, said where the press was. See feedPetNow.
+    const [feedNote, setFeedNote] = useState(null);
+    const feed = async (id) => {
+        setFeedNote(null);
+        const r = await onFeed(id);
+        if (r?.ok) return;
+        setFeedNote(r?.error === "nothing_to_feed" ? "No treats left — cook a dish or buy one at the stand."
+            : r?.error === "pet_maxed" ? (r.message || "That one is already at max level.")
+            : "That didn't go through.");
+    };
 
     return (
         <div className="qp-back" role="dialog" aria-modal="true" onClick={onClose}>
@@ -2543,14 +2596,19 @@ function QuickPanel({ farm, garden, busy, petBusy, onHarvestAll, onPlantAll, onF
                                         {petting ? "…" : x.petted ? "petted" : "Pet"}
                                     </button>
                                     <button type="button" className="qp-act is-feed" disabled={busy === `feed-${x.id}` || full || !treats}
-                                        onClick={() => onFeed(x.id)}>
-                                        {busy === `feed-${x.id}` ? "…" : full ? "maxed" : treats ? "Feed" : "no treats"}
+                                        onClick={() => feed(x.id)}>
+                                        {/* Luke: "it should just be a feed all button instead of feed." It always
+                                            WAS feed-all — feed_bulk spends as many treats as the pet can still
+                                            take, cheapest first — and the one-word label made it read like a
+                                            single plate you would have to press over and over. */}
+                                        {busy === `feed-${x.id}` ? "…" : full ? "maxed" : treats ? "Feed all" : "no treats"}
                                     </button>
                                 </span>
                             </div>
                         );
                     })}
                 </div>
+                {feedNote ? <p className="qp-note is-warn">{feedNote}</p> : null}
             </div>
         </div>
     );

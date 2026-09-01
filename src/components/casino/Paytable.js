@@ -192,16 +192,36 @@ export default function Paytable({ machineId, kind, table, art, bet, rate = 0.25
                             <b style={{ color: lookFor(machineId, m.wild)?.tone }}>{pretty(m.wild, machineId)}</b> is <b>wild</b> —
                             it stands in for any symbol except the {pretty(m.scatter, machineId)}, and it only appears on the middle three reels.
                         </li>
+                        {/* ── WHAT THE SCATTER ACTUALLY OPENS, PER CABINET ────────────────────────────
+                            This said "three of them open the free spins" on all five. The Vault has NO free
+                            round — its three moons open the Gem Vault directly — so the one machine where
+                            the scatter does something different was the one being described wrongly. */}
                         <li>
                             <b style={{ color: lookFor(machineId, m.scatter)?.tone }}>{pretty(m.scatter, machineId)}</b> pays from
-                            <b> anywhere</b>, on your whole bet rather than on a line. Three of them open the free spins.
+                            <b> anywhere</b>, on your whole bet rather than on a line. Three of them open{" "}
+                            {m.free ? "the free spins" : <b>{m.second?.label || "the bonus"}</b>}.
                         </li>
-                        <li>
-                            {m.second?.kind === "hold"
-                                ? <>{m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{pretty(m.second.trigger, machineId)}s</b> anywhere open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.</>
-                                : <>Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{pretty(m.bonus, machineId)}s</b> anywhere open <b>{m.second?.label || "the second round"}</b>.</>}
-                        </li>
-                        <li>The free round here: <b>{m.free?.label}</b>.</li>
+                        {/* ── AND THE SECOND ROUND, ONLY WHERE THERE IS ONE ───────────────────────────
+                            This line rendered on every cabinet and read "Five ▮s anywhere open the second
+                            round" — a blank symbol and a round that does not exist. `bonus` is authored on
+                            The Hunt alone; the other four either have no second round (The Deep, The
+                            Menagerie) or reach it through the scatter, which the line above now says. So the
+                            sentence was false on four machines out of five and unreadable on all four.
+                            A paytable is the one screen a player is entitled to trust literally. */}
+                        {m.second?.kind === "hold" ? (
+                            <li>
+                                {m.second.need} <b style={{ color: lookFor(machineId, m.second.trigger)?.tone }}>{pretty(m.second.trigger, machineId)}s</b> anywhere
+                                open <b>{m.second.label}</b> — they lock, and every new one buys three more respins.
+                            </li>
+                        ) : m.bonus ? (
+                            <li>
+                                Five <b style={{ color: lookFor(machineId, m.bonus)?.tone }}>{pretty(m.bonus, machineId)}s</b> anywhere
+                                open <b>{m.second?.label || "the second round"}</b>.
+                            </li>
+                        ) : null}
+                        {/* The Vault has no free round at all, and printed "The free round here:" followed
+                            by nothing. A label with an empty value is worse than no line. */}
+                        {m.free?.label ? <li>The free round here: <b>{m.free.label}</b>.</li> : null}
                     </ul>
                 ) : null}
             </div>

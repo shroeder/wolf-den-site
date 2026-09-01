@@ -318,7 +318,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
 
     // Where this bet sits in the ladder, so the stepper can move along it. Derived rather than stored: the
     // bet is owned by the room (every cabinet shares it) and a second copy here would drift from it.
-    const betIndex = Math.max(0, stakes.indexOf(bet));
     // ── AND YOU CANNOT PULL WHAT YOU CANNOT PAY FOR ──────────────────────────────────────────────────────
     // The server has always refused an unaffordable spin, but the button did not, so pressing it did
     // NOTHING: the reels sat still, no sound, no message, and the only way to work out why was to look at
@@ -353,7 +352,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // stake they COULD afford — while the message directly above the panel said "or step the bet down".
     // The stepper is the way out of the state; locking it makes the machine's own advice impossible to take.
     // Mid-spin still freezes it: changing the stake while the reels are turning changes what is being paid.
-    const stepLocked = busy || spinning || !atRest;
+    // ── PRESSING SPIN WHILE THE WIN COUNTS OUT ENDS THE COUNT ────────────────────────────────────────────
+    // Luke: "ideally we can hit the spin button when its counting the win to speed up the post spin win
+    // count and get to the next spin."
+    //
+    // The count is a celebration, and a celebration you are waiting out has stopped being one. Every real
+    // cabinet lets you cut it short with the same button, and this one disabled that button for the whole
+    // tally — so the only thing to do with a good win was sit and watch it be counted at you.
+    //
+    // It ends the count, it does NOT spin. A press meant as "hurry up" must never be the press that stakes
+    // the next hundred chips: the two are a fifth of a second apart and one of them costs money. Skipping
+    // reaches `atRest` by the ordinary route, so the balance still settles through onSettled and the next
+    // press is an ordinary spin.
+    const canSkip = counting && !spinning && !busy;
+    const skip = () => { setCelebrating(false); Haptic.hit(0.25); };
 
     // ── AND THE PURSE IS TOLD WHEN THE MACHINE HAS FINISHED TALKING ──────────────────────────────────────
     // The five-reel cabinets do their whole reveal in here — reels landing one at a time, then a bonus round,
@@ -368,10 +380,6 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         wasSpinning.current = false;
         onSettled?.();
     }, [atRest, onSettled]);
-    const step = (d) => {
-        const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
-        if (next !== bet) { onBet?.(next); Cas.chips(); }
-    };
 
     const clearTimers = useCallback(() => { timers.current.forEach(clearTimeout); timers.current = []; }, []);
     useEffect(() => () => clearTimers(), [clearTimers]);
@@ -657,7 +665,12 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     }, []);
 
     // ── PULLING ──────────────────────────────────────────────────────────────────────────────────────────
-    const pull = useCallback(async (force) => {
+    // ── THE STAKE TRAVELS WITH THE PULL ──────────────────────────────────────────────────────────────────
+    // `stake` is passed explicitly because the four stake buttons set the bet and spin in the SAME tick, and
+    // `bet` here — and in the parent's spin5 — is a closure over the previous render. Without threading it
+    // through, pressing 500 would raise the button to 500 and stake the amount you were on before it, which
+    // is a money bug with no symptom on screen: the reels look right and the wrong number left your purse.
+    const pull = useCallback(async (force, stake = null) => {
         if (busy || spinning) return;
         unlock();
         clearTimers();
@@ -669,7 +682,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         Cas.pull();
 
         // The middle deal, always — see the note where the chooser used to be.
-        const r = await onSpin("mid", typeof force === "string" ? force : null);
+        const r = await onSpin("mid", typeof force === "string" ? force : null, stake);
         if (!r?.ok) { setSpinning(false); setPhase("idle"); return; }
 
         setResult(r);
@@ -1020,16 +1033,15 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 <div className="s5-panel is-colossal">
                     <button type="button" className="s5-pays is-tile" onClick={() => setPays(true)}
                         aria-label="What this machine pays">PAYS</button>
-                    <div className="s5-stepper">
-                        <button type="button" aria-label="Lower the bet" disabled={stepLocked || betIndex <= 0}
-                            onClick={() => step(-1)}>−</button>
-                        {/* ── BET DOES NOT MOVE OVER FOR THE WIN ───────────────────────────────────────
-                            "I can't even see the bet amount now that you shoved one in there." Fair — the
-                            first cut REPLACED the stake with the payout, which is fine reasoning about what
-                            matters in the moment and useless when you want to change your bet and cannot
-                            read what it is. They sit side by side; the row had the width the whole time. */}
+                    {/* ── THE SAME FOUR STAKES AS EVERY OTHER CABINET ──────────────────────────────
+                        This kept the −/+ stepper after the others moved to one-tap stakes. One machine on the
+                        floor with a different bet control is worse than either choice on its own: the tap you
+                        learned on four cabinets does something else on the fifth.
+                        The win readout keeps its place — "I can't even see the bet amount now that you shoved
+                        one in there" was about exactly this row — and now sits ABOVE the stakes rather than
+                        between the − and the +, because the lit stake IS the bet readout it used to hold. */}
+                    <div className="s5-colcol">
                         <span className="s5-meters">
-                            <span className="s5-meter"><i>Bet</i><b>{bet.toLocaleString()}</b></span>
                             {colReadout ? (
                                 <span className="s5-meter is-win" aria-live="polite">
                                     <i>{colReadout.kind === "free"
@@ -1043,12 +1055,22 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                                 </span>
                             ) : null}
                         </span>
-                        <button type="button" aria-label="Raise the bet" disabled={stepLocked || betIndex >= stakes.length - 1}
-                            onClick={() => step(1)}>+</button>
+                        <div className="s5-stakes">
+                            {stakes.map((v) => (
+                                <button key={v} type="button"
+                                    className={`s5-stake${v === bet ? " is-on" : ""}`}
+                                    disabled={locked || Number(chips ?? 0) < v}
+                                    onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
+                                    {v.toLocaleString()}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}
-                        onClick={() => pull(null)} disabled={locked}>
+                    <button type="button" className={`s5-spin${broke && !canSkip ? " is-broke" : ""}${canSkip ? " is-skip" : ""}`}
+                        onClick={() => (canSkip ? skip() : pull(null))} disabled={canSkip ? false : locked}
+                        aria-label={canSkip ? "Finish the payout" : "Spin"}>
                         {spinning ? <span className="s5-spin-wait" aria-hidden="true" />
+                            : canSkip ? "SKIP"
                             : broke ? <span className="s5-spin-broke">NOT<br />ENOUGH</span>
                             : "SPIN"}
                     </button>
@@ -1579,16 +1601,35 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
             </div>
 
             <div className="s5-panel">
-                <div className="s5-stepper">
-                    <button type="button" aria-label="Lower the bet" disabled={stepLocked || betIndex <= 0}
-                        onClick={() => step(-1)}>−</button>
-                    <span><i>Bet</i><b>{bet.toLocaleString()}</b></span>
-                    <button type="button" aria-label="Raise the bet" disabled={stepLocked || betIndex >= stakes.length - 1}
-                        onClick={() => step(1)}>+</button>
+                {/* ── FOUR STAKES, EACH OF THEM A SPIN ────────────────────────────────────────────────
+                    Luke: "instead of plus and minus lets show the 4 different bet amounts as buttons that
+                    trigger a spin and keep the spin button on the right of them."
+
+                    The stepper was two taps to change a stake and a third to spin, and on a machine you pull
+                    two hundred times an evening that is the whole interaction. These are one tap: the amount
+                    you press is the amount you stake and the reels go. SPIN keeps its place on the right and
+                    repeats whatever you last played, which is the tap most of the evening actually is.
+
+                    The chosen stake stays lit afterwards, so the row doubles as the readout the BET cell
+                    used to be — otherwise pressing 500 and watching it spin leaves you unsure what the next
+                    press of SPIN will cost. A stake you cannot cover is disabled rather than hidden: the
+                    ladder is part of knowing what the machine offers, and a row that changes length as your
+                    balance moves is a row you cannot learn. */}
+                <div className="s5-stakes">
+                    {stakes.map((v) => (
+                        <button key={v} type="button"
+                            className={`s5-stake${v === bet ? " is-on" : ""}`}
+                            disabled={locked || Number(chips ?? 0) < v}
+                            onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
+                            {v.toLocaleString()}
+                        </button>
+                    ))}
                 </div>
-                <button type="button" className={`s5-spin${broke ? " is-broke" : ""}`}
-                    onClick={() => pull(null)} disabled={locked}>
+                <button type="button" className={`s5-spin${broke && !canSkip ? " is-broke" : ""}${canSkip ? " is-skip" : ""}`}
+                    onClick={() => (canSkip ? skip() : pull(null))} disabled={canSkip ? false : locked}
+                    aria-label={canSkip ? "Finish the payout" : "Spin"}>
                     {spinning ? <span className="s5-spin-wait" aria-hidden="true" />
+                        : canSkip ? "SKIP"
                         : broke ? <span className="s5-spin-broke">NOT<br />ENOUGH</span>
                         : "SPIN"}
                 </button>
