@@ -234,12 +234,30 @@ export async function getMemberMetrics(buyerId) {
     // `casino_<game>_bet` — see logCoin in casino.js, casino-slot5-play.js, blackjack and bingo — and
     // nothing else on the floor ends that way. ⚠️ A new cabinet that names its stake anything else is
     // invisible here again, which is the one thing to check when adding one.
+    // ── AND IT READS BOTH LEDGERS, BECAUSE THE FLOOR CHANGED CURRENCY ────────────────────────────────────
+    // SoullessShiitake: "Casino badges no longer seem to be tracking correctly. I am still at 39 games played
+    // since the update for Floor Regular. It also looks like High Roller and The Whale are both still
+    // tracking gold rather than chips."
+    //
+    // Exactly right, and it was total rather than partial: this read mkt_coin_event, every stake on the floor
+    // now lands in mkt_chip_event, so the moment the machines took chips these four counters stopped moving
+    // altogether. His 39 plays are the ones he made before the conversion.
+    //
+    // Both, unioned, rather than switching to the chip ledger — switching would have reset every member's
+    // casino badge to zero and thrown away weeks of real play. Gold buys chips one for one at the cage, so
+    // the two are the same unit for the question these badges ask ("how much have you put through the
+    // floor"). This is NOT the netting the economy screen is forbidden from doing: that rule is about coin
+    // spent against chips WON, which are genuinely different things. A stake is a stake.
     const casinoRow = await db.queryOne(
-        `SELECT COUNT(*) FILTER (WHERE reason ~ '_bet$')::int AS plays,
+        `WITH plays AS (
+             SELECT reason, delta, meta FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'
+             UNION ALL
+             SELECT reason, delta, meta FROM mkt_chip_event WHERE buyer_id = $1 AND reason LIKE 'casino_%')
+         SELECT COUNT(*) FILTER (WHERE reason ~ '_bet$')::int AS plays,
                 COALESCE(-SUM(delta) FILTER (WHERE reason ~ '_bet$'), 0)::bigint AS wagered,
                 COUNT(*) FILTER (WHERE reason = 'casino_slot_win' AND meta->>'jackpot' = 'true')::int AS jackpots,
                 COUNT(*) FILTER (WHERE reason = 'casino_keno_win' AND (meta->>'hits')::int = 5)::int AS perfect
-           FROM mkt_coin_event WHERE buyer_id = $1 AND reason LIKE 'casino_%'`,
+           FROM plays`,
         [buyerId],
     ).catch(() => null);
     // Owning all five is its own badge, and it is the hardest thing on the floor by a distance: the rarest

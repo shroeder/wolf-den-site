@@ -289,7 +289,15 @@ function rollFind(card, depth, packBonus = 0, powers = null) {
             return { kind: "ore", tier: t, n: Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * (1 + packBonus))), name: o.ore, color: o.color, art: oreArt(t) };
         }
         case "seeds": return { kind: "seed", deep: depth >= 4, art: "/images/ui/seed.png", name: "Seeds" };
-        case "gold": return { kind: "gold", n: Math.round((20 + Math.floor(Math.random() * (18 * depth + 20))) * (1 + packBonus)) };
+        // ── MINTED WHERE IT IS ROLLED, SO THE PURSE SAYS WHAT THE PURSE PAYS ─────────────────────────
+        // David B: "had found a 53 purse of gold in the mine left and it gave me 23 gold." Both numbers were
+        // real: the haul chip carried the raw roll all the way down the shaft, and payHaul minted it on the
+        // way into the wallet. 53 x 0.4 is 21, and he watched a purse lose more than half of itself between
+        // finding it and banking it — which reads exactly like being short-changed for pressing the wrong
+        // button. Minted here, once, so the number you are carrying is the number you will be paid; payHaul
+        // no longer touches it. mint() is deterministic, so doing it earlier changes nothing but the honesty
+        // of the readout.
+        case "gold": return { kind: "gold", n: mint(Math.round((20 + Math.floor(Math.random() * (18 * depth + 20))) * (1 + packBonus)), "mining") };
         case "consumable": return { kind: "consumable" };
         case "gear": return { kind: "gear", depth };
         case "chest": {
@@ -487,7 +495,7 @@ async function payHaul(buyerId, haul = [], powers = null) {
             await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
             paid.push(item);
         } else if (item.kind === "gold") {
-            item.n = mint(item.n, "mining"); // written back so the haul list shows what landed
+            // Already minted at the roll — see rollFind. Minting again here would have paid 40% of 40%.
             const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
             await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "descent" } }).catch(() => {});
             paid.push(item);

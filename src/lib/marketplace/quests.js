@@ -187,6 +187,31 @@ const QUEST_RESET_COST = 1500;
 export async function resetDailyQuests(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const day = storeDay();
+    // ── NOTHING IS CHARGED BEFORE WE KNOW THERE IS SOMETHING TO GIVE ─────────────────────────────────────
+    // ValkyrieSylve: "Rerolling no longer gives fully fresh daily quests? Used to be able to complete all 3,
+    // then reroll to complete 3 more. Just wasted 1500 gold thinking I would be getting 3 fresh quests."
+    //
+    // She had. The gold came out first and the draw ran afterwards asking for `3 - done.size` cards — so
+    // finishing all three made the number of replacements ZERO and the reroll became a paid no-op. The worst
+    // possible shape: it charged fifteen hundred gold, changed nothing, and had no way to say so.
+    //
+    // A reroll hands over a FULL set of unfinished bounties again, which is what it did before the completed
+    // ones started being kept on the board, and what she is describing. Her own earlier ask still holds —
+    // "exclude any previously completed quests done that day on the reroll" — so the day's finished cards stay
+    // where they are, keep their claimed record, and are excluded from the draw. The board grows rather than
+    // being replaced, which is exactly "complete all 3, then complete 3 more".
+    //
+    // And the pool is checked FIRST. On a day somebody has cleared so much that there is nothing new to
+    // offer, the reroll refuses and costs nothing, instead of taking the gold and shrugging.
+    const dayForCheck = day;
+    const preDone = new Set(((await db.query(
+        `SELECT quest_key FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, dayForCheck],
+    ).catch(() => [])) || []).map((r) => r.quest_key));
+    const prePowers = await equippedPowers(buyerId);
+    const wantN = prePowers.has("bounty_board_rights") ? 4 : 3;
+    if (!pickDaily(buyerId, dayForCheck, true, wantN, preDone).length) {
+        return { ok: false, error: "nothing_fresh" };
+    }
     const paid = await db
         .queryOne(
             `UPDATE mkt_buyer SET gold = gold - $3, quest_reset_day = $2::date
@@ -209,24 +234,17 @@ export async function resetDailyQuests(buyerId) {
     //
     // So the finished ones are READ FIRST, kept on the board, and excluded from the draw. Only the unfinished
     // slots are replaced — which is what a reroll means.
-    const doneRows = await db.query(
-        `SELECT quest_key FROM mkt_daily_quest
-          WHERE buyer_id = $1 AND day = $2 AND (claimed_at IS NOT NULL OR progress >= target)`,
-        [buyerId, day],
-    ).catch(() => []);
-    const done = new Set((doneRows || []).map((r) => r.quest_key));
+    // Everything on the board today is off the table for the draw — the finished ones because they are
+    // finished, the unfinished ones because handing back the card you just paid to be rid of is the whole
+    // complaint. The unfinished rows go; the finished ones stay, with their claimed record intact.
     await db.query(
         `DELETE FROM mkt_daily_quest
           WHERE buyer_id = $1 AND day = $2 AND claimed_at IS NULL AND progress < target`,
         [buyerId, day],
     ).catch(() => {});
-    const rerollPowers = await equippedPowers(buyerId);
-    // Draw enough to refill only the empty slots, and never draw something already sitting on the board.
-    const want = (rerollPowers.has("bounty_board_rights") ? 4 : 3) - done.size;
-    if (want > 0) {
-        await insertQuests(buyerId, day, pickDaily(buyerId, day, true, want, done),
-            rerollPowers.has("quartermaster_s_round"));
-    }
+    // A FULL set, not the difference. See the note above the charge.
+    await insertQuests(buyerId, day, pickDaily(buyerId, day, true, wantN, preDone),
+        prePowers.has("quartermaster_s_round"));
     return { ok: true, gold: paid.gold, ...(await getDailyQuests(buyerId)) };
 }
 

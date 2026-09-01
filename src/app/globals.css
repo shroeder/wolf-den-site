@@ -23731,3 +23731,8 @@ body.cas-seated .social-fab { display: none; }
   padding: 1px 6px; border-radius: 999px; color: #ffe6a3; background: rgba(255,215,94,0.16);
   border: 1px solid rgba(255,215,94,0.4); }
 
+
+/* Why a reroll did nothing. It refuses before charging now, and a refusal that says nothing looks exactly
+   like the paid no-op it replaces. */
+.quest-note { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; font-size: 0.78rem; line-height: 1.4;
+  color: #ffd9a8; background: rgba(255,176,60,0.1); border: 1px solid rgba(255,176,60,0.28); }

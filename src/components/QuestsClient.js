@@ -10,6 +10,7 @@ import Coin from "@/components/Coin";
 export default function QuestsClient() {
     const [quests, setQuests] = useState(null);
     const [meta, setMeta] = useState(null); // { canReset, resetCost, resetUsed, gold }
+    const [note, setNote] = useState(null);  // why a reroll did nothing — see reroll()
     const [busy, setBusy] = useState(false);
     const [reward, setReward] = useState(null); // { gold, chest } shown in the celebration
     const [mounted, setMounted] = useState(false);
@@ -24,9 +25,18 @@ export default function QuestsClient() {
 
     async function reroll() {
         if (busy || !meta?.canReset) return;
-        setBusy(true);
+        setBusy(true); setNote(null);
         const r = await fetch("/api/marketplace/quests", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reset" }) }).catch(() => null);
-        if (r?.ok) await load();
+        const d = r ? await r.json().catch(() => null) : null;
+        // A refusal has to SAY so. The server can now decline a reroll that has nothing fresh to hand over —
+        // and it declines before charging — but a silent failure looks identical to the paid no-op this
+        // replaces, which is the thing that cost ValkyrieSylve fifteen hundred gold.
+        if (d?.ok === false) {
+            setNote(d.error === "nothing_fresh" ? "Nothing new left to draw today — you have seen the whole board."
+                : d.error === "already_reset" ? "Already rerolled today."
+                : d.error === "not_enough_gold" ? "Not enough gold."
+                : "That didn't go through.");
+        } else if (r?.ok) await load();
         setBusy(false);
     }
 
@@ -58,6 +68,7 @@ export default function QuestsClient() {
                         Reroll · <Coin /> {(meta.resetCost || 1500).toLocaleString()}
                     </button>
                 ) : meta?.resetUsed ? <span className="muted" style={{ fontSize: "0.72rem" }}>rerolled today</span> : null}
+                {note ? <p className="quest-note">{note}</p> : null}
             </div>
             <div className="quests-list">
                 {quests.map((q) => {
