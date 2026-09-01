@@ -82,6 +82,14 @@ for (let i = 1; i <= 8; i += 1) {
     await mouse("mouseMoved", card.x + ((foe.x - card.x) * i) / 8, card.y + ((foe.y - card.y) * i) / 8);
     await sleep(35);
 }
+// Off-target first: the arrow has to read as NOT going to land, or the only feedback that you are about to
+// waste a card is the absence of something.
+await mouse("mouseMoved", 40, 210);
+await sleep(60);
+console.log("OFFTARGET", JSON.stringify(await evalJs(`({ live: !!document.querySelector('.cf-aim-line.is-live'), lit: !!document.querySelector('.cf-foe.is-target') })`)));
+await shot("2a-offtarget");
+await mouse("mouseMoved", foe.x, foe.y);
+await sleep(60);
 await shot("2-middrag");
 console.log("MIDDRAG ", JSON.stringify(await evalJs(`({ ghost: !!document.querySelector('.cf-drag'), aiming: !!document.querySelector('.cf-field.is-aiming'), lit: !!document.querySelector('.cf-foe.is-target') })`)));
 await mouse("mouseReleased", foe.x, foe.y);

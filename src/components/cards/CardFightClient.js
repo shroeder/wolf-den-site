@@ -50,6 +50,25 @@ const wash = (hex, alpha) => {
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
 };
 
+// ── THE PICTURE IN THE WINDOW, AND WHAT HAPPENS BEFORE IT EXISTS ─────────────────────────────────────────
+// A card shows its pet DOING the thing (scripts/gen-card-art.mjs), full-bleed inside the frame. If that file
+// has not been drawn yet the card falls back to the pet's own portrait sprite, contained rather than cropped —
+// so a new card can be written, played and balanced today and get its illustration whenever. The art is never
+// allowed to be a blocker on the rules.
+const CardArt = ({ card, pet }) => {
+    const [noArt, setNoArt] = useState(false);
+    if (!noArt) {
+        // eslint-disable-next-line @next/next/no-img-element
+        return (
+            <img
+                className="cf-art-full" src={`/images/cards/${card.id}.webp`} alt="" draggable="false"
+                onError={() => setNoArt(true)}
+            />
+        );
+    }
+    return <Sprite src={pet?.url} className="cf-art-img" />;
+};
+
 /**
  * One card face, in the anatomy Spire settled on: the cost hanging off the corner, a name banner whose colour
  * IS the rarity, a framed window for the art, a tab naming the type, and the text underneath with its keywords
@@ -63,7 +82,7 @@ const CardFace = ({ card, art, dim }) => {
             <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
             <span className="cf-banner" style={{ background: meta.color }}>{card.name}</span>
             <span className="cf-art" style={{ borderColor: meta.color, background: `radial-gradient(ellipse at 50% 62%, ${wash(meta.color, 0.3)}, rgba(6,8,12,0.92))` }}>
-                <Sprite src={art?.url} className="cf-art-img" />
+                <CardArt card={card} pet={art} />
             </span>
             <span className="cf-type" style={{ background: meta.color }}>{card.kind === "attack" ? "Attack" : "Skill"}</span>
             <span className="cf-text">{withKeywords(card.text)}</span>
@@ -190,7 +209,54 @@ export default function CardFightClient({ fixture }) {
     };
 
     const dragCard = drag?.moved ? cardById(fight.hand.find((c) => c.uid === drag.uid)?.id) : null;
-    const aiming = dragCard?.target === "foe" || cardById(fight.hand.find((c) => c.uid === selected)?.id)?.target === "foe";
+
+    // ── WHERE THE ARROW GOES ─────────────────────────────────────────────────────────────────────────────
+    // Struck from where the card started in the hand to wherever the pointer is now, bowed upward so it reads
+    // as a throw rather than as a wire. Only for cards that take a target: a card you play on yourself has
+    // nothing to point at, and Spire draws no arrow for those either.
+    //
+    // AND THE CARD STAYS PUT WHILE IT DOES. Glued to the pointer, a card dragged at a foe near the top of the
+    // screen runs clean off the top edge — you end up aiming with something you cannot see. Spire pins the
+    // held card above the hand and lets the ARROW travel, which is both legible and one less thing under your
+    // thumb. Cards with no target still follow the pointer: there is nothing to point at, so the card IS the
+    // feedback.
+    const ghostAt = (() => {
+        if (!drag?.moved || !dragCard) return null;
+        if (dragCard.target !== "foe") return { x: drag.x, y: drag.y };
+        const seam = fieldRef.current?.getBoundingClientRect().bottom;
+        return { x: drag.sx, y: Number.isFinite(seam) ? seam : drag.y };
+    })();
+
+    const aimArrow = useMemo(() => {
+        if (!drag?.moved || dragCard?.target !== "foe" || !ghostAt) return null;
+        const w = typeof window === "undefined" ? 0 : window.innerWidth;
+        const h = typeof window === "undefined" ? 0 : window.innerHeight;
+        // Struck from the held card itself rather than from where the thumb first pressed, because that is
+        // where the card now IS.
+        // Started INSIDE the card, not at its edge: the ghost is drawn above the arrow, so a tail tucked
+        // under it disappears, while a tail starting below the card pokes out as a loose stub.
+        const [sx, sy, ex, ey] = [ghostAt.x, ghostAt.y - 34, drag.x, drag.y];
+        // The bow: lifted above the higher of the two ends, and deeper the further the throw.
+        const cx = (sx + ex) / 2;
+        const cy = Math.min(sy, ey) - Math.min(150, 60 + Math.hypot(ex - sx, ey - sy) * 0.25);
+        // A quadratic's direction at the end is simply control -> end, which is the angle the head sits at.
+        const ang = Math.atan2(ey - cy, ex - cx);
+        const head = [[0, -9], [20, 0], [0, 9]]
+            .map(([px, py]) => [
+                ex + px * Math.cos(ang) - py * Math.sin(ang) - 12 * Math.cos(ang),
+                ey + px * Math.sin(ang) + py * Math.cos(ang) - 12 * Math.sin(ang),
+            ])
+            .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
+            .join(" ");
+        return { w, h, sx, sy, cx, cy, ex, ey, head, live: dropAccepts(drag.uid, ex, ey) };
+    }, [drag, dragCard, dropAccepts, ghostAt?.x, ghostAt?.y]);
+    const selectedCard = cardById(fight.hand.find((c) => c.uid === selected)?.id);
+    const aiming = dragCard?.target === "foe" || selectedCard?.target === "foe";
+    // ── THE GLOW MEANS "THIS WILL LAND" ──────────────────────────────────────────────────────────────────
+    // It used to mean "you are holding an attack", which is true for the whole drag and therefore tells you
+    // nothing — the foe sat lit while you hovered over your own hero. Lit follows the same test the release
+    // does. With no pointer in play (the tap path) a selected attack lights it, because there the selection IS
+    // the aim.
     const hurt = (who) => floats.some((f) => f.on === who && f.kind === "damage");
     // ── THE HAND IS A FAN, NOT A SHELF ───────────────────────────────────────────────────────────────────
     // Spire's cards sit tilted at rest, each rotated a few degrees and dropped slightly at the edges, so a
@@ -214,6 +280,8 @@ export default function CardFightClient({ fixture }) {
         // than a slope.
         return { rot: off * spread, drop: (off ** 2) * 2.4 };
     };
+
+    const foeLit = drag?.moved ? Boolean(aimArrow?.live) : selectedCard?.target === "foe";
 
     const pileList = useMemo(() => {
         if (!peek) return [];
@@ -248,7 +316,7 @@ export default function CardFightClient({ fixture }) {
                 </div>
 
                 <div
-                    className={`cf-fighter cf-foe${hurt("foe") ? " is-hit" : ""}${acting ? " is-acting" : ""}${aiming ? " is-target" : ""}`}
+                    className={`cf-fighter cf-foe${hurt("foe") ? " is-hit" : ""}${acting ? " is-acting" : ""}${foeLit ? " is-target" : ""}`}
                     ref={foeRef}
                     onClick={onFoeTap}
                 >
@@ -312,9 +380,24 @@ export default function CardFightClient({ fixture }) {
                 </div>
             </div>
 
+            {/* ── THE AIM ──────────────────────────────────────────────────────────────────────────────
+                Spire draws a thick curved arrow from the card to whatever you are pointing at, and it is not
+                decoration: on a phone your thumb is ON the target, so without it the only feedback that you
+                are aiming at the right thing is hidden under your own hand. It arcs (a straight line reads as
+                a UI connector), and it turns gold and thickens the moment the release would actually land. */}
+            {aimArrow ? (
+                <svg className="cf-aim" viewBox={`0 0 ${aimArrow.w} ${aimArrow.h}`} aria-hidden="true">
+                    <path
+                        className={`cf-aim-line${aimArrow.live ? " is-live" : ""}`}
+                        d={`M ${aimArrow.sx} ${aimArrow.sy} Q ${aimArrow.cx} ${aimArrow.cy} ${aimArrow.ex} ${aimArrow.ey}`}
+                    />
+                    <polygon className={`cf-aim-head${aimArrow.live ? " is-live" : ""}`} points={aimArrow.head} />
+                </svg>
+            ) : null}
+
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
             {dragCard ? (
-                <div className="cf-drag" style={{ left: drag.x, top: drag.y }}>
+                <div className="cf-drag" style={{ left: ghostAt.x, top: ghostAt.y }}>
                     <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} />
                 </div>
             ) : null}
@@ -486,6 +569,19 @@ export default function CardFightClient({ fixture }) {
                 .cf-end { justify-self: end; padding: 11px 18px; border-radius: 10px; border: 1px solid #7a6320;
                     background: linear-gradient(180deg, #ffd75e, #e0a92c); color: #241a03; font-weight: 800; font-size: 14px; }
                 .cf-end:disabled { opacity: 0.5; }
+
+                /* Full-bleed art fills its window; the fallback portrait is CONTAINED, because a pet sprite
+                   cropped to a letterbox loses its head. Two jobs, two fits. */
+                .cf-art-full { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+                /* ── THE AIM ── over everything, hit-testing nothing. */
+                .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;
+                    pointer-events: none; }
+                .cf-aim-line { fill: none; stroke: rgba(226,232,242,0.55); stroke-width: 5; stroke-linecap: round;
+                    stroke-dasharray: 13 9; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cf-aim-line.is-live { stroke: #ffd75e; stroke-width: 7; stroke-dasharray: none; }
+                .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cf-aim-head.is-live { fill: #ffd75e; }
 
                 .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 118px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
