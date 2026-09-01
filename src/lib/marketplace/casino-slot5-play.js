@@ -240,6 +240,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         // No gold moved — the cage is the only place gold touches the floor now. `bank` is the balance right
         // after the stake; `chips` is it again after any win.
         chips: chips ?? bank ?? await chipsOf(buyerId),
+        // The balance the instant the stake left, before a single reel has stopped. The purse drops to this
+        // now and only reaches `chips` when the reveal is over — otherwise the number at the top of the
+        // screen announces the win before the machine does. See the note in casino.js.
+        staked: bank,
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.
         grid: r.grid,

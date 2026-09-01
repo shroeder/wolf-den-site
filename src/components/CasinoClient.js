@@ -873,7 +873,44 @@ export default function CasinoClient({ initial }) {
     //
     // It also fixes something the slot had on its own: `pull` cleared the prize banner and never set it, so
     // the slot's chests were rolled by the server, banked, and never shown.
+    // ── THE PURSE MUST NOT ANSWER BEFORE THE MACHINE DOES ────────────────────────────────────────────────
+    // Luke: "im able to see the new chip amount immediately, which sucks, because it spoils the fun of
+    // watching the reels spin on the different slots, same thing for keno and bingo."
+    //
+    // He is right and it was the whole ceremony undone. Every one of these games is a REVEAL — reels landing
+    // one at a time, ten balls out of a hopper, a card daubing square by square — and the number at the top
+    // of the screen was jumping to the final figure the instant the server answered, which is before the
+    // first reel stops. The machine spends five seconds building to a result the purse has already given
+    // away. Nothing was wrong with the animation; it just was not the first to speak.
+    //
+    // So the balance now moves in two beats. The stake leaves immediately, because money going out is not a
+    // spoiler — it is the thing you just did, and a bet that does not visibly cost anything feels free. The
+    // win is HELD until the reveal is over. `staked` is the server's own balance the instant the bet left,
+    // not `balance - bet`: the on-the-house perk hands a stake straight back and only the server knows.
+    const heldChips = useRef(null);
+    const settleChips = useCallback(() => {
+        const n = heldChips.current;
+        if (n == null) return;
+        heldChips.current = null;
+        setSt((p) => (p ? { ...p, chips: n } : p));
+    }, []);
+    // Take the stake, hold the outcome. A response with no `staked` (a machine that has not been converted,
+    // or an error path) falls through to showing the final figure at once, which is the old behaviour rather
+    // than a blank purse.
+    const stakeNow = useCallback((r) => {
+        heldChips.current = r?.staked != null ? (r?.chips ?? null) : null;
+        setSt((p) => (p ? {
+            ...p,
+            chips: r?.staked ?? r?.chips ?? p.chips,
+            ...(r?.gold != null ? { gold: r.gold } : {}),
+        } : p));
+    }, []);
+
     const absorb = useCallback((r) => {
+        // The reveal is over, so the win can be paid into the number at the top. Every game that ends with a
+        // celebration calls absorb at exactly that moment, which is why this lives here rather than in five
+        // separate timeouts that would drift apart the first time one of them was retuned.
+        settleChips();
         if (r.prize) { setPrize(r.prize); Sfx.gemSet?.(); Haptic.crit(); }
         // The quiet ones. Said plainly and briefly — the pet paying for a pull is a nice thing to notice, not
         // an event to stop the room for.
@@ -883,7 +920,7 @@ export default function CasinoClient({ initial }) {
         // THE PET BANNER USED TO LIVE HERE. `r.pet` was one of the five arriving off a play at 1-in-455 to
         // 1-in-5,556; they are 50,000 chips at the Counter now and nothing sends that key any more. Removed
         // rather than left dormant — a handler for an event that can never happen reads as a working feature.
-    }, []);
+    }, [settleChips]);
 
     // ── THE FIVE-REEL MACHINE'S OWN SPIN ────────────────────────────────────────────────────────────────
     // Its own action rather than a flag on `pull`: a different engine, a different currency and a different
@@ -897,10 +934,10 @@ export default function CasinoClient({ initial }) {
                 : "That didn't go through.");
             return r || { ok: false };
         }
-        // Gold AND chips both moved, and the purse at the top of the screen shows both.
-        setSt((p) => (p ? { ...p, gold: r.gold, chips: r.chips } : p));
+        // The stake leaves now; the win waits for the reels. See stakeNow.
+        stakeNow(r);
         return r;
-    }, [bet, at]);
+    }, [bet, at, stakeNow]);
 
     // The shelf, and buying off it. Both go straight through to the server: the price is read from the
     // catalog there and `item` is only a key, so nothing this screen sends can change what anything costs.
@@ -1051,9 +1088,8 @@ export default function CasinoClient({ initial }) {
         // Held for keno until the last ball is out — see below. Everything else resolves in one beat.
         if (body.action !== "keno") setBusy(false);
         onResult(r);
-        // Gold went out, chips came back — both live in the purse at the top of the screen, and showing
-        // only one of them is how a currency conversion becomes invisible to the person it happened to.
-        setSt((p) => ({ ...p, gold: r.gold, chips: r.chips ?? p?.chips }));
+        // The stake leaves now; anything won waits for the last ball. See stakeNow.
+        stakeNow(r);
 
         // ── THE HOPPER, ONE BALL AT A TIME ────────────────────────────────────────
         // The ticket used to be placed into a shared round and answered 45 seconds later with a sentence.
@@ -1104,7 +1140,7 @@ export default function CasinoClient({ initial }) {
         } else {
             Cas.lose();
         }
-    }, [busy, absorb, throwBurst]);
+    }, [busy, absorb, throwBurst, stakeNow]);
 
     // ── THE TABLE ────────────────────────────────────────────────────────────────────────────────────────
     // Four verbs against one endpoint. The client sends no state at all — not which hand, not what is in it —
@@ -1147,7 +1183,7 @@ export default function CasinoClient({ initial }) {
         if (r.won > 0 || beat === "blackjack") {
             timers.current.push(setTimeout(() => setFlash(null), beat === "blackjack" ? 2200 : 1200));
         }
-    }, [busy, absorb, throwBurst]);
+    }, [busy, absorb, throwBurst, stakeNow]);
 
     // ── THE HALL ────────────────────────────────────────────────────────────────────────────────────────
     // One request buys the card, deals it and scores it. What happens next on screen is a ceremony over a
@@ -1200,9 +1236,8 @@ export default function CasinoClient({ initial }) {
             return;
         }
         setCard(r);
-        // Gold went out, chips came back. Both are in the purse at the top of the screen, and showing only
-        // one of them is how a currency conversion becomes invisible to the person it happened to.
-        setSt((p) => ({ ...p, gold: r.gold, chips: r.chips }));
+        // The stake leaves now; anything the card wins waits for the draw. See stakeNow.
+        stakeNow(r);
 
         // ── BALL BY BALL, AND THE CARD SETS THE PACE ─────────────────────────────────────────────────
         // Forty balls used to come out in three and a half seconds — twelve a second. Nothing on the strip
@@ -1284,7 +1319,7 @@ export default function CasinoClient({ initial }) {
                 timers.current.push(setTimeout(() => setFlash(null), big ? 2200 : 1200));
             } else Cas.lose();
         }, total));
-    }, [bet, busy, absorb, throwBurst]);
+    }, [bet, busy, absorb, throwBurst, stakeNow]);
 
     // ── EVERY CARD ON THE FELT, IN DEALING ORDER ─────────────────────────────────────────────────────────
     // One flat index across the dealer and every hand, so a card knows how far behind the one before it it
@@ -2089,6 +2124,7 @@ export default function CasinoClient({ initial }) {
                             machineId={at.id}
                             lines={SLOT5_LINES}
                             onSpin={spin5}
+                            onSettled={settleChips}
                             chips={st?.chips}
                             bet={bet}
                             onBet={setBet}

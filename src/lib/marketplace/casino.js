@@ -1089,6 +1089,14 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // A ticket costs CHIPS. moveChips carries its own conditional debit and writes its own ledger row.
     let chips = await moveChips(buyerId, -stake, "casino_keno_bet", { meta: { bet: stake, picks: clean } });
     if (chips == null) return { ok: false, error: "no_chips" };
+    // ── THE BALANCE THE MOMENT THE STAKE LEAVES ──────────────────────────────────────────────────────
+    // Sent alongside the final figure so the purse can drop by the bet immediately and only climb back when
+    // the reels, the balls or the card have finished saying what happened. Luke: "im able to see the new
+    // chip amount immediately, which sucks, because it spoils the fun of watching the reels spin." The
+    // screen was being told the ending before the animation started. Computed here rather than as
+    // `balance - bet` on the client, because a stake is not always the bet: the on-the-house perk hands it
+    // straight back, and only the server knows whether it fired.
+    const staked = chips;
 
     let onHouse = false;
     if (onTheHouse(perks)) {
@@ -1167,6 +1175,7 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         won,
         wonGold,
         chips,
+        staked,
         onHouse,
         refund,
         prize,

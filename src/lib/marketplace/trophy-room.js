@@ -127,7 +127,9 @@ const RECORD_HINT = {
     "Pieces salvaged": "Gear broken down into parts at the forge.",
     "Parts combined": "Parts fused together into higher-tier parts.",
     "Enhancements made": "Times you have enhanced a piece of gear.",
-    "Gems cut": "Gems produced at the Jewelcutter.",
+    // Not "produced at the Jewelcutter" — the Jewelcutter fuses and sets them, it does not make them.
+    // They come off spins, chests and drops, and this is every one you have ever come by.
+    "Gems cut": "Every gem you have ever come by, however you got it.",
     "Pet levels earned": "Every level across every pet you keep, added together.",
     "Decorations owned": "Every decoration in your possession, placed or not.",
     "Farm love": "Your farm's rating score — an Admire counts triple a Like, a Love double.",
@@ -667,7 +669,26 @@ async function denAggregates() {
         // One row per member per boss per DAY, carrying `n` swings — so this counts rows, not blows.
         db.query(`SELECT buyer_id, COALESCE(SUM(n),0)::int v FROM mkt_boss_swing GROUP BY buyer_id`).catch(() => []),
         db.query(`SELECT buyer_id, action, count(*)::int v FROM mkt_craft_event GROUP BY buyer_id, action`).catch(() => []),
-        db.query(`SELECT buyer_id, COALESCE(SUM(count),0)::int v FROM mkt_gem GROUP BY buyer_id`).catch(() => []),
+        // ── A RECORD THAT WENT DOWN ──────────────────────────────────────────────────────────────────
+        // GrayKitsune: "Gems cut is only counting how many gems you currently own — if you merge them or
+        // socket them, the count goes down."
+        //
+        // He is right, and it was reading the BAG: `SUM(count) FROM mkt_gem`, which is what you are holding
+        // right now. Its three neighbours on this wall are lifetime tallies of things you did — salvaged,
+        // combined, enhanced — and a wall of records with one inventory count in it punishes you for using
+        // the thing it is congratulating you on. Fusing three gems into one cost you two off your trophy;
+        // socketing one cost you another. The player who never opened the Jewelcutter ranked above the
+        // player who used it, which is precisely backwards. Same shape as `chests_forged`.
+        //
+        // mkt_gem_event is append-only and `grantGem` is the one way a gem enters the game, so the lifetime
+        // figure is already recorded. The source filter matters: a FUSE and an EXTRACT both come back through
+        // grantGem, and counting those would tally the same gem twice — once when it dropped and again when
+        // you reshaped it. Only gems that genuinely arrived are counted, and nothing can take one away.
+        db.query(`SELECT buyer_id, COALESCE(SUM(COALESCE((meta->>'n')::int, 1)),0)::int v
+                    FROM mkt_gem_event
+                   WHERE kind IN ('drop','bought')
+                     AND COALESCE(meta->>'source','') NOT IN ('fuse','extracted','reclaimed')
+                   GROUP BY buyer_id`).catch(() => []),
     ]);
     const rows = new Map();
     for (const b of buyers) {

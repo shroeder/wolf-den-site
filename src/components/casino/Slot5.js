@@ -159,7 +159,7 @@ const RUN_CELLS = 6;
 // the note in measureBrake for why this is above 1.
 const BRAKE = 1.45;
 
-export default function Slot5({ machineId = "slot", lines, onSpin, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
+export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, chips, bet, onBet, rate = 0.25, stakes = [25, 100, 500, 2500], owner, art, busy }) {
     const [grid, setGrid] = useState(null);        // what is on screen now
     const [spinning, setSpinning] = useState(false);
     const [landed, setLanded] = useState(0);       // how many reels have come to rest
@@ -354,6 +354,20 @@ export default function Slot5({ machineId = "slot", lines, onSpin, chips, bet, o
     // The stepper is the way out of the state; locking it makes the machine's own advice impossible to take.
     // Mid-spin still freezes it: changing the stake while the reels are turning changes what is being paid.
     const stepLocked = busy || spinning || !atRest;
+
+    // ── AND THE PURSE IS TOLD WHEN THE MACHINE HAS FINISHED TALKING ──────────────────────────────────────
+    // The five-reel cabinets do their whole reveal in here — reels landing one at a time, then a bonus round,
+    // then a payout counting up — so the page above cannot know when it is over. It held the win back and had
+    // nothing to release it. `atRest` is already the exact condition (idle, or done and no longer counting),
+    // and it is the same flag the spin button waits on, so the balance can never arrive before the machine
+    // will let you pull again. Only fires on the way BACK to rest, not on the first mount.
+    const wasSpinning = useRef(false);
+    useEffect(() => {
+        if (!atRest) { wasSpinning.current = true; return; }
+        if (!wasSpinning.current) return;
+        wasSpinning.current = false;
+        onSettled?.();
+    }, [atRest, onSettled]);
     const step = (d) => {
         const next = stakes[Math.min(stakes.length - 1, Math.max(0, betIndex + d))];
         if (next !== bet) { onBet?.(next); Cas.chips(); }

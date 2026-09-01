@@ -82,6 +82,14 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // three statements doing what one does.
     let chips = await moveChips(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
     if (chips == null) return { ok: false, error: "no_chips" };
+    // ── THE BALANCE THE MOMENT THE STAKE LEAVES ──────────────────────────────────────────────────────
+    // Sent alongside the final figure so the purse can drop by the bet immediately and only climb back when
+    // the reels, the balls or the card have finished saying what happened. Luke: "im able to see the new
+    // chip amount immediately, which sucks, because it spoils the fun of watching the reels spin." The
+    // screen was being told the ending before the animation started. Computed here rather than as
+    // `balance - bet` on the client, because a stake is not always the bet: the on-the-house perk hands it
+    // straight back, and only the server knows whether it fired.
+    const staked = chips;
 
     let onHouse = false;
     if ((perks.freePlay || 0) > 0 && Math.random() < perks.freePlay) {
@@ -139,6 +147,7 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
 
     return {
         ok: true,
+        staked,
         card,
         drawn,
         // ── THE DRAGON, AS A FLIGHT RATHER THAN A RESULT ─────────────────────────────────────────────
