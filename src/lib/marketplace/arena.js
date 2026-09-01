@@ -849,6 +849,26 @@ async function standings() {
          ) q WHERE id IS NOT NULL`
     ).catch(() => []);
     const fought = new Set((ever?.rows || ever || []).map((r) => String(r.id)));
+    // ── AND A STRICTER ONE, FOR THE BOARD ────────────────────────────────────────────────────────────────
+    // Luke: "we have weak players who have a lot of VP which is causing other weak players to bounce to the
+    // top. maybe it will sort itself out over time?"
+    //
+    // It will not, because most of them are not players at all. 47 of the 111 members on the board have never
+    // taken a PvP fight, and every one of them is parked on the 1200 seed — so a member who has never fought
+    // anybody outranks 78% of the members who have. They fill ranks 8 through 55 and push everyone who
+    // actually plays down underneath them. That is the "weak players with a lot of VP": they have the seed,
+    // which sits above the active field, and they have never risked it.
+    //
+    // A rating is a claim about how you do against people, so it does not exist until you have fought one.
+    // Stricter than `fought` above on purpose — that one is the challenge list's rule and rightly counts a
+    // Road walker as somebody who has turned up. A rung is not a result against a person.
+    const pvp = await db.query(
+        `SELECT DISTINCT id FROM (
+             SELECT challenger_id AS id FROM mkt_arena_bout WHERE defender_id IS NOT NULL AND COALESCE(rung,0) = 0
+             UNION SELECT defender_id AS id FROM mkt_arena_bout WHERE defender_id IS NOT NULL AND COALESCE(rung,0) = 0
+         ) q WHERE id IS NOT NULL`
+    ).catch(() => []);
+    const ranked = new Set((pvp?.rows || pvp || []).map((r) => String(r.id)));
     // ── THE BOARD IS A LADDER, NOT A STAT SHEET ──────────────────────────────────────────────────────────
     // This used to assemble every member's fighter — equipped stats in bulk, badge passives in bulk, and a
     // primePowers pass over everyone with XP — purely so the board could print a damage and health number
@@ -879,6 +899,8 @@ async function standings() {
         losses: Number(rec.get(String(r.buyer_id))?.l) || 0,
         // Read by the challenge list, not shown anywhere: an opponent who has never fought is not offered.
         fought: fought.has(String(r.buyer_id)),
+        // Whether they belong on the LADDER at all — see the note above.
+        ranked: ranked.has(String(r.buyer_id)),
     }));
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
@@ -985,6 +1007,8 @@ export async function getArenaState(buyerId, pre = {}) {
         pre.board ?? standings(),
         pre.kit ?? kitFor(buyerId),
     ]);
+    // Only members who have actually fought a person hold a place — see `ranked` in standings().
+    const ladderBoard = board.filter((o) => o.ranked);
     // ── HOW FAR THIS MEMBER'S ROAD RUNS ────────────────────────────────────────────────
     // One primary-key read. Everything the ladder block below publishes — its size, its houses, its foes and
     // the next rung — is cut to this, so a member without The Long Road is not sent the back hundred at all.
@@ -1200,7 +1224,12 @@ export async function getArenaState(buyerId, pre = {}) {
     return {
         unlocked: true,
         me: { ...me, name: "You", vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
-        size: board.length,
+        // ── THE LADDER IS THE PEOPLE ON IT ───────────────────────────────────────────────────────────────
+        // `board` is every member with XP, which includes 47 who have never taken a PvP fight and are all
+        // sitting on the 1200 seed. Counting them made "#17 of 111" a rank against a field that mostly is
+        // not playing, and put a wall of people who have never fought anybody between the active members.
+        // See the note on `ranked` in standings().
+        size: ladderBoard.length,
         // ── WHERE THAT VP ACTUALLY PUTS YOU ──────────────────────────────────────────────────────────────
         // VP is the only survivor of the rung ladder -- the `position` column, the seven bands and the
         // rank-up went with it -- so it now carries the whole idea of rank on its own. And the card printed
@@ -1213,7 +1242,7 @@ export async function getArenaState(buyerId, pre = {}) {
         //
         // Zero for anyone not on the board at all (standings() excludes members with no XP), which the
         // screen reads as "no standing yet" rather than printing "#0".
-        standing: board.findIndex((o) => o.id === buyerId) + 1 || null,
+        standing: ladderBoard.findIndex((o) => o.id === buyerId) + 1 || null,
         vp: myVp, laurels: Number(row?.laurels) || 0,
         fightsLeft: Math.max(0, dailyFights - used), fightsPerDay: dailyFights,
         // THE PURSER'S EXCHANGE. Null for everybody not wearing the piece, which is what the screen keys off —
@@ -1397,9 +1426,15 @@ async function awayReport(buyerId, row) {
     // ordering `standings()` uses. `total` is the field it is out of, so "7th" has a denominator.
     const place = await db.queryOne(
         `SELECT (SELECT COUNT(*) FROM mkt_arena a2 JOIN mkt_buyer b2 ON b2.id = a2.buyer_id
-                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > $1)::int + 1 AS rank,
+                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > $1
+                    AND EXISTS (SELECT 1 FROM mkt_arena_bout xb WHERE xb.defender_id IS NOT NULL
+                                  AND COALESCE(xb.rung,0) = 0
+                                  AND (xb.challenger_id = a2.buyer_id OR xb.defender_id = a2.buyer_id)))::int + 1 AS rank,
                 (SELECT COUNT(*) FROM mkt_arena a3 JOIN mkt_buyer b3 ON b3.id = a3.buyer_id
-                  WHERE COALESCE(b3.xp,0) > 0)::int AS total`,
+                  WHERE COALESCE(b3.xp,0) > 0
+                    AND EXISTS (SELECT 1 FROM mkt_arena_bout xb WHERE xb.defender_id IS NOT NULL
+                                  AND COALESCE(xb.rung,0) = 0
+                                  AND (xb.challenger_id = a3.buyer_id OR xb.defender_id = a3.buyer_id)))::int AS total`,
         [Number(row?.vp) || 0]
     ).catch(() => null);
     return {
@@ -2713,9 +2748,15 @@ async function finishBout(buyerId, row, b, won) {
     const after = await db.queryOne(
         `SELECT a.vp,
                 (SELECT COUNT(*) FROM mkt_arena a2 JOIN mkt_buyer b2 ON b2.id = a2.buyer_id
-                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > a.vp)::int + 1 AS rank,
+                  WHERE COALESCE(b2.xp,0) > 0 AND a2.vp > a.vp
+                    AND EXISTS (SELECT 1 FROM mkt_arena_bout xb WHERE xb.defender_id IS NOT NULL
+                                  AND COALESCE(xb.rung,0) = 0
+                                  AND (xb.challenger_id = a2.buyer_id OR xb.defender_id = a2.buyer_id)))::int + 1 AS rank,
                 (SELECT COUNT(*) FROM mkt_arena a3 JOIN mkt_buyer b3 ON b3.id = a3.buyer_id
-                  WHERE COALESCE(b3.xp,0) > 0)::int AS rank_total
+                  WHERE COALESCE(b3.xp,0) > 0
+                    AND EXISTS (SELECT 1 FROM mkt_arena_bout xb WHERE xb.defender_id IS NOT NULL
+                                  AND COALESCE(xb.rung,0) = 0
+                                  AND (xb.challenger_id = a3.buyer_id OR xb.defender_id = a3.buyer_id)))::int AS rank_total
            FROM mkt_arena a WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
 
     b.recap = {
