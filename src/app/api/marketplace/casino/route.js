@@ -4,7 +4,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { gambleWin, getCasinoState, moveCasino, playKeno, spinSlot } from "@/lib/marketplace/casino.js";
 import { spinSlot5 } from "@/lib/marketplace/casino-slot5-play.js";
-import { chipShelf } from "@/lib/marketplace/chips.js";
+import { chipShelf, buyChips, claimDailyChips } from "@/lib/marketplace/chips.js";
 import { buyWithChips } from "@/lib/marketplace/chip-store.js";
 // Composed HERE rather than inside getCasinoState: casino.js must not import blackjack.js, because
 // blackjack.js imports casino.js for the floor's shared furniture (perks, prizes, bounties) and a cycle
@@ -92,6 +92,10 @@ export async function POST(request) {
                     shelf: ["stat", "unlock"].includes(b?.shelf) ? b.shelf : null,
                 })) });
                 case "chip_buy": return noStore(await buyWithChips(buyer.id, String(b?.item || "")));
+                // ── THE CAGE ── gold for chips, one for one, and the free thousand a day. `chip_buy` above is
+                // the COUNTER (spending chips on goods); these two are the window that fills the purse.
+                case "chips_buy": return noStore(await buyChips(buyer.id, Number(b?.gold) || 0));
+                case "chips_daily": return noStore(await claimDailyChips(buyer.id));
                 // ── DOUBLE OR NOTHING ── the amount is read from the meter, never from the body. What is
                 // being gambled is what the last paid pull actually won, which is not a thing a POST gets
                 // an opinion about.

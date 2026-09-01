@@ -198,16 +198,13 @@ async function advance(buyerId, row, hands, active) {
     return { ok: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: row.stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
 }
 
-/** Take one stake. Returns the new balance, or null if it could not be paid. */
-const takeStake = async (buyerId, stake, meta) => {
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return null;
-    await logCoin(buyerId, -stake, "casino_blackjack_bet", { balanceAfter: paid.gold, meta });
-    return paid;
-};
+/**
+ * Take one stake, in CHIPS. Returns the new balance, or null if it could not be paid.
+ *
+ * Called three times per hand at most — the deal, a double, a split — and each one is a separate debit, which
+ * is what makes doubling and splitting honest: the extra money is actually taken before it can be won back.
+ */
+const takeStake = async (buyerId, stake, meta) => moveChips(buyerId, -stake, "casino_blackjack_bet", { meta });
 
 /**
  * DEAL.
@@ -224,7 +221,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
 
     const stake = clampBet(bet);
     const paid = await takeStake(buyerId, stake, { bet: stake });
-    if (!paid) return { ok: false, error: "no_gold" };
+    if (!paid) return { ok: false, error: "no_chips" };
 
     const shoe = freshShoe();
     const player = [shoe.pop(), shoe.pop()];
@@ -239,8 +236,7 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
     // The stake is already gone if this fails, so it goes straight back. A hand that could not be recorded is
     // a hand that never happened.
     if (!row) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, stake]).catch(() => null);
-        await logCoin(buyerId, stake, "casino_blackjack_void", { balanceAfter: back?.gold ?? null });
+        await moveChips(buyerId, stake, "casino_blackjack_void", { meta: { reason: "deal_failed" } });
         return { ok: false, error: "deal_failed" };
     }
 
@@ -249,7 +245,8 @@ export async function dealBlackjack(buyerId, { bet } = {}) {
         const s = await settleAll(buyerId, row, dealer, hands);
         return { ok: true, natural: true, gold: s.gold, chips: s.chips, hand: s.hand, bet: stake, won: s.won, wonGold: s.wonGold, outcome: s.outcome, prize: s.prize };
     }
-    return { ok: true, gold: paid.gold, hand: publicView(row), bet: stake };
+    // `paid` is the chip balance moveChips handed back — no gold moved anywhere in this file.
+    return { ok: true, chips: paid, hand: publicView(row), bet: stake };
 }
 
 /** HIT. One card to the hand in play. Busting moves the turn on rather than making somebody press stand on a
@@ -297,7 +294,7 @@ export async function doubleBlackjack(buyerId) {
     if (!hand || hand.cards.length !== 2 || hand.doubled || hand.splitAces) return { ok: false, error: "cannot_double" };
 
     const paid = await takeStake(buyerId, row.stake, { bet: row.stake, doubled: true });
-    if (!paid) return { ok: false, error: "no_gold" };
+    if (!paid) return { ok: false, error: "no_chips" };
 
     const shoe = parse(row.shoe, []);
     hand.cards = [...hand.cards, shoe.pop()];
@@ -330,7 +327,7 @@ export async function splitBlackjack(buyerId) {
     if (!hand || hands.length !== 1 || !canSplit(hand.cards, hand.fromSplit)) return { ok: false, error: "cannot_split" };
 
     const paid = await takeStake(buyerId, row.stake, { bet: row.stake, split: true });
-    if (!paid) return { ok: false, error: "no_gold" };
+    if (!paid) return { ok: false, error: "no_chips" };
 
     const shoe = parse(row.shoe, []);
     const splitAces = pairValue(hand.cards[0]) === 11;

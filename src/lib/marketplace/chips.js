@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { logCoin } from "@/lib/marketplace/coins.js";
 import { CHIP_RATE, chipsFor } from "@/lib/marketplace/chip-rate.js";
 import { STAT_TRACKS, STAT_STEP, UNLOCKS, statCost } from "@/lib/marketplace/casino-perks.js";
 import { GEM_KINDS, GEM_TIERS, gemId } from "@/lib/marketplace/gems.js";
@@ -288,6 +289,67 @@ export async function moveChips(buyerId, delta, reason, { ref = null, meta = nul
 export async function chipBalance(buyerId) {
     const row = await db.queryOne(`SELECT COALESCE(chips, 0)::bigint AS chips FROM mkt_buyer WHERE id = $1`, [buyerId]);
     return Number(row?.chips || 0);
+}
+
+// ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "lets make it so you can buy chips and make it so everything takes chips to play. maybe 1 to 1 coins
+// buy chips. and each day you can claim 1000 chips for free."
+//
+// The floor used to take GOLD at every machine and pay CHIPS, so the conversion happened once, invisibly, on
+// the way out — and it was the entire house edge (see the note at the top of chip-rate.js). Buying at the cage
+// moves that conversion to the front, where you can see it, and the edge moves into the machines, which is why
+// every paytable came down to 0.95 first.
+//
+// ONE TO ONE, so a chip is a gold piece you have decided to gamble. There is no exchange-rate arithmetic to do
+// on the floor and no second price to reason about: a 100-chip spin costs 100 gold, and what it is worth is
+// still decided entirely by the Counter's prices.
+export const CHIP_BUY_RATE = 1;
+
+/** Buy chips with gold, one for one. Atomic on the gold side — you cannot buy chips you cannot afford. */
+export async function buyChips(buyerId, gold) {
+    const n = Math.max(1, Math.round(Number(gold) || 0));
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // Conditional debit: two tabs cannot both buy the same last coin.
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, n],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold" };
+    const chips = Math.round(n * CHIP_BUY_RATE);
+    await logCoin(buyerId, -n, "casino_chips_buy", { balanceAfter: paid.gold, meta: { chips } }).catch(() => {});
+    const after = await moveChips(buyerId, chips, "casino_chips_buy", { meta: { gold: n } });
+    return { ok: true, gold: paid.gold, chips, chipsAfter: after ?? (await chipBalance(buyerId)) };
+}
+
+// ── AND A THOUSAND A DAY FOR NOTHING ─────────────────────────────────────────────────────────────────────────
+// Luke: "each day you can claim 1000 chips for free."
+//
+// Once the floor takes chips, a member with no gold has no way onto it at all — and the casino is the one
+// feature in the Den that could otherwise become a thing only the rich play. A thousand is ten spins at the
+// hundred-chip table, which is a real sitting rather than a token.
+//
+// Guarded on its own DAY COLUMN with a conditional update, exactly like the Loot Pig's box: the claim is spent
+// by the write, so a double tap or two tabs cannot take it twice.
+export const DAILY_CHIPS = 1000;
+
+export async function claimDailyChips(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const claim = await db.queryOne(
+        `UPDATE mkt_buyer SET chips_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+          WHERE id = $1 AND chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date
+          RETURNING id`, [buyerId],
+    ).catch(() => null);
+    if (!claim) return { ok: false, error: "already_claimed" };
+    const after = await moveChips(buyerId, DAILY_CHIPS, "casino_chips_daily", { meta: { n: DAILY_CHIPS } });
+    return { ok: true, chips: DAILY_CHIPS, chipsAfter: after ?? (await chipBalance(buyerId)) };
+}
+
+/** Whether today's free chips are still there to take. One column, read with everything else. */
+export async function dailyChipsReady(buyerId) {
+    if (!buyerId) return false;
+    const r = await db.queryOne(
+        `SELECT (chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS ready
+           FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return Boolean(r?.ready);
 }
 
 /** What this member has already bought that can only be bought once. */

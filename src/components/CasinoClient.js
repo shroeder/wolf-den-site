@@ -455,6 +455,62 @@ function Card({ card, delay = 0, flip = false, dead = false }) {
     );
 }
 
+// ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Gold in, chips out, one for one — and the free thousand a day. Every machine on this floor takes chips now,
+// so a member with none has no way to play at all; this is the door, and it is directly under the purse for
+// that reason rather than filed behind a tab.
+//
+// The free claim is FIRST and it is loud when it is available, because it is the thing somebody with an empty
+// purse needs to see. Once it is spent it stays visible but goes quiet — a button that vanishes when used
+// reads as a bug, and "come back tomorrow" is information.
+const BUY_STEPS = [1000, 5000, 25000];
+
+function Cage({ st, setSt }) {
+    const [busy, setBusy] = useState(null);
+    const [note, setNote] = useState("");
+    const gold = Number(st?.gold) || 0;
+
+    const post = async (body, key) => {
+        setBusy(key); setNote("");
+        const r = await casPost(body);
+        setBusy(null);
+        if (!r?.ok) {
+            setNote(r?.error === "not_enough_gold" ? "Not enough gold for that."
+                : r?.error === "already_claimed" ? "Already claimed today — back tomorrow."
+                : "That didn't go through.");
+            return;
+        }
+        // The server hands back both balances it moved; nothing here recomputes either.
+        setSt((p) => ({ ...p,
+            chips: r.chipsAfter ?? p.chips,
+            gold: r.gold ?? p.gold,
+            dailyChips: body.action === "chips_daily" ? false : p.dailyChips }));
+        setNote(body.action === "chips_daily" ? `+${money(r.chips)} chips` : `+${money(r.chips)} chips`);
+    };
+
+    return (
+        <div className="cas-cage">
+            <span className="cas-cage-lab">The cage · 1 gold buys 1 chip</span>
+            <div className="cas-cage-row">
+                <button type="button" className={`cas-cage-free${st?.dailyChips ? " is-on" : ""}`}
+                    disabled={!st?.dailyChips || busy === "daily"}
+                    onClick={() => post({ action: "chips_daily" }, "daily")}>
+                    {busy === "daily" ? "…" : st?.dailyChips
+                        ? `Claim ${money(st?.dailyChipsN || 1000)} free chips`
+                        : "Free chips claimed today"}
+                </button>
+                {BUY_STEPS.map((n) => (
+                    <button key={n} type="button" className="cas-cage-buy" disabled={gold < n || busy === `b${n}`}
+                        onClick={() => post({ action: "chips_buy", gold: n }, `b${n}`)}>
+                        {busy === `b${n}` ? "…" : `Buy ${money(n)}`}
+                    </button>
+                ))}
+            </div>
+            <span className="cas-cage-gold">{money(gold)} gold in your purse{note ? ` · ${note}` : ""}</span>
+        </div>
+    );
+}
+
 export default function CasinoClient({ initial }) {
     const [st, setSt] = useState(initial);
     // ── WALKING IN FACING SOMETHING ──────────────────────────────────────────────────────────────────────
@@ -835,7 +891,7 @@ export default function CasinoClient({ initial }) {
     const spin5 = useCallback(async (offerId, force) => {
         const r = await casPost({ action: "spin5", bet, machine: at?.id, offer: offerId, force: force || undefined });
         if (!r?.ok) {
-            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
                 : r?.error === "closed" ? "This machine is not open yet."
                 : "That didn't go through.");
             return r || { ok: false };
@@ -877,7 +933,7 @@ export default function CasinoClient({ initial }) {
 
         if (!r?.ok) {
             setSpinning(false); setBusy(false);
-            setErr(r?.error === "no_gold" ? "Not enough gold for that bet." : "That didn't go through.");
+            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage." : "That didn't go through.");
             return;
         }
 
@@ -986,7 +1042,7 @@ export default function CasinoClient({ initial }) {
         const r = await casPost(body);
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
                 : r?.error === "bad_ticket" ? "Pick five numbers first."
                     : "That didn't go through.");
             return;
@@ -1064,7 +1120,7 @@ export default function CasinoClient({ initial }) {
         const r = await casPost({ action, ...body });
         setBusy(false);
         if (!r?.ok) {
-            setErr(r?.error === "no_gold" ? "Not enough gold for that bet."
+            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage."
                 : r?.error === "cannot_double" ? "You can only double on your first two cards."
                     : r?.error === "no_hand" ? "That hand is already finished."
                         : "That didn't go through.");
@@ -1139,7 +1195,7 @@ export default function CasinoClient({ initial }) {
         const r = await casPost({ action: "bingo", bet, force: force || undefined });
         if (!r?.ok) {
             setBusy(false);
-            setErr(r?.error === "no_gold" ? "Not enough gold for that card." : "That didn't go through.");
+            setErr(r?.error === "no_chips" ? "Not enough chips — buy some at the cage." : "That didn't go through.");
             return;
         }
         setCard(r);
@@ -1469,8 +1525,15 @@ export default function CasinoClient({ initial }) {
             <header className="cas-top">
                 <a className="cas-out" href="/marketplace/town">← Town</a>
                 <b className="cas-name">The Casino</b>
-                <span className="cas-purse">{money(st?.gold)}<i>gold</i></span>
+                <span className="cas-purse">{money(st?.chips)}<i>chips</i></span>
             </header>
+
+            {/* ── THE CAGE ────────────────────────────────────────────────────────────────────────────────
+                Luke: "lets make it so you can buy chips and make it so everything takes chips to play. maybe
+                1 to 1 coins buy chips. and each day you can claim 1000 chips for free."
+                The floor takes chips at every machine now, so this is the only door onto it — which is
+                exactly why it is the first thing under the header rather than a tab somewhere. */}
+            <Cage st={st} setSt={setSt} />
 
             {/* ── WHO IS WORKING THE FLOOR FOR YOU ────────────────────────────────────────────────────────
                 The five casino pets do nothing you can see at the moment they fire — a stake quietly comes

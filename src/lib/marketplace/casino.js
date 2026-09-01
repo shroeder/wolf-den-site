@@ -1,6 +1,6 @@
 import "server-only";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { CHIP_RATE, chipBalance, chipsFor, moveChips } from "@/lib/marketplace/chips.js";
+import { CHIP_RATE, DAILY_CHIPS, chipBalance, chipsFor, moveChips } from "@/lib/marketplace/chips.js";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -577,31 +577,26 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     // Copper Paw and the Night Auditor pay for the odd play. Refunded AFTER the debit rather than skipping
     // it, so the ledger still shows the bet being placed and the stake coming back — a play that never
     // appears in the coin log is a play nobody can audit.
+    // ── THE OLD THREE-REEL TAKES CHIPS TOO ───────────────────────────────────────────────────────────────
+    // It was the one cabinet that took gold AND paid gold. Left alone while everything else moved to chips it
+    // would have become a laundry: buy chips at the cage one for one, feed them in, take gold back out. So it
+    // takes chips and pays chips like the rest of the floor. `bank` is the running balance in CHIPS — the
+    // downstream code calls it `gold` because that is what it was, and the name is corrected where it is read.
     let onHouse = false;
-    let paid;
+    let bank;
     if (free) {
         // No debit, no ledger row for a bet that was not placed — and the free pull is spent here so a
         // failure further down cannot hand out the same pull twice.
         meter.freePulls -= 1;
-        paid = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-        if (!paid) return { ok: false, error: "no_gold" };
+        bank = await chipBalance(buyerId);
     } else {
-        paid = await db.queryOne(
-            `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-            [buyerId, stake],
-        ).catch(() => null);
-        if (!paid) return { ok: false, error: "no_gold" };
-        await logCoin(buyerId, -stake, "casino_slot_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
+        bank = await moveChips(buyerId, -stake, "casino_slot_bet", { meta: { bet: stake, machine: m.id } });
+        if (bank == null) return { ok: false, error: "no_chips" };
     }
 
     if (!free && onTheHouse(perks)) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, stake]).catch(() => null);
-        if (back) {
-            onHouse = true;
-            paid.gold = back.gold;
-            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "slot" } });
-        }
+        const back = await moveChips(buyerId, stake, "casino_on_the_house", { meta: { game: "slot" } });
+        if (back != null) { onHouse = true; bank = back; }
     }
 
     const reels = [pickSymbol(m.id), pickSymbol(m.id), pickSymbol(m.id)];
@@ -636,25 +631,15 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
 
     const won = Math.round(stake * mult) + potWon;
 
-    let gold = paid.gold;
     if (won > 0) {
-        const back = await db.queryOne(
-            `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, won],
-        ).catch(() => null);
-        if (back) {
-            gold = back.gold;
-            // The machine stamps its OWN jackpot. Anything downstream that wants to count them — the badges
-            // do — then counts a fact the slot asserted, instead of re-deriving "three wolves" from a
-            // multiplier it would have to keep in step with the paytable forever.
-            await logCoin(buyerId, won, "casino_slot_win", {
-                balanceAfter: gold,
-                // Each machine stamps its OWN jackpot, and each one's jackpot is its own top symbol — so
-                // the badge that counts them keeps working across three cabinets without knowing there are
-                // three. See badges.js: it counts the fact, never re-derives it.
-                meta: { bet: stake, reels, mult, machine: m.id, jackpot: reels.every((r) => r === m.symbols[0].id) },
-            });
-        }
+        // The machine stamps its OWN jackpot. Anything downstream that wants to count them — the badges do —
+        // then counts a fact the slot asserted, instead of re-deriving "three wolves" from a multiplier it
+        // would have to keep in step with the paytable forever. Each cabinet's jackpot is its own top symbol,
+        // so the badge keeps working across three of them without knowing there are three.
+        const back = await moveChips(buyerId, won, "casino_slot_win", {
+            meta: { bet: stake, reels, mult, machine: m.id, jackpot: reels.every((r) => r === m.symbols[0].id) },
+        });
+        if (back != null) bank = back;
     }
     // Three of a kind on the top symbol is this machine's rarest event, so it is the one that is certain.
     const prize = await rollCasinoPrize(buyerId, { jackpot: reels.every((r) => r === m.symbols[0].id), perks });
@@ -684,7 +669,7 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
     }).catch(() => {});
 
     return {
-        ok: true, machine: m.id, reels, mult, bet: stake, won, gold, prize, onHouse,
+        ok: true, machine: m.id, reels, mult, bet: stake, won, chips: bank, prize, onHouse,
         free, nudged, awarded, struck: struck > 1 ? struck : null, tipped: tipped > 0 ? tipped : null,
         fed: fx.fed?.length ? fx.fed : null, burst: fx.burst?.length ? fx.burst : null,
         potWon: potWon > 0 ? potWon : null, pot: await readPot(),
@@ -910,26 +895,16 @@ export async function gambleWin(buyerId, { machine } = {}) {
     const stake = Math.round(meter.pending || 0);
     if (stake <= 0) return { ok: false, error: "nothing_to_gamble" };
 
-    // The win is already in the player's gold, so the gamble takes it back first and pays the result. Taking
-    // it back with the same `gold >= $2` guard every other bet uses means a gamble can never go through on
-    // gold that has already been spent elsewhere.
-    const taken = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!taken) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_gamble_bet", { balanceAfter: taken.gold, meta: { machine: m.id } });
+    // The win is already in the player's CHIPS, so the gamble takes it back first and pays the result. Taking
+    // it back with moveChips' own `chips >= n` guard — the same one every other bet uses — means a gamble can
+    // never go through on a balance that has already been spent elsewhere.
+    let bank = await moveChips(buyerId, -stake, "casino_gamble_bet", { meta: { machine: m.id } });
+    if (bank == null) return { ok: false, error: "no_chips" };
 
     const won = Math.random() < GAMBLE_WIN_CHANCE;
-    let gold = taken.gold;
     if (won) {
-        const back = await db.queryOne(
-            `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, stake * 2],
-        ).catch(() => null);
-        if (back) {
-            gold = back.gold;
-            await logCoin(buyerId, stake * 2, "casino_gamble_win", { balanceAfter: gold, meta: { machine: m.id } });
-        }
+        const back = await moveChips(buyerId, stake * 2, "casino_gamble_win", { meta: { machine: m.id } });
+        if (back != null) bank = back;
     }
 
     // Win or lose, the gamble is over — a win cannot be rolled again, or "even money" becomes a martingale
@@ -939,7 +914,7 @@ export async function gambleWin(buyerId, { machine } = {}) {
     await trackActivity(buyerId, "casino_gamble", {
         machine: m.id, staked: stake, won: Boolean(won), payout: won ? stake * 2 : 0,
     }).catch(() => {});
-    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, gold };
+    return { ok: true, machine: m.id, staked: stake, won, payout: won ? stake * 2 : 0, chips: bank };
 }
 
 // ── THE CROUPIER'S CAT ───────────────────────────────────────────────────────────────────────────────────────
@@ -1112,23 +1087,14 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     const settled = await settleKeno(buyerId);
 
     const perks = await casinoPerks(buyerId);
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_keno_bet", { balanceAfter: paid.gold, meta: { bet: stake, picks: clean } });
+    // A ticket costs CHIPS. moveChips carries its own conditional debit and writes its own ledger row.
+    let chips = await moveChips(buyerId, -stake, "casino_keno_bet", { meta: { bet: stake, picks: clean } });
+    if (chips == null) return { ok: false, error: "no_chips" };
 
-    let gold = paid.gold;
     let onHouse = false;
     if (onTheHouse(perks)) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`,
-            [buyerId, stake]).catch(() => null);
-        if (back) {
-            onHouse = true;
-            gold = back.gold;
-            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "keno" } });
-        }
+        const back = await moveChips(buyerId, stake, "casino_on_the_house", { meta: { game: "keno" } });
+        if (back != null) { onHouse = true; chips = back; }
     }
 
     // `goldIdx`, not `gold` — this function already has a `gold` and it is the player s balance. Two
@@ -1145,11 +1111,14 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
     // The paytable is in multiples of the stake — gold units. One conversion, here, like everywhere else.
     const wonGold = Math.round(stake * pays);
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
-    let chips = null;
+    // `chips` already holds the balance after the stake was taken — the win moves it again rather than
+    // shadowing it. Two `let chips` in one scope is a build error, and the second one silently meaning
+    // something different from the first would be worse than one.
     if (won > 0) {
-        chips = await moveChips(buyerId, won, "casino_keno_win", {
+        const after = await moveChips(buyerId, won, "casino_keno_win", {
             meta: { bet: stake, hits: hits.length, picks: clean, wonGold, rate: CHIP_RATE },
         });
+        if (after != null) chips = after;
     }
     await trackActivity(buyerId, "casino_play", {
         game: "keno", bet: stake, wonChips: won,
@@ -1160,18 +1129,18 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
 
     // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
     // Only on a LOSING ticket, only on the stake that actually lost, and only sometimes: REFUND_CHANCE
-    // decides whether the pet's budget arrives as a dribble nobody notices or as a moment. It refunds in
-    // GOLD, deliberately and unlike everything else in this function — it is a refund of a stake, not a
-    // payout, and handing back chips for gold that was lost would quietly be a second conversion.
+    // decides whether the pet's budget arrives as a dribble nobody notices or as a moment.
+    //
+    // IT USED TO REFUND GOLD, and the reason was sound at the time: the stake had been paid in gold, so a
+    // refund in chips would have been a second conversion the player never asked for. The stake is chips now,
+    // and that same argument runs the other way — a gold refund on a chip stake is a chips-to-gold converter
+    // with a losing ticket as the button, which is the one direction this economy must never run.
     let refund = 0;
     if (perks.lossRefund > 0 && won <= 0 && !onHouse) {
         if (Math.random() < REFUND_CHANCE) {
             refund = Math.max(1, Math.round(stake * Math.min(1, perks.lossRefund / REFUND_CHANCE)));
-            const back = await db.queryOne(
-                `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, refund],
-            ).catch(() => null);
-            if (back) { gold = back.gold; await logCoin(buyerId, refund, "casino_cat_refund", { balanceAfter: back.gold, meta: { game: "keno" } }); }
-            else refund = 0;
+            const back = await moveChips(buyerId, refund, "casino_cat_refund", { meta: { game: "keno" } });
+            if (back != null) chips = back; else refund = 0;
         }
     }
 
@@ -1196,7 +1165,6 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         won,
         wonGold,
         chips,
-        gold,
         onHouse,
         refund,
         prize,
@@ -1335,7 +1303,22 @@ export async function getCasinoState(buyerId) {
         // The avatar comes down with the gold. Everybody ELSE on this floor has been drawn with their own
         // sprite since it opened (see casinoOccupants), which left the one person the player is actually
         // looking at as the only blank on the screen.
-        db.queryOne(`SELECT gold, COALESCE(chips, 0)::bigint AS chips, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // ── AND IT SURVIVES ITS OWN DEPLOY ───────────────────────────────────────────────────────────
+        // `chips_day` arrives in migration 424, and for the minutes between this code serving and that
+        // migration landing the query names a column that does not exist. The .catch would turn that into a
+        // null row, which is a casino showing every member a purse of zero — on the deploy that makes chips
+        // the only way to play. So it falls back to the query it used yesterday and simply reports the free
+        // claim as unavailable until the column is there. Same shape as getGlobalChat's channel fallback.
+        (async () => {
+            const withDay = await db.queryOne(
+                `SELECT gold, COALESCE(chips, 0)::bigint AS chips, avatar_sprite_url,
+                        (chips_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS daily_ready
+                   FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+            if (withDay) return withDay;
+            return db.queryOne(
+                `SELECT gold, COALESCE(chips, 0)::bigint AS chips, avatar_sprite_url, FALSE AS daily_ready
+                   FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        })(),
         casinoOccupants(buyerId),
     ]);
     return {
@@ -1344,6 +1327,10 @@ export async function getCasinoState(buyerId) {
         // purse on that screen shows both — see chips.js. Sent from the first load rather than only in a spin
         // response, or a member who walks in and does not pull is told they have none.
         chips: Number(me?.chips) || 0,
+        // Is today's free thousand still there? Read with the rest of the state rather than on its own, so
+        // the cage can draw the button lit or spent without a second round trip on every visit.
+        dailyChips: Boolean(me?.daily_ready),
+        dailyChipsN: DAILY_CHIPS,
         // And the rate, so a paytable can print what a line is actually worth in chips before a single spin
         // has happened. The client must never keep its own copy of this — it moved once already, 0.08 to
         // 0.25, and a hardcoded copy would have quoted every payout three times too low.

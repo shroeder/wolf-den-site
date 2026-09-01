@@ -186,12 +186,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // three are worth the same to within half a percent, so a lie about it buys nothing.
     const offer = FREE_SPIN_OFFERS.find((o) => o.id === offerId) || FREE_SPIN_OFFERS[1];
 
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_slot5_bet", { balanceAfter: paid.gold, meta: { bet: stake, machine: m.id } });
+    // A spin costs CHIPS. moveChips carries the conditional debit and writes its own ledger row, so this is
+    // the whole of taking a stake — see the note in chips.js about why the cage moved to the front.
+    const bank = await moveChips(buyerId, -stake, "casino_slot5_bet", { meta: { bet: stake, machine: m.id } });
+    if (bank == null) return { ok: false, error: "no_chips" };
 
     // The force is read from the request but only honoured for the owner — a POST body is something anybody
     // can write, and "the button is hidden" is not a permission check.
@@ -239,8 +237,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     return {
         ok: true,
-        gold: Number(paid.gold),
-        chips: chips ?? await chipsOf(buyerId),
+        // No gold moved — the cage is the only place gold touches the floor now. `bank` is the balance right
+        // after the stake; `chips` is it again after any win.
+        chips: chips ?? bank ?? await chipsOf(buyerId),
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.
         grid: r.grid,

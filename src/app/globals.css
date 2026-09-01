@@ -17755,6 +17755,26 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-purse { font-family: var(--font-display); font-weight: 900; color: #ffd75e; }
 .cas-purse i { font-style: normal; font-size: 10px; color: #98a0aa; margin-left: 4px; }
 
+/* ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────
+   Directly under the purse, because with a chips-only floor this is the door onto it. The free claim is the
+   loud one — it is what somebody with an empty purse needs to find — and it stays put once spent rather than
+   disappearing, since a control that vanishes when you use it reads as a fault. */
+.cas-cage { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); }
+.cas-cage-lab { font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: #8a939d; }
+.cas-cage-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.cas-cage-free, .cas-cage-buy { padding: 9px 12px; border-radius: 10px; font-weight: 900; font-size: 12.5px;
+  cursor: pointer; white-space: nowrap; color: inherit; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.16); -webkit-tap-highlight-color: transparent; }
+.cas-cage-free { flex: 1 1 100%; }
+.cas-cage-free.is-on { color: #1c1608; background: linear-gradient(180deg, #ffd75e, #f0b73c);
+  border-color: rgba(255,240,190,0.7); }
+.cas-cage-buy { flex: 1 1 0; min-width: 0; color: #ffe6a3; border-color: rgba(255,215,94,0.35);
+  background: rgba(255,215,94,0.10); }
+.cas-cage-free:disabled, .cas-cage-buy:disabled { cursor: default; opacity: 0.45; color: #9aa2ac;
+  background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+.cas-cage-gold { font-size: 11px; color: #a4adb7; font-variant-numeric: tabular-nums; }
+
 /* The room. Deep and warm, with the floor catching the light from the cabinets. */
 /* ── HOW TALL THE ROOM IS ALLOWED TO BE ──────────────────────────────────────────────────────────────
    THE OLD RULE, AND WHY IT NO LONGER APPLIES. This was capped hard — 30vh, then 34 — because the machine

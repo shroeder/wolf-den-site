@@ -176,12 +176,13 @@ async function ledgers({ days, buyerId = null }) {
               GROUP BY 1, 2, 5`, args).catch(() => []),
         db.query(
             `SELECT e.buyer_id AS id, e.reason, COALESCE(e.ref, '') AS ref,
+                    COALESCE(e.meta->>'machine', '') AS machine,
                     COUNT(*)::int AS n,
                     COALESCE(SUM(e.delta), 0)::bigint AS total,
                     COALESCE(MAX(e.delta), 0)::bigint AS best
                FROM mkt_chip_event e
               WHERE e.created_at >= NOW() - $1::interval${who}
-              GROUP BY 1, 2, 3`, args).catch(() => []),
+              GROUP BY 1, 2, 3, 4`, args).catch(() => []),
     ]);
     return { coin, chip };
 }
@@ -384,7 +385,28 @@ export async function getCasinoReport({ days = 7 } = {}) {
             test.chipsWon += won;
             continue;
         }
-        if (won < 0) {                       // the Counter, the only chip sink
+        // ── A NEGATIVE IS NOT ALWAYS THE COUNTER ANY MORE ────────────────────────────────────────────
+        // It was, once: chips were minted by the machines and left only at the Counter, so every debit in
+        // this ledger was a purchase. The floor takes chips now, so a STAKE is a negative here too — and
+        // counting one as shopping would report the entire floor as Counter spending and nothing as staked.
+        const betGame = BET_GAME[r.reason];
+        if (won < 0 && betGame) {
+            if (!LIVE_GAMES.has(betGame)) { retired.plays += num(r.n); retired.coinSpent += -won; continue; }
+            const bk = unitKey(betGame, r.machine);
+            add(byPlayer, r.id, "coinSpent", -won);
+            add(byPlayer, r.id, "plays", num(r.n));
+            add(byGame, bk, "coinSpent", -won);
+            add(byGame, bk, "plays", num(r.n));
+            totals.coinSpent += -won;
+            totals.plays += num(r.n);
+            if (r.machine) {
+                const mk = machineKey(betGame, r.machine);
+                add(byMachine, mk, "coinSpent", -won);
+                add(byMachine, mk, "plays", num(r.n));
+            }
+            continue;
+        }
+        if (won < 0) {                       // the Counter — still the only place chips LEAVE for goods
             add(byPlayer, r.id, "chipsSpent", -won);
             totals.chipsSpent += -won;
             continue;

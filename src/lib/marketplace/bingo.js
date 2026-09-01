@@ -7,8 +7,8 @@ import {
 } from "@/lib/marketplace/bingo-kit.js";
 import { storeDay, weekdayOf } from "@/lib/marketplace/store-day.js";
 import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplace/casino.js";
-// Gold in, chips out — see the long note in blackjack.js. The stake is still gold because gold staked is what
-// chips are made of; the payout is chips because chips are what this floor pays.
+// Chips in, chips out. The stake used to be gold — see the long note in blackjack.js — and the cage now sells
+// the chips instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
@@ -76,21 +76,17 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     const stake = clampBet(bet);
 
     const perks = await casinoPerks(buyerId);
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
-        [buyerId, stake],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "no_gold" };
-    await logCoin(buyerId, -stake, "casino_bingo_bet", { balanceAfter: paid.gold, meta: { bet: stake } });
+    // ── THE CARD COSTS CHIPS ─────────────────────────────────────────────────────────────────────────────
+    // moveChips carries its own conditional debit (`AND chips >= n`) and writes its own ledger row, so this is
+    // the whole of taking a stake now — the gold guard, the balance read and the logCoin it replaced were
+    // three statements doing what one does.
+    let chips = await moveChips(buyerId, -stake, "casino_bingo_bet", { meta: { bet: stake } });
+    if (chips == null) return { ok: false, error: "no_chips" };
 
     let onHouse = false;
     if ((perks.freePlay || 0) > 0 && Math.random() < perks.freePlay) {
-        const back = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, stake]).catch(() => null);
-        if (back) {
-            onHouse = true;
-            paid.gold = back.gold;
-            await logCoin(buyerId, stake, "casino_on_the_house", { balanceAfter: back.gold, meta: { game: "bingo" } });
-        }
+        const back = await moveChips(buyerId, stake, "casino_on_the_house", { meta: { game: "bingo" } });
+        if (back != null) { onHouse = true; chips = back; }
     }
 
     const card = makeCard();
@@ -119,12 +115,13 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     // here, exactly as it does at every slot cabinet and now at the blackjack table.
     const wonGold = Math.round(stake * (score.mult + patternHit.mult));
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
-    let chips = null;
+    // `chips` already holds the balance after the stake — the win moves it again rather than shadowing it.
     if (won > 0) {
-        chips = await moveChips(buyerId, won, "casino_bingo_win", {
+        const after = await moveChips(buyerId, won, "casino_bingo_win", {
             meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
             pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
         });
+        if (after != null) chips = after;
     }
     if (chips == null) chips = await chipBalance(buyerId);
     await trackActivity(buyerId, "casino_play", {
@@ -169,7 +166,7 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         won,
         wonGold,
         chips,
-        gold: paid.gold,
+        chips,
         prize,
         onHouse,
     };
