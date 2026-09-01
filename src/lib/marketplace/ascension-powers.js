@@ -79,7 +79,7 @@ export const ASCENSION_POWERS = {
     kraken_s_toll: { item: "eternal_undying_sabre", name: "The Kraken's Toll", tier: "eternal", cls: "B", desc: "Sea monsters you meet pay you to be left alone." },
     salvager_s_claim: { item: "eternal_undying_wall", name: "Salvager's Claim", tier: "eternal", cls: "B", desc: "One voyage in three comes home with a piece of gear in the hold." },
     shored_timbers: { item: "eternal_undying_veil", name: "Shored Timbers", tier: "eternal", cls: "B", desc: "The first collapse of each trip does nothing at all." },
-    miner_s_lamp: { item: "eternal_undying_plate", name: "The Miner's Lamp", tier: "eternal", cls: "B", desc: "Your trips start at the depth you reached last time, not at the top." },
+    miner_s_lamp: { item: "eternal_undying_plate", name: "The Miner's Lamp", tier: "eternal", cls: "B", desc: "The roof holds one step deeper, and the tunnel gives up what it would four floors further down." },
     assayer_s_eye: { item: "eternal_undying_sash", name: "Assayer's Eye", tier: "eternal", cls: "B", desc: "One haul in three comes back at the best grade it contained." },
     delver_s_rope: { item: "eternal_undying_greaves", name: "The Delver's Rope", tier: "eternal", cls: "B", desc: "A dungeon run that ends badly does not count against your run for the day." },
     warren_map: { item: "eternal_undying_cape", name: "The Warren Map", tier: "eternal", cls: "A", desc: "Every dungeon run has one extra floor before the boss." },

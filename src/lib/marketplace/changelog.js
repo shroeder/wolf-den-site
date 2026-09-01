@@ -12,6 +12,14 @@
 
 export const CHANGELOG = [
     {
+        key: "the-roof-bites",
+        date: "2026-09-01",
+        tag: "improved",
+        title: "The roof comes in again",
+        blurb: "The descent is meant to be a gamble you choose to keep taking, and for anyone well kitted it had stopped being one. Two different things were slowing the roof — the Buttress track you buy in the mine, and the Nerve on your gear — and they were being applied in two separate places, so they multiplied: half off and then another third off, which took the best-built miners in the Den down to two and a half percent a step on a climb that starts at seven and a half. The hard ceiling the tunnel is supposed to have was not one either. It was applied before your Nerve rather than after, so the most dangerous step in the game topped out around a third, and past a certain depth every further step was the same step. Both are fixed. Nerve is now worth up to fifteen percent off rather than thirty-five, every point of it still counts, and Buttress is untouched and still the strongest thing you can buy for the roof — your own tracks should matter more down there than what you happen to be wearing. The number under the Deeper button is also honest now: it never quoted your Nerve, so you have been planning against a risk that was not the one being rolled. Expect the deep to cost more. Depth ten is still there for a built miner, twelve is a real push, and somewhere past twenty the roof is a coin flip no loadout can talk its way out of.",
+        href: "/marketplace/mining",
+    },
+    {
         key: "crit-reads-true",
         date: "2026-08-30",
         tag: "improved",

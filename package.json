@@ -28,7 +28,8 @@
     "check:vercel": "node scripts/check-vercel-json.mjs",
     "check:polls": "node scripts/check-polls.mjs",
     "check:chrome": "node scripts/check-chrome-fanout.mjs",
-    "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs"
+    "gen:season-art": "node --import ./scripts/lib/register-loader.mjs scripts/gen-season-art.mjs",
+    "mine:report": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/mine-report.mjs"
   },
   "keywords": [],
   "author": "",

@@ -114,8 +114,26 @@ const COLLAPSE_SEAM_TIER = 1;
 // you had bought. Splitting the two means deep runs are something you can actually build toward — "start
 // later" AND "grow slower" — while the cap below still guarantees the gamble never becomes a formality.
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
-// The Miner's Lamp buys five floors of safe roof — the same lever Shoring buys, which is what makes it
+// The Miner's Lamp buys ONE floor of safe roof — the same lever Shoring buys, which is what makes it
 // legible: a member who owns both can add the two numbers themselves.
+//
+// It bought FIVE. Nobody in the Den owns that power yet, so what this was is a trap laid for whoever bought
+// it first: five floors on top of Shoring's three and the two every miner starts with is TEN steps that
+// cannot fail — the exact number ruled out when the Shoring cadence was undone, one paragraph down. Luke:
+// "we dont want people getting 10 safe levels. thats absolutely not what I want. in fact its already too
+// easy to get too deep and I dont like that."
+const LAMP_SAFE_DEPTH = 1;
+// And the rest of what it is worth is paid in LIGHT, which is the rule this file already states one paragraph
+// down about Shoring's dead tenth level: if a thing should pay, it should pay in something that is not safe
+// depth. A lamp reads the tunnel richer than it is — the same lever the Lantern track buys, at exactly what a
+// maxed Lantern is worth (0.40 × 10 = four floors), so the two are legible together and an owner of both can
+// add them up. It buys better cards, never a safer step.
+const LAMP_CARD_DEPTH = 4;
+// AND A CEILING OVER THE WHOLE SUM, for the same reason COLLAPSE_CAP exists at the other end of the descent:
+// no pile of things that have been bought may add up to a run that starts safe and stays safe. Nothing on
+// sale today is worth a step less than it says — the free two, Shoring's three and the Lamp's one land
+// exactly on this number. It is a promise about the NEXT safe-depth stacker, written before there is one.
+const SAFE_DEPTH_CAP = 6;
 // ── EVERY THIRD LEVEL, FROM THE THIRD ────────────────────────────────────────────────────────────────────
 // This briefly paid on 1, 4, 7 and 10 instead of 3, 6 and 9, on the reasoning that the last level of a track
 // should buy something — ValkyrieSylve had asked in the plaza why you would take Shoring to 10 when the top
@@ -127,18 +145,37 @@ const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is alw
 // Undone. The dead tenth level comes back with it and is the better problem to have: a track whose last rung
 // is flat is a tuning complaint, and a push-your-luck game whose first four steps cannot fail is not a
 // push-your-luck game. If level 10 should pay, it should pay in something that is not safe depth.
-export const safeDepthFor = (shoringLevel = 0, lamp = false) =>
-    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? 5 : 0);
+export const safeDepthFor = (shoringLevel = 0, lamp = false) => Math.min(
+    SAFE_DEPTH_CAP,
+    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? LAMP_SAFE_DEPTH : 0));
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
 const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
 const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.
 export const braceSlow = (braceLevel = 0) => Math.min(COLLAPSE_SLOW_CAP, Math.max(0, Number(braceLevel) || 0) * COLLAPSE_SLOW_PER);
-export const perDepthFor = (braceLevel = 0) => COLLAPSE_PER_DEPTH * (1 - braceSlow(braceLevel));
+// ── BOTH REDUCERS, IN ONE PLACE ──────────────────────────────────────────────────────────────────────────
+// Buttress and the Nerve affinity slow the SAME climb, and they were applied in two different places —
+// braceSlow here, a bare `* (1 - eff.collapseCut)` at the descend() call site. Nothing said out loud that
+// they compounded, and nothing could: no single expression in the game held both. Half off and then another
+// third off is 67.5% off, and the best-built miners in the Den were stepping down at 2.44%, on a track whose
+// base rate is 7.5%. The roof stopped being a gamble somewhere around level six of two separate purchases.
+//
+// One expression now holds both, so the compounding is a thing you can read rather than a thing you find by
+// measuring. They still MULTIPLY rather than sharing a cap: sharing one meant Buttress bought nothing at all
+// past level three for anybody wearing depth gear, and a gold-priced track that quietly stops working is a
+// worse defect than the one being fixed. What changed instead is Nerve's own ceiling — see depthEffects.
+export const collapseSlow = (braceLevel = 0, affinityCut = 0) =>
+    1 - (1 - braceSlow(braceLevel)) * (1 - Math.min(0.9, Math.max(0, Number(affinityCut) || 0)));
+export const perDepthFor = (braceLevel = 0, affinityCut = 0) => COLLAPSE_PER_DEPTH * (1 - collapseSlow(braceLevel, affinityCut));
 // A HARD CEILING regardless of either track. However well you have built the tunnel out, a deep enough step is
 // always a coin flip you can lose — otherwise the push-your-luck stops being a gamble at all.
+//
+// It was not a ceiling. Nerve's cut was applied to the capped figure at the call site, AFTER this line had
+// done its work, so the deepest step in the game topped out at 35.75% for anyone carrying the affinity cap —
+// the coin flip this comment promises could not be reached from any depth. Every reducer goes in before the
+// cap now, which is the only order in which a ceiling means anything.
 const COLLAPSE_CAP = 0.55;
-export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0, lamp = false) =>
-    Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel, lamp)) * perDepthFor(braceLevel));
+export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0, lamp = false, affinityCut = 0) =>
+    Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel, lamp)) * perDepthFor(braceLevel, affinityCut));
 
 // ── DEPTHS AFFINITY ─────────────────────────────────────────────────────────────────────────────────────────
 // The mine shipped reading NOTHING off your loadout. You could be in full mythic with a legendary pet and the
@@ -217,7 +254,19 @@ async function computeDepthAffinity(buyerId) {
 export function depthEffects(depth = {}) {
     return {
         // DELVING
-        collapseCut: Math.min(0.35, (depth.nerve || 0) * 0.018),        // Nerve: −1.8% collapse chance/pt (cap −35%)
+        // ── NERVE: −0.8% COLLAPSE CHANCE PER POINT (cap −15%) ────────────────────────────────────────
+        // It was −1.8% to a cap of −35%, and −35% off a climb that Buttress had already halved is how the
+        // roof came to be a formality: 7.5% a step, bought down to 2.44%, which is the number a maxed miner
+        // was actually descending at. Luke, on the Shoring cadence that gave four free steps: "that made
+        // digging way too easy... its already too easy to get too deep and I dont like that." This was the
+        // larger half of the same complaint, and the harder half to see, because affinity is spread across
+        // five sources and never printed as one figure until the Depths panel shipped.
+        //
+        // The RATE comes down with the cap, deliberately, so the cap still lands around twenty points — the
+        // same shape the stat has always had. Cutting the ceiling alone would have made every point past the
+        // ninth worth nothing to anyone already wearing depth gear, which is the trap this file keeps
+        // finding in other tracks. Gear should tilt the mine's own safety track, not out-buy it.
+        collapseCut: Math.min(0.15, (depth.nerve || 0) * 0.008),
         seamTierBonus: Math.min(0.30, (depth.lodesense || 0) * 0.022),  // Lodesense: +2.2% odds of a better seam/pt (cap +30%)
         // MINING
         oreBonus: Math.min(0.60, (depth.hew || 0) * 0.03),              // Hew: +3% seam ore/pt (cap +60%)
@@ -335,9 +384,9 @@ export async function startTrip(buyerId) {
     const startPowers = await equippedPowers(buyerId);
     let startDepth = 0;
     if (startPowers.has("deep_key")) startDepth = 5;
-    // (The Miner's Lamp is NOT here. It was written as "start where you reached last time" and mkt_mining has
-    // no column for that — nodes_mined and steps_taken are totals, not a deepest run. It buys safe depth
-    // instead; see collapseChanceAt.)
+    // (The Miner's Lamp is NOT here, and never was. It was written as "start where you reached last time" and
+    // mkt_mining has no column for that — nodes_mined and steps_taken are totals, not a deepest run. It buys
+    // one safe floor and four floors of light instead; see LAMP_SAFE_DEPTH, and the card now says so.)
     const run = { depth: startDepth, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb, current_node_id = NULL WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
     await trackActivity(buyerId, "mine_trip", {}).catch(() => {});
@@ -393,7 +442,7 @@ export async function descend(buyerId) {
     // Shored Timbers eats the FIRST collapse of every trip outright — not the day's first, the trip's, which
     // is a much stronger promise and the one on the card. Tracked on the run itself so it resets with the run.
     const minePowers = await equippedPowers(buyerId);
-    let collapsing = Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level, minePowers.has("miner_s_lamp")) * (1 - eff.collapseCut);
+    let collapsing = Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level, minePowers.has("miner_s_lamp"), eff.collapseCut);
     if (collapsing && minePowers.has("shored_timbers") && !run.shored) {
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`,
             [buyerId, JSON.stringify({ ...run, depth, shored: true, last: { kind: "shored" } })]).catch(() => {});
@@ -425,7 +474,10 @@ export async function descend(buyerId) {
         };
     }
 
-    const card = drawCard(depth + Math.round(surveyValue("lantern", row?.lantern_level) * 10)); // Lantern reads the tunnel as deeper than it is
+    // Lantern reads the tunnel as deeper than it is, and the Miner's Lamp is a second lantern — light only,
+    // so neither of them makes the step you just survived any safer.
+    const card = drawCard(depth + Math.round(surveyValue("lantern", row?.lantern_level) * 10)
+        + (minePowers.has("miner_s_lamp") ? LAMP_CARD_DEPTH : 0));
     const found = rollFind(card, depth, surveyValue("pack", row?.face_level), minePowers);
     const haul = [...(run.haul || [])];
     let seamTier = Number(run.seamTier) || 1;
@@ -1031,6 +1083,19 @@ export async function getMiningState(buyerId) {
     const lvls = totalLevels(row);
     const tripsUsed = Number(row?.trips_used) || 0;
     const run = row?.run_json && !row.run_json.over ? row.run_json : null;
+    // ── THE NUMBER ON THE BUTTON IS THE NUMBER THAT GETS ROLLED ──────────────────────────────────────────
+    // The risk under "Deeper" quoted neither the Lamp nor the Nerve affinity, so every miner carrying depth
+    // gear was shown a step more dangerous than the one descend() actually rolls — while the Depths panel one
+    // tab over printed a collapse cut of up to −35% in the same session. A push-your-luck game is played entirely off
+    // that percentage; if it is not the percentage, the player is bluffing against a number nobody holds.
+    // Both reads are memoised for the request (equipMemo, and the one-second memo above equippedDepthAffinity)
+    // and descend() has just taken them, so the honest figure costs nothing on the tap that matters.
+    const [minePowers, depthPoints] = await Promise.all([
+        equippedPowers(buyerId).catch(() => new Set()),
+        equippedDepthAffinity(buyerId).catch(() => ({})),
+    ]);
+    const depthCut = depthEffects(depthPoints).collapseCut;
+    const lamp = minePowers.has("miner_s_lamp");
     // The mine's three COLLECTIONS (Delver / Rockbreaker / Founder), shown permanently on the Smeltery tab —
     // their bonuses land down here, so this is where the chase belongs.
     const collections = await (async () => {
@@ -1070,7 +1135,7 @@ export async function getMiningState(buyerId) {
             seamArt: oreArt(Number(run.seamTier) || 1),
             haul: run.haul || [],
             last: run.last || null,
-            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level, row?.brace_level) * 100),
+            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level, row?.brace_level, lamp, depthCut) * 100),
         } : null,
         // How the last descent ended, so the client can show the wrap-up once.
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
@@ -1086,12 +1151,16 @@ export async function getMiningState(buyerId) {
             // "still N safe" on a level that buys nothing. Printing "5 safe" against "5 safe" is how somebody
             // comes to ask whether the upgrade is broken — see the note on the track itself.
             if (key === "shoring") {
-                const here = safeDepthFor(lvl);
-                return here === safeDepthFor(lvl - 1) && lvl > 0 ? `still ${here} safe` : `${here} safe`;
+                const here = safeDepthFor(lvl, lamp);
+                return here === safeDepthFor(lvl - 1, lamp) && lvl > 0 ? `still ${here} safe` : `${here} safe`;
             }
             // Buttress reads as the actual per-step risk rather than a percentage OF a percentage — "7.5% a
             // step" going to "7.1% a step" is a number you can feel; "+5% risk climb" is a riddle.
-            if (key === "buttress") return `${(perDepthFor(lvl) * 100).toFixed(1)}% a step`;
+            // Quoted WITH this member's Nerve, because that is the rate their next step is rolled at. The
+            // card used to print the track in isolation — 7.5% going to 7.1% — while the tunnel was actually
+            // rolling 2.44%, so the one number a push-your-luck player plans against was the one number on
+            // the screen that was not true.
+            if (key === "buttress") return `${(perDepthFor(lvl, depthCut) * 100).toFixed(1)}% a step`;
             return `+${Math.round(surveyValue(key, lvl) * 100)}%`;
         }),
         furnace: furnaceForm(totalSmeltLevels(row)),
@@ -1162,7 +1231,7 @@ export async function getMiningState(buyerId) {
         // tell whether the piece they just equipped mattered. Points AND the effect they buy, because "+9 Hew"
         // means nothing on its own; "+27% ore" is the number you actually feel.
         depths: await (async () => {
-            const points = await equippedDepthAffinity(buyerId);
+            const points = depthPoints;
             const eff = depthEffects(points);
             return {
                 points,
