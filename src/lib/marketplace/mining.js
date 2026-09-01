@@ -787,8 +787,22 @@ export const MINE_TRACKS = {
 export const SURVEY_TRACKS = {
     lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "/images/mining/lantern-2.png", col: "lantern_level",
         desc: "Light reaches further — the tunnel gives up better things the deeper you get.", effect: "Find quality" },
-    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "/images/mining/track-shoring.png", col: "assay_level",
-        desc: "Timbered walls. The roof holds for longer before the risk starts climbing.", effect: "Safe depth" },
+    // ── AND IT SAYS WHAT IT ACTUALLY BUYS ────────────────────────────────────────────────────────────────
+    // ValkyrieSylve: "Shoring upgrade for level 10 is showing the old math again. Will upgrading to 10
+    // actually give me 6 safe steps? Because it only shows 5 right now again."
+    //
+    // The numbers on the card were right and the SENTENCE was not. `per: 1, cap: 10` is the old rule — one
+    // safe step a level, ten of them — and safeDepthFor has been `floor(level / 3)` for a while: three extra
+    // steps in total, reached at level 9, with the tenth level buying none at all. A track that presents as
+    // ten levels of safe depth and delivers three is going to be bought for a reason it cannot honour, and
+    // then asked about, which is what happened.
+    //
+    // Luke: "we dont want people getting 10 safe levels. thats absolutely not what I want. in fact its
+    // already too easy to get too deep and I dont like that." So the copy stops advertising depth as the
+    // thing you are buying and states the rate, and the projection below says plainly when a level adds
+    // nothing rather than printing the same number twice and letting it read as a fault.
+    shoring: { max: 10, per: 1 / 3, cap: 10 / 3, kind: "count", name: "Shoring", icon: "/images/mining/track-shoring.png", col: "assay_level",
+        desc: "Timbered walls, and slow to set. Every THIRD level pushes the roof one step further before the risk starts climbing — three steps in all, and the mine is meant to get away from you after that.", effect: "Safe depth" },
     buttress: { max: 10, per: COLLAPSE_SLOW_PER, cap: COLLAPSE_SLOW_CAP, kind: "pct", name: "Buttress", icon: "/images/mining/track-buttress.png", col: "brace_level",
         desc: "Arched stone set as you go. The risk still starts where Shoring says — it just climbs far more slowly from there.", effect: "Risk climb" },
     pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "/images/mining/track-pack.png", col: "face_level",
@@ -1061,7 +1075,12 @@ export async function getMiningState(buyerId) {
         lantern: lanternForm(totalSurveyLevels(row)),
         surveyLevels: totalSurveyLevels(row),
         surveyTracks: trackCards(SURVEY_TRACKS, row, surveyValue, trackCost, (key, lvl) => {
-            if (key === "shoring") return `${safeDepthFor(lvl)} safe`;
+            // "still N safe" on a level that buys nothing. Printing "5 safe" against "5 safe" is how somebody
+            // comes to ask whether the upgrade is broken — see the note on the track itself.
+            if (key === "shoring") {
+                const here = safeDepthFor(lvl);
+                return here === safeDepthFor(lvl - 1) && lvl > 0 ? `still ${here} safe` : `${here} safe`;
+            }
             // Buttress reads as the actual per-step risk rather than a percentage OF a percentage — "7.5% a
             // step" going to "7.1% a step" is a number you can feel; "+5% risk climb" is a riddle.
             if (key === "buttress") return `${(perDepthFor(lvl) * 100).toFixed(1)}% a step`;

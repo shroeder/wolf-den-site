@@ -2676,10 +2676,27 @@ async function finishBout(buyerId, row, b, won) {
             // celebration modal needs the same picture at the one moment the prize is actually handed over,
             // and looking it up here is one read on the eight rungs a season that carry one. Falls back to
             // the kind glyph client-side, exactly as the track does.
+            // ── AND WHAT THE PIECE ACTUALLY IS ──────────────────────────────────────────────────────
+            // Luke, on the first cut: "super weak attempt at the modal with bullshit in it where you could
+            // have shown the full sprite and actual details." Right on both counts. It had the season's
+            // blurb and a generic sentence about the KIND, which is the least informative thing on hand —
+            // the moment you are handed a season exclusive is the moment to say what it does. The milestone
+            // track already resolves exactly that (seasonPrizeDetails: rarity, and the stat lines rendered
+            // by the same helper the Armoury uses), so the modal reads the same source rather than a second,
+            // vaguer one.
             if (prize.prize) {
-                const { seasonPrizeArt } = await import("@/lib/marketplace/road-prizes.js");
-                const pics = await seasonPrizeArt(season).catch(() => ({}));
-                prize.prize = { ...prize.prize, art: pics?.[prize.prize.ref] || null };
+                const { seasonPrizeArt, seasonPrizeDetails } = await import("@/lib/marketplace/road-prizes.js");
+                const [pics, detail] = await Promise.all([
+                    seasonPrizeArt(season).catch(() => ({})),
+                    seasonPrizeDetails([prize.prize]).catch(() => ({})),
+                ]);
+                const d = detail?.[prize.prize.ref] || null;
+                prize.prize = {
+                    ...prize.prize,
+                    art: pics?.[prize.prize.ref] || null,
+                    rarity: d?.rarity || null,
+                    lines: d?.lines || [],
+                };
             }
             ladderPrize = prize;
             roadFirst = await announceRoadFirst(buyerId, wonRung, b.foe?.name).catch(() => null);
@@ -2706,7 +2723,14 @@ async function finishBout(buyerId, row, b, won) {
         vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
         rank: after?.rank ?? null, rankTotal: after?.rank_total ?? null,
         npcTier: npcTier || null,
-        ladder: wonRung ? { rung: wonRung, prize: ladderPrize } : null,
+        // ── THE PRIZE, NOT THE WHOLE REWARD ─────────────────────────────────────────────────────────────
+        // This published `ladderPrize` — the entire ladderReward() result, `{ laurels, label, prize? }` — as
+        // `prize`. That object is truthy on EVERY won rung, because every rung pays laurels. So the
+        // celebration modal, which mounts on `recap.ladder.prize`, fired on all of them: Luke got it at rung
+        // 40, which carries no milestone at all, with no name, no art and the fallback sentence about the
+        // kind, because none of those fields exist on the reward wrapper.
+        // Prizes are at 25, 50, 75, 100 and up (arena-season.js). Only the inner one is a prize.
+        ladder: wonRung ? { rung: wonRung, prize: ladderPrize?.prize || null } : null,
         // THE PERSON WHO DID IT GETS TOLD. The first cut announced a world-first to global chat and to nobody
         // else — so the one member who had actually earned it saw the same nothing everyone standing outside
         // the plaza saw. Luke, having taken rung 22: "where's the big announcement?" It was in chat. He was

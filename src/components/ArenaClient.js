@@ -3940,33 +3940,46 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 //
 // Its own sheet, over the recap, because it has to interrupt. The recap can be skimmed; this cannot, and the
 // player should have to close it — that is the celebration.
+// ── THE MILESTONE, THE MOMENT IT IS WON ──────────────────────────────────────────────────────────────────────
+// The SAME card the milestone track opens when you tap a rung — same classes, same order, same fields, same
+// art fallback. It was a second, thinner version of it: a react-icons glyph at icon size and one of four
+// hardcoded sentences chosen off `kind` ("a piece you keep, wear and forge like any other"), which is true of
+// every item in the game and so says nothing about this one. Luke: "super weak attempt at the modal with
+// bullshit in it where you could have shown the full sprite and actual details."
+//
+// Two screens describing one object is how they come to disagree; the track was already doing it properly, so
+// this renders what the track renders. Only two things differ, and both are because this is a CELEBRATION
+// rather than a browse: the kicker says MILESTONE, and the button takes the prize instead of claiming it.
 function RoadPrize({ ladder, onClose }) {
     useScrollLock(true);
     const prize = ladder?.prize;
     if (!prize) return null;
-    const Glyph = PRIZE_GLYPH[prize.kind] || GiBroadsword;
+    const KIND = { decoration: "farm decoration", recipe: "recipe", pet: "companion", gear: "gear" };
     return (
         <Portal>
             <div className="ar-prize" role="dialog" aria-modal="true">
-                <div className="ar-prize-card">
-                    <span className="ar-prize-kick">Rung {ladder.rung} · Milestone</span>
-                    <div className="ar-prize-art">
-                        {prize.art ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={prize.art} alt="" draggable="false" />
-                        ) : <Glyph aria-hidden="true" />}
-                    </div>
-                    <b className="ar-prize-name">{prize.name}</b>
-                    {/* The season's own line about the piece. It is the only place this text is ever read, and
-                        it is what makes the thing feel authored rather than dispensed. */}
-                    {prize.blurb ? <p className="ar-prize-blurb">{prize.blurb}</p> : null}
-                    <span className="ar-prize-kind">
-                        {prize.kind === "decoration" ? "A farm piece nobody outside this season can own."
-                            : prize.kind === "recipe" ? "A page for the book, cookable forever."
-                            : prize.kind === "pet" ? "A companion that only ever walked this Road."
-                            : "A piece you keep, wear and forge like any other."}
+                <div className="ar-prize-card" onClick={(e) => e.stopPropagation()}>
+                    <span className="ar-prize-rung">Rung {ladder.rung} · Milestone</span>
+                    <span className="ar-prize-art" aria-hidden="true">
+                        {prize.art
+                            ? // eslint-disable-next-line @next/next/no-img-element
+                            <img src={prize.art} alt="" draggable="false"
+                                onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            : (PRIZE_GLYPH[prize.kind] || GiLaurelCrown)({})}
                     </span>
-                    <button type="button" className="ar-btn ar-prize-go" onClick={onClose}>Take it</button>
+                    <b className="ar-prize-name">{prize.name}</b>
+                    <em className="ar-prize-kind">
+                        {prize.rarity ? `${prize.rarity} ` : ""}{KIND[prize.kind] || prize.kind}
+                    </em>
+                    {prize.blurb ? <p className="ar-prize-blurb">{prize.blurb}</p> : null}
+                    {prize.lines?.length ? (
+                        <dl className="ar-prize-stats">
+                            {prize.lines.map((l) => (
+                                <div key={l.label}><dt>{l.label}</dt><dd>{l.value}</dd></div>
+                            ))}
+                        </dl>
+                    ) : null}
+                    <button type="button" className="ar-prize-claim" onClick={onClose}>Take it</button>
                 </div>
             </div>
         </Portal>
