@@ -73,7 +73,9 @@ export const CARDS = {
     },
     hop: {
         id: "hop", pet: "frog", name: "Hop", cost: 1, kind: "skill", target: "self",
-        block: 5, text: "Gain 5 block.", upgrade: { block: 8 },
+        // "Block", capitalised, because that is the KEYWORD — the card face lights the vocabulary this file
+        // owns, and a lowercase "block" is just a word that silently fails to match and never lights.
+        block: 5, text: "Gain 5 Block.", upgrade: { block: 8 },
     },
     pounce: {
         id: "pounce", pet: "fox_kit", name: "Pounce", cost: 2, kind: "attack", target: "foe",
@@ -88,6 +90,13 @@ export const STARTER_DECK = [
 ];
 
 export const cardById = (id) => CARDS[id] || null;
+
+// ── THE WORDS THAT MEAN SOMETHING ────────────────────────────────────────────────────────────────────────
+// Spire colours its keywords inside the card text — "Gain 5 Block", "Apply 2 Vulnerable" — and that colouring
+// is how a hand gets read at speed: you are not reading sentences, you are spotting the two words that decide
+// the turn. Kept here rather than in the card component because the rules own the vocabulary; a screen that
+// invented its own list would drift the moment a card added a keyword.
+export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Strength"];
 
 // ── WHAT THE THING ACROSS THE SAND IS DOING ──────────────────────────────────────────────────────────────
 // Three beats on a loop, and you are always shown the NEXT one. Deliberately not random: a fixed cycle is

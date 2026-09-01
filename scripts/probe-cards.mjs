@@ -95,6 +95,9 @@ await mouse("mousePressed", card2.x, card2.y);
 await mouse("mouseReleased", card2.x, card2.y);
 await sleep(120);
 console.log("SELECTED", JSON.stringify(await evalJs(`({ picked: !!document.querySelector('.cf-card.is-picked') })`)));
+// The picked card is the ANSWER to a fanned hand: a card whose right-hand end is covered by its neighbour has
+// to become fully legible when you are considering it, or the overlap is just lost information.
+await shot("3b-selected");
 const foe2 = await box(".cf-foe");
 await mouse("mousePressed", foe2.x, foe2.y);
 await mouse("mouseReleased", foe2.x, foe2.y);

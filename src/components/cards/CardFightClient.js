@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GiCrossedSwords, GiShield, GiSwordWound } from "react-icons/gi";
+import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSwordWound } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight,
 } from "@/lib/marketplace/cards-kit.js";
+import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
 // ── ONE FIGHT, ON A PHONE ────────────────────────────────────────────────────────────────────────────────────
 // You on the left, something off the Long Road on the right, five cards in your hand and a pile at each corner.
@@ -31,15 +32,49 @@ const Sprite = ({ src, fallback, className, flip }) => {
     );
 };
 
-/** One card face: cost, the pet's own sprite, its name and what it does. */
-const CardFace = ({ card, art, dim }) => (
-    <>
-        <span className={`cf-cost${dim ? " is-dim" : ""}`}>{card.cost}</span>
-        <span className="cf-art"><Sprite src={art?.url} className="cf-art-img" /></span>
-        <span className="cf-name">{card.name}</span>
-        <span className="cf-text">{card.text}</span>
-    </>
-);
+// ── READING A HAND AT SPEED ──────────────────────────────────────────────────────────────────────────────
+// Nobody reads sentences on a card; they spot the two words that decide the turn. Spire colours its keywords
+// inside the text and that is most of why its cards are legible at a glance, so ours do the same — off the
+// vocabulary the RULES own (cards-kit), not a list this file invented.
+const KEY_RE = new RegExp(`\\b(${KEYWORDS.join("|")})\\b`, "g");
+const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
+    KEYWORDS.includes(part) ? <b key={`k${i}`} className="cf-key">{part}</b> : part
+));
+
+// A hex from RARITY_META, softened to a wash — the banner is tinted BY the rarity rather than painted in it,
+// or a Legendary card is a solid orange brick with unreadable text on it.
+const wash = (hex, alpha) => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
+    if (!m) return `rgba(154,160,166,${alpha})`;
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+};
+
+/**
+ * One card face, in the anatomy Spire settled on: the cost hanging off the corner, a name banner whose colour
+ * IS the rarity, a framed window for the art, a tab naming the type, and the text underneath with its keywords
+ * lit. Every one of those is a channel that does not cost a word — you can tell an Attack from a Skill, and a
+ * Legendary from a Common, without reading anything.
+ */
+const CardFace = ({ card, art, dim }) => {
+    const meta = RARITY_META[art?.rarity] || RARITY_META.common;
+    return (
+        <>
+            <span className={`cf-cost${dim ? " is-dim" : ""}`}>{card.cost}</span>
+            <span
+                className="cf-banner"
+                style={{ background: wash(meta.color, 0.24), color: meta.color, borderColor: wash(meta.color, 0.55) }}
+            >
+                {card.name}
+            </span>
+            <span className="cf-art" style={{ borderColor: wash(meta.color, 0.4) }}>
+                <Sprite src={art?.url} className="cf-art-img" />
+            </span>
+            <span className="cf-type">{card.kind === "attack" ? "Attack" : "Skill"}</span>
+            <span className="cf-text">{withKeywords(card.text)}</span>
+        </>
+    );
+};
 
 export default function CardFightClient({ fixture }) {
     const router = useRouter();
@@ -166,7 +201,7 @@ export default function CardFightClient({ fixture }) {
     // A five-card hand shows every face in full; past that they fan and overlap like a real hand. The old
     // overlap hid the right-hand end of each card TEXT, which reads as a rendering fault — "Apply 2 Vulnerab"
     // is not a clipped box, it is the next card sitting on top of the end of the sentence.
-    const overlap = fight.hand.length > 5 ? -38 : -4;
+    const overlap = fight.hand.length > 5 ? -44 : -18;
 
     const pileList = useMemo(() => {
         if (!peek) return [];
@@ -315,8 +350,11 @@ export default function CardFightClient({ fixture }) {
                 .cf-field::after { content: ""; position: absolute; inset: 0;
                     background: linear-gradient(180deg, rgba(8,9,13,0.55), rgba(8,9,13,0.1) 40%, rgba(8,9,13,0.75)); pointer-events: none; }
 
-                .cf-chrome { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between;
-                    align-items: center; z-index: 3; }
+                /* Both on the LEFT. The seed sat top-right and a foe with a long intent ("GUARDED SWING") grew its pill
+                   straight through it — and the intent is the one thing on this screen that must never be
+                   obstructed. */
+                .cf-chrome { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 10px;
+                    justify-content: flex-start; align-items: center; z-index: 3; }
                 .cf-chip { background: rgba(10,12,16,0.7); border: 1px solid #2c3340; color: #cfd7e2; border-radius: 999px;
                     padding: 5px 12px; font-size: 12px; font-weight: 700; }
                 .cf-seed { font-size: 11px; color: #8b97a8; letter-spacing: 0.04em; }
@@ -353,26 +391,49 @@ export default function CardFightClient({ fixture }) {
                 /* The lift on a picked card happens INSIDE this padding, and the cost badge sits inside the
                    card rather than hanging off it — at the end of a five-card hand the outside corner is
                    half a screen-edge away and the badge was being cut in half by it. */
-                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 18px 10px 0; }
-                .cf-card { position: relative; flex: 0 0 auto; width: 72px; height: 114px; padding: 5px 4px 4px;
-                    display: flex; flex-direction: column; align-items: center; gap: 1px; touch-action: none;
-                    overflow: hidden; background: linear-gradient(180deg, #1d2330, #141922); border: 1px solid #39445a;
-                    border-radius: 10px; box-shadow: 0 6px 14px rgba(0,0,0,0.5); transition: transform 120ms ease-out; }
-                .cf-card.is-picked { transform: translateY(-16px); border-color: #ffd75e; }
+                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 26px 12px 0; }
+                /* 80x108 — near enough Spire's 0.78 wide-to-tall, and the reason the text can be read at all.
+                   The 72x114 this started at was a 0.63 card, too narrow for its own sentence, which is what
+                   forced the font down to 8px in the first place. */
+                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 118px; padding: 0 0 5px;
+                    display: flex; flex-direction: column; align-items: center; touch-action: none;
+                    background: linear-gradient(180deg, #1d2330, #10141c); border: 1px solid #39445a;
+                    border-radius: 9px; box-shadow: 0 6px 14px rgba(0,0,0,0.5);
+                    transition: transform 120ms ease-out; }
+                /* The picked card LIFTS AND GROWS above its neighbours. A hand has to overlap to fit a phone,
+                   so the one you are considering is the one that has to be fully legible. */
+                .cf-card.is-picked { transform: translateY(-20px) scale(1.16); border-color: #ffd75e; z-index: 6;
+                    box-shadow: 0 12px 22px rgba(0,0,0,0.62); }
                 .cf-card.is-spent { opacity: 0.45; }
                 .cf-card.is-ghosted { opacity: 0.25; }
                 .cf-card.is-static { margin: 0; box-shadow: none; }
-                .cf-cost { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
-                    display: grid; place-items: center; font-size: 12px; font-weight: 800; z-index: 2;
-                    background: #2b3550; border: 1px solid #6f86c0; color: #dbe6ff; }
-                .cf-cost.is-dim { background: #2a2f38; border-color: #464f5e; color: #97a1b0; }
-                .cf-art { width: 100%; height: 34px; display: grid; place-items: center; margin-top: 3px; }
-                .cf-art-img { max-width: 100%; max-height: 34px; object-fit: contain; }
-                .cf-name { font-size: 10px; font-weight: 800; letter-spacing: 0.01em; }
+                /* HUNG OFF THE CORNER, in amber. Recessed inside the frame in cool blue it read as decoration;
+                   the cost is the first thing you check against the energy you have left. */
+                .cf-cost { position: absolute; top: -7px; left: -7px; width: 21px; height: 21px; border-radius: 50%;
+                    display: grid; place-items: center; font-size: 12px; font-weight: 800; z-index: 3;
+                    background: radial-gradient(circle at 35% 30%, #ffd75e, #d98b1c); border: 1px solid #7a5410;
+                    color: #2a1a02; box-shadow: 0 2px 5px rgba(0,0,0,0.55); }
+                .cf-cost.is-dim { background: #2a2f38; border-color: #464f5e; color: #97a1b0; box-shadow: none; }
+                /* The banner carries the RARITY of the pet on the card — the colour is doing a job. */
+                .cf-banner { width: 100%; padding: 2px 3px; border-bottom: 1px solid; border-radius: 8px 8px 0 0;
+                    font-size: 9.5px; font-weight: 800; letter-spacing: 0.01em; text-align: center;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .cf-art { position: relative; width: calc(100% - 8px); height: 40px; margin: 4px 4px 0;
+                    display: grid; place-items: center; border: 1px solid; border-radius: 5px;
+                    background: radial-gradient(ellipse at 50% 70%, rgba(255,255,255,0.07), rgba(0,0,0,0.28)); }
+                .cf-art-img { max-width: 92%; max-height: 36px; object-fit: contain; }
+                /* Sits ON the seam between the art and the text, exactly where Spire puts it. */
+                .cf-type { margin-top: -6px; padding: 1px 7px; border-radius: 999px; font-size: 7.5px;
+                    font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #cbd5e4;
+                    background: #232b3a; border: 1px solid #3d4959; z-index: 2; }
                 /* Bounded, or a two-clause card writes straight out through the side of itself — which is what
                    Pounce did, and it looked like a rendering fault rather than a card. */
-                .cf-text { width: 100%; font-size: 8px; line-height: 1.18; text-align: center; color: #b7c2d2;
-                    overflow: hidden; overflow-wrap: break-word; }
+                /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
+                   through the bottom edge onto the tray behind it. */
+                .cf-text { flex: 1; width: 100%; padding: 3px 4px 0; font-size: 8.5px; line-height: 1.2;
+                    text-align: center; color: #e2e8f2; overflow: hidden; overflow-wrap: break-word; }
+                /* The two words that decide the turn, lit. */
+                .cf-key { color: #ffd75e; font-weight: 800; }
 
                 .cf-bar { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; padding-top: 6px; }
                 .cf-pile { background: #141922; border: 1px solid #2c3340; color: #b7c2d2; border-radius: 8px;
@@ -386,7 +447,7 @@ export default function CardFightClient({ fixture }) {
                     background: linear-gradient(180deg, #ffd75e, #e0a92c); color: #241a03; font-weight: 800; font-size: 14px; }
                 .cf-end:disabled { opacity: 0.5; }
 
-                .cf-drag { position: fixed; z-index: 5000; width: 72px; height: 114px; padding: 5px 4px 4px;
+                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 118px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
@@ -430,10 +491,29 @@ function Bar({ unit, name, accent }) {
                 <div className="cfb-fill" style={{ width: `${pct}%` }} />
                 <span className="cfb-hp">{unit.hp} / {unit.hpMax}</span>
             </div>
+            {/* ── STATUS AS ICONS, NOT SENTENCES ──────────────────────────────────────────────────────
+                Spire puts a row of small marked icons under the health bar, and the reason is arithmetic:
+                three statuses written as words ("Vulnerable 2", "Weak 1", "Strength 3") is a wrapping
+                paragraph under a 168px bar on a phone. The title carries the word for anyone who needs it. */}
             <div className="cfb-tags">
-                {unit.block > 0 ? <span className="cfb-tag is-block"><GiShield aria-hidden="true" />{unit.block}</span> : null}
-                {unit.vulnerable > 0 ? <span className="cfb-tag is-vuln">Vulnerable {unit.vulnerable}</span> : null}
-                {unit.weak > 0 ? <span className="cfb-tag is-weak">Weak {unit.weak}</span> : null}
+                {unit.block > 0 ? (
+                    <span className="cfb-tag is-block" title={`Block ${unit.block}`}><GiShield aria-hidden="true" />{unit.block}</span>
+                ) : null}
+                {unit.vulnerable > 0 ? (
+                    <span className="cfb-tag is-vuln" title={`Vulnerable ${unit.vulnerable} — takes 50% more damage`}>
+                        <GiCrackedShield aria-hidden="true" />{unit.vulnerable}
+                    </span>
+                ) : null}
+                {unit.weak > 0 ? (
+                    <span className="cfb-tag is-weak" title={`Weak ${unit.weak} — deals 25% less damage`}>
+                        <GiSwordWound aria-hidden="true" />{unit.weak}
+                    </span>
+                ) : null}
+                {unit.strength > 0 ? (
+                    <span className="cfb-tag is-str" title={`Strength ${unit.strength}`}>
+                        <GiBiceps aria-hidden="true" />{unit.strength}
+                    </span>
+                ) : null}
             </div>
             <style jsx global>{`
                 .cfb { width: 100%; max-width: 168px; }
@@ -445,11 +525,12 @@ function Bar({ unit, name, accent }) {
                 .cfb-hp { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px;
                     font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 4px; min-height: 16px; }
-                .cfb-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
-                    font-size: 10px; font-weight: 700; background: rgba(10,12,16,0.8); border: 1px solid #3a4354; }
+                .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
+                    font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }
                 .cfb-tag.is-vuln { color: #ffcf6a; border-color: #6e5a24; }
                 .cfb-tag.is-weak { color: #c8a6ff; border-color: #4c3d6e; }
+                .cfb-tag.is-str { color: #ff9f6a; border-color: #6e4a2c; }
             `}</style>
         </div>
     );

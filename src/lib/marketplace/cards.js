@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import { CARDS, nextRand } from "@/lib/marketplace/cards-kit.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
 // The rules live in cards-kit.js and run in the browser (see the note at the top of that file: the fight pays
@@ -55,8 +56,18 @@ export async function getCardFightFixture(buyerId, seed) {
             name: foe.name, art: foe.sprite, artFallback: foe.spriteFallback,
             color: foe.color, houseName: foe.houseName, rung: foe.rung,
         },
-        // pet_id -> { url, flip }. A card face is a portrait rather than a combatant, so `flip` is carried but
-        // the card does not act on it — a pet looking left on its own card is not wrong, it is a photograph.
-        petArt: Object.fromEntries((sprites || []).map((r) => [r.pet_id, { url: r.url, flip: r.flip === true }])),
+        // pet_id -> { url, flip, rarity }. A card face is a portrait rather than a combatant, so `flip` is
+        // carried but the card does not act on it — a pet looking left on its own card is not wrong, it is a
+        // photograph.
+        //
+        // RARITY COMES ALONG FOR FREE, and it is the whole reason the banner can be coloured. Spire's card
+        // banners are grey / blue / gold for common / uncommon / rare, and every pet in the Den already
+        // carries a rarity on its collectible — so a Legendary pet's card can look legendary without anybody
+        // authoring a second table. Read here rather than in the browser so the client never has to pull the
+        // 118-entry catalogue in to colour three cards.
+        petArt: Object.fromEntries((sprites || []).map((r) => [
+            r.pet_id,
+            { url: r.url, flip: r.flip === true, rarity: collectibleById(r.pet_id)?.rarity || "common" },
+        ])),
     };
 }
