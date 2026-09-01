@@ -12,7 +12,19 @@
 // kill two beats out. It is the honest upper bracket to check:road's lower one, and the truth is between them.
 //
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-played.mjs [member] [maxRung] [tries]
-import { npcBuild } from "../src/lib/marketplace/arena-npc.js";
+// ── THE FOE IS BUILT THE WAY THE GAME BUILDS IT ──────────────────────────────────────────────────────────────
+// This used npcBuild(rung), and the game does not call npcBuild for a Road fight at all. arena.js builds a rung
+// from statsForPower(f.power, f.archetype) + ladderDr(rung) + npcSkills at a kitTier of round(rung*0.9). The two
+// disagree badly: at rung 33 npcBuild totals 1,991 stat points and the game fields 3,275 — the sim was fighting
+// an opponent about a third weaker than the one members actually meet, at every rung.
+//
+// That is why this script reported Kaishiern beating rung 40 outright on the night he lost rung 33 five times,
+// and why last night's archetype re-derivation did not land. Luke: "I'm guessing we use the one that matches up
+// with the state of the game." Exactly this — the game is the truth and the tool follows it.
+import { npcAbilities, statsForPower } from "../src/lib/marketplace/arena-npc.js";
+import { ladderFoe, ladderDr } from "../src/lib/marketplace/arena-ladder.js";
+import { npcClassForArchetype, npcSkills } from "../src/lib/marketplace/arena-skills.js";
+import { buildForClass } from "../src/lib/marketplace/arena-npc-build.js";
 import { fighterFrom, kitFor } from "../src/lib/marketplace/arena.js";
 import { openRing, act, ringResult, autoRing } from "../src/lib/marketplace/arena-ring.js";
 import { resolveSkill } from "../src/lib/marketplace/arena-skills.js";
@@ -63,8 +75,17 @@ console.log("  rung  build                    auto    played");
 let autoWall = 0;
 let playedWall = 0;
 for (let t = 1; t <= MAX; t += 1) {
-    const b = npcBuild(t, 0);
-    const foe = fighterFrom(b.stats, b.perks, null);
+    // Mirrors arena.js's ladder branch line for line — statsForPower, the Road's own damage reduction, the
+    // kit tier, the class off the ARCHETYPE (never the tier), and the deck drawn from inside that class.
+    const f = ladderFoe(t);
+    const st = statsForPower(f.power, f.archetype, null, t);
+    st.dr = ladderDr(t);
+    const kitTier = Math.max(1, Math.round(t * 0.9) + (f.champion ? 8 : 0));
+    const foeClass = npcClassForArchetype(f.archetype);
+    const foeBuild = buildForClass(kitTier, foeClass);
+    const foe = { ...f, ...st, ...fighterFrom(st, {}, null),
+        abilities: npcAbilities(kitTier, f.archetype),
+        skills: npcSkills(kitTier, f.archetype, foeClass, foeBuild?.branches) };
     let a = 0;
     let p = 0;
     for (let s = 0; s < TRIES; s += 1) {
@@ -76,7 +97,7 @@ for (let t = 1; t <= MAX; t += 1) {
     if (ar >= 0.5) autoWall = t;
     if (pr >= 0.5) playedWall = t;
     if (t % 5 === 0 || t > MAX - 6) {
-        console.log(`  ${String(t).padStart(4)}  ${`${b.classId}:${b.archetype}`.padEnd(22)} ${(ar * 100).toFixed(0).padStart(5)}%  ${(pr * 100).toFixed(0).padStart(7)}%`);
+        console.log(`  ${String(t).padStart(4)}  ${`${foeClass}:${f.archetype}`.padEnd(22)} ${(ar * 100).toFixed(0).padStart(5)}%  ${(pr * 100).toFixed(0).padStart(7)}%`);
     }
 }
 console.log(`\n  auto-resolved, you beat outright to rung ${autoWall}`);
