@@ -2853,13 +2853,29 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     // Every battle already records the foe by NAME in its activity row, so the same seven-sortie window works
     // for both kinds without a schema change — and it counts SORTIES, not member-sorties, which is what the
     // rule always meant: seven fights, whoever they were against.
+    // ── AND IT HAS NEVER ONCE EXCLUDED A SHIP ────────────────────────────────────────────────────────────
+    // This read `sail_raid` rows and matched on meta->>'foe'. A fleet battle does not write one: it settles
+    // through finishFleetBattle, which logs `ship_battle_end` and records a RANK, not a name. So skipNames has
+    // only ever contained members, the fleet exclusion was empty on every sortie since it was written, and the
+    // comment above it — "every battle already records the foe by NAME in its activity row, so the same
+    // seven-sortie window works for both kinds" — was describing something that was not true.
+    //
+    // Which is why Luke's original report survived its own fix: "I got the same encounter like once in three
+    // fights, and I thought I told you I don't want the same encounter for at least seven fights." It still
+    // did. GrayKitsune, five weeks later: "its usually one I have already beaten."
+    //
+    // Both kinds of sortie, in one window, ordered together — seven FIGHTS, whoever they were against, which
+    // is what the rule always meant.
     const lastFought = await db.query(
-        `SELECT meta->>'foe' AS foe FROM mkt_activity_event
-          WHERE buyer_id = $1 AND event = 'sail_raid' AND meta->>'foe' IS NOT NULL
+        `SELECT meta->>'foe' AS foe, meta->>'rank' AS rank FROM mkt_activity_event
+          WHERE buyer_id = $1 AND event IN ('sail_raid', 'ship_battle_end')
           ORDER BY created_at DESC LIMIT $2`,
         [buyerId, RIVAL_COOLDOWN]
     ).catch(() => []);
     const skipNames = new Set(lastFought.map((r) => r.foe).filter(Boolean));
+    // A fleet ship is identified by its rung. `sail_raid` rows carry a `rank` too — the rank a RIVAL's ship
+    // resembles — so only rows without a foe name are read as fleet sorties.
+    const skipRanks = new Set(lastFought.filter((r) => !r.foe && r.rank != null).map((r) => Number(r.rank)));
     const draw = async (excluding) => db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
@@ -2891,7 +2907,7 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     // a captain who has outgrown the bottom climbs into the ships above it instead of being handed the
     // flagship and marking every rung between as beaten.
     const reach = Math.min(MAX_FLEET_RANK, (Number(myDepth) || 0) + 2);
-    const fleetPool = FLEET.filter((f) => f.rank <= reach && !skipNames.has(f.name));
+    const fleetPool = FLEET.filter((f) => f.rank <= reach && !skipNames.has(f.name) && !skipRanks.has(f.rank));
     const fleetFallback = FLEET.filter((f) => f.rank <= reach);
     const all = (fleetPool.length ? fleetPool : (fleetFallback.length ? fleetFallback : FLEET)).map((f) => ({
         kind: "fleet", rank: f.rank, boost: 1, name: f.name,
@@ -2914,8 +2930,11 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     //
     // FLEET_SHARE of sorties are against the fleet now, guaranteed, and the distance weighting is left to do
     // the thing it is good at: choosing WHICH ship of that kind. If one kind is empty the other takes the roll.
-    const closest = (kind, n) => {
-        const pool = all.filter((c) => c.kind === kind).sort((a, z) => a.d - z.d).slice(0, n);
+    const closest = (kind, n, reorder = null) => {
+        const sorted = all.filter((c) => c.kind === kind).sort((a, z) => a.d - z.d);
+        // The reorder runs on the WHOLE sorted list, before the slice — otherwise a ship that has to be on
+        // the list could be cut by the slice a line before it gets promoted onto it.
+        const pool = (reorder ? reorder(sorted) : sorted).slice(0, n);
         const weighted = pool.map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
         let roll = Math.random() * weighted.reduce((sum, c) => sum + c.w, 0);
         return weighted.find((c) => (roll -= c.w) <= 0) || weighted[0] || null;
@@ -2923,7 +2942,28 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myDepth = 0) {
     // FIVE, not three. The cooldown removes whoever you just fought, but a shortlist of three weighted
     // boost/(1+i) still puts most of the remaining weight on one ship — the two halves of "the same encounter
     // again" are the missing filter AND the narrow pool.
-    const fleet = closest("fleet", 5);
+    // ── AND THE NEXT RUNG HAS TO BE ON THE LIST ──────────────────────────────────────────────────────────
+    // The shortlist takes the ships whose odds sit closest to TARGET_ODDS, which is a shade in your favour.
+    // A rung you have NOT beaten is, by construction, the hardest thing in the pool — so its odds are the
+    // furthest from "a shade in your favour", and it is exactly what an odds-nearest shortlist throws away.
+    //
+    // Measured on GrayKitsune's real numbers (depth 8, reach 10) over sixty draws: ranks 4,5,6,7,8 and never
+    // once 9 or 10. His actual history says the same — thirty-eight fleet fights, none above rank 8. The
+    // ladder could not advance, for anybody, which is why rank 12 has been fought three times in the Den's
+    // history and ranks 14 and 15 never at all. GrayKitsune: "there is still a lot of tiers of battles in the
+    // ladder I have never fought."
+    //
+    // So the next unbeaten rung is put at the FRONT of the fleet shortlist, ahead of the odds sort. It is the
+    // one fight that moves the ladder, and a ladder nobody can climb is fifteen ships of wasted art. Every
+    // other seat still goes to the nearest-odds ships, and the cooldown above still applies to it — beat it
+    // or lose to it and the next seven sorties look elsewhere.
+    const nextRung = Math.min(MAX_FLEET_RANK, (Number(myDepth) || 0) + 1);
+    const promote = (list) => {
+        const i = list.findIndex((c) => c.kind === "fleet" && c.rank === nextRung);
+        if (i <= 0) return list;                 // absent (on cooldown, or already top) or already first
+        return [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
+    };
+    const fleet = closest("fleet", 5, promote);
     const rival = closest("rival", SHORTLIST);
     if (!rival) return fleet;
     if (!fleet) return rival;
