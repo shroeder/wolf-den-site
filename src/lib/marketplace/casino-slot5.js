@@ -233,15 +233,15 @@ const HUNT = {
     // of the SAME cabinet's five-of-a-kind rather than by lifting the floor. That is not levelling a cabinet
     // down to a target — it is moving money from rare-and-enormous to common-and-small on one machine, which
     // is the actual fix for "nothing ever pays".
-        wolf: { 3: 14.7, 4: 132, 5: 1610 },
-        chest: { 3: 5.03, 4: 43.9, 5: 396 },
-        laurel: { 3: 1.83, 4: 13.2, 5: 110 },
-        doubloon: { 3: 0.92, 4: 5.03, 5: 36.6 },
-        bone: { 3: 0.48, 4: 1.83, 5: 14.7 },
+        wolf: { 3: 13.2, 4: 118, 5: 1448 },
+        chest: { 3: 4.52, 4: 39.5, 5: 356 },
+        laurel: { 3: 1.64, 4: 11.8, 5: 98.8 },
+        doubloon: { 3: 0.828, 4: 4.52, 5: 32.9 },
+        bone: { 3: 0.431, 4: 1.64, 5: 13.2 },
     },
     // Scatters pay a multiple of the TOTAL bet, not the line bet, because they do not sit on a line. This is
     // the one payout a player can always find without understanding paylines.
-    scatterPays: { 3: 1.1, 4: 5.03, 5: 33 },
+    scatterPays: { 3: 0.988, 4: 4.52, 5: 29.6 },
     // Its free round is the only one on the floor you CHOOSE the shape of — see FREE_SPIN_OFFERS.
     free: { kind: "deals", spins: 10, label: "Ten spins, four times" },
     // ── DOWN THROUGH THE WARREN ──────────────────────────────────────────────────────────────────────
@@ -300,13 +300,13 @@ const HARVEST = {
     // Base game 40 per cent of the return, the built round 60, which is what a Pharaoh's-Fortune bonus
     // is supposed to be: the base game keeps you in the chair and the bonus is the payday.
     pays: {
-        wolf: { 3: 6.65, 4: 40.9, 5: 346.6 },
-        chest: { 3: 3.48, 4: 18.7, 5: 125.7 },
-        laurel: { 3: 1.72, 4: 8.67, 5: 49.2 },
-        doubloon: { 3: 0.762, 4: 4.09, 5: 20.4 },
-        bone: { 3: 0.516, 4: 2.18, 5: 9.95 },
+        wolf: { 3: 6.31, 4: 38.8, 5: 329 },
+        chest: { 3: 3.3, 4: 17.8, 5: 119 },
+        laurel: { 3: 1.63, 4: 8.23, 5: 46.7 },
+        doubloon: { 3: 0.724, 4: 3.88, 5: 19.4 },
+        bone: { 3: 0.49, 4: 2.07, 5: 9.45 },
     },
-    scatterPays: { 3: 1.02, 4: 4.09, 5: 16.61 },
+    scatterPays: { 3: 0.969, 4: 3.88, 5: 15.8 },
     // ── AND IT DOES NOT CASCADE ──────────────────────────────────────────────────────────────────────
     // It used to: every win threshed away, what was above falling into the hole, the multiplier climbing
     // with each break, and eight breaks opening the round. That is The Vault's mechanic and The Vault is
@@ -383,13 +383,13 @@ const DEEP = {
     // The Deep took 99.17% to 118.33% on the fill alone — a low symbol's three-of-a-kind is the most common
     // event on a reel, so it costs far more than its size suggests. Swept: the new bottom rungs are small
     // (Herring 0.14, Mackerel 0.26) and the top four/five came down about 8% to pay for them.
-        wolf: { 3: 21.9, 4: 153.2, 5: 1718.2 },
-        chest: { 3: 6.49, 4: 45.8, 5: 393.4 },
-        laurel: { 3: 2.19, 4: 13.2, 5: 112.2 },
-        doubloon: { 3: 0.274, 4: 4.98, 5: 38.9 },
-        bone: { 3: 0.143, 4: 1.26, 5: 10.9 },
+        wolf: { 3: 20, 4: 140, 5: 1570 },
+        chest: { 3: 5.93, 4: 41.8, 5: 360 },
+        laurel: { 3: 2, 4: 12.1, 5: 102 },
+        doubloon: { 3: 0.251, 4: 4.55, 5: 35.6 },
+        bone: { 3: 0.131, 4: 1.15, 5: 10 },
     },
-    scatterPays: { 3: 1.09, 4: 4.98, 5: 27.61 },
+    scatterPays: { 3: 1, 4: 4.55, 5: 25.3 },
     // ── THREE STARFISH ON A LINE ─────────────────────────────────────────────────────────────────────
     // Luke, with a reference machine: "you trigger free spins by getting three bonus symbols on a payline,
     // and then you get eight free spins, and wilds once they pop up they stay in place, and then there's a
@@ -486,15 +486,15 @@ const MENAGERIE = {
     pays: {
         // The two giants sit above the wild, which is the right order for this cabinet: the wild is how you
         // COMPLETE a line of them, so it must be worth less than the thing it is completing.
-        dire: { 3: 1.63, 4: 9.8, 5: 87.6 },
-        keeper: { 3: 1.42, 4: 8.17, 5: 71.3 },
-        wolf: { 3: 0.857, 4: 4.89, 5: 42.0 },
-        chest: { 3: 0.406, 4: 2.13, 5: 14.0 },
-        laurel: { 3: 0.213, 4: 0.98, 5: 5.56 },
-        doubloon: { 3: 0.103, 4: 0.49, 5: 2.37 },
-        bone: { 3: 0.064, 4: 0.271, 5: 1.11 },
+        dire: { 3: 1.54, 4: 9.27, 5: 82.9 },
+        keeper: { 3: 1.34, 4: 7.73, 5: 67.5 },
+        wolf: { 3: 0.811, 4: 4.63, 5: 39.7 },
+        chest: { 3: 0.384, 4: 2.02, 5: 13.2 },
+        laurel: { 3: 0.202, 4: 0.927, 5: 5.26 },
+        doubloon: { 3: 0.0974, 4: 0.464, 5: 2.25 },
+        bone: { 3: 0.0606, 4: 0.256, 5: 1.05 },
     },
-    scatterPays: { 3: 0.064, 4: 0.322, 5: 2.58 },
+    scatterPays: { 3: 0.0606, 4: 0.304, 5: 2.44 },
     // ── HOW MANY SCATTERS BOUGHT HOW MANY SPINS ──────────────────────────────────────────────────────
     // "If you trigger the bonus you get a certain amount of free spins depending on how many scatters you
     // get." Three is the door; every one after that is worth a lot more than the last, which is what makes
@@ -562,13 +562,13 @@ const VAULT = {
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     pays: {
-        wolf: { 3: 3.48, 4: 26.7, 5: 345.5 },
-        chest: { 3: 1.01, 4: 7.69, 5: 76.0 },
-        laurel: { 3: 0.361, 4: 2.26, 5: 18.0 },
-        doubloon: { 3: 0.16, 4: 0.764, 5: 5.44 },
-        bone: { 3: 0.106, 4: 0.393, 5: 1.58 },
+        wolf: { 3: 3.19, 4: 24.5, 5: 317 },
+        chest: { 3: 0.927, 4: 7.06, 5: 69.8 },
+        laurel: { 3: 0.331, 4: 2.07, 5: 16.5 },
+        doubloon: { 3: 0.146, 4: 0.701, 5: 4.99 },
+        bone: { 3: 0.0973, 4: 0.361, 5: 1.45 },
     },
-    scatterPays: { 3: 0.743, 4: 3.85, 5: 23.9 },
+    scatterPays: { 3: 0.682, 4: 3.54, 5: 21.9 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And

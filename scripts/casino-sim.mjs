@@ -15,7 +15,8 @@ import { SLOTS5, playSpin } from "@/lib/marketplace/casino-slot5.js";
 
 const arg = (f, d) => { const i = process.argv.indexOf(f); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const SPINS = arg("--spins", 200000);
-const HOUSE = arg("--rtp", 1);        // multiply every payout by this to model a house edge
+const HOUSE = arg("--rtp", 1);        // an EXTRA multiplier on top of the shipped paytable, for asking
+                                      // "what if we cut another 5%" — 1 measures the machine as it ships
 const BET = 100;
 
 const pct = (n) => (100 * n).toFixed(2) + "%";
@@ -58,6 +59,7 @@ const m = SLOTS5.slot;
 console.log(`
 Buy in ${BANK.toLocaleString()} chips, play ${m.label} at ${BET} a spin until broke or ${GOAL.toLocaleString()} (a Counter pet).`);
 console.log("This is the question an RTP cannot answer: does anybody ever actually get there?");
+console.log("EXTRA x on top of the shipped paytable — 1.00 means the machine as it ships");
 console.log("payout x   reached goal   went broke   median spins");
 for (const edge of [1, 0.97, 0.95, 0.92, 0.90, 0.85]) {
     let won = 0, spinsTotal = 0;
@@ -154,9 +156,9 @@ const bi = await import("@/lib/marketplace/bingo-kit.js");
         for (let j = pool.length - 1; j > 0; j -= 1) { const k = Math.floor(Math.random() * (j + 1)); [pool[j], pool[k]] = [pool[k], pool[j]]; }
         const drawn = pool.slice(0, bi.DRAWN);
         const r = bi.scoreCard(card, drawn, []);
-        const mult = Number(r?.pays ?? r?.multiple ?? r?.mult ?? 0) || 0;
+        const mult = Number(r?.mult) || 0;   // scoreCard's own field — the one the screen reads
         staked += 1; back += mult;
-        const key = r?.tier ?? r?.pattern ?? (mult ? String(mult) : "nothing");
+        const key = r?.tier ?? (mult ? String(mult) : "nothing");
         tally[key] = (tally[key] || 0) + 1;
     }
     console.log(`\n── BINGO ──  ${CARDS.toLocaleString()} cards, ${bi.DRAWN} of ${bi.BALLS} drawn`);

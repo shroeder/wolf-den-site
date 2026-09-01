@@ -254,14 +254,19 @@ export const cornersOf = (card, drawn, burnt = []) => {
 //
 // A LINE STILL GETS YOUR CARD BACK, which is the one rule in this game worth saying out loud, and it is why
 // `1` is untouched. Everything above it was solved for by check:bingo against two million real cards.
+// ── RAISED TO MEET THE FLOOR, 2026-09-01 ─────────────────────────────────────────────────────────────────
+// This table returned 67.2% while every cabinet on the floor returned 101-105%. Bingo was not a game with a
+// house edge, it was the trap: two-thirds of the return of the thing next to it, for a player who has no way
+// of knowing that. The whole ladder is multiplied by 1.41 so the SHAPE is untouched — the same one-in-two-
+// thousand six-liner, the same corners consolation — and only the height moves.
 export const BINGO_PAYS = {
-    corners: 0.5,
-    1: 1,
-    2: 1.5,
-    3: 5,
-    4: 10,
-    5: 25,
-    6: 200,   // six lines or more — about one card in two thousand
+    corners: 0.7,
+    1: 1.4,
+    2: 2.1,
+    3: 7,
+    4: 14,
+    5: 35,
+    6: 283,   // six lines or more — about one card in two thousand
 };
 
 /** The single source of truth for what one card won. The screen shows what this returned. */

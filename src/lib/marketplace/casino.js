@@ -1005,7 +1005,14 @@ export const KENO_DRAWN = 10;
 // machine on the chip floor, and the rule there is the one check:slot5 states at length: chips are tickets,
 // not money, so what matters is that no cabinet is the smart pick. At 84.60% keno was the smart pick to
 // AVOID; the five slot cabinets return 97.6% to 108.5% and this now sits at 98.48%, in the middle of them.
-export const KENO_PAYS = { 0: 0, 1: 0, 2: 1, 3: 3, 4: 25, 5: 600 };
+// ── RETUNED TO 0.95, 2026-09-01 ──────────────────────────────────────────────────────────────────────────
+// Was { 2: 1, 3: 3, 4: 25, 5: 600 }, which returns 102.70% — and that is not a sample, it is arithmetic:
+// hypergeometric chances times the ladder, plus the golden ball. A ticket paid more than it took.
+//
+// Two hits still returns your stake exactly. That tier is 27.8% of all tickets and it is the one people read
+// as "I got my money back"; taking the cut from there would have made the commonest outcome a small loss,
+// which is a worse game for the same number. The whole reduction comes off the three tiers above it.
+export const KENO_PAYS = { 0: 0, 1: 0, 2: 1, 3: 2.7, 4: 22, 5: 540 };
 
 // ── THE GOLDEN BALL ──────────────────────────────────────────────────────────────────────────────────────────
 // Keno's problem was never its return, it was the shape of it. Worked out exactly rather than simulated — the
