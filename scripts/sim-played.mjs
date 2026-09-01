@@ -30,13 +30,26 @@ import { openRing, act, ringResult, autoRing } from "../src/lib/marketplace/aren
 import { resolveSkill } from "../src/lib/marketplace/arena-skills.js";
 import { db } from "../src/lib/db.js";
 
-const WHO = process.argv[2] || "The Wolf Den";
+// ── ONE TABLE, SEVERAL FIGHTERS ──────────────────────────────────────────────────────────────────────────────
+// Luke: "simulated, like, a hundred bouts on each rung for the three fighters... and then you gave me a table
+// of where we got, what our success rate was on each rung."
+//
+// A comma-separated list runs them all and prints one column each, so the three are read against each other on
+// the same rungs rather than in three separate outputs nobody can line up.
+//
+//   npm run sim:road -- "The Wolf Den,Eric D,JT" 100 100
+const WHO = (process.argv[2] || "The Wolf Den").split(",").map((w) => w.trim()).filter(Boolean);
 const MAX = Number(process.argv[3]) || 70;
 const TRIES = Number(process.argv[4]) || 30;
+// Every rung, not every fifth, once there is a table to read. `--step N` thins it back out.
+const STEP = Number((process.argv.find((a) => a.startsWith("--step")) || "").split("=")[1]) || 1;
 
-const me = await db.queryOne(`SELECT id, display_name FROM mkt_buyer WHERE display_name = $1`, [WHO]);
-if (!me) throw new Error(`no member called ${WHO}`);
-const kit = await kitFor(me.id);
+const fighters = [];
+for (const name of WHO) {
+    const row = await db.queryOne(`SELECT id, display_name FROM mkt_buyer WHERE display_name = $1`, [name]);
+    if (!row) throw new Error(`no member called ${name}`);
+    fighters.push({ name: row.display_name, kit: await kitFor(row.id) });
+}
 const seeded = (n) => { let x = n >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
 
 // What a beat was worth: damage taken off them, less damage taken by me, with their death counted as the win
@@ -47,7 +60,7 @@ const score = (before, after) => {
     return theirs - mine + (after.B.hp <= 0 ? 10 : 0) - (after.A.hp <= 0 ? 10 : 0);
 };
 
-function playedBout(foe, seed) {
+function playedBout(kit, foe, seed) {
     const rng = seeded(seed);
     let ring = openRing({ ...kit }, { ...foe }, { rng, foeSkills: foe.skills || {} });
     for (let guard = 0; guard < 400 && !ring.over && ring.awaiting === "act"; guard += 1) {
@@ -69,13 +82,16 @@ function playedBout(foe, seed) {
     return ringResult(ring).won;
 }
 
-console.log(`\n  ${me.display_name} — ${kit.classId}, damage ${Math.round(kit.damage)}, health ${kit.health}, armour ${kit.armor}`);
-console.log(`  auto = both sides on housePick (what check:road reports) · played = your side choosing properly\n`);
-console.log("  rung  build                    auto    played");
-let autoWall = 0;
-let playedWall = 0;
-let autoBest = 0;
-let playedBest = 0;
+for (const fx of fighters) {
+    console.log(`  ${fx.name.padEnd(14)} ${String(fx.kit.classId).padEnd(11)} damage ${String(Math.round(fx.kit.damage)).padStart(4)}  health ${String(fx.kit.health).padStart(5)}  armour ${fx.kit.armor}`);
+}
+console.log("");
+console.log(`  PLAYED — your side choosing properly, ${TRIES} bouts per rung per fighter.`);
+console.log("");
+console.log("  rung  opponent               " + fighters.map((fx) => fx.name.slice(0, 11).padStart(12)).join(""));
+
+const walk = fighters.map(() => 0);
+const best = fighters.map(() => 0);
 for (let t = 1; t <= MAX; t += 1) {
     // Mirrors arena.js's ladder branch line for line — statsForPower, the Road's own damage reduction, the
     // kit tier, the class off the ARCHETYPE (never the tier), and the deck drawn from inside that class.
@@ -88,34 +104,25 @@ for (let t = 1; t <= MAX; t += 1) {
     const foe = { ...f, ...st, ...fighterFrom(st, {}, null),
         abilities: npcAbilities(kitTier, f.archetype),
         skills: npcSkills(kitTier, f.archetype, foeClass, foeBuild?.branches) };
-    let a = 0;
-    let p = 0;
-    for (let s = 0; s < TRIES; s += 1) {
-        if (autoRing({ ...kit }, { ...foe }, { rng: seeded(9001 + s * 7919) }).won) a += 1;
-        if (playedBout(foe, 9001 + s * 7919)) p += 1;
-    }
-    const ar = a / TRIES;
-    const pr = p / TRIES;
-    // ── HOW FAR YOU GET IS WHERE YOU STOP, NOT THE LAST RUNG YOU EVER CLEAR ──────────────────────────
-    // These were `if (rate >= 0.5) wall = t`, overwritten every time — so the headline reported the HIGHEST
-    // rung anywhere above 50%, not how far you can actually walk. One lucky rung at 96 printed "you beat
-    // outright to rung 96" over a road that was 0% at 60, 70 and 75. That is almost certainly where "me and
-    // Eric could get to rung 100" came from: the number was never measuring a run.
-    //
-    // The wall is the FIRST rung you fail and do not recover from — tracked as the last rung of an unbroken
-    // run from the bottom. `best` keeps the old meaning alongside it, named honestly.
-    if (ar >= 0.5 && autoWall === t - 1) autoWall = t;
-    if (pr >= 0.5 && playedWall === t - 1) playedWall = t;
-    if (ar >= 0.5) autoBest = t;
-    if (pr >= 0.5) playedBest = t;
-    if (t % 5 === 0 || t > MAX - 6) {
-        console.log(`  ${String(t).padStart(4)}  ${`${foeClass}:${f.archetype}`.padEnd(22)} ${(ar * 100).toFixed(0).padStart(5)}%  ${(pr * 100).toFixed(0).padStart(7)}%`);
+
+    const rates = fighters.map((who, idx) => {
+        let p = 0;
+        for (let s = 0; s < TRIES; s += 1) if (playedBout(who.kit, foe, 9001 + s * 7919)) p += 1;
+        const r = p / TRIES;
+        // walk = an unbroken run from rung 1. best = the highest rung above 50% ANYWHERE. They differ wildly,
+        // and reporting only the second is what made this tool claim rung 100 for a road that walls in the 30s.
+        if (r >= 0.5 && walk[idx] === t - 1) walk[idx] = t;
+        if (r >= 0.5) best[idx] = t;
+        return r;
+    });
+    if (t % STEP === 0 || t === MAX) {
+        console.log(`  ${String(t).padStart(4)}  ${`${foeClass}:${f.archetype}`.padEnd(22)}`
+            + rates.map((r) => `${(r * 100).toFixed(0)}%`.padStart(12)).join(""));
     }
 }
 console.log("");
-console.log(`  auto-resolved  walk to rung ${autoWall} unbroken   (highest above 50% anywhere: ${autoBest})`);
-console.log(`  PLAYED         walk to rung ${playedWall} unbroken   (highest above 50% anywhere: ${playedBest})`);
-console.log("  walk = last rung of an unbroken run from 1. The two differ when the Road goes back up");
-console.log("  after a wall, which it does — read the column, not the headline.");
+fighters.forEach((who, idx) => {
+    console.log(`  ${who.name.padEnd(14)} walks to rung ${String(walk[idx]).padStart(3)} unbroken   (highest above 50% anywhere: ${best[idx]})`);
+});
 console.log("");
 process.exit(0);

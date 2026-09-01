@@ -199,7 +199,6 @@ function beatLabel(last, foeName = "") {
     const target = mine ? "them" : "you";
 
     // Things that happen TO a fighter get their own line, and that line's `who` is already the right fighter.
-    if (last.fever) return { move: "The pit closes", side: actor };
     if (last.burnTick) return { move: "Burning", side: actor };
     if (last.bleedTick) return { move: "Bleeding", side: actor };
     if (last.stunnedSkip) return { move: "Stunned", side: actor };
@@ -1602,7 +1601,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // never leaves the screen apparently frozen. Both clamps are cosmetic — the fight's own timeline is
         // unchanged and the server does not care what the screen does with it.
         if (line.atbGap != null) return hold + Math.max(120, Math.min(4000, line.atbGap));
-        const chore = line.cast || line.guard || line.fever;
+        const chore = line.cast || line.guard;
         const base = chore ? PLAY_CHORE_MS : PLAY_BLOW_MS;
         // Four or more still to come and the exchange is a run, not a beat: play it like one. A banner is
         // never rushed — only the beat that follows it is.
@@ -1960,7 +1959,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         }
 
         // Damage nobody threw: a wound, a fire, or the pit biting both fighters at once.
-        const passiveDmg = Boolean(last?.bleedTick || last?.burnTick || last?.fever);
+        const passiveDmg = Boolean(last?.bleedTick || last?.burnTick);
         if (p.hp != null && bout.hp < p.hp) {
             // YOU TOOK IT. Weight is the fraction of your whole bar this blow cost, which is what decides how
             // hard everything hits: the shake, the buzz, and how low and long the sound is.
@@ -2648,7 +2647,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 again, so it says so the round it starts and keeps saying how much. */}
                             {bout.fever > 1 ? (
                                 <span className="ar-tag is-fever"
-                                    title={`The pit is closing: both fighters take +${Math.round((bout.fever - 1) * 100)}% damage, rising every round until somebody goes down.`}>
+                                    title={`The pit is closing: every blow from both fighters lands for +${Math.round((bout.fever - 1) * 100)}% more, rising every beat until somebody goes down.`}>
                                     Pit +{Math.round((bout.fever - 1) * 100)}%
                                 </span>
                             ) : null}

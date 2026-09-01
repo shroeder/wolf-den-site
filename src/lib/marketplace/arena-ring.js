@@ -30,6 +30,7 @@
 // Which halves the cost of a fight, and that was the other complaint: a bout was 42-60 taps because half of
 // every exchange was a brace nobody was choosing.
 import { openTurn, resolveSwing, sideOf } from "@/lib/marketplace/arena-engine.js";
+import { pitFever } from "@/lib/marketplace/arena-kit.js";
 import { bars, chill, fillTo, foeTempo, FREEZE_MS_CAP, freezeMsFor, hold, haste, newTrack, nextUp, spend, STUN_HOLD_MS } from "@/lib/marketplace/arena-atb.js";
 import { housePick } from "@/lib/marketplace/arena-skills.js";
 // drFrom, so a defence measures an incoming blow exactly as the engine will apply it.
@@ -186,68 +187,25 @@ function settle(ring) {
 }
 
 // ── PIT FEVER: A FIGHT HAS TO END ────────────────────────────────────────────────────────────────────────────
-// Two Wardens both holding Bastion and Rally cannot kill each other. Measured: a mirror of either one runs to
-// the 300-beat cap, every seed, and comes back `unresolved` — which is not a fight, it is a member sitting in
-// a ring tapping for five minutes to be told nobody won.
+// Two Wardens both holding Bastion and Rally cannot kill each other, so something has to lean on a long fight
+// or it runs to the 300-beat cap and comes back `unresolved` — a member tapping for five minutes to be told
+// nobody won.
 //
-// The old engine had a rule for this and the note in arena-kit.js says what it was: "a fight is decided by the
-// fight. pitFever is what guarantees one ends." It came out with the turn loop. This is it, back.
+// ── AND IT IS THE DAMAGE THAT LEANS, NOT A BITE OUT OF BOTH BARS ─────────────────────────────────────────────
+// There were two mechanics here doing one job, and only one of them was real. `fever()` took a share of each
+// fighter's MAXIMUM health every beat past 28 — that ran. `pitFever()` raises what every blow lands for, 5% a
+// beat from beat 10, compounding — and it was exported, handed to the client, drawn on the fight screen as
+// "Pit +105%", and never once applied to a swing. The badge has been describing a mechanic the ring did not
+// have.
 //
-// From FEVER_AT the pit turns against both of them equally, and it compounds, so no amount of healing or
-// shielding outruns it for long. It is deliberately a share of MAXIMUM health rather than current: a fighter
-// cannot duck it by being nearly dead, and it cannot stall out asymptotically the way a share of current
-// health would.
-// ── AND THE PIT HAD TO CLOSE SOONER, BECAUSE THE MIRROR STOPPED ENDING ───────────────────────────────────────
-// Measured the day after the combat rework shipped. Almost everything moved the right way: the Warden's 85%
-// over the Reaver is gone, and ordinary bouts came down from the high twenties to 11-16 rounds, which is the
-// target. One pairing went the other way, hard — warden against warden went from 35 rounds to SEVENTY-NINE.
+// Luke: "you just remove the bite back we can keep the damage that goes up over time." So the bite is gone and
+// pitFever is wired into both swings, which is what the screen has been promising all along. It ends a stall
+// the same way — nothing survives a doubling multiplier for long — but it ends it by making the fight decisive
+// rather than by draining two bars that neither fighter can see a reason for.
 //
-// It is my own change that did it. Stuns stopped queueing (Math.min(1, ...) instead of +=) and a denied beat
-// now buys a beat of immunity, which together mean two Wardens can no longer take turns away from each other
-// at all. Both sides hold a guard they refresh every swing, neither can chain a denial to break the pattern,
-// and the fight becomes two walls. That is exactly the loop this fever exists to end — it just started far
-// too late to catch it: nothing at all happened until beat 45, and the grind from 45 to 80 is the number
-// above.
-//
-// 28 and 1.8%. A bout that finishes in the low twenties — which is now nearly all of them — still never sees
-// the pit at all, so nothing that is working gets touched. A thirty-round fight feels a nudge on its last
-// beats. A mirror that would have run to eighty now ends in the forties.
-//
-// The old warning still stands and is the reason this is a nudge rather than a hammer: this mechanic was
-// removed once for taking the fight off the player and punishing the Warden hardest, whose whole win
-// condition is outlasting. It has to end a stall without deciding a fight.
-//
-// SMALL SAMPLE. Four warden mirrors in twenty hours, nineteen in forty-eight. Re-measure before trusting it.
-export const FEVER_AT = 28;
-export const FEVER_PER_BEAT = 0.018;
+// It also stops punishing the outlast build for outlasting, which is why this mechanic was removed once
+// before: a Warden who wins slowly now wins faster, instead of being killed by the room.
 
-function fever(ring) {
-    if (ring.beat < FEVER_AT) return;
-    const share = FEVER_PER_BEAT * (ring.beat - FEVER_AT + 1);
-    const bites = [];
-    for (const f of [ring.A, ring.B]) {
-        // Through the shield first — a shield you refresh every beat is precisely what the fever is here to
-        // outlast, so letting it hide behind one would leave the stall exactly where it was.
-        const bite = Math.max(1, Math.round(f.maxHp * share));
-        const eaten = Math.min(f.shield, bite);
-        f.shield -= eaten;
-        f.hp -= bite - eaten;
-        bites.push(bite);
-    }
-    // NO `dmg` ON THIS LINE, deliberately. The fight screen reconstructs both health bars by subtracting each
-    // line's `dmg` from ONE side, and the pit bites both — a single number here would come off whichever bar
-    // `who` named and be wrong twice. The two bites ride as their own fields so the sentence can name them.
-    ring.log.push({ t: ring.t, who: "me", fever: true, share, meBite: bites[0], foeBite: bites[1],
-        meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });
-}
-
-/**
- * Hand the turn on — to the same fighter if they earned another, otherwise to the other one.
- *
- * Turn order is the bar: whoever's fills first is up. There is nothing here to decrement and nothing to
- * roll — the go-again chance that used to answer "who is up" is gone with the second attack speed behind
- * it. See the tombstone in arena-kit.js.
- */
 function closeTurn(ring, rng = Math.random) {
     const f = ring.acting === "me" ? ring.A : ring.B;
     // ── YOUR FIRST TURN IS SACRED ────────────────────────────────────────────────────────────────────
@@ -315,11 +273,10 @@ function advance(ring, rng) {
         // this, so the pit closing arrived with no text and no beat and the fight screen printed it as "You
         // strike — 0". The one line in the transcript that explains why both bars are falling on their own
         // read as a swing that did nothing.
+        if (settle(ring)) return ring;
+        // Taken before openTurn so the narration below also covers the bleed and burn ticks and the stun skip
+        // it pushes. It used to be declared above the fever call; the fever is gone and this is still needed.
         const from = ring.log.length;
-        fever(ring);
-        // Including when the pit is what ends it — narrate before the return, or the last line of the fight
-        // is the unnarrated one.
-        if (settle(ring)) { narrate(ring, from, { name: ring.foeName }); return ring; }
         // ── WHOEVER'S BAR FILLS FIRST ────────────────────────────────────────────────────────────────────
         // The one line the timer mode replaces. Everything below this point — the blows, the crits, the
         // bleed, the armour — is the same code the classic ring runs, which is the entire reason this can
@@ -344,8 +301,8 @@ function advance(ring, rng) {
         ring.beat += 1;
         const att = mine ? ring.A : ring.B;
         const def = mine ? ring.B : ring.A;
-        // `from` is above the fever call on purpose, so this narration also covers the bleed and burn ticks
-        // and the stun skip that openTurn pushes — those were the lines still coming out blank. A wound
+        // `from` is taken before openTurn on purpose, so this narration also covers the bleed and burn ticks
+        // and the stun skip it pushes — those were the lines still coming out blank. A wound
         // eating a third of somebody's health between two swings is not a footnote; it is frequently the
         // reason the fight went the way it did.
         // ── IS THIS TURN AN EXTRA ONE ────────────────────────────────────────────────────────────────────
@@ -376,7 +333,7 @@ function advance(ring, rng) {
                 resolveSwing({
                     A: ring.A, B: ring.B, att: ring.B, def: ring.A, who: "foe",
                     log: ring.log, t: ring.t, rng,
-                    mult: (foeSkill?.power ?? 1) * (cast?.mult || 1),
+                    mult: (foeSkill?.power ?? 1) * (cast?.mult || 1) * pitFever(ring.beat),
                     hitsOverride: foeSkill?.hits || 0,
                 });
             } else ring.log.push({ t: ring.t, who: "foe", cast: true, meHp: ring.A.hp, foeHp: ring.B.hp, meShield: ring.A.shield, foeShield: ring.B.shield, meStun: ring.A.stunned, foeStun: ring.B.stunned, meChill: ring.A.skipChance, foeChill: ring.B.skipChance });   // see the same push in act()
@@ -599,7 +556,7 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         // line in the beat's range with it, and openTurn pushes the wound and burn ticks into that same range,
         // so a bleed you were standing there taking came out as "BLEEDING · goes again" and did it once per
         // tick. A tick is not a turn: it happens TO you and nobody was handed anything.
-        const passive = Boolean(l.bleedTick || l.burnTick || l.fever || l.stunnedSkip || l.chilledSkip);
+        const passive = Boolean(l.bleedTick || l.burnTick || l.stunnedSkip || l.chilledSkip);
         if (again && l.who === by && !answer && !passive) l.again = true;
         const mine = l.who === "me";
         const actor = mine ? "You" : name;
@@ -610,8 +567,7 @@ function narrate(ring, from, { name, skill = null, by = "me", again = false }) {
         // strikes — 0", eight lines running, while the fight is in fact going well for you. Naming the guard
         // says the same number and says who is winning the exchange.
         const took = l.damage > 0 ? `${l.damage}.` : "the guard holds.";
-        if (l.fever) l.text = `The pit closes — ${l.meBite} off you, ${l.foeBite} off ${name}.`;
-        else if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
+        if (l.bleedTick) l.text = `${actor} bleed${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.burnTick) l.text = `${actor} burn${mine ? "" : "s"} — ${l.damage}.`;
         else if (l.stunnedSkip) l.text = `${actor} cannot act.`;
         // Named, rather than folded in with the stun. They are the same outcome and completely different
@@ -742,7 +698,7 @@ export function act(ring, { skill = null, rng = Math.random } = {}) {
         resolveSwing({
             A: ring.A, B: ring.B, att: ring.A, def: ring.B, who: "me",
             log: ring.log, t: ring.t, rng,
-            mult: (skill?.power ?? 1) * (cast?.mult || 1),
+            mult: (skill?.power ?? 1) * (cast?.mult || 1) * pitFever(ring.beat),
             hitsOverride: skill?.hits || 0,
         });
     } else {
