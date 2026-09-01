@@ -76,3 +76,90 @@ for (const edge of [1, 0.97, 0.95, 0.92, 0.90, 0.85]) {
     console.log(edge.toFixed(2).padStart(8) + pct(won / RUNS).padStart(15)
         + pct(1 - won / RUNS).padStart(13) + Math.round(spinsTotal / RUNS).toLocaleString().padStart(15));
 }
+
+// ── THE THREE TABLES ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "yes" — extend it past the slots. Each one is measured with the game's OWN functions, for the same
+// reason the cabinets are: a re-implementation prices a game nobody is playing.
+//
+// KENO is not simulated at all. Its return is a closed form — five picks out of forty, ten drawn — and
+// casino.js already computes it exactly, so sampling it would be a worse answer to a question that has an
+// arithmetic one.
+const { KENO_PAYS, KENO_PICKS, KENO_DRAWN, KENO_POOL, kenoChance, kenoRtp } =
+    await import("@/lib/marketplace/casino.js");
+console.log("\n── KENO ──  exact, not sampled");
+console.log(`  ${KENO_PICKS} picks from ${KENO_POOL}, ${KENO_DRAWN} drawn`);
+for (let k = 0; k <= KENO_PICKS; k += 1) {
+    const p = kenoChance(k);
+    if (!p) continue;
+    console.log(`  hit ${k}: ${(100 * p).toFixed(3).padStart(7)}%  pays ${String(KENO_PAYS[k] || 0).padStart(4)}x` +
+        (KENO_PAYS[k] ? `   1 in ${Math.round(1 / p).toLocaleString()}` : ""));
+}
+console.log(`  RTP ${(100 * kenoRtp()).toFixed(2)}%`);
+
+// ── BLACKJACK ────────────────────────────────────────────────────────────────────────────────────────────────
+// Played by basicStrategy(), which lives in the kit rather than here precisely so this can ask "what does the
+// table return to somebody who plays it WELL" — a simulation of a bad player flatters the house and proves
+// nothing. Six decks, dealer stands on all 17, 3:2 naturals, double after split, no rake.
+const bj = await import("@/lib/marketplace/blackjack-kit.js");
+const HANDS = arg("--hands", 300000);
+{
+    let staked = 0, back = 0, shoe = bj.freshShoe();
+    const draw = () => { if (shoe.length < 20) shoe = bj.freshShoe(); return shoe.pop(); };
+    const STAKE = 100;
+    for (let i = 0; i < HANDS; i += 1) {
+        const dealer = [draw(), draw()];
+        let hands = [{ cards: [draw(), draw()], doubled: false, fromSplit: false }];
+        staked += STAKE;
+        // One split, matching the table: canSplit refuses a second one.
+        for (let h = 0; h < hands.length; h += 1) {
+            const hand = hands[h];
+            for (;;) {
+                const may = bj.canSplit(hand.cards, hand.fromSplit) && hands.length < 2;
+                const act = bj.basicStrategy(hand.cards, dealer[0], hand.cards.length === 2, may);
+                if (act === "split") {
+                    staked += STAKE;
+                    const [a, b] = hand.cards;
+                    hands[h] = { cards: [a, draw()], doubled: false, fromSplit: true };
+                    hands.push({ cards: [b, draw()], doubled: false, fromSplit: true });
+                    continue;
+                }
+                if (act === "double" && hand.cards.length === 2) {
+                    staked += STAKE; hand.doubled = true; hand.cards.push(draw()); break;
+                }
+                if (act === "hit") { hand.cards.push(draw()); if (bj.handValue(hand.cards).bust) break; continue; }
+                break;
+            }
+        }
+        const done = bj.playDealer(dealer, shoe);
+        const dealerFinal = Array.isArray(done) ? done : (done?.cards || dealer);
+        for (const hand of hands) {
+            back += bj.settleHand({ player: hand.cards, dealer: dealerFinal, stake: STAKE,
+                doubled: hand.doubled, fromSplit: hand.fromSplit }).back;
+        }
+    }
+    console.log(`\n── BLACKJACK ──  ${HANDS.toLocaleString()} hands, basic strategy`);
+    console.log(`  staked ${staked.toLocaleString()}  returned ${Math.round(back).toLocaleString()}`);
+    console.log(`  RTP ${(100 * back / staked).toFixed(2)}%   rake ${bj.BLACKJACK_RAKE}`);
+}
+
+// ── BINGO ────────────────────────────────────────────────────────────────────────────────────────────────────
+const bi = await import("@/lib/marketplace/bingo-kit.js");
+{
+    const CARDS = arg("--cards", 200000);
+    let staked = 0, back = 0;
+    const tally = {};
+    for (let i = 0; i < CARDS; i += 1) {
+        const card = bi.makeCard();
+        const pool = Array.from({ length: bi.BALLS }, (_, n) => n + 1);
+        for (let j = pool.length - 1; j > 0; j -= 1) { const k = Math.floor(Math.random() * (j + 1)); [pool[j], pool[k]] = [pool[k], pool[j]]; }
+        const drawn = pool.slice(0, bi.DRAWN);
+        const r = bi.scoreCard(card, drawn, []);
+        const mult = Number(r?.pays ?? r?.multiple ?? r?.mult ?? 0) || 0;
+        staked += 1; back += mult;
+        const key = r?.tier ?? r?.pattern ?? (mult ? String(mult) : "nothing");
+        tally[key] = (tally[key] || 0) + 1;
+    }
+    console.log(`\n── BINGO ──  ${CARDS.toLocaleString()} cards, ${bi.DRAWN} of ${bi.BALLS} drawn`);
+    console.log(`  RTP ${(100 * back / staked).toFixed(2)}%`);
+    console.log("  outcomes " + JSON.stringify(tally));
+}
