@@ -17755,25 +17755,37 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-purse { font-family: var(--font-display); font-weight: 900; color: #ffd75e; }
 .cas-purse i { font-style: normal; font-size: 10px; color: #98a0aa; margin-left: 4px; }
 
-/* ── THE CAGE ─────────────────────────────────────────────────────────────────────────────────────────────
-   Directly under the purse, because with a chips-only floor this is the door onto it. The free claim is the
-   loud one — it is what somebody with an empty purse needs to find — and it stays put once spent rather than
-   disappearing, since a control that vanishes when you use it reads as a fault. */
-.cas-cage { display: grid; gap: 6px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px;
-  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); }
-.cas-cage-lab { font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: #8a939d; }
-.cas-cage-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.cas-cage-free, .cas-cage-buy { padding: 9px 12px; border-radius: 10px; font-weight: 900; font-size: 12.5px;
-  cursor: pointer; white-space: nowrap; color: inherit; background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.16); -webkit-tap-highlight-color: transparent; }
-.cas-cage-free { flex: 1 1 100%; }
-.cas-cage-free.is-on { color: #1c1608; background: linear-gradient(180deg, #ffd75e, #f0b73c);
+/* ── BUYING CHIPS ─────────────────────────────────────────────────────────────────────────────────────────
+   Directly under the purse, because with a chips-only floor this is the door onto it: today's free thousand,
+   then three amounts of gold to convert, then what that costs on one line underneath.
+
+   ── AND IT IS CALLED cas-buy BECAUSE cas-cage WAS ALREADY TAKEN ───────────────────────────────────────────
+   This shipped as `.cas-cage` — the obvious name for a chip cage — and drew as a 52px box with four buttons
+   spilling out of the side of it. `.cas-cage` is KENO'S HOPPER SPRITE, 800 lines further down this file:
+   `flex: 0 0 auto; width: 52px; height: 52px`. Same file, later rule, so the sprite's width won and the strip
+   was crushed into a square. Luke: "its not rendering properly."
+   Nothing about the strip's own rules was wrong, which is why reading them found nothing — the collision is
+   only visible if you grep the SELECTOR rather than the block. `.cas-hall` in CasinoClient.js carries a
+   comment about exactly this happening once before and getting renamed for it. It happened again.
+   Prefix by what a thing DOES on this screen (`cas-buy`), never by what the sprite in it is called. */
+.cas-buy { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+/* The claim gets its own row because it is a sentence and the three buys are not. Crammed onto one line all
+   four ellipsised at 375px — "Claim 1,000 fr…", "+1…", "+5…" — which is a strip that tells you nothing.
+   No `overflow: hidden` on any of them, deliberately: a label that stops fitting should visibly break the
+   row so it gets fixed, rather than quietly turning into three dots on the one screen size nobody shot. */
+.cas-buy-row { display: flex; gap: 6px; }
+.cas-buy-add { flex: 1 1 0; min-width: 0; }
+.cas-buy-free, .cas-buy-add { padding: 10px 8px; border-radius: 10px; font-weight: 900; font-size: 12.5px;
+  cursor: pointer; white-space: nowrap; color: inherit; text-align: center;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16);
+  -webkit-tap-highlight-color: transparent; }
+.cas-buy-free { display: block; width: 100%; font-size: 13.5px; }
+.cas-buy-free.is-on { color: #1c1608; background: linear-gradient(180deg, #ffd75e, #f0b73c);
   border-color: rgba(255,240,190,0.7); }
-.cas-cage-buy { flex: 1 1 0; min-width: 0; color: #ffe6a3; border-color: rgba(255,215,94,0.35);
-  background: rgba(255,215,94,0.10); }
-.cas-cage-free:disabled, .cas-cage-buy:disabled { cursor: default; opacity: 0.45; color: #9aa2ac;
+.cas-buy-add { color: #ffe6a3; border-color: rgba(255,215,94,0.35); background: rgba(255,215,94,0.10); }
+.cas-buy-free:disabled, .cas-buy-add:disabled { cursor: default; opacity: 0.45; color: #9aa2ac;
   background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
-.cas-cage-gold { font-size: 11px; color: #a4adb7; font-variant-numeric: tabular-nums; }
+.cas-buy-gold { font-size: 11px; color: #a4adb7; font-variant-numeric: tabular-nums; }
 
 /* The room. Deep and warm, with the floor catching the light from the cabinets. */
 /* ── HOW TALL THE ROOM IS ALLOWED TO BE ──────────────────────────────────────────────────────────────

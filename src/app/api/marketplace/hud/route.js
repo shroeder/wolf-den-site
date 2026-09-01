@@ -14,6 +14,7 @@ import { fishingUnlocked, sailingNeedsAttention, unusedCasts } from "@/lib/marke
 import { getFeatureClaimCounts } from "@/lib/marketplace/feature-dailies.js";
 import { getTownTodo } from "@/lib/marketplace/town.js";
 import { farmNav } from "@/lib/marketplace/farm.js";
+import { dailyChipsReady } from "@/lib/marketplace/chips.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -57,7 +58,7 @@ export async function GET(request) {
             });
         }
 
-        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm] =
+        const [arena, mining, delves, chests, spin, quests, strikes, attention, casts, featureClaims, townTodo, farm, freeChips] =
             await Promise.all([
                 safe(arenaNav(id), { unlocked: false, fightsLeft: 0 }),
                 MINING_UNLOCKED(id) ? safe(miningNav(id), null) : null,
@@ -71,6 +72,12 @@ export async function GET(request) {
                 safe(getFeatureClaimCounts(id), {}),
                 safe(getTownTodo(id), null),
                 safe(farmNav(id), null),
+                // ── THE FREE CHIPS, AS ONE BOOLEAN ───────────────────────────────────────────────────
+                // Luke: "casino should show a badge if you havent claimed your free chips."
+                // dailyChipsReady is a single indexed read of one column on mkt_buyer — deliberately NOT
+                // getCasinoState, which builds the whole floor. A nav badge that costs a feature build is
+                // the exact thing check:chrome exists to catch, and this component is in the layout.
+                safe(dailyChipsReady(id), false),
             ]);
 
         const chestList = Array.isArray(chests) ? chests : (chests?.chests || []);
@@ -80,6 +87,8 @@ export async function GET(request) {
             // Four booleans that used to cost four full feature builds between them.
             jeweller: true,
             casino: true,
+            // Unclaimed free chips today — drives the nav badge on /marketplace/casino.
+            casinoChips: Boolean(freeChips),
             kitchen: COOK_UNLOCKED(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             mine: {

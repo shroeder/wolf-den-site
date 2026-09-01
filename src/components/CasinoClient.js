@@ -489,24 +489,25 @@ function Cage({ st, setSt }) {
     };
 
     return (
-        <div className="cas-cage">
-            <span className="cas-cage-lab">The cage · 1 gold buys 1 chip</span>
-            <div className="cas-cage-row">
-                <button type="button" className={`cas-cage-free${st?.dailyChips ? " is-on" : ""}`}
-                    disabled={!st?.dailyChips || busy === "daily"}
-                    onClick={() => post({ action: "chips_daily" }, "daily")}>
-                    {busy === "daily" ? "…" : st?.dailyChips
-                        ? `Claim ${money(st?.dailyChipsN || 1000)} free chips`
-                        : "Free chips claimed today"}
-                </button>
+        <div className="cas-buy">
+            <button type="button" className={`cas-buy-free${st?.dailyChips ? " is-on" : ""}`}
+                disabled={!st?.dailyChips || busy === "daily"}
+                onClick={() => post({ action: "chips_daily" }, "daily")}>
+                {busy === "daily" ? "…" : st?.dailyChips
+                    ? `Claim ${money(st?.dailyChipsN || 1000)} free chips`
+                    : "Free chips claimed — back tomorrow"}
+            </button>
+            <div className="cas-buy-row">
                 {BUY_STEPS.map((n) => (
-                    <button key={n} type="button" className="cas-cage-buy" disabled={gold < n || busy === `b${n}`}
+                    <button key={n} type="button" className="cas-buy-add" disabled={gold < n || busy === `b${n}`}
                         onClick={() => post({ action: "chips_buy", gold: n }, `b${n}`)}>
                         {busy === `b${n}` ? "…" : `Buy ${money(n)}`}
                     </button>
                 ))}
             </div>
-            <span className="cas-cage-gold">{money(gold)} gold in your purse{note ? ` · ${note}` : ""}</span>
+            <span className="cas-buy-gold">
+                {note || `${money(gold)} gold · 1 gold buys 1 chip`}
+            </span>
         </div>
     );
 }
@@ -1528,7 +1529,7 @@ export default function CasinoClient({ initial }) {
                 <span className="cas-purse">{money(st?.chips)}<i>chips</i></span>
             </header>
 
-            {/* ── THE CAGE ────────────────────────────────────────────────────────────────────────────────
+            {/* ── BUYING CHIPS ────────────────────────────────────────────────────────────────────────────
                 Luke: "lets make it so you can buy chips and make it so everything takes chips to play. maybe
                 1 to 1 coins buy chips. and each day you can claim 1000 chips for free."
                 The floor takes chips at every machine now, so this is the only door onto it — which is

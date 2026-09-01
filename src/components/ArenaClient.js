@@ -1152,6 +1152,9 @@ function Recap({ bout, busy, onClose, away = null }) {
 export default function ArenaClient({ initial, boutOnly = false, onLeave = null }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
+    // One milestone sheet per bout. Keyed off the bout's own rung so the next prize opens its own, and so
+    // dismissing this one does not re-open it every time the recap re-renders.
+    const [prizeSeenAt, setPrizeSeenAt] = useState(null);
     // ── WHO TOOK IT, AND HOW HARD ── two different questions, and they used to share one number.
     // `shake` was 1 for "you landed a normal hit", 2 for "you landed a crit" AND for "you took a normal hit",
     // 3 for "you took a heavy one" — so the fighters, which read it as `hurt={shake >= 2}` for you and
@@ -1720,7 +1723,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // and a transcript written before interactive combat both play through here too, and neither should grow
     // a set of buttons on the way past.
     useEffect(() => { if (raw?.awaiting === "act") askedThisBout.current = true; }, [raw?.awaiting]);
-    const holdDeck = playing && askedThisBout.current;
+    // ── AND A FIGHT THAT WAS OVER BEFORE IT ASKED ────────────────────────────────────────────────────────
+    // askedThisBout is only true once the ring has asked you for something, so a bout that comes back already
+    // DECIDED — the whole exchange resolved in one response — never sets it, and the player watches the
+    // animation play out under no deck at all. Kaishiern reported exactly that and I told him his skills were
+    // on his bar, which was true and not what he was looking at. Luke: "the bug is you dont see your ability
+    // bar if the fight is already decided and its just playing the animations."
+    //
+    // `bout.deck` is the honest test for "a fight you are in": FightInput renders from it, a transcript from
+    // before interactive combat has none, and the away report does not come through this component at all.
+    // So a decided fight keeps its deck on screen, greyed, saying "the ring — playing out the last one".
+    // `raw`, not `bout` — bout is derived a hundred lines below this and reading it here is a temporal dead
+    // zone that throws at runtime while the build stays green. Same trap that broke every settle earlier in
+    // this codebase; caught by npm run lint:undef, which exists because of it. raw is the server payload and
+    // carries the deck already.
+    const holdDeck = playing && (askedThisBout.current || Boolean(raw?.deck?.length));
 
     // The position after the blows played so far. Recomputed rather than accumulated, so a scrub or a replay
     // can land anywhere without the health bars drifting out of step with the transcript.
@@ -3051,6 +3068,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         onClose={() => { if (st.away?.per?.length) act("seen"); leaveBout(); }} />
                 ) : null}
 
+                {/* ── AND THE MILESTONE, OVER THE TOP OF IT ───────────────────────────────────────────────
+                    Eight rungs in a season carry a prize. Shown ABOVE the recap rather than inside it: the
+                    recap is a summary you skim, and being handed a season-exclusive is the thing the rung was
+                    for. Dismissing it drops you back onto the recap, which is still there underneath. */}
+                {bout?.over && bout?.recap?.ladder?.prize && prizeSeenAt !== bout.recap.ladder.rung ? (
+                    <RoadPrize ladder={bout.recap.ladder}
+                        onClose={() => setPrizeSeenAt(bout.recap.ladder.rung)} />
+                ) : null}
+
                 {/* ── WHAT THE FIGHT IS ASKING YOU FOR ────────────────────────────────────────────────────
                     Mounted off `bout.awaiting` and nothing else. A finished bout, or a transcript from before
                     interactive combat shipped, publishes null and this renders nothing at all — so the passive
@@ -3901,6 +3927,49 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             </>) : null}
             <Styles />
         </section>
+    );
+}
+
+// ── A MILESTONE, THE MOMENT IT IS WON ────────────────────────────────────────────────────────────────────────
+// Luke: "when we get to a milestone in the road and unlock something we need a modal to celebrate and show
+// what they got."
+//
+// A season puts eight prizes on the Road and the recap was reporting them the way it reports 25 laurels — a
+// line in a list. Clearing rung 25 and being handed a decoration nobody outside this season can own is not a
+// line item; it is the reason the rung was worth taking, and it happens eight times in two hundred fights.
+//
+// Its own sheet, over the recap, because it has to interrupt. The recap can be skimmed; this cannot, and the
+// player should have to close it — that is the celebration.
+function RoadPrize({ ladder, onClose }) {
+    useScrollLock(true);
+    const prize = ladder?.prize;
+    if (!prize) return null;
+    const Glyph = PRIZE_GLYPH[prize.kind] || GiBroadsword;
+    return (
+        <Portal>
+            <div className="ar-prize" role="dialog" aria-modal="true">
+                <div className="ar-prize-card">
+                    <span className="ar-prize-kick">Rung {ladder.rung} · Milestone</span>
+                    <div className="ar-prize-art">
+                        {prize.art ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={prize.art} alt="" draggable="false" />
+                        ) : <Glyph aria-hidden="true" />}
+                    </div>
+                    <b className="ar-prize-name">{prize.name}</b>
+                    {/* The season's own line about the piece. It is the only place this text is ever read, and
+                        it is what makes the thing feel authored rather than dispensed. */}
+                    {prize.blurb ? <p className="ar-prize-blurb">{prize.blurb}</p> : null}
+                    <span className="ar-prize-kind">
+                        {prize.kind === "decoration" ? "A farm piece nobody outside this season can own."
+                            : prize.kind === "recipe" ? "A page for the book, cookable forever."
+                            : prize.kind === "pet" ? "A companion that only ever walked this Road."
+                            : "A piece you keep, wear and forge like any other."}
+                    </span>
+                    <button type="button" className="ar-btn ar-prize-go" onClick={onClose}>Take it</button>
+                </div>
+            </div>
+        </Portal>
     );
 }
 
@@ -5034,6 +5103,30 @@ function Styles() {
                loudest treatment on the recap and sits ABOVE the Victory line — winning the fight is the small
                half of it. Keyframes are ar-prefixed: two @keyframes sharing a name across styled-jsx blocks
                silently break both, and this file has several. */
+            /* ── THE MILESTONE SHEET ───────────────────────────────────────────────────────────────
+               Sits over the recap at a higher z than it, because it has to interrupt rather than queue. The
+               art is given real room — these are drawn per season and this is the one screen that shows one
+               at size. */
+            .ar-prize { position: fixed; inset: 0; height: 100dvh; z-index: 10120; display: grid;
+                place-items: center; padding: 18px; background: radial-gradient(120% 100% at 50% 30%,
+                rgba(80,60,10,.82), rgba(0,0,0,.86)); animation: overlayFade .25s ease both; }
+            .ar-prize-card { width: 100%; max-width: 340px; max-height: 90dvh; overflow-y: auto; text-align: center;
+                padding: 22px 18px 18px; border-radius: 20px; border: 2px solid #ffd75e;
+                background: linear-gradient(180deg, #2b2410, #16151b);
+                box-shadow: 0 24px 80px rgba(0,0,0,.65), 0 0 46px rgba(255,215,94,.28);
+                animation: pigPop .5s cubic-bezier(.2,1.2,.3,1) both; }
+            .ar-prize-kick { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .2em;
+                text-transform: uppercase; color: #ffd75e; }
+            .ar-prize-art { display: grid; place-items: center; width: 132px; height: 132px; margin: 10px auto 6px; }
+            .ar-prize-art img { width: 100%; height: 100%; object-fit: contain;
+                filter: drop-shadow(0 6px 16px rgba(0,0,0,.5)); }
+            .ar-prize-art svg { width: 78px; height: 78px; color: #ffd75e; opacity: .9; }
+            .ar-prize-name { display: block; font-family: var(--font-display); font-size: 1.5rem; font-weight: 900;
+                line-height: 1.1; color: #fff; text-wrap: balance; }
+            .ar-prize-blurb { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: #cfd6e4; }
+            .ar-prize-kind { display: block; margin-top: 10px; font-size: 11.5px; color: #98a0aa; }
+            .ar-prize-go { width: 100%; margin-top: 16px; }
+
             .ar-first { position: relative; overflow: hidden; margin: 0 0 12px; padding: 13px 14px;
                 border-radius: 15px; text-align: center;
                 background: radial-gradient(120% 140% at 50% 0%, rgba(255,215,94,0.30), rgba(255,215,94,0.06) 65%);

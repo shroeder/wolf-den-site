@@ -2670,6 +2670,17 @@ async function finishBout(buyerId, row, b, won) {
                 if (paid) prize.paid = paid;
             }
             await trackActivity(buyerId, "arena_ladder", { rung: wonRung, foe: b.foe.name }).catch(() => {});
+            // ── AND ITS PICTURE, FOR THE MOMENT IT IS WON ────────────────────────────────────────────
+            // ladderReward hands back the season's raw entry — rung, kind, ref, name, blurb — and no art,
+            // because the milestone TRACK resolves pictures separately when it draws the whole ladder. The
+            // celebration modal needs the same picture at the one moment the prize is actually handed over,
+            // and looking it up here is one read on the eight rungs a season that carry one. Falls back to
+            // the kind glyph client-side, exactly as the track does.
+            if (prize.prize) {
+                const { seasonPrizeArt } = await import("@/lib/marketplace/road-prizes.js");
+                const pics = await seasonPrizeArt(season).catch(() => ({}));
+                prize.prize = { ...prize.prize, art: pics?.[prize.prize.ref] || null };
+            }
             ladderPrize = prize;
             roadFirst = await announceRoadFirst(buyerId, wonRung, b.foe?.name).catch(() => null);
         }
