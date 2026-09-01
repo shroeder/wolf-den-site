@@ -23,7 +23,7 @@ import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.j
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
     vpTransfer, vpStakePreview, vpLossPreview,
-    lossLaurels, vpFor,
+    lossLaurels, vpFor, vpOdds,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr,
@@ -1116,6 +1116,10 @@ export async function getArenaState(buyerId, pre = {}) {
             // Luke: "I would expect to see just the vp I would earn or lose if I choose to fight them."
             vp: vpStakePreview(myVp, Number(o.vp) || 0),
             vpLoss: vpLossPreview(myVp, Number(o.vp) || 0),
+            // Your share of the expected result, so the row can say how hard this is with the same number
+            // that decides what it pays. The screen used to work it out from a RATIO of the two VP totals,
+            // which is not what the ladder means and moves the moment the scale does.
+            odds: vpOdds(myVp, Number(o.vp) || 0),
             // A member, so the PvP premium applies — the card must promise what finishBout will pay.
             laurels: boutLaurels({ won: true, myPower: Math.max(1, myVp), theirPower: Math.max(1, Number(o.vp) || 0), kind: "member" }),
             // What a defeat is worth at best and at worst, so "challenge upward" is a visible offer rather

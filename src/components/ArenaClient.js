@@ -3835,13 +3835,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         // the person reading it. It is the same undefined-power bug that once printed
                         // "0 dmg · 0 hp", surviving in the one place that did not print a number.
                         //
-                        // A member is banded on VICTORY POINTS, which is what the row already shows and what
-                        // matchmaking and the ladder both use. A Gauntlet tier has no standing, so it keeps
-                        // the power ratio — that one was never broken.
-                        const mine = o.vp != null ? (Number(st.me?.vp) || 0) : (Number(st.me?.power) || 0);
-                        const theirs = o.vp != null ? (Number(o.vp) || 0) : (Number(o.power) || 0);
-                        const ratio = theirs / Math.max(1, mine);
-                        const band = ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy";
+                        // ── BANDED ON THE ODDS, NOT ON A RATIO ──────────────────────────────────────
+                        // This divided their VP by yours: 1.15x was "harder", 0.85x "easier". That is not
+                        // what the ladder means — difficulty is a DIFFERENCE run through the rating curve —
+                        // and it only ever looked right because VP happened to be a four-digit number. The
+                        // scale moved from 3000 to 400 and every one of those ratios would have moved with
+                        // it without a single fight changing.
+                        // `odds` is your expected share of the result, computed server-side by the same
+                        // function that decides what the fight pays, so the word and the points agree.
+                        // A Gauntlet tier has no standing and keeps the power ratio — that was never broken.
+                        const ratio = (Number(o.power) || 0) / Math.max(1, Number(st.me?.power) || 0);
+                        const odds = o.reward?.odds;
+                        const band = odds != null
+                            ? (odds < 0.3 ? "brutal" : odds < 0.45 ? "hard" : odds < 0.6 ? "even" : "easy")
+                            : (ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy");
                         const top = (o.reward?.laurels || 0) === best && best > 0;
                         return (
                             <button key={o.key} type="button" className={`ar-pick-row is-${band}${top ? " is-top" : ""}`}

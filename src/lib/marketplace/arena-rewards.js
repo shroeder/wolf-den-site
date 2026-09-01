@@ -70,8 +70,38 @@ export function vpFor({ won, myPower = 1, theirPower = 1 }) {
 // have player risk player, so it has unique rules... the truth is they don't do anything, so there's nothing
 // to really get mad about. Losing victory points brings you down to a point where you can fight people that
 // are easier." Nothing else in the Den takes anything back.
-export const VP_SCALE = 3000;
-export const VP_K = 300;
+// ── MEASURED AGAINST 3,162 REAL BOUTS, NOT CHOSEN ────────────────────────────────────────────────────────────
+// scripts/vp-replay.mjs replays every member-vs-member bout in order, predicting each from the ratings as they
+// stood before it and only then applying it, so every figure below is out-of-sample.
+//
+//     SCALE   K     predicts   rank churn
+//      3000  300      76.4%       4.17     ← what this was
+//       400   32      76.4%       3.69     ← what it is
+//       800  300      79.7%       5.18     (predicts best BY chasing recent form, which is the complaint)
+//
+// The old pair was a ten-times-inflated version of a standard curve: the same information, ten times the
+// numbers, and up to 250 points moving on a single bout — a fifth of the seed. Luke: "vp rewards swing the
+// most recent player to the top pretty much." That is K, and 300 of it against a field where almost everybody
+// sits within 100 points of each other is a random walk with enormous steps.
+//
+// SCALE is the other half of what he asked for — "you should get less points if the opponent is easy and more
+// if they are more powerful". At 3000 a two-thousand-point gap only moved the expectation to 0.83, so beating
+// somebody far below you still paid 52. At 400 it pays about 3. The gap finally means something.
+export const VP_SCALE = 400;
+export const VP_K = 32;
+
+/**
+ * Your share of the expected result against them — 0.5 is a coin flip.
+ *
+ * Exported because the challenge list has to BAND each opponent, and it was doing that on a RATIO of the two
+ * VP totals (1.15x harder, 0.85x easier). A ratio is not what the ladder means: difficulty here is a
+ * DIFFERENCE run through the curve below, and a ratio only looked right while VP happened to be a
+ * four-digit number. Halve the scale and every ratio moves without a single fight changing.
+ * One function, so the word on the row and the points on the row can never disagree.
+ */
+export function vpOdds(myVp = 0, theirVp = 0) {
+    return 1 / (1 + Math.pow(10, ((Number(theirVp) || 0) - (Number(myVp) || 0)) / VP_SCALE));
+}
 
 /** What a bout moves between two members. Always a positive number — the caller decides the signs. */
 export function vpTransfer({ myVp = 0, theirVp = 0, won = false }) {
