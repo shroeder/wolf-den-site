@@ -13,7 +13,8 @@
 // This maps those into moves. Every ability names the item it came from, because an ability you cannot trace
 // to a piece of gear is magic, and you cannot build toward magic.
 
-import { itemById, CRIT_PER_POINT } from "@/lib/marketplace/items.js";
+import { itemById, CRIT_PER_POINT, STAT_EXPONENT, curve, procFrom,
+    PIERCE_PER_POINT, HASTE_PER_POINT, STUN_PER_POINT, COUNTER_PER_POINT, LIFESTEAL_PER_POINT } from "@/lib/marketplace/items.js";
 import { ELEMENTS, itemElement } from "@/lib/marketplace/boss-weakness.js";
 
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
@@ -549,10 +550,11 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // health/damage cancels, so BOUT LENGTH IS SCALE-INVARIANT: two equally-geared fighters trade the same number
 // of beats in commons as in primordials, forever. Give health and damage different exponents and bout length
 // starts drifting the moment gear grows, which is the whole class of bug this replaces.
-export const STAT_EXPONENT = 0.75;
-// Exported because arena-atb.js now runs Ferocity through it too, and a second copy of an exponent is
-// exactly how DAMAGE_PER_MIGHT came to be wrong by 3.1x. One curve, one file.
-export const curve = (v) => Math.pow(Math.max(0, Number(v) || 0), STAT_EXPONENT);
+// STAT_EXPONENT and `curve` moved to items.js with the five rates that use them — same one-way dependency,
+// and the item card has to be able to say what a stat is worth. Re-exported because arena-atb.js runs Ferocity
+// through the curve too, and a second copy of an exponent is exactly how DAMAGE_PER_MIGHT came to be wrong by
+// 3.1x. One curve, one file — that file is now items.js.
+export { STAT_EXPONENT, curve };
 
 // ── HEALTH PER POINT OF VITALITY ─────────────────────────────────────────────────────────────────────────────
 // Sized so the top of the ladder lands at Luke's target of about 1,500 health. HEALTH_BASE is gone with the
@@ -1067,12 +1069,12 @@ export const drFrom = (armour = 0, pierce = 0) => {
 // rarity (AFFIX_COUNT: common 2, primordial 6) and the forge spreads over whatever lines a piece carries — so
 // a fully-forged common puts half its enhances on each of two stats where a primordial spreads them over six.
 // For a single-stat build the humbler piece genuinely wins.
-export const procFrom = (points = 0, rate = 0) => rate * curve(points);
-export const PIERCE_PER_POINT = 0.005648;
-export const HASTE_PER_POINT = 0.005907;
-export const STUN_PER_POINT = 0.006073;
-export const COUNTER_PER_POINT = 0.005053;
-export const LIFESTEAL_PER_POINT = 0.006890;
+// ── DEFINED IN items.js, RE-EXPORTED HERE ────────────────────────────────────────────────────────────────────
+// Exactly as CRIT_PER_POINT already is, and for the reason written beside it there: this file imports items.js,
+// so the dependency only runs one way, and the ITEM CARD needs these numbers to describe the stat truthfully.
+// While they lived here the descriptions could only restate them from memory, and they did — five sentences
+// still quoting a flat per-point rate two tunings after these went onto a curve. One definition, both surfaces.
+export { procFrom, PIERCE_PER_POINT, HASTE_PER_POINT, STUN_PER_POINT, COUNTER_PER_POINT, LIFESTEAL_PER_POINT };
 
 export const BLOCK_REDUCTION = 0.35;
 // What one raised guard is worth, as a share of your own maximum health, before Unbreakable enlarges it.

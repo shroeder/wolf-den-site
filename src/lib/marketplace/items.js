@@ -82,6 +82,30 @@ export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.
 // Each stat carries a plain-English `desc` (what it does for a player, no jargon) + an icon, so the gear
 // screen can teach what every stat means instead of just showing a number.
+// ── THE FIVE THAT ARE ON A CURVE, AND THE CURVE ──────────────────────────────────────────────────────────────
+// Same argument as CRIT_PER_POINT directly above, and the same fault it was written to fix. These five stats
+// came off a flat per-point rate and onto a diminishing curve; the DESCRIPTIONS below did not follow, and went
+// on quoting the flat rate for two tunings. A member with 50 Pierce was being sold "25% of their armour
+// ignored" by the card while the ring gave them 10.6% — the card and the fight in different languages, which
+// is exactly the crit-chance bug over again.
+//
+// So the numbers live HERE, where the copy is written, and arena-kit re-exports them for the engine. The
+// descriptions are generated from them (see pointsPct) rather than typed, so the sentence cannot survive the
+// next retune with the old figure in it.
+export const STAT_EXPONENT = 0.75;
+export const curve = (v) => Math.pow(Math.max(0, Number(v) || 0), STAT_EXPONENT);
+export const procFrom = (points = 0, rate = 0) => rate * curve(points);
+export const PIERCE_PER_POINT = 0.005648;
+export const HASTE_PER_POINT = 0.005907;
+export const STUN_PER_POINT = 0.006073;
+export const COUNTER_PER_POINT = 0.005053;
+export const LIFESTEAL_PER_POINT = 0.006890;
+// What N points of one of them is actually worth, for the card. Two anchors rather than a per-point figure:
+// on a curve there IS no per-point figure, and quoting the one that is only true at a single point is how
+// this went wrong the first time.
+const pointsPct = (rate, pts) => `${Math.round(procFrom(pts, rate) * 1000) / 10}%`;
+const curveDesc = (what, rate) => `${what} 25 points is about ${pointsPct(rate, 25)}, 100 about ${pointsPct(rate, 100)} — each point past the last is worth a little less.`;
+
 export const STAT_META = {
     // ── WHAT THE PIECE ITSELF IS ─────────────────────────────────────────────────────────────────────────
     // These three are not affixes — they are the item. A weapon's damage and speed and a piece of armour's
@@ -119,14 +143,14 @@ export const STAT_META = {
     crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra a critical deals. Each point is +1%.", suffix: "" },
 
     // ── THE RARE ONES ────────────────────────────────────────────────────────────────────────────────────
-    pierce: { label: "Pierce", icon: "🗡️", desc: "Thins their armour. Each point ignores 0.5% of it.", suffix: "" },
-    lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you land comes back as health. Each point is 0.25%.", suffix: "" },
-    counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands. Each point is 0.25%.", suffix: "" },
+    pierce: { label: "Pierce", icon: "🗡️", desc: curveDesc("Thins their armour — how much of it your blows simply ignore.", PIERCE_PER_POINT), suffix: "" },
+    lifesteal: { label: "Lifedrink", icon: "🩸", desc: curveDesc("A share of the damage you land comes back as health.", LIFESTEAL_PER_POINT), suffix: "" },
+    counter: { label: "Riposte", icon: "⚔️", desc: curveDesc("Chance to strike back the moment their blow lands — a real swing, with its own crit roll, against their armour.", COUNTER_PER_POINT), suffix: "" },
     // The affix KEEPS ITS KEY so every piece already rolled with it keeps its value — it now buys the bar
     // refund instead of a second blow, at the same 0.5% a point. The label had to change with it: an affix
     // that says "lands twice" while granting something else is the kind of lie the info cards were full of.
-    stun: { label: "Chance to Stun", icon: "💫", desc: "Chance a blow stops their turn bar dead for a second. Each point is 0.5%.", suffix: "" },
-    haste: { label: "Chance to Haste", icon: "🌀", desc: "Chance a swing sends your turn bar to double speed for 6 seconds. Each point is 0.5%.", suffix: "" },
+    stun: { label: "Chance to Stun", icon: "💫", desc: curveDesc("Chance a blow stops their turn bar dead for a second.", STUN_PER_POINT), suffix: "" },
+    haste: { label: "Chance to Haste", icon: "🌀", desc: curveDesc("Chance a swing sends your turn bar to double speed for 6 seconds.", HASTE_PER_POINT), suffix: "" },
 
     // ── OUTSIDE THE RING ─────────────────────────────────────────────────────────────────────────────────
     // The one description not written here. Fortune reaches nine screens and its old copy was wrong on every
