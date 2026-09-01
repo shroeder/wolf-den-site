@@ -60,17 +60,12 @@ const CardFace = ({ card, art, dim }) => {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
     return (
         <>
-            <span className={`cf-cost${dim ? " is-dim" : ""}`}>{card.cost}</span>
-            <span
-                className="cf-banner"
-                style={{ background: wash(meta.color, 0.24), color: meta.color, borderColor: wash(meta.color, 0.55) }}
-            >
-                {card.name}
-            </span>
-            <span className="cf-art" style={{ borderColor: wash(meta.color, 0.4) }}>
+            <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
+            <span className="cf-banner" style={{ background: meta.color }}>{card.name}</span>
+            <span className="cf-art" style={{ borderColor: meta.color, background: `radial-gradient(ellipse at 50% 62%, ${wash(meta.color, 0.3)}, rgba(6,8,12,0.92))` }}>
                 <Sprite src={art?.url} className="cf-art-img" />
             </span>
-            <span className="cf-type">{card.kind === "attack" ? "Attack" : "Skill"}</span>
+            <span className="cf-type" style={{ background: meta.color }}>{card.kind === "attack" ? "Attack" : "Skill"}</span>
             <span className="cf-text">{withKeywords(card.text)}</span>
         </>
     );
@@ -197,11 +192,28 @@ export default function CardFightClient({ fixture }) {
     const dragCard = drag?.moved ? cardById(fight.hand.find((c) => c.uid === drag.uid)?.id) : null;
     const aiming = dragCard?.target === "foe" || cardById(fight.hand.find((c) => c.uid === selected)?.id)?.target === "foe";
     const hurt = (who) => floats.some((f) => f.on === who && f.kind === "damage");
-    // The hand overlaps harder the fuller it gets, so ten cards still fit on a 375px phone.
-    // A five-card hand shows every face in full; past that they fan and overlap like a real hand. The old
-    // overlap hid the right-hand end of each card TEXT, which reads as a rendering fault — "Apply 2 Vulnerab"
-    // is not a clipped box, it is the next card sitting on top of the end of the sentence.
-    const overlap = fight.hand.length > 5 ? -44 : -18;
+    // ── THE HAND IS A FAN, NOT A SHELF ───────────────────────────────────────────────────────────────────
+    // Spire's cards sit tilted at rest, each rotated a few degrees and dropped slightly at the edges, so a
+    // hand reads as something HELD. Ours were five upright rectangles in a row, which reads as a toolbar —
+    // and that difference is most of why they looked like UI and Spire's look like cards.
+    //
+    // Rotated about a point below the card (transform-origin 50% 130%) so the arc is struck from somewhere
+    // near the wrist. The angle widens with a fuller hand, and the overlap tightens to match, because ten
+    // cards and five have to live in the same 375px.
+    const handSize = fight.hand.length;
+    // 5 x 84 wide at -18 is a 348px row, and 22px of shoulder each side for the fan put it at 392 —
+    // seventeen wider than the phone it has to sit in, so the outer cost gems hung off the screen. At -24 the
+    // row is 368 and everything is on the glass. What you lose is the tail of a sentence at REST, which is
+    // what picking the card up is for.
+    const overlap = handSize > 5 ? -46 : -24;
+    const spread = handSize > 5 ? 2.8 : 4;
+    const fanOf = (i) => {
+        const mid = (handSize - 1) / 2;
+        const off = i - mid;
+        // The tilt is linear off the middle; the drop is quadratic, which is what makes it an arc rather
+        // than a slope.
+        return { rot: off * spread, drop: (off ** 2) * 2.4 };
+    };
 
     const pileList = useMemo(() => {
         if (!peek) return [];
@@ -269,7 +281,15 @@ export default function CardFightClient({ fixture }) {
                                 key={entry.uid}
                                 type="button"
                                 className={`cf-card${selected === entry.uid ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging ? " is-ghosted" : ""}`}
-                                style={{ marginLeft: i === 0 ? 0 : overlap }}
+                                style={{
+                                    marginLeft: i === 0 ? 0 : overlap,
+                                    // The picked card comes OUT of the fan — straightened, lifted and grown,
+                                    // and above its neighbours, because it is the one being read.
+                                    transform: selected === entry.uid
+                                        ? "translateY(-22px) scale(1.16)"
+                                        : `rotate(${fanOf(i).rot}deg) translateY(${fanOf(i).drop}px)`,
+                                    zIndex: selected === entry.uid ? 6 : i,
+                                }}
                                 onPointerDown={(e) => startDrag(e, entry.uid)}
                             >
                                 <CardFace card={card} art={fixture.petArt[card.pet]} dim={!playable} />
@@ -391,41 +411,61 @@ export default function CardFightClient({ fixture }) {
                 /* The lift on a picked card happens INSIDE this padding, and the cost badge sits inside the
                    card rather than hanging off it — at the end of a five-card hand the outside corner is
                    half a screen-edge away and the badge was being cut in half by it. */
-                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 26px 12px 0; }
+                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 30px 22px 6px; }
                 /* 80x108 — near enough Spire's 0.78 wide-to-tall, and the reason the text can be read at all.
                    The 72x114 this started at was a 0.63 card, too narrow for its own sentence, which is what
                    forced the font down to 8px in the first place. */
+                /* ── BUILT THE WAY THEIRS IS BUILT ───────────────────────────────────────────────────────
+                   Read off Spire's own shop screen at full size, which corrected the guess made from the
+                   small card images: the card BODY is neutral grey stone on every card in the game, and the
+                   rarity colour lives in three places only — the ribbon, the art window's border, and the
+                   type tab. Forethought (uncommon, blue) and Chrysalis (rare, gold) sit on the identical
+                   grey slab. Colouring the whole frame by rarity, which is what a first look suggests, makes
+                   a hand of five look like five different games. */
                 .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 118px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
-                    background: linear-gradient(180deg, #1d2330, #10141c); border: 1px solid #39445a;
-                    border-radius: 9px; box-shadow: 0 6px 14px rgba(0,0,0,0.5);
-                    transition: transform 120ms ease-out; }
-                /* The picked card LIFTS AND GROWS above its neighbours. A hand has to overlap to fit a phone,
-                   so the one you are considering is the one that has to be fully legible. */
-                .cf-card.is-picked { transform: translateY(-20px) scale(1.16); border-color: #ffd75e; z-index: 6;
-                    box-shadow: 0 12px 22px rgba(0,0,0,0.62); }
-                .cf-card.is-spent { opacity: 0.45; }
-                .cf-card.is-ghosted { opacity: 0.25; }
-                .cf-card.is-static { margin: 0; box-shadow: none; }
-                /* HUNG OFF THE CORNER, in amber. Recessed inside the frame in cool blue it read as decoration;
-                   the cost is the first thing you check against the energy you have left. */
-                .cf-cost { position: absolute; top: -7px; left: -7px; width: 21px; height: 21px; border-radius: 50%;
-                    display: grid; place-items: center; font-size: 12px; font-weight: 800; z-index: 3;
-                    background: radial-gradient(circle at 35% 30%, #ffd75e, #d98b1c); border: 1px solid #7a5410;
-                    color: #2a1a02; box-shadow: 0 2px 5px rgba(0,0,0,0.55); }
-                .cf-cost.is-dim { background: #2a2f38; border-color: #464f5e; color: #97a1b0; box-shadow: none; }
-                /* The banner carries the RARITY of the pet on the card — the colour is doing a job. */
-                .cf-banner { width: 100%; padding: 2px 3px; border-bottom: 1px solid; border-radius: 8px 8px 0 0;
-                    font-size: 9.5px; font-weight: 800; letter-spacing: 0.01em; text-align: center;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .cf-art { position: relative; width: calc(100% - 8px); height: 40px; margin: 4px 4px 0;
-                    display: grid; place-items: center; border: 1px solid; border-radius: 5px;
-                    background: radial-gradient(ellipse at 50% 70%, rgba(255,255,255,0.07), rgba(0,0,0,0.28)); }
-                .cf-art-img { max-width: 92%; max-height: 36px; object-fit: contain; }
-                /* Sits ON the seam between the art and the text, exactly where Spire puts it. */
-                .cf-type { margin-top: -6px; padding: 1px 7px; border-radius: 999px; font-size: 7.5px;
-                    font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #cbd5e4;
-                    background: #232b3a; border: 1px solid #3d4959; z-index: 2; }
+                    background: linear-gradient(180deg, #454b55 0%, #363b44 26%, #2b3038 100%);
+                    border: 1px solid #12161c; border-radius: 9px;
+                    box-shadow: 0 5px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09);
+                    transform-origin: 50% 130%; transition: transform 140ms ease-out; }
+                /* The picked card STRAIGHTENS out of the fan, lifts and grows. Its transform is set inline
+                   (the fan angle is per-card data), so this rule carries only what does not vary. */
+                .cf-card.is-picked { border-color: #ffd75e; box-shadow: 0 14px 24px rgba(0,0,0,0.66),
+                    inset 0 1px 0 rgba(255,255,255,0.12); }
+                .cf-card.is-spent { opacity: 0.5; }
+                .cf-card.is-ghosted { opacity: 0.22; }
+                .cf-card.is-static { margin: 0; box-shadow: none; transform: none; }
+                /* A DIAMOND HUNG OFF THE CORNER, in dark stone with a white numeral — theirs, and it reads
+                   better than the amber disc did against a lit card. Rotated square, so the glyph inside is
+                   counter-rotated. */
+                .cf-cost { position: absolute; top: -8px; left: -8px; width: 22px; height: 22px; z-index: 4;
+                    display: grid; place-items: center; transform: rotate(45deg); border-radius: 4px;
+                    background: linear-gradient(145deg, #6b7280, #2c313a); border: 1px solid #10131a;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28); }
+                .cf-cost i { transform: rotate(-45deg); font-style: normal; font-size: 12px; font-weight: 800;
+                    color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+                .cf-cost.is-dim { background: linear-gradient(145deg, #3a3f47, #23272e); }
+                .cf-cost.is-dim i { color: #96a0ae; }
+                /* THE RIBBON OVERHANGS THE CARD and its ends fold down past the top edge — it is draped over
+                   the card rather than printed on it. Solid rarity colour, white text: on their cards the
+                   ribbon IS the rarity read, so it has to be the strongest colour on the face. */
+                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px); margin: 5px -6px 0;
+                    padding: 2px 7px 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.01em;
+                    text-align: center; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.75);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                    clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 6px) 62%, 6px 62%, 0 100%);
+                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.45)); }
+                /* FULL BLEED inside a thick coloured window. The sprite floating on a dark panel with margins
+                   read as a sticker stuck to a card; theirs is a painted illustration filling the frame. */
+                .cf-art { position: relative; width: calc(100% - 8px); height: 45px; margin: -3px 4px 0;
+                    display: grid; place-items: center; border: 2px solid; border-radius: 5px;
+                    overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.55); }
+                .cf-art-img { max-width: 96%; max-height: 41px; object-fit: contain;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+                /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
+                .cf-type { margin-top: -7px; padding: 0 7px 1px; border-radius: 3px; font-size: 7px;
+                    font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: #14181f;
+                    border: 1px solid rgba(0,0,0,0.4); z-index: 3; }
                 /* Bounded, or a two-clause card writes straight out through the side of itself — which is what
                    Pounce did, and it looked like a rendering fault rather than a card. */
                 /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
@@ -448,12 +488,12 @@ export default function CardFightClient({ fixture }) {
                 .cf-end:disabled { opacity: 0.5; }
 
                 .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 118px; padding: 0 0 5px;
-                    display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none;
+                    display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
                        thumb is already taking a bite out of that half of the screen. */
-                    transform: translate(-50%, -118%) scale(0.9) rotate(-3deg);
-                    background: linear-gradient(180deg, #232a3a, #161c27);
+                    transform: translate(-50%, -118%) scale(0.94) rotate(-3deg);
+                    background: linear-gradient(180deg, #454b55 0%, #363b44 26%, #2b3038 100%);
                     border: 1px solid #ffd75e; border-radius: 10px; box-shadow: 0 14px 26px rgba(0,0,0,0.6); }
 
                 .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 16px;
