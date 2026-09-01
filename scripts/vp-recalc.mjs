@@ -38,7 +38,12 @@ const live = await db.query(`SELECT a.buyer_id, a.vp::int vp, a.best_vp::int bes
   FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id`);
 const changes = live
   .filter((r) => vp.has(r.buyer_id))
-  .map((r) => ({ id: r.buyer_id, name: r.display_name, from: r.vp, to: Math.round(vp.get(r.buyer_id)), best: r.best }))
+  .map((r) => {
+    const to = Math.round(vp.get(r.buyer_id));
+    // The high-water of the REPLAY, never below where they finished.
+    return { id: r.buyer_id, name: r.display_name, from: r.vp, to, best: r.best,
+             bestTo: Math.max(Math.round(best.get(r.buyer_id) ?? SEED), to) };
+  })
   .sort((a, b) => b.to - a.to);
 
 console.log(`VP_SCALE=${VP_SCALE} VP_K=${VP_K} · ${rows.length} bouts replayed · ${changes.length} members\n`);
@@ -53,6 +58,9 @@ const roll = changes.map((c) => `UPDATE mkt_arena SET vp = ${c.from}, best_vp = 
 const path = `scripts/_vp-rollback-${rows.length}.sql`;
 writeFileSync(path, roll + "\n");
 console.log(`rollback written to ${path}`);
+
+const bad = changes.filter((c) => !Number.isFinite(c.to) || !Number.isFinite(c.bestTo));
+if (bad.length) { console.error("REFUSING TO WRITE — non-numeric result for:", bad.map((b) => b.name).join(", ")); process.exit(1); }
 
 for (const c of changes) {
   // best_vp is the highest anyone has ever STOOD, and a figure on the old scale is not comparable to one on
