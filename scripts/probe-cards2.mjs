@@ -96,16 +96,19 @@ console.log("OPEN    ", JSON.stringify(await readout()));
 await shot("1-open");
 
 // ── 2. THE SWIPE ── sideways across the hand walks the active card; nothing is picked up.
+// The dial turns WITH the finger: drag right and the highlight moves right. It was inverted at first —
+// filmstrip logic, where you shove the cards one way and the selection goes the other — which is right for
+// a strip you scroll and wrong for a dial where the raised card never moves.
 const hand = await box(".cf-hand");
 await mouse("mousePressed", hand.x, hand.y);
 for (let i = 1; i <= 6; i += 1) { await mouse("mouseMoved", hand.x + i * 16, hand.y); await sleep(28); }
 await shot("2-swiped-left");
-console.log("SWIPE-L ", JSON.stringify(await readout()));
+console.log("DRAG-RIGHT ", JSON.stringify(await readout()));  // expect active to WALK RIGHT
 for (let i = 1; i <= 12; i += 1) { await mouse("mouseMoved", hand.x + 96 - i * 18, hand.y); await sleep(24); }
 await mouse("mouseReleased", hand.x - 120, hand.y);
 await sleep(140);
 await shot("3-swiped-right");
-console.log("SWIPE-R ", JSON.stringify(await readout()));
+console.log("DRAG-LEFT  ", JSON.stringify(await readout()));  // and back down to the left end
 
 // ── 3. THE LIFT ── straight up out of the hand, onto the middle foe.
 // BY NAME, not by position. Picking "the third card" got a Hop on the first run — a block, self-targeting, so

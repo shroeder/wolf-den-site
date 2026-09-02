@@ -416,7 +416,13 @@ export default function CardFightClient({ fixture }) {
             // Axis locked on the first real movement and never revisited.
             const axis = d.axis || (moved ? (Math.abs(dx) > Math.abs(dy) ? "swipe" : "lift") : null);
             if (axis === "swipe") {
-                const steps = Math.round(-dx / 46);
+                // SWIPE RIGHT, WALK RIGHT. This was inverted — dragging the hand like a filmstrip, where you
+                // push the CARDS one way and the selection therefore moves the other. That is the right model
+                // for a strip you are scrolling and the wrong one for a dial you are turning: the raised card
+                // stays put in the middle and only the highlight travels, so the finger reads as pointing at
+                // the next card rather than as shoving the row along. Luke's call, and it is the one that
+                // matches what the screen actually does.
+                const steps = Math.round(dx / 46);
                 const want = Math.max(0, Math.min(fight.hand.length - 1, d.fromActive + steps));
                 setActive(want);
                 dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved, axis };
