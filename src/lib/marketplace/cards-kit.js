@@ -81,13 +81,44 @@ export const CARDS = {
         id: "pounce", pet: "fox_kit", name: "Pounce", cost: 2, kind: "attack", target: "foe",
         damage: 8, vulnerable: 2, text: "Deal 8 damage. Apply 2 Vulnerable.", upgrade: { damage: 10, vulnerable: 3 },
     },
+    // ── THE CARD THAT POINTS AT YOU ──────────────────────────────────────────────────────────────────────
+    // Everything above either hits a foe or quietly helps you; nothing yet TARGETS you, and targeting is the
+    // whole interaction this slice exists to prove. A heal is the clearest case of it — the only card so far
+    // where dragging onto the wrong body is a real mistake rather than a no-op — so it is here to make the
+    // self-target path exist before there are twenty cards that need it.
+    //
+    // Deliberately weak per energy: five back where a Bite deals six. Healing that competes with attacking on
+    // rate turns every fight into a stalemate, and Spire keeps it off the card pool almost entirely for that
+    // reason. It is here to be a decision on the turn you are about to be hit for sixteen.
+    purr: {
+        id: "purr", pet: "kitten", name: "Purr", cost: 1, kind: "skill", target: "self",
+        heal: 5, text: "Heal 5.", upgrade: { heal: 8 },
+    },
 };
 
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",
-    "hop", "hop", "hop", "hop",
+    "hop", "hop", "hop",
+    "purr",
     "pounce",
 ];
+
+// ── AND THE PARTY DOES NOT SWING IN UNISON ───────────────────────────────────────────────────────────────
+// Three copies of one script is one enemy standing in three places. These two sit either side of the default:
+// a jackal that hits small and often and never guards, and a bruiser that spends a turn winding up and then
+// takes a quarter of you off. Which one you kill first is the question three enemies are FOR.
+export const FOE_SCRIPTS = {
+    jackal: [
+        { key: "nip", label: "Nip", damage: 6 },
+        { key: "snap", label: "Snap", damage: 8 },
+        { key: "worry", label: "Worry", damage: 5 },
+    ],
+    bruiser: [
+        { key: "brace", label: "Brace", block: 9 },
+        { key: "swing", label: "Swing", damage: 13 },
+        { key: "crush", label: "Crush", damage: 18 },
+    ],
+};
 
 export const cardById = (id) => CARDS[id] || null;
 
@@ -202,9 +233,19 @@ function beginTurn(state) {
  * care who anybody is. That is what lets the page hand it a random fighter off the Long Road without this file
  * importing the Road.
  */
-export function startFight({ seed = 1, hero = {}, foe = {} } = {}) {
+/**
+ * A fight from a seed, against a PARTY.
+ *
+ * It held exactly one foe until now, which was fine for proving a fight and wrong for proving a game: three
+ * enemies is where a hand stops being "spend everything on the only thing there is" and starts being a
+ * question about where the damage should go. Every rule below reads `foes` — an attack carries the index of
+ * what it hit, every living foe acts on its own turn, and the fight is won when the last one is down.
+ */
+export function startFight({ seed = 1, hero = {}, foe = null, foes = null } = {}) {
     const deck = STARTER_DECK.map((id, i) => ({ uid: `c${i}`, id }));
     const [draw, rng] = shuffle(deck, seed >>> 0);
+    // One foe or many: a single `foe` is still accepted so nothing that only wants a duel has to build an array.
+    const party = (Array.isArray(foes) && foes.length ? foes : [foe || {}]).slice(0, 5);
     const state = {
         seed: seed >>> 0,
         rng,
@@ -215,30 +256,48 @@ export function startFight({ seed = 1, hero = {}, foe = {} } = {}) {
             name: hero.name || "You", art: hero.art || null, flip: Boolean(hero.flip),
             hp: HERO_HP, hpMax: HERO_HP, block: 0, strength: 0, vulnerable: 0, weak: 0,
         },
-        foe: {
-            name: foe.name || "Something", art: foe.art || null, artFallback: foe.artFallback || null,
-            color: foe.color || "#ff8f6a", houseName: foe.houseName || null,
-            hp: foe.hp || FOE_HP, hpMax: foe.hp || FOE_HP,
-            script: Array.isArray(foe.script) && foe.script.length ? foe.script : FOE_SCRIPT,
+        foes: party.map((f, i) => ({
+            id: `f${i}`,
+            name: f.name || "Something", art: f.art || null, artFallback: f.artFallback || null,
+            color: f.color || "#ff8f6a", houseName: f.houseName || null,
+            hp: f.hp || FOE_HP, hpMax: f.hp || FOE_HP,
+            script: Array.isArray(f.script) && f.script.length ? f.script : FOE_SCRIPT,
+            // ALL START AT THE TOP OF THEIR OWN SCRIPT. Starting each one a beat further in was meant to
+            // stop a party swinging in unison, and instead opened every fight with three enemies on their
+            // heaviest beat at once: 35 damage on turn one against 70 health, measured. What makes three
+            // enemies feel like three is that they run DIFFERENT scripts, not that they run the same one out
+            // of phase — a jackal that nips, a bruiser that spends a turn bracing, and one that builds to a
+            // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
+            // length and in shape.
             block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0,
-        },
+        })),
         hand: [], draw, discard: [],
         over: null,
     };
     return beginTurn(state);
 }
 
-/** What the foe will do when you end your turn — the whole reason the fight is a puzzle. */
-export const foeIntent = (state) => {
-    const script = state?.foe?.script?.length ? state.foe.script : FOE_SCRIPT;
-    return script[(state?.foe?.beat || 0) % script.length];
+export const livingFoes = (state) => (state?.foes || []).filter((f) => f.hp > 0);
+
+/** What this foe will do when you end your turn — the whole reason the fight is a puzzle. */
+export const foeIntent = (state, i = 0) => {
+    const foe = state?.foes?.[i];
+    const script = foe?.script?.length ? foe.script : FOE_SCRIPT;
+    return script[(foe?.beat || 0) % script.length];
 };
 
 /** What that intent will actually land for, after Strength, Weak and your Vulnerable. Shown, never hidden. */
-export const intentDamage = (state) => {
-    const intent = foeIntent(state);
-    return intent?.damage ? attackDamage(intent.damage, state.foe, state.hero) : 0;
+export const intentDamage = (state, i = 0) => {
+    const intent = foeIntent(state, i);
+    return intent?.damage ? attackDamage(intent.damage, state.foes[i], state.hero) : 0;
 };
+
+/**
+ * The whole party's next swing, added up. With one enemy this is the number over its head; with three it is
+ * the only figure that answers the question a turn actually asks — can I afford to take this?
+ */
+export const incomingTotal = (state) => (state?.foes || [])
+    .reduce((n, f, i) => (f.hp > 0 ? n + intentDamage(state, i) : n), 0);
 
 export const canPlay = (state, uid) => {
     if (!state || state.over) return false;
@@ -250,35 +309,52 @@ export const canPlay = (state, uid) => {
  * Play one card out of the hand. Returns { state, events } — events exist so the screen can throw a number off
  * whoever was hit without re-deriving what happened by diffing two states.
  */
-export function playCard(state, uid) {
+export function playCard(state, uid, targetIndex = 0) {
     if (!canPlay(state, uid)) return { state, events: [] };
     const entry = state.hand.find((c) => c.uid === uid);
     const card = cardById(entry.id);
     const events = [];
     let hero = state.hero;
-    let foe = state.foe;
+    let foes = state.foes;
+
+    // A card that needs a target and was given a dead one (or none) finds the first thing still standing,
+    // rather than being swallowed. The screen should never send this, but a rule that can be called wrongly
+    // should fail into something sane instead of eating a card and its energy.
+    let ti = Number.isInteger(targetIndex) ? targetIndex : 0;
+    if (card.target === "foe" && !(foes[ti]?.hp > 0)) ti = foes.findIndex((f) => f.hp > 0);
+    if (card.target === "foe" && ti < 0) return { state, events: [] };
+
+    const hitFoe = (i, fn) => { foes = foes.map((f, n) => (n === i ? fn(f) : f)); };
 
     if (card.damage) {
-        const dealt = attackDamage(card.damage, hero, foe);
-        foe = land(foe, dealt);
-        events.push({ type: "damage", on: "foe", amount: dealt });
+        const dealt = attackDamage(card.damage, hero, foes[ti]);
+        hitFoe(ti, (f) => land(f, dealt));
+        events.push({ type: "damage", on: foes[ti].id, amount: dealt });
     }
     if (card.block) {
         hero = { ...hero, block: (hero.block || 0) + card.block };
         events.push({ type: "block", on: "hero", amount: card.block });
     }
+    // HEALING, which is the other half of what a target means: a card can point at YOU. Capped at your own
+    // maximum — a heal is not a way to grow.
+    if (card.heal) {
+        const before = hero.hp;
+        hero = { ...hero, hp: Math.min(hero.hpMax, hero.hp + card.heal) };
+        events.push({ type: "heal", on: "hero", amount: hero.hp - before });
+    }
     if (card.vulnerable) {
-        foe = { ...foe, vulnerable: (foe.vulnerable || 0) + card.vulnerable };
-        events.push({ type: "debuff", on: "foe", key: "Vulnerable", amount: card.vulnerable });
+        hitFoe(ti, (f) => ({ ...f, vulnerable: (f.vulnerable || 0) + card.vulnerable }));
+        events.push({ type: "debuff", on: foes[ti].id, key: "Vulnerable", amount: card.vulnerable });
     }
 
     const next = {
         ...state,
-        hero, foe,
+        hero, foes,
         energy: state.energy - card.cost,
         hand: state.hand.filter((c) => c.uid !== uid),
         discard: [...state.discard, entry],
-        over: foe.hp <= 0 ? "win" : state.over,
+        // The fight is over when the LAST one is down, not the first.
+        over: foes.every((f) => f.hp <= 0) ? "win" : state.over,
     };
     if (next.over === "win") events.push({ type: "over", result: "win" });
     return { state: next, events };
@@ -302,24 +378,29 @@ export function endTurn(state) {
     if (!state || state.over) return { state, events: [] };
     const events = [];
     let hero = tick(state.hero);
-    let foe = { ...state.foe, block: 0 };
-    const intent = foeIntent(state);
 
-    if (intent.block) {
-        foe = { ...foe, block: foe.block + intent.block };
-        events.push({ type: "block", on: "foe", amount: intent.block });
-    }
-    if (intent.damage) {
-        const dealt = attackDamage(intent.damage, foe, hero);
-        hero = land(hero, dealt);
-        events.push({ type: "damage", on: "hero", amount: dealt });
-    }
-
-    foe = tick({ ...foe, beat: (foe.beat || 0) + 1 });
+    // Every foe still standing takes its turn, left to right, and the block each gains is its own. A corpse
+    // does not swing and does not advance its script — which matters, because killing the one winding up for
+    // the big hit is exactly the decision three enemies exist to offer.
+    const foes = state.foes.map((foe, i) => {
+        if (foe.hp <= 0) return foe;
+        let f = { ...foe, block: 0 };
+        const intent = foeIntent(state, i);
+        if (intent.block) {
+            f = { ...f, block: f.block + intent.block };
+            events.push({ type: "block", on: f.id, amount: intent.block });
+        }
+        if (intent.damage) {
+            const dealt = attackDamage(intent.damage, f, hero);
+            hero = land(hero, dealt);
+            events.push({ type: "damage", on: "hero", amount: dealt });
+        }
+        return tick({ ...f, beat: (f.beat || 0) + 1 });
+    });
 
     const spent = {
         ...state,
-        hero, foe,
+        hero, foes,
         discard: [...state.discard, ...state.hand],
         hand: [],
         over: hero.hp <= 0 ? "lose" : state.over,

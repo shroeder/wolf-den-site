@@ -45,6 +45,9 @@ const ART = {
         + "water droplets and spreading ripples below, tall reeds and a sunlit pond behind",
     pounce: "an orange fox kit caught mid-pounce in the air, front paws thrown forward and claws out, bushy "
         + "tail streaming behind, autumn leaves kicked up and scattering around it, a golden dusk field beyond",
+    purr: "a small tabby kitten curled up purring against a warm hearthstone, eyes closed and utterly content, "
+        + "soft golden firelight washing over its fur and a gentle haze of warmth rising around it, a cosy "
+        + "fireside beyond",
 };
 
 // Card art is looked at small and in a hurry, between reading a cost and reading a sentence. It needs one

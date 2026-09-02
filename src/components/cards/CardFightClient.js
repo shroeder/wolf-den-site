@@ -8,8 +8,8 @@ import {
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, intentDamage, playCard, startFight,
-    typeLook,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, incomingTotal, intentDamage,
+    playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
@@ -184,7 +184,7 @@ export default function CardFightClient({ fixture }) {
     const [fight, setFight] = useState(() => startFight({
         seed: fixture.seed,
         hero: fixture.hero,
-        foe: fixture.foe,
+        foes: fixture.foes,
     }));
     const [selected, setSelected] = useState(null);
     const [drag, setDrag] = useState(null);
@@ -194,14 +194,16 @@ export default function CardFightClient({ fixture }) {
     const [played, setPlayed] = useState(null);
 
     const dragRef = useRef(null);
-    const foeRef = useRef(null);
+    const foeRefs = useRef([]);
+    const partyRef = useRef(null);
     const fieldRef = useRef(null);
     const trayRef = useRef(null);
     const floatSeq = useRef(0);
     const playSeq = useRef(0);
 
-    const intent = foeIntent(fight);
-    const incoming = intentDamage(fight);
+    // The whole party's next swing. With one enemy this was the number over its head; with three it is
+    // the only figure that answers what a turn actually asks — can I afford to take this?
+    const incoming = incomingTotal(fight);
 
     // ── WHAT JUST HAPPENED, THROWN OFF WHOEVER IT HAPPENED TO ────────────────────────────────────────────
     // The engine hands back events precisely so this does not have to diff two states and guess. A number that
@@ -227,10 +229,10 @@ export default function CardFightClient({ fixture }) {
     //
     // Purely presentational: the state has already changed underneath, exactly as theirs has. What this buys
     // is the half-second in which the number floating off the foe has something to have come FROM.
-    const commit = useCallback((uid) => {
+    const commit = useCallback((uid, target = 0) => {
         if (!canPlay(fight, uid)) return;
         const entry = fight.hand.find((c) => c.uid === uid);
-        const { state, events } = playCard(fight, uid);
+        const { state, events } = playCard(fight, uid, target === "self" ? 0 : target);
         setFight(state);
         pushFloats(events);
         setSelected(null);
@@ -260,17 +262,45 @@ export default function CardFightClient({ fixture }) {
         }, 420);
     }, [fight, acting, pushFloats]);
 
-    /** Would a release here play this card? Foe cards want the foe; a card you play on yourself wants the field. */
-    const dropAccepts = useCallback((uid, x, y) => {
+    /**
+     * WHICH of them is under the pointer. Returns a foe index, or -1.
+     *
+     * A thumb is not a cursor, so each foe claims a generous box — and because three boxes side by side will
+     * overlap once padded, the NEAREST centre wins rather than the first box that happens to contain the
+     * point. Otherwise the left-hand foe quietly eats every drop aimed between two of them.
+     */
+    const foeUnder = useCallback((x, y) => {
+        let best = -1;
+        let bestDist = Infinity;
+        fight.foes.forEach((foe, i) => {
+            if (foe.hp <= 0) return;
+            const box = foeRefs.current[i]?.getBoundingClientRect();
+            if (!box) return;
+            const pad = 22;
+            const inside = x >= box.left - pad && x <= box.right + pad && y >= box.top - pad && y <= box.bottom + pad;
+            if (!inside) return;
+            const d = Math.hypot(x - (box.left + box.width / 2), y - (box.top + box.height / 2));
+            if (d < bestDist) { bestDist = d; best = i; }
+        });
+        return best;
+    }, [fight.foes]);
+
+    /** Would a release here play this card, and at whom? Returns an index, "self", or null. */
+    const dropTarget = useCallback((uid, x, y) => {
         const entry = fight.hand.find((c) => c.uid === uid);
         const card = cardById(entry?.id);
-        if (!card) return false;
-        const box = (card.target === "foe" ? foeRef.current : fieldRef.current)?.getBoundingClientRect();
-        if (!box) return false;
-        // A thumb is not a cursor: the drop zone is the sprite plus a generous margin.
-        const pad = 26;
-        return x >= box.left - pad && x <= box.right + pad && y >= box.top - pad && y <= box.bottom + pad;
-    }, [fight.hand]);
+        if (!card) return null;
+        if (card.target === "foe") {
+            const i = foeUnder(x, y);
+            return i >= 0 ? i : null;
+        }
+        // A card you play on yourself is dropped anywhere on the field, which is what Spire does with its
+        // untargeted cards: there is nothing to point at, so pointing is not asked for.
+        const box = fieldRef.current?.getBoundingClientRect();
+        if (!box) return null;
+        return y >= box.top && y <= box.bottom ? "self" : null;
+    }, [fight.hand, foeUnder]);
+
 
     useEffect(() => {
         const move = (e) => {
@@ -287,7 +317,8 @@ export default function CardFightClient({ fixture }) {
             setDrag(null);
             // Under the slop it was a TAP: select the card, or unselect it if it was already the chosen one.
             if (!d.moved) { setSelected((cur) => (cur === d.uid ? null : d.uid)); return; }
-            if (dropAccepts(d.uid, e.clientX, e.clientY)) commit(d.uid);
+            const target = dropTarget(d.uid, e.clientX, e.clientY);
+            if (target !== null) commit(d.uid, target);
         };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
@@ -297,7 +328,7 @@ export default function CardFightClient({ fixture }) {
             window.removeEventListener("pointerup", up);
             window.removeEventListener("pointercancel", up);
         };
-    }, [commit, dropAccepts]);
+    }, [commit, dropTarget]);
 
     const startDrag = (e, uid) => {
         if (fight.over || acting) return;
@@ -305,18 +336,19 @@ export default function CardFightClient({ fixture }) {
         setDrag(dragRef.current);
     };
 
-    // Tapping the foe fires whatever is selected — the half of the interaction that works with a mouse.
-    const onFoeTap = () => {
-        if (!selected) return;
+    // Tapping a particular foe fires whatever is selected AT THAT ONE — the half of the interaction that
+    // works with a mouse, and the half that has to name a target now there is more than one.
+    const onFoeTap = (i) => {
+        if (!selected || fight.foes[i]?.hp <= 0) return;
         const card = cardById(fight.hand.find((c) => c.uid === selected)?.id);
-        if (card?.target === "foe") commit(selected);
+        if (card?.target === "foe") commit(selected, i);
     };
 
     const newFight = () => router.push(`/marketplace/cards?seed=${Math.floor(Math.random() * 900000) + 1000}`);
     const replay = () => {
         setFloats([]);
         setSelected(null);
-        setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foe: fixture.foe }));
+        setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes }));
     };
 
     const dragCard = drag?.moved ? cardById(fight.hand.find((c) => c.uid === drag.uid)?.id) : null;
@@ -362,8 +394,8 @@ export default function CardFightClient({ fixture }) {
             ])
             .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
             .join(" ");
-        return { w, h, sx, sy, cx, cy, ex, ey, head, live: dropAccepts(drag.uid, ex, ey) };
-    }, [drag, dragCard, dropAccepts, ghostAt?.x, ghostAt?.y]);
+        return { w, h, sx, sy, cx, cy, ex, ey, head, live: foeUnder(ex, ey) >= 0 };
+    }, [drag, dragCard, foeUnder, ghostAt?.x, ghostAt?.y]);
     const selectedCard = cardById(fight.hand.find((c) => c.uid === selected)?.id);
     const aiming = dragCard?.target === "foe" || selectedCard?.target === "foe";
     // ── THE GLOW MEANS "THIS WILL LAND" ──────────────────────────────────────────────────────────────────
@@ -395,7 +427,10 @@ export default function CardFightClient({ fixture }) {
         return { rot: off * spread, drop: (off ** 2) * 2.4 };
     };
 
-    const foeLit = drag?.moved ? Boolean(aimArrow?.live) : selectedCard?.target === "foe";
+    // WHICH foe is lit: the one the pointer is over while dragging. With a card merely selected and no
+    // pointer in play, every living one lights, because any of them is a legal tap.
+    const aimAt = drag?.moved && dragCard?.target === "foe" ? foeUnder(drag.x, drag.y)
+        : selectedCard?.target === "foe" ? "any" : -1;
 
     const pileList = useMemo(() => {
         if (!peek) return [];
@@ -454,39 +489,56 @@ export default function CardFightClient({ fixture }) {
                             <span key={f.id} className={`cf-float is-${f.kind}`}>{f.text}</span>
                         ))}
                     </div>
-                    <Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} />
+                    <span className="cf-body"><Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} /></span>
                     <span className="cf-shade" aria-hidden="true" />
                     <Bar unit={fight.hero} />
                 </div>
 
-                <div
-                    className={`cf-fighter cf-foe${hurt("foe") ? " is-hit" : ""}${acting ? " is-acting" : ""}${foeLit ? " is-target" : ""}`}
-                    ref={foeRef}
-                    onClick={onFoeTap}
-                >
-                    {/* ── WHAT HE IS ABOUT TO DO ──────────────────────────────────────────────────
-                        An icon and a number over his head, drawn as part of the picture. Theirs is exactly
-                        that — no chip, no border, no word — and the reason is that this is the one thing you
-                        read every single turn: it has to be a glance, not a label. Ours was a bordered pill
-                        reading "11 LUNGE" in letterspaced caps, which is a UI component standing where a
-                        telegraph should be. The name of the move survives on the title for anyone who wants
-                        it, and the shield appears alongside when the swing comes with guard. */}
-                    <div className="cf-intent" title={intent.label}>
-                        <span className="cf-intent-marks">
-                            <GiCrossedSwords aria-hidden="true" />
-                            {intent.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
-                        </span>
-                        <b>{incoming}</b>
-                    </div>
-                    <div className="cf-floats">
-                        {floats.filter((f) => f.on === "foe").map((f) => (
-                            <span key={f.id} className={`cf-float is-${f.kind}`}>{f.text}</span>
-                        ))}
-                    </div>
-                    {/* Every fighter on the Road is drawn facing right, so on this side of the sand they all turn round. */}
-                    <Sprite src={fixture.foe.art} fallback={fixture.foe.artFallback} className="cf-sprite" flip />
-                    <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.foe} />
+                {/* ── THE PARTY ────────────────────────────────────────────────────────────────────────
+                    Three of them, and each one is its own target: its own health, its own block, its own
+                    announced swing, and its own place to drop a card. One enemy could only ever ask "do I
+                    attack or do I block"; three ask the question a hand of cards is actually for, which is
+                    where the damage should go. */}
+                <div className="cf-party" ref={partyRef}>
+                    {fight.foes.map((foe, i) => {
+                        const dead = foe.hp <= 0;
+                        const swing = intentDamage(fight, i);
+                        const beat = foeIntent(fight, i);
+                        return (
+                            <div
+                                key={foe.id}
+                                ref={(el) => { foeRefs.current[i] = el; }}
+                                className={`cf-fighter cf-foe${hurt(foe.id) ? " is-hit" : ""}${acting ? " is-acting" : ""}`
+                                    + `${aimAt === i || aimAt === "any" ? " is-target" : ""}${dead ? " is-down" : ""}`}
+                                onClick={() => onFoeTap(i)}
+                            >
+                                {dead ? null : (
+                                    <div className="cf-intent" title={beat.label}>
+                                        <span className="cf-intent-marks">
+                                            {beat.damage ? <GiCrossedSwords aria-hidden="true" /> : null}
+                                            {beat.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
+                                        </span>
+                                        {beat.damage ? <b>{swing}</b> : null}
+                                    </div>
+                                )}
+                                <div className="cf-floats">
+                                    {floats.filter((f) => f.on === foe.id).map((f) => (
+                                        <span key={f.id} className={`cf-float is-${f.kind}`}>{f.text}</span>
+                                    ))}
+                                </div>
+                                {/* Every fighter on the Road is drawn facing right, so on this side of the
+                                    sand they all turn round — and the mirror lives on the WRAPPER, not on the
+                                    image, because a CSS animation overrides an inline style for as long as it
+                                    runs. The breath was replacing the scaleX(-1) and quietly turning every foe
+                                    back to face the wall. */}
+                                <span className="cf-body is-mirrored">
+                                    <Sprite src={foe.art} fallback={foe.artFallback} className="cf-sprite" />
+                                </span>
+                                <span className="cf-shade" aria-hidden="true" />
+                                {dead ? null : <Bar unit={foe} />}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -577,13 +629,13 @@ export default function CardFightClient({ fixture }) {
                         {/* Giving up is not the same as being killed, and the engine already knows which one
                             happened, so the sheet says the true thing rather than the convenient one. */}
                         <h2>
-                            {fight.over === "win" ? `${fight.foe.name} is down`
+                            {fight.over === "win" ? "The sand is yours"
                                 : fight.gaveUp ? "You walked away" : "You fall"}
                         </h2>
                         <p className="cf-note">
                             {fight.over === "win"
                                 ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
-                                : `${fight.foe.name} had ${fight.foe.hp} of ${fight.foe.hpMax} left.`}
+                                : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
                         </p>
                         {/* The seed is off the screen everywhere now, this button included — it lives in the
                             URL, which is what a replay actually reads. And with the old Leave chip gone from
@@ -653,10 +705,28 @@ export default function CardFightClient({ fixture }) {
                    on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
                    phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
                    above the bottom at worst, 38% when there is room, and never more than 320. */
-                .cf-fighter { position: absolute; bottom: clamp(150px, 27%, 280px); width: 44%; display: flex; flex-direction: column;
+                .cf-fighter { position: absolute; bottom: clamp(140px, 24%, 250px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
-                .cf-hero { left: 3%; }
-                .cf-foe { right: 3%; cursor: pointer; }
+                .cf-hero { left: 2%; width: 34%; }
+                /* ── THE PARTY SHARES THE RIGHT-HAND HALF ────────────────────────────────────────────────
+                   A row of slots rather than one fighter: they sit shoulder to shoulder, each with its own
+                   footing on the same floor line, and the row itself is what the fighters are positioned by.
+                   Ends aligned to the BASE, because they are all standing on the same ground and a party
+                   centred on its own boxes would have three different foot heights. */
+                .cf-party { position: absolute; right: 1%; bottom: 0; top: 0; width: 62%;
+                    display: flex; align-items: flex-end; justify-content: space-around; pointer-events: none; }
+                .cf-foe { position: relative; left: auto; right: auto; bottom: clamp(140px, 24%, 250px);
+                    width: 33%; cursor: pointer; pointer-events: auto; }
+                /* Three abreast means each is smaller than a lone duellist was. */
+                .cf-party .cf-sprite { height: clamp(56px, 15vh, 128px); }
+                .cf-party .cfb { max-width: 96px; }
+                .cf-party .cfb-hp { font-size: 13px; }
+                .cf-party .cf-intent b { font-size: 17px; }
+                .cf-party .cf-intent-marks { font-size: 17px; }
+                /* A body on the sand: no bar, no telegraph, and it stops breathing. */
+                .cf-foe.is-down { opacity: 0.34; filter: grayscale(0.85); pointer-events: none; }
+                .cf-foe.is-down .cf-body { animation: none; transform: scaleX(-1) rotate(88deg) translateY(14%); }
+                .cf-foe.is-down .cf-shade { animation: none; opacity: 0.5; }
                 /* Smaller on a short screen, or the fighter block grows tall enough to push its INTENT PILL up behind
                    the control strip — and the intent is the one thing on this screen that can never be covered. */
 /* ── THEY BREATHE ────────────────────────────────────────────────────────────────────────
@@ -665,14 +735,17 @@ export default function CardFightClient({ fixture }) {
                    the two are deliberately out of step (different durations, one delayed) so they do not
                    bob in unison like a pair of metronomes. The shadow under each pulses very slightly against
                    the body, which is what sells the lift as a lift rather than a slide. */
-                .cf-sprite { width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
-                    filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45));
-                    animation: cfBreathe 3.4s ease-in-out infinite; transform-origin: 50% 100%; }
-                .cf-foe .cf-sprite { animation-duration: 4.1s; animation-delay: -1.2s; }
+                .cf-body { display: block; width: 100%; transform-origin: 50% 100%;
+                    animation: cfBreathe 3.4s ease-in-out infinite; }
+                .cf-body.is-mirrored { transform: scaleX(-1); animation-name: cfBreatheMirrored; }
+                .cf-body.is-mirrored .cf-sprite { animation: none; }
+                .cf-foe .cf-body { animation-duration: 4.1s; animation-delay: -1.2s; }
+                .cf-sprite { display: block; width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
+                    filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45)); }
                 .cf-shade { animation: cfShade 3.4s ease-in-out infinite; }
                 .cf-foe .cf-shade { animation-duration: 4.1s; animation-delay: -1.2s; }
                 /* The hit shake takes the sprite over entirely: a shove has to beat a breath. */
-                .cf-fighter.is-hit .cf-sprite { animation: cfShake 260ms ease-out; }
+                .cf-fighter.is-hit .cf-body { animation: cfShake 260ms ease-out; }
                 /* THE POOL ON THE GROUND. A drop-shadow is a copy of the sprite offset behind it, which reads
                    as a sticker lifted off the page; what puts a figure ON a floor is a soft dark ellipse at
                    its feet, and every fighter in Spire has one. This is the "no contact shadow = pasted on"
@@ -745,7 +818,12 @@ export default function CardFightClient({ fixture }) {
                 /* ── THE MOULDING ── one painted frame for every card in the game, hollow, laid over the
                    pet-coloured stock. Neutral metal on purpose: the colour comes from the card underneath,
                    the way their frame takes the character's. Above the art, under the ribbon and the cost. */
-                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2; pointer-events: none;
+/* Every card that is DRAWN anywhere gets the moulding, not just the ones sitting in the hand.
+                   Luke: "why does the card lose its border when it's played?" — because this rule was hung on
+                   .cf-card alone, and the card you are holding and the card performing centre stage are two
+                   other elements. A card is a card wherever it is. */
+                .cf-card::after, .cf-drag::after, .cf-played-card::after {
+                    content: ""; position: absolute; inset: -1px; z-index: 2; pointer-events: none;
                     background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
                 .cf-card.is-spent { opacity: 0.5; }
@@ -925,6 +1003,12 @@ export default function CardFightClient({ fixture }) {
                 @keyframes cfBreathe {
                     0%, 100% { transform: translateY(0) rotate(-0.5deg) scaleY(1); }
                     50% { transform: translateY(-6px) rotate(0.5deg) scaleY(1.02); }
+                }
+                /* The foe is mirrored by its wrapper, so its breath has to carry the mirror too — otherwise
+                   the animation's transform drops the scaleX and he spins round twice a cycle. */
+                @keyframes cfBreatheMirrored {
+                    0%, 100% { transform: scaleX(-1) translateY(0) rotate(0.5deg) scaleY(1); }
+                    50% { transform: scaleX(-1) translateY(-6px) rotate(-0.5deg) scaleY(1.02); }
                 }
                 @keyframes cfShade {
                     0%, 100% { opacity: 1; transform: scaleX(1); }

@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
-import { CARDS, nextRand } from "@/lib/marketplace/cards-kit.js";
+import { CARDS, FOE_SCRIPTS, nextRand } from "@/lib/marketplace/cards-kit.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
@@ -24,9 +24,25 @@ export const CARDS_UNLOCKED = (buyerId) => isOwner(buyerId);
 //
 // PICKED FROM THE SEED, not from Math.random, so a seed names the same fighter every time — otherwise "play
 // seed 4471 and tell me what you think" means two different fights and the whole point of a seed is gone.
-export async function getCardFightFixture(buyerId, seed) {
-    const [rand] = nextRand(seed >>> 0);
-    const foe = ladderFoe(1 + Math.floor(rand * LADDER_SIZE));
+export async function getCardFightFixture(buyerId, seed, count = 3) {
+    // ── A PARTY, PICKED FROM THE SEED ────────────────────────────────────────────────────────────────
+    // Three fighters off the Road rather than one, because "which of them do I hit" is the question a hand of
+    // cards exists to answer and one enemy cannot ask it. Drawn from the same seed, so a seed still names the
+    // same fight, and de-duplicated — meeting the same man three times reads as a bug rather than a party.
+    let roll = seed >>> 0;
+    const picked = [];
+    for (let n = 0; n < 40 && picked.length < count; n += 1) {
+        const [r, next] = nextRand(roll);
+        roll = next;
+        const rung = 1 + Math.floor(r * LADDER_SIZE);
+        if (!picked.some((f) => f.rung === rung)) picked.push(ladderFoe(rung));
+    }
+    // The one in the middle is the big one, so a party reads as having a shape rather than a row of equals.
+    const SHAPES = [
+        { script: "jackal", hp: 34 },
+        { script: "bruiser", hp: 68 },
+        { script: null, hp: 48 },
+    ];
 
     const petIds = [...new Set(Object.values(CARDS).map((c) => c.pet))];
     const [me, sprites] = await Promise.all([
@@ -52,10 +68,12 @@ export async function getCardFightFixture(buyerId, seed) {
         // Every fighter on the Road is drawn facing RIGHT, because the arena stands them on the left. This
         // screen stands them on the right, so every one of them needs turning around or the fight is two
         // people looking the same way.
-        foe: {
-            name: foe.name, art: foe.sprite, artFallback: foe.spriteFallback,
-            color: foe.color, houseName: foe.houseName, rung: foe.rung,
-        },
+        foes: picked.map((f, i) => ({
+            name: f.name, art: f.sprite, artFallback: f.spriteFallback,
+            color: f.color, houseName: f.houseName, rung: f.rung,
+            hp: SHAPES[i % SHAPES.length].hp,
+            script: FOE_SCRIPTS[SHAPES[i % SHAPES.length].script] || null,
+        })),
         // pet_id -> { url, flip, rarity }. A card face is a portrait rather than a combatant, so `flip` is
         // carried but the card does not act on it — a pet looking left on its own card is not wrong, it is a
         // photograph.
