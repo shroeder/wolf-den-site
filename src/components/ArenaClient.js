@@ -837,7 +837,7 @@ function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, br
 //   THE FEATS    — named things you did, which is the only place performance is ever acknowledged.
 //   THE FIGHT    — damage dealt and taken, your biggest blow, crits, what your guard actually stopped.
 // Nothing in here may throw: a crash while this is mounted leaves a scroll-locked overlay with no way off it.
-function Recap({ bout, busy, onClose, away = null }) {
+function Recap({ bout, busy, onClose }) {
     const r = bout?.recap || null;
     useScrollLock(true);
     const won = Boolean(bout?.won);
@@ -1106,35 +1106,13 @@ function Recap({ bout, busy, onClose, away = null }) {
 
                     Compact on purpose: the headline number and who came at you. The full report is still its
                     own card when you arrive without having just fought. */}
-                {away?.per?.length ? (() => {
-                    const rows = away.per;
-                    const bouts = rows.reduce((n, x) => n + (x.bouts || 0), 0);
-                    const held = rows.reduce((n, x) => n + (x.held || 0), 0);
-                    const laurels = rows.reduce((n, x) => n + (x.laurels || 0), 0);
-                    const dv = Number(away.vp) || 0;
-                    return (
-                        <div className="ar-recap-away">
-                            <span className="ar-recap-kick">While you were away</span>
-                            <b>{bouts} bout{bouts === 1 ? "" : "s"}
-                                {held ? ` · you held ${held}` : ""}
-                                {laurels ? ` · +${money(laurels)} laurels` : ""}
-                            </b>
-                            {/* The standing, in the compact version too — it is the answer to "did I slip
-                                overnight", which is the only reason to read this at all. */}
-                            {away.vpNow != null ? (
-                                <em>
-                                    <span className={dv > 0 ? "is-up" : dv < 0 ? "is-down" : ""}>
-                                        {dv > 0 ? "+" : dv < 0 ? "−" : ""}{money(Math.abs(dv))} VP
-                                    </span>
-                                    {" · "}{money(away.vpNow)} total{away.rank ? ` · #${away.rank}` : ""}
-                                </em>
-                            ) : null}
-                            <em>{rows.slice(0, 3).map((x) => x.them?.name).filter(Boolean).join(", ")}
-                                {rows.length > 3 ? ` and ${rows.length - 3} more` : ""} came at your build</em>
-                        </div>
-                    );
-                })() : null}
-
+                {/* ── THE AWAY REPORT IS NOT IN HERE ANY MORE ─────────────────────────────────────────
+                    It used to be folded in at the bottom of every recap, which is where Luke found it: the
+                    only way to learn you had been raided overnight was to go and fight somebody. A report
+                    about what happened while you were GONE has no business being a footnote on a fight you
+                    just had — it belongs at the door, before you pick your next opponent.
+                    It greets you on arrival now (see the mount effect by AwayReport). The two do not stack,
+                    because arriving is what consumes it: by the time any recap exists it has been read. */}
                 <div className="ar-recap-foot">
                     <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
                         {raid ? "Back to the plaza" : r?.fishing ? "Back to the water"
@@ -1166,6 +1144,21 @@ function Recap({ bout, busy, onClose, away = null }) {
 export default function ArenaClient({ initial, boutOnly = false, onLeave = null }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
+    // ── WHAT HAPPENED WHILE YOU WERE GONE, AT THE DOOR ───────────────────────────────────────────────
+    // Luke: "take the while you're away model and have it be its own thing that greets you whenever you go to
+    // the arena page when you first encounter it in the day."
+    //
+    // It used to be a strip at the bottom of the battle recap, which meant the only way to find out you had
+    // been raided overnight was to go and fight somebody first. Now it opens on ARRIVAL — once, on the first
+    // render where the report actually has rows in it.
+    //
+    // ONCE PER VISIT, and the ref is why. Gating the modal on `st.away?.per?.length` alone would re-open it
+    // every time the state refreshed, including the moment a recap closed — which is exactly the two-cards-
+    // back-to-back problem that got it merged into the recap in the first place ("post fight has two modals,
+    // one of which is showing a button that when clicked skips past the second modal"). Latching it at the
+    // door means arriving consumes it, and nothing that happens afterwards can stack a second card on top.
+    const awayGreeted = useRef(false);
+    const [showAway, setShowAway] = useState(false);
     // One milestone sheet per bout. Keyed off the bout's own rung so the next prize opens its own, and so
     // dismissing this one does not re-open it every time the recap re-renders.
     const [prizeSeenAt, setPrizeSeenAt] = useState(null);
@@ -1867,6 +1860,23 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     }, [raw, logAll, shown]);
 
     const bout = played;
+
+    // Open it at the door: the first render that has rows AND is not mid-fight. Walking straight into a bout
+    // (from a Road link, say) defers it rather than dropping a dialog over a fight in progress — it opens when
+    // that fight is done and you are back on the ladder, which is still the first moment you could read it.
+    useEffect(() => {
+        if (awayGreeted.current) return;
+        if (!st?.away?.per?.length) return;
+        // NOT WHILE A BOUT IS ON SCREEN, finished or otherwise. Walking in on a recap that was left open deals
+        // this card the moment that recap closes — under the finger that just closed it. That is the original
+        // complaint verbatim: "a button that when clicked skips past the second modal". So it waits for the
+        // ladder, and then for the tap to be over: 420ms is longer than any thumb stays down and shorter than
+        // anyone notices.
+        if (bout) return;
+        awayGreeted.current = true;
+        const t = setTimeout(() => setShowAway(true), 420);
+        return () => clearTimeout(t);
+    }, [st?.away, bout]);
 
     // ── LEAVING A FINISHED FIGHT, FROM WHEREVER YOU CAME IN ──────────────────────────────────────────────
     // One handler because there are TWO ways off this screen — the recap's button and the bare verdict
@@ -3078,8 +3088,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     so the user immediately sees relevant info."
                     So the away rows are handed to the recap and drawn inside it, and leaving marks them seen. */}
                 {bout.over && recapReady ? (
-                    <Recap bout={bout} busy={busy} away={st.away || null}
-                        onClose={() => { if (st.away?.per?.length) act("seen"); leaveBout(); }} />
+                    <Recap bout={bout} busy={busy} onClose={() => leaveBout()} />
                 ) : null}
 
                 {/* ── AND THE MILESTONE, OVER THE TOP OF IT ───────────────────────────────────────────────
@@ -3144,8 +3153,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             {/* what happened while you were asleep */}
             {/* Only when there is no recap to fold it into — a fight that has just ended carries these rows
                 inside its own card instead, so the two never stack. */}
-            {st.away?.per?.length && !bout?.over ? (
-                <AwayReport away={st.away} onClose={() => act("seen")} />
+            {showAway ? (
+                <AwayReport away={st.away} onClose={() => { setShowAway(false); act("seen"); }} />
             ) : null}
 
             {/* ── YOUR CARD ── this used to be a rung ("Cub · #41 of 84") and a named band, both of them
