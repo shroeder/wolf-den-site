@@ -1439,10 +1439,19 @@ export default function CardFightClient({ fixture }) {
                 .cf-pile-art { width: 30px; height: 42px; object-fit: contain;
                     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
                 .cf-pile.is-discard .cf-pile-art { transform: rotate(7deg); opacity: 0.82; }
-                .cf-pile-n { position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
-                    min-width: 19px; padding: 1px 4px; border-radius: 999px; background: #b8322f;
-                    border: 1px solid #12161c; color: #fff; font-size: 11px; font-weight: 800; line-height: 1.3;
-                    text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+                /* ── A COUNT, NOT AN ALERT ───────────────────────────────────────────────────────────
+                   Luke: "i dont like the red badges on the card piles." He is right, and the reason is that a
+                   red disc on the corner of a thing is the universal shape for UNREAD — it says something has
+                   gone wrong or is waiting for you. How many cards are left in your draw pile is neither; it
+                   is just a number, and it is a number you want to be able to read without being nagged by it.
+                   So it becomes a struck plaque instead: the same slate the cost diamond and the chrome are
+                   painted in, sitting across the bottom of the pile like a label on a box. */
+                .cf-pile-n { position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+                    min-width: 20px; padding: 0 4px; border-radius: 3px;
+                    background: linear-gradient(180deg, #6b7280, #2b3038);
+                    border: 1px solid #10131a; color: #f2f5f8; font-size: 11px; font-weight: 800; line-height: 1.45;
+                    text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,0.85);
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.22); }
 
                 /* THE BIGGEST THING IN THE TRAY, which is what it should be: every decision on a turn is made
                    against it, and it used to be the smallest. */
