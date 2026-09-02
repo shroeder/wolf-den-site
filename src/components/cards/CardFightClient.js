@@ -230,6 +230,28 @@ export default function CardFightClient({ fixture }) {
     const turnNo = fight.turn;
     useEffect(() => { setActive(2); }, [turnNo]);
 
+    // ── SHIELDING IS AN EVENT ───────────────────────────────────────────────────────────────────────
+    // Luke: "what visual effects do they have when they shield?" Spire does not just increment a badge — the
+    // character takes a pale ring of light and the shield pops, and that is the difference between a number
+    // that changed and a thing that happened. Same argument as the pet crossing the sand: a state written on
+    // screen is not an event until something moves.
+    //
+    // Block goes UP for one of two reasons and only one of them deserves a flash: you played a card, or a turn
+    // began and it was wiped to zero first. Comparing against the previous value catches the first and ignores
+    // the second, because a wipe to zero is a fall, not a rise.
+    const blockSeen = useRef({});
+    const [guarded, setGuarded] = useState({});
+    useEffect(() => {
+        const now = { hero: fight.hero.block, ...Object.fromEntries(fight.foes.map((f, i) => [i, f.block])) };
+        const lit = {};
+        for (const k of Object.keys(now)) if (now[k] > (blockSeen.current[k] || 0)) lit[k] = true;
+        blockSeen.current = now;
+        if (!Object.keys(lit).length) return undefined;
+        setGuarded(lit);
+        const id = setTimeout(() => setGuarded({}), 520);
+        return () => clearTimeout(id);
+    }, [fight]);
+
     const incoming = incomingTotal(fight);
     // A hand shrinks as it is played, so the active index has to stay inside it — and when the last card on
     // the right is played, the one that takes its place is the new right-hand end, not a gap.
@@ -654,7 +676,7 @@ export default function CardFightClient({ fixture }) {
                 <div className="cf-turn">Turn {fight.turn}</div>
 
                 <div
-                    className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}${selfLit ? " is-target" : ""}`}
+                    className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}${selfLit ? " is-target" : ""}${guarded.hero ? " is-guarding" : ""}`}
                     ref={heroRef}
                     onClick={onHeroTap}
                 >
@@ -665,7 +687,7 @@ export default function CardFightClient({ fixture }) {
                     </div>
                     <span className="cf-body"><Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} /></span>
                     <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.hero} />
+                    <Bar unit={fight.hero} guarding={guarded.hero} />
                 </div>
 
                 {/* ── THE PARTY ────────────────────────────────────────────────────────────────────────
@@ -683,7 +705,8 @@ export default function CardFightClient({ fixture }) {
                                 key={foe.id}
                                 ref={(el) => { foeRefs.current[i] = el; }}
                                 className={`cf-fighter cf-foe${hurt(foe.id) ? " is-hit" : ""}${acting ? " is-acting" : ""}`
-                                    + `${aimAt === i || aimAt === "any" ? " is-target" : ""}${dead ? " is-down" : ""}`}
+                                    + `${aimAt === i || aimAt === "any" ? " is-target" : ""}${dead ? " is-down" : ""}`
+                                    + `${guarded[i] ? " is-guarding" : ""}`}
                                 onClick={() => onFoeTap(i)}
                             >
                                 {dead ? null : (
@@ -709,7 +732,7 @@ export default function CardFightClient({ fixture }) {
                                     <Sprite src={foe.art} fallback={foe.artFallback} className="cf-sprite" />
                                 </span>
                                 <span className="cf-shade" aria-hidden="true" />
-                                {dead ? null : <Bar unit={foe} />}
+                                {dead ? null : <Bar unit={foe} guarding={guarded[i]} />}
                             </div>
                         );
                     })}
@@ -992,7 +1015,7 @@ export default function CardFightClient({ fixture }) {
                    touched, and the eye reads a continuous red strip as ONE gauge — the screen was telling you
                    the party had 34/34/68/68/48/48 hit points. A bar belongs to a body, so it has to be
                    narrower than the body it hangs under and there has to be air between it and the next one. */
-                .cf-party .cfb { max-width: 74px; }
+                .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.84); }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
                 .cf-party .cf-intent-marks { font-size: 17px; }
@@ -1042,6 +1065,20 @@ export default function CardFightClient({ fixture }) {
                    painted straight over the pool. Eight more pixels and the numeral clears it. */
                 .cf-shade { width: calc(var(--cf-figure) * 0.72); height: 13px; margin: -10px 0 10px;
                     background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.92), rgba(0,0,0,0.6) 38%, transparent 74%); }
+                /* ── THE FOES NEED A DIFFERENT POOL FROM THE HERO'S ──────────────────────────────────────
+                   Luke: the hero's shadow is right, the enemies' is too narrow and sits too low. Both are
+                   properties of the ART, not of the layout, which is why one offset could never suit both.
+                   Measured across the ladder sprites: every one carries 4.9% of its frame as empty space BELOW
+                   the feet (rung-1, 28, 55, 94 and 120 all identical), so a pool aligned to the picture's
+                   bottom edge sits about five pixels under the boots with a visible gap — detached, which is
+                   what makes it look thin as well as low. And their stance spans 62-77% of the frame against
+                   a member avatar that fills far more of its own, so the same fraction reads as a wide pool
+                   under the hero and a narrow one under them.
+                   Lifted by exactly that 4.9%, and widened. The lift is a TRANSFORM rather than a margin
+                   because a margin would drag the health bar up with it and knock the foe bars out of line
+                   with the hero's. */
+                .cf-foe .cf-shade { width: calc(var(--cf-figure) * 0.88);
+                    --cf-shade-lift: calc(var(--cf-figure) * -0.049); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
@@ -1356,8 +1393,8 @@ export default function CardFightClient({ fixture }) {
                     50% { transform: scaleX(-1) translateY(-6px) rotate(-0.5deg) scaleY(1.02); }
                 }
                 @keyframes cfShade {
-                    0%, 100% { opacity: 1; transform: scaleX(1); }
-                    50% { opacity: 0.74; transform: scaleX(0.9); }
+                    0%, 100% { opacity: 1; transform: translateY(var(--cf-shade-lift, 0px)) scaleX(1); }
+                    50% { opacity: 0.74; transform: translateY(var(--cf-shade-lift, 0px)) scaleX(0.9); }
                 }
                 @keyframes cfFloat { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-36px); } }
                 @keyframes cfShake {
@@ -1371,7 +1408,7 @@ export default function CardFightClient({ fixture }) {
 
 /** Name, health, and the block standing in front of it. */
 /** Health, and whatever is stuck to the body it belongs to. No name: the fighter is the identification. */
-function Bar({ unit }) {
+function Bar({ unit, guarding }) {
     const pct = Math.max(0, Math.min(100, (unit.hp / unit.hpMax) * 100));
     return (
         <div className="cfb">
@@ -1383,7 +1420,7 @@ function Bar({ unit }) {
                     rather than filed in the status row underneath with the debuffs. A shield with a number,
                     at the near end, and the bar takes a cold edge while it holds. */}
                 {unit.block > 0 ? (
-                    <span className="cfb-guard" title={`Block ${unit.block}`}>
+                    <span className={`cfb-guard${guarding ? " is-fresh" : ""}`} title={`Block ${unit.block}`}>
                         <GiShield aria-hidden="true" /><i>{unit.block}</i>
                     </span>
                 ) : null}
@@ -1412,23 +1449,50 @@ function Bar({ unit }) {
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
                    column he stands in, and the NUMBER is the loud part rather than the bar. */
-                .cfb { width: 100%; max-width: 96px; }
+                .cfb { width: 100%; max-width: calc(var(--cf-figure) * 0.98); }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
 /* Theirs is a lean trough with the number drawn OVER it, bigger than the bar is tall, outlined
                    rather than boxed — it reads as part of the picture instead of a widget with a caption. Ours
                    was a rounded pill with a border, which is a progress indicator on a settings page. */
+                /* ── MEASURED OFF THEIRS, NOT REMEMBERED ─────────────────────────────────────────────
+                   Three reference frames (28/43, 47/82, 57/87). What ours had wrong:
+                     · theirs is WIDER — see below; ours was narrower than the body it hung under
+                   And one thing I got wrong on the way and had to walk back: I read their empty half as a
+                   translucent charcoal and made ours see-through, which rendered at 57% and 12% as a bar that
+                   had simply got SHORTER. The whole job of the unfilled part is to hold the full length on
+                   screen so the red reads as a FRACTION of something. Theirs is dark and definite against the
+                   floor for exactly that reason, so ours is too.
+                     · our fill was a vertical gradient; theirs is flat saturated red with no shading at all
+                     · about 1.36x the creature's stance, which is most of why the two looked so far apart
+                   Kept from ours: the big outlined numeral overflowing the bar, which theirs does too (their
+                   text runs about 1.6x the bar's height, and so does ours). */
                 .cfb-track { position: relative; height: 8px; border-radius: 1px; overflow: visible;
-                    background: #17090c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,0,0,0.55); }
+                    background: rgba(8,4,6,0.9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.8); }
                 .cfb-track.is-guarded { box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(150,205,255,0.75); }
                 .cfb-guard { position: absolute; left: -13px; top: 50%; transform: translateY(-50%);
                     display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
                     color: #bfe2ff; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
+                /* The shield lands rather than appears. */
+                .cfb-guard.is-fresh { animation: cfGuardPop 460ms cubic-bezier(0.2, 1.5, 0.4, 1); }
+                @keyframes cfGuardPop {
+                    0% { transform: translateY(-50%) scale(2.2); opacity: 0; }
+                    40% { transform: translateY(-50%) scale(1.16); opacity: 1; }
+                    100% { transform: translateY(-50%) scale(1); opacity: 1; }
+                }
+                /* And the body takes a cold ring of light — pale blue, brief, gone. Drawn on the sprite with a
+                   drop-shadow rather than as an element, so it follows the silhouette instead of boxing it. */
+                .cf-fighter.is-guarding .cf-sprite { animation: cfWard 520ms ease-out; }
+                @keyframes cfWard {
+                    0% { filter: drop-shadow(0 0 0 rgba(150,205,255,0)) brightness(1); }
+                    22% { filter: drop-shadow(0 0 10px rgba(160,215,255,0.95)) drop-shadow(0 0 22px rgba(90,170,255,0.7))
+                        brightness(1.28); }
+                    100% { filter: drop-shadow(0 0 0 rgba(150,205,255,0)) brightness(1); }
+                }
                 .cfb-guard i { position: absolute; font-style: normal; font-family: var(--cf-card-font);
                     font-size: 12px; font-weight: 700; color: #10222f; }
-                .cfb-fill { height: 100%; border-radius: 1px; background: linear-gradient(180deg, #f0505c, #8f1420);
-                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+                .cfb-fill { height: 100%; border-radius: 1px; background: #d42230;
                     transition: width 420ms cubic-bezier(0.2, 0.8, 0.3, 1); }
                 .cfb-hp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
                     display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 17px;
