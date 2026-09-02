@@ -239,7 +239,12 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
         setResult(null); setFlash(null);
         const r = await act({ action: "gambit_start", bet: amount });
         if (r?.ok) { setRolling(true); setG({ bet: r.bet, dice: r.dice, hold: [false, false, false], rerolled: false, hand: r.hand }); setTimeout(() => setRolling(false), 650); }
-        else setFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend." : r?.error === "daily_limit" ? "That's your five rolls for today — the Gambler's cashing out. Back tomorrow!" : "Couldn't ante up.");
+        else setFlash(r?.error === "insufficient_gold" ? "Not enough gold, friend."
+            : r?.error === "daily_limit" ? "That's your five rolls for today — the Gambler's cashing out. Back tomorrow!"
+            // Saying "couldn't ante up" to somebody who already has dice on the table is what sent Kaishiern
+            // looking at his purse for a problem that was never there. Name the actual blocker.
+            : r?.error === "already_playing" ? "Your hand's still on the table — lay it down first."
+            : "Couldn't ante up.");
     }, [act]);
     const toggleHold = useCallback((i) => { setG((cur) => (cur && !cur.rerolled ? { ...cur, hold: cur.hold.map((h, idx) => (idx === i ? !h : h)) } : cur)); }, []);
     const reroll = useCallback(async () => {
@@ -260,7 +265,25 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
         }
     }, [act]);
 
-    const openStation = useCallback((key) => { setFlash(null); if (key === "dice") { setG(null); setResult(null); } setStation(key); }, []);
+    const openStation = useCallback((key) => { setFlash(null); if (key === "dice") setResult(null); setStation(key); }, []);
+
+    // ── A HAND LEFT ON THE TABLE IS STILL YOURS ──────────────────────────────────────────────────────
+    // Kaishiern: "when I'm in the tavern and click on the gambler to play dice it says I couldn't ante up
+    // even though I do have enough gold." He did have the gold. What he also had was an unresolved hand: the
+    // ante was taken, the dice were rolled, and he left the panel before laying them down.
+    //
+    // Opening the Gambler CLEARED the board on the way in, so that hand was invisible — and the server, quite
+    // correctly, refused every ante afterwards because one was already open. The result was a permanent
+    // lockout of the dice game reported as the one thing that was not wrong: your gold. Two members were in
+    // that state, one of them since the previous afternoon.
+    //
+    // The state endpoint has always sent the open hand back. Now the panel picks it up, so a hand is resumed
+    // where it was left rather than stranding the stake that paid for it.
+    useEffect(() => {
+        if (station !== "dice" || g || result) return;
+        const open = st?.dice?.active ? st.dice : null;
+        if (open) setG({ bet: open.bet, dice: open.dice, hold: [false, false, false], rerolled: Boolean(open.rerolled), hand: open.hand });
+    }, [station, g, result, st?.dice]);
     const others = st?.occupants || [];
     const here = others.length + 1;
     overlayRef.current = Boolean(station || menuFor); // keep the pointer-guard in sync (barkeep is in-scene, not blocking)
