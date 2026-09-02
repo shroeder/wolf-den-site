@@ -39,6 +39,13 @@ const CHROME = "Drawn FLAT ON, straight from the front, perfectly symmetrical le
 const METAL = "Forged from pale neutral grey-silver metal with hammered facets, subtle rivets at the corners, "
     + "and a bright specular edge along the top — desaturated, almost no colour of its own.";
 
+// The type plate is the one piece that is NOT hollow — it is a solid plaque with an emblem struck on top of
+// it, so it needs the opposite instruction to everything else here.
+const SOLID = "Drawn FLAT ON, straight from the front, perfectly symmetrical left to right, with NO perspective "
+    + "and no tilt. SOLID all the way across — a filled plate, not a frame and not a ring — and completely "
+    + "BLANK: no emblem, no engraving, no pattern, nothing struck into its face. Centred, with a few pixels of "
+    + "empty space outside it.";
+
 const PIECES = {
     // The card's outer moulding. One asset for every card in the game: the pet-coloured stock shows through
     // the hollow middle, exactly as the character colour does on theirs.
@@ -65,6 +72,15 @@ const PIECES = {
         size: "1024x1024", store: { w: 240, h: 240 },
         subject: "An empty circular window rim — a plain ring. A narrow moulded rim and nothing inside it. "
             + METAL,
+    },
+    // ── THE TYPE PLATE ── a small plaque that says what kind of card this is. It was a CSS rectangle with a
+    // word in it, and on a card whose every other edge is painted that is the one piece that looks like a web
+    // page. Luke: "the skill/attack/block text and rectangle bothers me, I think its the text and no sprite
+    // for a plate."
+    plate: {
+        size: "1536x1024", store: { w: 240, h: 100 }, extra: SOLID,
+        subject: "A small blank horizontal metal name plaque with softly rounded corners and a rivet at each "
+            + "end — a solid plate with a plain smooth face. " + METAL,
     },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
@@ -98,7 +114,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
         continue;
     }
     if (fs.existsSync(base) && !FORCE) { skipped += 1; continue; }
-    const prompt = housePrompt(piece.subject, { extra: CHROME });
+    const prompt = housePrompt(piece.subject, { extra: piece.extra || CHROME });
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSwordWound } from "react-icons/gi";
+import { Kreon } from "next/font/google";
+import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSmallFire, GiSwordWound } from "react-icons/gi";
 
 import {
     DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight, typeLook,
@@ -17,6 +18,15 @@ import { RARITY_META } from "@/lib/marketplace/rarity.js";
 // NO POINTER CAPTURE. setPointerCapture on the card is the obvious way to follow a drag and it silently kills
 // mouse clicks in this codebase — it has already cost one afternoon. Window listeners instead, with a slop
 // threshold below which a press is a tap and not a drag.
+
+// ── THE CARD FACE IS NOT SET IN THE UI FONT ──────────────────────────────────────────────────────────────
+// Luke: "i really dont like the font on the description". It was inheriting the site body face, which is a
+// clean modern sans chosen to make a shop legible — correct for a page and wrong on a painted card, where it
+// reads as a caption pasted onto a game. Kreon is a slab serif with the same weight of stroke as the ink
+// contour the art is drawn with, and is the closest free face to the one Spire sets its own cards in. Scoped
+// to this screen through next/font, so nothing else on the site changes and the file is fetched only by the
+// people who open the fight.
+const cardFont = Kreon({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
 
 const Sprite = ({ src, fallback, className, flip }) => {
     const [bad, setBad] = useState(false);
@@ -108,6 +118,13 @@ const CardArt = ({ card, pet }) => {
  * lit. Every one of those is a channel that does not cost a word — you can tell an Attack from a Skill, and a
  * Legendary from a Common, without reading anything.
  */
+/** The emblem on the type plate. Crossed swords is an attack, a shield is a skill, a flame is a power. */
+const TypeMark = ({ kind }) => {
+    if (kind === "attack") return <GiCrossedSwords aria-hidden="true" />;
+    if (kind === "power") return <GiSmallFire aria-hidden="true" />;
+    return <GiShield aria-hidden="true" />;
+};
+
 // ── WHICH PAINTED TINT A RARITY WEARS ────────────────────────────────────────────────────────────────────
 // The chrome is drawn once and tinted into three (scripts/gen-card-chrome.mjs). Nine rarities map onto those
 // three rather than each demanding its own file: grey for common, steel blue through the middle, gold at the
@@ -144,7 +161,16 @@ const CardFace = ({ card, art, dim }) => {
                 </span>
                 <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${card.kind}-${tint}.png)` }} />
             </span>
-            <span className="cf-type" style={{ background: meta.color, color: inkOn(meta.color) }}>{look.label}</span>
+            {/* ── THE TYPE PLATE ──────────────────────────────────────────────────────────────────────
+                A painted plaque with an EMBLEM struck on it, not a CSS rectangle with a word in it. Two
+                complaints in one, both Luke's: on a card whose every other edge is painted, the tab was the
+                one piece that still looked like a web page, and the word was doing work the window's shape
+                already does — an attack window comes to a point, a skill is a rounded rectangle, and now the
+                plate under it carries crossed swords or a shield. The word is one line away if it is missed;
+                the `label` it would use is still in the rules. */}
+            <span className="cf-type" style={{ backgroundImage: `url(/images/cards/chrome/plate-${tint}.png)` }} aria-label={look.label}>
+                <TypeMark kind={card.kind} />
+            </span>
             <span className="cf-text">{withKeywords(card.text)}</span>
         </>
     );
@@ -353,7 +379,9 @@ export default function CardFightClient({ fixture }) {
     }, [peek, fight.draw, fight.discard]);
 
     return (
-        <div className="cf">
+        // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
+        // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
+        <div className="cf" style={{ "--cf-card-font": cardFont.style.fontFamily }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/arena/arena-bg.webp" className="cf-bg" />
@@ -614,7 +642,9 @@ export default function CardFightClient({ fixture }) {
                 /* PAINTED CLOTH, not a clipped div. The folded tails are in the picture now, which is what the
                    clip-path was faking — and faking badly: its clipped underside was letting the card art show
                    through beneath the name, which read as the sprite covering the banner. */
-                .cf-banner { position: relative; z-index: 3; width: calc(100% + 14px);
+                /* Set in the card face, not the UI face — see the note on cardFont at the top. */
+                .cf-banner { font-family: var(--cf-card-font); font-weight: 700;
+                    position: relative; z-index: 3; width: calc(100% + 14px);
                     margin: 4px -7px -6px; padding: 3px 9px 6px;
                     background-repeat: no-repeat; background-size: 100% 100%;
                     font-size: 9px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1;
@@ -648,9 +678,10 @@ export default function CardFightClient({ fixture }) {
                 .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
                 /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
-                .cf-type { margin-top: -6px; padding: 0 7px 1px; border-radius: 3px; font-size: 7px;
-                    font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: #14181f;
-                    border: 1px solid rgba(0,0,0,0.4); z-index: 3; }
+                .cf-type { position: relative; z-index: 3; margin-top: -7px; width: 34px; height: 15px;
+                    display: grid; place-items: center; background-repeat: no-repeat; background-size: 100% 100%;
+                    color: #1b1f27; font-size: 10px; line-height: 1;
+                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
                 /* Bounded, or a two-clause card writes straight out through the side of itself — which is what
                    Pounce did, and it looked like a rendering fault rather than a card. */
                 /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
@@ -660,8 +691,8 @@ export default function CardFightClient({ fixture }) {
                    they are in the markup — so the sentence went under the slab the moment the stock arrived,
                    and the cards shipped for two commits with no rules text on them at all. The banner and the
                    type tab survived only because they already carried a z-index of their own. */
-                .cf-text { position: relative; z-index: 1; flex: 1; width: 100%; padding: 3px 8px 0;
-                    font-size: 8.5px; line-height: 1.2; text-align: center; color: #e2e8f2;
+                .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
+                    padding: 3px 8px 0; font-size: 9.5px; line-height: 1.18; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
