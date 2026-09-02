@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Kreon } from "next/font/google";
-import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSmallFire, GiSwordWound } from "react-icons/gi";
+import {
+    GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiShield, GiSmallFire, GiSwordWound,
+} from "react-icons/gi";
 
 import {
     DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, intentDamage, playCard, startFight,
@@ -421,9 +423,6 @@ export default function CardFightClient({ fixture }) {
                     The seed is gone from the screen with them; it lives in the URL, which is where it is
                     actually used. */}
                 <div className="cf-top">
-                    <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)}>
-                        Forfeit
-                    </button>
                     <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
                         <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
                         <span className="cf-pile-n">{fight.draw.length}</span>
@@ -432,6 +431,11 @@ export default function CardFightClient({ fixture }) {
                         <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
                         <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
                     </div>
+                    {/* Small, in the middle, and a door rather than a word — it is the one control up here
+                        you are not meant to reach for. */}
+                    <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
+                        <GiExitDoor aria-hidden="true" />
+                    </button>
                     <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
                         <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
                         <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
@@ -452,7 +456,7 @@ export default function CardFightClient({ fixture }) {
                     </div>
                     <Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} />
                     <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.hero} name={fight.hero.name} />
+                    <Bar unit={fight.hero} />
                 </div>
 
                 <div
@@ -482,7 +486,7 @@ export default function CardFightClient({ fixture }) {
                     {/* Every fighter on the Road is drawn facing right, so on this side of the sand they all turn round. */}
                     <Sprite src={fixture.foe.art} fallback={fixture.foe.artFallback} className="cf-sprite" flip />
                     <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.foe} name={fight.foe.name} accent={fight.foe.color} />
+                    <Bar unit={fight.foe} />
                 </div>
             </div>
 
@@ -637,9 +641,10 @@ export default function CardFightClient({ fixture }) {
                     display: flex; align-items: center; justify-content: space-between; gap: 6px;
                     padding: calc(6px + env(safe-area-inset-top)) 8px 12px;
                     background: linear-gradient(180deg, rgba(8,9,13,0.92), rgba(8,9,13,0.5) 64%, rgba(8,9,13,0)); }
-                .cf-forfeit { background: rgba(10,12,16,0.6); border: 1px solid #39424f; color: #b8c2d0;
-                    border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 700; }
-                .cf-forfeit:disabled { opacity: 0.4; }
+                .cf-forfeit { display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+                    background: rgba(10,12,16,0.5); border: 1px solid #39424f; border-radius: 999px;
+                    color: #9aa6b4; font-size: 15px; }
+                .cf-forfeit:disabled { opacity: 0.35; }
                 .cf-turn { position: absolute; top: calc(62px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3;
                     font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb0c4; }
 
@@ -648,22 +653,33 @@ export default function CardFightClient({ fixture }) {
                    on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
                    phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
                    above the bottom at worst, 38% when there is room, and never more than 320. */
-                .cf-fighter { position: absolute; bottom: clamp(160px, 30%, 300px); width: 44%; display: flex; flex-direction: column;
+                .cf-fighter { position: absolute; bottom: clamp(150px, 27%, 280px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
                 .cf-hero { left: 3%; }
                 .cf-foe { right: 3%; cursor: pointer; }
                 /* Smaller on a short screen, or the fighter block grows tall enough to push its INTENT PILL up behind
                    the control strip — and the intent is the one thing on this screen that can never be covered. */
+/* ── THEY BREATHE ────────────────────────────────────────────────────────────────────────
+                   A fighter standing perfectly still is a picture of a fighter. Two or three pixels of rise
+                   and fall is the whole difference between a scene and a screenshot, and it costs nothing —
+                   the two are deliberately out of step (different durations, one delayed) so they do not
+                   bob in unison like a pair of metronomes. The shadow under each pulses very slightly against
+                   the body, which is what sells the lift as a lift rather than a slide. */
                 .cf-sprite { width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
-                    filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45)); }
+                    filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45));
+                    animation: cfBreathe 3.4s ease-in-out infinite; transform-origin: 50% 100%; }
+                .cf-foe .cf-sprite { animation-duration: 4.1s; animation-delay: -1.2s; }
+                .cf-shade { animation: cfShade 3.4s ease-in-out infinite; }
+                .cf-foe .cf-shade { animation-duration: 4.1s; animation-delay: -1.2s; }
+                /* The hit shake takes the sprite over entirely: a shove has to beat a breath. */
+                .cf-fighter.is-hit .cf-sprite { animation: cfShake 260ms ease-out; }
                 /* THE POOL ON THE GROUND. A drop-shadow is a copy of the sprite offset behind it, which reads
                    as a sticker lifted off the page; what puts a figure ON a floor is a soft dark ellipse at
                    its feet, and every fighter in Spire has one. This is the "no contact shadow = pasted on"
                    note from the farm, and it was the whole of "our characters are floating". */
-                .cf-shade { width: 62%; height: 14px; margin: -7px 0 2px;
-                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.62), rgba(0,0,0,0.34) 45%, transparent 72%); }
+                .cf-shade { width: 66%; height: 17px; margin: -9px 0 3px;
+                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.78), rgba(0,0,0,0.42) 42%, transparent 70%); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
-                .cf-fighter.is-hit { animation: cfShake 260ms ease-out; }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -903,6 +919,17 @@ export default function CardFightClient({ fixture }) {
                     72% { opacity: 1; transform: translateY(-6px) scale(1.5); }
                     100% { opacity: 0; transform: translateY(-26px) scale(1.35); }
                 }
+                /* 3px was honest and invisible — filmed at ten frames over two and a half seconds you could
+                   not tell it from a still. A breath has to be seen to be doing its job, so it is six pixels
+                   with a degree of sway, which reads as weight shifting rather than a sprite sliding. */
+                @keyframes cfBreathe {
+                    0%, 100% { transform: translateY(0) rotate(-0.5deg) scaleY(1); }
+                    50% { transform: translateY(-6px) rotate(0.5deg) scaleY(1.02); }
+                }
+                @keyframes cfShade {
+                    0%, 100% { opacity: 1; transform: scaleX(1); }
+                    50% { opacity: 0.74; transform: scaleX(0.9); }
+                }
                 @keyframes cfFloat { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-36px); } }
                 @keyframes cfShake {
                     0% { transform: translateX(0); } 25% { transform: translateX(-7px); }
@@ -914,11 +941,11 @@ export default function CardFightClient({ fixture }) {
 }
 
 /** Name, health, and the block standing in front of it. */
-function Bar({ unit, name, accent }) {
+/** Health, and whatever is stuck to the body it belongs to. No name: the fighter is the identification. */
+function Bar({ unit }) {
     const pct = Math.max(0, Math.min(100, (unit.hp / unit.hpMax) * 100));
     return (
         <div className="cfb">
-            <div className="cfb-name" style={accent ? { color: accent } : undefined}>{name}</div>
             <div className="cfb-track">
                 <div className="cfb-fill" style={{ width: `${pct}%` }} />
                 <span className="cfb-hp">{unit.hp} / {unit.hpMax}</span>
@@ -948,26 +975,27 @@ function Bar({ unit, name, accent }) {
                 ) : null}
             </div>
             <style jsx global>{`
-                .cfb { width: 100%; max-width: 168px; }
-                .cfb-name { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-                    text-align: center; margin-bottom: 4px; opacity: 0.72;
-                    text-shadow: 0 1px 3px rgba(0,0,0,0.95); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
+                   column he stands in, and the NUMBER is the loud part rather than the bar. */
+                .cfb { width: 100%; max-width: 132px; }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
 /* Theirs is a lean trough with the number drawn OVER it, bigger than the bar is tall, outlined
                    rather than boxed — it reads as part of the picture instead of a widget with a caption. Ours
                    was a rounded pill with a border, which is a progress indicator on a settings page. */
-                .cfb-track { position: relative; height: 9px; border-radius: 1px; overflow: visible;
-                    background: rgba(12,6,8,0.9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
+                .cfb-track { position: relative; height: 8px; border-radius: 1px; overflow: visible;
+                    background: #17090c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,0,0,0.55); }
                 .cfb-fill { height: 100%; border-radius: 1px; background: linear-gradient(180deg, #e2323f, #9c1a27);
                     transition: width 240ms ease-out; }
                 .cfb-hp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
-                    display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 15px;
+                    display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 17px;
                     font-weight: 700; letter-spacing: 0.01em; color: #fff;
                     text-shadow: 0 0 3px rgba(0,0,0,0.95), 1px 1px 0 rgba(0,0,0,0.95), -1px 1px 0 rgba(0,0,0,0.95),
                         1px -1px 0 rgba(0,0,0,0.95), -1px -1px 0 rgba(0,0,0,0.95); }
-                .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 4px; min-height: 16px; }
+/* Under the bar for both fighters, the way theirs are — buffs and debuffs belong to the body they
+                   are stuck to, not to a panel somewhere else on the screen. */
+                .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 6px; min-height: 18px; }
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }
