@@ -193,6 +193,7 @@ export default function CardFightClient({ fixture }) {
     const dragRef = useRef(null);
     const foeRef = useRef(null);
     const fieldRef = useRef(null);
+    const trayRef = useRef(null);
     const floatSeq = useRef(0);
     const playSeq = useRef(0);
 
@@ -323,7 +324,10 @@ export default function CardFightClient({ fixture }) {
     const ghostAt = (() => {
         if (!drag?.moved || !dragCard) return null;
         if (dragCard.target !== "foe") return { x: drag.x, y: drag.y };
-        const seam = fieldRef.current?.getBoundingClientRect().bottom;
+        // The TOP of the tray, not the bottom of the field. The field used to end at the hand and now it is
+        // the whole screen, so anchoring to its bottom would pin the held card off the bottom edge — an
+        // invisible break that the layout change would have shipped with.
+        const seam = trayRef.current?.getBoundingClientRect().top;
         return { x: drag.sx, y: Number.isFinite(seam) ? seam : drag.y };
     })();
 
@@ -371,7 +375,7 @@ export default function CardFightClient({ fixture }) {
     // seventeen wider than the phone it has to sit in, so the outer cost gems hung off the screen. At -24 the
     // row is 368 and everything is on the glass. What you lose is the tail of a sentence at REST, which is
     // what picking the card up is for.
-    const overlap = handSize > 5 ? -46 : -24;
+    const overlap = handSize > 5 ? -58 : -38;
     const spread = handSize > 5 ? 2.8 : 4;
     const fanOf = (i) => {
         const mid = (handSize - 1) / 2;
@@ -440,7 +444,7 @@ export default function CardFightClient({ fixture }) {
             </div>
 
             {/* ── THE HAND ──────────────────────────────────────────────────────────────────────────── */}
-            <div className="cf-tray">
+            <div className="cf-tray" ref={trayRef}>
                 <div className="cf-hand">
                     {fight.hand.map((entry, i) => {
                         const card = cardById(entry.id);
@@ -456,7 +460,7 @@ export default function CardFightClient({ fixture }) {
                                     // The picked card comes OUT of the fan — straightened, lifted and grown,
                                     // and above its neighbours, because it is the one being read.
                                     transform: selected === entry.uid
-                                        ? "translateY(-22px) scale(1.16)"
+                                        ? "translateY(-46px) scale(1.12)"
                                         : `rotate(${fanOf(i).rot}deg) translateY(${fanOf(i).drop}px)`,
                                     zIndex: selected === entry.uid ? 6 : i,
                                 }}
@@ -573,13 +577,23 @@ export default function CardFightClient({ fixture }) {
                 as a warning. Every selector below is under the `.cf` prefix, which is this screen and nothing
                 else. Same trap the mine hit; the answer there was global CSS too. */}
             <style jsx global>{`
-                .cf { position: fixed; inset: 0; height: 100dvh; z-index: 4000; display: flex; flex-direction: column;
+                /* ── ONE SPACE, NOT A PICTURE ABOVE A SHELF ──────────────────────────────────────────────
+                   Measured off Spire's own frame with a percentage grid laid on it: their fighters stand with
+                   their feet at 62%, health bars at 70%, the hand from 78% — and the FLOOR RUNS EDGE TO EDGE
+                   behind all of it. There is no UI band anywhere on that screen.
+                   Ours had the fighters at about the same height and then stopped the world at 70% and put a
+                   black slab under it, which is exactly why they read as being "at the top" (Luke): everything
+                   below them was dead. The scene is the whole screen now and the hand floats over it. */
+                .cf { position: fixed; inset: 0; height: 100dvh; z-index: 4000;
                     background: #0a0b0f; color: #e9edf2; user-select: none; -webkit-user-select: none; overflow: hidden; }
 
-                .cf-field { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-                .cf-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.82; }
-                .cf-field::after { content: ""; position: absolute; inset: 0;
-                    background: linear-gradient(180deg, rgba(8,9,13,0.55), rgba(8,9,13,0.1) 40%, rgba(8,9,13,0.75)); pointer-events: none; }
+                .cf-field { position: absolute; inset: 0; overflow: hidden; }
+                .cf-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.86; }
+                /* Darkened at the foot rather than ENDED there, so the cards have something to sit against
+                   while the floor keeps going. */
+                .cf-field::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                    background: linear-gradient(180deg, rgba(8,9,13,0.5), rgba(8,9,13,0.05) 34%,
+                        rgba(8,9,13,0.3) 60%, rgba(8,9,13,0.86) 86%, rgba(8,9,13,0.95)); }
 
                 /* Both on the LEFT. The seed sat top-right and a foe with a long intent ("GUARDED SWING") grew its pill
                    straight through it — and the intent is the one thing on this screen that must never be
@@ -592,7 +606,12 @@ export default function CardFightClient({ fixture }) {
                 .cf-turn { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 3;
                     font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb0c4; }
 
-                .cf-fighter { position: absolute; bottom: 12px; width: 44%; display: flex; flex-direction: column;
+                /* Feet at ~62% of the screen and bars at ~66% — where Spire stands its fighters, measured. */
+                /* clamp, not a bare percentage. The tray is a roughly FIXED height — a control strip plus a hand — so
+                   on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
+                   phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
+                   above the bottom at worst, 38% when there is room, and never more than 320. */
+                .cf-fighter { position: absolute; bottom: clamp(215px, 38%, 320px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
                 .cf-hero { left: 3%; }
                 .cf-foe { right: 3%; cursor: pointer; }
@@ -617,12 +636,23 @@ export default function CardFightClient({ fixture }) {
                 .cf-float.is-block { color: #8fd3ff; }
                 .cf-float.is-debuff { color: #ffcf6a; font-size: 14px; }
 
-                .cf-tray { flex: 0 0 auto; padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
-                    background: linear-gradient(180deg, rgba(10,12,16,0), #0d1016 22%); }
+                /* ── THE TRAY FLOATS ON THE SCENE ────────────────────────────────────────────────────────
+                   column-reverse, so the controls sit ABOVE the hand while staying second in the markup. In
+                   Spire's landscape frame the energy, End Turn and the piles sit BESIDE the hand; a portrait
+                   phone has no room either side of five cards, so on ours they become a strip across the top
+                   of the tray. Done in CSS rather than by reordering the JSX, because the hand and the
+                   controls have separate reasons to be in the order they are read. */
+                .cf-tray { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; background: none;
+                    display: flex; flex-direction: column-reverse;
+                    padding: 0 6px calc(2px + env(safe-area-inset-bottom)); }
                 /* The lift on a picked card happens INSIDE this padding, and the cost badge sits inside the
                    card rather than hanging off it — at the end of a five-card hand the outside corner is
                    half a screen-edge away and the badge was being cut in half by it. */
-                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 30px 22px 6px; }
+                /* BLED OFF THE BOTTOM. Their cards run past the edge of the screen, so what you read at rest is the
+                   cost, the name, the picture and the type — the sentence is what picking one up is for. Ours were
+                   fully visible and therefore had to be tiny to fit. */
+                .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 26px 10px 0;
+                    margin-bottom: -18px; }
                 /* 80x108 — near enough Spire's 0.78 wide-to-tall, and the reason the text can be read at all.
                    The 72x114 this started at was a 0.63 card, too narrow for its own sentence, which is what
                    forced the font down to 8px in the first place. */
@@ -636,7 +666,7 @@ export default function CardFightClient({ fixture }) {
                 /* The box paints NOTHING — no background, no border. The drawn moulding is the card's outside
                    edge, and anything the box painted would show past it wherever the two silhouettes disagree,
                    which is exactly what put a green line down the side of the frog. */
-                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 120px; padding: 0 0 7px;
+                .cf-card { position: relative; flex: 0 0 auto; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55));
@@ -683,7 +713,7 @@ export default function CardFightClient({ fixture }) {
                    clip-path was faking — and faking badly: its clipped underside was letting the card art show
                    through beneath the name, which read as the sprite covering the banner. */
                 /* Set in the card face, not the UI face — see the note on cardFont at the top. */
-                .cf-banner { font-family: var(--cf-card-font); font-weight: 700;
+                .cf-banner { font-family: var(--cf-card-font); font-weight: 700; font-size: 10.5px;
                     position: relative; z-index: 3; width: calc(100% + 14px);
                     margin: 4px -7px -6px; padding: 3px 9px 6px;
                     background-repeat: no-repeat; background-size: 100% 100%;
@@ -699,7 +729,7 @@ export default function CardFightClient({ fixture }) {
                    The clip is inset a shade tighter than the art so the rim covers the cut edge — a clip and
                    a painted rim never agree to the pixel, and the way to make that invisible is to let the
                    metal be the thing that ends the picture. */
-                .cf-art { position: relative; width: calc(100% - 14px); height: 44px; margin: 0 7px;
+                .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
                     display: block; }
                 .cf-art-in { position: absolute; inset: 3px; display: grid; place-items: center;
                     border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
@@ -732,13 +762,13 @@ export default function CardFightClient({ fixture }) {
                    and the cards shipped for two commits with no rules text on them at all. The banner and the
                    type tab survived only because they already carried a z-index of their own. */
                 .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
-                    padding: 3px 8px 0; font-size: 9.5px; line-height: 1.18; text-align: center; color: #eef2f8;
+                    padding: 4px 9px 0; font-size: 10.5px; line-height: 1.16; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
 
                 .cf-bar { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center;
-                    gap: 8px; padding-top: 4px; }
+                    gap: 8px; padding: 4px 2px 6px; }
 
                 /* A little card back with the count struck on it, and its name under it. Ours keeps the word
                    where Spire drops it, because a draw pile and a discard pile drawn from the same back are
@@ -791,11 +821,11 @@ export default function CardFightClient({ fixture }) {
                    over the hand, which is the one place a card that has just left your hand should not be. */
                 .cf-played { position: fixed; inset: 0 0 34% 0; z-index: 4950; display: grid; place-items: center;
                     pointer-events: none; }
-                .cf-played-card { position: relative; width: 84px; height: 120px; padding: 0 0 7px;
+                .cf-played-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     animation: cfPerform 640ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 
-                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 120px; padding: 0 0 7px;
+                .cf-drag { position: fixed; z-index: 5000; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     background: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
