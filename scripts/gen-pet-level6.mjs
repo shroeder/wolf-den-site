@@ -144,8 +144,28 @@ function catalogue() {
     return out;
 }
 
-async function editTo(srcBuf, form) {
-    const prompt = `Transform THIS EXACT creature into its final level-6 form. ${FORMS[form].line} `
+// ── NAME THE ANIMAL. THE CATALOGUE ALWAYS KNEW AND THIS NEVER ASKED. ────────────────────────────────────────
+// `catalogue()` reads every pet's own spritePrompt and it was never passed in here, so the only thing telling
+// the model WHAT it was looking at was the reference image. That is enough for most of the set and it is not
+// enough for an animal with no limbs.
+//
+// Luke, on the Lantern Jelly: "the jellyfish evolves into a wolf? thatd wrong". It did, and so did the reroll,
+// because the dark line asks for things a jellyfish does not have — "claws, fangs, beak or mane grown longer
+// and sharper", "posture lower and more predatory", "smoke near its FEET". Handed a creature with no feet and
+// no claws, the only way to satisfy that sentence is to draw an animal that has them. The Lightstone form of
+// the very same pet came out right from the very same source image, because sigils, a crown and crystal tips
+// are all things a jellyfish CAN wear.
+//
+// So the species is stated, in its own words, and the extremity clause is explicitly excused for animals that
+// lack those parts. This costs nothing per image and it is the difference between a prompt describing a wolf
+// and a prompt describing this pet.
+async function editTo(srcBuf, form, species = "") {
+    const prompt = `Transform THIS EXACT creature into its final level-6 form. `
+        + (species ? `The creature is: ${species}. It MUST still be that exact animal when you are done. ` : "")
+        + `${FORMS[form].line} `
+        + `IF THIS ANIMAL HAS NO HORNS, CLAWS, FANGS, BEAK, MANE, LEGS OR FEET, simply SKIP those parts of the `
+        + `instruction — apply the effect to the body parts it actually has (tentacles, fins, shell, wings, `
+        + `petals) and DO NOT invent limbs, claws or a predatory stance it never had. `
         + `${KEEP_PALETTE} ${IDENTITY} ${NO_AURA} `
         + `Keep the same right-facing three-quarter full-body pose as the reference. ${HOUSE}`;
     const body = new FormData();
@@ -236,7 +256,7 @@ async function worker(n) {
         const label = `${job.id} ${job.form}`;
         try {
             const srcBuf = Buffer.from(await (await fetch(topUrl.get(job.id))).arrayBuffer());
-            const buf = await withRetry(() => editTo(srcBuf, job.form), label);
+            const buf = await withRetry(() => editTo(srcBuf, job.form, job.prompt), label);
             fs.writeFileSync(path.join(OUT, `${job.id}-lv6-${job.form}.png`), buf);
 
             if (APPLY) {
