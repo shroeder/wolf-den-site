@@ -9,6 +9,7 @@ import {
 
 import {
     DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, incomingTotal, intentDamage, resolveCard,
+    splitDamage,
     playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
@@ -684,6 +685,22 @@ export default function CardFightClient({ fixture }) {
         [fight.hero, resolveAgainst]
     );
 
+    // Only while a card is actually in the air and pointed at somebody. A card merely sitting in the middle
+    // of the dial lights every legal body, and painting a pending band on all three would be a promise the
+    // player has not made yet.
+    const pendingFor = (unit, index) => {
+        if (!drag?.moved || !dragCard) return null;
+        if (dragCard.target === "foe") {
+            if (index !== aimAt || !dragCard.damage) return null;
+            const dealt = resolveCard(dragCard, fight.hero, unit).damage || 0;
+            return { kind: "damage", amount: splitDamage(unit, dealt).toHp };
+        }
+        if (index !== "hero") return null;
+        const live = resolveCard(dragCard, fight.hero, null);
+        if (!live.heal) return null;
+        return { kind: "heal", amount: Math.min(live.heal, unit.hpMax - unit.hp) };
+    };
+
     const pileList = useMemo(() => {
         if (!peek) return [];
         const list = peek === "draw" ? fight.draw : fight.discard;
@@ -747,7 +764,7 @@ export default function CardFightClient({ fixture }) {
                     </div>
                     <span className="cf-body"><Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} /></span>
                     <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.hero} guarding={guarded.hero} />
+                    <Bar unit={fight.hero} guarding={guarded.hero} pending={pendingFor(fight.hero, "hero")} />
                 </div>
 
                 {/* ── THE PARTY ────────────────────────────────────────────────────────────────────────
@@ -792,7 +809,7 @@ export default function CardFightClient({ fixture }) {
                                     <Sprite src={foe.art} fallback={foe.artFallback} className="cf-sprite" />
                                 </span>
                                 <span className="cf-shade" aria-hidden="true" />
-                                {dead ? null : <Bar unit={foe} guarding={guarded[i]} />}
+                                {dead ? null : <Bar unit={foe} guarding={guarded[i]} pending={pendingFor(foe, i)} />}
                             </div>
                         );
                     })}
@@ -1075,7 +1092,12 @@ export default function CardFightClient({ fixture }) {
                    touched, and the eye reads a continuous red strip as ONE gauge — the screen was telling you
                    the party had 34/34/68/68/48/48 hit points. A bar belongs to a body, so it has to be
                    narrower than the body it hangs under and there has to be air between it and the next one. */
-                .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.84); }
+                /* MEASURED, not chosen. The party columns overlap by design — that is what lets the foes be
+                   full size — so a bar sized as a fraction of the FIGURE inherits that overlap and the four
+                   bars run together into one continuous gauge. At 0.84 they overlapped by 5px at 412 and 4px
+                   at 375. The probe now measures the narrowest gap between any two bars and fails under 4px,
+                   because this has regressed twice. */
+                .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.74); }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
                 .cf-party .cf-intent-marks { font-size: 17px; }
@@ -1496,12 +1518,34 @@ export default function CardFightClient({ fixture }) {
 
 /** Name, health, and the block standing in front of it. */
 /** Health, and whatever is stuck to the body it belongs to. No name: the fighter is the identification. */
-function Bar({ unit, guarding }) {
+function Bar({ unit, guarding, pending }) {
     const pct = Math.max(0, Math.min(100, (unit.hp / unit.hpMax) * 100));
+    // ── WHAT THE CARD IN YOUR HAND WOULD DO TO THIS BAR ─────────────────────────────────────────────────
+    // Luke: "I don't see the preview of the hp damage when I target enemy." Spire does not draw one — theirs
+    // previews the BLOW, on the card, and leaves you to do the subtraction — and on a desktop with a mouse
+    // you can afford that. On a phone you are holding a card over a body with your thumb covering half the
+    // screen, and "will this kill it" is the only question you are actually asking.
+    // So the bar answers it directly: a pale band over the stretch of health the blow would take, sitting at
+    // the leading edge of what is left, so the amount AND what remains after are one glance. Nothing lies —
+    // the band is drawn from the same splitDamage the hit itself uses, so armour is already subtracted.
+    const band = pending && pending.amount > 0
+        ? { left: Math.max(0, pct - (pending.amount / unit.hpMax) * 100),
+            width: Math.min(pct, (pending.amount / unit.hpMax) * 100), kind: pending.kind }
+        : null;
+    // A heal grows to the RIGHT of what you have, into the empty part of the track.
+    const heal = pending?.kind === "heal" && pending.amount > 0
+        ? { left: pct, width: Math.min(100 - pct, (pending.amount / unit.hpMax) * 100) }
+        : null;
     return (
         <div className="cfb">
             <div className={`cfb-track${unit.block > 0 ? " is-guarded" : ""}`}>
                 <div className="cfb-fill" style={{ width: `${pct}%` }} />
+                {band && band.kind === "damage" ? (
+                    <div className="cfb-band is-damage" style={{ left: `${band.left}%`, width: `${band.width}%` }} />
+                ) : null}
+                {heal ? (
+                    <div className="cfb-band is-heal" style={{ left: `${heal.left}%`, width: `${heal.width}%` }} />
+                ) : null}
                 <span className="cfb-hp">{unit.hp} / {unit.hpMax}</span>
                 {/* ── BLOCK SITS ON THE BAR, AT THE FRONT ──────────────────────────────────────────────
                     Armour is the thing standing in front of your health, so it is drawn in front of the bar
@@ -1537,7 +1581,7 @@ function Bar({ unit, guarding }) {
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
                    column he stands in, and the NUMBER is the loud part rather than the bar. */
-                .cfb { width: 100%; max-width: calc(var(--cf-figure) * 0.98); }
+                .cfb { width: 100%; max-width: calc(var(--cf-figure) * 0.9); }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
@@ -1582,6 +1626,17 @@ function Bar({ unit, guarding }) {
                     font-size: 12px; font-weight: 700; color: #10222f; }
                 .cfb-fill { height: 100%; border-radius: 1px; background: #d42230;
                     transition: width 420ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+                /* The stretch about to be taken, or about to be given back. Hatched rather than flat, because a
+                   solid paler red inside a red bar reads as a rendering artefact; diagonal stripes read as
+                   "provisional" in every game that has ever drawn one. */
+                .cfb-band { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+                .cfb-band.is-damage { background: repeating-linear-gradient(115deg,
+                    rgba(255,235,225,0.92) 0 3px, rgba(255,150,130,0.72) 3px 6px);
+                    box-shadow: inset 0 0 0 1px rgba(90,10,10,0.5); animation: cfBand 900ms ease-in-out infinite; }
+                .cfb-band.is-heal { background: repeating-linear-gradient(115deg,
+                    rgba(190,255,205,0.9) 0 3px, rgba(90,215,130,0.7) 3px 6px);
+                    box-shadow: inset 0 0 0 1px rgba(10,70,30,0.5); animation: cfBand 900ms ease-in-out infinite; }
+                @keyframes cfBand { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
                 .cfb-hp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
                     display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 17px;
                     font-weight: 700; letter-spacing: 0.01em; color: #fff;

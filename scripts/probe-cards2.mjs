@@ -76,14 +76,22 @@ const mouse = (type, x, y) => send("Input.dispatchMouseEvent", { type, x, y, but
 const layout = await evalJs(`(() => {
     const r = (sel, n = 0) => { const e = document.querySelectorAll(sel)[n]; if (!e) return null;
         const b = e.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom) }; };
+    // The narrowest horizontal gap between any two adjacent health bars. Four bars in a row that TOUCH read as
+    // one continuous gauge — the screen says the party shares a pool — and this has now regressed twice, both
+    // times because a width was tied to the figure while the spacing was tied to the column.
+    const bars = [...document.querySelectorAll('.cfb')].map((e) => e.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+    let gap = 999;
+    for (let i = 1; i < bars.length; i += 1) gap = Math.min(gap, Math.round(bars[i].left - bars[i - 1].right));
     return { vh: innerHeight, topbar: r('.cf-top'), heroBar: r('.cf-hero .cfb'), foeBar: r('.cf-foe .cfb', 1),
-             sprite: r('.cf-hero .cf-sprite'), rest: r('.cf-hand .cf-card'), raised: r('.cf-hand .cf-card.is-picked') };
+             sprite: r('.cf-hero .cf-sprite'), rest: r('.cf-hand .cf-card'), raised: r('.cf-hand .cf-card.is-picked'),
+             barGap: gap };
 })()`);
 const checks = [
     ["the raised card clears the health bars", layout.raised.top - layout.heroBar.bottom, (v) => v >= 0],
     ["resting cards are on screen", layout.vh - layout.rest.bottom, (v) => v >= 0],
     ["the fighters clear the top bar", layout.sprite.top - layout.topbar.bottom, (v) => v >= 0],
     ["foe bars sit under their bodies", layout.foeBar.top - layout.sprite.bottom, (v) => v >= 0],
+    ["health bars do not touch each other", layout.barGap, (v) => v >= 4],
 ];
 let bad = 0;
 for (const [what, got, ok] of checks) {
@@ -216,7 +224,9 @@ if (await tapNamed("/Pounce/i")) {
 await send("Page.navigate", { url: URL_ });
 await sleep(3600);
 const dragText = () => evalJs(`(() => { const d = document.querySelector('.cf-drag');
-    return d ? { text: d.querySelector('.cf-text').textContent.trim(), up: !!d.querySelector('.cf-num.is-up') } : null; })()`);
+    const b = [...document.querySelectorAll('.cfb-band.is-damage')];
+    return d ? { text: d.querySelector('.cf-text').textContent.trim(), up: !!d.querySelector('.cf-num.is-up'),
+                 bands: b.length, bandPx: b[0] ? Math.round(b[0].getBoundingClientRect().width) : 0 } : null; })()`);
 if (await tapNamed("/Pounce/i")) {
     await sleep(220);
     await evalJs(`document.querySelectorAll('.cf-foe')[1].click()`);
@@ -239,6 +249,11 @@ if (await tapNamed("/Pounce/i")) {
             && /6 damage/.test(onClean?.text || "") && !onClean?.up;
         console.log(`  ${right ? "ok  " : "FAIL"} the printed damage follows the target`,
             JSON.stringify({ onVuln, onClean }));
+        // Exactly ONE bar wears the pending band, and it is the one being pointed at — a band on all three
+        // would be promising something the player has not chosen.
+        const banded = onVuln?.bands === 1 && onVuln.bandPx > 0 && onClean?.bands === 1;
+        console.log(`  ${banded ? "ok  " : "FAIL"} one bar previews the blow`,
+            JSON.stringify({ onVuln: onVuln?.bands, px: onVuln?.bandPx, onClean: onClean?.bands }));
     }
 }
 

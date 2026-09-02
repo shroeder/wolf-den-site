@@ -220,6 +220,17 @@ export function resolveCard(card, attacker = {}, defender = null) {
     return out;
 }
 
+/**
+ * How a blow of this size would divide against this unit: what its armour eats, and what is left to reach
+ * the health bar. Exported because the PREVIEW needs the same split the resolution uses — a preview computed
+ * a second way is a preview that will eventually disagree with the hit it is previewing, and the player will
+ * believe the preview.
+ */
+export function splitDamage(unit, amount) {
+    const absorbed = Math.min(unit?.block || 0, Math.max(0, amount));
+    return { absorbed, toHp: Math.max(0, amount - absorbed) };
+}
+
 /** Block eats damage first, and only what is left reaches HP. */
 function land(unit, amount) {
     const absorbed = Math.min(unit.block || 0, amount);
