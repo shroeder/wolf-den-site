@@ -429,6 +429,13 @@ export default function CardFightClient({ fixture }) {
                 setDrag(null);
                 return;
             }
+            // Held down and pulled upward on a card there is no energy for: the axis is remembered so the
+            // gesture cannot become a swipe halfway up, but nothing leaves the hand and no arrow is drawn.
+            if (axis === "lift" && !d.canLift) {
+                dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved, axis };
+                setDrag(null);
+                return;
+            }
             dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved, axis };
             setDrag(dragRef.current);
         };
@@ -441,6 +448,7 @@ export default function CardFightClient({ fixture }) {
             if (d.axis === "swipe") return;
             // Under the slop it was a TAP: that card becomes the one being read.
             if (!d.moved) { setActive(d.index); return; }
+            if (!d.canLift) return;
             const target = dropTarget(d.uid, e.clientX, e.clientY);
             if (target !== null) commit(d.uid, target);
         };
@@ -478,6 +486,15 @@ export default function CardFightClient({ fixture }) {
         dragRef.current = {
             uid, index, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY,
             moved: false, axis: null, fromActive: activeIndex,
+            // ── A CARD YOU CANNOT PAY FOR DOES NOT COME OFF THE TRAY ──────────────────────────────────
+            // Luke: "if you don't have the energy to use a card you shouldn't be able to drag it up."
+            // It was already unplayable — commit checks canPlay and refuses — but only AFTER you had picked
+            // it up, aimed it at something and let go, so the game let you do the whole gesture and then
+            // quietly did nothing. A rule you find out about at the end of an action is indistinguishable
+            // from a bug.
+            // Only the LIFT is blocked. Swiping past it and tapping to read it both still work, because
+            // reading a card you cannot afford yet is exactly how you decide what to play first.
+            canLift: canPlay(fight, uid),
         };
         setDrag(dragRef.current);
     };
@@ -488,6 +505,9 @@ export default function CardFightClient({ fixture }) {
         if (!activeEntry || fight.foes[i]?.hp <= 0) return;
         if (cardById(activeEntry.id)?.target === "foe") commit(activeEntry.uid, i);
     };
+    // Whether the card in the middle can be afforded at all — the bodies stop inviting a tap they would
+    // refuse, and the raised card says so on its face.
+    const activeAffordable = activeEntry ? canPlay(fight, activeEntry.uid) : false;
     const onHeroTap = () => {
         if (!activeEntry) return;
         if (cardById(activeEntry.id)?.target === "self") commit(activeEntry.uid, "self");
@@ -595,7 +615,7 @@ export default function CardFightClient({ fixture }) {
     const selectedCard = activeEntry ? cardById(activeEntry.id) : null;
     const aiming = dragCard?.target === "foe" || selectedCard?.target === "foe";
     // Your own body lights when the card in the middle is one you would play on yourself.
-    const selfLit = dragCard ? dragCard.target === "self" : selectedCard?.target === "self";
+    const selfLit = dragCard ? dragCard.target === "self" : (activeAffordable && selectedCard?.target === "self");
     // ── THE GLOW MEANS "THIS WILL LAND" ──────────────────────────────────────────────────────────────────
     // It used to mean "you are holding an attack", which is true for the whole drag and therefore tells you
     // nothing — the foe sat lit while you hovered over your own hero. Lit follows the same test the release
@@ -628,7 +648,7 @@ export default function CardFightClient({ fixture }) {
     // WHICH foe is lit: the one the pointer is over while dragging. With a card merely selected and no
     // pointer in play, every living one lights, because any of them is a legal tap.
     const aimAt = drag?.moved && dragCard?.target === "foe" ? foeUnder(drag.x, drag.y)
-        : selectedCard?.target === "foe" ? "any" : -1;
+        : (activeAffordable && selectedCard?.target === "foe") ? "any" : -1;
 
     const pileList = useMemo(() => {
         if (!peek) return [];
@@ -756,7 +776,7 @@ export default function CardFightClient({ fixture }) {
                             <button
                                 key={entry.uid}
                                 type="button"
-                                className={`cf-card${i === activeIndex ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging || entry.uid === spending ? " is-ghosted" : ""}`}
+                                className={`cf-card${i === activeIndex ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging || entry.uid === spending ? " is-ghosted" : ""}${i === activeIndex && !playable ? " is-unaffordable" : ""}`}
                                 style={{
                                     marginLeft: i === 0 ? 0 : overlap,
                                     // The picked card comes OUT of the fan — straightened, lifted and grown,
@@ -1174,6 +1194,18 @@ export default function CardFightClient({ fixture }) {
                     background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
                 .cf-card.is-spent { opacity: 0.5; }
+                /* Raised, being read, and out of reach: the cost diamond goes RED rather than the card going
+                   dimmer. Dimming the one card you have deliberately brought to the middle to read is the
+                   wrong lever — it is the PRICE that is the problem, so the price is what says so, which is
+                   also the convention Spire uses.
+                   Repainted rather than filtered: the first cut hue-rotated the diamond, and a hue rotation
+                   applied to a near-grey slate moves almost nothing — it rendered identical to the affordable
+                   cards beside it. There is no hue there to rotate. */
+                .cf-card.is-unaffordable { opacity: 0.86; }
+                .cf-card.is-unaffordable .cf-cost { background: linear-gradient(145deg, #d9534a, #7a1710);
+                    border-color: #3d0a06; box-shadow: 0 2px 5px rgba(0,0,0,0.6), 0 0 8px rgba(255,70,50,0.55),
+                    inset 0 1px 0 rgba(255,255,255,0.3); }
+                .cf-card.is-unaffordable .cf-cost i { color: #ffe2de; }
                 .cf-card.is-ghosted { opacity: 0.22; }
                 .cf-card.is-static { margin: 0; box-shadow: none; transform: none; }
                 /* A DIAMOND HUNG OFF THE CORNER, in dark stone with a white numeral — theirs, and it reads

@@ -169,5 +169,45 @@ await sleep(1400);
 await shot("8-afterfoe");
 console.log("ENDED   ", JSON.stringify(await readout()));
 
+// ── 7. A CARD YOU CANNOT PAY FOR DOES NOTHING ───────────────────────────────────────────────────────────────
+// It was always unplayable, but only after you had picked it up, aimed it and let go — the game let you
+// perform the whole gesture and then quietly refused. This asserts the refusal happens at the START: no
+// ghost, no arrow, no lit foes, and the card still in hand afterwards. Reading it must still work.
+// From a FRESH fight: by this point the run above has played most of the opening hand, so Pounce — the only
+// two-cost card in the starter deck and therefore the only one that can ever be unaffordable — is long gone.
+// The first version of this section reported "not exercised" and would have gone on reporting it forever.
+await send("Page.navigate", { url: URL_ });
+await sleep(3600);
+const tapNamed = async (re) => evalJs(`(() => { const c = [...document.querySelectorAll('.cf-hand .cf-card')].find((e) => ${re}.test(e.textContent));
+    if (!c) return false; const r = c.getBoundingClientRect();
+    const o = { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    c.dispatchEvent(new PointerEvent('pointerdown', o)); window.dispatchEvent(new PointerEvent('pointerup', o)); return true; })()`);
+for (let n = 0; n < 2; n += 1) {
+    if (await tapNamed("/Bite/i")) {
+        await sleep(200);
+        await evalJs(`document.querySelectorAll('.cf-foe')[0]?.click()`);
+        await sleep(700);
+    }
+}
+if (await tapNamed("/Pounce/i")) {
+    await sleep(260);
+    const pre = await evalJs(`({ hand: document.querySelectorAll('.cf-hand .cf-card').length,
+        flagged: !!document.querySelector('.cf-card.is-unaffordable'), energy: document.querySelector('.cf-energy')?.textContent.trim(),
+        lit: [...document.querySelectorAll('.cf-foe')].filter((f) => f.classList.contains('is-target')).length })`);
+    const pc = await box(".cf-hand .cf-card.is-picked");
+    await mouse("mousePressed", pc.x, pc.y);
+    for (let i = 1; i <= 8; i += 1) { await mouse("mouseMoved", pc.x, pc.y - i * 22); await sleep(30); }
+    const mid = await evalJs(`({ ghost: !!document.querySelector('.cf-drag'), arrow: !!document.querySelector('.cf-aim'),
+        lit: [...document.querySelectorAll('.cf-foe')].filter((f) => f.classList.contains('is-target')).length })`);
+    await mouse("mouseReleased", pc.x, pc.y - 176);
+    await sleep(420);
+    const post = await evalJs(`({ hand: document.querySelectorAll('.cf-hand .cf-card').length, energy: document.querySelector('.cf-energy')?.textContent.trim() })`);
+    const held = !mid.ghost && !mid.arrow && mid.lit === 0 && post.hand === pre.hand && pre.flagged && pre.lit === 0;
+    console.log(`  ${held ? "ok  " : "FAIL"} an unaffordable card stays in the tray`,
+        JSON.stringify({ ...pre, ...mid, after: post }));
+} else {
+    console.log("  --    no Pounce reachable this seed; energy gate not exercised");
+}
+
 chrome.kill();
 process.exit(0);
