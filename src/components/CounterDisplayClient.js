@@ -126,8 +126,14 @@ export default function CounterDisplayClient({ displayKey, idleQr, pitch, gear, 
             <aside className="pos-rail">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="pos-qr" src={idleQr} alt="" />
-                <b className="pos-scan">Scan to join</b>
-                <span className="pos-scan-sub">Free. {pitch.rate} points per $1, every purchase.</span>
+                {/* ── THE ASK, WHICH IS NOW A PRIZE RATHER THAN A SIGN-UP ─────────────────────────────
+                    "Scan to join" asks a stranger to take on an account for a game they have not seen. The
+                    same scan now opens the sign-up form and comes back to the wheel, and every account gets a
+                    free spin a day — so the honest headline is the spin, and joining is the thing you do on
+                    the way to it. The points line stays underneath: it is the reason to come back, and it
+                    reads better as the second sentence than as the offer. */}
+                <b className="pos-scan">Scan to spin</b>
+                <span className="pos-scan-sub">Free to join. Everyone gets a spin — then {pitch.rate} points per $1.</span>
                 <div className="pos-dots" aria-hidden="true">
                     {slides.map((s, i) => (
                         <i key={s.key} className={i === index ? "is-on" : ""} />

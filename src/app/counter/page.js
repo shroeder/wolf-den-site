@@ -23,7 +23,25 @@ export const metadata = {
 // visitors are `direct`. mkt_visitor already stores utm_source/medium/campaign and back-fills buyer_id the
 // moment that visitor signs in, so tagging this one link makes the whole screen measurable — how many people
 // scanned it, and how many of those became members — with no new schema at all.
-const IDLE_URL = `${SITE_URL}/?utm_source=pos&utm_medium=qr&utm_campaign=counter-screen`;
+// ── AND IT LANDS ON THE WHEEL ────────────────────────────────────────────────────────────────────────────────
+// Luke: "the QR code lets them register and then they can go to the wheel like anybody else who's already
+// registered... we would just need to make sure that the onboarding ramp from QR code sign up to the wheel is
+// pretty easy because otherwise it's going to be overwhelming for new users to try and navigate and figure out
+// where the menu is and get to the right place."
+//
+// It used to land on the site's front page, which is a shop window: a new member then had to find sign-up,
+// get through it, and then go hunting through a game menu for a wheel nobody had told them about. Three
+// guesses in a row, at a counter, with somebody waiting behind them.
+//
+// Now it opens the sign-up form directly and comes back to the wheel the moment the account is live. Nothing
+// about the wheel changes — every account already gets a free spin every day, so a brand-new member has one
+// waiting and so does the member who joined a year ago and never found it. That is the whole offer, and it
+// needed no new mechanic, only a door.
+//
+// `signup=1` opens on the CREATE form rather than the sign-in form, because somebody scanning a QR code off a
+// shop counter does not have an account yet — and the sign-in link is right there for the ones who do.
+const IDLE_URL = `${SITE_URL}/marketplace/login?signup=1&returnTo=${encodeURIComponent("/marketplace/spin")}`
+    + `&utm_source=pos&utm_medium=qr&utm_campaign=counter-screen`;
 
 export default async function CounterPage({ searchParams }) {
     const { key, slide } = await searchParams;
