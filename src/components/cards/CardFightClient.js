@@ -6,7 +6,8 @@ import { Kreon } from "next/font/google";
 import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSmallFire, GiSwordWound } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight, typeLook,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, intentDamage, playCard, startFight,
+    typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
@@ -236,6 +237,13 @@ export default function CardFightClient({ fixture }) {
         setTimeout(() => setPlayed((cur) => (cur?.id === shown.id ? null : cur)), 640);
     }, [fight, pushFloats]);
 
+    // Giving up ends the fight as a loss, decided in the rules rather than by poking the state from here.
+    const onForfeit = useCallback(() => {
+        if (fight.over) return;
+        setSelected(null);
+        setFight(forfeit(fight));
+    }, [fight]);
+
     const onEndTurn = useCallback(() => {
         if (fight.over || acting) return;
         setSelected(null);
@@ -404,9 +412,34 @@ export default function CardFightClient({ fixture }) {
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/arena/arena-bg.webp" className="cf-bg" />
 
-                <div className="cf-chrome">
-                    <button type="button" className="cf-chip" onClick={() => router.push("/marketplace/town")}>Leave</button>
-                    <span className="cf-seed">seed {fight.seed}</span>
+                {/* ── EVERYTHING BUT THE CARDS LIVES UP HERE ──────────────────────────────────────────
+                    Luke's call, looking at the restaged screen: the piles, the energy and End Turn go to the
+                    TOP and the bottom of the phone belongs entirely to the hand. It is a departure from
+                    Spire — theirs sits beside the cards, which a landscape frame can afford — and it is the
+                    right one for a thumb: the controls are out of the arc the hand is dragged through, and
+                    nothing you press by accident is next to the card you meant to pick up.
+                    The seed is gone from the screen with them; it lives in the URL, which is where it is
+                    actually used. */}
+                <div className="cf-top">
+                    <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)}>
+                        Forfeit
+                    </button>
+                    <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
+                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                        <span className="cf-pile-n">{fight.draw.length}</span>
+                    </button>
+                    <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
+                        <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
+                        <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
+                    </div>
+                    <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
+                        <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
+                        <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
+                    </button>
+                    <button type="button" className="cf-pile is-discard" onClick={() => setPeek("discard")} aria-label={`Discard pile, ${fight.discard.length} cards`}>
+                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                        <span className="cf-pile-n">{fight.discard.length}</span>
+                    </button>
                 </div>
 
                 <div className="cf-turn">Turn {fight.turn}</div>
@@ -472,35 +505,6 @@ export default function CardFightClient({ fixture }) {
                     })}
                 </div>
 
-                {/* ── THE TRAY, DRAWN ─────────────────────────────────────────────────────────────────
-                    Every one of these was a text box or a coloured rectangle sitting on a painted screen —
-                    the same fault as the type tab, one level out. Spire's piles are little card backs with a
-                    count struck on them, its energy is a cut gem in a socket, its End Turn is a plate. So are
-                    ours now. The energy gem is deliberately the biggest thing down here: it is the resource
-                    every decision on a turn is made against, and it was the smallest. */}
-                <div className="cf-bar">
-                    <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
-                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
-                        <span className="cf-pile-n">{fight.draw.length}</span>
-                        <span className="cf-pile-tag">Draw</span>
-                    </button>
-
-                    <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
-                        <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
-                        <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
-                    </div>
-
-                    <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
-                        <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
-                        <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
-                    </button>
-
-                    <button type="button" className="cf-pile is-discard" onClick={() => setPeek("discard")} aria-label={`Discard pile, ${fight.discard.length} cards`}>
-                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
-                        <span className="cf-pile-n">{fight.discard.length}</span>
-                        <span className="cf-pile-tag">Discard</span>
-                    </button>
-                </div>
             </div>
 
             {/* ── THE AIM ──────────────────────────────────────────────────────────────────────────────
@@ -556,14 +560,23 @@ export default function CardFightClient({ fixture }) {
                 <div className="cf-over">
                     <div className="cf-sheet cf-result">
                         <GiSwordWound className="cf-result-ico" aria-hidden="true" />
-                        <h2>{fight.over === "win" ? `${fight.foe.name} is down` : "You fall"}</h2>
+                        {/* Giving up is not the same as being killed, and the engine already knows which one
+                            happened, so the sheet says the true thing rather than the convenient one. */}
+                        <h2>
+                            {fight.over === "win" ? `${fight.foe.name} is down`
+                                : fight.gaveUp ? "You walked away" : "You fall"}
+                        </h2>
                         <p className="cf-note">
                             {fight.over === "win"
                                 ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
-                                : `${fight.foe.name} had ${fight.foe.hp} left.`}
+                                : `${fight.foe.name} had ${fight.foe.hp} of ${fight.foe.hpMax} left.`}
                         </p>
+                        {/* The seed is off the screen everywhere now, this button included — it lives in the
+                            URL, which is what a replay actually reads. And with the old Leave chip gone from
+                            the top strip, the way back to the town is here. */}
                         <div className="cf-result-btns">
-                            <button type="button" className="cf-btn" onClick={replay}>Replay seed {fight.seed}</button>
+                            <button type="button" className="cf-btn" onClick={() => router.push("/marketplace/town")}>Leave</button>
+                            <button type="button" className="cf-btn" onClick={replay}>Replay this fight</button>
                             <button type="button" className="cf-btn is-primary" onClick={newFight}>New fight</button>
                         </div>
                     </div>
@@ -598,12 +611,17 @@ export default function CardFightClient({ fixture }) {
                 /* Both on the LEFT. The seed sat top-right and a foe with a long intent ("GUARDED SWING") grew its pill
                    straight through it — and the intent is the one thing on this screen that must never be
                    obstructed. */
-                .cf-chrome { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 10px;
-                    justify-content: flex-start; align-items: center; z-index: 3; }
-                .cf-chip { background: rgba(10,12,16,0.7); border: 1px solid #2c3340; color: #cfd7e2; border-radius: 999px;
-                    padding: 5px 12px; font-size: 12px; font-weight: 700; }
-                .cf-seed { font-size: 11px; color: #8b97a8; letter-spacing: 0.04em; }
-                .cf-turn { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 3;
+                /* ── THE CONTROL STRIP ────────────────────────────────────────────────────────────────────
+                   Everything that is not a card, across the top, clear of the arc a thumb drags through.
+                   The seed went with the old chrome: it lives in the URL, which is where it is used. */
+                .cf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 6;
+                    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+                    padding: calc(6px + env(safe-area-inset-top)) 8px 12px;
+                    background: linear-gradient(180deg, rgba(8,9,13,0.92), rgba(8,9,13,0.5) 64%, rgba(8,9,13,0)); }
+                .cf-forfeit { background: rgba(10,12,16,0.6); border: 1px solid #39424f; color: #b8c2d0;
+                    border-radius: 999px; padding: 5px 11px; font-size: 11px; font-weight: 700; }
+                .cf-forfeit:disabled { opacity: 0.4; }
+                .cf-turn { position: absolute; top: calc(62px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3;
                     font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb0c4; }
 
                 /* Feet at ~62% of the screen and bars at ~66% — where Spire stands its fighters, measured. */
@@ -611,11 +629,13 @@ export default function CardFightClient({ fixture }) {
                    on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
                    phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
                    above the bottom at worst, 38% when there is room, and never more than 320. */
-                .cf-fighter { position: absolute; bottom: clamp(215px, 38%, 320px); width: 44%; display: flex; flex-direction: column;
+                .cf-fighter { position: absolute; bottom: clamp(198px, 38%, 320px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
                 .cf-hero { left: 3%; }
                 .cf-foe { right: 3%; cursor: pointer; }
-                .cf-sprite { width: 100%; height: clamp(96px, 26vh, 190px); object-fit: contain;
+                /* Smaller on a short screen, or the fighter block grows tall enough to push its INTENT PILL up behind
+                   the control strip — and the intent is the one thing on this screen that can never be covered. */
+                .cf-sprite { width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
                     filter: drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-fighter.is-hit { animation: cfShake 260ms ease-out; }
@@ -767,39 +787,35 @@ export default function CardFightClient({ fixture }) {
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
 
-                .cf-bar { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center;
-                    gap: 8px; padding: 4px 2px 6px; }
 
                 /* A little card back with the count struck on it, and its name under it. Ours keeps the word
                    where Spire drops it, because a draw pile and a discard pile drawn from the same back are
                    otherwise the same picture twice. */
-                .cf-pile { position: relative; width: 40px; padding: 0; background: none; border: 0;
+                .cf-pile { position: relative; width: 34px; padding: 0; background: none; border: 0;
                     display: flex; flex-direction: column; align-items: center; }
-                .cf-pile-art { width: 34px; height: 48px; object-fit: contain;
+                .cf-pile-art { width: 30px; height: 42px; object-fit: contain;
                     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
                 .cf-pile.is-discard .cf-pile-art { transform: rotate(7deg); opacity: 0.82; }
-                .cf-pile-n { position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+                .cf-pile-n { position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
                     min-width: 19px; padding: 1px 4px; border-radius: 999px; background: #b8322f;
                     border: 1px solid #12161c; color: #fff; font-size: 11px; font-weight: 800; line-height: 1.3;
                     text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
-                .cf-pile-tag { margin-top: 2px; font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase;
-                    color: #8b97a8; }
 
                 /* THE BIGGEST THING IN THE TRAY, which is what it should be: every decision on a turn is made
                    against it, and it used to be the smallest. */
-                .cf-energy { position: relative; width: 54px; height: 54px; justify-self: start;
+                .cf-energy { position: relative; width: 46px; height: 46px;
                     display: grid; place-items: center; }
                 .cf-energy-art { width: 100%; height: 100%; object-fit: contain;
                     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
-                .cf-energy-n { position: absolute; font-family: var(--cf-card-font); font-size: 21px;
+                .cf-energy-n { position: absolute; font-family: var(--cf-card-font); font-size: 18px;
                     font-weight: 700; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.85); line-height: 1; }
                 .cf-energy-n i { font-style: normal; font-size: 11px; opacity: 0.85; }
 
-                .cf-end { position: relative; justify-self: end; width: 116px; height: 44px; padding: 0;
+                .cf-end { position: relative; width: 104px; height: 40px; padding: 0;
                     background: none; border: 0; display: grid; place-items: center; }
                 .cf-end-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill;
                     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
-                .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 15px;
+                .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 14px;
                     font-weight: 700; color: #1b1f27; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
                 .cf-end:disabled { opacity: 0.55; }
 

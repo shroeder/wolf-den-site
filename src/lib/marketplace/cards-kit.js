@@ -285,6 +285,15 @@ export function playCard(state, uid) {
 }
 
 /**
+ * Give up. Ends the fight as a loss, which is the honest reading: the foe is still standing.
+ *
+ * In the rules rather than done by poking the state from the screen, for the same reason everything else is —
+ * the day a forfeit costs something (a trip, a rung, the run), it will cost it here, once, rather than in
+ * whichever screen happened to offer the button.
+ */
+export const forfeit = (state) => (state?.over ? state : { ...state, over: "lose", gaveUp: true });
+
+/**
  * End your turn: your debuffs tick, the foe clears its block, does the thing it told you it would do, and then
  * a fresh turn opens. A foe's block is gained on ITS turn and stands through yours, which is what makes the
  * guarded swing worth reading rather than just worth surviving.
