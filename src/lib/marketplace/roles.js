@@ -40,6 +40,10 @@ export const ROLES = {
     owner: { key: "owner", name: "Owner", tone: "#ffd75e", glow: true },
     staff: { key: "staff", name: "Staff", tone: "#ff6f7d", glow: true },
     vip: { key: "vip", name: "VIP", tone: "#b45aff", glow: true },
+    // Ten reports that became fixes. The only role in here you earn by making the game better rather than by
+    // being given it or by spending — which is exactly why Luke asked for it, and why it sits with the others
+    // rather than on the rank ladder underneath them.
+    bugfinder: { key: "bugfinder", name: "Bug Finder", tone: "#8fe39a", glow: true },
 };
 
 // ── SEVEN HUNDRED DOLLARS, ACROSS THE COUNTER AND ONLINE TOGETHER ────────────────────────────────────────────
@@ -87,7 +91,7 @@ export async function standingFor(buyerId) {
         // The two badges that carry standing. Read here, in the same round trip as the rest, so granting the
         // role costs nothing extra — see the note by `roles` below for why the badge counts at all.
         db.query(
-            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff')`,
+            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff', 'bug_finder')`,
             [buyerId],
         ).catch(() => []),
     ]);
@@ -112,6 +116,12 @@ export async function standingFor(buyerId) {
     if (isOwner(buyerId) || wears.has("owner")) roles.push(ROLES.owner);
     if (isStaff(buyerId) || wears.has("staff")) roles.push(ROLES.staff);
     if (spentCents >= VIP_CENTS) roles.push(ROLES.vip);
+    // ── AND THIS ONE COMES OFF ITS BADGE, ON PURPOSE ─────────────────────────────────────────────────────
+    // The threshold is ten bugs, and the badge at ten already knows that — auto_rule 'bugs_rewarded' with a
+    // threshold beside it in the badge table, granted by syncEarnedBadges. Counting to ten a SECOND time here
+    // would be a second definition of the same milestone, which is how the arena ended up telling members a
+    // fight was even while matching them on something else entirely. One counter, and the role follows it.
+    if (wears.has("bug_finder")) roles.push(ROLES.bugfinder);
     // The ladder is last and always present: it is the floor, not a prize.
     roles.push({ key: `rank:${rank.title}`, name: rank.title, tone: rank.tone, glow: false, rank: true });
 

@@ -10,6 +10,16 @@ import { awardXp, getRewardsProgress, levelForXp, SPEND_XP_PER_DOLLAR } from "@/
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { allowsNotify } from "@/lib/marketplace/notify-prefs.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+
+// ── WHAT A BUG IS WORTH ──────────────────────────────────────────────────────────────────────────────────────
+// Luke: "its 500 a bug to the first reporter." Flat, and deliberately NOT run through the mint rate — it is a
+// fixed reward he set rather than a faucet, so `bug_bounty` is absent from MINT_REASONS on purpose.
+//
+// It lives here as a number because the badge ladder has to divide by it: there is no bug-report table and
+// there should not be one (a report is a chat message, and most chat messages are not reports). The record
+// that a report became a FIX is the payment, so the ledger is the counter. If the rate ever changes, change it
+// here and the badge keeps counting bugs rather than silently counting half of them.
+export const BUG_BOUNTY_GOLD = 500;
 import { logCoin } from "@/lib/marketplace/coins.js";
 
 // The admin app loads avatars over the network, so it needs an ABSOLUTE url (the built DiceBear avatar is
@@ -178,7 +188,7 @@ export async function getMemberMetrics(buyerId) {
 
     // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
     // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
-    const [ratingRow, creationRow, referralRow, playerTradeRow] = await Promise.all([
+    const [ratingRow, bugRow, creationRow, referralRow, playerTradeRow] = await Promise.all([
         // ── VOTES, NOT RATERS ────────────────────────────────────────────────────────────────────────
         // Eric D: "the adored badge says I only have 29 farm ratings, when my farm shows that I have 69."
         // Both numbers were real and neither was the one the badge promises. This counted ROWS — one per
@@ -190,6 +200,14 @@ export async function getMemberMetrics(buyerId) {
         // out of 111 members, most of whom have never opened a farm, and nobody holds the badge. Read as
         // votes, four members have already earned it — which is what a popularity badge is supposed to do.
         db.queryOne(`SELECT COALESCE(SUM(votes),0)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [buyerId]).catch(() => null),
+        // ── BUGS YOU FOUND, COUNTED OFF THE MONEY ────────────────────────────────────────────────────
+        // There is no bug-report table and there should not be one: a report is a chat message, and most
+        // chat messages are not reports. The thing that IS a record is the PAYMENT — a bounty is only ever
+        // paid when a report turned into a fix, which is exactly what the badge is for. The rate is flat
+        // (500 a bug, first reporter), so the ledger divides cleanly, and a single row that paid 1,000
+        // correctly counts as the two defects it was paid for.
+        db.queryOne(`SELECT COALESCE(SUM(delta),0)::int / ${BUG_BOUNTY_GOLD} AS n FROM mkt_coin_event
+                      WHERE buyer_id = $1 AND reason = 'bug_bounty' AND delta > 0`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'final'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE referred_by = $1 AND referral_reward_at IS NOT NULL`, [buyerId]).catch(() => null),
         // ── A TRADE IS A TRADE ───────────────────────────────────────────────────────────────────────
@@ -325,6 +343,7 @@ export async function getMemberMetrics(buyerId) {
         fertilizerUsed: farmRow?.fertilizer_used || 0,
         pigClaims: farmRow?.pig_claims || 0,
         farmRatingsReceived: ratingRow?.n || 0,
+        bugsRewarded: bugRow?.n || 0,
         creationsMade: creationRow?.n || 0,
         referralsConverted: referralRow?.n || 0,
         tradeCount: (tradeRow?.trades || 0) + (playerTradeRow?.n || 0), // shop trade-ins + member-to-member trades
@@ -634,6 +653,7 @@ export function progressForRule(rule, threshold, m) {
         case "fertilizer_used": return { current: m.fertilizerUsed, target: t }; // fertilizer applied to crops
         case "pig_claims": return { current: m.pigClaims, target: t }; // Wild Loot Pig claims
         case "farm_ratings_received": return { current: m.farmRatingsReceived, target: t }; // ratings your farm earned
+        case "bugs_rewarded": return { current: m.bugsRewarded, target: t }; // defects you reported that got fixed and paid
         case "creations_made": return { current: m.creationsMade, target: t }; // custom creations finalized
         case "referrals_converted": return { current: m.referralsConverted, target: t }; // invited friends who joined
         case "auction_sales": return { current: m.auctionSales, target: t }; // items SOLD on the Auction House
