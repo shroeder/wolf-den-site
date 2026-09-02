@@ -13,6 +13,11 @@ import {
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
+// 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
+// the floating number and the screen jolt are all timed off this one value, because the whole point of the
+// animation is that the consequence arrives WITH the cause rather than before it.
+const IMPACT_MS = 200;
+
 // ── ONE FIGHT, ON A PHONE ────────────────────────────────────────────────────────────────────────────────────
 // You on the left, something off the Long Road on the right, five cards in your hand and a pile at each corner.
 // Drag a card onto the foe, or tap it and then tap the foe — BOTH, deliberately: a phone wants the drag and a
@@ -186,29 +191,50 @@ export default function CardFightClient({ fixture }) {
         hero: fixture.hero,
         foes: fixture.foes,
     }));
-    const [selected, setSelected] = useState(null);
+    // ── THE HAND IS ALWAYS INSPECTING SOMETHING ─────────────────────────────────────────────────────
+    // Luke: "I dont know that tap and hold is gonna be ideal. Oftentimes when you're playing Slay the Spire on
+    // the computer you quickly hover over a bunch of different cards... it should already be in inspection
+    // mode where it's like a radial dial when you swipe the cards left and right. Whatever's in the middle
+    // would be active. And then you would drag it up to play it and target."
+    //
+    // He is right, and the reason is that hold-to-read charges you 320ms EVERY TIME to answer a question you
+    // ask constantly. A mouse hover is free and instant; the phone equivalent has to be free and instant too.
+    // So one card is always raised and readable, swiping left or right walks the hand, and playing is a
+    // separate gesture entirely — up and out. Nothing is ever "armed" and nothing has to be held.
+    const [active, setActive] = useState(2);
     const [drag, setDrag] = useState(null);
     const [floats, setFloats] = useState([]);
     const [peek, setPeek] = useState(null);
     const [acting, setActing] = useState(false);
     const [played, setPlayed] = useState(null);
-    const [preview, setPreview] = useState(null);
+    const [strike, setStrike] = useState(null);
+    const [shaking, setShaking] = useState(false);
+    // The card that has been thrown but whose damage has not landed yet: gone from the hand on screen, still
+    // in the state underneath.
+    const [spending, setSpending] = useState(null);
 
     const dragRef = useRef(null);
-    // The pointerup handler is bound once and must not close over a stale preview.
-    const previewRef = useRef(null);
     const foeRefs = useRef([]);
     const partyRef = useRef(null);
     const fieldRef = useRef(null);
+    const heroRef = useRef(null);
     const trayRef = useRef(null);
     const floatSeq = useRef(0);
     const playSeq = useRef(0);
-    const holdTimer = useRef(null);
 
     // The whole party's next swing. With one enemy this was the number over its head; with three it is
     // the only figure that answers what a turn actually asks — can I afford to take this?
-    previewRef.current = preview;
+    // A fresh hand of five arrives every turn and the thing you are reading should be the middle of it —
+    // that is what "whatever's in the middle would be active" means once cards start moving. Keyed on the turn
+    // rather than on the hand, so playing a card does NOT yank the carousel back to centre underneath you.
+    const turnNo = fight.turn;
+    useEffect(() => { setActive(2); }, [turnNo]);
+
     const incoming = incomingTotal(fight);
+    // A hand shrinks as it is played, so the active index has to stay inside it — and when the last card on
+    // the right is played, the one that takes its place is the new right-hand end, not a gap.
+    const activeIndex = Math.max(0, Math.min(active, fight.hand.length - 1));
+    const activeEntry = fight.hand[activeIndex] || null;
 
     // ── WHAT JUST HAPPENED, THROWN OFF WHOEVER IT HAPPENED TO ────────────────────────────────────────────
     // The engine hands back events precisely so this does not have to diff two states and guess. A number that
@@ -226,36 +252,87 @@ export default function CardFightClient({ fixture }) {
         setTimeout(() => setFloats((cur) => cur.filter((f) => !ids.has(f.id))), 900);
     }, []);
 
-    // ── THE CARD PERFORMS ────────────────────────────────────────────────────────────────────────────────
-    // Spire holds the card you played LARGE in the middle of the screen while its effect resolves — the card
-    // leaves your hand, grows, and does the thing. Ours went straight into the discard and threw a number,
-    // and side by side that one missing beat is most of the difference in how the two screens feel. It is the
-    // moment the game acknowledges what you just did.
+    // ── ONE BEAT, ONE THING TO WATCH ─────────────────────────────────────────────────────────────────────
+    // Spire holds the card you played LARGE in the middle while its effect resolves, and copying that was the
+    // right call when a played card otherwise vanished into the discard and threw a number. It stops being
+    // the right call the moment the PET starts crossing the sand, because then there are two things asking to
+    // be looked at in the same third of a second and they are in the same part of the screen. Filmed, the card
+    // rose straight through the party at the exact frame the wolf landed on the bruiser.
     //
-    // Purely presentational: the state has already changed underneath, exactly as theirs has. What this buys
-    // is the half-second in which the number floating off the foe has something to have come FROM.
+    // So the two are now exclusive, and the rule is simply WHICH ONE IS THE EVENT:
+    //   · an attack that sends an animal → the animal is the event, and no card is held up
+    //   · a block, a heal, a buff → nothing crosses the sand, so the card is the only acknowledgement there is
+    // Either way exactly one thing performs, which is what makes either of them readable.
     const commit = useCallback((uid, target = 0) => {
         if (!canPlay(fight, uid)) return;
         const entry = fight.hand.find((c) => c.uid === uid);
         const { state, events } = playCard(fight, uid, target === "self" ? 0 : target);
+        const willStrike = Boolean(
+            cardById(entry.id)?.damage
+            && fixture.petArt[cardById(entry.id).pet]?.url
+            && foeRefs.current[target === "self" ? 0 : target]
+            && heroRef.current
+        );
+        if (!willStrike) {
+            const shown = { id: (playSeq.current += 1), card: cardById(entry.id) };
+            setPlayed(shown);
+            setTimeout(() => setPlayed((cur) => (cur?.id === shown.id ? null : cur)), 360);
+        }
+
+        // ── AND THE ANIMAL ACTUALLY GOES AND DOES IT ─────────────────────────────────────────────────
+        // Luke: "the animal that is associated to the card, that sprite would actually attack the enemy."
+        // A number appearing over a foe says a thing happened TO it; a wolf crossing the sand and the screen
+        // jolting says something DID it. The pet flies from the card to whatever was targeted, the floor
+        // shakes when it lands, and the health bar tweens down behind it rather than snapping.
+        const card = cardById(entry.id);
+        const petArt = fixture.petArt[card.pet]?.url;
+        if (petArt && card.damage) {
+            const box = foeRefs.current[target === "self" ? 0 : target]?.getBoundingClientRect();
+            const home = heroRef.current?.getBoundingClientRect();
+            if (box && home) {
+                const hit = {
+                    id: (playSeq.current += 1), art: petArt,
+                    x0: home.left + home.width / 2, y0: home.top + home.height * 0.45,
+                    // Not the foe's centre: a sprite dropped dead-centre on another sprite ERASES it, and
+                    // filming showed the bruiser simply replaced by a wolf. Landing a third of the way in from
+                    // the near edge overlaps him, which is what a blow looks like, and leaves him on screen.
+                    x1: box.left + box.width * 0.34, y1: box.top + box.height * 0.45,
+                };
+                setStrike(hit);
+                // ── THE DAMAGE ARRIVES WHEN THE ANIMAL DOES ──────────────────────────────────────────
+                // Filmed, the first version had the bar reading 62/68 and a red -6 floating at 166ms, and the
+                // wolf did not reach the bruiser until 300. The consequence was on screen before the cause —
+                // which is precisely the thing the animation was added to fix, so it was making the problem
+                // worse while looking like it was solving it.
+                // So the fight's state is HELD until impact. The card is out of your hand from the frame you
+                // let go — the spending marker hides it, and the card rising over the tray is the receipt —
+                // and the numbers, the bar and the jolt all land together a fifth of a second later.
+                setSpending(uid);
+                setTimeout(() => {
+                    setFight(state);
+                    pushFloats(events);
+                    setSpending(null);
+                    setShaking(true);
+                }, IMPACT_MS);
+                setTimeout(() => setShaking(false), IMPACT_MS + 220);
+                setTimeout(() => setStrike((cur) => (cur?.id === hit.id ? null : cur)), 500);
+                return;
+            }
+        }
+        // Everything with nothing in flight — blocks, heals, a card played with no reachable target — resolves
+        // on the spot. There is no blow to wait for.
         setFight(state);
         pushFloats(events);
-        setSelected(null);
-        const shown = { id: (playSeq.current += 1), card: cardById(entry.id) };
-        setPlayed(shown);
-        setTimeout(() => setPlayed((cur) => (cur?.id === shown.id ? null : cur)), 640);
     }, [fight, pushFloats]);
 
     // Giving up ends the fight as a loss, decided in the rules rather than by poking the state from here.
     const onForfeit = useCallback(() => {
         if (fight.over) return;
-        setSelected(null);
         setFight(forfeit(fight));
     }, [fight]);
 
     const onEndTurn = useCallback(() => {
         if (fight.over || acting) return;
-        setSelected(null);
         // A beat before the foe swings. Without it the damage lands in the same frame as the tap and reads as
         // the button hurting you rather than the thing across the sand.
         setActing(true);
@@ -311,24 +388,31 @@ export default function CardFightClient({ fixture }) {
         const move = (e) => {
             const d = dragRef.current;
             if (!d) return;
-            const moved = d.moved || Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > DRAG_SLOP;
-            if (moved && !d.moved) { clearTimeout(holdTimer.current); setPreview(null); }
-            dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved };
+            const dx = e.clientX - d.sx;
+            const dy = e.clientY - d.sy;
+            const moved = d.moved || Math.hypot(dx, dy) > DRAG_SLOP;
+            // Axis locked on the first real movement and never revisited.
+            const axis = d.axis || (moved ? (Math.abs(dx) > Math.abs(dy) ? "swipe" : "lift") : null);
+            if (axis === "swipe") {
+                const steps = Math.round(-dx / 46);
+                const want = Math.max(0, Math.min(fight.hand.length - 1, d.fromActive + steps));
+                setActive(want);
+                dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved, axis };
+                setDrag(null);
+                return;
+            }
+            dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved, axis };
             setDrag(dragRef.current);
         };
         const up = (e) => {
             const d = dragRef.current;
             if (!d) return;
-            clearTimeout(holdTimer.current);
-            // A card being READ is not a card being chosen: letting go after a hold puts it back, it does not
-            // select it. Otherwise every read leaves something armed.
-            const wasReading = Boolean(previewRef.current);
-            setPreview(null);
             dragRef.current = null;
             setDrag(null);
-            if (wasReading) return;
-            // Under the slop it was a TAP: select the card, or unselect it if it was already the chosen one.
-            if (!d.moved) { setSelected((cur) => (cur === d.uid ? null : d.uid)); return; }
+            // A swipe has already done its work on the way; there is nothing to resolve on release.
+            if (d.axis === "swipe") return;
+            // Under the slop it was a TAP: that card becomes the one being read.
+            if (!d.moved) { setActive(d.index); return; }
             const target = dropTarget(d.uid, e.clientX, e.clientY);
             if (target !== null) commit(d.uid, target);
         };
@@ -353,31 +437,38 @@ export default function CardFightClient({ fixture }) {
      * past the slop, or do neither. The hold is cancelled the moment either of the other two happens, so
      * nobody who meant to drag ever gets a card in their face.
      */
-    const startDrag = (e, uid) => {
+    /**
+     * One press, three possible meanings, decided by what the finger does next:
+     *   · sideways  → walk the hand, one card per 46px, and read whatever lands in the middle
+     *   · upward    → pick the card up and aim it
+     *   · neither   → make the card you touched the active one
+     * The axis is decided ONCE, on the first movement past the slop, and then held — otherwise a throw that
+     * drifts sideways halfway up turns into a swipe and drops the card.
+     */
+    const startDrag = (e, uid, index) => {
         if (fight.over || acting) return;
-        dragRef.current = { uid, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
+        dragRef.current = {
+            uid, index, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY,
+            moved: false, axis: null, fromActive: activeIndex,
+        };
         setDrag(dragRef.current);
-        clearTimeout(holdTimer.current);
-        holdTimer.current = setTimeout(() => {
-            // Only if the finger is still down and still still: a hold that became a drag is a drag.
-            if (dragRef.current?.uid === uid && !dragRef.current.moved) {
-                setPreview(cardById(fight.hand.find((c) => c.uid === uid)?.id));
-            }
-        }, 320);
     };
 
-    // Tapping a particular foe fires whatever is selected AT THAT ONE — the half of the interaction that
-    // works with a mouse, and the half that has to name a target now there is more than one.
+    // Tapping a body plays the ACTIVE card at it — the half of the interaction a mouse can do, and the half
+    // that has to name a target now there are three of them. Tapping yourself is how a heal finds you.
     const onFoeTap = (i) => {
-        if (!selected || fight.foes[i]?.hp <= 0) return;
-        const card = cardById(fight.hand.find((c) => c.uid === selected)?.id);
-        if (card?.target === "foe") commit(selected, i);
+        if (!activeEntry || fight.foes[i]?.hp <= 0) return;
+        if (cardById(activeEntry.id)?.target === "foe") commit(activeEntry.uid, i);
+    };
+    const onHeroTap = () => {
+        if (!activeEntry) return;
+        if (cardById(activeEntry.id)?.target === "self") commit(activeEntry.uid, "self");
     };
 
     const newFight = () => router.push(`/marketplace/cards?seed=${Math.floor(Math.random() * 900000) + 1000}`);
     const replay = () => {
         setFloats([]);
-        setSelected(null);
+        setActive(0);
         setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes }));
     };
 
@@ -405,7 +496,16 @@ export default function CardFightClient({ fixture }) {
         // Parked to the LEFT, over your own side, not dead centre. Centred it sat directly under the party and
         // the arrow came out a seventeen-pixel vertical sliver hidden behind it — measured, not guessed. From
         // over here every throw is a diagonal with real length, and nothing covers the thing being aimed at.
-        return { x: w * 0.2, y: Number.isFinite(seam) ? seam : drag.y, small: true };
+        //
+        // AND PARKED OFF THE BOTTOM EDGE, not off the tray seam. Hung at the seam the card is 104px tall and
+        // the fighters stand in the 190px directly above it, so moving it off the enemy just moved it onto the
+        // hero: at 412x780 it covered his feet AND his health bar, which is the one number you are reading
+        // while you decide who to hit. Measuring down from the bottom of the screen instead puts it clear of
+        // every bar at both 780 and the 441 a real phone leaves, and it lands on the HAND — the only thing on
+        // screen that does not matter while you are aiming.
+        const h = typeof window === "undefined" ? 0 : window.innerHeight;
+        const y = h ? h - 24 : (Number.isFinite(seam) ? seam : drag.y);
+        return { x: w * 0.2, y, small: true };
     })();
 
     const aimArrow = useMemo(() => {
@@ -421,13 +521,16 @@ export default function CardFightClient({ fixture }) {
         const cy = Math.min(sy, ey) - Math.min(120, 40 + Math.hypot(ex - sx, ey - sy) * 0.22);
         // A quadratic's direction at the end is simply control -> end, which is the angle the head sits at.
         const ang = Math.atan2(ey - cy, ex - cx);
-        const head = [[0, -11], [23, 0], [0, 11]]
-            .map(([px, py]) => [
-                ex + px * Math.cos(ang) - py * Math.sin(ang) - 14 * Math.cos(ang),
-                ey + px * Math.sin(ang) + py * Math.cos(ang) - 14 * Math.sin(ang),
-            ])
-            .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
-            .join(" ");
+        // The head is not a separate triangle any more — it is the last three points of the ribbon itself
+        // (Luke: "make it not so clear that the triangle part is so different than the line"). Two overlapping
+        // shapes always show their seam, however carefully they are placed; one shape has no seam to show.
+        const rot = ([px, py]) => [
+            ex + px * Math.cos(ang) - py * Math.sin(ang) - 15 * Math.cos(ang),
+            ey + px * Math.sin(ang) + py * Math.cos(ang) - 15 * Math.sin(ang),
+        ];
+        const barbL = rot([0, -13]);
+        const barbR = rot([0, 13]);
+        const tip = rot([25, 0]);
 
         // ── A TAPERED RIBBON RATHER THAN A STROKED LINE ──────────────────────────────────────────────
         // An SVG stroke is one width for its whole length, and a bezier drawn that way reads as a wire
@@ -454,14 +557,17 @@ export default function CardFightClient({ fixture }) {
             left.push([px + nx, py + ny]);
             right.push([px - nx, py - ny]);
         }
-        const ribbon = [...left, ...right.reverse()]
+        // Up one edge, out to the left barb, to the tip, back to the right barb, and down the other edge.
+        const ribbon = [...left, barbL, tip, barbR, ...right.reverse()]
             .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
             .join(" ");
 
-        return { w, h, sx, sy, cx, cy, ex, ey, head, ribbon, live: foeUnder(ex, ey) >= 0 };
+        return { w, h, sx, sy, cx, cy, ex, ey, ribbon, live: foeUnder(ex, ey) >= 0 };
     }, [drag, dragCard, foeUnder, ghostAt?.x, ghostAt?.y]);
-    const selectedCard = cardById(fight.hand.find((c) => c.uid === selected)?.id);
+    const selectedCard = activeEntry ? cardById(activeEntry.id) : null;
     const aiming = dragCard?.target === "foe" || selectedCard?.target === "foe";
+    // Your own body lights when the card in the middle is one you would play on yourself.
+    const selfLit = dragCard ? dragCard.target === "self" : selectedCard?.target === "self";
     // ── THE GLOW MEANS "THIS WILL LAND" ──────────────────────────────────────────────────────────────────
     // It used to mean "you are holding an attack", which is true for the whole drag and therefore tells you
     // nothing — the foe sat lit while you hovered over your own hero. Lit follows the same test the release
@@ -508,7 +614,7 @@ export default function CardFightClient({ fixture }) {
     return (
         // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
         // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
-        <div className="cf" style={{ "--cf-card-font": cardFont.style.fontFamily }}>
+        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
@@ -547,7 +653,11 @@ export default function CardFightClient({ fixture }) {
 
                 <div className="cf-turn">Turn {fight.turn}</div>
 
-                <div className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}`}>
+                <div
+                    className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}${selfLit ? " is-target" : ""}`}
+                    ref={heroRef}
+                    onClick={onHeroTap}
+                >
                     <div className="cf-floats">
                         {floats.filter((f) => f.on === "hero").map((f) => (
                             <span key={f.id} className={`cf-float is-${f.kind}`}>{f.text}</span>
@@ -617,17 +727,34 @@ export default function CardFightClient({ fixture }) {
                             <button
                                 key={entry.uid}
                                 type="button"
-                                className={`cf-card${selected === entry.uid ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging ? " is-ghosted" : ""}`}
+                                className={`cf-card${i === activeIndex ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging || entry.uid === spending ? " is-ghosted" : ""}`}
                                 style={{
                                     marginLeft: i === 0 ? 0 : overlap,
                                     // The picked card comes OUT of the fan — straightened, lifted and grown,
                                     // and above its neighbours, because it is the one being read.
-                                    transform: selected === entry.uid
-                                        ? "translateY(-46px) scale(1.12)"
-                                        : `rotate(${fanOf(i).rot}deg) translateY(${fanOf(i).drop}px)`,
-                                    zIndex: selected === entry.uid ? 6 : i,
+                                    // ── A DIAL SHRINKS ITS NEIGHBOURS; IT DOES NOT INFLATE ITS MIDDLE ──
+                                    // Measured at 412x780, the first cut put the raised card's top at y=556
+                                    // with the health bars at 623 and the sprites' feet at 619 — so reading a
+                                    // card covered both the thing you were aiming at and the number telling
+                                    // you whether it was worth it. There is no room above the hand to grow
+                                    // into, because the fighters are standing there.
+                                    // So the emphasis is made by CONTRAST instead: the middle card sits at its
+                                    // true size and its neighbours are turned down and away, which is what a
+                                    // physical dial actually looks like and costs no vertical space at all.
+                                    transform: i === activeIndex
+                                        ? "translateY(-22px) scale(1.04)"
+                                        : `rotate(${fanOf(i).rot}deg) translateY(${fanOf(i).drop}px) scale(0.84)`,
+                                    // ── SCALE FROM THE CARD'S OWN FOOT ──────────────────────────────────
+                                    // The fan's origin is 50% 130%, a point below the tray, which is right for
+                                    // rotating a spread of cards around a common pivot and badly wrong for
+                                    // growing one: an origin that far below the card converts a 4% scale into
+                                    // a ~40px climb, which is how the raised card ended up standing in the
+                                    // health bars. Anchored to its own bottom edge, the lift is the lift.
+                                    transformOrigin: i === activeIndex ? "50% 100%" : "50% 130%",
+                                    zIndex: i === activeIndex ? 6 : i,
+                                    filter: i === activeIndex ? "none" : "brightness(0.72) saturate(0.8)",
                                 }}
-                                onPointerDown={(e) => startDrag(e, entry.uid)}
+                                onPointerDown={(e) => startDrag(e, entry.uid, i)}
                                 onContextMenu={(e) => e.preventDefault()}
                             >
                                 <CardFace card={card} art={fixture.petArt[card.pet]} dim={!playable} />
@@ -645,18 +772,34 @@ export default function CardFightClient({ fixture }) {
                 a UI connector), and it turns gold and thickens the moment the release would actually land. */}
             {aimArrow ? (
                 <svg className="cf-aim" viewBox={`0 0 ${aimArrow.w} ${aimArrow.h}`} aria-hidden="true">
+                    {/* Textured rather than flat: a gradient down the length so it has a lit edge and a shaded
+                        one, which is what stops a solid colour reading as a UI shape. */}
+                    <defs>
+                        <linearGradient id="cfAimFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#fff2c4" />
+                            <stop offset="45%" stopColor="#ffd75e" />
+                            <stop offset="100%" stopColor="#c98a12" />
+                        </linearGradient>
+                        <linearGradient id="cfAimDead" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="rgba(236,242,250,0.6)" />
+                            <stop offset="100%" stopColor="rgba(150,162,178,0.42)" />
+                        </linearGradient>
+                    </defs>
                     <polygon className={`cf-aim-line${aimArrow.live ? " is-live" : ""}`} points={aimArrow.ribbon} />
-                    <polygon className={`cf-aim-head${aimArrow.live ? " is-live" : ""}`} points={aimArrow.head} />
                 </svg>
             ) : null}
 
-            {/* Held to read: the card, big, in the middle, until the finger lifts. */}
-            {preview ? (
-                <div className="cf-read">
-                    <div className="cf-read-card">
-                        <CardFace card={preview} art={fixture.petArt[preview.pet]} />
-                    </div>
-                </div>
+            {/* The pet crossing the sand to land the blow. */}
+            {strike ? (
+                <img
+                    key={strike.id}
+                    className="cf-strike" src={strike.art} alt="" draggable="false"
+                    style={{
+                        left: strike.x0, top: strike.y0,
+                        "--cf-dx": `${strike.x1 - strike.x0}px`,
+                        "--cf-dy": `${strike.y1 - strike.y0}px`,
+                    }}
+                />
             ) : null}
 
             {/* The card you just played, held large in the middle for half a second while its effect lands. */}
@@ -735,7 +878,17 @@ export default function CardFightClient({ fixture }) {
                    black slab under it, which is exactly why they read as being "at the top" (Luke): everything
                    below them was dead. The scene is the whole screen now and the hand floats over it. */
                 .cf { -webkit-touch-callout: none; position: fixed; inset: 0; height: 100dvh; z-index: 4000;
-                    background: #0a0b0f; color: #e9edf2; user-select: none; -webkit-user-select: none; overflow: hidden; }
+                    background: #0a0b0f; color: #e9edf2; user-select: none; -webkit-user-select: none; overflow: hidden;
+                    /* ── THE FLOOR IS WHEREVER THE HAND ISN'T ────────────────────────────────────────────
+                       The fighters were placed with a percentage and the tray is a FIXED height, because a
+                       card is a fixed number of pixels tall — so the two only agreed at one screen size. At
+                       412x780 the party stood 12px inside its own health bars; at 375x441, which is what a
+                       real phone leaves after browser chrome, the entire fighter column sat 44px INSIDE the
+                       hand. It looked like a layout choice on the tall screen and like a bug on the short one,
+                       and it was the same bug both times.
+                       One number instead: how much of the bottom of the screen the hand owns. Everything that
+                       has to stand on the ground is placed off it, so the two cannot drift apart again. */
+                    --cf-tray-h: 188px; }
 
                 .cf-field { position: absolute; inset: 0; overflow: hidden; }
                 /* ── THE ARENA IS ZOOMED IN, AND THAT IS THE FIX FOR THE FLOATING ───────────────────────
@@ -776,7 +929,10 @@ export default function CardFightClient({ fixture }) {
                    on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
                    phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
                    above the bottom at worst, 38% when there is room, and never more than 320. */
-                .cf-fighter { position: absolute; bottom: clamp(140px, 24%, 250px); width: 44%; display: flex; flex-direction: column;
+/* LOWER. There is a whole band of empty floor between the fighters and the hand, and standing them
+                   down into it is most of what makes them look like they are ON it rather than hung in front
+                   of it. */
+                .cf-fighter { position: absolute; bottom: calc(var(--cf-tray-h) + 10px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
                 .cf-hero { left: 2%; width: 34%; }
                 /* ── THE PARTY SHARES THE RIGHT-HAND HALF ────────────────────────────────────────────────
@@ -784,13 +940,27 @@ export default function CardFightClient({ fixture }) {
                    footing on the same floor line, and the row itself is what the fighters are positioned by.
                    Ends aligned to the BASE, because they are all standing on the same ground and a party
                    centred on its own boxes would have three different foot heights. */
-                .cf-party { position: absolute; right: 1%; bottom: 0; top: 0; width: 62%;
-                    display: flex; align-items: flex-end; justify-content: space-around; pointer-events: none; }
-                .cf-foe { position: relative; left: auto; right: auto; bottom: clamp(140px, 24%, 250px);
-                    width: 33%; cursor: pointer; pointer-events: auto; }
-                /* Three abreast means each is smaller than a lone duellist was. */
-                .cf-party .cf-sprite { height: clamp(56px, 15vh, 128px); }
-                .cf-party .cfb { max-width: 96px; }
+                .cf-party { position: absolute; right: 0; bottom: 0; top: 0; width: 66%;
+                    display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+                /* Negative margins: they stand close enough to overlap, which is what lets them be full size. */
+                .cf-foe { position: relative; left: auto; right: auto; bottom: calc(var(--cf-tray-h) + 10px);
+                    width: 38%; margin: 0 -4%; cursor: pointer; pointer-events: auto; }
+                /* The one you are pointing at comes to the front of the crowd. */
+                .cf-foe.is-target { z-index: 3; }
+/* SAME SCALE AS THE PLAYER. Shrinking them to fit three abreast made the fight look like a man
+                   against three toys; Luke's call is that overlapping is the lesser evil, and he is right — a
+                   crowd standing shoulder to shoulder is what three enemies in an arena would actually look
+                   like. They keep the hero's sprite size and the row lets them overlap. */
+                /* 22vh of a 441px viewport is 97px and 22vh of a 780px one is 172 — the same rule reads
+                   as "as big as there is room for", which is exactly right, and the floor under them no longer
+                   moves when it changes. */
+                .cf-party .cf-sprite { height: clamp(78px, 22vh, 190px); }
+                /* ── FOUR BARS, NOT ONE BAR ──────────────────────────────────────────────────────────
+                   At 375 wide the three foe bars plus the hero's ran edge to edge at the same height and
+                   touched, and the eye reads a continuous red strip as ONE gauge — the screen was telling you
+                   the party had 34/34/68/68/48/48 hit points. A bar belongs to a body, so it has to be
+                   narrower than the body it hangs under and there has to be air between it and the next one. */
+                .cf-party .cfb { max-width: 74px; }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
                 .cf-party .cf-intent-marks { font-size: 17px; }
@@ -821,8 +991,10 @@ export default function CardFightClient({ fixture }) {
                    as a sticker lifted off the page; what puts a figure ON a floor is a soft dark ellipse at
                    its feet, and every fighter in Spire has one. This is the "no contact shadow = pasted on"
                    note from the farm, and it was the whole of "our characters are floating". */
-                .cf-shade { width: 66%; height: 17px; margin: -9px 0 3px;
-                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.78), rgba(0,0,0,0.42) 42%, transparent 70%); }
+/* Tighter and closer: a pool the width of a stance rather than the width of the column, pulled up
+                   under the feet. A wide soft shadow reads as a figure hovering over a smudge. */
+                .cf-shade { width: 42%; height: 13px; margin: -12px 0 2px;
+                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.85), rgba(0,0,0,0.45) 40%, transparent 68%); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
@@ -853,7 +1025,11 @@ export default function CardFightClient({ fixture }) {
                    phone has no room either side of five cards, so on ours they become a strip across the top
                    of the tray. Done in CSS rather than by reordering the JSX, because the hand and the
                    controls have separate reasons to be in the order they are read. */
-                .cf-tray { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; background: none;
+                /* The tray was flush with the bottom edge and the fanned cards hang BELOW their tray by
+                   design, so the bottom line of every resting card was off-screen — measured 813 on a 780
+                   viewport. A card whose text is cut off is a card you have to pick up to read, which is the
+                   whole thing the dial exists to avoid. */
+                .cf-tray { position: absolute; left: 0; right: 0; bottom: 40px; z-index: 5; background: none;
                     display: flex; flex-direction: column-reverse;
                     padding: 0 6px calc(2px + env(safe-area-inset-bottom)); }
                 /* The lift on a picked card happens INSIDE this padding, and the cost badge sits inside the
@@ -1022,14 +1198,43 @@ export default function CardFightClient({ fixture }) {
                 /* ── THE AIM ── over everything, hit-testing nothing. */
                 .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;
                     pointer-events: none; }
-                .cf-aim-line { fill: rgba(226,232,242,0.42); stroke: none;
-                    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
-                .cf-aim-line.is-live { fill: #ffd75e; }
-                .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
-                .cf-aim-head.is-live { fill: #ffd75e; }
+                .cf-aim-line { fill: url(#cfAimDead); stroke: rgba(0,0,0,0.5); stroke-width: 1.2;
+                    stroke-linejoin: round; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cf-aim-line.is-live { fill: url(#cfAimFill); stroke: rgba(60,36,0,0.75); }
 
-                /* Press and hold to read one. Big enough that the sentence is the point of the screen for
-                   as long as the finger is down. */
+                /* The animal, mid-flight. Fires from the card, arrives at the target, lands, gone — half a
+                   second in total, which is as long as a blow is allowed to take when a turn holds three. */
+                /* A LUNGE, NOT A VISIT. The first cut reached the target at 52% and then spent the whole
+                   back half of the animation hovering there, which films as a wolf teleporting onto a man and
+                   standing on him. Out fast, connect at 44%, and immediately back toward home — the retreat is
+                   what makes the arrival read as a hit rather than as an arrival. */
+                .cf-strike { position: fixed; z-index: 4980; width: 76px; height: 76px; object-fit: contain;
+                    pointer-events: none; transform: translate(-50%, -50%);
+                    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.6));
+                    animation: cfStrike 460ms cubic-bezier(0.35, 0, 0.3, 1) forwards; }
+                @keyframes cfStrike {
+                    0% { transform: translate(-50%, -50%) scale(0.6) rotate(-16deg); opacity: 0; }
+                    18% { transform: translate(calc(-50% + var(--cf-dx) * 0.28), calc(-50% + var(--cf-dy) * 0.28))
+                        scale(0.95) rotate(-8deg); opacity: 1; }
+                    44% { transform: translate(calc(-50% + var(--cf-dx)), calc(-50% + var(--cf-dy)))
+                        scale(1.16) rotate(8deg); opacity: 1; }
+                    58% { transform: translate(calc(-50% + var(--cf-dx) * 1.06), calc(-50% + var(--cf-dy) * 1.0))
+                        scale(1.12) rotate(11deg); opacity: 1; }
+                    100% { transform: translate(calc(-50% + var(--cf-dx) * 0.42), calc(-50% + var(--cf-dy) * 0.5))
+                        scale(0.72) rotate(-4deg); opacity: 0; }
+                }
+                /* The whole arena takes the hit, briefly. Small — a jolt, not an earthquake. */
+                .cf.is-shaking .cf-field { animation: cfJolt 200ms ease-out; }
+                @keyframes cfJolt {
+                    0% { transform: translate(0, 0); }
+                    25% { transform: translate(-4px, 3px); }
+                    55% { transform: translate(3px, -2px); }
+                    80% { transform: translate(-2px, 1px); }
+                    100% { transform: translate(0, 0); }
+                }
+
+                /* NOTE: the press-and-hold read overlay lived here and is gone — the hand inspects
+                   continuously now, so there is nothing to summon. */
                 .cf-read { position: fixed; inset: 0; z-index: 5100; display: grid; place-items: center;
                     background: rgba(6,7,10,0.72); pointer-events: none; }
                 .cf-read-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
@@ -1040,14 +1245,22 @@ export default function CardFightClient({ fixture }) {
                     background-repeat: no-repeat; background-size: 100% 100%; }
                 @keyframes cfRead { from { transform: scale(1.5); opacity: 0; } to { transform: scale(2.1); opacity: 1; } }
 
-                /* ── THE CARD, PERFORMING ── centre stage, big, for the half second its effect takes. */
-                /* Held in the FIELD rather than the middle of the phone — centred on the viewport it sat
-                   over the hand, which is the one place a card that has just left your hand should not be. */
-                .cf-played { position: fixed; inset: 0 0 34% 0; z-index: 4950; display: grid; place-items: center;
-                    pointer-events: none; }
+                /* ── THE CARD, LEAVING ─────────────────────────────────────────────────────────────────
+                   This used to be the whole show: the card held centre-field at 1.5x for 640ms, because
+                   without it a played card vanished into the discard and threw a number, and that one missing
+                   beat was most of what made the screen feel cheap next to Spire's.
+                   It is not the show any more. The PET crosses the sand now, and filming the two together made
+                   the problem obvious — for the entire flight the card was parked on top of the arena at one
+                   and a half times size, so the blow we had just built happened behind it. Two things
+                   competing to be the acknowledgement, and the one that covered the other won.
+                   So the card gives way. It rises off the hand, small, and is gone in a third of a second,
+                   low enough that it never crosses the fighters. The animal is the event; this is just the
+                   card getting out of the way on its path to the discard. */
+                .cf-played { position: fixed; left: 0; right: 0; bottom: 22%; z-index: 4950;
+                    display: grid; place-items: center; pointer-events: none; }
                 .cf-played-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
-                    animation: cfPerform 640ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
+                    animation: cfPerform 340ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 
                 /* Parked: smaller and lower, because while it is aiming it is a label for what is being
                    thrown rather than the thing you are looking at. */
@@ -1078,10 +1291,9 @@ export default function CardFightClient({ fixture }) {
                    happened here before, and the symptom is somebody else's animation playing on your element. */
                 /* Up out of the hand, held big, then gone — the card doing the thing rather than vanishing. */
                 @keyframes cfPerform {
-                    0% { opacity: 0; transform: translateY(90px) scale(0.7); }
-                    22% { opacity: 1; transform: translateY(0) scale(1.55); }
-                    72% { opacity: 1; transform: translateY(-6px) scale(1.5); }
-                    100% { opacity: 0; transform: translateY(-26px) scale(1.35); }
+                    0% { opacity: 0; transform: translateY(40px) scale(0.82); }
+                    30% { opacity: 1; transform: translateY(0) scale(1.02); }
+                    100% { opacity: 0; transform: translateY(-30px) scale(0.86); }
                 }
                 /* 3px was honest and invisible — filmed at ten frames over two and a half seconds you could
                    not tell it from a still. A breath has to be seen to be doing its job, so it is six pixels
@@ -1116,18 +1328,24 @@ function Bar({ unit }) {
     const pct = Math.max(0, Math.min(100, (unit.hp / unit.hpMax) * 100));
     return (
         <div className="cfb">
-            <div className="cfb-track">
+            <div className={`cfb-track${unit.block > 0 ? " is-guarded" : ""}`}>
                 <div className="cfb-fill" style={{ width: `${pct}%` }} />
                 <span className="cfb-hp">{unit.hp} / {unit.hpMax}</span>
+                {/* ── BLOCK SITS ON THE BAR, AT THE FRONT ──────────────────────────────────────────────
+                    Armour is the thing standing in front of your health, so it is drawn in front of the bar
+                    rather than filed in the status row underneath with the debuffs. A shield with a number,
+                    at the near end, and the bar takes a cold edge while it holds. */}
+                {unit.block > 0 ? (
+                    <span className="cfb-guard" title={`Block ${unit.block}`}>
+                        <GiShield aria-hidden="true" /><i>{unit.block}</i>
+                    </span>
+                ) : null}
             </div>
             {/* ── STATUS AS ICONS, NOT SENTENCES ──────────────────────────────────────────────────────
                 Spire puts a row of small marked icons under the health bar, and the reason is arithmetic:
                 three statuses written as words ("Vulnerable 2", "Weak 1", "Strength 3") is a wrapping
                 paragraph under a 168px bar on a phone. The title carries the word for anyone who needs it. */}
             <div className="cfb-tags">
-                {unit.block > 0 ? (
-                    <span className="cfb-tag is-block" title={`Block ${unit.block}`}><GiShield aria-hidden="true" />{unit.block}</span>
-                ) : null}
                 {unit.vulnerable > 0 ? (
                     <span className="cfb-tag is-vuln" title={`Vulnerable ${unit.vulnerable} — takes 50% more damage`}>
                         <GiCrackedShield aria-hidden="true" />{unit.vulnerable}
@@ -1147,7 +1365,7 @@ function Bar({ unit }) {
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
                    column he stands in, and the NUMBER is the loud part rather than the bar. */
-                .cfb { width: 100%; max-width: 132px; }
+                .cfb { width: 100%; max-width: 96px; }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
@@ -1156,8 +1374,15 @@ function Bar({ unit }) {
                    was a rounded pill with a border, which is a progress indicator on a settings page. */
                 .cfb-track { position: relative; height: 8px; border-radius: 1px; overflow: visible;
                     background: #17090c; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(0,0,0,0.55); }
-                .cfb-fill { height: 100%; border-radius: 1px; background: linear-gradient(180deg, #e2323f, #9c1a27);
-                    transition: width 240ms ease-out; }
+                .cfb-track.is-guarded { box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(150,205,255,0.75); }
+                .cfb-guard { position: absolute; left: -13px; top: 50%; transform: translateY(-50%);
+                    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+                    color: #bfe2ff; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
+                .cfb-guard i { position: absolute; font-style: normal; font-family: var(--cf-card-font);
+                    font-size: 12px; font-weight: 700; color: #10222f; }
+                .cfb-fill { height: 100%; border-radius: 1px; background: linear-gradient(180deg, #f0505c, #8f1420);
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+                    transition: width 420ms cubic-bezier(0.2, 0.8, 0.3, 1); }
                 .cfb-hp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
                     display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 17px;
                     font-weight: 700; letter-spacing: 0.01em; color: #fff;
