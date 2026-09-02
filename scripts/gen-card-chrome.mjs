@@ -82,6 +82,29 @@ const PIECES = {
         subject: "A small blank horizontal metal name plaque with softly rounded corners and a rivet at each "
             + "end — a solid plate with a plain smooth face. " + METAL,
     },
+    // ── AND THE FIGHT SCREENS OWN FURNITURE ──────────────────────────────────────────────────────────────
+    // Not card parts: the things AROUND the cards. Spire draws all of these too — its draw and discard piles
+    // are little card backs with a count on them, its energy is a big cut gem in a socket, its End Turn is a
+    // struck plate. Ours were three text boxes and a yellow rectangle, which is the same fault as the type
+    // tab one level out: web widgets sitting on a painted screen.
+    //
+    // No rarity tints on these — they belong to the screen, not to a card, so there is nothing for a rarity to
+    // say about them.
+    "card-back": {
+        size: "1024x1536", store: { w: 168, h: 240 }, tint: false, extra: SOLID,
+        subject: "The BACK of a playing card: a snarling wolf head crest struck in metal, centred on a deep "
+            + "midnight-blue field inside a narrow ornamental border. Symmetrical, solid, no writing. " + METAL,
+    },
+    "energy-gem": {
+        size: "1024x1024", store: { w: 200, h: 200 }, tint: false, extra: SOLID,
+        subject: "A large round faceted amber gemstone glowing from within, set into a heavy hexagonal metal "
+            + "socket with rivets — a solid jewel in its mount, filled, seen straight on. " + METAL,
+    },
+    "button-plate": {
+        size: "1536x1024", store: { w: 300, h: 120 }, tint: false, extra: SOLID,
+        subject: "A wide blank rectangular metal button plate with softly rounded corners, gently domed, a "
+            + "rivet at each end and a bright bevel along the top edge — solid and completely blank. " + METAL,
+    },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
     banner: {
@@ -146,6 +169,7 @@ for (const id of Object.keys(PIECES)) {
     if (only && !only.has(id)) continue;
     const base = `${OUT}/${id}.png`;
     if (!fs.existsSync(base)) continue;
+    if (PIECES[id].tint === false) continue;
     for (const rarity of TINTS) {
         const hex = RARITY_META[rarity].color;
         const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));

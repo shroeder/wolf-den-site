@@ -188,11 +188,13 @@ export default function CardFightClient({ fixture }) {
     const [floats, setFloats] = useState([]);
     const [peek, setPeek] = useState(null);
     const [acting, setActing] = useState(false);
+    const [played, setPlayed] = useState(null);
 
     const dragRef = useRef(null);
     const foeRef = useRef(null);
     const fieldRef = useRef(null);
     const floatSeq = useRef(0);
+    const playSeq = useRef(0);
 
     const intent = foeIntent(fight);
     const incoming = intentDamage(fight);
@@ -213,12 +215,24 @@ export default function CardFightClient({ fixture }) {
         setTimeout(() => setFloats((cur) => cur.filter((f) => !ids.has(f.id))), 900);
     }, []);
 
+    // ── THE CARD PERFORMS ────────────────────────────────────────────────────────────────────────────────
+    // Spire holds the card you played LARGE in the middle of the screen while its effect resolves — the card
+    // leaves your hand, grows, and does the thing. Ours went straight into the discard and threw a number,
+    // and side by side that one missing beat is most of the difference in how the two screens feel. It is the
+    // moment the game acknowledges what you just did.
+    //
+    // Purely presentational: the state has already changed underneath, exactly as theirs has. What this buys
+    // is the half-second in which the number floating off the foe has something to have come FROM.
     const commit = useCallback((uid) => {
         if (!canPlay(fight, uid)) return;
+        const entry = fight.hand.find((c) => c.uid === uid);
         const { state, events } = playCard(fight, uid);
         setFight(state);
         pushFloats(events);
         setSelected(null);
+        const shown = { id: (playSeq.current += 1), card: cardById(entry.id) };
+        setPlayed(shown);
+        setTimeout(() => setPlayed((cur) => (cur?.id === shown.id ? null : cur)), 640);
     }, [fight, pushFloats]);
 
     const onEndTurn = useCallback(() => {
@@ -454,16 +468,33 @@ export default function CardFightClient({ fixture }) {
                     })}
                 </div>
 
+                {/* ── THE TRAY, DRAWN ─────────────────────────────────────────────────────────────────
+                    Every one of these was a text box or a coloured rectangle sitting on a painted screen —
+                    the same fault as the type tab, one level out. Spire's piles are little card backs with a
+                    count struck on them, its energy is a cut gem in a socket, its End Turn is a plate. So are
+                    ours now. The energy gem is deliberately the biggest thing down here: it is the resource
+                    every decision on a turn is made against, and it was the smallest. */}
                 <div className="cf-bar">
-                    <button type="button" className="cf-pile" onClick={() => setPeek("draw")}>
-                        <b>{fight.draw.length}</b> draw
+                    <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
+                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                        <span className="cf-pile-n">{fight.draw.length}</span>
+                        <span className="cf-pile-tag">Draw</span>
                     </button>
-                    <div className="cf-energy"><b>{fight.energy}</b><span>/{fight.energyMax}</span></div>
+
+                    <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
+                        <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
+                        <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
+                    </div>
+
                     <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
-                        {acting ? "…" : "End turn"}
+                        <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
+                        <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
                     </button>
-                    <button type="button" className="cf-pile" onClick={() => setPeek("discard")}>
-                        <b>{fight.discard.length}</b> discard
+
+                    <button type="button" className="cf-pile is-discard" onClick={() => setPeek("discard")} aria-label={`Discard pile, ${fight.discard.length} cards`}>
+                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                        <span className="cf-pile-n">{fight.discard.length}</span>
+                        <span className="cf-pile-tag">Discard</span>
                     </button>
                 </div>
             </div>
@@ -481,6 +512,15 @@ export default function CardFightClient({ fixture }) {
                     />
                     <polygon className={`cf-aim-head${aimArrow.live ? " is-live" : ""}`} points={aimArrow.head} />
                 </svg>
+            ) : null}
+
+            {/* The card you just played, held large in the middle for half a second while its effect lands. */}
+            {played ? (
+                <div className="cf-played" key={played.id}>
+                    <div className="cf-played-card">
+                        <CardFace card={played.card} art={fixture.petArt[played.card.pet]} />
+                    </div>
+                </div>
             ) : null}
 
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
@@ -697,17 +737,41 @@ export default function CardFightClient({ fixture }) {
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
 
-                .cf-bar { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; padding-top: 6px; }
-                .cf-pile { background: #141922; border: 1px solid #2c3340; color: #b7c2d2; border-radius: 8px;
-                    padding: 6px 9px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-                .cf-pile b { display: block; font-size: 15px; color: #e9edf2; }
-                .cf-energy { display: flex; align-items: baseline; gap: 1px; justify-self: start;
-                    padding: 4px 12px; border-radius: 999px; background: #1a2340; border: 1px solid #6f86c0; }
-                .cf-energy b { font-size: 20px; font-weight: 800; color: #dbe6ff; }
-                .cf-energy span { font-size: 12px; color: #93a3c8; }
-                .cf-end { justify-self: end; padding: 11px 18px; border-radius: 10px; border: 1px solid #7a6320;
-                    background: linear-gradient(180deg, #ffd75e, #e0a92c); color: #241a03; font-weight: 800; font-size: 14px; }
-                .cf-end:disabled { opacity: 0.5; }
+                .cf-bar { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center;
+                    gap: 8px; padding-top: 4px; }
+
+                /* A little card back with the count struck on it, and its name under it. Ours keeps the word
+                   where Spire drops it, because a draw pile and a discard pile drawn from the same back are
+                   otherwise the same picture twice. */
+                .cf-pile { position: relative; width: 40px; padding: 0; background: none; border: 0;
+                    display: flex; flex-direction: column; align-items: center; }
+                .cf-pile-art { width: 34px; height: 48px; object-fit: contain;
+                    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
+                .cf-pile.is-discard .cf-pile-art { transform: rotate(7deg); opacity: 0.82; }
+                .cf-pile-n { position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+                    min-width: 19px; padding: 1px 4px; border-radius: 999px; background: #b8322f;
+                    border: 1px solid #12161c; color: #fff; font-size: 11px; font-weight: 800; line-height: 1.3;
+                    text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+                .cf-pile-tag { margin-top: 2px; font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: #8b97a8; }
+
+                /* THE BIGGEST THING IN THE TRAY, which is what it should be: every decision on a turn is made
+                   against it, and it used to be the smallest. */
+                .cf-energy { position: relative; width: 54px; height: 54px; justify-self: start;
+                    display: grid; place-items: center; }
+                .cf-energy-art { width: 100%; height: 100%; object-fit: contain;
+                    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+                .cf-energy-n { position: absolute; font-family: var(--cf-card-font); font-size: 21px;
+                    font-weight: 700; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.85); line-height: 1; }
+                .cf-energy-n i { font-style: normal; font-size: 11px; opacity: 0.85; }
+
+                .cf-end { position: relative; justify-self: end; width: 116px; height: 44px; padding: 0;
+                    background: none; border: 0; display: grid; place-items: center; }
+                .cf-end-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill;
+                    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+                .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 15px;
+                    font-weight: 700; color: #1b1f27; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+                .cf-end:disabled { opacity: 0.55; }
 
                 /* Full-bleed art fills its window; the fallback portrait is CONTAINED, because a pet sprite
                    cropped to a letterbox loses its head. Two jobs, two fits. */
@@ -721,6 +785,15 @@ export default function CardFightClient({ fixture }) {
                 .cf-aim-line.is-live { stroke: #ffd75e; stroke-width: 7; stroke-dasharray: none; }
                 .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
                 .cf-aim-head.is-live { fill: #ffd75e; }
+
+                /* ── THE CARD, PERFORMING ── centre stage, big, for the half second its effect takes. */
+                /* Held in the FIELD rather than the middle of the phone — centred on the viewport it sat
+                   over the hand, which is the one place a card that has just left your hand should not be. */
+                .cf-played { position: fixed; inset: 0 0 34% 0; z-index: 4950; display: grid; place-items: center;
+                    pointer-events: none; }
+                .cf-played-card { position: relative; width: 84px; height: 120px; padding: 0 0 7px;
+                    display: flex; flex-direction: column; align-items: center;
+                    animation: cfPerform 640ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 
                 .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 120px; padding: 0 0 7px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
@@ -746,6 +819,13 @@ export default function CardFightClient({ fixture }) {
 
                 /* Named for this screen so they cannot collide with another component's keyframes — which has
                    happened here before, and the symptom is somebody else's animation playing on your element. */
+                /* Up out of the hand, held big, then gone — the card doing the thing rather than vanishing. */
+                @keyframes cfPerform {
+                    0% { opacity: 0; transform: translateY(90px) scale(0.7); }
+                    22% { opacity: 1; transform: translateY(0) scale(1.55); }
+                    72% { opacity: 1; transform: translateY(-6px) scale(1.5); }
+                    100% { opacity: 0; transform: translateY(-26px) scale(1.35); }
+                }
                 @keyframes cfFloat { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-36px); } }
                 @keyframes cfShake {
                     0% { transform: translateX(0); } 25% { transform: translateX(-7px); }
@@ -794,11 +874,17 @@ function Bar({ unit, name, accent }) {
                 .cfb { width: 100%; max-width: 168px; }
                 .cfb-name { font-size: 11px; font-weight: 800; text-align: center; margin-bottom: 3px;
                     text-shadow: 0 1px 4px rgba(0,0,0,0.9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .cfb-track { position: relative; height: 16px; border-radius: 4px; overflow: hidden;
-                    background: #2a1116; border: 1px solid #4a2028; }
-                .cfb-fill { height: 100%; background: linear-gradient(180deg, #ff6b78, #c62d3d); transition: width 240ms ease-out; }
-                .cfb-hp { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px;
-                    font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
+                   thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
+                   progress indicator on a settings page. */
+                .cfb-track { position: relative; height: 13px; border-radius: 2px; overflow: hidden;
+                    background: rgba(20,8,11,0.85); border: 1px solid rgba(0,0,0,0.75);
+                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); }
+                .cfb-fill { height: 100%; background: linear-gradient(180deg, #e84a57, #a3202f);
+                    transition: width 240ms ease-out; }
+                .cfb-hp { position: absolute; inset: 0; display: grid; place-items: center;
+                    font-family: var(--cf-card-font); font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.95); }
                 .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 4px; min-height: 16px; }
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
