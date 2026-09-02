@@ -422,40 +422,89 @@ export const forfeit = (state) => (state?.over ? state : { ...state, over: "lose
  * a fresh turn opens. A foe's block is gained on ITS turn and stands through yours, which is what makes the
  * guarded swing worth reading rather than just worth surviving.
  */
+/**
+ * ── THE ENEMY TURN, ONE ENEMY AT A TIME ──────────────────────────────────────────────────────────────────
+ * This used to be a single function that resolved the whole party and handed back one state and one pile of
+ * events. The arithmetic was right and the SCREEN was wrong: filmed, all three foes lunged together and the
+ * entire turn then landed in one frame — the hero dropped 70 to 53 while a 6 and an 11 appeared over him
+ * simultaneously and a shield popped on a third foe. You could not tell who hit you for what.
+ *
+ * Spire resolves them in slot order with a real gap between, each with its own animation and its own number,
+ * and the reason is legibility: a turn where you took seventeen has to read as "six, then eleven".
+ *
+ * So the turn is now three exported steps and the client drives the clock. endTurn is KEPT and is composed
+ * from exactly those steps rather than reimplementing them — one set of rules, two ways to run it, and no
+ * possibility of the stepped version and the atomic version disagreeing (cards-sim.mjs still calls endTurn).
+ */
+
+/** Your debuffs tick, and the party is on notice. Nothing swings yet. */
+export function startFoeTurn(state) {
+    if (!state || state.over) return { state, events: [] };
+    return { state: { ...state, hero: tick(state.hero) }, events: [] };
+}
+
+/**
+ * ONE foe acts. Returns `acted: false` for a corpse — a dead enemy neither swings nor advances its script,
+ * which is what makes killing the one winding up for the big hit a real decision — so the caller can skip
+ * straight past it without spending a beat of screen time on nothing.
+ *
+ * Reads the intent from `state`, whose other foes have not moved, so a party resolving one at a time
+ * telegraphs exactly what it telegraphed before the first one went.
+ */
+export function foeAct(state, i) {
+    const foe = state?.foes?.[i];
+    if (!state || state.over || !foe || foe.hp <= 0) return { state, events: [], acted: false };
+
+    const events = [];
+    let hero = state.hero;
+    let f = { ...foe, block: 0 };
+    const intent = foeIntent(state, i);
+    if (intent.block) {
+        f = { ...f, block: f.block + intent.block };
+        events.push({ type: "block", on: f.id, amount: intent.block });
+    }
+    if (intent.damage) {
+        const dealt = attackDamage(intent.damage, f, hero);
+        hero = land(hero, dealt);
+        events.push({ type: "damage", on: "hero", amount: dealt });
+    }
+    const foes = state.foes.map((other, n) => (n === i ? tick({ ...f, beat: (f.beat || 0) + 1 }) : other));
+    return {
+        state: { ...state, hero, foes, over: hero.hp <= 0 ? "lose" : state.over },
+        events,
+        acted: true,
+        // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
+        // playing an attack animation on an enemy that never attacked. The old code lunged all three.
+        kind: intent.damage ? "attack" : intent.block ? "guard" : "idle",
+    };
+}
+
+/** The party is done: your hand goes to the discard and the next turn opens. */
+export function finishFoeTurn(state) {
+    if (!state) return { state, events: [] };
+    const spent = { ...state, discard: [...state.discard, ...state.hand], hand: [] };
+    if (spent.over === "lose") return { state: spent, events: [{ type: "over", result: "lose" }] };
+    return { state: beginTurn(spent), events: [] };
+}
+
+/**
+ * The whole enemy turn at once — the same three steps, run without a clock. For anything that is not a
+ * screen: the sim, a test, a future replay.
+ *
+ * A HERO WHO HAS DIED STOPS THE TURN. The previous version let every remaining foe swing at a corpse (land()
+ * floors HP at zero, so the outcome was the same) and pushed damage events for blows nobody could take. Now
+ * both paths stop, and they stop identically because there is only one implementation of stopping.
+ */
 export function endTurn(state) {
     if (!state || state.over) return { state, events: [] };
+    let cur = startFoeTurn(state).state;
     const events = [];
-    let hero = tick(state.hero);
-
-    // Every foe still standing takes its turn, left to right, and the block each gains is its own. A corpse
-    // does not swing and does not advance its script — which matters, because killing the one winding up for
-    // the big hit is exactly the decision three enemies exist to offer.
-    const foes = state.foes.map((foe, i) => {
-        if (foe.hp <= 0) return foe;
-        let f = { ...foe, block: 0 };
-        const intent = foeIntent(state, i);
-        if (intent.block) {
-            f = { ...f, block: f.block + intent.block };
-            events.push({ type: "block", on: f.id, amount: intent.block });
-        }
-        if (intent.damage) {
-            const dealt = attackDamage(intent.damage, f, hero);
-            hero = land(hero, dealt);
-            events.push({ type: "damage", on: "hero", amount: dealt });
-        }
-        return tick({ ...f, beat: (f.beat || 0) + 1 });
-    });
-
-    const spent = {
-        ...state,
-        hero, foes,
-        discard: [...state.discard, ...state.hand],
-        hand: [],
-        over: hero.hp <= 0 ? "lose" : state.over,
-    };
-    if (spent.over === "lose") {
-        events.push({ type: "over", result: "lose" });
-        return { state: spent, events };
+    for (let i = 0; i < cur.foes.length; i += 1) {
+        const step = foeAct(cur, i);
+        cur = step.state;
+        events.push(...step.events);
+        if (cur.over) break;
     }
-    return { state: beginTurn(spent), events };
+    const done = finishFoeTurn(cur);
+    return { state: done.state, events: [...events, ...done.events] };
 }

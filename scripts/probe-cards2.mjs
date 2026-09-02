@@ -257,5 +257,29 @@ if (await tapNamed("/Pounce/i")) {
     }
 }
 
+// ── 9. THE PARTY ACTS ONE AT A TIME ─────────────────────────────────────────────────────────────────────────
+// Filmed, the old turn had all three lunging together and the whole turn landing in a single frame: the hero
+// dropped 70 to 53 while a 6 and an 11 appeared over him simultaneously. Two things make that legible, and
+// both are asserted here rather than admired in a contact sheet — the hero's health has to come down in
+// SEPARATE steps, and no two foes may ever be mid-swing at the same moment.
+await send("Page.navigate", { url: URL_ });
+await sleep(3600);
+await evalJs(`document.querySelector('.cf-end')?.click()`);
+const hpSteps = [];
+let maxConcurrent = 0;
+let sawGuard = false;
+for (let n = 0; n < 26; n += 1) {
+    const snap = await evalJs(`({ hp: document.querySelector('.cf-hero .cfb-hp')?.textContent.trim(),
+        swinging: document.querySelectorAll('.cf-foe.is-attacking').length,
+        bracing: document.querySelectorAll('.cf-foe.is-bracing').length })`);
+    if (snap.hp && hpSteps[hpSteps.length - 1] !== snap.hp) hpSteps.push(snap.hp);
+    maxConcurrent = Math.max(maxConcurrent, snap.swinging);
+    if (snap.bracing) sawGuard = true;
+    await sleep(80);
+}
+const oneAtATime = maxConcurrent <= 1 && hpSteps.length >= 3;
+console.log(`  ${oneAtATime ? "ok  " : "FAIL"} the party acts one at a time`,
+    JSON.stringify({ hpSteps, maxSwingingAtOnce: maxConcurrent, aGuardBraced: sawGuard }));
+
 chrome.kill();
 process.exit(0);

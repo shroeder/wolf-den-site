@@ -8,8 +8,8 @@ import {
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, incomingTotal, intentDamage, resolveCard,
-    splitDamage,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    intentDamage, resolveCard, splitDamage, startFoeTurn,
     playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
@@ -229,6 +229,8 @@ export default function CardFightClient({ fixture }) {
     const [floats, setFloats] = useState([]);
     const [peek, setPeek] = useState(null);
     const [acting, setActing] = useState(false);
+    // WHICH foe is mid-beat, and whether it is swinging or guarding. One at a time, by construction.
+    const [actor, setActor] = useState(null);
     const [played, setPlayed] = useState(null);
     const [strike, setStrike] = useState(null);
     const [shaking, setShaking] = useState(false);
@@ -376,17 +378,66 @@ export default function CardFightClient({ fixture }) {
         setFight(forfeit(fight));
     }, [fight]);
 
+    /**
+     * ── THE PARTY TAKES ITS TURN, ONE AT A TIME ─────────────────────────────────────────────────────────
+     * The whole turn used to resolve in a single frame after a 420ms pause: all three lunged together and
+     * then the hero dropped seventeen while a 6 and an 11 appeared over him simultaneously. Filmed, you
+     * cannot tell who hit you for what — and "who hit me for what" is the only question that makes a party
+     * different from one big enemy.
+     *
+     * So each foe gets its own beat. It steps forward, does its one thing, its number goes up alone, and only
+     * then does the next one move. A foe that is merely guarding raises a shield and does not lunge — the old
+     * code played the attack animation on every enemy including the ones that never attacked.
+     *
+     * A corpse costs nothing: foeAct reports acted:false and the loop moves straight on without spending a
+     * beat of screen time on an empty slot.
+     */
+    const turnTimers = useRef([]);
+    useEffect(() => () => turnTimers.current.forEach(clearTimeout), []);
+
     const onEndTurn = useCallback(() => {
         if (fight.over || acting) return;
-        // A beat before the foe swings. Without it the damage lands in the same frame as the tap and reads as
-        // the button hurting you rather than the thing across the sand.
         setActing(true);
-        setTimeout(() => {
-            const { state, events } = endTurn(fight);
-            setFight(state);
-            pushFloats(events);
+        setActor(null);
+
+        let cur = startFoeTurn(fight).state;
+        setFight(cur);
+
+        // Walked as a plan rather than a chain of nested callbacks: the whole turn's timings are decided up
+        // front so a clear on unmount kills all of them, and so the pacing is one table you can read.
+        const plan = [];
+        let at = 320;                       // a beat before anything moves, or the damage reads as the button
+        for (let i = 0; i < cur.foes.length; i += 1) {
+            const peek = foeAct(cur, i);
+            if (!peek.acted) continue;      // a corpse gets no screen time
+            plan.push({ at, i, kind: peek.kind });
+            cur = peek.state;
+            at += peek.kind === "attack" ? 620 : 420;
+            if (cur.over) break;            // a dead hero stops the party
+        }
+
+        // Re-run the same steps live, on the clock, so what the screen shows IS what the rules did.
+        let live = startFoeTurn(fight).state;
+        const timers = [];
+        for (const step of plan) {
+            timers.push(setTimeout(() => {
+                const done = foeAct(live, step.i);
+                live = done.state;
+                setActor({ i: step.i, kind: step.kind });
+                setFight(done.state);
+                pushFloats(done.events);
+            }, step.at));
+            // The lunge is over well before the next foe starts, so two are never mid-swing at once.
+            timers.push(setTimeout(() => setActor(null), step.at + 300));
+        }
+        timers.push(setTimeout(() => {
+            const done = finishFoeTurn(live);
+            setFight(done.state);
+            pushFloats(done.events);
+            setActor(null);
             setActing(false);
-        }, 420);
+        }, at + 220));
+        turnTimers.current = timers;
     }, [fight, acting, pushFloats]);
 
     /**
@@ -781,7 +832,8 @@ export default function CardFightClient({ fixture }) {
                             <div
                                 key={foe.id}
                                 ref={(el) => { foeRefs.current[i] = el; }}
-                                className={`cf-fighter cf-foe${hurt(foe.id) ? " is-hit" : ""}${acting ? " is-acting" : ""}`
+                                className={`cf-fighter cf-foe${hurt(foe.id) ? " is-hit" : ""}`
+                                    + `${actor?.i === i ? (actor.kind === "attack" ? " is-attacking" : " is-bracing") : ""}`
                                     + `${aimAt === i || aimAt === "any" ? " is-target" : ""}${dead ? " is-down" : ""}`
                                     + `${guarded[i] ? " is-guarding" : ""}`}
                                 onClick={() => onFoeTap(i)}
@@ -1172,7 +1224,45 @@ export default function CardFightClient({ fixture }) {
                 .cf-fighter.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-hero.is-target .cf-sprite { filter: drop-shadow(0 0 12px #8fd0ff) drop-shadow(0 0 22px rgba(90,170,255,0.5))
                     drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
-                .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
+                /* THE ONE WHOSE BEAT IT IS. A swing crosses the sand and comes back; a guard plants and
+                   squares up without advancing, because an enemy gaining armour that lunges at you is the
+                   screen telling you it attacked.
+                   ON .cf-body, NOT ON .cf-foe. The column holds the sprite AND the health bar, so animating
+                   the column sent the bar travelling with the swing — filmed, the party's bars slid apart
+                   every time one of them attacked. Theirs stay nailed down while the body moves.
+                   And a MIRRORED body needs its own keyframes, the same way the idle breath already does:
+                   the foes are drawn facing right and flipped with scaleX(-1), which inverts every child
+                   translation, so a lunge of -30px would have carried them AWAY from the hero. */
+                .cf-foe.is-attacking .cf-body { animation: cfLunge 300ms cubic-bezier(0.3, 0, 0.2, 1); }
+                .cf-foe.is-attacking .cf-body.is-mirrored { animation-name: cfLungeMirrored; }
+                .cf-foe.is-attacking { z-index: 4; }
+                @keyframes cfLunge {
+                    0% { transform: translateX(0) scale(1); }
+                    35% { transform: translateX(-30px) scale(1.05); }
+                    60% { transform: translateX(-24px) scale(1.03); }
+                    100% { transform: translateX(0) scale(1); }
+                }
+                @keyframes cfLungeMirrored {
+                    0% { transform: scaleX(-1) translateX(0) scale(1); }
+                    35% { transform: scaleX(-1) translateX(30px) scale(1.05); }
+                    60% { transform: scaleX(-1) translateX(24px) scale(1.03); }
+                    100% { transform: scaleX(-1) translateX(0) scale(1); }
+                }
+                /* NOT is-guarding — that class is already the ward flash for GAINING block on your turn, and
+                   reusing it here would have made an enemy raising its shield glow like it had just been
+                   healed. Two different events, two different names. */
+                .cf-foe.is-bracing .cf-body { animation: cfBrace 300ms ease-out; }
+                .cf-foe.is-bracing .cf-body.is-mirrored { animation-name: cfBraceMirrored; }
+                @keyframes cfBrace {
+                    0% { transform: translateY(0) scaleX(1) scaleY(1); }
+                    45% { transform: translateY(4px) scaleX(1.06) scaleY(0.95); }
+                    100% { transform: translateY(0) scaleX(1) scaleY(1); }
+                }
+                @keyframes cfBraceMirrored {
+                    0% { transform: scaleX(-1) translateY(0) scaleY(1); }
+                    45% { transform: scaleX(-1.06) translateY(4px) scaleY(0.95); }
+                    100% { transform: scaleX(-1) translateY(0) scaleY(1); }
+                }
 
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
                     margin-bottom: 4px; }
