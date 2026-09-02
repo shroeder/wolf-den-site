@@ -70,6 +70,18 @@ export const LOOT_LABEL = { common: "Basic loot", rare: "Better loot", epic: "Go
 const HARVEST_BONUS_CHANCE = 0.05;
 
 export const seedById = (id) => SEEDS[id] || null;
+
+// ── WHAT THE SHEET SAYS IS WHAT THE WALLET GETS ──────────────────────────────────────────────────────────────
+// David B: "it says when you go to plant a crop they sell for a certain amount but when you harvest them you
+// get significantly less." Both numbers were real, which is the worst kind — the same shape as the mine purse
+// he found last week, in a different room. `sell` above is the crop's BASE price and every harvest runs it
+// through the mint rate on the way out, so a wheat labelled 11 gold banked 4 with nothing on screen to say why.
+//
+// One function, called by the screen AND standing beside the payout, so the two cannot drift apart again: it
+// passes the same reason string harvestPlot pays under, which means a change to the rate — or to whether
+// harvest counts as a heavy faucet — moves both at once. Buffs still stack ON TOP at harvest, so the number
+// shown is the floor rather than a promise that can come up short.
+export const cropPayout = (id) => mint(seedById(id)?.sell || 0, "harvest");
 const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === r);
 
 // A SEED IS THE FARM'S. It used to be showered from six other systems as a bolt-on — a chest you opened, a fish you landed, a boss you struck, a wheel you spun — each one a grant fired after that system had already paid you. Seeds come from the farm loop and from tables that LIST them now.
@@ -351,12 +363,12 @@ export async function getGarden(buyerId) {
         gardenPlots.push({
             x: pos.x, y: pos.y, s: pos.s, tracks, specLevel,
             slot: i, empty: false, seedId: p.seed_id, name: def?.name || p.seed_id, emoji: def?.emoji || "🌱",
-            sprout: def?.sprout || "🌱", sell: def?.sell || 0, xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
+            sprout: def?.sprout || "🌱", sell: cropPayout(p.seed_id), xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
             plantedAt: new Date(p.planted_at).toISOString(), readyAt: new Date(p.ready_at).toISOString(),
             ready, secondsLeft: Math.max(0, Math.round((readyMs - now) / 1000)), fertilized: p.fertilized,
         });
     }
-    const seedBag = (seeds || []).map((s) => { const d = seedById(s.seed_id); return { id: s.seed_id, count: s.count, ...(d || { name: s.seed_id, emoji: "🌱" }), loot: LOOT_LABEL[d?.rarity] || null }; })
+    const seedBag = (seeds || []).map((s) => { const d = seedById(s.seed_id); return { id: s.seed_id, count: s.count, ...(d || { name: s.seed_id, emoji: "🌱" }), sell: cropPayout(s.seed_id), loot: LOOT_LABEL[d?.rarity] || null }; })
         .filter((s) => SEEDS[s.id]);
     const upgrades = Object.entries(FARM_UPGRADES).map(([key, def]) => {
         const level = lvl(up, key);
