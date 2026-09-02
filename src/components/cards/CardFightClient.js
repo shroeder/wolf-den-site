@@ -1085,7 +1085,17 @@ export default function CardFightClient({ fixture }) {
                    with the hero's. */
                 .cf-foe .cf-shade { width: calc(var(--cf-figure) * 0.88);
                     --cf-shade-lift: calc(var(--cf-figure) * -0.049); }
-                .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
+                /* ── WHATEVER THE CARD WOULD LAND ON, LIGHTS ────────────────────────────────────────────
+                   The class was already being set on the hero for a block or a heal — selfLit has been feeding
+                   is-target the whole time — but the rule that draws the glow was scoped to .cf-foe, so it
+                   matched nothing and the hero never lit. One selector short of working.
+                   The colour stays split on purpose. Gold on a foe means "this is where the damage goes", and
+                   putting the same gold on your own champion for a heal would read as pointing a weapon at
+                   him. Friendly targeting takes the cold blue the shield badge and the ward already use, so
+                   the hand's two halves are legible at a glance: gold out, blue home. */
+                .cf-fighter.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
+                .cf-hero.is-target .cf-sprite { filter: drop-shadow(0 0 12px #8fd0ff) drop-shadow(0 0 22px rgba(90,170,255,0.5))
+                    drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
