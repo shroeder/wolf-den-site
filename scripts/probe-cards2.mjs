@@ -305,5 +305,69 @@ await sample(22);
 const held = [...seenFlips].every((v) => v < 0);
 console.log(`  ${held ? "ok  " : "FAIL"} foes stay facing the hero`, JSON.stringify({ scaleXseen: [...seenFlips] }));
 
+// ── 11. THE LINE CLOSES OVER A BODY — BUT NEVER UNDER A FINGER ──────────────────────────────────
+// Spire leaves the hole — its monsters stand on positions fixed when the encounter is built and never move
+// again. We close it, because three foes across a phone cannot spare a third of the line to a gap. That trade
+// is only safe because of one rule, and the rule is the thing worth testing: the survivors must not move while
+// a card is being dragged, or a target slides out from under a committed drag.
+//
+// HITTING THAT WINDOW TAKES CARE. Playing a card sets `acting`, and startDrag refuses to begin a gesture while
+// acting is true — so pressing a card just after a kill does nothing at all, and an earlier version of this
+// test "passed" the hold while holding nothing. The finger has to already be down when the body drops. So:
+// whittle the foe to under one card's worth, press and HOLD an attack, and land the killing blow with a tap
+// on the body while the gesture is still live.
+await send("Page.navigate", { url: URL_ });
+await sleep(3600);
+const laidOut = () => evalJs(`(() => { const p = document.querySelector('.cf-party').getBoundingClientRect();
+    return { partyMid: Math.round(p.left + p.width / 2),
+        foes: [...document.querySelectorAll('.cf-foe')].map((f) => { const b = f.getBoundingClientRect();
+            return { down: f.classList.contains('is-down'), gone: getComputedStyle(f).display === 'none',
+                     mid: Math.round(b.left + b.width / 2) }; }) }; })()`);
+const foeHp = () => evalJs(`Number((document.querySelectorAll('.cf-foe')[0]?.querySelector('.cfb-hp')?.textContent || '')
+    .split('/')[0].trim()) || 0`);
+
+// Down to single figures, but NOT dead: every attack in this deck swings 6-9, so from here the next one kills.
+for (let turn = 0; turn < 6 && (await foeHp()) > 9; turn += 1) {
+    for (let n = 0; n < 5 && (await foeHp()) > 9; n += 1) {
+        if (!(await tapNamed("/damage/i"))) break;
+        await sleep(170);
+        await evalJs(`document.querySelectorAll('.cf-foe')[0]?.click()`);
+        await sleep(900);
+    }
+    if ((await foeHp()) > 9) { await evalJs(`document.querySelector('.cf-end')?.click()`); await sleep(3400); }
+}
+const hpBefore = await foeHp();
+
+// The finger goes down FIRST and stays down: press an attack, lift it clear of the tray, and only then tap the
+// body to land the blow. The dissolve now runs with a live gesture on screen.
+await tapNamed("/damage/i");
+await sleep(200);
+const grabbed = await box(".cf-hand .cf-card.is-picked");
+await mouse("mousePressed", grabbed.x, grabbed.y);
+for (let i = 1; i <= 5; i += 1) { await mouse("mouseMoved", grabbed.x, grabbed.y - i * 14); await sleep(25); }
+const gestureLive = await evalJs(`!!document.querySelector('.cf-drag')`);
+await evalJs(`document.querySelectorAll('.cf-foe')[0]?.click()`);
+await sleep(1100);
+const heldSnap = await laidOut();
+
+// And now let go, somewhere harmless — the bottom corner is tray, not a body.
+await mouse("mouseMoved", 12, H - 12); await sleep(60);
+await mouse("mouseReleased", 12, H - 12);
+await sleep(1400);
+const closed = await laidOut();
+
+const killed = heldSnap.foes[0].down;
+const survivorsHeld = heldSnap.foes.filter((f) => !f.gone && !f.down);
+const survivors = closed.foes.filter((f) => !f.gone);
+const stoodStill = killed && gestureLive && !heldSnap.foes[0].gone;
+const centred = survivors.length === 2
+    && Math.abs(Math.round(survivors.reduce((a, f) => a + f.mid, 0) / survivors.length) - closed.partyMid) <= 8;
+const shifted = survivors.length === survivorsHeld.length && survivors.some((f, i) => f.mid !== survivorsHeld[i].mid);
+const ok11 = killed && stoodStill && closed.foes[0].gone && centred && shifted;
+console.log(`  ${ok11 ? "ok  " : "FAIL"} the line closes over a body, and never under a finger`,
+    JSON.stringify({ hpBefore, killed, gestureLive, heldStill: stoodStill, closedUp: closed.foes[0].gone,
+        reCentred: centred, moved: shifted, partyMid: closed.partyMid,
+        mids: { held: heldSnap.foes.map((f) => (f.gone ? "gone" : f.mid)), after: closed.foes.map((f) => (f.gone ? "gone" : f.mid)) } }));
+
 chrome.kill();
 process.exit(0);

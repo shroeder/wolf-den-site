@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Kreon } from "next/font/google";
 import {
@@ -207,6 +207,12 @@ const CardFace = ({ card, art, dim, live }) => {
     );
 };
 
+// How long a body takes to go, and how long the line takes to close over it. DIE_MS reaches the stylesheet
+// as --cf-die off the root rather than being written twice: the close-up is timed to start as the last of the
+// sprite fades, and two numbers that must agree should not be two numbers.
+const DIE_MS = 460;
+const CLOSE_MS = 340;
+
 export default function CardFightClient({ fixture }) {
     const router = useRouter();
     const [fight, setFight] = useState(() => startFight({
@@ -276,6 +282,58 @@ export default function CardFightClient({ fixture }) {
         const id = setTimeout(() => setGuarded({}), 520);
         return () => clearTimeout(id);
     }, [fight]);
+
+    // ── AND THEN THE LINE CLOSES UP ──────────────────────────────────────────────────────────────────
+    // Spire does NOT do this, and it is worth writing down why we are departing from it rather than pretending
+    // we are copying. Its monsters stand on positions fixed when the encounter is built and they never move
+    // again: StS2 pins each one to a named Marker2D slot in the encounter scene, StS1 hands each monster a
+    // literal x/y in the constructor (`new Fastrunner(-310, 0), new Hardhitter(-40, 50)`). Kill the middle of
+    // three and the hole stays there for the rest of the fight.
+    // It can afford that. It is a wide landscape frame with room to spare, and you target by clicking. We are
+    // a phone: three foes across 66% of a 375px screen, and a hole in the middle of them is a third of the
+    // battle line reading as missing rather than as won.
+    //
+    // THE ONE RULE: NOBODY MOVES WHILE A FINGER IS DOWN. A card is dragged onto a target here, and a target
+    // that slides out from under a drag already committed is a card played on the wrong foe — which is the
+    // whole reason Spire gets away with fixed slots. So the close-up waits for the pointer to lift. It reads
+    // dragRef and not the `drag` state deliberately: the ref is true DURING the gesture, the state is a render
+    // behind it, and a render behind is exactly the window this is here to close.
+    const [gone, setGone] = useState([]);
+    const flipFrom = useRef(null);
+    useEffect(() => {
+        const dead = fight.foes.filter((f) => f.hp <= 0 && !gone.includes(f.id)).map((f) => f.id);
+        if (!dead.length) return undefined;
+        const id = setTimeout(() => {
+            // Still holding a card: leave the body in place. Releasing sets `drag` to null, which re-runs this
+            // effect, which schedules the close-up again — so the gesture defers it rather than cancelling it.
+            if (dragRef.current) return;
+            const from = [];
+            (foeRefs.current || []).forEach((el, i) => { if (el) from[i] = el.getBoundingClientRect().left; });
+            flipFrom.current = from;
+            setGone((cur) => [...new Set([...cur, ...dead])]);
+        }, DIE_MS);
+        return () => clearTimeout(id);
+    }, [fight, drag, gone]);
+
+    // FLIP, because flexbox re-centring is a reflow and a reflow cannot be transitioned. Measure where
+    // everyone stood, let the layout snap, then put each survivor back where it was with a transform and
+    // release it — so the browser does the arithmetic and we only animate a translate.
+    useLayoutEffect(() => {
+        const from = flipFrom.current;
+        if (!from) return;
+        flipFrom.current = null;
+        (foeRefs.current || []).forEach((el, i) => {
+            if (!el || from[i] === undefined || el.offsetParent === null) return;
+            const dx = from[i] - el.getBoundingClientRect().left;
+            if (!dx) return;
+            el.style.transition = "none";
+            el.style.transform = `translateX(${dx}px)`;
+            requestAnimationFrame(() => {
+                el.style.transition = `transform ${CLOSE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+                el.style.transform = "";
+            });
+        });
+    }, [gone]);
 
     const incoming = incomingTotal(fight);
     // A hand shrinks as it is played, so the active index has to stay inside it — and when the last card on
@@ -764,7 +822,7 @@ export default function CardFightClient({ fixture }) {
     return (
         // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
         // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
-        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily }}>
+        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
@@ -835,6 +893,7 @@ export default function CardFightClient({ fixture }) {
                                 className={`cf-fighter cf-foe${hurt(foe.id) ? " is-hit" : ""}`
                                     + `${actor?.i === i ? (actor.kind === "attack" ? " is-attacking" : " is-bracing") : ""}`
                                     + `${aimAt === i || aimAt === "any" ? " is-target" : ""}${dead ? " is-down" : ""}`
+                                    + `${gone.includes(foe.id) ? " is-gone" : ""}`
                                     + `${guarded[i] ? " is-guarding" : ""}`}
                                 onClick={() => onFoeTap(i)}
                             >
@@ -1153,10 +1212,27 @@ export default function CardFightClient({ fixture }) {
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
                 .cf-party .cf-intent-marks { font-size: 17px; }
-                /* A body on the sand: no bar, no telegraph, and it stops breathing. */
-                .cf-foe.is-down { opacity: 0.34; filter: grayscale(0.85); pointer-events: none; }
-                .cf-foe.is-down .cf-body { animation: none; transform: scaleX(-1) rotate(88deg) translateY(14%); }
-                .cf-foe.is-down .cf-shade { animation: none; opacity: 0.5; }
+                /* ── A KILL TAKES THE THING AWAY, IT DOES NOT LEAVE A BODY ───────────────────────────
+                   Spire flashes a dead enemy white and dissolves it out over about half a second, and the
+                   floor is empty afterwards. There is no corpse in that game at any point, and there was one
+                   here: the sprite tipped 88deg and parked at a third opacity for the rest of the fight.
+                   Two things wrong with that. Every fighter is DRAWN STANDING — the shading, the weight and
+                   the contact shadow all still read as vertical once you lay it on its side, so it looks like
+                   an asset that broke rather than a thing that died. And it never leaves, so for the rest of
+                   the fight the sand is cluttered with bodies competing with the foes you can still hit.
+                   What happens to the empty slot afterwards is a separate decision, made up in the component
+                   at the "gone" state — the line closes over it, which is where we part company with Spire. */
+                .cf-foe.is-down { pointer-events: none; animation: cfDie var(--cf-die) ease-in forwards; }
+                .cf-foe.is-down .cf-body, .cf-foe.is-down .cf-shade { animation: none; }
+                /* OUT OF THE LAYOUT ENTIRELY, once it has finished going. display:none rather than a zero
+                   width: the negative side margins that let these three overlap would otherwise leave an 8%
+                   notch behind where the body was, which is the hole we are here to close. */
+                .cf-foe.is-gone { display: none; }
+                @keyframes cfDie {
+                    0% { opacity: 1; filter: brightness(1) saturate(1); transform: translateY(0) scale(1); }
+                    22% { opacity: 0.92; filter: brightness(2.6) saturate(0.15); transform: translateY(-2px) scale(1.03); }
+                    100% { opacity: 0; filter: brightness(1.7) saturate(0); transform: translateY(9px) scale(0.94); }
+                }
                 /* Smaller on a short screen, or the fighter block grows tall enough to push its INTENT PILL up behind
                    the control strip — and the intent is the one thing on this screen that can never be covered. */
 /* ── THEY BREATHE ────────────────────────────────────────────────────────────────────────
@@ -1167,8 +1243,21 @@ export default function CardFightClient({ fixture }) {
                    the body, which is what sells the lift as a lift rather than a slide. */
                 .cf-body { display: block; width: 100%; transform-origin: 50% 100%;
                     animation: cfBreathe 3.4s ease-in-out infinite; }
-                .cf-body.is-mirrored { transform: scaleX(-1); animation-name: cfBreatheMirrored; }
-                .cf-body.is-mirrored .cf-sprite { animation: none; }
+                /* ── THE FLIP LIVES ON THE PICTURE, NOT ON THE BODY ──────────────────────────────────
+                   Every foe sprite is drawn facing right and has to be turned round to face the hero. That
+                   flip used to be a transform on .cf-body — the same property every animation on .cf-body
+                   writes — so ANY keyframe that set transform without remembering to repeat scaleX(-1)
+                   silently unflipped the fighter for its whole duration.
+                   That has now happened three times: the idle breath, then the lunge and the brace, and then
+                   cfShake, which is the one Luke caught — measured, a hit foe sat at scaleX +1 for 240ms and
+                   spun round to face away mid-flinch. Each time the fix was another mirrored copy of the
+                   keyframes, which is three chances to forget and a fourth waiting.
+                   So the flip goes on the <img> instead. The body is then free to be animated by anything at
+                   all without touching it, and every mirrored keyframe variant is deleted rather than
+                   maintained: the bug cannot be written again because there is nothing left to forget.
+                   It also means body translations are in ordinary coordinates — a lunge of -30px moves left
+                   for everybody, mirrored or not, instead of moving the flipped ones the wrong way. */
+                .cf-body.is-mirrored .cf-sprite { transform: scaleX(-1); }
                 .cf-foe .cf-body { animation-duration: 4.1s; animation-delay: -1.2s; }
                 /* ── AND IT STANDS ON THE BOTTOM OF ITS OWN BOX ──────────────────────────────────────
                    contain CENTRES the picture in whatever space is left over, splitting the slack above and
