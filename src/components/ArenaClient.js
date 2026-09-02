@@ -3844,7 +3844,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     them on screen would be asking somebody to compare two ladders to answer one question. */}
                 {(() => {
                     const all = FIGHT_OPTIONS(st);
-                    const opts = all.slice(0, fightPage * FIGHT_PAGE);
+                    // ── CHOSEN BY NEARNESS, SHOWN BY RATING ──────────────────────────────────────
+                    // Luke: "amongst this list provided it should be sorted by VP highest on top."
+                    //
+                    // Two different jobs, and they were doing each other's. WHICH people you are offered is
+                    // decided by how close they sit to you on the ladder — that is what keeps the list to
+                    // your own neighbourhood, and it is why "load more" widens a ring outward instead of
+                    // walking down from the leaders. Sorting the whole roster by VP instead would put the
+                    // same handful of top players at the top of everybody's list, which is the arrangement
+                    // this already had once and lost on purpose.
+                    // So the SELECTION still goes by nearness and only the ORDER ON SCREEN changes: take the
+                    // ring, then read it strongest-first. Kaishiern at 1,985 now leads the card he is on
+                    // rather than sitting fourth between two people rated below him.
+                    const opts = all.slice(0, fightPage * FIGHT_PAGE)
+                        .slice()
+                        .sort((x, y) => (Number(y.vp) || 0) - (Number(x.vp) || 0));
                     // The biggest purse on the board, so one row can be flagged as the one worth taking.
                     // Computed over what is SHOWN, not over the whole roster — a badge pointing at a fight
                     // that is not on screen is a badge that lies.
