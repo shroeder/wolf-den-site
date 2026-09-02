@@ -9,12 +9,16 @@
 // one the Town and the timeclock believed in. Everything derives from HOURS now; nothing restates it.
 //
 // Updated 2026-08-30: Wednesday added, Saturday opens an hour later, Sunday closes at 7.
+// Corrected 2026-09-02: WEDNESDAY REMOVED AGAIN. It should never have gone in — the shop is shut Monday,
+// Tuesday AND Wednesday. Luke, looking at the Town on a Wednesday afternoon: "the store isnt open today why
+// does it say this". The clock and the code were both right; the table was wrong, and a wrong table is
+// indistinguishable from a broken feature to everybody reading it.
 const TZ = "America/Chicago";
 
 // [openMinute, closeMinute] minutes-since-midnight, keyed by weekday (0=Sun … 6=Sat). Missing = closed.
 const HOURS = {
     0: [660, 1140],   // Sun 11:00 AM – 7:00 PM
-    3: [900, 1260],   // Wed 3:00 PM – 9:00 PM
+    // Mon, Tue, Wed — shut. Absent rather than zeroed: `HOURS[wd] || null` is the closed test everywhere.
     4: [900, 1260],   // Thu 3:00 PM – 9:00 PM
     5: [900, 1260],   // Fri 3:00 PM – 9:00 PM
     6: [660, 1260],   // Sat 11:00 AM – 9:00 PM
