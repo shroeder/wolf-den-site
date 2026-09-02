@@ -65,9 +65,18 @@ export async function getCardFightFixture(buyerId, seed) {
         // carries a rarity on its collectible — so a Legendary pet's card can look legendary without anybody
         // authoring a second table. Read here rather than in the browser so the client never has to pull the
         // 118-entry catalogue in to colour three cards.
-        petArt: Object.fromEntries((sprites || []).map((r) => [
-            r.pet_id,
-            { url: r.url, flip: r.flip === true, rarity: collectibleById(r.pet_id)?.rarity || "common" },
-        ])),
+        // AND ITS COLOUR. Every collectible carries one — the fox kit's orange, the frog's green, the wolf
+        // pup's slate blue — and it is the pet's identity rather than its tier. The ribbon across the top of
+        // the card wears it, which is what stops a hand of commons being a row of identical grey bars: rarity
+        // is a fine thing to encode but it is not a thing to LOOK at when every card in a starting deck shares
+        // it. Rarity keeps the art window's border, where it still reads.
+        petArt: Object.fromEntries((sprites || []).map((r) => {
+            const pet = collectibleById(r.pet_id);
+            return [r.pet_id, {
+                url: r.url, flip: r.flip === true,
+                rarity: pet?.rarity || "common",
+                color: pet?.color || "#9aa0a6",
+            }];
+        })),
     };
 }

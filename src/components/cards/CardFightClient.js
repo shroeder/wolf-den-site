@@ -43,11 +43,22 @@ const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
 
 // A hex from RARITY_META, softened to a wash — the banner is tinted BY the rarity rather than painted in it,
 // or a Legendary card is a solid orange brick with unreadable text on it.
-const wash = (hex, alpha) => {
+const rgb = (hex) => {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
-    if (!m) return `rgba(154,160,166,${alpha})`;
-    const n = parseInt(m[1], 16);
-    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+    const n = m ? parseInt(m[1], 16) : 0x9aa0a6;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+const wash = (hex, alpha) => `rgba(${rgb(hex).join(",")},${alpha})`;
+/** The same colour, darker — the underside of a ribbon, so it reads as folded cloth rather than a flat bar. */
+const shade = (hex, k) => `rgb(${rgb(hex).map((c) => Math.round(c * k)).join(",")})`;
+/**
+ * Ink that survives its own background. The pets run from a near-white bunny to a deep slate wolf, and a
+ * ribbon painted in the pet's colour cannot assume white text works — on the pale ones it vanishes.
+ * Rec. 601 luma, which is the cheap standard and correct enough for a decision with two outcomes.
+ */
+const inkOn = (hex) => {
+    const [r, g, b] = rgb(hex);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#16191f" : "#ffffff";
 };
 
 // ── THE PICTURE IN THE WINDOW, AND WHAT HAPPENS BEFORE IT EXISTS ─────────────────────────────────────────
@@ -77,12 +88,24 @@ const CardArt = ({ card, pet }) => {
  */
 const CardFace = ({ card, art, dim }) => {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
+    const hue = art?.color || meta.color;
     return (
         <>
             <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
-            <span className="cf-banner" style={{ background: meta.color }}>{card.name}</span>
             <span className="cf-art" style={{ borderColor: meta.color, background: `radial-gradient(ellipse at 50% 62%, ${wash(meta.color, 0.3)}, rgba(6,8,12,0.92))` }}>
                 <CardArt card={card} pet={art} />
+            </span>
+            {/* The ribbon is drawn AFTER the art and laid back over it, so it sits on the picture the way a
+                banner nailed across a frame would. In flow above it, it was a separate grey lane. */}
+            <span
+                className="cf-banner"
+                style={{
+                    background: `linear-gradient(180deg, ${hue} 0%, ${hue} 58%, ${shade(hue, 0.72)} 100%)`,
+                    color: inkOn(hue),
+                    textShadow: inkOn(hue) === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.6)" : "0 1px 0 rgba(255,255,255,0.35)",
+                }}
+            >
+                {card.name}
             </span>
             <span className="cf-type" style={{ background: meta.color }}>{card.kind === "attack" ? "Attack" : "Skill"}</span>
             <span className="cf-text">{withKeywords(card.text)}</span>
@@ -505,7 +528,7 @@ export default function CardFightClient({ fixture }) {
                    type tab. Forethought (uncommon, blue) and Chrysalis (rare, gold) sit on the identical
                    grey slab. Colouring the whole frame by rarity, which is what a first look suggests, makes
                    a hand of five look like five different games. */
-                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 118px; padding: 0 0 5px;
+                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 106px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
                     background: linear-gradient(180deg, #454b55 0%, #363b44 26%, #2b3038 100%);
                     border: 1px solid #12161c; border-radius: 9px;
@@ -532,15 +555,19 @@ export default function CardFightClient({ fixture }) {
                 /* THE RIBBON OVERHANGS THE CARD and its ends fold down past the top edge — it is draped over
                    the card rather than printed on it. Solid rarity colour, white text: on their cards the
                    ribbon IS the rarity read, so it has to be the strongest colour on the face. */
-                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px); margin: 5px -6px 0;
+                /* LAID OVER THE ART, IN THE PET'S OWN COLOUR. Two faults in one strip: it sat in its own lane
+                   above the picture rather than on it, and keyed to rarity it was a grey bar on every card in
+                   a starting deck — the fox is orange, the frog green, the wolf slate, and those are the
+                   colours a hand should be. Rendered after the art and pulled back up over it, so it overlaps
+                   the top of the window the way a banner nailed across a frame does. */
+                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px); margin: -47px -6px 28px;
                     padding: 2px 7px 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.01em;
-                    text-align: center; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.75);
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                    text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                     clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 6px) 62%, 6px 62%, 0 100%);
-                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.45)); }
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
                 /* FULL BLEED inside a thick coloured window. The sprite floating on a dark panel with margins
                    read as a sticker stuck to a card; theirs is a painted illustration filling the frame. */
-                .cf-art { position: relative; width: calc(100% - 8px); height: 45px; margin: -3px 4px 0;
+                .cf-art { position: relative; width: calc(100% - 8px); height: 45px; margin: 7px 4px 0;
                     display: grid; place-items: center; border: 2px solid; border-radius: 5px;
                     overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.55); }
                 .cf-art-img { max-width: 96%; max-height: 41px; object-fit: contain;
@@ -583,7 +610,7 @@ export default function CardFightClient({ fixture }) {
                 .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
                 .cf-aim-head.is-live { fill: #ffd75e; }
 
-                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 118px; padding: 0 0 5px;
+                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 106px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
