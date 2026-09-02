@@ -1712,6 +1712,13 @@ export async function getSailingState(buyerId, skyKey = null) {
     ).catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop, baits, baitCookable, deepFish), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        // ── THE PURSE, WHERE YOU CAN SEE IT ──────────────────────────────────────────────────────────
+        // Sunflower Jinxx: "it gives boat stat lvl 22, then has dabloons and gold but the dabloons is always
+        // 0. I can't see how many I have unless I look in the quartermaster." Always 0 is exactly right: the
+        // strip read a top-level `doubloons` that nothing ever set, while the real figure lived inside the
+        // ship-battle payload — which is built only when a battle is OPEN. So the one number the deck shows
+        // you all the time was the one number that could never be right.
+        doubloons: Number(row?.doubloons || 0),
         hero: { art: heroRow?.avatar_sprite_url || null, flip: heroRow?.avatar_sprite_flip === true },
         // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
         chestsHeld: (() => {
