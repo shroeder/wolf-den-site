@@ -34,6 +34,12 @@ export const GAME_EXTRA_PATHS = [
     // and the game nav and the Pathfinder strip both vanish, with no way back but the browser button. Being
     // gated is a reason to be missing from the MENU for most people, never a reason to be an unknown path.
     "/marketplace/casino",
+    // The Trophy Room, reported by GrayKitsune: "doesnt have the Menu bar on it to travel, so you either need
+    // to go back a page or click the top button to return to the game." It is the FOURTH page to fall into the
+    // trap this file exists to prevent, and it fell in the day it moved — it used to be a tab inside the farm,
+    // which is a listed path, so it inherited the shell and nobody noticed it needed its own entry. A room
+    // that gets promoted to its own address has to be added here on the same day.
+    "/marketplace/trophies",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];
