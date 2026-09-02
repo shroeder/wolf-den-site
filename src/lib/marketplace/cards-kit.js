@@ -66,20 +66,34 @@ export function shuffle(list, rngState) {
 // PET LEVEL GOES HERE LATER. Spire upgrades cards (Strike -> Strike+); a levelled pet is exactly that, so
 // every card carries an `upgrade` block that nothing reads yet. It is the hole, dug now, so the day pet levels
 // arrive they are a lookup rather than a rewrite of every card.
+// ── THE NUMBER ON THE CARD IS THE NUMBER THAT HAPPENS ────────────────────────────────────────────────────
+// Every card's text is a TEMPLATE over its own fields — "Deal {damage} damage." rather than "Deal 6 damage."
+// Two reasons, and the second one is the bug.
+//
+// THE FEATURE: Spire recomputes the printed damage against whoever you are pointing at, so a Strike reading
+// "Deal 6 damage" reads "Deal 9 damage" while it hovers a Vulnerable enemy. It is a preview of the BLOW, not
+// of the aftermath — they never show you the target's resulting HP — and it is the thing that makes Vulnerable
+// legible instead of arithmetic you are expected to do in your head. We already computed it correctly in
+// attackDamage and then printed a hardcoded sentence next to it.
+//
+// THE BUG: the sentence and the number were two independent sources of truth. `upgrade: { damage: 9 }` exists
+// on bite today and would have upgraded the card to nine damage while the card went on saying six, forever,
+// silently. A template cannot drift from the field it interpolates.
 export const CARDS = {
     bite: {
         id: "bite", pet: "wolf_pup", name: "Bite", cost: 1, kind: "attack", target: "foe",
-        damage: 6, text: "Deal 6 damage.", upgrade: { damage: 9 },
+        damage: 6, text: "Deal {damage} damage.", upgrade: { damage: 9 },
     },
     hop: {
         id: "hop", pet: "frog", name: "Hop", cost: 1, kind: "skill", target: "self",
         // "Block", capitalised, because that is the KEYWORD — the card face lights the vocabulary this file
         // owns, and a lowercase "block" is just a word that silently fails to match and never lights.
-        block: 5, text: "Gain 5 Block.", upgrade: { block: 8 },
+        block: 5, text: "Gain {block} Block.", upgrade: { block: 8 },
     },
     pounce: {
         id: "pounce", pet: "fox_kit", name: "Pounce", cost: 2, kind: "attack", target: "foe",
-        damage: 8, vulnerable: 2, text: "Deal 8 damage. Apply 2 Vulnerable.", upgrade: { damage: 10, vulnerable: 3 },
+        damage: 8, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable.",
+        upgrade: { damage: 10, vulnerable: 3 },
     },
     // ── THE CARD THAT POINTS AT YOU ──────────────────────────────────────────────────────────────────────
     // Everything above either hits a foe or quietly helps you; nothing yet TARGETS you, and targeting is the
@@ -92,7 +106,7 @@ export const CARDS = {
     // reason. It is here to be a decision on the turn you are about to be hit for sixteen.
     purr: {
         id: "purr", pet: "kitten", name: "Purr", cost: 1, kind: "skill", target: "self",
-        heal: 5, text: "Heal 5.", upgrade: { heal: 8 },
+        heal: 5, text: "Heal {heal}.", upgrade: { heal: 8 },
     },
 };
 
@@ -181,6 +195,29 @@ export function attackDamage(base, attacker = {}, defender = {}) {
     const withStrength = Math.max(0, (Number(base) || 0) + (Number(attacker.strength) || 0));
     const weakened = (attacker.weak || 0) > 0 ? Math.floor(withStrength * 0.75) : withStrength;
     return (defender.vulnerable || 0) > 0 ? Math.floor(weakened * 1.5) : weakened;
+}
+
+/**
+ * What this card would actually do, right now, to this defender — the values behind the text.
+ *
+ * `defender` is optional and its absence is meaningful rather than an error: with no target chosen there is
+ * no Vulnerable to apply, so the card shows base plus your own Strength and Weak. That is exactly Spire's
+ * resting state, and the reason theirs behaves that way is that one enemy can be Vulnerable while the one
+ * beside it is not — the number genuinely cannot be resolved until you have picked somebody.
+ *
+ * Block and heal take no defender at all: they are properties of the player, which is why Spire can show a
+ * modified Block permanently in hand and cannot do the same for damage. When Dexterity and Frail arrive they
+ * belong HERE, in this function, and nothing that renders a card will need to know they exist.
+ */
+export function resolveCard(card, attacker = {}, defender = null) {
+    if (!card) return {};
+    const out = {};
+    if (card.damage) out.damage = attackDamage(card.damage, attacker, defender || {});
+    if (card.block) out.block = card.block;
+    if (card.heal) out.heal = card.heal;
+    if (card.vulnerable) out.vulnerable = card.vulnerable;
+    if (card.weak) out.weak = card.weak;
+    return out;
 }
 
 /** Block eats damage first, and only what is left reaches HP. */

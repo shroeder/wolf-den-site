@@ -209,5 +209,38 @@ if (await tapNamed("/Pounce/i")) {
     console.log("  --    no Pounce reachable this seed; energy gate not exercised");
 }
 
+// ── 8. THE CARD MUST NOT LIE ABOUT ITS OWN NUMBER ───────────────────────────────────────────────────────────
+// Pounce applies Vulnerable 2. A Bite aimed at that foe has to PRINT nine, and print six when aimed at
+// anybody else — that difference is the entire reason the number waits for a target instead of being
+// resolved once. It is also the assertion that catches the text and the field drifting apart again.
+await send("Page.navigate", { url: URL_ });
+await sleep(3600);
+const dragText = () => evalJs(`(() => { const d = document.querySelector('.cf-drag');
+    return d ? { text: d.querySelector('.cf-text').textContent.trim(), up: !!d.querySelector('.cf-num.is-up') } : null; })()`);
+if (await tapNamed("/Pounce/i")) {
+    await sleep(220);
+    await evalJs(`document.querySelectorAll('.cf-foe')[1].click()`);
+    await sleep(900);
+    if (await tapNamed("/Bite/i")) {
+        await sleep(220);
+        const held = await box(".cf-hand .cf-card.is-picked");
+        const at = async (n) => box(".cf-foe", n);
+        const marked = await at(1);
+        const clean = await at(2);
+        await mouse("mousePressed", held.x, held.y);
+        await mouse("mouseMoved", held.x, held.y - 40); await sleep(50);
+        await mouse("mouseMoved", marked.x, marked.y); await sleep(170);
+        const onVuln = await dragText();
+        await mouse("mouseMoved", clean.x, clean.y); await sleep(170);
+        const onClean = await dragText();
+        await mouse("mouseReleased", clean.x, clean.y);
+        await sleep(600);
+        const right = /9 damage/.test(onVuln?.text || "") && onVuln?.up
+            && /6 damage/.test(onClean?.text || "") && !onClean?.up;
+        console.log(`  ${right ? "ok  " : "FAIL"} the printed damage follows the target`,
+            JSON.stringify({ onVuln, onClean }));
+    }
+}
+
 chrome.kill();
 process.exit(0);

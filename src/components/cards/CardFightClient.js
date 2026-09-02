@@ -8,7 +8,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, incomingTotal, intentDamage,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, forfeit, incomingTotal, intentDamage, resolveCard,
     playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
@@ -58,6 +58,28 @@ const KEY_RE = new RegExp(`\\b(${KEYWORDS.join("|")})\\b`, "g");
 const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
     KEYWORDS.includes(part) ? <b key={`k${i}`} className="cf-key">{part}</b> : part
 ));
+
+/**
+ * ── THE CARD'S SENTENCE, WITH THE REAL NUMBERS IN IT ─────────────────────────────────────────────────────
+ * The text is a template over the card's own fields ("Deal {damage} damage."), and the values come from
+ * resolveCard, so a Bite thrown at something Vulnerable says nine on its face while it is being aimed.
+ *
+ * A number that has MOVED is coloured — green when the fight is working for you, red when against — because
+ * a nine that looks exactly like the six it replaced is a number nobody notices changing. Only the delta is
+ * marked; an unmodified number stays plain, or every card in the hand is a Christmas tree.
+ */
+const KEY_FIELD = /\{(\w+)\}/g;
+const withNumbers = (card, live) => {
+    const parts = String(card.text || "").split(KEY_FIELD);
+    return parts.map((part, i) => {
+        // split() on a capturing group alternates literal, capture, literal, capture...
+        if (i % 2 === 0) return <span key={`t${i}`}>{withKeywords(part)}</span>;
+        const base = Number(card[part]) || 0;
+        const now = live && live[part] != null ? Number(live[part]) : base;
+        const cls = now > base ? " is-up" : now < base ? " is-down" : "";
+        return <b key={`n${i}`} className={`cf-num${cls}`}>{now}</b>;
+    });
+};
 
 // A hex from RARITY_META, softened to a wash — the banner is tinted BY the rarity rather than painted in it,
 // or a Legendary card is a solid orange brick with unreadable text on it.
@@ -143,7 +165,7 @@ const chromeTint = (rarity) => {
     return ["rare", "epic"].includes(r) ? "rare" : "legendary";
 };
 
-const CardFace = ({ card, art, dim }) => {
+const CardFace = ({ card, art, dim, live }) => {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
     const look = typeLook(card.kind);
     const hue = art?.color || meta.color;
@@ -179,7 +201,7 @@ const CardFace = ({ card, art, dim }) => {
             <span className="cf-type" style={{ backgroundImage: `url(/images/cards/chrome/plate-${tint}.png)` }} aria-label={look.label}>
                 <TypeMark kind={card.kind} />
             </span>
-            <span className="cf-text">{withKeywords(card.text)}</span>
+            <span className="cf-text">{withNumbers(card, live)}</span>
         </>
     );
 };
@@ -650,6 +672,18 @@ export default function CardFightClient({ fixture }) {
     const aimAt = drag?.moved && dragCard?.target === "foe" ? foeUnder(drag.x, drag.y)
         : (activeAffordable && selectedCard?.target === "foe") ? "any" : -1;
 
+    // ── WHO EACH CARD IS BEING RESOLVED AGAINST ─────────────────────────────────────────────────────
+    // The foe under the pointer while you drag, and NOBODY otherwise. Deliberately not "the first living foe"
+    // as a stand-in: Vulnerable belongs to one body, so guessing which body would print a number that is
+    // right about a target the player never chose. With no choice made the card shows base plus your own
+    // Strength and Weak, which is all that can honestly be known — Spire's own resting state, for the same
+    // reason. Block and heal resolve regardless; they never had a target to wait for.
+    const resolveAgainst = aimAt >= 0 && aimAt !== "any" ? fight.foes[aimAt] : null;
+    const liveFor = useCallback(
+        (card) => resolveCard(card, fight.hero, resolveAgainst),
+        [fight.hero, resolveAgainst]
+    );
+
     const pileList = useMemo(() => {
         if (!peek) return [];
         const list = peek === "draw" ? fight.draw : fight.discard;
@@ -806,7 +840,7 @@ export default function CardFightClient({ fixture }) {
                                 onPointerDown={(e) => startDrag(e, entry.uid, i)}
                                 onContextMenu={(e) => e.preventDefault()}
                             >
-                                <CardFace card={card} art={fixture.petArt[card.pet]} dim={!playable} />
+                                <CardFace card={card} art={fixture.petArt[card.pet]} dim={!playable} live={liveFor(card)} />
                             </button>
                         );
                     })}
@@ -863,7 +897,7 @@ export default function CardFightClient({ fixture }) {
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
             {dragCard ? (
                 <div className={`cf-drag${ghostAt.small ? " is-parked" : ""}`} style={{ left: ghostAt.x, top: ghostAt.y }}>
-                    <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} />
+                    <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} live={liveFor(dragCard)} />
                 </div>
             ) : null}
 
@@ -1290,6 +1324,12 @@ export default function CardFightClient({ fixture }) {
                     overflow: hidden; overflow-wrap: break-word; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
+                /* An unmodified number is just text. One the fight has moved is called out — green up, red
+                   down — and nothing else on the card changes, so the eye goes to the digit rather than to a
+                   card that has started glowing. */
+                .cf-num { font-weight: 800; font-style: normal; }
+                .cf-num.is-up { color: #7fe07f; text-shadow: 0 0 6px rgba(80,220,110,0.5); }
+                .cf-num.is-down { color: #ff8f7a; text-shadow: 0 0 6px rgba(255,90,60,0.45); }
 
 
                 /* A little card back with the count struck on it, and its name under it. Ours keeps the word
