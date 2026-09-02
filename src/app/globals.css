@@ -23329,8 +23329,15 @@ body.cas-seated .social-fab { display: none; }
     font-size: clamp(34px, 4.4vw, 78px); color: #fff; text-wrap: balance; max-width: 15ch; }
 
 /* The rail. Fixed width so the stage beside it never reflows between slides — a QR that shifts sideways
-   every eleven seconds is one somebody has to re-aim at. */
-.pos-rail { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+   every eleven seconds is one somebody has to re-aim at.
+   IT WAS NOT FIXED WIDTH. `flex: 0 0 auto` with no width sizes to CONTENT, so the rail was as wide as its
+   longest line of text and the stage got whatever was left. Editing the caption under the QR — one line of
+   marketing copy, nothing to do with layout — visibly narrowed the artwork beside it. Same family as the `ch`
+   bug that wrecked this screen at every resolution: a width derived from type rather than declared.
+   It is the QR's own width now, with the divider padding outside it (content-box), so the QR fits exactly,
+   the caption wraps within it, and no wording can move the stage. */
+.pos-rail { flex: 0 0 auto; box-sizing: content-box; width: clamp(280px, 28vw, 470px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; padding-left: clamp(20px, 3vw, 48px);
     border-left: 1px solid rgba(255,255,255,0.1); }
 .pos-dots { display: flex; gap: 7px; margin-top: 22px; }
