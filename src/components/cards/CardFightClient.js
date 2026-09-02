@@ -101,23 +101,27 @@ const CardArt = ({ card, pet }) => {
  * lit. Every one of those is a channel that does not cost a word — you can tell an Attack from a Skill, and a
  * Legendary from a Common, without reading anything.
  */
+// ── WHICH PAINTED TINT A RARITY WEARS ────────────────────────────────────────────────────────────────────
+// The chrome is drawn once and tinted into three (scripts/gen-card-chrome.mjs). Nine rarities map onto those
+// three rather than each demanding its own file: grey for common, steel blue through the middle, gold at the
+// top. A rarity nobody has authored a card for yet still gets furniture.
+const chromeTint = (rarity) => {
+    const r = String(rarity || "common");
+    if (r === "common") return "common";
+    return ["rare", "epic"].includes(r) ? "rare" : "legendary";
+};
+
 const CardFace = ({ card, art, dim }) => {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
     const hue = art?.color || meta.color;
+    const tint = chromeTint(art?.rarity);
     return (
         <>
             <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
             {/* The ribbon sits ABOVE the picture with its folded ends draping over the window's top corners —
                 which is where Spire puts it. Laid fully across the art, its own clipped underside let the
                 picture show through directly under the name, and that reads as the sprite covering it. */}
-            <span
-                className="cf-banner"
-                style={{
-                    background: `linear-gradient(180deg, ${meta.color} 0%, ${meta.color} 62%, ${shade(meta.color, 0.68)} 100%)`,
-                    color: inkOn(meta.color),
-                    textShadow: inkOn(meta.color) === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.6)" : "0 1px 0 rgba(255,255,255,0.3)",
-                }}
-            >
+            <span className="cf-banner" style={{ backgroundImage: `url(/images/cards/chrome/banner-${tint}.png)` }}>
                 {card.name}
             </span>
             {/* THE WINDOW'S SHAPE IS THE CARD'S TYPE. An attack comes to a point at the bottom, a skill is a
@@ -125,10 +129,11 @@ const CardFace = ({ card, art, dim }) => {
                 without reading one of them. The rim is the rarity, painted as the container behind a 2px
                 inset rather than as a border, because a border does not follow a clip-path and the pointed
                 bottom would lose its edge. */}
-            <span className={`cf-art is-${card.kind}`} style={{ background: meta.color }}>
+            <span className={`cf-art is-${card.kind}`}>
                 <span className="cf-art-in" style={{ background: `radial-gradient(ellipse at 50% 62%, ${wash(hue, 0.34)}, rgba(6,8,12,0.94))` }}>
                     <CardArt card={card} pet={art} />
                 </span>
+                <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${card.kind}-${tint}.png)` }} />
             </span>
             <span className="cf-type" style={{ background: meta.color, color: inkOn(meta.color) }}>
                 {card.kind === "attack" ? "Attack" : "Skill"}
@@ -554,7 +559,7 @@ export default function CardFightClient({ fixture }) {
                    type tab. Forethought (uncommon, blue) and Chrysalis (rare, gold) sit on the identical
                    grey slab. Colouring the whole frame by rarity, which is what a first look suggests, makes
                    a hand of five look like five different games. */
-                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 106px; padding: 0 0 5px;
+                .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 120px; padding: 0 0 7px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
                     border: 1px solid; border-radius: 9px;
                     box-shadow: 0 5px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09);
@@ -563,6 +568,12 @@ export default function CardFightClient({ fixture }) {
                    (the fan angle is per-card data), so this rule carries only what does not vary. */
                 .cf-card.is-picked { border-color: #ffd75e; box-shadow: 0 14px 24px rgba(0,0,0,0.66),
                     inset 0 1px 0 rgba(255,255,255,0.12); }
+                /* ── THE MOULDING ── one painted frame for every card in the game, hollow, laid over the
+                   pet-coloured stock. Neutral metal on purpose: the colour comes from the card underneath,
+                   the way their frame takes the character's. Above the art, under the ribbon and the cost. */
+                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2; pointer-events: none;
+                    background-image: url(/images/cards/chrome/frame.png);
+                    background-repeat: no-repeat; background-size: 100% 100%; }
                 .cf-card.is-spent { opacity: 0.5; }
                 .cf-card.is-ghosted { opacity: 0.22; }
                 .cf-card.is-static { margin: 0; box-shadow: none; transform: none; }
@@ -591,27 +602,35 @@ export default function CardFightClient({ fixture }) {
                    covering the banner" (Luke, off his phone). It belongs above the window with only the tails
                    draping over its top corners, which is where Spire's sits, and the bar is tall enough now
                    that the clip takes tail and not text. */
-                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px);
-                    margin: 5px -6px -7px; padding: 2px 8px 7px;
+                /* PAINTED CLOTH, not a clipped div. The folded tails are in the picture now, which is what the
+                   clip-path was faking — and faking badly: its clipped underside was letting the card art show
+                   through beneath the name, which read as the sprite covering the banner. */
+                .cf-banner { position: relative; z-index: 3; width: calc(100% + 14px);
+                    margin: 4px -7px -6px; padding: 3px 9px 6px;
+                    background-repeat: no-repeat; background-size: 100% 100%;
                     font-size: 9px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1;
-                    text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                    clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 8px) 66%, 8px 66%, 0 100%);
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+                    text-align: center; color: #1b1e24; text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
                 /* FULL BLEED inside a thick coloured window. The sprite floating on a dark panel with margins
                    read as a sticker stuck to a card; theirs is a painted illustration filling the frame. */
-                /* The rim is the CONTAINER, and the picture is inset 2px inside it — so the rim follows the
-                   clipped shape, which a border cannot do. */
-                .cf-art { position: relative; width: calc(100% - 8px); height: 46px; margin: 0 4px;
-                    display: block; padding: 2px; border-radius: 5px; }
-                .cf-art-in { position: relative; display: grid; place-items: center; width: 100%; height: 100%;
-                    border-radius: 3px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
-                /* ATTACK COMES TO A POINT; a SKILL is a rounded rectangle. Spire's tell for what a card does,
-                   readable before a single word is. Powers get the circle when powers exist. */
-                .cf-art.is-attack { border-radius: 5px 5px 3px 3px;
-                    clip-path: polygon(0 0, 100% 0, 100% 66%, 50% 100%, 0 66%); }
-                .cf-art.is-attack .cf-art-in { clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); }
-                .cf-art.is-skill { border-radius: 9px; }
-                .cf-art.is-skill .cf-art-in { border-radius: 7px; }
+                /* ── A PAINTED RIM OVER A CLIPPED PICTURE ────────────────────────────────────────────────
+                   The rim is a drawn asset laid on top (one per type, tinted per rarity), and the picture
+                   underneath is clipped to roughly the same silhouette so it cannot spill past the metal.
+                   The clip is inset a shade tighter than the art so the rim covers the cut edge — a clip and
+                   a painted rim never agree to the pixel, and the way to make that invisible is to let the
+                   metal be the thing that ends the picture. */
+                .cf-art { position: relative; width: calc(100% - 14px); height: 44px; margin: 0 7px;
+                    display: block; }
+                .cf-art-in { position: absolute; inset: 3px; display: grid; place-items: center;
+                    border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
+                .cf-rim { position: absolute; inset: 0; z-index: 2; pointer-events: none;
+                    background-repeat: no-repeat; background-size: 100% 100%;
+                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+                /* ATTACK COMES TO A POINT; a SKILL is a rounded rectangle — Spire's tell for what a card does,
+                   readable before a single word is. Powers have their ring drawn and waiting. */
+                .cf-art.is-attack .cf-art-in { clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%); }
+                .cf-art.is-skill .cf-art-in { border-radius: 9px; }
                 .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
                 /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
@@ -622,7 +641,7 @@ export default function CardFightClient({ fixture }) {
                    Pounce did, and it looked like a rendering fault rather than a card. */
                 /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
                    through the bottom edge onto the tray behind it. */
-                .cf-text { flex: 1; width: 100%; padding: 3px 4px 0; font-size: 8.5px; line-height: 1.2;
+                .cf-text { flex: 1; width: 100%; padding: 3px 8px 0; font-size: 8.5px; line-height: 1.2;
                     text-align: center; color: #e2e8f2; overflow: hidden; overflow-wrap: break-word; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
@@ -652,7 +671,7 @@ export default function CardFightClient({ fixture }) {
                 .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
                 .cf-aim-head.is-live { fill: #ffd75e; }
 
-                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 106px; padding: 0 0 5px;
+                .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 120px; padding: 0 0 7px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
