@@ -60,6 +60,21 @@ const inkOn = (hex) => {
     const [r, g, b] = rgb(hex);
     return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#16191f" : "#ffffff";
 };
+/**
+ * The colour, sunk toward the card stock. Spire's frame is painted in the CHARACTER's colour — red for the
+ * Ironclad, green for the Silent — which is what stops a deck of commons being a tray of grey. Our pets carry
+ * their own colours, so the pet's is the frame's, sunk far enough that white text still sits on it.
+ */
+const deep = (hex, k) => {
+    const [r, g, b] = rgb(hex);
+    const mix = (c, d) => Math.round(c + (d - c) * k);
+    return `rgb(${mix(r, 20)},${mix(g, 23)},${mix(b, 29)})`;
+};
+/** Frame paint for one card: a tinted slab and its edge. */
+const frameStyle = (hue) => ({
+    background: `linear-gradient(180deg, ${deep(hue, 0.5)} 0%, ${deep(hue, 0.68)} 26%, ${deep(hue, 0.84)} 100%)`,
+    borderColor: deep(hue, 0.28),
+});
 
 // ── THE PICTURE IN THE WINDOW, AND WHAT HAPPENS BEFORE IT EXISTS ─────────────────────────────────────────
 // A card shows its pet DOING the thing (scripts/gen-card-art.mjs), full-bleed inside the frame. If that file
@@ -92,22 +107,32 @@ const CardFace = ({ card, art, dim }) => {
     return (
         <>
             <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
-            <span className="cf-art" style={{ borderColor: meta.color, background: `radial-gradient(ellipse at 50% 62%, ${wash(meta.color, 0.3)}, rgba(6,8,12,0.92))` }}>
-                <CardArt card={card} pet={art} />
-            </span>
-            {/* The ribbon is drawn AFTER the art and laid back over it, so it sits on the picture the way a
-                banner nailed across a frame would. In flow above it, it was a separate grey lane. */}
+            {/* The ribbon sits ABOVE the picture with its folded ends draping over the window's top corners —
+                which is where Spire puts it. Laid fully across the art, its own clipped underside let the
+                picture show through directly under the name, and that reads as the sprite covering it. */}
             <span
                 className="cf-banner"
                 style={{
-                    background: `linear-gradient(180deg, ${hue} 0%, ${hue} 58%, ${shade(hue, 0.72)} 100%)`,
-                    color: inkOn(hue),
-                    textShadow: inkOn(hue) === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.6)" : "0 1px 0 rgba(255,255,255,0.35)",
+                    background: `linear-gradient(180deg, ${meta.color} 0%, ${meta.color} 62%, ${shade(meta.color, 0.68)} 100%)`,
+                    color: inkOn(meta.color),
+                    textShadow: inkOn(meta.color) === "#ffffff" ? "0 1px 2px rgba(0,0,0,0.6)" : "0 1px 0 rgba(255,255,255,0.3)",
                 }}
             >
                 {card.name}
             </span>
-            <span className="cf-type" style={{ background: meta.color }}>{card.kind === "attack" ? "Attack" : "Skill"}</span>
+            {/* THE WINDOW'S SHAPE IS THE CARD'S TYPE. An attack comes to a point at the bottom, a skill is a
+                rounded rectangle — Spire's own tell, and it means you can sort a hand by what the cards DO
+                without reading one of them. The rim is the rarity, painted as the container behind a 2px
+                inset rather than as a border, because a border does not follow a clip-path and the pointed
+                bottom would lose its edge. */}
+            <span className={`cf-art is-${card.kind}`} style={{ background: meta.color }}>
+                <span className="cf-art-in" style={{ background: `radial-gradient(ellipse at 50% 62%, ${wash(hue, 0.34)}, rgba(6,8,12,0.94))` }}>
+                    <CardArt card={card} pet={art} />
+                </span>
+            </span>
+            <span className="cf-type" style={{ background: meta.color, color: inkOn(meta.color) }}>
+                {card.kind === "attack" ? "Attack" : "Skill"}
+            </span>
             <span className="cf-text">{withKeywords(card.text)}</span>
         </>
     );
@@ -373,6 +398,7 @@ export default function CardFightClient({ fixture }) {
                                 type="button"
                                 className={`cf-card${selected === entry.uid ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging ? " is-ghosted" : ""}`}
                                 style={{
+                                    ...frameStyle(fixture.petArt[card.pet]?.color),
                                     marginLeft: i === 0 ? 0 : overlap,
                                     // The picked card comes OUT of the fan — straightened, lifted and grown,
                                     // and above its neighbours, because it is the one being read.
@@ -420,7 +446,7 @@ export default function CardFightClient({ fixture }) {
 
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
             {dragCard ? (
-                <div className="cf-drag" style={{ left: ghostAt.x, top: ghostAt.y }}>
+                <div className="cf-drag" style={{ ...frameStyle(fixture.petArt[dragCard.pet]?.color), left: ghostAt.x, top: ghostAt.y }}>
                     <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} />
                 </div>
             ) : null}
@@ -432,7 +458,7 @@ export default function CardFightClient({ fixture }) {
                         <p className="cf-note">{peek === "draw" ? "Sorted — the order is the game." : "In the order it fell."}</p>
                         <div className="cf-sheet-cards">
                             {pileList.map((card, i) => (
-                                <div key={`${card.id}-${i}`} className="cf-card is-static">
+                                <div key={`${card.id}-${i}`} className="cf-card is-static" style={frameStyle(fixture.petArt[card.pet]?.color)}>
                                     <CardFace card={card} art={fixture.petArt[card.pet]} />
                                 </div>
                             ))}
@@ -530,8 +556,7 @@ export default function CardFightClient({ fixture }) {
                    a hand of five look like five different games. */
                 .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 106px; padding: 0 0 5px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
-                    background: linear-gradient(180deg, #454b55 0%, #363b44 26%, #2b3038 100%);
-                    border: 1px solid #12161c; border-radius: 9px;
+                    border: 1px solid; border-radius: 9px;
                     box-shadow: 0 5px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09);
                     transform-origin: 50% 130%; transition: transform 140ms ease-out; }
                 /* The picked card STRAIGHTENS out of the fan, lifts and grows. Its transform is set inline
@@ -560,20 +585,37 @@ export default function CardFightClient({ fixture }) {
                    a starting deck — the fox is orange, the frog green, the wolf slate, and those are the
                    colours a hand should be. Rendered after the art and pulled back up over it, so it overlaps
                    the top of the window the way a banner nailed across a frame does. */
-                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px); margin: -47px -6px 28px;
-                    padding: 2px 7px 3px; font-size: 9px; font-weight: 800; letter-spacing: 0.01em;
+                /* THE RIBBON, AND THE BUG THAT WAS IN IT. The clip below makes the two ENDS hang lower than
+                   the bar — folded tails. Laid across the middle of the art, that clipped underside let the
+                   picture show through immediately beneath the name, which reads exactly as "the sprite is
+                   covering the banner" (Luke, off his phone). It belongs above the window with only the tails
+                   draping over its top corners, which is where Spire's sits, and the bar is tall enough now
+                   that the clip takes tail and not text. */
+                .cf-banner { position: relative; z-index: 3; width: calc(100% + 12px);
+                    margin: 5px -6px -7px; padding: 2px 8px 7px;
+                    font-size: 9px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1;
                     text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                    clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 6px) 62%, 6px 62%, 0 100%);
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+                    clip-path: polygon(0 0, 100% 0, 100% 100%, calc(100% - 8px) 66%, 8px 66%, 0 100%);
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
                 /* FULL BLEED inside a thick coloured window. The sprite floating on a dark panel with margins
                    read as a sticker stuck to a card; theirs is a painted illustration filling the frame. */
-                .cf-art { position: relative; width: calc(100% - 8px); height: 45px; margin: 7px 4px 0;
-                    display: grid; place-items: center; border: 2px solid; border-radius: 5px;
-                    overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.55); }
-                .cf-art-img { max-width: 96%; max-height: 41px; object-fit: contain;
+                /* The rim is the CONTAINER, and the picture is inset 2px inside it — so the rim follows the
+                   clipped shape, which a border cannot do. */
+                .cf-art { position: relative; width: calc(100% - 8px); height: 46px; margin: 0 4px;
+                    display: block; padding: 2px; border-radius: 5px; }
+                .cf-art-in { position: relative; display: grid; place-items: center; width: 100%; height: 100%;
+                    border-radius: 3px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
+                /* ATTACK COMES TO A POINT; a SKILL is a rounded rectangle. Spire's tell for what a card does,
+                   readable before a single word is. Powers get the circle when powers exist. */
+                .cf-art.is-attack { border-radius: 5px 5px 3px 3px;
+                    clip-path: polygon(0 0, 100% 0, 100% 66%, 50% 100%, 0 66%); }
+                .cf-art.is-attack .cf-art-in { clip-path: polygon(0 0, 100% 0, 100% 64%, 50% 100%, 0 64%); }
+                .cf-art.is-skill { border-radius: 9px; }
+                .cf-art.is-skill .cf-art-in { border-radius: 7px; }
+                .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
                 /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
-                .cf-type { margin-top: -7px; padding: 0 7px 1px; border-radius: 3px; font-size: 7px;
+                .cf-type { margin-top: -6px; padding: 0 7px 1px; border-radius: 3px; font-size: 7px;
                     font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: #14181f;
                     border: 1px solid rgba(0,0,0,0.4); z-index: 3; }
                 /* Bounded, or a two-clause card writes straight out through the side of itself — which is what
@@ -615,8 +657,7 @@ export default function CardFightClient({ fixture }) {
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
                        thumb is already taking a bite out of that half of the screen. */
-                    transform: translate(-50%, -118%) scale(0.94) rotate(-3deg);
-                    background: linear-gradient(180deg, #454b55 0%, #363b44 26%, #2b3038 100%);
+                    transform: translate(-50%, -118%) scale(0.94) rotate(-3deg); border: 1px solid;
                     border: 1px solid #ffd75e; border-radius: 10px; box-shadow: 0 14px 26px rgba(0,0,0,0.6); }
 
                 .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 16px;
