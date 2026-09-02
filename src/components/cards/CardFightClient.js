@@ -410,7 +410,7 @@ export default function CardFightClient({ fixture }) {
         <div className="cf" style={{ "--cf-card-font": cardFont.style.fontFamily }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
-                <Sprite src="/images/arena/arena-bg.webp" className="cf-bg" />
+                <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
 
                 {/* ── EVERYTHING BUT THE CARDS LIVES UP HERE ──────────────────────────────────────────
                     Luke's call, looking at the restaged screen: the piles, the energy and End Turn go to the
@@ -451,6 +451,7 @@ export default function CardFightClient({ fixture }) {
                         ))}
                     </div>
                     <Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} />
+                    <span className="cf-shade" aria-hidden="true" />
                     <Bar unit={fight.hero} name={fight.hero.name} />
                 </div>
 
@@ -459,11 +460,19 @@ export default function CardFightClient({ fixture }) {
                     ref={foeRef}
                     onClick={onFoeTap}
                 >
-                    <div className="cf-intent" style={{ borderColor: fight.foe.color }}>
-                        {intent.block ? <GiShield aria-hidden="true" /> : null}
-                        <GiCrossedSwords aria-hidden="true" />
+                    {/* ── WHAT HE IS ABOUT TO DO ──────────────────────────────────────────────────
+                        An icon and a number over his head, drawn as part of the picture. Theirs is exactly
+                        that — no chip, no border, no word — and the reason is that this is the one thing you
+                        read every single turn: it has to be a glance, not a label. Ours was a bordered pill
+                        reading "11 LUNGE" in letterspaced caps, which is a UI component standing where a
+                        telegraph should be. The name of the move survives on the title for anyone who wants
+                        it, and the shield appears alongside when the swing comes with guard. */}
+                    <div className="cf-intent" title={intent.label}>
+                        <span className="cf-intent-marks">
+                            <GiCrossedSwords aria-hidden="true" />
+                            {intent.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
+                        </span>
                         <b>{incoming}</b>
-                        <span className="cf-intent-label">{intent.label}</span>
                     </div>
                     <div className="cf-floats">
                         {floats.filter((f) => f.on === "foe").map((f) => (
@@ -472,6 +481,7 @@ export default function CardFightClient({ fixture }) {
                     </div>
                     {/* Every fighter on the Road is drawn facing right, so on this side of the sand they all turn round. */}
                     <Sprite src={fixture.foe.art} fallback={fixture.foe.artFallback} className="cf-sprite" flip />
+                    <span className="cf-shade" aria-hidden="true" />
                     <Bar unit={fight.foe} name={fight.foe.name} accent={fight.foe.color} />
                 </div>
             </div>
@@ -601,7 +611,16 @@ export default function CardFightClient({ fixture }) {
                     background: #0a0b0f; color: #e9edf2; user-select: none; -webkit-user-select: none; overflow: hidden; }
 
                 .cf-field { position: absolute; inset: 0; overflow: hidden; }
-                .cf-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.86; }
+                /* ── THE ARENA IS ZOOMED IN, AND THAT IS THE FIX FOR THE FLOATING ───────────────────────
+                   arena-bg puts its sand at 76% of the picture — everything above that is seating and sky.
+                   Shown edge to edge on a portrait phone the image fills the height exactly, so the sand
+                   landed at 76% of the SCREEN while the fighters stood at 62%: they were standing in mid-air
+                   in front of the stands, a hundred pixels above the floor. Anchored to the bottom and scaled
+                   past the frame, the sand rises to about 64% and they stand ON it. What that costs is the
+                   bunting and the sky, which is the right thing to lose — Spire's camera is low and close for
+                   the same reason. */
+                .cf-bg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: max(100%, 560px);
+                    object-fit: cover; object-position: 50% 100%; opacity: 0.95; }
                 /* Darkened at the foot rather than ENDED there, so the cards have something to sit against
                    while the floor keeps going. */
                 .cf-field::after { content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -629,26 +648,38 @@ export default function CardFightClient({ fixture }) {
                    on a short screen a percentage puts the fighters underneath it: at 375x441, which is what a 667-tall
                    phone actually leaves, 29% landed the health bars behind the End Turn plate. The floor is 215px
                    above the bottom at worst, 38% when there is room, and never more than 320. */
-                .cf-fighter { position: absolute; bottom: clamp(198px, 38%, 320px); width: 44%; display: flex; flex-direction: column;
+                .cf-fighter { position: absolute; bottom: clamp(160px, 30%, 300px); width: 44%; display: flex; flex-direction: column;
                     align-items: center; z-index: 2; }
                 .cf-hero { left: 3%; }
                 .cf-foe { right: 3%; cursor: pointer; }
                 /* Smaller on a short screen, or the fighter block grows tall enough to push its INTENT PILL up behind
                    the control strip — and the intent is the one thing on this screen that can never be covered. */
                 .cf-sprite { width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
-                    filter: drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
+                    filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45)); }
+                /* THE POOL ON THE GROUND. A drop-shadow is a copy of the sprite offset behind it, which reads
+                   as a sticker lifted off the page; what puts a figure ON a floor is a soft dark ellipse at
+                   its feet, and every fighter in Spire has one. This is the "no contact shadow = pasted on"
+                   note from the farm, and it was the whole of "our characters are floating". */
+                .cf-shade { width: 62%; height: 14px; margin: -7px 0 2px;
+                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.62), rgba(0,0,0,0.34) 45%, transparent 72%); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-fighter.is-hit { animation: cfShake 260ms ease-out; }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
-                .cf-intent { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 6px; padding: 4px 10px;
-                    background: rgba(10,12,16,0.82); border: 1px solid #3a4354; border-radius: 999px; font-size: 13px; }
-                .cf-intent b { font-size: 15px; }
-                .cf-intent-label { font-size: 10px; color: #9fb0c4; text-transform: uppercase; letter-spacing: 0.06em; }
+                .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
+                    margin-bottom: 4px; }
+                .cf-intent-marks { display: inline-flex; align-items: center; gap: 3px; font-size: 21px;
+                    color: #ffd0c4; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.9)); }
+                .cf-intent-marks .is-guard { font-size: 17px; color: #9fd2ff; }
+                /* Outlined rather than boxed, the way a number painted onto a scene has to be. */
+                .cf-intent b { font-family: var(--cf-card-font); font-size: 20px; font-weight: 700; color: #fff;
+                    line-height: 1;
+                    text-shadow: 0 0 4px rgba(0,0,0,0.95), 1px 1px 0 rgba(0,0,0,0.95), -1px 1px 0 rgba(0,0,0,0.95),
+                        1px -1px 0 rgba(0,0,0,0.95), -1px -1px 0 rgba(0,0,0,0.95); }
 
-                /* Clear of the intent pill, which is the first thing in this box — a -6 landing on top of "11 LUNGE"
-                   obscures the one number the next decision is made from. */
-                .cf-floats { position: absolute; top: 34px; left: 0; right: 0; display: flex; flex-direction: column;
+                /* Clear of the intent, which is the first thing in this box — a -6 landing on top of the
+                   number he is about to hit you for obscures the one thing the next decision is made from. */
+                .cf-floats { position: absolute; top: 46px; left: 0; right: 0; display: flex; flex-direction: column;
                     align-items: center; gap: 2px; pointer-events: none; z-index: 4; }
                 .cf-float { font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px rgba(0,0,0,0.8);
                     animation: cfFloat 900ms ease-out forwards; }
@@ -918,19 +949,24 @@ function Bar({ unit, name, accent }) {
             </div>
             <style jsx global>{`
                 .cfb { width: 100%; max-width: 168px; }
-                .cfb-name { font-size: 11px; font-weight: 800; text-align: center; margin-bottom: 3px;
-                    text-shadow: 0 1px 4px rgba(0,0,0,0.9); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .cfb-name { font-size: 9.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+                    text-align: center; margin-bottom: 4px; opacity: 0.72;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.95); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
-                .cfb-track { position: relative; height: 13px; border-radius: 2px; overflow: hidden;
-                    background: rgba(20,8,11,0.85); border: 1px solid rgba(0,0,0,0.75);
-                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); }
-                .cfb-fill { height: 100%; background: linear-gradient(180deg, #e84a57, #a3202f);
+/* Theirs is a lean trough with the number drawn OVER it, bigger than the bar is tall, outlined
+                   rather than boxed — it reads as part of the picture instead of a widget with a caption. Ours
+                   was a rounded pill with a border, which is a progress indicator on a settings page. */
+                .cfb-track { position: relative; height: 9px; border-radius: 1px; overflow: visible;
+                    background: rgba(12,6,8,0.9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
+                .cfb-fill { height: 100%; border-radius: 1px; background: linear-gradient(180deg, #e2323f, #9c1a27);
                     transition: width 240ms ease-out; }
-                .cfb-hp { position: absolute; inset: 0; display: grid; place-items: center;
-                    font-family: var(--cf-card-font); font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.95); }
+                .cfb-hp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+                    display: grid; place-items: center; font-family: var(--cf-card-font); font-size: 15px;
+                    font-weight: 700; letter-spacing: 0.01em; color: #fff;
+                    text-shadow: 0 0 3px rgba(0,0,0,0.95), 1px 1px 0 rgba(0,0,0,0.95), -1px 1px 0 rgba(0,0,0,0.95),
+                        1px -1px 0 rgba(0,0,0,0.95), -1px -1px 0 rgba(0,0,0,0.95); }
                 .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 4px; min-height: 16px; }
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
