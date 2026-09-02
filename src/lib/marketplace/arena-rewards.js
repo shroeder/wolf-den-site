@@ -103,6 +103,40 @@ export function vpOdds(myVp = 0, theirVp = 0) {
     return 1 / (1 + Math.pow(10, ((Number(theirVp) || 0) - (Number(myVp) || 0)) / VP_SCALE));
 }
 
+// ── THE FOUR WORDS, AND THE ONE PLACE THEY ARE DECIDED ───────────────────────────────────────────────────────
+// The challenge list bands every opponent with one of these, and the matchmaker behind "Surprise me" has to
+// decide whether a stranger is "your own size". Those are the same question and they were answered in two
+// different files, in two different units — the row banded on ODDS, and the matcher gated on how many PLACES
+// apart you sit on the board.
+//
+// That is not a near-equivalence, it is the same mistake the row itself already made once and had fixed: five
+// places is a different fight at every point on the ladder. At the top of a thirty-five member board five
+// places is four hundred points, and 400 points is a one-in-eleven chance. GrayKitsune, on being handed the
+// Den's strongest player by a button captioned "even": "Eric is shown as option to attack with a Brutal, I
+// click random and it has even beside it.. and puts me against Eric."
+//
+// So the thresholds live here, once, and both sides read them.
+export const ODDS_BANDS = [
+    { band: "brutal", below: 0.30 },
+    { band: "hard", below: 0.45 },
+    { band: "even", below: 0.60 },
+    { band: "easy", below: Infinity },
+];
+
+/** The word for a fight at these odds — "even" is a coin flip, "brutal" is one you are expected to lose. */
+export function oddsBand(odds) {
+    const n = Number(odds);
+    if (!Number.isFinite(n)) return null;
+    return (ODDS_BANDS.find((b) => n < b.below) || ODDS_BANDS[ODDS_BANDS.length - 1]).band;
+}
+
+// How far from a coin flip still counts as "someone your own size" for MATCHMAKING. Taken from the band table
+// rather than picked: 0.30 is exactly where the list stops calling a fight winnable and starts calling it
+// brutal, and the window is symmetric so the button cannot hand you a walkover either.
+export const FAIR_ODDS = ODDS_BANDS[0].below;                 // 0.30
+/** 0 at a coin flip, 1 at the edge of fair, above 1 outside it. */
+export const oddsUnfairness = (odds) => Math.abs((Number(odds) || 0) - 0.5) / (0.5 - FAIR_ODDS);
+
 /** What a bout moves between two members. Always a positive number — the caller decides the signs. */
 export function vpTransfer({ myVp = 0, theirVp = 0, won = false }) {
     const expected = 1 / (1 + Math.pow(10, ((Number(theirVp) || 0) - (Number(myVp) || 0)) / VP_SCALE));

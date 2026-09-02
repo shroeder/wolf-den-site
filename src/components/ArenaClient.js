@@ -5,6 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BASE_FILL_MS } from "@/lib/marketplace/arena-atb.js";
+import { oddsBand } from "@/lib/marketplace/arena-rewards.js";
 import FightInput from "@/components/arena/FightInput";
 import SkillPanel from "@/components/arena/SkillPanel";
 import { createPortal } from "react-dom";
@@ -3859,8 +3860,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         // A Gauntlet tier has no standing and keeps the power ratio — that was never broken.
                         const ratio = (Number(o.power) || 0) / Math.max(1, Number(st.me?.power) || 0);
                         const odds = o.reward?.odds;
+                        // The thresholds moved to arena-rewards.js beside vpOdds, because the MATCHER needed
+                        // the same four words to decide who is "your own size" and was using board places
+                        // instead — see the note over ODDS_BANDS. Two copies is how they disagreed.
                         const band = odds != null
-                            ? (odds < 0.3 ? "brutal" : odds < 0.45 ? "hard" : odds < 0.6 ? "even" : "easy")
+                            ? oddsBand(odds)
                             : (ratio >= 1.5 ? "brutal" : ratio >= 1.15 ? "hard" : ratio >= 0.85 ? "even" : "easy");
                         const top = (o.reward?.laurels || 0) === best && best > 0;
                         return (
@@ -3938,7 +3942,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     <span className="ar-pick-who">
                         <b>{busy ? "Looking for an opponent…" : "Surprise me"}</b>
                         <em>someone your own size, chosen for you</em>
-                        <span className="ar-pick-band is-even">even</span>
+                        {/* The pill here was the word "even", written into the markup. It was not a reading of
+                            anything — every other row on this screen computes its band from the opponent's
+                            odds, and this one simply asserted the best of the four, every time, whoever the
+                            server went on to pick. GrayKitsune got Eric out of it at odds of 0.09.
+                            The matcher is honest now (it gates on those same odds), but it still cannot name
+                            the opponent before it has chosen one, so this says what it actually knows. */}
+                        <span className="ar-pick-band is-even">your size</span>
                     </span>
                     <span className="ar-pick-pay"><em>matched</em></span>
                 </button>

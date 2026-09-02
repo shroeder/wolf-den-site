@@ -23,7 +23,7 @@ import { buildForTier, buildForClass } from "@/lib/marketplace/arena-npc-build.j
 import {
     boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, LOSS_EFFORT_CEIL, lossEffort,
     vpTransfer, vpStakePreview, vpLossPreview,
-    lossLaurels, vpFor, vpOdds,
+    lossLaurels, vpFor, vpOdds, oddsUnfairness,
 } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
 import { LADDER, LADDER_HOUSES, LADDER_SIZE, LADDER_MAX, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr,
@@ -1589,9 +1589,9 @@ const TARGET_RATIO = 0.95;   // their power against yours: a shade in your favou
 const FAIR_GAP = 0.5;
 const SHORTLIST = 7;         // how many of the closest go in the hat
 const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your size
-// How many places up or down the ladder still counts as your neighbourhood. Five either side is the same
-// window the board now draws, so the people you can SEE are the people you can be matched with.
-const MEMBER_SPAN = 5;
+// MEMBER_SPAN — "how many places up or down still counts as your neighbourhood" — used to live here and is
+// gone: a number of PLACES cannot answer that question, which is what let the matcher and the row disagree.
+// Fairness for members is FAIR_ODDS in arena-rewards.js, beside the words the row is banded with.
 
 // ── BOTH KINDS, ALWAYS ───────────────────────────────────────────────────────────────────────────────────────
 // This used to rank members and Gauntlet tiers in one pile by closeness and take the seven nearest, which made
@@ -1639,10 +1639,22 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // is what the board is ordered by and what Luke asked for: "just show five people that are close to you in
     // victory points, that way you're always fighting someone around your level."
     //
-    // Distance is in PLACES, scaled so FAIR_GAP means the same thing to both pools: MEMBER_SPAN places away
-    // is exactly as unfair as being FAIR_GAP off someone's power.
+    // Both pools end up in the same units: a member's distance is how far the odds sit from a coin flip, a
+    // tier's is how far its power sits from yours, and FAIR_GAP is the edge of fair for both.
     const myIdx = board.findIndex((o) => String(o.id) === String(buyerId));
-    const rankDist = (i) => (myIdx < 0 ? 0 : Math.abs(i - myIdx) / MEMBER_SPAN * FAIR_GAP);
+    // ── AND "YOUR OWN SIZE" MEANS WHAT THE ROW SAYS IT MEANS ─────────────────────────────────────────────
+    // This measured distance in BOARD PLACES: five either side, scaled so five places hit the fairness gate
+    // exactly. Reported twice, fixed once, and still wrong — because the fix was written in the same units as
+    // the bug. Places are not a difficulty: five places is four hundred points at the top of the board and
+    // sixty in the middle, so the gate let GrayKitsune (4th) be handed Eric (1st) at odds of 0.09 under a row
+    // captioned "even", which is precisely what he reported. Measured across the whole board, 14% of what the
+    // button was allowed to pick was BRUTAL by the list's own word and 32 of 35 members could be handed a
+    // fight the list would not have called even.
+    // It reads the odds now — the same curve the row's word comes from — so the promise and the match are the
+    // same measurement. The Gauntlet remains the fallback for anyone with nobody their size, which is the
+    // entire reason it exists; at the very top of the board that is now Eric and Kaishiern, by design.
+    const myVp = Number(board[myIdx]?.vp) || 0;
+    const rankDist = (i) => (myIdx < 0 ? 0 : oddsUnfairness(vpOdds(myVp, Number(board[i]?.vp) || 0)) * FAIR_GAP);
     const members = [];
     const npcs = [];
     for (let i = 0; i < board.length; i += 1) {
