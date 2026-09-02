@@ -853,10 +853,10 @@ export default function CardFightClient({ fixture }) {
                                     ))}
                                 </div>
                                 {/* Every fighter on the Road is drawn facing right, so on this side of the
-                                    sand they all turn round — and the mirror lives on the WRAPPER, not on the
-                                    image, because a CSS animation overrides an inline style for as long as it
-                                    runs. The breath was replacing the scaleX(-1) and quietly turning every foe
-                                    back to face the wall. */}
+                                    sand they all turn round — and the mirror lives on the IMAGE, one level
+                                    below the body, because .cf-body is the element every animation writes a
+                                    transform to. Out of reach of those keyframes is the only place the flip
+                                    cannot be dropped halfway through a breath, a lunge or a flinch. */}
                                 <span className="cf-body is-mirrored">
                                     <Sprite src={foe.art} fallback={foe.artFallback} className="cf-sprite" />
                                 </span>
@@ -1230,11 +1230,10 @@ export default function CardFightClient({ fixture }) {
                    ON .cf-body, NOT ON .cf-foe. The column holds the sprite AND the health bar, so animating
                    the column sent the bar travelling with the swing — filmed, the party's bars slid apart
                    every time one of them attacked. Theirs stay nailed down while the body moves.
-                   And a MIRRORED body needs its own keyframes, the same way the idle breath already does:
-                   the foes are drawn facing right and flipped with scaleX(-1), which inverts every child
-                   translation, so a lunge of -30px would have carried them AWAY from the hero. */
+                   Written once, for everybody. The mirror sits on the <img> rather than on this element, so
+                   -30px carries a foe towards the hero exactly the way it carries the hero forward — there is
+                   no flipped copy of these keyframes left to keep in step. */
                 .cf-foe.is-attacking .cf-body { animation: cfLunge 300ms cubic-bezier(0.3, 0, 0.2, 1); }
-                .cf-foe.is-attacking .cf-body.is-mirrored { animation-name: cfLungeMirrored; }
                 .cf-foe.is-attacking { z-index: 4; }
                 @keyframes cfLunge {
                     0% { transform: translateX(0) scale(1); }
@@ -1242,26 +1241,14 @@ export default function CardFightClient({ fixture }) {
                     60% { transform: translateX(-24px) scale(1.03); }
                     100% { transform: translateX(0) scale(1); }
                 }
-                @keyframes cfLungeMirrored {
-                    0% { transform: scaleX(-1) translateX(0) scale(1); }
-                    35% { transform: scaleX(-1) translateX(30px) scale(1.05); }
-                    60% { transform: scaleX(-1) translateX(24px) scale(1.03); }
-                    100% { transform: scaleX(-1) translateX(0) scale(1); }
-                }
                 /* NOT is-guarding — that class is already the ward flash for GAINING block on your turn, and
                    reusing it here would have made an enemy raising its shield glow like it had just been
                    healed. Two different events, two different names. */
                 .cf-foe.is-bracing .cf-body { animation: cfBrace 300ms ease-out; }
-                .cf-foe.is-bracing .cf-body.is-mirrored { animation-name: cfBraceMirrored; }
                 @keyframes cfBrace {
                     0% { transform: translateY(0) scaleX(1) scaleY(1); }
                     45% { transform: translateY(4px) scaleX(1.06) scaleY(0.95); }
                     100% { transform: translateY(0) scaleX(1) scaleY(1); }
-                }
-                @keyframes cfBraceMirrored {
-                    0% { transform: scaleX(-1) translateY(0) scaleY(1); }
-                    45% { transform: scaleX(-1.06) translateY(4px) scaleY(0.95); }
-                    100% { transform: scaleX(-1) translateY(0) scaleY(1); }
                 }
 
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -1585,12 +1572,6 @@ export default function CardFightClient({ fixture }) {
                 @keyframes cfBreathe {
                     0%, 100% { transform: translateY(0) rotate(-0.5deg) scaleY(1); }
                     50% { transform: translateY(-6px) rotate(0.5deg) scaleY(1.02); }
-                }
-                /* The foe is mirrored by its wrapper, so its breath has to carry the mirror too — otherwise
-                   the animation's transform drops the scaleX and he spins round twice a cycle. */
-                @keyframes cfBreatheMirrored {
-                    0%, 100% { transform: scaleX(-1) translateY(0) rotate(0.5deg) scaleY(1); }
-                    50% { transform: scaleX(-1) translateY(-6px) rotate(-0.5deg) scaleY(1.02); }
                 }
                 @keyframes cfShade {
                     0%, 100% { opacity: 1; transform: translateY(var(--cf-shade-lift, 0px)) scaleX(1); }

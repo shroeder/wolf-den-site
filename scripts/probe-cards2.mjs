@@ -281,5 +281,29 @@ const oneAtATime = maxConcurrent <= 1 && hpSteps.length >= 3;
 console.log(`  ${oneAtATime ? "ok  " : "FAIL"} the party acts one at a time`,
     JSON.stringify({ hpSteps, maxSwingingAtOnce: maxConcurrent, aGuardBraced: sawGuard }));
 
+// ── 10. NOBODY EVER UNFLIPS ─────────────────────────────────────────────────────────────────────────────────
+// The foe art is drawn facing right and turned round to face the hero. When that flip lived on .cf-body — the
+// same property every animation writes — three separate keyframes forgot to repeat it and silently spun a
+// fighter to face away for the length of their animation: the idle breath, then the lunge and brace, then
+// cfShake, which had a hit foe at scaleX +1 for 240ms. The flip is on the <img> now so no keyframe can reach
+// it, and this samples the horizontal scale of every foe through a hit AND a full enemy turn to prove it.
+await send("Page.navigate", { url: URL_ });
+await sleep(3600);
+const flips = () => evalJs(`[...document.querySelectorAll('.cf-foe .cf-sprite')].map((s) => {
+    const tr = getComputedStyle(s).transform;
+    return tr === 'none' ? 1 : Math.round(new DOMMatrix(tr).a * 100) / 100; })`);
+const seenFlips = new Set();
+const sample = async (n) => { for (let i = 0; i < n; i += 1) { (await flips()).forEach((v) => seenFlips.add(v)); await sleep(70); } };
+await sample(3);
+if (await tapNamed("/Bite/i")) {
+    await sleep(200);
+    await evalJs(`document.querySelectorAll('.cf-foe')[2]?.click()`);
+    await sample(12);
+}
+await evalJs(`document.querySelector('.cf-end')?.click()`);
+await sample(22);
+const held = [...seenFlips].every((v) => v < 0);
+console.log(`  ${held ? "ok  " : "FAIL"} foes stay facing the hero`, JSON.stringify({ scaleXseen: [...seenFlips] }));
+
 chrome.kill();
 process.exit(0);
