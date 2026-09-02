@@ -192,17 +192,22 @@ export default function CardFightClient({ fixture }) {
     const [peek, setPeek] = useState(null);
     const [acting, setActing] = useState(false);
     const [played, setPlayed] = useState(null);
+    const [preview, setPreview] = useState(null);
 
     const dragRef = useRef(null);
+    // The pointerup handler is bound once and must not close over a stale preview.
+    const previewRef = useRef(null);
     const foeRefs = useRef([]);
     const partyRef = useRef(null);
     const fieldRef = useRef(null);
     const trayRef = useRef(null);
     const floatSeq = useRef(0);
     const playSeq = useRef(0);
+    const holdTimer = useRef(null);
 
     // The whole party's next swing. With one enemy this was the number over its head; with three it is
     // the only figure that answers what a turn actually asks — can I afford to take this?
+    previewRef.current = preview;
     const incoming = incomingTotal(fight);
 
     // ── WHAT JUST HAPPENED, THROWN OFF WHOEVER IT HAPPENED TO ────────────────────────────────────────────
@@ -307,14 +312,21 @@ export default function CardFightClient({ fixture }) {
             const d = dragRef.current;
             if (!d) return;
             const moved = d.moved || Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > DRAG_SLOP;
+            if (moved && !d.moved) { clearTimeout(holdTimer.current); setPreview(null); }
             dragRef.current = { ...d, x: e.clientX, y: e.clientY, moved };
             setDrag(dragRef.current);
         };
         const up = (e) => {
             const d = dragRef.current;
             if (!d) return;
+            clearTimeout(holdTimer.current);
+            // A card being READ is not a card being chosen: letting go after a hold puts it back, it does not
+            // select it. Otherwise every read leaves something armed.
+            const wasReading = Boolean(previewRef.current);
+            setPreview(null);
             dragRef.current = null;
             setDrag(null);
+            if (wasReading) return;
             // Under the slop it was a TAP: select the card, or unselect it if it was already the chosen one.
             if (!d.moved) { setSelected((cur) => (cur === d.uid ? null : d.uid)); return; }
             const target = dropTarget(d.uid, e.clientX, e.clientY);
@@ -330,10 +342,28 @@ export default function CardFightClient({ fixture }) {
         };
     }, [commit, dropTarget]);
 
+    /**
+     * ── WHAT "HOVER" MEANS WITHOUT A MOUSE ──────────────────────────────────────────────────────────
+     * On a desktop you rest the pointer on a card and it comes up to be read. A phone has no resting
+     * state — a finger is either off the glass or pressing it — so the equivalent has to be borrowed from
+     * time instead of position: PRESS AND HOLD.
+     *
+     * A tap still selects, a drag still throws, and holding still for a third of a second reads the card.
+     * The three do not collide because they are separated by what the finger does next: lift quickly, move
+     * past the slop, or do neither. The hold is cancelled the moment either of the other two happens, so
+     * nobody who meant to drag ever gets a card in their face.
+     */
     const startDrag = (e, uid) => {
         if (fight.over || acting) return;
         dragRef.current = { uid, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false };
         setDrag(dragRef.current);
+        clearTimeout(holdTimer.current);
+        holdTimer.current = setTimeout(() => {
+            // Only if the finger is still down and still still: a hold that became a drag is a drag.
+            if (dragRef.current?.uid === uid && !dragRef.current.moved) {
+                setPreview(cardById(fight.hand.find((c) => c.uid === uid)?.id));
+            }
+        }, 320);
     };
 
     // Tapping a particular foe fires whatever is selected AT THAT ONE — the half of the interaction that
@@ -366,11 +396,16 @@ export default function CardFightClient({ fixture }) {
     const ghostAt = (() => {
         if (!drag?.moved || !dragCard) return null;
         if (dragCard.target !== "foe") return { x: drag.x, y: drag.y };
-        // The TOP of the tray, not the bottom of the field. The field used to end at the hand and now it is
-        // the whole screen, so anchoring to its bottom would pin the held card off the bottom edge — an
-        // invisible break that the layout change would have shipped with.
+        // PARKED AT THE BOTTOM CENTRE while you aim, small, and out of the way. Pinned above the card you
+        // picked up, it sat directly under the party — so it covered the enemy you were pointing at, and the
+        // arrow from it to the pointer was two inches long and hidden behind it. That was the "janky" arrow:
+        // there was barely an arrow. Down here the throw is always a real distance and nothing is under it.
         const seam = trayRef.current?.getBoundingClientRect().top;
-        return { x: drag.sx, y: Number.isFinite(seam) ? seam : drag.y };
+        const w = typeof window === "undefined" ? 0 : window.innerWidth;
+        // Parked to the LEFT, over your own side, not dead centre. Centred it sat directly under the party and
+        // the arrow came out a seventeen-pixel vertical sliver hidden behind it — measured, not guessed. From
+        // over here every throw is a diagonal with real length, and nothing covers the thing being aimed at.
+        return { x: w * 0.2, y: Number.isFinite(seam) ? seam : drag.y, small: true };
     })();
 
     const aimArrow = useMemo(() => {
@@ -379,22 +414,51 @@ export default function CardFightClient({ fixture }) {
         const h = typeof window === "undefined" ? 0 : window.innerHeight;
         // Struck from the held card itself rather than from where the thumb first pressed, because that is
         // where the card now IS.
-        // Started INSIDE the card, not at its edge: the ghost is drawn above the arrow, so a tail tucked
-        // under it disappears, while a tail starting below the card pokes out as a loose stub.
-        const [sx, sy, ex, ey] = [ghostAt.x, ghostAt.y - 34, drag.x, drag.y];
+        // Leaves from the TOP of the parked card rather than its middle, so no part of the ribbon is behind it.
+        const [sx, sy, ex, ey] = [ghostAt.x, ghostAt.y - 96, drag.x, drag.y];
         // The bow: lifted above the higher of the two ends, and deeper the further the throw.
         const cx = (sx + ex) / 2;
-        const cy = Math.min(sy, ey) - Math.min(150, 60 + Math.hypot(ex - sx, ey - sy) * 0.25);
+        const cy = Math.min(sy, ey) - Math.min(120, 40 + Math.hypot(ex - sx, ey - sy) * 0.22);
         // A quadratic's direction at the end is simply control -> end, which is the angle the head sits at.
         const ang = Math.atan2(ey - cy, ex - cx);
-        const head = [[0, -9], [20, 0], [0, 9]]
+        const head = [[0, -11], [23, 0], [0, 11]]
             .map(([px, py]) => [
-                ex + px * Math.cos(ang) - py * Math.sin(ang) - 12 * Math.cos(ang),
-                ey + px * Math.sin(ang) + py * Math.cos(ang) - 12 * Math.sin(ang),
+                ex + px * Math.cos(ang) - py * Math.sin(ang) - 14 * Math.cos(ang),
+                ey + px * Math.sin(ang) + py * Math.cos(ang) - 14 * Math.sin(ang),
             ])
             .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
             .join(" ");
-        return { w, h, sx, sy, cx, cy, ex, ey, head, live: foeUnder(ex, ey) >= 0 };
+
+        // ── A TAPERED RIBBON RATHER THAN A STROKED LINE ──────────────────────────────────────────────
+        // An SVG stroke is one width for its whole length, and a bezier drawn that way reads as a wire
+        // between two objects. Theirs swells toward the target, which is what makes it read as thrown. So
+        // the curve is walked, the perpendicular is taken at each step, and the two offset edges are joined
+        // into one polygon — thin at the card, wide under the head.
+        const STEPS = 22;
+        const at = (u) => [
+            (1 - u) * (1 - u) * sx + 2 * (1 - u) * u * cx + u * u * ex,
+            (1 - u) * (1 - u) * sy + 2 * (1 - u) * u * cy + u * u * ey,
+        ];
+        const left = [];
+        const right = [];
+        for (let i = 0; i <= STEPS; i += 1) {
+            const u = i / STEPS;
+            const [px, py] = at(u);
+            // Direction from the derivative of the quadratic, normalised; the perpendicular is (-dy, dx).
+            const dx = 2 * (1 - u) * (cx - sx) + 2 * u * (ex - cx);
+            const dy = 2 * (1 - u) * (cy - sy) + 2 * u * (ey - cy);
+            const len = Math.hypot(dx, dy) || 1;
+            const half = (2 + 7 * u) / 2;
+            const nx = (-dy / len) * half;
+            const ny = (dx / len) * half;
+            left.push([px + nx, py + ny]);
+            right.push([px - nx, py - ny]);
+        }
+        const ribbon = [...left, ...right.reverse()]
+            .map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`)
+            .join(" ");
+
+        return { w, h, sx, sy, cx, cy, ex, ey, head, ribbon, live: foeUnder(ex, ey) >= 0 };
     }, [drag, dragCard, foeUnder, ghostAt?.x, ghostAt?.y]);
     const selectedCard = cardById(fight.hand.find((c) => c.uid === selected)?.id);
     const aiming = dragCard?.target === "foe" || selectedCard?.target === "foe";
@@ -564,6 +628,7 @@ export default function CardFightClient({ fixture }) {
                                     zIndex: selected === entry.uid ? 6 : i,
                                 }}
                                 onPointerDown={(e) => startDrag(e, entry.uid)}
+                                onContextMenu={(e) => e.preventDefault()}
                             >
                                 <CardFace card={card} art={fixture.petArt[card.pet]} dim={!playable} />
                             </button>
@@ -580,12 +645,18 @@ export default function CardFightClient({ fixture }) {
                 a UI connector), and it turns gold and thickens the moment the release would actually land. */}
             {aimArrow ? (
                 <svg className="cf-aim" viewBox={`0 0 ${aimArrow.w} ${aimArrow.h}`} aria-hidden="true">
-                    <path
-                        className={`cf-aim-line${aimArrow.live ? " is-live" : ""}`}
-                        d={`M ${aimArrow.sx} ${aimArrow.sy} Q ${aimArrow.cx} ${aimArrow.cy} ${aimArrow.ex} ${aimArrow.ey}`}
-                    />
+                    <polygon className={`cf-aim-line${aimArrow.live ? " is-live" : ""}`} points={aimArrow.ribbon} />
                     <polygon className={`cf-aim-head${aimArrow.live ? " is-live" : ""}`} points={aimArrow.head} />
                 </svg>
+            ) : null}
+
+            {/* Held to read: the card, big, in the middle, until the finger lifts. */}
+            {preview ? (
+                <div className="cf-read">
+                    <div className="cf-read-card">
+                        <CardFace card={preview} art={fixture.petArt[preview.pet]} />
+                    </div>
+                </div>
             ) : null}
 
             {/* The card you just played, held large in the middle for half a second while its effect lands. */}
@@ -599,7 +670,7 @@ export default function CardFightClient({ fixture }) {
 
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
             {dragCard ? (
-                <div className="cf-drag" style={{ left: ghostAt.x, top: ghostAt.y }}>
+                <div className={`cf-drag${ghostAt.small ? " is-parked" : ""}`} style={{ left: ghostAt.x, top: ghostAt.y }}>
                     <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} />
                 </div>
             ) : null}
@@ -663,7 +734,7 @@ export default function CardFightClient({ fixture }) {
                    Ours had the fighters at about the same height and then stopped the world at 70% and put a
                    black slab under it, which is exactly why they read as being "at the top" (Luke): everything
                    below them was dead. The scene is the whole screen now and the hand floats over it. */
-                .cf { position: fixed; inset: 0; height: 100dvh; z-index: 4000;
+                .cf { -webkit-touch-callout: none; position: fixed; inset: 0; height: 100dvh; z-index: 4000;
                     background: #0a0b0f; color: #e9edf2; user-select: none; -webkit-user-select: none; overflow: hidden; }
 
                 .cf-field { position: absolute; inset: 0; overflow: hidden; }
@@ -951,11 +1022,23 @@ export default function CardFightClient({ fixture }) {
                 /* ── THE AIM ── over everything, hit-testing nothing. */
                 .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;
                     pointer-events: none; }
-                .cf-aim-line { fill: none; stroke: rgba(226,232,242,0.55); stroke-width: 5; stroke-linecap: round;
-                    stroke-dasharray: 13 9; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
-                .cf-aim-line.is-live { stroke: #ffd75e; stroke-width: 7; stroke-dasharray: none; }
+                .cf-aim-line { fill: rgba(226,232,242,0.42); stroke: none;
+                    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cf-aim-line.is-live { fill: #ffd75e; }
                 .cf-aim-head { fill: rgba(226,232,242,0.6); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
                 .cf-aim-head.is-live { fill: #ffd75e; }
+
+                /* Press and hold to read one. Big enough that the sentence is the point of the screen for
+                   as long as the finger is down. */
+                .cf-read { position: fixed; inset: 0; z-index: 5100; display: grid; place-items: center;
+                    background: rgba(6,7,10,0.72); pointer-events: none; }
+                .cf-read-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                    display: flex; flex-direction: column; align-items: center;
+                    transform: scale(2.1); animation: cfRead 140ms ease-out; }
+                .cf-read-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                    pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
+                    background-repeat: no-repeat; background-size: 100% 100%; }
+                @keyframes cfRead { from { transform: scale(1.5); opacity: 0; } to { transform: scale(2.1); opacity: 1; } }
 
                 /* ── THE CARD, PERFORMING ── centre stage, big, for the half second its effect takes. */
                 /* Held in the FIELD rather than the middle of the phone — centred on the viewport it sat
@@ -966,6 +1049,9 @@ export default function CardFightClient({ fixture }) {
                     display: flex; flex-direction: column; align-items: center;
                     animation: cfPerform 640ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 
+                /* Parked: smaller and lower, because while it is aiming it is a label for what is being
+                   thrown rather than the thing you are looking at. */
+                .cf-drag.is-parked { transform: translate(-50%, -104%) scale(0.72) rotate(0deg); opacity: 0.94; }
                 .cf-drag { position: fixed; z-index: 5000; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     background: none;
