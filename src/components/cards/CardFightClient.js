@@ -70,10 +70,17 @@ const deep = (hex, k) => {
     const mix = (c, d) => Math.round(c + (d - c) * k);
     return `rgb(${mix(r, 20)},${mix(g, 23)},${mix(b, 29)})`;
 };
-/** Frame paint for one card: a tinted slab and its edge. */
-const frameStyle = (hue) => ({
+/**
+ * The card STOCK — the coloured slab the painted moulding sits on.
+ *
+ * This used to be painted on the card box itself, with the frame laid over the top, and a sliver of it showed
+ * all the way down the outside edge: "there is a little green peaking out" (Luke, zoomed in on the frog). A
+ * drawn frame has its own silhouette and a CSS box has border-radius, and the two do not agree — so the colour
+ * escaped wherever the picture's edge sat inside the box's. It is an inner layer now, inset far enough that
+ * the moulding covers its boundary on every side, and the card box paints nothing at all.
+ */
+const stockStyle = (hue) => ({
     background: `linear-gradient(180deg, ${deep(hue, 0.5)} 0%, ${deep(hue, 0.68)} 26%, ${deep(hue, 0.84)} 100%)`,
-    borderColor: deep(hue, 0.28),
 });
 
 // ── THE PICTURE IN THE WINDOW, AND WHAT HAPPENS BEFORE IT EXISTS ─────────────────────────────────────────
@@ -117,6 +124,7 @@ const CardFace = ({ card, art, dim }) => {
     const tint = chromeTint(art?.rarity);
     return (
         <>
+            <span className="cf-stock" style={stockStyle(hue)} />
             <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
             {/* The ribbon sits ABOVE the picture with its folded ends draping over the window's top corners —
                 which is where Spire puts it. Laid fully across the art, its own clipped underside let the
@@ -403,7 +411,6 @@ export default function CardFightClient({ fixture }) {
                                 type="button"
                                 className={`cf-card${selected === entry.uid ? " is-picked" : ""}${playable ? "" : " is-spent"}${isDragging ? " is-ghosted" : ""}`}
                                 style={{
-                                    ...frameStyle(fixture.petArt[card.pet]?.color),
                                     marginLeft: i === 0 ? 0 : overlap,
                                     // The picked card comes OUT of the fan — straightened, lifted and grown,
                                     // and above its neighbours, because it is the one being read.
@@ -451,7 +458,7 @@ export default function CardFightClient({ fixture }) {
 
             {/* The card under your thumb, drawn at the pointer so it is never hidden by the finger holding it. */}
             {dragCard ? (
-                <div className="cf-drag" style={{ ...frameStyle(fixture.petArt[dragCard.pet]?.color), left: ghostAt.x, top: ghostAt.y }}>
+                <div className="cf-drag" style={{ left: ghostAt.x, top: ghostAt.y }}>
                     <CardFace card={dragCard} art={fixture.petArt[dragCard.pet]} />
                 </div>
             ) : null}
@@ -463,7 +470,7 @@ export default function CardFightClient({ fixture }) {
                         <p className="cf-note">{peek === "draw" ? "Sorted — the order is the game." : "In the order it fell."}</p>
                         <div className="cf-sheet-cards">
                             {pileList.map((card, i) => (
-                                <div key={`${card.id}-${i}`} className="cf-card is-static" style={frameStyle(fixture.petArt[card.pet]?.color)}>
+                                <div key={`${card.id}-${i}`} className="cf-card is-static">
                                     <CardFace card={card} art={fixture.petArt[card.pet]} />
                                 </div>
                             ))}
@@ -559,15 +566,18 @@ export default function CardFightClient({ fixture }) {
                    type tab. Forethought (uncommon, blue) and Chrysalis (rare, gold) sit on the identical
                    grey slab. Colouring the whole frame by rarity, which is what a first look suggests, makes
                    a hand of five look like five different games. */
+                /* The box paints NOTHING — no background, no border. The drawn moulding is the card's outside
+                   edge, and anything the box painted would show past it wherever the two silhouettes disagree,
+                   which is exactly what put a green line down the side of the frog. */
                 .cf-card { position: relative; flex: 0 0 auto; width: 84px; height: 120px; padding: 0 0 7px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
-                    border: 1px solid; border-radius: 9px;
-                    box-shadow: 0 5px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.09);
+                    background: none; border: 0; border-radius: 9px;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55));
                     transform-origin: 50% 130%; transition: transform 140ms ease-out; }
+                .cf-stock { position: absolute; inset: 4px; z-index: 0; border-radius: 6px; }
                 /* The picked card STRAIGHTENS out of the fan, lifts and grows. Its transform is set inline
                    (the fan angle is per-card data), so this rule carries only what does not vary. */
-                .cf-card.is-picked { border-color: #ffd75e; box-shadow: 0 14px 24px rgba(0,0,0,0.66),
-                    inset 0 1px 0 rgba(255,255,255,0.12); }
+                .cf-card.is-picked { filter: drop-shadow(0 0 5px rgba(255,215,94,0.85)) drop-shadow(0 10px 16px rgba(0,0,0,0.6)); }
                 /* ── THE MOULDING ── one painted frame for every card in the game, hollow, laid over the
                    pet-coloured stock. Neutral metal on purpose: the colour comes from the card underneath,
                    the way their frame takes the character's. Above the art, under the ribbon and the cost. */
@@ -629,7 +639,12 @@ export default function CardFightClient({ fixture }) {
                     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
                 /* ATTACK COMES TO A POINT; a SKILL is a rounded rectangle — Spire's tell for what a card does,
                    readable before a single word is. Powers have their ring drawn and waiting. */
-                .cf-art.is-attack .cf-art-in { clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%); }
+                /* Inset INSIDE the painted opening, not flush with the box. A clip that reaches the corners
+                   lets the picture sit outside the shield's shoulders — a sliver of sky above the fox, which
+                   at a glance looks like the art is leaking out of its frame. The metal has to be the last
+                   thing on every edge. */
+                .cf-art.is-attack .cf-art-in { inset: 5px 6px 4px;
+                    clip-path: polygon(2% 0, 98% 0, 98% 58%, 50% 100%, 2% 58%); }
                 .cf-art.is-skill .cf-art-in { border-radius: 9px; }
                 .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
@@ -673,10 +688,11 @@ export default function CardFightClient({ fixture }) {
 
                 .cf-drag { position: fixed; z-index: 5000; width: 84px; height: 120px; padding: 0 0 7px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
+                    background: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe
                        completely — you were aiming at a thing you could no longer see, and on a phone the
                        thumb is already taking a bite out of that half of the screen. */
-                    transform: translate(-50%, -118%) scale(0.94) rotate(-3deg); border: 1px solid;
+                    transform: translate(-50%, -118%) scale(0.94) rotate(-3deg); border: 0;
                     border: 1px solid #ffd75e; border-radius: 10px; box-shadow: 0 14px 26px rgba(0,0,0,0.6); }
 
                 .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 16px;
