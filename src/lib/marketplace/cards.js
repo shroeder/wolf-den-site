@@ -65,11 +65,13 @@ export async function getCardFightFixture(buyerId, seed) {
         // carries a rarity on its collectible — so a Legendary pet's card can look legendary without anybody
         // authoring a second table. Read here rather than in the browser so the client never has to pull the
         // 118-entry catalogue in to colour three cards.
-        // AND ITS COLOUR. Every collectible carries one — the fox kit's orange, the frog's green, the wolf
-        // pup's slate blue — and it is the pet's identity rather than its tier. The ribbon across the top of
-        // the card wears it, which is what stops a hand of commons being a row of identical grey bars: rarity
-        // is a fine thing to encode but it is not a thing to LOOK at when every card in a starting deck shares
-        // it. Rarity keeps the art window's border, where it still reads.
+        // AND ITS COLOUR, which paints the card's frame. Spire spends that channel on the CLASS — red
+        // Ironclad, green Silent — and we have no classes, so it was briefly going to carry the card's TYPE
+        // instead. Luke's call, looking at it: "I kinda like that it chose the colors of the pet to match."
+        // He is right, and the reason is that the frame sits directly around the ART: an orange card around a
+        // fox and a green one around a frog read as ONE object, where a red card around that same fox reads as
+        // a fox in somebody else's frame. Type has the window's shape and the word on the tab, which is all
+        // Spire gives it too.
         petArt: Object.fromEntries((sprites || []).map((r) => {
             const pet = collectibleById(r.pet_id);
             return [r.pet_id, {

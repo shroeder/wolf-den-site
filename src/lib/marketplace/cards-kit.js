@@ -98,6 +98,24 @@ export const cardById = (id) => CARDS[id] || null;
 // invented its own list would drift the moment a card added a keyword.
 export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Strength"];
 
+// ── WHAT EACH KIND OF CARD IS CALLED ─────────────────────────────────────────────────────────────────────
+// The card face used to name the type with `kind === "attack" ? "Attack" : "Skill"`, which is a ternary that
+// quietly calls a Power a Skill the day one exists. The rules own the vocabulary — the same argument KEYWORDS
+// makes one block up — so the screen asks rather than guesses.
+//
+// COLOUR IS NOT IN HERE, and that was a decision rather than an omission. Spire paints a card in its CLASS's
+// colour and carries the type in the window's shape plus this word; we have no classes, so the colour was
+// briefly going to say the type instead — red attack, blue skill. Luke, looking at it: "I kinda like that it
+// chose the colors of the pet to match." The frame sits directly around the ART, so an orange card around a
+// fox reads as one object and a red card around that same fox reads as a fox in somebody else's frame. The
+// pet keeps the colour; the type keeps the shape and the word, which is all Spire gives it either.
+export const TYPE_LOOK = {
+    attack: { label: "Attack" },
+    skill: { label: "Skill" },
+    power: { label: "Power" },
+};
+export const typeLook = (kind) => TYPE_LOOK[kind] || TYPE_LOOK.skill;
+
 // ── WHAT THE THING ACROSS THE SAND IS DOING ──────────────────────────────────────────────────────────────
 // Three beats on a loop, and you are always shown the NEXT one. Deliberately not random: a fixed cycle is
 // readable, and a first foe whose job is to teach "block on the big one" has to be learnable inside a single

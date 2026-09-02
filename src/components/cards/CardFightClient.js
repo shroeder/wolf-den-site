@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { GiBiceps, GiCrackedShield, GiCrossedSwords, GiShield, GiSwordWound } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight,
+    DRAG_SLOP, KEYWORDS, canPlay, cardById, endTurn, foeIntent, intentDamage, playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
@@ -120,6 +120,7 @@ const chromeTint = (rarity) => {
 
 const CardFace = ({ card, art, dim }) => {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
+    const look = typeLook(card.kind);
     const hue = art?.color || meta.color;
     const tint = chromeTint(art?.rarity);
     return (
@@ -143,9 +144,7 @@ const CardFace = ({ card, art, dim }) => {
                 </span>
                 <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${card.kind}-${tint}.png)` }} />
             </span>
-            <span className="cf-type" style={{ background: meta.color, color: inkOn(meta.color) }}>
-                {card.kind === "attack" ? "Attack" : "Skill"}
-            </span>
+            <span className="cf-type" style={{ background: meta.color, color: inkOn(meta.color) }}>{look.label}</span>
             <span className="cf-text">{withKeywords(card.text)}</span>
         </>
     );
@@ -656,8 +655,14 @@ export default function CardFightClient({ fixture }) {
                    Pounce did, and it looked like a rendering fault rather than a card. */
                 /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
                    through the bottom edge onto the tray behind it. */
-                .cf-text { flex: 1; width: 100%; padding: 3px 8px 0; font-size: 8.5px; line-height: 1.2;
-                    text-align: center; color: #e2e8f2; overflow: hidden; overflow-wrap: break-word; }
+                /* POSITIONED, or the stock eats it. The card's colour is an absolutely-positioned layer at
+                   z-index 0, and a STATIC element paints below every positioned sibling no matter what order
+                   they are in the markup — so the sentence went under the slab the moment the stock arrived,
+                   and the cards shipped for two commits with no rules text on them at all. The banner and the
+                   type tab survived only because they already carried a z-index of their own. */
+                .cf-text { position: relative; z-index: 1; flex: 1; width: 100%; padding: 3px 8px 0;
+                    font-size: 8.5px; line-height: 1.2; text-align: center; color: #e2e8f2;
+                    overflow: hidden; overflow-wrap: break-word; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
 
