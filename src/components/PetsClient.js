@@ -609,7 +609,11 @@ export default function PetsClient() {
                         {/* two self-explaining stat groups: what every pet stacks + what your earners generate */}
                         <div className="petsum-groups">
                             <MenagerieGroup
-                                title="Passive bonuses" sub={`stacked from all ${ownedCount} pets you own`} accent="#ffd75e"
+                                /* Was "Passive bonuses ... stacked from all N pets you own", which described
+                                   the old hand-rolled sum: each pet's own passive and nothing else. These are
+                                   the real totals now — dual affinity, the enshrined doubling and the mythic
+                                   menagerie aura included — so the heading says what they are. */
+                                title="What your pets give you" sub={`everything your ${ownedCount} pets add, menagerie bonus included`} accent="#ffd75e"
                                 tiles={passiveEntries.map(([stat, val]) => ({ key: stat, icon: PET_STAT_META[stat]?.icon || "•", sprite: state.statSprites?.[stat], label: PET_STAT_META[stat]?.label || stat, value: `+${val}`, desc: PET_STAT_META[stat]?.desc }))}
                             />
                             <MenagerieGroup

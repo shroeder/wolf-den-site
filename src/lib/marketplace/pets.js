@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { levelForXp } from "@/lib/marketplace/xp.js";
-import { COLLECTIBLES, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
+import { COLLECTIBLES, PET_STAT_META, collectibleById, isCollectibleUnlocked, petPassive, petPrice } from "@/lib/marketplace/collectibles.js";
 import { getPetXpMap, petLevelInfo, petPassiveLevelMult, accrueEquippedPetTrickle, startPetTrickleClock } from "@/lib/marketplace/pet-level.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { getMemberMetrics } from "@/lib/marketplace/badges.js";
@@ -252,7 +252,39 @@ export async function petsState(buyerId, { sync = false, sprites = null } = {}) 
     // The stones in hand and the pets already enshrined — the whole of the level-6 surface.
     const { ascensionState } = await import("@/lib/marketplace/pet-ascension.js");
     const ascension = await ascensionState(buyerId).catch(() => null);
-    return { newPets, ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
+
+    // ── THE MENAGERIE SUMMARY IS READ, NOT RE-DERIVED ────────────────────────────────────────────────────
+    // GrayKitsune, twice: "stat gains from dual affinities and signatures (enshrined) don't show on pet page.
+    // I also dont think pet page is showing the increased stats after the menagerie."
+    //
+    // Right on all three, and for one reason: `passiveTotals` above is a SECOND formula for a number the game
+    // already computes. It sums each pet's own passive at its level and stops there — while the total the
+    // game actually pays you comes from combinePetBonuses, which additionally folds in a top-rarity pet's
+    // SECOND stat (dual affinity), the broad passives, the Second Bowl / Shepherd's Crook doubling on the pet
+    // you carry and the ones you have enshrined, and finally multiplies the whole passive pile by the mythic
+    // MENAGERIE AURA. Everything he listed is a term in the real sum and absent from this one.
+    //
+    // So the page stops doing its own arithmetic and reads the same function the arena and the boss read. The
+    // per-pet rows below still show each pet's own contribution — that is a different question, and the one
+    // the rows are for.
+    const { getPetCombatBonus } = await import("@/lib/marketplace/pet-combat.js");
+    const real = await getPetCombatBonus(buyerId).catch(() => null);
+    // Zeroes are dropped: combinePetBonuses starts its buckets at 0 for every stat it knows about, and the
+    // page renders one row per entry — so passing them straight through would fill the summary with "+0".
+    //
+    // And only stats with a NAME. `system` carries about twenty-five keys that have an icon and a kind but no
+    // member-facing label, so the tile would print `sea_dredge` at somebody — an internal key on a page in the
+    // game. They are real bonuses and they should be on this page eventually; writing twenty-five accurate
+    // descriptions is its own piece of work and inventing them here would put wrong copy in front of members.
+    // Nothing that was already shown is lost by this: everything GrayKitsune named lands in stats/economy.
+    const menagerieTotals = real
+        ? Object.fromEntries(Object.entries({ ...(real.stats || {}), ...(real.economy || {}), ...(real.system || {}) })
+            // One decimal at most. The real totals are fractional once the aura multiplies them — a tile
+            // reading "+12.25 Seed luck" is a number nobody asked for at a precision nobody needs.
+            .filter(([k, v]) => Number(v) && PET_STAT_META[k])
+            .map(([k, v]) => [k, Math.round(Number(v) * 10) / 10]))
+        : passiveTotals;
+    return { newPets, ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals: menagerieTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
 }
 
 /**
