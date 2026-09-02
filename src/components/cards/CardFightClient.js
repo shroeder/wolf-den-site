@@ -888,9 +888,25 @@ export default function CardFightClient({ fixture }) {
                        and it was the same bug both times.
                        One number instead: how much of the bottom of the screen the hand owns. Everything that
                        has to stand on the ground is placed off it, so the two cannot drift apart again. */
-                    --cf-tray-h: 188px; }
+                    --cf-tray-h: 188px;
+                    /* ── ONE FIGURE SIZE, AND IT IS A SQUARE ─────────────────────────────────────────────
+                       Every fighter sprite is a SQUARE picture — the ladder foes are 384x384, the hero 1024 —
+                       and they were being poured into a box 104 wide by 175 tall. object-fit: contain on a
+                       square image in a tall box scales to the WIDTH, so the drawn figure was as tall as its
+                       column was wide and the box height did nothing at all. That is why the hero came out at
+                       140px and the party at 104 while both rules said 22vh: the height was never the thing
+                       being read. Sizing the box square makes the number mean what it says, and makes
+                       "everyone is the same scale" true rather than merely written down.
+                       Capped against the viewport WIDTH as well, because four figures side by side on a narrow
+                       phone are limited by how much floor there is, not by how tall the screen is. */
+                    --cf-figure: min(clamp(68px, 15.5vh, 130px), 25vw);
+                    /* ── WHERE THE GROUND IS ─────────────────────────────────────────────────────────────
+                       How far the fighters' feet stand above the bottom of the screen: the hand, plus the gap,
+                       plus the health bar and the shadow above it. A fixed number of pixels, because every
+                       part of it is a fixed number of pixels. The backdrop is sized off THIS below. */
+                    --cf-floor: calc(var(--cf-tray-h) + 56px); }
 
-                .cf-field { position: absolute; inset: 0; overflow: hidden; }
+                .cf-field { position: absolute; inset: 0; overflow: hidden; background: #0b0d12; }
                 /* ── THE ARENA IS ZOOMED IN, AND THAT IS THE FIX FOR THE FLOATING ───────────────────────
                    arena-bg puts its sand at 76% of the picture — everything above that is seating and sky.
                    Shown edge to edge on a portrait phone the image fills the height exactly, so the sand
@@ -899,13 +915,29 @@ export default function CardFightClient({ fixture }) {
                    past the frame, the sand rises to about 64% and they stand ON it. What that costs is the
                    bunting and the sky, which is the right thing to lose — Spire's camera is low and close for
                    the same reason. */
-                .cf-bg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: max(100%, 560px);
+                /* ── THE SAND HAS TO MEET THE FEET ──────────────────────────────────────────────────
+                   The painted floor line sits at 68% of scene-arena.webp, so with the picture anchored to the
+                   bottom of the screen the sand begins 32% of the PICTURE'S height above the bottom — while
+                   the fighters stand a fixed number of PIXELS above it. A percentage and a pixel count agree
+                   at exactly one screen size and nowhere else, and at 375x680 they disagreed by about 35px:
+                   everybody stood on the dark strip at the base of the wall with the lit floor beginning
+                   below their own health bars. Diagnostically obvious once the shadows were painted red — they
+                   were in the right place relative to the feet and both were in the wrong place relative to
+                   the ground, which is why moving the shadow could never have fixed it.
+                   So the picture is sized FROM the floor mark instead: 32% of its height must equal
+                   --cf-floor, hence x 3.125. The sand now lands under everyone's boots at any screen height,
+                   and the field's own dark colour covers the sliver above it on a tall phone. */
+                .cf-bg { position: absolute; left: 0; right: 0; bottom: 0; width: 100%;
+                    height: calc(var(--cf-floor) * 3.125);
                     object-fit: cover; object-position: 50% 100%; opacity: 0.95; }
                 /* Darkened at the foot rather than ENDED there, so the cards have something to sit against
-                   while the floor keeps going. */
+                   while the floor keeps going. THE BAND THE FIGHTERS STAND IN IS LEFT ALONE, though: sampled,
+                   the sand under their boots came back at luminance 31-62 out of 255, and a black contact
+                   shadow on ground that is already nearly black cannot be seen however dark you make it. The
+                   ramp now stays light through the floor and only closes up under the hand. */
                 .cf-field::after { content: ""; position: absolute; inset: 0; pointer-events: none;
                     background: linear-gradient(180deg, rgba(8,9,13,0.5), rgba(8,9,13,0.05) 34%,
-                        rgba(8,9,13,0.3) 60%, rgba(8,9,13,0.86) 86%, rgba(8,9,13,0.95)); }
+                        rgba(8,9,13,0.14) 62%, rgba(8,9,13,0.8) 86%, rgba(8,9,13,0.95)); }
 
                 /* Both on the LEFT. The seed sat top-right and a foe with a long intent ("GUARDED SWING") grew its pill
                    straight through it — and the intent is the one thing on this screen that must never be
@@ -954,7 +986,7 @@ export default function CardFightClient({ fixture }) {
                 /* 22vh of a 441px viewport is 97px and 22vh of a 780px one is 172 — the same rule reads
                    as "as big as there is room for", which is exactly right, and the floor under them no longer
                    moves when it changes. */
-                .cf-party .cf-sprite { height: clamp(78px, 22vh, 190px); }
+                /* (size now comes from --cf-figure; the party and the hero share it by construction) */
                 /* ── FOUR BARS, NOT ONE BAR ──────────────────────────────────────────────────────────
                    At 375 wide the three foe bars plus the hero's ran edge to edge at the same height and
                    touched, and the eye reads a continuous red strip as ONE gauge — the screen was telling you
@@ -981,7 +1013,17 @@ export default function CardFightClient({ fixture }) {
                 .cf-body.is-mirrored { transform: scaleX(-1); animation-name: cfBreatheMirrored; }
                 .cf-body.is-mirrored .cf-sprite { animation: none; }
                 .cf-foe .cf-body { animation-duration: 4.1s; animation-delay: -1.2s; }
-                .cf-sprite { display: block; width: 100%; height: clamp(78px, 22vh, 190px); object-fit: contain;
+                /* ── AND IT STANDS ON THE BOTTOM OF ITS OWN BOX ──────────────────────────────────────
+                   contain CENTRES the picture in whatever space is left over, splitting the slack above and
+                   below. With a square picture in a 175px-tall box that put the bottom of the drawing 28px
+                   above the bottom of the box — and the contact shadow is drawn at the bottom of the box. So
+                   the shadow sat almost thirty pixels below anybody's feet, on all four fighters, which is
+                   precisely what "it looks like everyone's floating" looks like. Bottom-aligned, the drawing's
+                   base and the box's base are the same line, and the shadow lands where the feet are.
+                   (The art itself is tight: measured, the ladder sprites carry 4.9% air under the feet, which
+                   is the ~5px the shade's negative margin already accounts for.) */
+                .cf-sprite { display: block; margin: 0 auto; width: var(--cf-figure); height: var(--cf-figure);
+                    object-fit: contain; object-position: 50% 100%;
                     filter: drop-shadow(0 6px 6px rgba(0,0,0,0.45)); }
                 .cf-shade { animation: cfShade 3.4s ease-in-out infinite; }
                 .cf-foe .cf-shade { animation-duration: 4.1s; animation-delay: -1.2s; }
@@ -993,8 +1035,13 @@ export default function CardFightClient({ fixture }) {
                    note from the farm, and it was the whole of "our characters are floating". */
 /* Tighter and closer: a pool the width of a stance rather than the width of the column, pulled up
                    under the feet. A wide soft shadow reads as a figure hovering over a smudge. */
-                .cf-shade { width: 42%; height: 13px; margin: -12px 0 2px;
-                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.85), rgba(0,0,0,0.45) 40%, transparent 68%); }
+                /* Sized off the figure rather than off the column, so a pool under a small foe is a small
+                   pool. Pulled up 10px to sit under the feet rather than under the picture's bottom edge. */
+                /* The 2px gap under this was not enough: elementFromPoint at the middle of the shadow
+                   came back .cfb-hp — the big outlined "70 / 70" overflows its own track upward and was
+                   painted straight over the pool. Eight more pixels and the numeral clears it. */
+                .cf-shade { width: calc(var(--cf-figure) * 0.72); height: 13px; margin: -10px 0 10px;
+                    background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.92), rgba(0,0,0,0.6) 38%, transparent 74%); }
                 .cf-foe.is-target .cf-sprite { filter: drop-shadow(0 0 12px #ffd75e) drop-shadow(0 10px 12px rgba(0,0,0,0.55)); }
                 .cf-foe.is-acting { transform: translateX(-14px); transition: transform 200ms ease-out; }
 
