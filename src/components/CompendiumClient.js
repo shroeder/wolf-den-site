@@ -32,7 +32,7 @@ const SLOT_LABEL = {
     main_hand: "Weapon", off_hand: "Off-hand", helmet: "Helmet", chest: "Chest", belt: "Belt",
     boots: "Boots", back: "Back", amulet: "Amulet", ring: "Ring",
 };
-import { describeStats, ITEM_SOURCE_LABEL } from "@/lib/marketplace/items.js";
+import { describeStats } from "@/lib/marketplace/items.js";
 const tint = (r) => RARITY_META[r]?.color || "#9aa0a6";
 // TWO DIFFERENT QUESTIONS on this screen: the milestone line is a bonus you have EARNED, and the sheet is
 // an ITEM, whose damage and armour are the thing itself. Only the caller can tell them apart.
@@ -206,7 +206,7 @@ export default function CompendiumClient() {
                         </p>
                         {/* Where it comes from — said on every card, collected or not, because "how do I get
                             the rest of these" is the only question this screen exists to raise. */}
-                        {ITEM_SOURCE_LABEL[inspect.source] ? <p className="cmp-sheet-source">{ITEM_SOURCE_LABEL[inspect.source]}</p> : null}
+                        {inspect.sourceLabel ? <p className="cmp-sheet-source">{inspect.sourceLabel}</p> : null}
                     </div>
                 </div>
             ), document.body) : null}

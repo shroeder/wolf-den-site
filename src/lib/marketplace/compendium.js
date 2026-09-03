@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { ITEMS, isOwnerOnlyItem } from "@/lib/marketplace/items.js";
+import { ITEMS, isOwnerOnlyItem, itemSourceLabel } from "@/lib/marketplace/items.js";
 
 // ── THE COMPENDIUM ───────────────────────────────────────────────────────────────────────────────────────────
 // Every piece of gear in the game, and whether you have ever held it.
@@ -91,7 +91,7 @@ export async function getCompendium(buyerId) {
     const items = pool.map((i) => ({
         id: i.id, name: i.name, slot: i.slot || null, rarity: i.rarity, icon: i.icon || null,
         flavor: i.flavor || null, stats: i.stats || null, reqLevel: i.reqLevel || null,
-        source: i.source || null, signature: i.signature || null,
+        source: i.source || null, sourceLabel: itemSourceLabel(i), signature: i.signature || null,
         collected: have.has(i.id),
     }));
     const count = items.filter((i) => i.collected).length;

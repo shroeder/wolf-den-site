@@ -179,9 +179,25 @@ export const ITEM_SOURCE_LABEL = {
     boss_drop: "Dropped by the weekly boss",
     elite: "The elite tiers — chests from Ascendant up",
     bounty_reward: "Paid out by a bounty",
-    admin: "Handed over the counter in the shop",
+    // ⚠️ NOT "handed over the counter in the shop" any more. Of the 44 admin items, FOUR carry a real
+    // redemption (chargeReward); the other forty are trophies with nothing behind them — free_binder,
+    // free_playmat, free_sleeves, skip_line and the rest are written in REWARDS and attached to no item.
+    // The old wording read as an invitation, and members acted on it: one came in to show a binder because
+    // the Binder Charm said the counter would do something about it. Say what is true — the shop gives
+    // these out when it feels like it — and let itemSourceLabel() below say the other thing for the four
+    // that really are redeemable.
+    admin: "A gift from the shop — handed out, not asked for",
     season: "Won at a rung of the Long Road, in one season only",
 };
+
+// The "how do I get this" line a member reads. A FUNCTION rather than a bare lookup because the honest
+// answer for an admin item depends on the item: the four with a chargeReward are genuinely redeemed at the
+// counter, and the rest are gifts. Every screen that shows a source must call this, never the table.
+export function itemSourceLabel(item) {
+    if (!item?.source) return null;
+    if (item.source === "admin" && item.chargeReward) return "Redeemed at the counter in the shop";
+    return ITEM_SOURCE_LABEL[item.source] || null;
+}
 
 export const REWARDS = {
     // Small freebies (fixed, low value)
