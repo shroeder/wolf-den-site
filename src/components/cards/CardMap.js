@@ -346,11 +346,14 @@ export default function CardMap({ run }) {
                 /* The curls at each end of the scroll are part of the picture, so the list has to start
                    BELOW the top one and stop above the bottom one — at 26px of padding the title sat on the
                    roll and "Elite" fell off the end. */
-                /* ⚠️ THE SIDE PADDING IS A PERCENTAGE, NOT PIXELS. The rolls are WIDER than the paper: in the
-                   art the written surface only spans 14%–85% of the image, so a fixed 12px (9px on a phone)
-                   put the icon column out on the rolled edge and the marks read as bleeding off the scroll.
-                   A percentage is of the element's own width, so it tracks both widths on its own. */
-                .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 15% 54px 14%;
+                /* ⚠️ THE SIDE PADDING IS PIXELS, AND NEVER A PERCENTAGE. The rolls are WIDER than the paper —
+                   the written surface spans 14%–85% of the art — so the list has to start 14% of the SCROLL'S
+                   width in, and 12px did not reach it: the marks sat out on the rolled edge. A percentage
+                   looks like the fix and is not: percentage padding resolves against the CONTAINING BLOCK,
+                   which here is .cm (the whole viewport), so 14% became 55px on a 128px-wide scroll, the
+                   text was shoved past the right roll, and it bled off the other side instead. These are 14%
+                   and 15% of 146 and of 128, worked out by hand. Re-do the sums if either width changes. */
+                .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 22px 54px 21px;
                     display: grid; gap: 5px; justify-items: start; color: #1b2430; font-size: 11.5px;
                     background-image: url(/images/cards/chrome/legend-scroll.png);
                     background-size: 100% 100%; background-repeat: no-repeat;
@@ -398,7 +401,7 @@ export default function CardMap({ run }) {
                 @media (max-width: 520px) {
                     .cm-bar { gap: 5px; padding: 6px 8px; }
                     .cm-who { display: none; }
-                    .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 15% 48px 14%; }
+                    .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 19px 48px 18px; }
                     .cm-node { width: 32px; height: 32px; }
                 }
             `}</style>
