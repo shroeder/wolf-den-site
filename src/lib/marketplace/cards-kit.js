@@ -198,6 +198,44 @@ export const ALL_CARDS = { ...CARDS, ...POOL };
 // front of a decision that should be about the deck.
 export const SKIP_EMBERS = 25;
 
+// ── PERKS ────────────────────────────────────────────────────────────────────────────────────────────────
+// Spire's relics: things you keep for the whole run that quietly change every fight after them, shown in a
+// row under the top bar. Luke: "we would need to introduce perks as well and show them there."
+//
+// EVERY ONE OF THESE DOES SOMETHING, and that is the rule to hold. A perk row that is decoration is worse
+// than no perk row — it is the merchant node all over again, a promise the game cannot keep. So the list is
+// short and each entry maps onto something startFight already understands: your health, your opening block,
+// your Strength, or the size of your first hand.
+export const PERKS = {
+    ember_heart: { id: "ember_heart", name: "Ember Heart", icon: "heart", maxHp: 8,
+        text: "+8 max health, and healed for it now." },
+    whetstone: { id: "whetstone", name: "Whetstone", icon: "sword", strength: 1,
+        text: "Start every fight with 1 Strength." },
+    tin_shield: { id: "tin_shield", name: "Tin Shield", icon: "shield", block: 6,
+        text: "Start every fight with 6 Block." },
+    lucky_paw: { id: "lucky_paw", name: "Lucky Paw", icon: "paw", draw: 1,
+        text: "Draw one extra card on your first turn." },
+    old_lantern: { id: "old_lantern", name: "Old Lantern", icon: "lantern", energy: 1,
+        text: "One extra energy on your first turn." },
+    iron_ration: { id: "iron_ration", name: "Iron Ration", icon: "ration", healAfter: 5,
+        text: "Heal 5 after every fight you win." },
+};
+export const PERK_IDS = Object.keys(PERKS);
+
+// ── POTIONS ──────────────────────────────────────────────────────────────────────────────────────────────
+// Three slots, carried between fights, drunk on the turn you need them. Theirs sit in the top bar beside the
+// health, which is where Luke wants ours, and the reason they belong up there rather than in the hand is that
+// a potion is not a card — it costs no energy and it is not shuffled.
+export const POTION_SLOTS = 3;
+export const POTIONS = {
+    swift: { id: "swift", name: "Swift Draught", icon: "draw", draw: 2, text: "Draw 2 cards." },
+    blood: { id: "blood", name: "Blood Tonic", icon: "heal", heal: 12, text: "Heal 12." },
+    bark: { id: "bark", name: "Barkskin", icon: "shield", block: 12, text: "Gain 12 Block." },
+    fury: { id: "fury", name: "Bottled Fury", icon: "sword", strength: 2, text: "Gain 2 Strength." },
+    spark: { id: "spark", name: "Spark", icon: "energy", energy: 2, text: "Gain 2 energy." },
+};
+export const POTION_IDS = Object.keys(POTIONS);
+
 export const RUN_LENGTH = 15;              // map rows; the boss stands above them
 
 export function roomFight(row, kind = "fight") {
@@ -240,6 +278,10 @@ export const FOE_SCRIPTS = {
 
 // Reads the starter four AND the pet pool. Declared before POOL exists, so it dereferences ALL_CARDS at CALL
 // time rather than closing over a map that is still empty at module-evaluation order.
+/** What the carried perks add up to for one field. */
+export const perkSum = (perks, field) => (perks || [])
+    .reduce((n, id) => n + (Number(PERKS[id]?.[field]) || 0), 0);
+
 export const cardById = (id) => ALL_CARDS[id] || null;
 
 // ── THE WORDS THAT MEAN SOMETHING ────────────────────────────────────────────────────────────────────────
@@ -370,15 +412,24 @@ function drawCards(state, n) {
     return { ...state, draw, discard, hand, rng };
 }
 
-/** Your turn opens: block gone, energy back, five cards. */
+/**
+ * Your turn opens: block gone, energy back, five cards.
+ *
+ * ── AND THE FIRST TURN IS DIFFERENT, IF YOU CARRY THE PERKS FOR IT ───────────────────────────────────────
+ * Lucky Paw and Old Lantern pay on the OPENING turn only, which is the shape of half of Spire's relics: they
+ * buy you a better first hand rather than a permanently bigger one, so they change how a fight starts without
+ * changing what it costs to keep playing. `perks` rides on the state because the engine takes no arguments it
+ * was not handed at startFight.
+ */
 function beginTurn(state) {
+    const first = state.turn === 0;
     const opened = {
         ...state,
         turn: state.turn + 1,
-        energy: state.energyMax,
-        hero: { ...state.hero, block: 0 },
+        energy: state.energyMax + (first ? perkSum(state.perks, "energy") : 0),
+        hero: { ...state.hero, block: first ? state.hero.block : 0 },
     };
-    return drawCards(opened, DRAW_PER_TURN);
+    return drawCards(opened, DRAW_PER_TURN + (first ? perkSum(state.perks, "draw") : 0));
 }
 
 // ── THE FIGHT ────────────────────────────────────────────────────────────────────────────────────────────
@@ -395,7 +446,7 @@ function beginTurn(state) {
  * question about where the damage should go. Every rule below reads `foes` — an attack carries the index of
  * what it hit, every living foe acts on its own turn, and the fight is won when the last one is down.
  */
-export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck: deckIds = null } = {}) {
+export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck: deckIds = null, perks = [] } = {}) {
     // A RUN BRINGS ITS OWN DECK AND ITS OWN HEALTH. Without one this is still the standalone fight it always
     // was — the starter ten at full health — which is what keeps ?seed=N working as a thing you can hand
     // somebody. With one, the cards you have picked and the health you walked out of the last fight on are
@@ -406,6 +457,7 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
     const party = (Array.isArray(foes) && foes.length ? foes : [foe || {}]).slice(0, 5);
     const state = {
         seed: seed >>> 0,
+        perks: [...(perks || [])],
         rng,
         turn: 0,
         energy: 0,
@@ -414,7 +466,13 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             name: hero.name || "You", art: hero.art || null, flip: Boolean(hero.flip),
             hp: Math.max(1, Math.min(hero.hpMax || HERO_HP, hero.hp || HERO_HP)),
             hpMax: hero.hpMax || HERO_HP,
-            block: 0, strength: 0, vulnerable: 0, weak: 0,
+            // ── PERKS LAND HERE, ONCE ────────────────────────────────────────────────────────────────
+            // A perk that changes how a fight OPENS belongs in the opening state rather than in a branch
+            // somewhere in the turn loop — the engine stays a function of its state, and a new perk of this
+            // shape is a line in PERKS rather than a line in here.
+            block: perkSum(perks, "block"),
+            strength: perkSum(perks, "strength"),
+            vulnerable: 0, weak: 0,
         },
         foes: party.map((f, i) => ({
             id: `f${i}`,

@@ -58,6 +58,8 @@ const PANEL = "Forged from BLACKENED IRON, deep near-black charcoal with a soft 
 
 // The type plate is the one piece that is NOT hollow — it is a solid plaque with an emblem struck on top of
 // it, so it needs the opposite instruction to everything else here.
+const INK = "Drawn as a HAND-INKED MAP SYMBOL: flat solid BLACK ink on nothing, no colour, no grey shading, no gradient, no outline glow and no background — just bold black shapes with clean gaps between them, the way a symbol is stamped on an old chart. Seen straight on, centred, filling the frame, with a little empty space around it. Simple and readable at the size of a thumbnail.";
+
 const SOLID = "Drawn FLAT ON, straight from the front, perfectly symmetrical left to right, with NO perspective "
     + "and no tilt. SOLID all the way across — a filled plate, not a frame and not a ring — and completely "
     + "BLANK: no emblem, no engraving, no pattern, nothing struck into its face. Centred, with a few pixels of "
@@ -158,6 +160,38 @@ const PIECES = {
             + "decorative square panel with a round domed rivet at its centre. Everything between those two "
             + "end panels is a plain uniform span of hammered metal: no centrepiece, no crest, no join, no "
             + "ornament, nothing written on it. " + METAL,
+    },
+    // ── THE MAP'S ROOM MARKS ─────────────────────────────────────────────────────────────────────────────
+    // Luke: "the key difference between us and them is that they have actual sprites." He is right — the
+    // map was drawing react-icons glyphs, which are UI icons: even stroke weight, designed to sit in a
+    // toolbar. Theirs are MAP INK, stamped symbols with the weight and the wobble of something drawn onto
+    // a chart, and that difference is most of why their sheet reads as a map and ours read as a diagram.
+    //
+    // Flat black on transparency so the paper shows through and one file serves every state — faint,
+    // reachable and visited are opacity and rings in CSS, not three drawings.
+    "map-fight": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A snarling horned monster head seen head-on — two curved horns, two eyes, a wide jaw.",
+    },
+    "map-elite": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A large horned SKULL seen head-on with heavy curved horns and deep empty eye sockets — the same creature as the ordinary monster mark but bigger and bonier.",
+    },
+    "map-rest": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A small campfire: three crossed logs with a curling flame above them.",
+    },
+    "map-merchant": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A tied money pouch, round and full, with a knotted cord at its neck and a coin beside it.",
+    },
+    "map-treasure": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A closed treasure chest seen straight on, with a curved lid, a band across it and a keyhole.",
+    },
+    "map-boss": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A crowned skull seen head-on, a heavy jagged crown resting on it.",
     },
     // ── THE ONLY FURNITURE A REWARD SCREEN NEEDS ─────────────────────────────────────────────────────────
     // There used to be three pieces here — an ornate panel frame, a stone background texture and a brass

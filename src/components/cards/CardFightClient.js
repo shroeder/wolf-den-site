@@ -246,6 +246,9 @@ export default function CardFightClient({ fixture, run = null }) {
         foes: fixture.foes,
         // A run brings its own deck; a bare ?seed= fight does not and falls back to the starter ten.
         deck: fixture.deck || null,
+        // Perks change how a fight OPENS — the block you start on, your Strength, your first hand — so they
+        // are handed to the engine at the start rather than checked somewhere in the turn loop.
+        perks: fixture.perks || [],
     }));
     // ── THE RUN LIVES BESIDE THE FIGHT, NOT INSIDE IT ────────────────────────────────────────────────
     // cards-kit knows about ONE fight and should keep knowing about one fight: it is pure, it is seeded, and

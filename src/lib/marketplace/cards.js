@@ -5,7 +5,8 @@ import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
-    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, POOL, RUN_LENGTH, STARTER_DECK, nextRand, stopAt,
+    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS, RUN_LENGTH,
+    STARTER_DECK, nextRand, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
@@ -127,6 +128,12 @@ const newRun = (seed) => ({
     trail: [],
     hp: 70, hpMax: 70,
     embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
+    perks: [],             // kept for the whole run and applied at the start of every fight (PERKS)
+    potions: [],           // up to POTION_SLOTS, drunk in a fight (POTIONS)
+    // ⚠️ A TIMESTAMP, NOT A FLAG. This key used to be `started: true` further down the object, and adding a
+    // clock under the same name left BOTH — the later one won, the top bar subtracted `true` from Date.now()
+    // and the run showed as 29,806,893 hours old. One key, one meaning.
+    startedAt: Date.now(),
     deck: [...STARTER_DECK],
     offers: null,          // the three on the table after a win, null the rest of the time
     done: null,            // null | "won" | "dead"
@@ -209,5 +216,34 @@ export async function runFixture(buyerId, run) {
         foes: fixture.foes.map((f) => ({ ...f, hp: Math.max(12, Math.round(f.hp * stop.hp)) })),
         hero: { ...fixture.hero, hp: run.hp, hpMax: run.hpMax },
         deck: run.deck,
+        perks: run.perks || [],
+        potions: run.potions || [],
     };
+}
+
+
+// ── WHAT A ROOM HANDS OVER ───────────────────────────────────────────────────────────────────────────────
+// Threaded off the run's seed and the room's position rather than Math.random, for the same reason every
+// other roll in this game is: a room re-entered after a refresh must not pay twice or pay differently.
+export function grantForRoom(run, row, lane, kind) {
+    let roll = ((run.seed >>> 0) + row * 6151 + lane * 97) >>> 0;
+    const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
+
+    if (kind === "elite") {
+        // Elites are where perks come from, which is what makes taking one worth the health it costs.
+        const held = new Set(run.perks || []);
+        const open = PERK_IDS.filter((id) => !held.has(id));
+        if (open.length) return { perk: open[Math.floor(next() * open.length)] };
+        return { embers: 60 };
+    }
+    if (kind === "treasure") {
+        // A chest is embers and, half the time, a potion — a potion being the thing you can carry OUT of the
+        // room, which is what a chest should feel like.
+        const out = { embers: 40 };
+        if (next() < 0.55 && (run.potions || []).length < POTION_SLOTS) {
+            out.potion = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
+        }
+        return out;
+    }
+    return {};
 }

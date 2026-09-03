@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, cardOffers, loadRun, saveRun } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { RUN_LENGTH, SKIP_EMBERS } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS } from "@/lib/marketplace/cards-kit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -51,9 +51,17 @@ export async function POST(request) {
                     run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
                     run.at = null;
                 }
-                // Treasure pays embers rather than a relic, because relics do not exist yet and a room that
-                // silently gives nothing is the Drowned Admiral's scroll all over again.
-                if (kind === "treasure") { run.embers = (run.embers || 0) + 40; run.at = null; }
+                // Chests and elites pay out here. Both are seeded off the room, so a refresh mid-room cannot
+                // roll a second reward — the Drowned Admiral's scroll taught that a reward path with no
+                // record of itself is the one that silently goes wrong.
+                if (kind === "treasure") {
+                    const got = grantForRoom(run, want.row, want.lane, "treasure");
+                    run.embers = (run.embers || 0) + (got.embers || 0);
+                    if (got.potion && (run.potions || []).length < POTION_SLOTS) {
+                        run.potions = [...(run.potions || []), got.potion];
+                    }
+                    run.at = null;
+                }
                 // The merchant has no shop to open yet. It says so on the map rather than pretending.
                 if (kind === "merchant") { run.at = null; }
 
@@ -64,6 +72,20 @@ export async function POST(request) {
             if (action === "won") {
                 // The fight is over and won. Bank the health it was won on, then put three cards on the table.
                 run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
+                // Iron Ration pays here — after a win, before the reward, so the number on the card is the
+                // number you keep.
+                const ration = (run.perks || []).reduce((n, id) => n + (PERKS[id]?.healAfter || 0), 0);
+                if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
+                // An elite hands over a perk for the health it just cost you.
+                if (run.at?.kind === "elite") {
+                    const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
+                    if (got.perk && !(run.perks || []).includes(got.perk)) {
+                        run.perks = [...(run.perks || []), got.perk];
+                        const bump = PERKS[got.perk]?.maxHp || 0;
+                        if (bump) { run.hpMax += bump; run.hp += bump; }
+                    }
+                    if (got.embers) run.embers = (run.embers || 0) + got.embers;
+                }
                 if (run.at?.kind === "boss" || run.stop > RUN_LENGTH) {
                     run.done = "won";
                     run.offers = null;
@@ -94,6 +116,21 @@ export async function POST(request) {
                 run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
                 run.at = null;
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // A potion is spent from the RUN, not from the fight: the fight reports what it did, and the run
+            // is what remembers the bottle is empty. Kept here so a refresh mid-fight cannot un-drink one.
+            if (action === "drink") {
+                const idx = Number(body?.slot);
+                if (!Number.isInteger(idx) || !(run.potions || [])[idx]) {
+                    return NextResponse.json({ error: "no_such_potion" }, { status: 400 });
+                }
+                run.potions = run.potions.filter((_, i) => i !== idx);
+                if (Number.isFinite(Number(body?.hp))) {
+                    run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp))));
+                }
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
