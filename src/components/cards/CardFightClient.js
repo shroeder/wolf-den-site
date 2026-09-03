@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { Cinzel, Kreon } from "next/font/google";
 import {
-    GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiShield, GiSmallFire, GiSwordWound,
+    GiBiceps, GiCardDraw, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
+    GiSlowBlob, GiSmallFire, GiSwordWound, GiThunderStruck,
 } from "react-icons/gi";
 
 import {
@@ -156,10 +157,28 @@ const CardArt = ({ card, pet }) => {
  * Legendary from a Common, without reading anything.
  */
 /** The emblem on the type plate. Crossed swords is an attack, a shield is a skill, a flame is a power. */
-const TypeMark = ({ kind }) => {
+// ── THE PLATE SAYS WHAT THE CARD DOES, BECAUSE THE WINDOW ALREADY SAYS WHAT IT IS ────────────────────────
+// Luke: "drawing two cards is not a defensive skill, it's more of a utility." He is right, and the reason it
+// was wrong is that the plate and the window were saying the SAME thing: an attack window comes to a point, a
+// skill window is a rounded rectangle — the shape is already the type — and then the plate underneath showed a
+// shield for every skill in the game. So Hoot, which draws two cards, wore a shield.
+//
+// The plate is free to carry something the shape cannot, so it carries the EFFECT. Shape = what kind of card
+// this is; emblem = what it will do to somebody. Read off the card's own fields in the order that decides how
+// it gets played: a card that deals damage is an attack whatever else it also does.
+const TypeMark = ({ card, kind }) => {
+    const c = card || {};
+    if (c.damage) return <GiCrossedSwords aria-hidden="true" />;
+    if (c.block) return <GiShield aria-hidden="true" />;
+    if (c.heal) return <GiHeartPlus aria-hidden="true" />;
+    if (c.draw || c.energy) return <GiCardDraw aria-hidden="true" />;
+    if (c.strength) return <GiBiceps aria-hidden="true" />;
+    if (c.weak) return <GiSlowBlob aria-hidden="true" />;
+    if (c.vulnerable) return <GiCrackedShield aria-hidden="true" />;
+    // Nothing matched: fall back to the TYPE, which is what this used to be entirely.
     if (kind === "attack") return <GiCrossedSwords aria-hidden="true" />;
-    if (kind === "power") return <GiSmallFire aria-hidden="true" />;
-    return <GiShield aria-hidden="true" />;
+    if (kind === "power") return <GiThunderStruck aria-hidden="true" />;
+    return <GiSmallFire aria-hidden="true" />;
 };
 
 // ── WHICH PAINTED TINT A RARITY WEARS ────────────────────────────────────────────────────────────────────
@@ -206,7 +225,7 @@ const CardFace = ({ card, art, dim, live }) => {
                 plate under it carries crossed swords or a shield. The word is one line away if it is missed;
                 the `label` it would use is still in the rules. */}
             <span className="cf-type" style={{ backgroundImage: `url(/images/cards/chrome/plate-${tint}.png)` }} aria-label={look.label}>
-                <TypeMark kind={card.kind} />
+                <TypeMark card={card} kind={card.kind} />
             </span>
             <span className="cf-text">{withNumbers(card, live)}</span>
         </>
@@ -925,7 +944,9 @@ export default function CardFightClient({ fixture, run = null }) {
                     </div>
                 </div>
 
-                <div className="cf-turn">Turn {fight.turn}</div>
+                {/* The ladder position belongs HERE, in the HUD, the way Spire keeps its floor number up top —
+                    not on the reward banner, which only ever needs to say what to do. */}
+                <div className="cf-turn">{run ? `Stop ${runState?.stop || run.stop} of ${RUN_LENGTH} · ` : ""}Turn {fight.turn}</div>
 
                 <div
                     className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}${selfLit ? " is-target" : ""}${guarded.hero ? " is-guarding" : ""}`}
@@ -1123,9 +1144,20 @@ export default function CardFightClient({ fixture, run = null }) {
                     MORE furnished than the thing it was imitating, so every extra piece was a place to notice
                     the difference. All three assets were deleted for this. */
                 <div className="cf-over">
-                    {runState && fight.over === "win" && runState.offers?.length ? (
+                    {/* ── NO "YOU WON THIS FIGHT" SCREEN ──────────────────────────────────────────────
+                        Spire does not have one. A won fight goes straight to the reward — the Rewards banner
+                        IS the victory screen — and stopping to tell somebody they won before showing them what
+                        they won is a click between the deed and the payoff. So while the offers are still
+                        coming back from the server this shows nothing rather than flashing a result sheet,
+                        which is where "The sand is yours" was appearing for half a second mid-run. */}
+                    {runState && fight.over === "win" && !runState.done && !runState.offers?.length ? (
+                        <div className="cf-choose"><div className="cf-title"><span>…</span></div></div>
+                    ) : runState && fight.over === "win" && runState.offers?.length ? (
                         <div className="cf-choose">
-                            <div className="cf-title"><span>Stop {runState.stop} of {RUN_LENGTH} — take one</span></div>
+                            {/* Spire's banner says "Choose a Card" and nothing else — the floor number lives up in the HUD
+                                where it belongs, not on the prop. Ours said "Stop 1 of 8 — take one", which put
+                                bookkeeping on a piece of cloth and made the instruction the smaller half of it. */}
+                            <div className="cf-title"><span>Choose a card</span></div>
                             <div className="cf-offers">
                                 {runState.offers.map((id) => {
                                     const c = cardById(id);
@@ -1149,9 +1181,16 @@ export default function CardFightClient({ fixture, run = null }) {
                                 {/* Giving up is not the same as being killed, and the engine knows which one
                                     happened, so the banner says the true thing rather than the convenient one. */}
                                 <span>
+                                    {/* Plain, and true to what happened. "The sand is yours" was flavour for a
+                                        won fight and it was showing up where a run had ENDED, which is how Luke
+                                        read it as the abandon screen. Spire has no in-combat forfeit at all —
+                                        abandoning is a menu action behind an "are you sure" — so ours says the
+                                        honest thing rather than borrowing a phrase for it. */}
                                     {runState?.done === "won" ? "The run is yours"
-                                        : fight.over === "win" ? "The sand is yours"
-                                            : fight.gaveUp ? "You walked away" : "You fall"}
+                                        : runState?.done === "dead" && fight.gaveUp ? "Run abandoned"
+                                            : runState?.done === "dead" ? "You died"
+                                                : fight.over === "win" ? "Victory"
+                                                    : fight.gaveUp ? "You walked away" : "You died"}
                                 </span>
                             </div>
                             <p className="cf-note">
