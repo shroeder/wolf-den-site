@@ -28,7 +28,7 @@ import CounterWheel from "@/components/CounterWheel";
 
 const POLL_MS = 4000;
 
-export default function CounterDisplayClient({ displayKey, signupQr, wheel, pointsRate, claimBase }) {
+export default function CounterDisplayClient({ displayKey, signupQr, pointsRate, claimBase }) {
     const [claim, setClaim] = useState(null);
     const [qr, setQr] = useState(null);
     const [offline, setOffline] = useState(false);
@@ -93,7 +93,7 @@ export default function CounterDisplayClient({ displayKey, signupQr, wheel, poin
 
     return (
         <>
-            <CounterWheel prizes={wheel.prizes} signupQr={signupQr} pointsRate={pointsRate} />
+            <CounterWheel signupQr={signupQr} pointsRate={pointsRate} />
             {offline ? <span className="pos-offline">offline</span> : null}
         </>
     );

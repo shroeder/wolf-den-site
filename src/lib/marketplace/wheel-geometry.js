@@ -61,6 +61,32 @@ export function iconPos(i, offset, deg, r) {
 }
 
 /**
+ * Position a TEXT face at wedge i, reading outward along the spoke.
+ *
+ * ── WHY THIS IS NOT iconPos ──────────────────────────────────────────────────────────────────────────────
+ * iconPos rotates by the wedge angle, which is right for a sprite: a round icon looks the same whichever way
+ * it is turned. Text does not. Rotated by the wedge angle, a label runs TANGENTIALLY — across the slice, in
+ * the one direction a pie wedge has no room in (about 65px at the icon ring) — so "off a single" ran straight
+ * over its neighbours and the wheel read as a pile of overlapping words.
+ *
+ * A quarter turn further round and the line runs from hub to rim instead, which is the direction with 25% of
+ * the rotor's width to spend, and is how every prize wheel ever painted has done it. Lines stacked inside the
+ * box then sit side by side tangentially — two of them fit in that 65px comfortably.
+ *
+ * Text on the bottom half is upside down to the viewer. That is correct and deliberate: it is upright when it
+ * comes to rest under the pointer at top, which is the only moment anyone reads a wedge.
+ */
+export function spokePos(i, offset, deg, r) {
+    const th = i * deg + offset;
+    const rad = (th * Math.PI) / 180;
+    return {
+        left: `${fix(50 + r * Math.sin(rad))}%`,
+        top: `${fix(50 - r * Math.cos(rad))}%`,
+        transform: `translate(-50%, -50%) rotate(${th - 90}deg)`,
+    };
+}
+
+/**
  * The rotation that parks wedge `idx` dead under the pointer at top, always moving FORWARD from `prev`.
  *
  * NO JITTER. It used to stop up to ±3.6° off centre "for feel" — noise on the one signal the whole wheel

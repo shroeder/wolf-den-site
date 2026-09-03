@@ -2,7 +2,6 @@ import QRCode from "qrcode";
 
 import CounterDisplayClient from "@/components/CounterDisplayClient";
 import { POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
-import { publicWheelView } from "@/lib/marketplace/spin.js";
 import { SITE_URL } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -31,10 +30,14 @@ export const metadata = {
 // pretty easy because otherwise it's going to be overwhelming for new users to try and navigate and figure out
 // where the menu is and get to the right place."
 //
-// That ramp is now the whole screen: they spin the wheel here, and the code takes them to the same wheel with
-// an account behind it. Nothing about the destination changed when the slideshow went — every account already
-// gets a free spin every day, so a brand-new member has one waiting and so does the member who joined a year
-// ago and never found it.
+// The destination has not changed through two redesigns of this screen, and should not: every account gets a
+// free spin every day, so a brand-new member has one waiting and so does the member who joined a year ago and
+// never found it.
+//
+// ⚠️ TWO DIFFERENT WHEELS, ON PURPOSE. The one on this screen pays STORE DISCOUNTS (counter-discounts.js) and
+// anyone walking past can spin it. The one behind the QR is the member's daily spin, which pays gold, gear and
+// chests. They are not the same table and must not be confused for each other: the first is honour-based and
+// costs the shop margin, the second grants real balances to a real account.
 //
 // `signup=1` opens on the CREATE form rather than the sign-in form, because somebody scanning a QR code off a
 // shop counter does not have an account yet — and the sign-in link is right there for the ones who do.
@@ -57,9 +60,9 @@ export default async function CounterPage({ searchParams }) {
         );
     }
 
-    // Both of these are static for the life of the screen, so they are resolved once here rather than fetched
-    // on the poll: the QR needs the encoder, and the wheel is a module-level table. Only the claim rides the
-    // poll, because only the claim changes.
+    // The QR is the ONLY thing this page has to compute: the wheel's offers are a plain module the client
+    // imports for itself (counter-discounts.js), and the claim rides the poll. So the idle screen costs one
+    // encode and no database at all.
     const signupQr = await QRCode.toDataURL(IDLE_URL, {
         width: 720, margin: 1, errorCorrectionLevel: "M",
         color: { dark: "#101014", light: "#ffffff" },
@@ -69,7 +72,6 @@ export default async function CounterPage({ searchParams }) {
         <CounterDisplayClient
             displayKey={String(key)}
             signupQr={signupQr}
-            wheel={publicWheelView()}
             pointsRate={POS_PITCH.rate}
             claimBase={`${SITE_URL}/marketplace/claim/`}
         />

@@ -2,48 +2,43 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ICON_R, WEDGES, WEDGE_DEG, WEDGE_OFFSET, iconPos, landingRotation } from "@/lib/marketplace/wheel-geometry.js";
+import { COUNTER_DISCOUNTS, rollDiscount } from "@/lib/marketplace/counter-discounts.js";
+import { ICON_R, WEDGE_DEG, WEDGE_OFFSET, landingRotation, spokePos } from "@/lib/marketplace/wheel-geometry.js";
 
-// ── THE WHEEL ON THE COUNTER ─────────────────────────────────────────────────────────────────────────────────
+// ── THE WHEEL ON THE COUNTER ────────────────────────────────────────────────────────────────────
 // Luke: "just make a wheel you can spin. and it says the reward. and then shows a qr code to scan. that takes
-// them to the sign up."
+// them to the sign up." And then: "rewards are in store discounts, all different kinds."
 //
 // It replaces a three-panel slideshow that explained the game in prose to people who were not reading it. A
-// stranger will put a finger on a prize wheel without being asked to, and that touch is the whole pitch: they
-// have now played the game, and the QR is the way to keep playing it.
+// stranger will put a finger on a prize wheel without being asked to, and the discount they land on is a
+// reason to buy something today — with the QR under it as the reason to come back.
 //
-// ── IT IS THE REAL WHEEL, NOT A PROP ─────────────────────────────────────────────────────────────────────────
-// The wedges, the art and the odds all come from publicWheelView() — the same table getSpinState hands the
-// member's daily spin. Nothing here is a hand-written prize list, because a made-up wedge is a promise the
-// counter cannot keep, and a real wedge whose gold figure was copied instead of imported goes stale the first
-// time GOLD_MINT_RATE moves. What a customer watches land is what a new account can actually win.
+// ── THE WEDGES ARE OFFERS, NOT GAME PRIZES ────────────────────────────────────────────────────────
+// Every number lives in counter-discounts.js — that is the file to edit, and it is the only one. This drew
+// the member wheel's prize table for its first hour of life, which was the wrong wheel for a shop window: gold
+// and Farm Seeds mean nothing to somebody who has never had an account, and everything on it was a thing they
+// could not have without making one first.
 //
-// What it deliberately does NOT do is pay out: there is no account behind this screen, so the result card says
-// the wheel landed on a thing, never that they have won a thing. The prize is the reason to scan, and it is
-// waiting on the other side — every account gets a free spin a day, so a brand-new member has one ready.
+// The faces are TEXT, not sprites, and that is the point: a discount is a number, and a number at six feet is
+// the only thing on a counter screen a passer-by can read. The full offer and its qualifier land on the card
+// beside the wheel once it stops, so the wedge never has to carry the small print.
 
 const SPIN_MS = 5200;
-// How long a result stands before the screen invites the next person. Long enough to read it, scan it, and
-// talk about it; short enough that nobody walks up to a stranger's result and thinks the wheel is broken.
+// How long a result stands before the screen invites the next person. Long enough to read it, take it to the
+// counter, and talk about it; short enough that nobody walks up to a stranger's result and tries to claim it.
 // (The D&D kiosk had exactly this bug: it sat on one person's thank-you screen until somebody reloaded it.)
 const HOLD_MS = 45000;
 // The idle disc turns slowly on its own. A dead wheel reads as a picture of a wheel; a moving one reads as a
 // machine that is waiting for you.
 const DRIFT_DEG_PER_S = 3;
+// ── WHERE A TEXT FACE SITS, AND WHY IT IS NOT ICON_R ─────────────────────────────────────────────────────────
+// ICON_R (34) is the centre of a round sprite, pushed out to the fat end of the slice. A radial text box is
+// 25 units LONG, and in the same units as ICON_R the usable band runs from the hub at 15.4 to the frame's
+// inner rim at 40.6 — 25.2 units, near enough exactly the length of the box. So the face is centred on the
+// MIDDLE of that band, at 28, and reaches 15.5 to 40.5: hub to rim, touching neither.
+const FACE_R = (15.4 + 40.6) / 2;
 
-/** Pick a wedge the way the real spin does — by weight, off the odds the wheel actually ships with. */
-function rollIndex(prizes) {
-    const total = prizes.reduce((s, p) => s + (Number(p.odds) || 0), 0);
-    if (!(total > 0)) return Math.floor(Math.random() * prizes.length);
-    let r = Math.random() * total;
-    for (let i = 0; i < prizes.length; i += 1) {
-        r -= Number(prizes[i].odds) || 0;
-        if (r <= 0) return i;
-    }
-    return prizes.length - 1;
-}
-
-export default function CounterWheel({ prizes, signupQr, pointsRate }) {
+export default function CounterWheel({ signupQr, pointsRate }) {
     const [rot, setRot] = useState(0);
     const [spinning, setSpinning] = useState(false);
     const [wonIdx, setWonIdx] = useState(null);
@@ -63,7 +58,7 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
     const spin = useCallback(() => {
         if (spinning) return;
         clearTimers();
-        const idx = rollIndex(prizes);
+        const idx = rollDiscount();
         setWonIdx(null);
         setSpinning(true);
         // The roll is local, so there is no server round trip to cover and no lead-in phase — the disc goes
@@ -76,9 +71,9 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
             setWonIdx(idx);
             timers.current.push(setTimeout(() => setWonIdx(null), HOLD_MS));
         }, SPIN_MS));
-    }, [prizes, spinning]);
+    }, [spinning]);
 
-    const won = wonIdx != null ? prizes[wonIdx] : null;
+    const won = wonIdx != null ? COUNTER_DISCOUNTS[wonIdx] : null;
 
     return (
         <div className="cq" onClick={spin} role="presentation">
@@ -94,14 +89,14 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cq-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
                         <div className="cq-icons">
-                            {prizes.slice(0, WEDGES).map((p, i) => (
+                            {COUNTER_DISCOUNTS.map((d, i) => (
                                 <div
-                                    key={p.label + i}
-                                    className={`cq-ico tier-${p.tier}${wonIdx === i && !spinning ? " is-won" : ""}`}
-                                    style={iconPos(i, WEDGE_OFFSET, WEDGE_DEG, ICON_R)}
+                                    key={d.label}
+                                    className={`cq-ico tier-${d.tier || "normal"}${wonIdx === i && !spinning ? " is-won" : ""}`}
+                                    style={spokePos(i, WEDGE_OFFSET, WEDGE_DEG, FACE_R)}
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    {p.sprite ? <img className="cq-ico-img" src={p.sprite} alt="" draggable="false" /> : null}
+                                    <b className="cq-face">{d.face}</b>
+                                    <span className="cq-face-sub">{d.sub}</span>
                                 </div>
                             ))}
                         </div>
@@ -116,34 +111,33 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
 
             <aside className="cq-side">
                 {won ? (
-                    <div className={`cq-won tier-${won.tier}`} key={`${wonIdx}-${rot}`}>
-                        <span className="cq-kick">The wheel landed on</span>
-                        <div className="cq-won-face">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            {won.sprite ? <img className="cq-won-img" src={won.sprite} alt="" /> : null}
-                            <strong className="cq-won-name">{won.label}</strong>
-                        </div>
-                        {won.desc ? <p className="cq-won-desc">{won.desc}</p> : null}
+                    <div className={`cq-won tier-${won.tier || "normal"}`} key={wonIdx}>
+                        <span className="cq-kick">You won</span>
+                        <strong className="cq-won-name">{won.label}</strong>
+                        <p className="cq-won-desc">{won.fine}</p>
+                        {/* The only thing standing between this wheel and somebody tapping it eight times is
+                            a sentence, because Luke's call is that the counter honours whatever is on screen
+                            — no code, no token. So the sentence is on the card, where staff can see it too. */}
+                        <span className="cq-claim">Show this screen at the counter · one spin per customer</span>
 
                         <div className="cq-ask">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             {signupQr ? <img className="cq-qr" src={signupQr} alt="" /> : <div className="cq-qr cq-qr-wait" />}
-                            <b className="cq-scan">Scan to take your own spin</b>
+                            <b className="cq-scan">There is a whole game too</b>
                             <span className="cq-sub">
-                                Free to join, about ten seconds. Every account gets a spin a day — then {pointsRate} points
-                                per $1 you spend here.
+                                Scan to join — free, about ten seconds. {pointsRate} points per $1 you spend here, and a
+                                free spin of our prize wheel every day.
                             </span>
                         </div>
-                        <span className="cq-again">Touch the wheel to spin again</span>
                     </div>
                 ) : (
                     <div className="cq-invite">
                         <span className="cq-kick">The Wolf Den</span>
-                        <strong className="cq-invite-head">{spinning ? "Good luck…" : "Give it a spin"}</strong>
+                        <strong className="cq-invite-head">{spinning ? "Good luck…" : "Spin for a discount"}</strong>
                         <p className="cq-invite-sub">
                             {spinning
-                                ? "Every wedge on there is a real prize off the real wheel."
-                                : "Touch the wheel. It is the same wheel every member spins for free, every day."}
+                                ? "Every wedge is money off, today."
+                                : "Touch the wheel. Every wedge is money off something in this shop — and nobody walks away with nothing."}
                         </p>
                     </div>
                 )}
@@ -161,8 +155,11 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
 
                 /* Square, and sized off BOTH axes so it fills its own column instead of overflowing into the
                    copy beside it — 92vh on a 16:9 screen is wider than the half it has to live in. */
+                /* --cqw is the wheel's own width, so the wedge type scales with the disc rather than with the
+                   viewport. A vw-sized face grows when the screen gets wider even though the wheel does not,
+                   and "off everything" starts falling off its slice. */
                 .cq-stage { position: relative; display: grid; place-items: center;
-                    width: min(94vh, 46vw); height: min(94vh, 46vw); margin: 0 auto; }
+                    --cqw: min(94vh, 46vw); width: var(--cqw); height: var(--cqw); margin: 0 auto; }
                 .cq-stage::before { content: ""; position: absolute; inset: 4%; border-radius: 50%;
                     background: radial-gradient(circle, rgba(255,190,70,0.18), transparent 68%); filter: blur(10px); }
                 .cq-ring { position: relative; width: 100%; height: 100%; }
@@ -171,13 +168,24 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
                 .cq-disc { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%;
                     box-shadow: 0 8px 30px rgba(0,0,0,0.6); }
                 .cq-icons { position: absolute; inset: 0; }
-                .cq-ico { position: absolute; width: 9.5%; height: 9.5%; display: grid; place-items: center;
-                    border-radius: 50%; background: radial-gradient(circle, rgba(8,5,2,0.62) 48%, rgba(8,5,2,0) 74%); }
-                .cq-ico-img { width: 116%; height: 116%; object-fit: contain;
-                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
-                .cq-ico.tier-jackpot .cq-ico-img { filter: drop-shadow(0 0 6px rgba(255,215,94,0.95)); }
-                .cq-ico.tier-mini .cq-ico-img { filter: drop-shadow(0 0 5px rgba(200,150,255,0.8)); }
-                .cq-ico.tier-bonus .cq-ico-img { filter: drop-shadow(0 0 5px rgba(255,140,240,0.7)); }
+                /* ── A TEXT FACE IS A SPOKE, NOT A DOT ────────────────────────────────────────────────────
+                   spokePos turns the box a further quarter turn, so its WIDTH runs hub-to-rim and its two
+                   stacked lines sit side by side across the slice. 25% of the rotor's width is the whole
+                   usable band (see FACE_R), and 11% of height is two lines against the ~13% a slice spans at
+                   that radius — the type is sized in cqw units off the stage, never vw, so it scales with the
+                   wheel and not with the screen. The dark lozenge behind it is what makes white type readable
+                   over six different wedge colours. */
+                .cq-ico { position: absolute; width: 25%; height: 11%; display: grid; align-content: center;
+                    justify-items: center; gap: 0.05em; text-align: center; line-height: 1.02;
+                    border-radius: 999px; white-space: nowrap;
+                    background: radial-gradient(ellipse, rgba(8,5,2,0.66) 38%, rgba(8,5,2,0) 78%); }
+                .cq-face { font-size: calc(var(--cqw) * 0.042); font-weight: 900; color: #fff; letter-spacing: -0.015em;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 12px rgba(0,0,0,0.7); }
+                .cq-face-sub { font-size: calc(var(--cqw) * 0.019); font-weight: 800; color: #f2e3c4;
+                    letter-spacing: 0.01em; text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.8); }
+                .cq-ico.tier-good .cq-face { color: #ffe9b8; }
+                .cq-ico.tier-rare .cq-face { color: #ffd75e; }
+                .cq-ico.tier-top .cq-face { color: #ffd75e; text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 14px rgba(255,190,60,0.9); }
                 /* ── THE ROTOR DOES NOT RISE HERE, AND THE MEMBER'S WHEEL IS RIGHT TO ─────────────────────
                    SpinWheel lifts the whole rotor over the frame when it stops, because dead top is behind
                    the wolf's snout and the won sprite is the only readout it has. This screen has a result
@@ -188,10 +196,13 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
                 .cq-ico.is-won::before { content: ""; position: absolute; inset: -80%; border-radius: 50%; z-index: -1;
                     background: radial-gradient(circle, rgba(255,215,94,0.6), rgba(255,150,30,0.24) 42%, transparent 70%);
                     animation: cqHalo 1.1s ease-in-out infinite alternate; }
-                .cq-ico.is-won .cq-ico-img { animation: cqWon 1.1s ease-in-out infinite alternate; }
+                .cq-ico.is-won .cq-face { animation: cqWon 1.1s ease-in-out infinite alternate; }
                 @keyframes cqHalo { from { opacity: 0.5; transform: scale(0.84); } to { opacity: 1; transform: scale(1.14); } }
-                @keyframes cqWon { from { transform: scale(1.06); filter: drop-shadow(0 0 5px #ffd75e); }
-                    to { transform: scale(1.32); filter: drop-shadow(0 0 16px #ffd75e) drop-shadow(0 0 26px #ffb020); } }
+                /* The pulse lives on the FACE, never on .cq-ico — the ico's transform is its polar position
+                   (translate + the wedge's own rotation), set inline, and an animation on it would overwrite
+                   that and walk the winner off its slice while it celebrated. */
+                @keyframes cqWon { from { transform: scale(1); color: #ffd75e; }
+                    to { transform: scale(1.16); color: #fff3c8; } }
                 .cq-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
                     filter: drop-shadow(0 6px 18px rgba(0,0,0,0.5)); }
                 .cq-stage.is-spinning .cq-frame { animation: cqBuzz 0.14s steps(2) infinite; }
@@ -214,16 +225,17 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
                 .cq-won { display: grid; justify-items: center; gap: 1.2vh; width: 100%;
                     animation: cqPop 0.4s cubic-bezier(.2,1.4,.35,1) both; }
                 @keyframes cqPop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-                .cq-won-face { display: grid; justify-items: center; gap: 0.6vh; }
-                .cq-won-img { width: clamp(70px, 15vh, 190px); height: clamp(70px, 15vh, 190px); object-fit: contain;
-                    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)); }
-                .cq-won-name { font-size: clamp(28px, 5.4vh, 70px); font-weight: 900; line-height: 1.05; color: #fff; }
-                .cq-won-desc { margin: 0; max-width: 26ch; font-size: clamp(13px, 1.9vh, 24px); color: #aab2bb; line-height: 1.35; }
-                .cq-won.tier-rare .cq-kick { color: #8bf5d6; }
-                .cq-won.tier-bonus .cq-kick { color: #ffb6f2; }
-                .cq-won.tier-mini .cq-kick { color: #d3aaff; }
-                .cq-won.tier-jackpot .cq-kick { color: #ffe28a; }
-                .cq-won.tier-jackpot .cq-won-name { color: #ffe28a; text-shadow: 0 0 30px rgba(255,190,60,0.55); }
+                /* The offer IS the picture — it is the biggest thing on the screen, because a discount read
+                   from across the shop is what gets somebody to walk over. */
+                .cq-won-name { max-width: 15ch; font-size: clamp(30px, 7.4vh, 96px); font-weight: 900;
+                    line-height: 1.03; color: #fff; text-wrap: balance; text-shadow: 0 4px 24px rgba(0,0,0,0.6); }
+                .cq-won-desc { margin: 0; max-width: 28ch; font-size: clamp(13px, 2.2vh, 28px); color: #aab2bb; line-height: 1.3; }
+                .cq-claim { max-width: 30ch; font-size: clamp(12px, 1.7vh, 21px); font-weight: 700; color: #c9a253;
+                    letter-spacing: 0.03em; }
+                .cq-won.tier-good .cq-kick, .cq-won.tier-rare .cq-kick { color: #ffd75e; }
+                .cq-won.tier-top .cq-kick { color: #ffe28a; }
+                .cq-won.tier-rare .cq-won-name, .cq-won.tier-top .cq-won-name { color: #ffe9b8;
+                    text-shadow: 0 0 40px rgba(255,190,60,0.5); }
 
                 .cq-ask { display: grid; justify-items: center; gap: 0.7vh; margin-top: 1vh;
                     padding: 1.6vh 1.6vw; border-radius: 18px; background: rgba(255,255,255,0.045);
@@ -233,12 +245,11 @@ export default function CounterWheel({ prizes, signupQr, pointsRate }) {
                 .cq-qr-wait { opacity: 0.15; }
                 .cq-scan { font-size: clamp(16px, 2.6vh, 34px); font-weight: 900; color: #ffcf6a; }
                 .cq-sub { max-width: 30ch; font-size: clamp(12px, 1.7vh, 21px); color: #9aa2ab; line-height: 1.35; }
-                .cq-again { font-size: clamp(11px, 1.5vh, 18px); color: #6f7681; letter-spacing: 0.04em; }
 
                 /* A counter screen is landscape, but the same page gets opened on a phone to check it. */
                 @media (max-aspect-ratio: 1/1) {
                     .cq { grid-template-columns: 1fr; grid-template-rows: auto auto; align-content: center; }
-                    .cq-stage { width: min(86vw, 52vh); height: min(86vw, 52vh); }
+                    .cq-stage { --cqw: min(86vw, 52vh); }
                     .cq-side { padding-right: 0; }
                     .cq-invite-head { font-size: clamp(30px, 6vh, 60px); }
                     .cq-invite-sub { font-size: clamp(14px, 2.2vh, 24px); }
