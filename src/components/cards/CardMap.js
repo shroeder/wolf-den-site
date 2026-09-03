@@ -354,7 +354,12 @@ export default function CardMap({ run }) {
                    text was shoved past the right roll, and it bled off the other side instead. These are 14%
                    and 15% of 146 and of 128, worked out by hand. Re-do the sums if either width changes. */
                 .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 22px 54px 21px;
-                    display: grid; gap: 5px; justify-items: start; color: #1b2430; font-size: 11.5px;
+                    /* justify-CONTENT centres the whole list as one block on the paper; justify-ITEMS keeps
+                       the rows left-aligned to each other so the marks still read as a column. Left-aligned
+                       alone leaves the block hugging the left roll, because the longest row is well short of
+                       the paper's width. */
+                    display: grid; gap: 5px; justify-content: center; justify-items: start;
+                    color: #1b2430; font-size: 11.5px;
                     background-image: url(/images/cards/chrome/legend-scroll.png);
                     background-size: 100% 100%; background-repeat: no-repeat;
                     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
