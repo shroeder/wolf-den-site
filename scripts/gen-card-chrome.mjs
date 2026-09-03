@@ -105,6 +105,28 @@ const PIECES = {
         subject: "A wide blank rectangular metal button plate with softly rounded corners, gently domed, a "
             + "rivet at each end and a bright bevel along the top edge — solid and completely blank. " + METAL,
     },
+    // ── THE TOP BAR ── one plate under the whole control strip.
+    // Luke: "If you only generate a Sprite that goes across the top, serves as a back plate for all the
+    // buttons and info up there, can we group the info by left and right? and maybe center. That way on
+    // desktop, it doesn't feel so spaced out."
+    //
+    // The two halves of that are one idea: five widgets evenly spaced across 1100px read as five separate
+    // things floating on a dark gradient, and a plate under them makes the strip ONE object — at which point
+    // clustering them left / centre / right is what the object is for.
+    //
+    // ⚠️ DRAWN TO BE STRETCHED. This is the only piece here whose displayed width is unknown — the board is
+    // 1100px on a desktop and 375 on a phone, and gpt-image-1 will not draw wider than 3:2. So the bar is
+    // asked for with NO structure along its length: the detail all runs across it (a bevel at the top, a dark
+    // edge at the bottom) and nothing marks its middle. A texture that is uniform lengthways can be stretched
+    // to any width without smearing, which is the same trick the `banner` piece below relies on. Rivets sit
+    // near the ENDS, where a stretch moves them apart rather than distorting them.
+    "top-bar": {
+        size: "1536x1024", store: { w: 900, h: 96 }, tint: false, extra: SOLID,
+        subject: "A long horizontal metal bar spanning the full width — a heavy hammered plate seen straight "
+            + "on, with a bright bevelled highlight running the whole length of its top edge and a dark "
+            + "shadowed edge along the bottom. UNIFORM ALL THE WAY ALONG: no centrepiece, no crest, no join, "
+            + "no ornament in the middle, nothing written on it. A single round rivet near each end. " + METAL,
+    },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
     banner: {

@@ -835,28 +835,49 @@ export default function CardFightClient({ fixture }) {
                     nothing you press by accident is next to the card you meant to pick up.
                     The seed is gone from the screen with them; it lives in the URL, which is where it is
                     actually used. */}
+                {/* ── THE CONTROL STRIP, ON A PLATE ────────────────────────────────────────────────────
+                    Luke: "can we group the info up there by left and right? and maybe center. That way on
+                    desktop, it doesn't feel so spaced out."
+
+                    Five widgets space-between across an 1100px board is five things floating separately on a
+                    gradient. THREE GROUPS on one painted bar is a control panel — and the grouping is by what
+                    the thing IS, not by what fits:
+                      LEFT   the two piles. Where your cards came from and where they went; they are the same
+                             fact twice and they belong beside each other rather than at opposite ends of the
+                             screen, which is where space-between had put them.
+                      CENTRE the energy. The number you re-read before every single card, so it sits where the
+                             eye already is.
+                      RIGHT  the two things you PRESS. End turn is the only button up here that ends anything,
+                             and forfeit is deliberately the small one next to it.  */}
                 <div className="cf-top">
-                    <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
-                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
-                        <span className="cf-pile-n">{fight.draw.length}</span>
-                    </button>
-                    <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
-                        <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
-                        <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
+                    <Sprite src="/images/cards/chrome/top-bar.png" className="cf-top-plate" />
+                    <div className="cf-top-group">
+                        <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
+                            <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                            <span className="cf-pile-n">{fight.draw.length}</span>
+                        </button>
+                        <button type="button" className="cf-pile is-discard" onClick={() => setPeek("discard")} aria-label={`Discard pile, ${fight.discard.length} cards`}>
+                            <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
+                            <span className="cf-pile-n">{fight.discard.length}</span>
+                        </button>
                     </div>
-                    {/* Small, in the middle, and a door rather than a word — it is the one control up here
-                        you are not meant to reach for. */}
-                    <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
-                        <GiExitDoor aria-hidden="true" />
-                    </button>
-                    <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
-                        <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
-                        <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
-                    </button>
-                    <button type="button" className="cf-pile is-discard" onClick={() => setPeek("discard")} aria-label={`Discard pile, ${fight.discard.length} cards`}>
-                        <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
-                        <span className="cf-pile-n">{fight.discard.length}</span>
-                    </button>
+                    <div className="cf-top-group">
+                        <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
+                            <Sprite src="/images/cards/chrome/energy-gem.png" className="cf-energy-art" />
+                            <span className="cf-energy-n">{fight.energy}<i>/{fight.energyMax}</i></span>
+                        </div>
+                    </div>
+                    <div className="cf-top-group">
+                        {/* A door rather than a word — it is the one control up here you are not meant to
+                            reach for. */}
+                        <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
+                            <GiExitDoor aria-hidden="true" />
+                        </button>
+                        <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
+                            <Sprite src="/images/cards/chrome/button-plate.png" className="cf-end-art" />
+                            <span className="cf-end-label">{acting ? "…" : "End turn"}</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="cf-turn">Turn {fight.turn}</div>
@@ -1166,8 +1187,14 @@ export default function CardFightClient({ fixture }) {
                    maths reads. */
                 @media (min-width: 1200px) {
                     .cf { --cf-side: max(0px, calc(50vw - 550px)); }
-                    /* Prefixed for the same reason as above — all three base rules are further down. */
-                    .cf .cf-field, .cf .cf-tray, .cf .cf-top { left: var(--cf-side); right: var(--cf-side); }
+                    /* Prefixed for the same reason as above — both base rules are further down.
+                       ⚠️ .cf-top IS NOT IN THIS LIST, and leaving it out is the whole point. It is a CHILD of
+                       .cf-field (the tray is a sibling; the control strip is not), so insetting it here
+                       applied the side margin TWICE: at 1440 it came out 760px wide inside an 1100px board,
+                       and the piles, energy and End turn read as bunched toward the middle. That shipped in
+                       the previous commit and was visible in the 1920 shot as a huddle of controls with a
+                       third of the bar empty either side of them. It inherits the narrowing from the field. */
+                    .cf .cf-field, .cf .cf-tray { left: var(--cf-side); right: var(--cf-side); }
                 }
 
                 .cf-field { position: absolute; inset: 0; overflow: hidden; background: #0b0d12; }
@@ -1209,15 +1236,33 @@ export default function CardFightClient({ fixture }) {
                 /* ── THE CONTROL STRIP ────────────────────────────────────────────────────────────────────
                    Everything that is not a card, across the top, clear of the arc a thumb drags through.
                    The seed went with the old chrome: it lives in the URL, which is where it is used. */
+                /* THE GRADIENT IS GONE and the bar is a drawn object. The gradient existed to keep white text
+                   legible over a lit floor; a painted opaque plate does that job and stops the strip reading
+                   as five widgets floating on a dark smear. Fixed height so the plate has a box to fill. */
                 .cf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 6;
-                    display: flex; align-items: center; justify-content: space-between; gap: 6px;
-                    padding: calc(6px + env(safe-area-inset-top)) 8px 12px;
-                    background: linear-gradient(180deg, rgba(8,9,13,0.92), rgba(8,9,13,0.5) 64%, rgba(8,9,13,0)); }
+                    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                    height: calc(58px + env(safe-area-inset-top));
+                    padding: env(safe-area-inset-top) 12px 0 12px; background: none; }
+                /* object-fit: fill, ON PURPOSE. The bar is the one piece of chrome whose width is unknown —
+                   1100px on a desktop board, 375 on a phone — and gpt-image-1 will not draw past 3:2. It is
+                   drawn with no structure along its length (see gen-card-chrome.mjs) precisely so it can be
+                   stretched to any width: there is nothing lengthways to smear. "contain" would letterbox it
+                   and "cover" would crop the rivets off the ends. */
+                /* KNOCKED BACK, not redrawn. Straight out of the generator it is the same pale metal as the
+                   card frames, which is right for a 96px card and wrong for a band running the whole width of
+                   the screen: it out-shone the intent numbers, and the intents are the one thing on here that
+                   must be read first. Darkened locally so it stays in the same family as the rest of the
+                   furniture — the alternative was a second, darker generation of the same bar. */
+                .cf-top-plate { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
+                    object-fit: fill; pointer-events: none;
+                    filter: brightness(0.62) saturate(0.9) drop-shadow(0 3px 9px rgba(0,0,0,0.6)); }
+                /* Three of them, and space-between now spaces the GROUPS rather than the widgets. */
+                .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
                 .cf-forfeit { display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
                     background: rgba(10,12,16,0.5); border: 1px solid #39424f; border-radius: 999px;
                     color: #9aa6b4; font-size: 15px; }
                 .cf-forfeit:disabled { opacity: 0.35; }
-                .cf-turn { position: absolute; top: calc(62px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3;
+                .cf-turn { position: absolute; top: calc(66px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 3;
                     font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #9fb0c4; }
 
                 /* Feet at ~62% of the screen and bars at ~66% — where Spire stands its fighters, measured. */
