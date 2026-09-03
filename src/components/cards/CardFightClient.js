@@ -850,7 +850,7 @@ export default function CardFightClient({ fixture }) {
                       RIGHT  the two things you PRESS. End turn is the only button up here that ends anything,
                              and forfeit is deliberately the small one next to it.  */}
                 <div className="cf-top">
-                    <Sprite src="/images/cards/chrome/top-bar.png" className="cf-top-plate" />
+                    <div className="cf-top-plate" aria-hidden="true" />
                     <div className="cf-top-group">
                         <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
                             <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
@@ -1168,6 +1168,12 @@ export default function CardFightClient({ fixture }) {
                        source order, and at equal specificity the later rule takes it — which is exactly what
                        happened on the first pass: the variables applied (their base rule is above this one)
                        and the positioning silently did not. */
+                    /* The groups step inside the bar's end panels so the rivets are not buried under the
+                       piles and the End turn plate. Only here: on a phone the same inset would leave the
+                       three groups fighting over 200px, so there they sit on the panels and that is fine —
+                       nobody is admiring a rivet on a 412px screen. */
+                    .cf .cf-top { padding-left: calc(195 * var(--cf-bar-h) / 120 + 16px);
+                        padding-right: calc(195 * var(--cf-bar-h) / 120 + 16px); }
                     .cf .cf-hero { left: 9%; width: 26%; }
                     .cf .cf-party { right: 5%; width: 52%; }
                 }
@@ -1241,20 +1247,28 @@ export default function CardFightClient({ fixture }) {
                    as five widgets floating on a dark smear. Fixed height so the plate has a box to fill. */
                 .cf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 6;
                     display: flex; align-items: center; justify-content: space-between; gap: 8px;
-                    height: calc(58px + env(safe-area-inset-top));
+                    --cf-bar-h: 58px;
+                    height: calc(var(--cf-bar-h) + env(safe-area-inset-top));
                     padding: env(safe-area-inset-top) 12px 0 12px; background: none; }
-                /* object-fit: fill, ON PURPOSE. The bar is the one piece of chrome whose width is unknown —
-                   1100px on a desktop board, 375 on a phone — and gpt-image-1 will not draw past 3:2. It is
-                   drawn with no structure along its length (see gen-card-chrome.mjs) precisely so it can be
-                   stretched to any width: there is nothing lengthways to smear. "contain" would letterbox it
-                   and "cover" would crop the rivets off the ends. */
-                /* KNOCKED BACK, not redrawn. Straight out of the generator it is the same pale metal as the
-                   card frames, which is right for a 96px card and wrong for a band running the whole width of
-                   the screen: it out-shone the intent numbers, and the intents are the one thing on here that
-                   must be read first. Darkened locally so it stays in the same family as the rest of the
-                   furniture — the alternative was a second, darker generation of the same bar. */
-                .cf-top-plate { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
-                    object-fit: fill; pointer-events: none;
+                /* ── THREE PIECES, AND ONLY THE MIDDLE STRETCHES ──────────────────────────────────────────
+                   This was an <img> stretched edge to edge with object-fit: fill. A bar drawn uniform along
+                   its length survives that, but the RIVETS did not: stored at 9:1 and drawn at 19:1 on a
+                   desktop board they flattened into ovals. Luke: "the rivets on the left and right look all
+                   smoshed vertically."
+                   border-image is built for exactly this. The source is 1200x120 with a moulded cap occupying
+                   the first and last 195px (measured off the alpha: the caps stand 120 tall where the middle
+                   span is 80), so slicing at 195 hands the caps to the borders and the plain middle to the
+                   fill. The middle takes all the stretching; the caps never do.
+                   THE BORDER WIDTH IS NOT A GUESS. A cap keeps its aspect only if it is drawn at the same
+                   scale the bar's height implies: 195 source px x (bar height / 120 source px). Written as
+                   that calculation rather than the 94px it works out to, so changing --cf-bar-h cannot
+                   silently squash the caps again — which is the whole bug this replaced. */
+                .cf-top-plate { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+                    border-style: solid; border-color: transparent;
+                    border-width: 0 calc(195 * var(--cf-bar-h) / 120);
+                    border-image-source: url(/images/cards/chrome/top-bar.png);
+                    border-image-slice: 0 195 fill;
+                    border-image-repeat: stretch;
                     filter: brightness(0.62) saturate(0.9) drop-shadow(0 3px 9px rgba(0,0,0,0.6)); }
                 /* Three of them, and space-between now spaces the GROUPS rather than the widgets. */
                 .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }

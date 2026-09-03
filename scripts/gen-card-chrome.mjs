@@ -114,18 +114,33 @@ const PIECES = {
     // things floating on a dark gradient, and a plate under them makes the strip ONE object — at which point
     // clustering them left / centre / right is what the object is for.
     //
-    // ⚠️ DRAWN TO BE STRETCHED. This is the only piece here whose displayed width is unknown — the board is
-    // 1100px on a desktop and 375 on a phone, and gpt-image-1 will not draw wider than 3:2. So the bar is
-    // asked for with NO structure along its length: the detail all runs across it (a bevel at the top, a dark
-    // edge at the bottom) and nothing marks its middle. A texture that is uniform lengthways can be stretched
-    // to any width without smearing, which is the same trick the `banner` piece below relies on. Rivets sit
-    // near the ENDS, where a stretch moves them apart rather than distorting them.
+    // ── THE TOP BAR ── ⚠️ READ THIS BEFORE CHANGING THE PROMPT OR THE STORE SIZE.
+    // Its displayed width is unknown — 1100px on a desktop board, 375 on a phone — and gpt-image-1 will not
+    // draw wider than 3:2. The first cut solved that by asking for a bar with NO structure along its length
+    // and stretching it edge to edge, on the theory that a lengthways-uniform texture cannot smear. It cannot,
+    // but the two rivets can, and they did: stored at 9:1 and shown at 19:1 they flattened into ovals. Luke:
+    // "the aspect ratio is kinda not right, the rivets on the left and right look all smoshed vertically."
+    //
+    // So the shape changed to suit how it is DRAWN rather than how it is generated. It is a THREE-PIECE bar
+    // now — a moulded cap at each end and a plain middle — and the component hangs it on border-image, which
+    // stretches only the middle and leaves the caps at their own aspect at any width. That is why the caps are
+    // asked for as clearly separate blocks: border-image slices them off by pixel count, so they have to end
+    // somewhere obvious. CAP_PX below is that number and it is shared with the CSS.
     "top-bar": {
-        size: "1536x1024", store: { w: 900, h: 96 }, tint: false, extra: SOLID,
-        subject: "A long horizontal metal bar spanning the full width — a heavy hammered plate seen straight "
-            + "on, with a bright bevelled highlight running the whole length of its top edge and a dark "
-            + "shadowed edge along the bottom. UNIFORM ALL THE WAY ALONG: no centrepiece, no crest, no join, "
-            + "no ornament in the middle, nothing written on it. A single round rivet near each end. " + METAL,
+        size: "1536x1024", store: { w: 1200, h: 120 }, tint: false, extra: SOLID,
+        // ── CONSTANT HEIGHT, END TO END ──────────────────────────────────────────────────────────────
+        // The first three-piece cut drew the caps as blocks standing TALLER than the span between them, and
+        // the result read as two chunky terminals bookending a thin rail — with the piles and the End turn
+        // button sitting right on top of the caps, because that is exactly where the groups live. The bar has
+        // to be one solid object the controls can sit anywhere along, so the ends are DECORATION ON the bar
+        // now rather than a different shape from it: same height the whole way, detail inset within it.
+        subject: "A long horizontal metal bar seen straight on, EXACTLY THE SAME HEIGHT from one end to the "
+            + "other — one solid unbroken plate, never pinched or stepped in the middle. A bright bevelled "
+            + "highlight runs the whole length of its top edge and a dark shadowed edge along the bottom. "
+            + "Inset WITHIN the bar's own height at each end, and not sticking out past it, sits a small "
+            + "decorative square panel with a round domed rivet at its centre. Everything between those two "
+            + "end panels is a plain uniform span of hammered metal: no centrepiece, no crest, no join, no "
+            + "ornament, nothing written on it. " + METAL,
     },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
