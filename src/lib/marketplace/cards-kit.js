@@ -181,46 +181,38 @@ export const BASIC_UNLOCKS = ["swipe", "scuttle", "peck", "hoot", "coils", "rall
 /** Every card the game knows about: the starter four plus the whole pet pool. */
 export const ALL_CARDS = { ...CARDS, ...POOL };
 
-// ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────
-// Eight stops, and the shape is Spire's compressed to something a person finishes standing up in a card shop:
-// a soft opening, an elite in the middle that is meant to hurt, and a boss. `foes` is how many stand against
-// you, `hp` scales what each one carries, and `offer` is the highest card tier that stop is allowed to pay.
+// ── HOW HARD A ROOM IS ───────────────────────────────────────────────────────────────────────────────────
+// This was an eight-entry ladder, one row per stop, back when a run was a straight line. The map is fifteen
+// rows and the route through it is the player's, so difficulty is a CURVE over the row you are standing on
+// rather than a table of hand-written stops — a table would have to be rewritten every time the map changed
+// shape, and would say nothing about a room the route skipped.
 //
-// NOT A MAP. Spire's branching map is most of its UI and none of its core loop; a straight ladder proves
-// whether the FIGHT is worth repeating, which is the only question this slice exists to answer. If the answer
-// is yes, the map is the next thing worth building.
-export const LADDER = [
-    { n: 1, kind: "fight", foes: 2, hp: 0.7, offer: 1 },
-    { n: 2, kind: "fight", foes: 2, hp: 0.85, offer: 1 },
-    { n: 3, kind: "fight", foes: 3, hp: 0.9, offer: 1 },
-    { n: 4, kind: "fight", foes: 3, hp: 1.0, offer: 2 },
-    { n: 5, kind: "elite", foes: 2, hp: 1.45, offer: 2 },
-    { n: 6, kind: "fight", foes: 3, hp: 1.15, offer: 2 },
-    { n: 7, kind: "fight", foes: 3, hp: 1.3, offer: 3 },
-    { n: 8, kind: "boss", foes: 1, hp: 3.2, offer: 3 },
-];
+// The kind does the rest: an elite is fewer bodies carrying far more, a boss is one thing carrying a lot.
 // ── EMBERS ───────────────────────────────────────────────────────────────────────────────────────────────
-// The run's own money, and it is deliberately NOT gold. The Den already mints gold, doubloons, chips and
-// laurels, and a fifth thing that looked like any of them would have members believing a card game paid them
-// real currency. Embers are named, coloured and spelled differently from all four, they exist only inside a
-// run, and they die with it.
+// The run's own money, and deliberately NOT gold. The Den already mints gold, doubloons, chips and laurels,
+// and a fifth thing that looked like any of them would have members believing a card game paid them real
+// currency. Embers exist only inside a run and die with it.
 //
-// ⚠️ THE ONLY WAY TO EARN THEM IS TO REFUSE A CARD. Luke's call: taking nothing pays. That makes the skip a
-// real fork rather than a courtesy — a smaller deck AND the money for the shop, against a card you wanted —
-// which is a better version of the tension Spire gets from deck size alone. Flat per skip on purpose: pricing
-// each card would put arithmetic in front of a decision that should be about your deck.
+// Earned by REFUSING a card — Luke's call — which makes the skip a real fork: a leaner deck AND the means to
+// fix it later, against a card you wanted. Flat per skip, because pricing each card would put arithmetic in
+// front of a decision that should be about the deck.
 export const SKIP_EMBERS = 25;
 
-export const RUN_LENGTH = LADDER.length;
+export const RUN_LENGTH = 15;              // map rows; the boss stands above them
 
-// ── A CARD THAT NAMES A PET NOBODY HAS IS A CARD NOBODY CAN EVER BE OFFERED ──────────────────────────────
-// Every entry in POOL is gated on owning its pet, so a typo in `pet` does not throw and does not warn — the
-// card simply never appears, for anyone, forever. That is the same silent class of bug as the Drowned
-// Admiral's scroll, and it is checked here rather than discovered in a month. The list is imported lazily by
-// the server (collectibles.js is not client-safe), so the check lives in cards.js where the ids are already
-// in hand; this export is what it validates against.
-export const POOL_PET_IDS = Object.values(POOL).map((c) => c.pet);
-export const stopAt = (n) => LADDER[Math.max(0, Math.min(LADDER.length - 1, (n || 1) - 1))];
+export function roomFight(row, kind = "fight") {
+    const t = Math.max(0, Math.min(1, (row - 1) / (RUN_LENGTH - 1)));   // 0 at the bottom, 1 at the top
+    if (kind === "boss") return { foes: 1, hp: 3.2 + t, offer: 3 };
+    if (kind === "elite") return { foes: 2, hp: 1.35 + t * 0.6, offer: t > 0.55 ? 3 : 2 };
+    return {
+        foes: row < 3 ? 2 : 3,
+        hp: 0.7 + t * 0.75,
+        offer: t < 0.3 ? 1 : t < 0.7 ? 2 : 3,
+    };
+}
+
+// Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
+export const stopAt = (n, kind = "fight") => ({ n, kind, ...roomFight(n, kind) });
 
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",

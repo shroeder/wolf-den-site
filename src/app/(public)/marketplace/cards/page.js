@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import CardFightClient from "@/components/cards/CardFightClient";
+import CardMap from "@/components/cards/CardMap";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, getCardFightFixture, loadRun, runFixture } from "@/lib/marketplace/cards.js";
 
@@ -43,6 +44,13 @@ export default async function CardsPage({ searchParams }) {
     }
 
     const run = await loadRun(buyer.id, { create: true });
+
+    // ── THE MAP IS THE DEFAULT SCREEN ────────────────────────────────────────────────────────────────────
+    // `at` is null whenever the run is between rooms — at the start, after a card is taken, after a rest or a
+    // treasure — and that is exactly when Spire shows you the sheet. A fight is what happens when you have
+    // chosen where to go, not the thing the game opens on.
+    if (!run.at && !run.done) return <CardMap run={run} />;
+
     const fixture = await runFixture(buyer.id, run);
     return <CardFightClient fixture={fixture} run={run} />;
 }

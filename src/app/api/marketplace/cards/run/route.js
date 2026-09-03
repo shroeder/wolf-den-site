@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardOffers, loadRun, saveRun } from "@/lib/marketplace/cards.js";
+import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { RUN_LENGTH, SKIP_EMBERS } from "@/lib/marketplace/cards-kit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -27,10 +28,43 @@ export async function POST(request) {
             const action = String(body?.action || "");
             const run = await loadRun(buyer.id, { create: true });
 
+            // ── WALKING ONTO A ROOM ──────────────────────────────────────────────────────────────────
+            // The move is checked, not because the numbers are worth defending — nothing here pays a coin —
+            // but because an unchecked move lets a refresh at the wrong moment put somebody on a room their
+            // route never reached, and then the map on screen stops describing the run.
+            if (action === "enter") {
+                const want = { row: Number(body?.row), lane: Number(body?.lane) };
+                const legal = reachable(run.map, run.at ? { row: run.at.row, lane: run.at.lane } : null)
+                    .some((n) => n.row === want.row && n.lane === want.lane);
+                if (!legal) return NextResponse.json({ error: "unreachable" }, { status: 400 });
+
+                const node = run.map.nodes.find((n) => n.row === want.row && n.lane === want.lane);
+                // AN UNKNOWN DECIDES ITSELF ON ENTRY, which is the whole reason theirs can be a fifth of the
+                // map — a question mark resolved when the map was drawn is just a room with a worse label.
+                const kind = node.kind === "unknown" ? resolveUnknown(run.seed, want.row) : node.kind;
+                run.at = { row: want.row, lane: want.lane, kind };
+                run.stop = want.row + 1;
+                run.trail = [...(run.trail || []), { row: want.row, lane: want.lane }];
+
+                // A rest is not a fight: it heals and hands you straight back to the map.
+                if (kind === "rest") {
+                    run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
+                    run.at = null;
+                }
+                // Treasure pays embers rather than a relic, because relics do not exist yet and a room that
+                // silently gives nothing is the Drowned Admiral's scroll all over again.
+                if (kind === "treasure") { run.embers = (run.embers || 0) + 40; run.at = null; }
+                // The merchant has no shop to open yet. It says so on the map rather than pretending.
+                if (kind === "merchant") { run.at = null; }
+
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
             if (action === "won") {
                 // The fight is over and won. Bank the health it was won on, then put three cards on the table.
                 run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
-                if (run.stop >= RUN_LENGTH) {
+                if (run.at?.kind === "boss" || run.stop > RUN_LENGTH) {
                     run.done = "won";
                     run.offers = null;
                 } else {
@@ -47,7 +81,7 @@ export async function POST(request) {
                 if (!run.offers?.includes(id)) return NextResponse.json({ error: "no_such_offer" }, { status: 400 });
                 run.deck = [...run.deck, id];
                 run.offers = null;
-                run.stop += 1;
+                run.at = null;              // back to the sheet to choose where next
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
@@ -59,7 +93,7 @@ export async function POST(request) {
                 // deck and the means to fix it later".
                 run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
-                run.stop += 1;
+                run.at = null;
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }

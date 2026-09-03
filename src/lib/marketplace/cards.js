@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
@@ -116,6 +117,14 @@ export async function getCardFightFixture(buyerId, seed, count = 3) {
 const newRun = (seed) => ({
     seed: seed >>> 0,
     stop: 1,
+    // ── THE OVERWORLD ────────────────────────────────────────────────────────────────────────────────
+    // Built once from the run's own seed and carried whole, because a map regenerated on each request is a
+    // map that can change under somebody standing on it. `at` is the room being fought/visited right now and
+    // null when the player is looking at the map; `trail` is every room already taken, which is the only way
+    // the sheet can draw where you have been.
+    map: buildMap(seed >>> 0),
+    at: null,
+    trail: [],
     hp: 70, hpMax: 70,
     embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
     deck: [...STARTER_DECK],
@@ -162,7 +171,7 @@ export async function cardOffers(buyerId, run) {
         .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId])
         .catch(() => []);
     const have = new Set((owned || []).map((r) => r.ref));
-    const maxTier = stopAt(run.stop).offer;
+    const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind).offer;
     const eligible = Object.values(POOL)
         .filter((c) => c.tier <= maxTier)
         .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
@@ -180,13 +189,21 @@ export async function cardOffers(buyerId, run) {
     return out;
 }
 
-/** The fight standing at this stop: how many, how big, and which of the Road's fighters they are. */
+/**
+ * The fight standing in this room: how many, how big, and which of the Road's fighters they are.
+ *
+ * The ladder still supplies the CURVE — how hard a fight is this far up — but the map now supplies the
+ * position, so `stop` is the row you are standing on rather than a step in a straight line.
+ */
 export async function runFixture(buyerId, run) {
-    const stop = stopAt(run.stop);
-    const fixture = await getCardFightFixture(buyerId, (run.seed >>> 0) + run.stop * 104729, stop.foes);
+    // The room being stood in decides the fight: its row sets the curve, its kind sets the shape. A run
+    // with no room selected is not in a fight at all — the page shows the map instead.
+    const room = run.at || { row: run.stop - 1, kind: "fight" };
+    const stop = stopAt(room.row + 1, room.kind);
+    const fixture = await getCardFightFixture(buyerId, (run.seed >>> 0) + (room.row * 31 + room.lane) * 104729, stop.foes);
     return {
         ...fixture,
-        stop: { ...stop, of: RUN_LENGTH },
+        stop: { ...stop, of: RUN_LENGTH, row: room.row, kind: room.kind },
         // The ladder scales what each fighter carries rather than authoring eight sets of enemies: the same
         // hundred fighters off the Road, standing in a harder line the further in you are.
         foes: fixture.foes.map((f) => ({ ...f, hp: Math.max(12, Math.round(f.hp * stop.hp)) })),
