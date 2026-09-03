@@ -1498,14 +1498,29 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
                 await addChests(buyerId, { [l.tier]: 1 }, { source: "sail_encounter" }).catch(() => {});
                 spoils.push({ kind: "chest", tier: l.tier });
             } else if (l.kind === "consumable") {
-                await grantConsumable(buyerId, l.id, 1).catch(() => {});
                 // ── SAY WHAT IT WAS ─────────────────────────────────────────────────────────────────
                 // This pushed the id and nothing else, so the victory card printed the literal word
                 // "consumable" with no sprite beside it — every other spoil on that screen names itself
                 // and shows its art. Luke: "sprites and readout of actually what we got".
                 const { CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
-                const art = await db.queryOne(`SELECT url FROM mkt_consumable_sprite WHERE consumable_id = $1`, [l.id]).catch(() => null);
-                spoils.push({ kind: "consumable", id: l.id, n: 1, name: CONSUMABLES[l.id]?.name || l.id, sprite: art?.url || null });
+                // ── AN ID THE CATALOGUE DOES NOT KNOW IS A BUG, AND IT USED TO BE AN INVISIBLE ONE ───
+                // grantConsumable returns silently for an unknown id and this line fell back to printing
+                // that id, so a typo in a loot table paid the player NOTHING and told them so in a slug:
+                // the Drowned Admiral's "scroll_enchant" (the Quartermaster's name for it, not the
+                // consumable's) shipped that way and a member photographed it. Both halves are fixed —
+                // the id in encounters.js, and this: an unknown id now says so in the log instead of
+                // being swallowed, and never puts a raw slug in front of a player.
+                const known = CONSUMABLES[l.id];
+                if (!known) {
+                    console.error(JSON.stringify({ level: "error", event: "sail.loot.unknown_consumable",
+                        subsystem: "sailing", consumableId: l.id, encounter: enc?.id || null,
+                        note: "loot table names a consumable the catalogue has no key for — nothing was granted" }));
+                }
+                if (known) await grantConsumable(buyerId, l.id, 1).catch(() => {});
+                const art = known
+                    ? await db.queryOne(`SELECT url FROM mkt_consumable_sprite WHERE consumable_id = $1`, [l.id]).catch(() => null)
+                    : null;
+                if (known) spoils.push({ kind: "consumable", id: l.id, n: 1, name: known.name, sprite: art?.url || null });
             } else if (l.kind === "parts") {
                 try {
                     const { addParts } = await import("@/lib/marketplace/crafting.js");

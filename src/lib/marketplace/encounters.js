@@ -126,7 +126,13 @@ export const ENCOUNTERS = [
     { id: "drowned_admiral", kind: "ship", tier: 5, name: "The Drowned Admiral", cls: "Sunken flagship",
         blurb: "It went down with all hands nine years ago. It has come back up.",
         guns: 9, hits: 40, accuracy: 0.75, rake: 0.22, ammo: "chain",
-        loot: [L.doubloons(80), L.chest("mythic"), L.consumable("scroll_enchant")] },
+        // ⚠️ THE CONSUMABLE'S OWN ID, NOT THE SHOP'S. This read "scroll_enchant", which is what the
+        // QUARTERMASTER calls this scroll (sailing.js keeps a shop row whose `consumable` field maps it
+        // across). CONSUMABLES has never had that key — the real one is forge_enchant_scroll — and
+        // grantConsumable returns silently for an id it does not know, so sinking the Drowned Admiral paid
+        // nothing and the victory card printed the raw slug where a name should be. See the note in
+        // sailing.js: an unknown id is now logged rather than swallowed.
+        loot: [L.doubloons(80), L.chest("mythic"), L.consumable("forge_enchant_scroll")] },
     { id: "world_serpent", kind: "monster", tier: 5, name: "The Long Coil", cls: "World serpent",
         blurb: "You can see two parts of it at once and they are very far apart.", limb: "serpent",
         guns: 8, hits: 46, accuracy: 0.73, rake: 0.24, ammo: "explosive",
