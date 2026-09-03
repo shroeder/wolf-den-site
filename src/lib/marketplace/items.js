@@ -393,6 +393,13 @@ export const ITEMS = [
     { id: "wolf_totem", name: "Wolf Totem", slot: "amulet", rarity: "legendary", icon: "GiWolfHead", flavor: "The pack runs with you.", stats: { might: 13, crit_power: 17 }, reqLevel: 60, source: "chest", sort: 256 },
     { id: "star_amulet", name: "Amulet of Stars", slot: "amulet", rarity: "legendary", icon: "GiStarFormation", flavor: "Fortune written in the sky.", stats: { crit_chance: 14, fortune: 16 }, reqLevel: 68, source: "chest", sort: 257 },
     { id: "dragonheart_sigil", name: "Dragonheart Sigil", slot: "amulet", rarity: "mythic", icon: "GiDragonHead", flavor: "A wyrm's fury, bottled.", stats: { crit_chance: 15, crit_power: 25 }, reqLevel: 95, source: "chest", sort: 258 },
+    // ⚠️ WAS A REAL-WORLD PERK (source "admin"). Sitting in the perk block it rendered as "Binder Charm —
+    // show off the collection — handed over the counter in the shop", and members read that as an
+    // instruction: bring your binder in and show it to Luke. There was never a binder behind it — the
+    // free_binder reward was written and never attached to anything — so it is loot now, and the flavour no
+    // longer asks anyone for anything. Stats and reqLevel are untouched on purpose: one member already owns
+    // one, and a rare at level 12 fills the real gap between the level-8 commons and the level-20 rares.
+    { id: "binder_charm", name: "Binder Charm", slot: "amulet", rarity: "rare", icon: "GiGemPendant", flavor: "Nine pockets, every one spoken for.", stats: { fortune: 12 }, reqLevel: 12, source: "chest", sort: 259 },
     // -- Belt --
     { id: "woven_belt", name: "Woven Belt", slot: "belt", rarity: "common", icon: "GiBeltArmor", flavor: "Simple and sturdy.", stats: { fortune: 6, crit_chance: 5 }, reqLevel: 6, source: "chest", sort: 260 },
     { id: "monk_sash", name: "Monk's Sash", slot: "belt", rarity: "rare", icon: "GiPrayerBeads", flavor: "Focus in every knot.", stats: { crit_chance: 16 }, reqLevel: 22, source: "chest", sort: 261 },
@@ -545,7 +552,6 @@ export const ITEMS = [
     { id: "box_charm", name: "Storage Charm", slot: "amulet", rarity: "common", icon: "GiBeltArmor", flavor: "A home for the collection.", stats: { ferocity: 5, fortune: 4 }, reqLevel: 5, source: "admin", earnable: true, sort: 533 },
     { id: "restock_signet", name: "Restock Signet", slot: "ring", rarity: "rare", icon: "GiSkullSignet", flavor: "First in line for the good stuff.", stats: { might: 6, fortune: 6 }, reqLevel: 10, source: "admin", earnable: true, sort: 534 },
     { id: "reserved_seat_charm", name: "Reserved Seat Charm", slot: "amulet", rarity: "rare", icon: "GiPrayerBeads", flavor: "Your spot's saved.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", earnable: true, sort: 535 },
-    { id: "binder_charm", name: "Binder Charm", slot: "amulet", rarity: "rare", icon: "GiGemPendant", flavor: "Show off the collection.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", sort: 536 },
     { id: "premium_sleeve_charm", name: "Premium Sleeve Charm", slot: "amulet", rarity: "rare", icon: "GiIntricateNecklace", flavor: "Protect in style.", stats: { ferocity: 12 }, reqLevel: 12, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "store_credit_10", chargeRewardLabel: REWARDS.store_credit_10, sort: 537 },
     { id: "birthday_charm", name: "Birthday Charm", slot: "amulet", rarity: "rare", icon: "GiHeartNecklace", flavor: "Happy birthday from the Den.", stats: { fortune: 12 }, reqLevel: 10, source: "admin", sort: 538 },
     { id: "champions_plaque", name: "Champion's Plaque", slot: "helmet", rarity: "epic", icon: "GiCrown", flavor: "Immortalized on the wall.", stats: { might: 8, fortune: 6 }, reqLevel: 20, source: "admin", earnable: true, sort: 539 },
