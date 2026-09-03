@@ -62,8 +62,20 @@ export function buildMap(seed) {
         let lane = Math.floor(roll() * MAP_LANES);
         touch(0, lane);
         for (let row = 0; row < MAP_ROWS - 1; row += 1) {
-            const drift = Math.floor(roll() * 3) - 1;                  // -1, 0 or +1
-            const to = Math.max(0, Math.min(MAP_LANES - 1, lane + drift));
+            // ── DRIFT, WITH A PULL TOWARD THE MIDDLE ─────────────────────────────────────────────
+            // A flat -1/0/+1 walk lets a path that starts in lane 6 stay in lanes 5-6 for all fifteen rows
+            // and never meet another route — Luke: "there's one path on the right that just completely goes
+            // its own way." Theirs converge because six paths over seven lanes keep colliding.
+            // The pull grows with the row, so the bottom stays wide and the top gathers: by the last rows a
+            // lane out at the edge is twice as likely to step inward as outward.
+            const mid = (MAP_LANES - 1) / 2;
+            const pull = (row / (MAP_ROWS - 1)) * 0.55;                 // 0 at the floor, 0.55 at the top
+            const inward = lane < mid ? 1 : lane > mid ? -1 : 0;
+            const r = roll();
+            const drift = r < (1 / 3) + pull * (inward === -1 ? 1 : 0) ? -1
+                : r < (2 / 3) + pull * (inward === -1 ? 1 : 0) - (inward === 1 ? pull : 0) ? 0
+                    : 1;
+            const to = Math.max(0, Math.min(MAP_LANES - 1, lane + (inward === 0 ? drift : drift)));
             const here = touch(row, lane);
             touch(row + 1, to);
             if (!here.next.includes(to)) here.next.push(to);

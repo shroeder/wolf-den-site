@@ -58,7 +58,7 @@ const PANEL = "Forged from BLACKENED IRON, deep near-black charcoal with a soft 
 
 // The type plate is the one piece that is NOT hollow — it is a solid plaque with an emblem struck on top of
 // it, so it needs the opposite instruction to everything else here.
-const INK = "Drawn as a HAND-INKED MAP SYMBOL: flat solid BLACK ink on nothing, no colour, no grey shading, no gradient, no outline glow and no background — just bold black shapes with clean gaps between them, the way a symbol is stamped on an old chart. Seen straight on, centred, filling the frame, with a little empty space around it. Simple and readable at the size of a thumbnail.";
+const INK = "⚠️ SIMPLE. Drawn as a CHUNKY PICTOGRAM with a thick brush in solid black ink: a bold silhouette with VERY FEW internal details, rounded friendly shapes, and slightly rough uneven brush edges as if stamped by hand. NO shading, no cross-hatching, no engraving lines, no texture, no outline, no colour, no background — flat black shapes and clean empty gaps, nothing else. It must read instantly at the size of a fingernail. Centred, filling the frame, a little empty space around it.";
 
 const SOLID = "Drawn FLAT ON, straight from the front, perfectly symmetrical left to right, with NO perspective "
     + "and no tilt. SOLID all the way across — a filled plate, not a frame and not a ring — and completely "
@@ -171,27 +171,79 @@ const PIECES = {
     // reachable and visited are opacity and rings in CSS, not three drawings.
     "map-fight": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A snarling horned monster head seen head-on — two curved horns, two eyes, a wide jaw.",
+        subject: "A simple round monster face seen head-on: two small curved horns on top, two eyes and a wide grinning mouth. Almost a mask. No nose, no ears, no hair, no neck.",
     },
     "map-elite": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A large horned SKULL seen head-on with heavy curved horns and deep empty eye sockets — the same creature as the ordinary monster mark but bigger and bonier.",
+        subject: "A simple horned SKULL face seen head-on: two big curved horns, two round empty eye sockets and a row of square teeth. The same simple mask shape as the monster face but broader and bonier.",
     },
     "map-rest": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A small campfire: three crossed logs with a curling flame above them.",
+        subject: "A simple campfire: two crossed logs with one rounded flame above them. Three shapes in total.",
     },
     "map-merchant": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A tied money pouch, round and full, with a knotted cord at its neck and a coin beside it.",
+        subject: "A simple round money pouch with a knotted neck and a coin symbol on its belly. One shape.",
     },
     "map-treasure": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A closed treasure chest seen straight on, with a curved lid, a band across it and a keyhole.",
+        subject: "A simple closed treasure chest seen straight on: a wide rounded box, one band across the middle and a diamond shape at its centre.",
     },
     "map-boss": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A crowned skull seen head-on, a heavy jagged crown resting on it.",
+        subject: "A simple skull face seen head-on wearing a small pointed crown: two round eye sockets, square teeth, three crown points. Nothing else.",
+    },
+    // ── THE REST OF WHAT THEIR MAP SCREEN IS MADE OF ─────────────────────────────────────────────────────
+    // Luke: "we need to generate sprites where they use sprites... why did you invent a return? They use a
+    // sprite, that red sprite looking thing." Every one of these was CSS pretending to be art.
+    "map-visited": {
+        size: "1024x1024", store: { w: 200, h: 200 }, tint: false, extra: INK,
+        subject: "A rough hand-drawn CIRCLE, a single thick brush ring with the two ends not quite meeting and "
+            + "the stroke thick and thin along its length. Completely EMPTY inside — just the ring.",
+    },
+    "ui-heart": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A plump glossy red heart seen straight on, painted with a soft highlight at the top left and "
+            + "a darker crimson at the base. Rounded and friendly, no outline.",
+    },
+    "ui-floor": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A small flight of STAIRS seen from the side, three steps rising to the right, drawn as a "
+            + "solid pale stone block shape. Simple and flat.",
+    },
+    "ui-potion": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A small round-bellied glass potion bottle with a short neck and a cork, filled with bright "
+            + "liquid and a soft highlight down one side.",
+    },
+    // The legend is a pinned scroll on their screen, not a rounded div.
+    "legend-scroll": {
+        size: "1024x1536", store: { w: 420, h: 630 }, tint: false, extra: SOLID,
+        subject: "A pale blue-white parchment scroll hanging flat, its top and bottom edges ROLLED into neat "
+            + "curls and the sheet between them smooth, blank and empty. Soft painted paper, cool white-blue, "
+            + "faint shading where it curls. Nothing written on it.",
+    },
+    // And the Return ribbon, bottom left, which was a CSS pill.
+    "return-ribbon": {
+        size: "1536x1024", store: { w: 420, h: 150 }, tint: false, extra: SOLID,
+        subject: "A deep red cloth ribbon banner running horizontally, its RIGHT end tapering to a notched "
+            + "swallow-tail point and its left end running flat off the edge. Smooth painted fabric with a "
+            + "soft fold shadow, a thin darker red hem, and nothing written on it.",
+    },
+    "ui-ember": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A single bright ember flame, teardrop shaped, glowing orange at its heart and fading to a "
+            + "deeper red at the edges, with a soft warm glow. Simple and rounded, no logs, no smoke.",
+    },
+    "ui-mapbook": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A small rolled paper map seen at a slight angle, tied with a red cord, its edges curling. "
+            + "Warm parchment against nothing.",
+    },
+    "ui-deckbook": {
+        size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
+        subject: "A neat stack of playing cards seen at a slight angle, the top card face down showing a dark "
+            + "blue back with a pale border. Simple and solid.",
     },
     // ── THE ONLY FURNITURE A REWARD SCREEN NEEDS ─────────────────────────────────────────────────────────
     // There used to be three pieces here — an ornate panel frame, a stone background texture and a brass
