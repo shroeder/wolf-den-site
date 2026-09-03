@@ -23282,47 +23282,11 @@ body.cas-seated .social-fab { display: none; }
 .cclaim-dead { text-align: center; }
 .cclaim-dead b { display: block; font-size: 1.05rem; color: #ffd08a; margin-bottom: 5px; }
 
-/* ── THE POINT-OF-SALE SCREEN ─────────────────────────────────────────────────────────────────────────────
-   A PC monitor turned to face the customer, read from about two feet away while they pay. Everything here is
-   sized for that: nothing is smaller than 18px, the QR is 300px+ square, and the whole thing fits 1080p with
-   no scrolling ever. It is a SIGN — no controls, nothing to tap, nothing that can be left in a bad state.
-
-   Full-bleed: this route lives outside the (public) group so it gets no site header or footer. `position:
-   fixed` rather than min-height so a browser chrome bar or an odd resolution cannot introduce a scrollbar. */
-.pos { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    gap: clamp(24px, 5vw, 80px); padding: clamp(24px, 4vw, 64px);
-    background:
-        radial-gradient(90% 120% at 15% -20%, rgba(255,215,94,0.13), transparent 60%),
-        linear-gradient(180deg, #14161a, #090a0c);
-    color: #e8edf3; overflow: hidden; }
-
-.pos-kick { display: block; font-size: clamp(15px, 1.6vw, 26px); font-weight: 900; letter-spacing: .18em;
-    text-transform: uppercase; color: #b9a05a; }
-.pos-qr { display: block; width: clamp(280px, 28vw, 470px); height: auto; border-radius: 16px;
-    background: #fff; padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
-.pos-qr-wait { aspect-ratio: 1; background: rgba(255,255,255,0.08); }
-.pos-scan { display: block; margin-top: 20px; font-family: var(--font-display);
-    font-size: clamp(26px, 2.9vw, 48px); color: #ffd75e; }
-.pos-scan-sub { display: block; margin-top: 6px; font-size: clamp(15px, 1.4vw, 24px); color: #9aa2ae; }
-
-/* ── A SALE JUST LANDED ── the number on the left, the QR on the right, nothing else on the screen. */
-.pos-claim-left { flex: 0 1 auto; min-width: 0; text-align: right; }
-.pos-points { display: block; font-family: var(--font-display); font-weight: 900; line-height: .95;
-    font-size: clamp(90px, 15vw, 240px); color: #ffd75e; font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 60px rgba(255,215,94,0.4); }
-.pos-unit { display: block; font-size: clamp(20px, 2vw, 32px); font-weight: 800; letter-spacing: .1em;
-    text-transform: uppercase; color: #9aa2ae; }
-.pos-break { list-style: none; margin: 22px 0 0 auto; padding: 16px 0 0; max-width: 420px;
-    display: flex; flex-direction: column; gap: 7px; border-top: 1px solid rgba(255,255,255,0.12); }
-.pos-break li { display: flex; justify-content: space-between; gap: 20px;
-    font-size: clamp(15px, 1.4vw, 22px); color: #9aa2ae; }
-.pos-break b { color: #e8edf3; font-variant-numeric: tabular-nums; }
-.pos-claim-right { flex: 0 0 auto; text-align: center; }
-
-/* The idle half of the till screen used to be a rotating stage plus a QR rail (.pos-idle/.pos-stage/
-   .pos-slide/.pos-world/.pos-myst/.pos-call/.pos-rail/.pos-dots). It is a prize wheel now and the wheel
-   carries its own styled-jsx, so those rules are gone rather than left to win a specificity fight with
-   whatever gets built here next. The .pos-claim rules above are still live. */
+/* The point-of-sale screen used to be styled here: a full-bleed .pos flex frame, a .pos-claim panel for
+   the points a sale had just earned, and before that a rotating slideshow. /counter is a single
+   component now (CounterWheel) which carries its own styled-jsx, and the claim panel and its endpoint
+   are gone entirely — so every .pos-* rule went with them rather than being left to win a specificity
+   fight with whatever gets built on that route next. */
 
 /* ── THE D&D INTEREST SURVEY (/dnd) ─────────────────────────────────────────────────────────────────────────
    Chips, not selects. This form arrives almost entirely from a phone off a Facebook post, and every question
