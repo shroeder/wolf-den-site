@@ -1117,6 +1117,59 @@ export default function CardFightClient({ fixture }) {
                        part of it is a fixed number of pixels. The backdrop is sized off THIS below. */
                     --cf-floor: calc(var(--cf-tray-h) + 56px); }
 
+                /* ── DESKTOP: THE SAME SCENE, STOOD UP TO THE SCREEN ─────────────────────────────────────
+                   Everything above is tuned for a phone and is right there. On a wide screen it broke in two
+                   ways at once, and both come from the same arithmetic rather than from the design:
+                     1. THE BACKDROP RAN OUT. Its height is --cf-floor x 3.125 (the floor mark has to land
+                        under the boots — see .cf-bg). At a 188px tray that is 762px, so on a 900px-tall
+                        screen the top 138px was bare #0b0d12 and the arena read as a strip of floor with the
+                        walls, the torches and the arches all cropped away above it.
+                     2. THE FIGHT SAT IN THE BOTTOM THIRD. The ground line is a fixed pixel count off the
+                        bottom, so the taller the screen got, the more empty floor opened up above the fight.
+                   Both are fixed by RAISING THE GROUND rather than by stretching the picture: the backdrop
+                   covers exactly when --cf-floor >= 32vh, so the tray takes whatever height that needs. The
+                   invariant the phone layout depends on — floor mark meets feet — is untouched, because it is
+                   still the same one expression driving both.
+                   Gated on WIDTH, not height: a tall phone (412x915) would otherwise get a 237px tray and a
+                   layout nobody measured. Below 900px wide, nothing here applies. */
+                @media (min-width: 900px) {
+                    .cf {
+                        --cf-tray-h: max(188px, calc(32vh - 56px));
+                        /* The figures grow with the room now that there is room. Still capped against the
+                           width so a very wide, very short window cannot blow them up past the floor. */
+                        --cf-figure: min(clamp(90px, 20vh, 210px), 16vw);
+                    }
+                    /* And they stop being four small things spread across a wide field. The hero comes in off
+                       the wall and the party gives back the outer quarter it does not need — at 1440 the row
+                       was 950px wide holding three 130px bodies, which is why they read as strangers standing
+                       apart rather than as a fight. */
+                    /* .cf-prefixed so these WIN. This block sits above the base .cf-hero/.cf-party rules in
+                       source order, and at equal specificity the later rule takes it — which is exactly what
+                       happened on the first pass: the variables applied (their base rule is above this one)
+                       and the positioning silently did not. */
+                    .cf .cf-hero { left: 9%; width: 26%; }
+                    .cf .cf-party { right: 5%; width: 52%; }
+                }
+
+                /* ── AND A CEILING ON HOW WIDE THE BOARD GETS ────────────────────────────────────────────
+                   Growing the figures fixed 1440. It did not fix 1920, and looking at that shot says why:
+                   this whole UI is built in FIXED PIXELS for a phone — a 96px card, a 22px cost diamond, a
+                   104px End turn plate — so on a very wide screen the only thing that grew was the fighters
+                   and everything else read as miniature furniture scattered around a hangar.
+                   The answer is not to scale the chrome up (every one of those numbers was measured against a
+                   thumb) but to stop giving the scene more room than it can use. The board is capped at
+                   1100px and centred; past that, the extra width is just dark. Every pixel measurement inside
+                   keeps meaning exactly what it meant on a phone.
+                   Done with insets rather than a transform ON PURPOSE: .cf-strike is position: fixed, and a
+                   transformed ancestor would become its containing block and throw the strike animation
+                   across the screen. Insets move the box without touching the coordinate system the drag
+                   maths reads. */
+                @media (min-width: 1200px) {
+                    .cf { --cf-side: max(0px, calc(50vw - 550px)); }
+                    /* Prefixed for the same reason as above — all three base rules are further down. */
+                    .cf .cf-field, .cf .cf-tray, .cf .cf-top { left: var(--cf-side); right: var(--cf-side); }
+                }
+
                 .cf-field { position: absolute; inset: 0; overflow: hidden; background: #0b0d12; }
                 /* ── THE ARENA IS ZOOMED IN, AND THAT IS THE FIX FOR THE FLOATING ───────────────────────
                    arena-bg puts its sand at 76% of the picture — everything above that is seating and sky.
