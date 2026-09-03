@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Cinzel, Kreon } from "next/font/google";
 import {
     GiBiceps, GiCardDraw, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
-    GiSlowBlob, GiSmallFire, GiSwordWound, GiThunderStruck,
+    GiFlame, GiSlowBlob, GiSmallFire, GiSwordWound, GiThunderStruck,
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, RUN_LENGTH, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    DRAG_SLOP, KEYWORDS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn,
     playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
@@ -946,7 +946,12 @@ export default function CardFightClient({ fixture, run = null }) {
 
                 {/* The ladder position belongs HERE, in the HUD, the way Spire keeps its floor number up top —
                     not on the reward banner, which only ever needs to say what to do. */}
-                <div className="cf-turn">{run ? `Stop ${runState?.stop || run.stop} of ${RUN_LENGTH} · ` : ""}Turn {fight.turn}</div>
+                <div className="cf-turn">
+                    {run ? `Stop ${runState?.stop || run.stop} of ${RUN_LENGTH} · ` : ""}Turn {fight.turn}
+                    {run ? (
+                        <b className="cf-embers"><GiFlame aria-hidden="true" />{runState?.embers || 0}</b>
+                    ) : null}
+                </div>
 
                 <div
                     className={`cf-fighter cf-hero${hurt("hero") ? " is-hit" : ""}${selfLit ? " is-target" : ""}${guarded.hero ? " is-guarding" : ""}`}
@@ -1171,8 +1176,11 @@ export default function CardFightClient({ fixture, run = null }) {
                                     );
                                 })}
                             </div>
+                            {/* The payout is ON the button. A skip that quietly pays is a skip nobody presses
+                                deliberately — the whole point is that refusing a card is a choice you make with
+                                your eyes open. */}
                             <button type="button" className="cf-pill" disabled={busy} onClick={() => takeCard(null)}>
-                                Take nothing
+                                Take nothing <b className="cf-pill-em"><GiFlame aria-hidden="true" />+{SKIP_EMBERS}</b>
                             </button>
                         </div>
                     ) : (
@@ -1902,6 +1910,12 @@ export default function CardFightClient({ fixture, run = null }) {
                     font-size: clamp(13px, 3.4vw, 17px); font-weight: 700; line-height: 1.1;
                     color: #33240f; text-align: center; text-wrap: balance; }
 
+                /* Embers are the run's own money and they are coloured so they can never be mistaken for the
+                   Den's gold: ember-orange with a flame, against gold's amber coin everywhere else. */
+                .cf-embers { display: inline-flex; align-items: center; gap: 3px; margin-left: 10px;
+                    color: #ff9a4d; font-weight: 800; font-variant-numeric: tabular-nums; }
+                .cf-pill-em { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px;
+                    color: #ff9a4d; font-weight: 800; }
                 .cf-note { margin: 0; max-width: 32ch; font-size: 13px; color: #b9c3d0; text-align: center; }
 
                 /* ── A PILL, NOT A PLATE ─────────────────────────────────────────────────────────────────

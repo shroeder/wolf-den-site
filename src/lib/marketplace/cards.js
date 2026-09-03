@@ -117,6 +117,7 @@ const newRun = (seed) => ({
     seed: seed >>> 0,
     stop: 1,
     hp: 70, hpMax: 70,
+    embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
     deck: [...STARTER_DECK],
     offers: null,          // the three on the table after a win, null the rest of the time
     done: null,            // null | "won" | "dead"

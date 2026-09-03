@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardOffers, loadRun, saveRun } from "@/lib/marketplace/cards.js";
-import { RUN_LENGTH } from "@/lib/marketplace/cards-kit.js";
+import { RUN_LENGTH, SKIP_EMBERS } from "@/lib/marketplace/cards-kit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -54,7 +54,10 @@ export async function POST(request) {
 
             if (action === "skip") {
                 // Spire lets you take nothing, and it is a real choice: a deck that stays small draws its good
-                // cards more often. Taking it away would make every reward automatic.
+                // cards more often. Taking it away would make every reward automatic. Ours pays EMBERS on top
+                // — the run's own money, for the run's own shop — so the fork is "a card" against "a smaller
+                // deck and the means to fix it later".
+                run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
                 run.stop += 1;
                 await saveRun(buyer.id, run);

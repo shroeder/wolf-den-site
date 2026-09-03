@@ -199,6 +199,18 @@ export const LADDER = [
     { n: 7, kind: "fight", foes: 3, hp: 1.3, offer: 3 },
     { n: 8, kind: "boss", foes: 1, hp: 3.2, offer: 3 },
 ];
+// ── EMBERS ───────────────────────────────────────────────────────────────────────────────────────────────
+// The run's own money, and it is deliberately NOT gold. The Den already mints gold, doubloons, chips and
+// laurels, and a fifth thing that looked like any of them would have members believing a card game paid them
+// real currency. Embers are named, coloured and spelled differently from all four, they exist only inside a
+// run, and they die with it.
+//
+// ⚠️ THE ONLY WAY TO EARN THEM IS TO REFUSE A CARD. Luke's call: taking nothing pays. That makes the skip a
+// real fork rather than a courtesy — a smaller deck AND the money for the shop, against a card you wanted —
+// which is a better version of the tension Spire gets from deck size alone. Flat per skip on purpose: pricing
+// each card would put arithmetic in front of a decision that should be about your deck.
+export const SKIP_EMBERS = 25;
+
 export const RUN_LENGTH = LADDER.length;
 
 // ── A CARD THAT NAMES A PET NOBODY HAS IS A CARD NOBODY CAN EVER BE OFFERED ──────────────────────────────
