@@ -8,7 +8,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    DRAG_SLOP, KEYWORDS, RUN_LENGTH, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn,
     playCard, startFight, typeLook,
 } from "@/lib/marketplace/cards-kit.js";
@@ -213,13 +213,44 @@ const CardFace = ({ card, art, dim, live }) => {
 const DIE_MS = 460;
 const CLOSE_MS = 340;
 
-export default function CardFightClient({ fixture }) {
+export default function CardFightClient({ fixture, run = null }) {
     const router = useRouter();
     const [fight, setFight] = useState(() => startFight({
         seed: fixture.seed,
         hero: fixture.hero,
         foes: fixture.foes,
+        // A run brings its own deck; a bare ?seed= fight does not and falls back to the starter ten.
+        deck: fixture.deck || null,
     }));
+    // ── THE RUN LIVES BESIDE THE FIGHT, NOT INSIDE IT ────────────────────────────────────────────────
+    // cards-kit knows about ONE fight and should keep knowing about one fight: it is pure, it is seeded, and
+    // the day it moves behind an API it has to move without dragging a run's worth of bookkeeping with it.
+    // So the ladder position, the carried health and the three cards on the table are here, and the only
+    // thing that crosses between them is `hp` at the moment a fight ends.
+    const [runState, setRunState] = useState(run);
+    const [busy, setBusy] = useState(false);
+    const reported = useRef(null);
+
+    const post = useCallback(async (action, extra = {}) => {
+        setBusy(true);
+        const r = await fetch("/api/marketplace/cards/run", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action, ...extra }),
+        }).catch(() => null);
+        const d = await r?.json().catch(() => null);
+        setBusy(false);
+        if (d?.run) setRunState(d.run);
+        return d?.run || null;
+    }, []);
+
+    // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
+    // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
+    // and posting a win twice would put three fresh cards on a table that already had a pick made against it.
+    useEffect(() => {
+        if (!run || !fight.over || reported.current === fight.over) return;
+        reported.current = fight.over;
+        post(fight.over === "win" ? "won" : "dead", { hp: fight.hero.hp });
+    }, [run, fight.over, fight.hero.hp, post]);
     // ── THE HAND IS ALWAYS INSPECTING SOMETHING ─────────────────────────────────────────────────────
     // Luke: "I dont know that tap and hold is gonna be ideal. Oftentimes when you're playing Slay the Spire on
     // the computer you quickly hover over a bunch of different cards... it should already be in inspection
@@ -649,8 +680,16 @@ export default function CardFightClient({ fixture }) {
     const replay = () => {
         setFloats([]);
         setActive(0);
-        setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes }));
+        setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes, deck: fixture.deck || null }));
     };
+
+    // A pick (or a deliberate skip) advances the ladder, and the next stop is a fresh server render — the
+    // fixture for stop N+1 is built there, so the screen asks for it rather than trying to derive it.
+    const takeCard = async (id) => {
+        const next = await post(id ? "pick" : "skip", id ? { id } : {});
+        if (next) router.refresh();
+    };
+    const startNewRun = async () => { await post("restart"); router.refresh(); };
 
     const dragCard = drag?.moved ? cardById(fight.hand.find((c) => c.uid === drag.uid)?.id) : null;
 
@@ -1070,28 +1109,65 @@ export default function CardFightClient({ fixture }) {
 
             {fight.over ? (
                 <div className="cf-over">
-                    <div className="cf-sheet cf-result">
-                        <GiSwordWound className="cf-result-ico" aria-hidden="true" />
-                        {/* Giving up is not the same as being killed, and the engine already knows which one
-                            happened, so the sheet says the true thing rather than the convenient one. */}
-                        <h2>
-                            {fight.over === "win" ? "The sand is yours"
-                                : fight.gaveUp ? "You walked away" : "You fall"}
-                        </h2>
-                        <p className="cf-note">
-                            {fight.over === "win"
-                                ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
-                                : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
-                        </p>
-                        {/* The seed is off the screen everywhere now, this button included — it lives in the
-                            URL, which is what a replay actually reads. And with the old Leave chip gone from
-                            the top strip, the way back to the town is here. */}
-                        <div className="cf-result-btns">
-                            <button type="button" className="cf-btn" onClick={() => router.push("/marketplace/town")}>Leave</button>
-                            <button type="button" className="cf-btn" onClick={replay}>Replay this fight</button>
-                            <button type="button" className="cf-btn is-primary" onClick={newFight}>New fight</button>
+                    {/* ── THE REWARD, WHICH IS THE WHOLE LOOP ──────────────────────────────────────────
+                        A win inside a run does not end at a result card, it ends at a CHOICE: three cards
+                        drawn from the pets you own, one of which joins your deck for the rest of the run.
+                        Spire's entire game is this moment repeated, and the reason it works is that the
+                        cards are not upgrades — a deck that grows is a deck that draws its best card less
+                        often, which is why "take nothing" has to be on the screen beside them. */}
+                    {runState && fight.over === "win" && runState.offers?.length ? (
+                        <div className="cf-sheet cf-reward">
+                            <span className="cf-kick">Stop {runState.stop} of {RUN_LENGTH} — take one</span>
+                            <div className="cf-offers">
+                                {runState.offers.map((id) => {
+                                    const c = cardById(id);
+                                    if (!c) return null;
+                                    return (
+                                        <button key={id} type="button" className="cf-offer" disabled={busy}
+                                            onClick={() => takeCard(id)}>
+                                            <CardFace card={c} art={fixture.petArt?.[c.pet]} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <button type="button" className="cf-btn" disabled={busy} onClick={() => takeCard(null)}>
+                                Take nothing
+                            </button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="cf-sheet cf-result">
+                            <GiSwordWound className="cf-result-ico" aria-hidden="true" />
+                            {/* Giving up is not the same as being killed, and the engine already knows which
+                                one happened, so the sheet says the true thing rather than the convenient one. */}
+                            <h2>
+                                {runState?.done === "won" ? "The run is yours"
+                                    : fight.over === "win" ? "The sand is yours"
+                                        : fight.gaveUp ? "You walked away" : "You fall"}
+                            </h2>
+                            <p className="cf-note">
+                                {runState?.done === "won"
+                                    ? `All ${RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
+                                    : runState?.done === "dead"
+                                        ? `You made it to stop ${runState.stop} of ${RUN_LENGTH}.`
+                                        : fight.over === "win"
+                                            ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
+                                            : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
+                            </p>
+                            <div className="cf-result-btns">
+                                <button type="button" className="cf-btn" onClick={() => router.push("/marketplace/town")}>Leave</button>
+                                {runState ? (
+                                    <button type="button" className="cf-btn is-primary" disabled={busy} onClick={startNewRun}>
+                                        {runState.done ? "New run" : "Give up the run"}
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button type="button" className="cf-btn" onClick={replay}>Replay this fight</button>
+                                        <button type="button" className="cf-btn is-primary" onClick={newFight}>New fight</button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : null}
 
@@ -1764,6 +1840,18 @@ export default function CardFightClient({ fixture }) {
                 .cf-sheet-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
                 .cf-result-ico { font-size: 34px; color: #ff8f9a; }
                 .cf-result-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+                /* ── THE REWARD SHEET ── three cards at their real size, because the choice is between three
+                   things you have to READ, and a shrunken card is a card nobody reads before picking. */
+                .cf-reward { display: grid; justify-items: center; gap: 14px; }
+                .cf-kick { font-size: 11px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
+                    color: #c9a253; }
+                .cf-offers { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+                .cf-offer { position: relative; width: 96px; height: 138px; padding: 0; background: none;
+                    border: 0; cursor: pointer; transition: transform 140ms ease-out;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)); }
+                .cf-offer:hover:not(:disabled), .cf-offer:focus-visible { transform: translateY(-8px) scale(1.04); }
+                .cf-offer:disabled { opacity: 0.5; cursor: default; }
                 .cf-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #2c3340; background: #1a202b;
                     color: #e9edf2; font-weight: 700; font-size: 13px; }
                 .cf-btn.is-primary { border-color: #7a6320; background: linear-gradient(180deg, #ffd75e, #e0a92c); color: #241a03; }

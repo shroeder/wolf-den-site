@@ -3,7 +3,9 @@ import "server-only";
 import { db } from "@/lib/db";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
-import { CARDS, FOE_SCRIPTS, nextRand } from "@/lib/marketplace/cards-kit.js";
+import {
+    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, POOL, RUN_LENGTH, STARTER_DECK, nextRand, stopAt,
+} from "@/lib/marketplace/cards-kit.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
@@ -44,7 +46,9 @@ export async function getCardFightFixture(buyerId, seed, count = 3) {
         { script: null, hp: 48 },
     ];
 
-    const petIds = [...new Set(Object.values(CARDS).map((c) => c.pet))];
+        // ALL_CARDS, not CARDS: the reward screen shows cards from the whole pet pool, and a card whose portrait
+    // was never fetched renders as an empty frame at the exact moment somebody is choosing between three.
+    const petIds = [...new Set(Object.values(ALL_CARDS).map((c) => c.pet))];
     const [me, sprites] = await Promise.all([
         db.queryOne(
             `SELECT COALESCE(NULLIF(display_name, ''), alias) AS name, avatar_sprite_url, avatar_sprite_flip
@@ -98,5 +102,94 @@ export async function getCardFightFixture(buyerId, seed, count = 3) {
                 color: pet?.color || "#9aa0a6",
             }];
         })),
+    };
+}
+
+// ── THE RUN ──────────────────────────────────────────────────────────────────────────────────────────────
+// Eight fights with the health and the deck carried between them, a card picked after every win, and a boss
+// at the end. It still pays NOTHING and is still owner-gated — the engine stays in the browser for exactly as
+// long as that is true (see the note at the top of cards-kit.js).
+//
+// The server owns the run because a phone that locks itself mid-fight should not lose it, not because the
+// numbers are worth defending. One row, overwritten.
+
+const newRun = (seed) => ({
+    seed: seed >>> 0,
+    stop: 1,
+    hp: 70, hpMax: 70,
+    deck: [...STARTER_DECK],
+    offers: null,          // the three on the table after a win, null the rest of the time
+    done: null,            // null | "won" | "dead"
+    started: true,
+});
+
+export async function loadRun(buyerId, { create = true } = {}) {
+    const row = await db.queryOne(`SELECT state FROM mkt_cards_run WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    if (row?.state && !row.state.done) return row.state;
+    if (row?.state?.done && !create) return row.state;
+    if (!create) return null;
+    // ⚠️ Math.random is fine HERE and nowhere inside the rules. The seed is the one thing a run is allowed to
+    // pull out of the air; everything downstream of it is threaded (see nextRand), which is what lets a run be
+    // replayed from its seed alone.
+    const run = newRun(Math.floor(Math.random() * 900000) + 1000);
+    await saveRun(buyerId, run);
+    return run;
+}
+
+export async function saveRun(buyerId, run) {
+    await db.query(
+        `INSERT INTO mkt_cards_run (buyer_id, state, updated_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE SET state = $2, updated_at = NOW()`,
+        [buyerId, JSON.stringify(run)]
+    ).catch(() => {});
+}
+
+/**
+ * The three cards on offer after a win.
+ *
+ * ── WHAT YOU OWN IS WHAT YOU CAN BE OFFERED, WITH A FLOOR ────────────────────────────────────────────────
+ * Every card in POOL is a pet, and a pet you do not own cannot appear. That is the point of the design and it
+ * is also its one failure mode: a member with five pets would be offered the same card three times, so
+ * BASIC_UNLOCKS is added to the eligible set for everybody. The worst collection in the Den still gets a real
+ * choice; a full one gets a deep one, which is the reward for having collected.
+ *
+ * `tier` gates by how far in you are — the back half of the ladder is where the big cards live, so an early
+ * stop cannot hand you Crush.
+ */
+export async function cardOffers(buyerId, run) {
+    const owned = await db
+        .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId])
+        .catch(() => []);
+    const have = new Set((owned || []).map((r) => r.ref));
+    const maxTier = stopAt(run.stop).offer;
+    const eligible = Object.values(POOL)
+        .filter((c) => c.tier <= maxTier)
+        .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
+
+    // Threaded off the run's own seed and its stop, so the same run re-offers the same three cards if the
+    // page is reloaded before a pick is made — reloading is not a reroll.
+    let roll = (run.seed >>> 0) + run.stop * 7919;
+    const pool = [...eligible];
+    const out = [];
+    while (out.length < 3 && pool.length) {
+        const [r, next] = nextRand(roll);
+        roll = next;
+        out.push(pool.splice(Math.floor(r * pool.length), 1)[0].id);
+    }
+    return out;
+}
+
+/** The fight standing at this stop: how many, how big, and which of the Road's fighters they are. */
+export async function runFixture(buyerId, run) {
+    const stop = stopAt(run.stop);
+    const fixture = await getCardFightFixture(buyerId, (run.seed >>> 0) + run.stop * 104729, stop.foes);
+    return {
+        ...fixture,
+        stop: { ...stop, of: RUN_LENGTH },
+        // The ladder scales what each fighter carries rather than authoring eight sets of enemies: the same
+        // hundred fighters off the Road, standing in a harder line the further in you are.
+        foes: fixture.foes.map((f) => ({ ...f, hp: Math.max(12, Math.round(f.hp * stop.hp)) })),
+        hero: { ...fixture.hero, hp: run.hp, hpMax: run.hpMax },
+        deck: run.deck,
     };
 }

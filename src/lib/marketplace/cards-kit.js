@@ -110,6 +110,106 @@ export const CARDS = {
     },
 };
 
+// ── THE POOL YOUR COLLECTION UNLOCKS ─────────────────────────────────────────────────────────────────────
+// Luke's call: "pets you own unlock cards." The four above are the starter deck and belong to everybody; every
+// card below is a PET, and it can only be offered to somebody who actually owns that pet. That is the whole
+// reason the cards were pets in the first place — 118 of them are already drawn and already collected, and
+// this turns the collection into a card pool instead of a wall of portraits.
+//
+// ⚠️ A THIN COLLECTION MUST STILL PLAY. A brand-new member owns four or five pets, so an offer drawn purely
+// from what you own would hand them the same card three times. BASIC_UNLOCKS below is the floor: those are
+// offered to anyone, owned or not, so the worst pool in the game is still a real pool. See cardOffers().
+//
+// `tier` is what a stop is allowed to offer, not a power level for its own sake: early stops offer 1, the
+// back half opens 2, and 3 only appears after the elite. `pet` must be a real id in collectibles.js.
+export const POOL = {
+    // ── TIER 1 ── the shape of the deck, not the ceiling of it.
+    swipe: { id: "swipe", pet: "bear_cub", name: "Swipe", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 9, text: "Deal {damage} damage." },
+    quill: { id: "quill", pet: "hedgehog", name: "Quills", cost: 1, kind: "skill", target: "self", tier: 1,
+        block: 5, strength: 1, text: "Gain {block} Block and 1 Strength." },
+    peck: { id: "peck", pet: "raven", name: "Peck", cost: 0, kind: "attack", target: "foe", tier: 1,
+        damage: 3, text: "Deal {damage} damage." },
+    scuttle: { id: "scuttle", pet: "crab", name: "Scuttle", cost: 1, kind: "skill", target: "self", tier: 1,
+        block: 8, text: "Gain {block} Block." },
+    swarm: { id: "swarm", pet: "honeybee", name: "Swarm", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 3, hits: 3, text: "Deal {damage} damage three times." },
+    hoot: { id: "hoot", pet: "owl", name: "Hoot", cost: 1, kind: "skill", target: "self", tier: 1,
+        draw: 2, text: "Draw 2 cards." },
+    sting: { id: "sting", pet: "scorpion", name: "Sting", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 5, weak: 1, text: "Deal {damage} damage. Apply {weak} Weak." },
+    shell: { id: "shell", pet: "turtle", name: "Shell Up", cost: 2, kind: "skill", target: "self", tier: 1,
+        block: 14, text: "Gain {block} Block." },
+
+    // ── TIER 2 ── the cards a deck is actually built around.
+    stampede: { id: "stampede", pet: "kangaroo", name: "Stampede", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 7, all: true, text: "Deal {damage} damage to ALL enemies." },
+    screech: { id: "screech", pet: "bat", name: "Screech", cost: 1, kind: "skill", target: "foe", tier: 2,
+        weak: 2, all: true, text: "Apply {weak} Weak to ALL enemies." },
+    coils: { id: "coils", pet: "serpent", name: "Coils", cost: 1, kind: "attack", target: "foe", tier: 2,
+        damage: 6, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable." },
+    rally: { id: "rally", pet: "wolf_pup", name: "Rally", cost: 1, kind: "power", target: "self", tier: 2,
+        strength: 2, text: "Gain {strength} Strength." },
+    tide: { id: "tide", pet: "dolphin", name: "Tide", cost: 0, kind: "skill", target: "self", tier: 2,
+        block: 4, draw: 1, text: "Gain {block} Block. Draw 1 card." },
+    gorge: { id: "gorge", pet: "gorilla", name: "Gorge", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 18, text: "Deal {damage} damage." },
+    fetch: { id: "fetch", pet: "raccoon", name: "Fetch", cost: 0, kind: "skill", target: "self", tier: 2,
+        energy: 1, draw: 1, text: "Gain 1 energy. Draw 1 card." },
+    mend: { id: "mend", pet: "panda", name: "Mend", cost: 1, kind: "skill", target: "self", tier: 2,
+        heal: 8, block: 4, text: "Heal {heal}. Gain {block} Block." },
+
+    // ── TIER 3 ── only after the elite, and they should feel like it.
+    maul: { id: "maul", pet: "lion_cub", name: "Maul", cost: 2, kind: "attack", target: "foe", tier: 3,
+        damage: 8, hits: 3, text: "Deal {damage} damage three times." },
+    firebreath: { id: "firebreath", pet: "dragon_whelp", name: "Firebreath", cost: 2, kind: "attack", target: "foe", tier: 3,
+        damage: 11, all: true, vulnerable: 1, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable." },
+    inkcloud: { id: "inkcloud", pet: "squid", name: "Ink Cloud", cost: 1, kind: "skill", target: "self", tier: 3,
+        block: 10, draw: 2, text: "Gain {block} Block. Draw 2 cards." },
+    crush: { id: "crush", pet: "kraken", name: "Crush", cost: 3, kind: "attack", target: "foe", tier: 3,
+        damage: 32, text: "Deal {damage} damage." },
+    ascend: { id: "ascend", pet: "griffin", name: "Ascend", cost: 1, kind: "power", target: "self", tier: 3,
+        strength: 3, text: "Gain {strength} Strength." },
+    phoenixfire: { id: "phoenixfire", pet: "radiant_phoenix", name: "Phoenix Fire", cost: 2, kind: "skill", target: "self", tier: 3,
+        heal: 14, strength: 2, text: "Heal {heal}. Gain {strength} Strength." },
+};
+
+// The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
+// choice of three every time — see the note above POOL.
+export const BASIC_UNLOCKS = ["swipe", "scuttle", "peck", "hoot", "coils", "rally"];
+
+/** Every card the game knows about: the starter four plus the whole pet pool. */
+export const ALL_CARDS = { ...CARDS, ...POOL };
+
+// ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────
+// Eight stops, and the shape is Spire's compressed to something a person finishes standing up in a card shop:
+// a soft opening, an elite in the middle that is meant to hurt, and a boss. `foes` is how many stand against
+// you, `hp` scales what each one carries, and `offer` is the highest card tier that stop is allowed to pay.
+//
+// NOT A MAP. Spire's branching map is most of its UI and none of its core loop; a straight ladder proves
+// whether the FIGHT is worth repeating, which is the only question this slice exists to answer. If the answer
+// is yes, the map is the next thing worth building.
+export const LADDER = [
+    { n: 1, kind: "fight", foes: 2, hp: 0.7, offer: 1 },
+    { n: 2, kind: "fight", foes: 2, hp: 0.85, offer: 1 },
+    { n: 3, kind: "fight", foes: 3, hp: 0.9, offer: 1 },
+    { n: 4, kind: "fight", foes: 3, hp: 1.0, offer: 2 },
+    { n: 5, kind: "elite", foes: 2, hp: 1.45, offer: 2 },
+    { n: 6, kind: "fight", foes: 3, hp: 1.15, offer: 2 },
+    { n: 7, kind: "fight", foes: 3, hp: 1.3, offer: 3 },
+    { n: 8, kind: "boss", foes: 1, hp: 3.2, offer: 3 },
+];
+export const RUN_LENGTH = LADDER.length;
+
+// ── A CARD THAT NAMES A PET NOBODY HAS IS A CARD NOBODY CAN EVER BE OFFERED ──────────────────────────────
+// Every entry in POOL is gated on owning its pet, so a typo in `pet` does not throw and does not warn — the
+// card simply never appears, for anyone, forever. That is the same silent class of bug as the Drowned
+// Admiral's scroll, and it is checked here rather than discovered in a month. The list is imported lazily by
+// the server (collectibles.js is not client-safe), so the check lives in cards.js where the ids are already
+// in hand; this export is what it validates against.
+export const POOL_PET_IDS = Object.values(POOL).map((c) => c.pet);
+export const stopAt = (n) => LADDER[Math.max(0, Math.min(LADDER.length - 1, (n || 1) - 1))];
+
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",
     "hop", "hop", "hop",
@@ -134,7 +234,9 @@ export const FOE_SCRIPTS = {
     ],
 };
 
-export const cardById = (id) => CARDS[id] || null;
+// Reads the starter four AND the pet pool. Declared before POOL exists, so it dereferences ALL_CARDS at CALL
+// time rather than closing over a map that is still empty at module-evaluation order.
+export const cardById = (id) => ALL_CARDS[id] || null;
 
 // ── THE WORDS THAT MEAN SOMETHING ────────────────────────────────────────────────────────────────────────
 // Spire colours its keywords inside the card text — "Gain 5 Block", "Apply 2 Vulnerable" — and that colouring
@@ -289,8 +391,12 @@ function beginTurn(state) {
  * question about where the damage should go. Every rule below reads `foes` — an attack carries the index of
  * what it hit, every living foe acts on its own turn, and the fight is won when the last one is down.
  */
-export function startFight({ seed = 1, hero = {}, foe = null, foes = null } = {}) {
-    const deck = STARTER_DECK.map((id, i) => ({ uid: `c${i}`, id }));
+export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck: deckIds = null } = {}) {
+    // A RUN BRINGS ITS OWN DECK AND ITS OWN HEALTH. Without one this is still the standalone fight it always
+    // was — the starter ten at full health — which is what keeps ?seed=N working as a thing you can hand
+    // somebody. With one, the cards you have picked and the health you walked out of the last fight on are
+    // the fight, and that carry is the entire reason a run is more than eight separate fights.
+    const deck = (Array.isArray(deckIds) && deckIds.length ? deckIds : STARTER_DECK).map((id, i) => ({ uid: `c${i}`, id }));
     const [draw, rng] = shuffle(deck, seed >>> 0);
     // One foe or many: a single `foe` is still accepted so nothing that only wants a duel has to build an array.
     const party = (Array.isArray(foes) && foes.length ? foes : [foe || {}]).slice(0, 5);
@@ -302,7 +408,9 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null } = {}
         energyMax: ENERGY_PER_TURN,
         hero: {
             name: hero.name || "You", art: hero.art || null, flip: Boolean(hero.flip),
-            hp: HERO_HP, hpMax: HERO_HP, block: 0, strength: 0, vulnerable: 0, weak: 0,
+            hp: Math.max(1, Math.min(hero.hpMax || HERO_HP, hero.hp || HERO_HP)),
+            hpMax: hero.hpMax || HERO_HP,
+            block: 0, strength: 0, vulnerable: 0, weak: 0,
         },
         foes: party.map((f, i) => ({
             id: `f${i}`,
@@ -374,10 +482,21 @@ export function playCard(state, uid, targetIndex = 0) {
 
     const hitFoe = (i, fn) => { foes = foes.map((f, n) => (n === i ? fn(f) : f)); };
 
+    // ── DAMAGE, AND THE THREE WAYS A CARD CAN SHAPE IT ───────────────────────────────────────────────
+    // `hits` swings the same number more than once, `all` swings at everybody. Both are resolved as REPEATED
+    // SINGLE HITS rather than one big number, because that is what makes them different from a card with a
+    // bigger figure on it: each swing is rolled against that foe's own Block and its own Vulnerable, so three
+    // hits of 4 chew through 6 Block where one hit of 12 does not, and a party of three is what `all` is for.
     if (card.damage) {
-        const dealt = attackDamage(card.damage, hero, foes[ti]);
-        hitFoe(ti, (f) => land(f, dealt));
-        events.push({ type: "damage", on: foes[ti].id, amount: dealt });
+        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
+        for (let swing = 0; swing < (card.hits || 1); swing += 1) {
+            for (const i of targets) {
+                if (!(foes[i].hp > 0)) continue;
+                const dealt = attackDamage(card.damage, hero, foes[i]);
+                hitFoe(i, (f) => land(f, dealt));
+                events.push({ type: "damage", on: foes[i].id, amount: dealt });
+            }
+        }
     }
     if (card.block) {
         hero = { ...hero, block: (hero.block || 0) + card.block };
@@ -391,19 +510,44 @@ export function playCard(state, uid, targetIndex = 0) {
         events.push({ type: "heal", on: "hero", amount: hero.hp - before });
     }
     if (card.vulnerable) {
-        hitFoe(ti, (f) => ({ ...f, vulnerable: (f.vulnerable || 0) + card.vulnerable }));
-        events.push({ type: "debuff", on: foes[ti].id, key: "Vulnerable", amount: card.vulnerable });
+        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
+        for (const i of targets) {
+            hitFoe(i, (f) => ({ ...f, vulnerable: (f.vulnerable || 0) + card.vulnerable }));
+            events.push({ type: "debuff", on: foes[i].id, key: "Vulnerable", amount: card.vulnerable });
+        }
+    }
+    // ── WEAK ── the defensive half of the pair, and it was already half here: attackDamage has always taken a
+    // quarter off a Weak attacker and resolveCard has always reported it, but nothing could APPLY it. A card
+    // that makes the big swing smaller is the only answer to an intent you cannot block through, so the run
+    // needs it the moment enemies start hitting for sixteen.
+    if (card.weak) {
+        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
+        for (const i of targets) {
+            hitFoe(i, (f) => ({ ...f, weak: (f.weak || 0) + card.weak }));
+            events.push({ type: "debuff", on: foes[i].id, key: "Weak", amount: card.weak });
+        }
+    }
+    // Strength is permanent for the fight and adds to EVERY attack after it, which is what makes a card that
+    // does nothing on the turn you play it worth a slot.
+    if (card.strength) {
+        hero = { ...hero, strength: (hero.strength || 0) + card.strength };
+        events.push({ type: "buff", on: "hero", key: "Strength", amount: card.strength });
     }
 
-    const next = {
+    let next = {
         ...state,
         hero, foes,
-        energy: state.energy - card.cost,
+        // `energy` on a card is energy GAINED, so a 1-cost card that gives 2 back is a net +1 and the reason
+        // a deck can do more than three things a turn.
+        energy: state.energy - card.cost + (card.energy || 0),
         hand: state.hand.filter((c) => c.uid !== uid),
         discard: [...state.discard, entry],
         // The fight is over when the LAST one is down, not the first.
         over: foes.every((f) => f.hp <= 0) ? "win" : state.over,
     };
+    // Drawn AFTER the card has left the hand and reached the discard, so a card that draws cannot draw itself
+    // back, and so a draw that exhausts the pile reshuffles a discard this card is already part of.
+    if (card.draw) next = drawCards(next, card.draw);
     if (next.over === "win") events.push({ type: "over", result: "win" });
     return { state: next, events };
 }

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import CardFightClient from "@/components/cards/CardFightClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, getCardFightFixture } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, getCardFightFixture, loadRun, runFixture } from "@/lib/marketplace/cards.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -10,13 +10,22 @@ export const metadata = {
     description: "A deck, a foe, and one decision a turn.",
 };
 
-// ── THE VERTICAL SLICE ───────────────────────────────────────────────────────────────────────────────────────
-// One fight. A hand, a draw pile, a discard pile, you on the left, something off the Long Road on the right,
-// and cards you drag onto it. No map, no rewards, no economy, no writes — the point of a slice is to find out
-// whether the thing in the middle is any fun before building the rest of the building around it.
+// ── THE RUN ──────────────────────────────────────────────────────────────────────────────────────────────────
+// It was one fight: a hand, a draw pile, three fighters off the Long Road, and nothing on either side of it.
+// The slice answered the question it was built to ask — the fight is worth repeating — so this is the loop
+// around it. Eight stops, your health carried from one to the next, a card picked after every win, an elite
+// in the middle and a boss at the end.
 //
-// ?seed=N IS THE WHOLE POINT OF THE URL. The shuffle, and the foe, come from it — so two people can play the
-// identical fight on different devices and argue about the same turn instead of about two different ones.
+// WHAT MAKES IT A GAME rather than eight fights is the carry. Health does not reset, so a win at 12 HP is a
+// problem you take with you, and the deck only grows, so every pick is a bet about the fights you have not
+// seen yet.
+//
+// STILL PAYS NOTHING. No gold, no XP, no item, no row outside its own — and still owner-gated. That is what
+// keeps the rules in the browser where they can be changed in a minute (see cards-kit.js).
+//
+// ?seed=N STILL WORKS and still means what it always did: one standalone fight, the starter deck, full
+// health, no run touched. That is the replay link you hand somebody to argue about a specific turn, and a run
+// would make it a different fight every time.
 export default async function CardsPage({ searchParams }) {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards");
@@ -26,9 +35,14 @@ export default async function CardsPage({ searchParams }) {
 
     const q = await searchParams;
     const asked = Number.parseInt(q?.seed, 10);
-    // A fresh seed per visit when none is asked for, so opening the page twice is two different fights.
-    const seed = Number.isFinite(asked) && asked > 0 ? asked >>> 0 : (Math.floor(Math.random() * 900000) + 1000);
 
-    const fixture = await getCardFightFixture(buyer.id, seed);
-    return <CardFightClient fixture={fixture} />;
+    // ── A NAMED SEED IS THE OLD ONE-OFF FIGHT ────────────────────────────────────────────────────────────
+    if (Number.isFinite(asked) && asked > 0) {
+        const fixture = await getCardFightFixture(buyer.id, asked >>> 0);
+        return <CardFightClient fixture={fixture} />;
+    }
+
+    const run = await loadRun(buyer.id, { create: true });
+    const fixture = await runFixture(buyer.id, run);
+    return <CardFightClient fixture={fixture} run={run} />;
 }
