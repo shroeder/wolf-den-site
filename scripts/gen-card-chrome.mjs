@@ -39,6 +39,23 @@ const CHROME = "Drawn FLAT ON, straight from the front, perfectly symmetrical le
 const METAL = "Forged from pale neutral grey-silver metal with hammered facets, subtle rivets at the corners, "
     + "and a bright specular edge along the top — desaturated, almost no colour of its own.";
 
+// ── AND A MATERIAL FOR THE PANEL FURNITURE ───────────────────────────────────────────────────────────────────
+// Luke: "I don't really like how you've decided to create these textured buttons and borders, it just looks
+// really ghetto and it always seems to just be Gray."
+//
+// The grey is not an accident and it is not the model's fault — METAL above SAYS "desaturated, almost no
+// colour of its own", because everything it describes gets TINTED into rarity colours afterwards. The panel
+// is never tinted, so it kept the neutral base and nothing ever put colour back. It also fought the screen it
+// sits on: the arena behind it is warm orange and firelight, and a cold grey slab in front of that reads as a
+// browser dialog someone dropped on a painting.
+//
+// So the panel has its own material — blackened iron with brass, lit warm, which is the furniture the rest of
+// this game is already made of.
+const PANEL = "Forged from BLACKENED IRON, deep near-black charcoal with a soft graphite sheen, and inlaid "
+    + "with warm antique BRASS along its raised edges — aged brass with a gentle golden glow, not yellow "
+    + "plastic. Lit warmly from above so the brass catches the light and the iron stays dark. Rich and "
+    + "restrained: no bright silver, no cold grey, no rust.";
+
 // The type plate is the one piece that is NOT hollow — it is a solid plaque with an emblem struck on top of
 // it, so it needs the opposite instruction to everything else here.
 const SOLID = "Drawn FLAT ON, straight from the front, perfectly symmetrical left to right, with NO perspective "
@@ -152,12 +169,17 @@ const PIECES = {
     // it — same trick as the top bar, and for the same reason: the panel is a different size on a phone than
     // on a desktop and its corners must not squash.
     "panel-frame": {
-        // tint: false — a panel has no rarity. Without this the tint pass writes three coloured copies nobody
-        // ever loads, which is the same dead weight as any other unread export.
+        // ⚠️ THE SLICE HAS TO MATCH THE CORNER, and last time it did not. The drawn corner blocks ran about
+        // 90px into a 480px image and the CSS sliced at 68 — so the cut went THROUGH each corner and the
+        // leftover piece was stretched along the edges. Luke saw it exactly: "sharp rectangles sticking out
+        // behind each of the corners."
+        // The fix is a frame that is easy to slice rather than a cleverer number: an even band with a SMALL
+        // corner accent, so anywhere sensible to cut is a correct place to cut.
         size: "1024x1024", store: { w: 480, h: 480 }, tint: false,
-        subject: "An ornate empty rectangular panel frame — a wide moulded border of EVEN THICKNESS on all "
-            + "four sides, with a small raised corner boss at each of the four corners and a bevelled inner "
-            + "lip. Nothing at all inside it. " + METAL,
+        subject: "An empty rectangular panel frame: a moulded band of EXACTLY EVEN THICKNESS on all four "
+            + "sides, no thicker at the corners than along the sides, with a slim brass pinstripe following "
+            + "its inner edge and a small neat brass corner accent tucked INSIDE the band at each corner. "
+            + "Nothing at all inside the opening. " + PANEL,
     },
     // Flat and even on purpose: any lighting baked into a background shows up as a bright patch that does not
     // move when the panel resizes, which is the tell that a texture is a picture.
@@ -174,12 +196,17 @@ const PIECES = {
         subject: "Dark charcoal stone. Fine even grain with faint mineral flecks and a few shallow scratches, "
             + "deep desaturated near-black grey.",
     },
-    // Wider and more ornate than button-plate, which is the small End turn tab. This one carries a sentence.
+    // ── THE PANEL BUTTON ── and it is drawn to be SLICED, not stretched.
+    // Luke: "the button sprite clearly looks stretched, the aspect ratio, I don't like that." He is right and
+    // it is the same fault the top bar had: one image at 3:1 pulled across a button at 4.5:1 pulls everything
+    // in it — the domed shading, the end rivets — out of shape with it. Same answer as the top bar: a cap at
+    // each end that border-image holds at its own aspect, and a plain middle that takes the stretch.
     "panel-button": {
-        size: "1536x1024", store: { w: 360, h: 120 }, tint: false, extra: SOLID,
-        subject: "A wide ornate blank metal button with softly rounded corners, gently domed so it catches "
-            + "the light along the top, a bevelled outer edge and a small rivet at each end — solid, filled, "
-            + "and completely blank with nothing written or struck on it. " + METAL,
+        size: "1536x1024", store: { w: 600, h: 150 }, tint: false, extra: SOLID,
+        subject: "A wide horizontal button, EXACTLY THE SAME HEIGHT from end to end, built in three parts: a "
+            + "short ornate CAP at each end carrying a small brass rivet, and between them a long plain "
+            + "unbroken span, gently domed, catching a soft highlight along its whole top edge. The span is "
+            + "completely blank — no lettering, no emblem, no ornament in the middle. " + PANEL,
     },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.

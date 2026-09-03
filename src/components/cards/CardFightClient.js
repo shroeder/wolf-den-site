@@ -1859,9 +1859,15 @@ export default function CardFightClient({ fixture, run = null }) {
                    own layer here because the two want different sizing: the frame stretches, the stone tiles. */
                 .cf-sheet { width: min(460px, 100%); max-height: 82dvh; overflow-y: auto;
                     padding: 18px 14px; text-align: center;
-                    border-style: solid; border-width: 22px; border-color: transparent;
+                    /* SLICE WIDE ENOUGH TO CONTAIN THE WHOLE CORNER. The band is 57px thick in a 480px
+                       source and the brass corner accent reaches further in than that, so the cut is taken at
+                       96 — past everything the corner is made of. Cutting at 68 last time went THROUGH the
+                       corner and the offcut was stretched down each edge, which is the "sharp rectangles
+                       sticking out behind each of the corners" Luke saw. A slice is only correct if nothing
+                       ornamental straddles it. */
+                    border-style: solid; border-width: 32px; border-color: transparent;
                     border-image-source: url(/images/cards/chrome/panel-frame.png);
-                    border-image-slice: 68; border-image-repeat: stretch;
+                    border-image-slice: 96; border-image-repeat: stretch;
                     background-image: url(/images/cards/chrome/panel-bg.png);
                     background-size: 320px; background-repeat: repeat; background-origin: padding-box;
                     box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
@@ -1898,18 +1904,25 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-offer:hover:not(:disabled) .cf-card, .cf-offer:focus-visible .cf-card {
                     transform: scale(calc(var(--cf-offer-s) + 0.08)) translateY(-4px); }
                 .cf-offer:disabled { opacity: 0.5; cursor: default; }
-                /* The button is a struck plate too. Stretched rather than sliced: it is drawn blank and
-                   uniform across its face, so the only thing a stretch moves is the rivets at its ends. */
-                .cf-btn { position: relative; padding: 13px 26px; border: 0; background: none;
+                /* ── SLICED, NOT STRETCHED ───────────────────────────────────────────────────────────────
+                   One image pulled across a button of a different aspect drags its shading and its rivets out
+                   of shape with it — the same fault the top bar had, and Luke caught this one too: "the button
+                   sprite clearly looks stretched, the aspect ratio." The flared caps run to x=110 and from
+                   x=495 in a 600x150 source, so the cut is 108 and only the flat middle is allowed to give.
+                   The border width is written as the scale calculation rather than the 33px it works out to,
+                   so changing the button height cannot silently squash the caps. */
+                .cf-btn { position: relative; --cf-btn-h: 46px; height: var(--cf-btn-h);
+                    padding: 0 18px; min-width: 150px; background: none;
+                    border-style: solid; border-color: transparent;
+                    border-width: 0 calc(108 * var(--cf-btn-h) / 150);
+                    border-image-source: url(/images/cards/chrome/panel-button.png);
+                    border-image-slice: 0 108 fill; border-image-repeat: stretch;
                     font-family: var(--cf-panel-font); font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
-                    color: #f3e7c8; text-shadow: 0 2px 3px rgba(0,0,0,0.85); cursor: pointer;
+                    color: #f6e9c6; text-shadow: 0 2px 3px rgba(0,0,0,0.9); cursor: pointer;
                     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
-                .cf-btn::before { content: ""; position: absolute; inset: 0; z-index: -1;
-                    background-image: url(/images/cards/chrome/panel-button.png);
-                    background-size: 100% 100%; background-repeat: no-repeat; }
                 .cf-btn:active { transform: translateY(1px); }
                 .cf-btn.is-primary { color: #2a1c04; }
-                .cf-btn.is-primary::before { filter: sepia(0.7) saturate(2.4) hue-rotate(-18deg) brightness(1.18); }
+                .cf-btn.is-primary { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) brightness(1.22) saturate(1.25); }
                 .cf-btn:disabled { opacity: 0.55; cursor: default; }
                 @media (max-width: 460px) {
                     .cf-sheet { border-width: 16px; padding: 14px 8px; }
