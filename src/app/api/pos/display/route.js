@@ -22,42 +22,11 @@ export async function GET(request) {
             // and is worth guessing at. Closed also means closed when no key is configured at all.
             if (!posDisplayKeyOk(key)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            // ── THE MYSTERY BOARD RIDES THE SAME POLL ───────────────────────────────────────────────────
-            // Luke: "I don't want to have to flip between mystery packs and then this marketing thing."
-            // So it is a slide on this screen rather than a second URL somebody has to remember to open.
-            //
-            // Behind the shared cache at 60s — the poll runs every 4 seconds and this data changes when a
-            // bag is sold, so re-reading it fifteen times a minute would be fifteen times the work for the
-            // same answer. The claim above is NOT cached: that one has to be live to the second.
-            const [claim, mystery] = await Promise.all([
-                latestCounterClaim(),
-                (async () => {
-                    const { shared, TTL } = await import("@/lib/marketplace/shared-cache.js");
-                    return shared("pos:mystery", TTL.SLOW * 2, async () => {
-                        const { getMysteryBagDashboardData } = await import("@/lib/mystery-bags.js");
-                        const d = await getMysteryBagDashboardData().catch(() => null);
-                        if (!d) return null;
-                        return {
-                            remaining: d.remainingPacks ?? null,
-                            // Square carries no price for the bag, so the board falls back the same way
-                            // /mystery-bags does — env first, then the shelf price Luke quoted ("mystery
-                            // packs that are twenty bucks a piece"). Never the computed average: that is
-                            // what a pack is WORTH, and printing it as the price would be a lie in our
-                            // favour on a screen a customer is reading.
-                            price: d.bagPrice || Number(process.env.MYSTERY_BAG_PRICE) || 20,
-                            marketTotal: d.metrics?.marketTotal ?? 0,
-                            average: d.averagePackValue ?? null,
-                            // FIVE, not three. Luke: "it needs to render the top five chase cards and their
-                            // price ... it really needs to sell the mystery packs." topCards is only ever
-                            // three, so this reads the full sorted list.
-                            top: (d.cards || []).slice(0, 5).map((c) => ({
-                                name: c.name, value: c.marketValue, image: c.imageUrl || null,
-                            })),
-                        };
-                    });
-                })().catch(() => null),
-            ]);
-            return NextResponse.json({ claim, mystery }, { headers: { "Cache-Control": "no-store" } });
+            // THE MYSTERY BOARD USED TO RIDE THIS POLL. It fed a slide on the till screen; the screen is
+            // a prize wheel now and nothing reads it, so it is gone rather than computed every minute for a
+            // field no client opens. It is in the history if the board is ever wanted back.
+            const claim = await latestCounterClaim();
+            return NextResponse.json({ claim }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "pos.display.failure" });
         }

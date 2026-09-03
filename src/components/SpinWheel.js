@@ -7,36 +7,15 @@ import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import useScrollLock from "@/lib/useScrollLock";
 import Coin from "@/components/Coin";
+import { ICON_R, WEDGES, WEDGE_DEG, WEDGE_OFFSET, iconPos, landingRotation } from "@/lib/marketplace/wheel-geometry.js";
 
 // ── THE PRIZE WHEEL — hand-painted game art: a big rotating 20-wedge disc inside a slim bulb-lit gold frame
 // with a wolf-head pointer. Real prize sprites on every wedge (no emoji). Feeds a shared PROGRESSIVE jackpot,
 // and has two bonus rounds: a MINI WHEEL and a pick-a-box BONUS GAME that reveals wheel-exclusive gear. ──
 
-const WEDGES = 20;
-const WEDGE_DEG = 360 / WEDGES;
-const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°… so wedge CENTERS are at 0°,18°… (measured from the art). Icons were landing on the divider lines at offset 9.
-// ── WHERE THE PRIZE SPRITES SIT ──────────────────────────────────────────────────────────────────────────────
-// READ THE UNITS BEFORE TOUCHING THIS NUMBER. iconPos writes `left: ${50 + r*sinθ}%`, and a percentage there is
-// a percentage of the rotor's WIDTH — so the offset from centre is r% of the width, and the rotor's RADIUS is
-// 50 of these units, not 100. Every past attempt at this number got that wrong in one direction or the other:
-// 25.5 and 28.5 read as "huddled around the hub" because they are only 0.51 and 0.57 of the radius, and 62 —
-// picked while thinking 100 was the rim — put the whole ring of sprites outside the wheel, floating in the page
-// around the frame.
-//
-// Measured off the composited art (disc at 82% inside the frame), in ROTOR RADII:
-//     the disc's hub ends at        0.308   →  ICON_R 15.4
-//     the frame's inner rim starts  0.812   →  ICON_R 40.6
-// An icon is 9.5% of the rotor wide and its <img> is 116% of that, so it reaches ±5.5 ICON_R units:
-//     15.4 + 5.5 = 20.9   <=   ICON_R   <=   40.6 - 5.5 = 35.1
-// 34 is the top of that band: dead centre of each wedge, out in the FAT end where a pie slice is widest, which
-// is where every prize wheel ever built puts them. The size is set from the geometry too — at this radius each
-// wedge is 0.215 rotor radii wide at the icon ring, and a 9.5% icon is 0.220 across, so they sit one per slice
-// and just touch instead of overlapping their neighbours.
-//
-// The wolf's muzzle hangs down to 0.583 of the radius, so an icon does pass behind it once per turn. That is
-// deliberate and already handled: the WINNING icon lifts above the frame when the wheel stops (see
-// .cw-ring.has-won .cw-rotor), so the one sprite that has to be readable never is covered.
-const ICON_R = 34;
+// The disc geometry — wedge count, icon-ring radius, and the polar layout — lives in wheel-geometry.js, so
+// the counter screen'''s demo wheel is drawn off the same numbers as this one. Read the notes there before
+// changing any of them: the units are not what they look like.
 const SPIN_MS = 5600;
 // The wheel starts turning the INSTANT you tap, on a constant-speed lead-in, and only retargets to the
 // winning wedge once the server answers. It used to sit dead still until the POST came back — on a cold
@@ -78,13 +57,6 @@ function playWin(kind) {
     notes.forEach((freq, i) => {
         try { const t = a.currentTime + i * 0.1; const o = a.createOscillator(), g = a.createGain(); o.type = "triangle"; o.frequency.value = freq; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34); o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.38); } catch { /* ignore */ }
     });
-}
-
-// Position an icon at wedge i of an N-wedge ring (percent coords + radial rotation).
-function iconPos(i, offset, deg, r) {
-    const th = i * deg + offset;
-    const rad = (th * Math.PI) / 180;
-    return { left: `${50 + r * Math.sin(rad)}%`, top: `${50 - r * Math.cos(rad)}%`, transform: `translate(-50%, -50%) rotate(${th}deg)` };
 }
 
 // Render full-screen overlays into <body> so `position: fixed` is measured against the VIEWPORT, not a
@@ -200,16 +172,13 @@ export default function SpinWheel() {
         // wrong-length list at build time, and a modulo here degrades honestly if one ever slips past.
         const idx = ((Math.round(Number(d.prizeIndex) || 0) % WEDGES) + WEDGES) % WEDGES;
         setWonIdx(idx);
-        // NO JITTER. It used to stop up to ±3.6° off centre "for feel" — noise on the one signal the whole
-        // wheel exists to send. Dead centre under the wolf, every time.
         const turns = 5 + Math.floor(Math.random() * 4);
-        const targetMod = (((-(idx * WEDGE_DEG + WEDGE_OFFSET)) % 360) + 360) % 360;
         // `prev` is the lead-in's target, which is always at or ahead of the live angle — so landing from it
         // can only ever move the disc forward. The land transition REPLACES a running one, which interpolates
         // from wherever the disc actually is; that hand-off is safe (unlike arming from `none`).
         landed = true;
         setPhase("land");
-        setRot((prev) => { let n = Math.ceil(prev / 360) * 360 + turns * 360 + targetMod; if (n <= prev + 360) n += 360; return n; });
+        setRot((prev) => landingRotation(prev, idx, turns));
         timerRef.current = setTimeout(() => {
             cancelAnimationFrame(rafRef.current);
             setSpinning(false); setPhase("idle");

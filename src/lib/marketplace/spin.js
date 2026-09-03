@@ -632,6 +632,38 @@ export async function grantSpinTokens(buyerId, n = 1) {
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
+// ── THE WHEEL, DRESSED FOR A SCREEN ──────────────────────────────────────────────────────────────────────────
+// One mapping from a wheel definition to what a client is allowed to know about it: the wedge faces in disc
+// order, and the odds of each. `odds` rather than `weight` because a weight only means anything next to the
+// total — and because the counter screen rolls its demo spin off this same array, so the wheel a stranger
+// watches in the shop behaves like the wheel they get when they sign up, without shipping the raw table.
+export function wheelView(wheel) {
+    const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
+    return {
+        id: wheel.id,
+        name: wheel.name,
+        disc: wheel.disc || null,
+        prizes: wheel.prizes.map((p) => ({
+            label: goldLabel(p),
+            sprite: p.sprite ? P(p.sprite) : null,
+            rare: Boolean(p.rare),
+            tier: p.tier || (p.rare ? "rare" : "normal"),
+            odds: Math.round((p.weight / total) * 1000) / 10,
+            desc: prizeDesc(p),
+        })),
+    };
+}
+
+/**
+ * The ordinary wheel, for a screen with nobody signed in behind it (the counter display).
+ *
+ * WHEELS[0] on purpose, never wheelForMember: the Golden Wheel is a 20,000-chip perk, and a shop screen
+ * advertising its numbers to the street would be showing prizes that no new account can reach.
+ */
+export function publicWheelView() {
+    return wheelView(WHEELS[0]);
+}
+
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
     const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -673,10 +705,7 @@ export async function getSpinState(buyerId) {
         return collectionsForFeature("wheel", await ownedPieces(buyerId).catch(() => []));
         })().catch(() => []),
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
-        wheel: (() => {
-            const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;
-            return { id: wheel.id, name: wheel.name, disc: wheel.disc || null, prizes: wheel.prizes.map((p) => ({ label: goldLabel(p), sprite: p.sprite ? P(p.sprite) : null, rare: Boolean(p.rare), tier: p.tier || (p.rare ? "rare" : "normal"), odds: Math.round((p.weight / total) * 1000) / 10, desc: prizeDesc(p) })) };
-        })(),
+        wheel: wheelView(wheel),
         nextWheel: next ? { name: next.name, atLevel: next.minLevel } : null,
         canSpin: freeAvailable || (row?.tokens || 0) > 0,
     };

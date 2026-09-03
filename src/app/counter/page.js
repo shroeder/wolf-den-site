@@ -1,7 +1,8 @@
 import QRCode from "qrcode";
 
 import CounterDisplayClient from "@/components/CounterDisplayClient";
-import { bossPrizes, chargedGearArt, chargedGearPitch, posCollage, shelfPrize, POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
+import { POS_PITCH, posDisplayConfigured, posDisplayKeyOk } from "@/lib/marketplace/pos-display.js";
+import { publicWheelView } from "@/lib/marketplace/spin.js";
 import { SITE_URL } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -12,8 +13,9 @@ export const metadata = {
 };
 
 // ── THE SCREEN THAT FACES THE CUSTOMER ───────────────────────────────────────────────────────────────────────
-// Park a browser on /counter?key=<POS_DISPLAY_KEY>, full screen, and leave it. It shows the pitch until a sale
-// lands, then that sale's QR for a couple of minutes, then goes back to the pitch. Nobody touches it.
+// Park a browser on /counter?key=<POS_DISPLAY_KEY>, full screen, and leave it. It shows a prize wheel anybody
+// can spin until a sale lands, then that sale's QR for a couple of minutes, then goes back to the wheel.
+// Nobody touches it (except the customers, which is the point).
 //
 // The key is in the URL rather than a login because the machine is unattended and customer-facing — a signed-in
 // staff session sitting on a screen the public can see is the thing this avoids. See pos-display.js.
@@ -29,14 +31,10 @@ export const metadata = {
 // pretty easy because otherwise it's going to be overwhelming for new users to try and navigate and figure out
 // where the menu is and get to the right place."
 //
-// It used to land on the site's front page, which is a shop window: a new member then had to find sign-up,
-// get through it, and then go hunting through a game menu for a wheel nobody had told them about. Three
-// guesses in a row, at a counter, with somebody waiting behind them.
-//
-// Now it opens the sign-up form directly and comes back to the wheel the moment the account is live. Nothing
-// about the wheel changes — every account already gets a free spin every day, so a brand-new member has one
-// waiting and so does the member who joined a year ago and never found it. That is the whole offer, and it
-// needed no new mechanic, only a door.
+// That ramp is now the whole screen: they spin the wheel here, and the code takes them to the same wheel with
+// an account behind it. Nothing about the destination changed when the slideshow went — every account already
+// gets a free spin every day, so a brand-new member has one waiting and so does the member who joined a year
+// ago and never found it.
 //
 // `signup=1` opens on the CREATE form rather than the sign-in form, because somebody scanning a QR code off a
 // shop counter does not have an account yet — and the sign-in link is right there for the ones who do.
@@ -44,7 +42,7 @@ const IDLE_URL = `${SITE_URL}/marketplace/login?signup=1&returnTo=${encodeURICom
     + `&utm_source=pos&utm_medium=qr&utm_campaign=counter-screen`;
 
 export default async function CounterPage({ searchParams }) {
-    const { key, slide } = await searchParams;
+    const { key } = await searchParams;
 
     if (!posDisplayKeyOk(key)) {
         return (
@@ -59,34 +57,20 @@ export default async function CounterPage({ searchParams }) {
         );
     }
 
-    // The QR and the collage are the two things the client cannot build for itself: one needs the qrcode
-    // encoder, the other needs four database tables. Both are effectively static for the life of the screen,
-    // so they are resolved once here rather than fetched on the poll. The mystery board is the exception and
-    // rides the poll, because it changes when a bag is sold.
-    const [idleQr, collage, prizes, gearArt, shelf] = await Promise.all([
-        QRCode.toDataURL(IDLE_URL, {
-            width: 720, margin: 1, errorCorrectionLevel: "M",
-            color: { dark: "#101014", light: "#ffffff" },
-        }).catch(() => null),
-        posCollage().catch(() => []),
-        bossPrizes().catch(() => ({ given: [], upNext: null })),
-        chargedGearArt().catch(() => ({})),
-        shelfPrize().catch(() => null),
-    ]);
+    // Both of these are static for the life of the screen, so they are resolved once here rather than fetched
+    // on the poll: the QR needs the encoder, and the wheel is a module-level table. Only the claim rides the
+    // poll, because only the claim changes.
+    const signupQr = await QRCode.toDataURL(IDLE_URL, {
+        width: 720, margin: 1, errorCorrectionLevel: "M",
+        color: { dark: "#101014", light: "#ffffff" },
+    }).catch(() => null);
 
-    // ?slide=world|prizes|gear|mystery|loop pins one panel instead of rotating — park it on the mystery
-    // board during a bag drop, or on the prizes the week a boss is up. No param and it cycles.
     return (
         <CounterDisplayClient
             displayKey={String(key)}
-            idleQr={idleQr}
-            pitch={POS_PITCH}
-            gear={chargedGearPitch()}
-            gearArt={gearArt}
-            shelf={shelf}
-            collage={collage}
-            prizes={prizes}
-            pinned={typeof slide === "string" ? slide : null}
+            signupQr={signupQr}
+            wheel={publicWheelView()}
+            pointsRate={POS_PITCH.rate}
             claimBase={`${SITE_URL}/marketplace/claim/`}
         />
     );
