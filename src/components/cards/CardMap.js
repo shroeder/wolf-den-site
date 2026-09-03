@@ -346,14 +346,22 @@ export default function CardMap({ run }) {
                 /* The curls at each end of the scroll are part of the picture, so the list has to start
                    BELOW the top one and stop above the bottom one — at 26px of padding the title sat on the
                    roll and "Elite" fell off the end. */
-                .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 12px 54px;
+                /* ⚠️ THE SIDE PADDING IS A PERCENTAGE, NOT PIXELS. The rolls are WIDER than the paper: in the
+                   art the written surface only spans 14%–85% of the image, so a fixed 12px (9px on a phone)
+                   put the icon column out on the rolled edge and the marks read as bleeding off the scroll.
+                   A percentage is of the element's own width, so it tracks both widths on its own. */
+                .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 15% 54px 14%;
                     display: grid; gap: 5px; justify-items: start; color: #1b2430; font-size: 11.5px;
                     background-image: url(/images/cards/chrome/legend-scroll.png);
                     background-size: 100% 100%; background-repeat: no-repeat;
                     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
                 .cm-legend-title { justify-self: center; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
                 .cm-leg { display: flex; align-items: center; gap: 7px; }
-                .cm-leg-ink { width: 15px; height: 15px; object-fit: contain; }
+                /* Unknown is a "?" glyph, not an image, and width/height do NOTHING to an inline <b> — that
+                   row's mark was narrower than the rest and its label sat left of every other one. A grid
+                   box makes the glyph occupy the same 15px the sprites do. */
+                .cm-leg-ink { flex: 0 0 15px; width: 15px; height: 15px; object-fit: contain;
+                    display: grid; place-items: center; font-size: 12px; }
 
                 /* ── RETURN, ON THE RIBBON ──────────────────────────────────────────────────────────────── */
                 .cm-return { position: absolute; left: 0; bottom: 18px; width: 158px; height: 52px;
@@ -390,7 +398,7 @@ export default function CardMap({ run }) {
                 @media (max-width: 520px) {
                     .cm-bar { gap: 5px; padding: 6px 8px; }
                     .cm-who { display: none; }
-                    .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 9px 48px; }
+                    .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 15% 48px 14%; }
                     .cm-node { width: 32px; height: 32px; }
                 }
             `}</style>
