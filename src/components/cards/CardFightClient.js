@@ -1098,7 +1098,7 @@ export default function CardFightClient({ fixture, run = null }) {
             {peek ? (
                 <div className="cf-over" onClick={() => setPeek(null)}>
                     <div className="cf-sheet" onClick={(e) => e.stopPropagation()}>
-                        <h2>{peek === "draw" ? "Draw pile" : "Discard"}</h2>
+                        <div className="cf-title"><span>{peek === "draw" ? "Draw pile" : "Discard"}</span></div>
                         <p className="cf-note">{peek === "draw" ? "Sorted — the order is the game." : "In the order it fell."}</p>
                         <div className="cf-sheet-cards">
                             {pileList.map((card, i) => (
@@ -1108,22 +1108,24 @@ export default function CardFightClient({ fixture, run = null }) {
                             ))}
                             {pileList.length ? null : <p className="cf-note">Empty.</p>}
                         </div>
-                        <button type="button" className="cf-btn" onClick={() => setPeek(null)}>Close</button>
+                        <button type="button" className="cf-pill" onClick={() => setPeek(null)}>Close</button>
                     </div>
                 </div>
             ) : null}
 
             {fight.over ? (
+                /* ── BUILT OFF THE REFERENCE, NOT OFF A GUESS ─────────────────────────────────────────
+                    Luke pulled up Spire's actual card reward and it settled a long argument: THERE IS NO
+                    PANEL. Three cards sit on the dimmed fight, a painted cloth banner hangs over them with
+                    the instruction on it, and the skip is a small flat pill. That is the whole screen.
+                    What we had was an ornate iron frame, a stone texture and a brass button — three drawn
+                    pieces where the reference has one — which is why it read cheap rather than rich: it was
+                    MORE furnished than the thing it was imitating, so every extra piece was a place to notice
+                    the difference. All three assets were deleted for this. */
                 <div className="cf-over">
-                    {/* ── THE REWARD, WHICH IS THE WHOLE LOOP ──────────────────────────────────────────
-                        A win inside a run does not end at a result card, it ends at a CHOICE: three cards
-                        drawn from the pets you own, one of which joins your deck for the rest of the run.
-                        Spire's entire game is this moment repeated, and the reason it works is that the
-                        cards are not upgrades — a deck that grows is a deck that draws its best card less
-                        often, which is why "take nothing" has to be on the screen beside them. */}
                     {runState && fight.over === "win" && runState.offers?.length ? (
-                        <div className="cf-sheet cf-reward">
-                            <span className="cf-kick">Stop {runState.stop} of {RUN_LENGTH} — take one</span>
+                        <div className="cf-choose">
+                            <div className="cf-title"><span>Stop {runState.stop} of {RUN_LENGTH} — take one</span></div>
                             <div className="cf-offers">
                                 {runState.offers.map((id) => {
                                     const c = cardById(id);
@@ -1131,36 +1133,27 @@ export default function CardFightClient({ fixture, run = null }) {
                                     return (
                                         <button key={id} type="button" className="cf-offer" disabled={busy}
                                             onClick={() => takeCard(id)}>
-                                            {/* ── THE SAME CARD, NOT A SECOND ONE ──────────────────────
-                                                Luke: "we need a shared method that renders cards... we
-                                                already have the perfect render at the bottom of the screen."
-                                                He is right, and the split was subtler than a second
-                                                component: CardFace was always shared, but the LAYOUT that
-                                                makes its parts land — the centred flex column — lives on
-                                                .cf-card, and the offer was a plain button. So the banner
-                                                sized itself against the wrong box and the type plate fell to
-                                                the left. The offer holds an actual .cf-card now and inherits
-                                                every rule the hand does, for ever, including ones added
-                                                later. */}
+                                            {/* The same .cf-card the hand renders — see the note on .cf-offer. */}
                                             <span className="cf-card is-static"><CardFace card={c} art={fixture.petArt?.[c.pet]} /></span>
                                         </button>
                                     );
                                 })}
                             </div>
-                            <button type="button" className="cf-btn" disabled={busy} onClick={() => takeCard(null)}>
+                            <button type="button" className="cf-pill" disabled={busy} onClick={() => takeCard(null)}>
                                 Take nothing
                             </button>
                         </div>
                     ) : (
-                        <div className="cf-sheet cf-result">
-                            <GiSwordWound className="cf-result-ico" aria-hidden="true" />
-                            {/* Giving up is not the same as being killed, and the engine already knows which
-                                one happened, so the sheet says the true thing rather than the convenient one. */}
-                            <h2>
-                                {runState?.done === "won" ? "The run is yours"
-                                    : fight.over === "win" ? "The sand is yours"
-                                        : fight.gaveUp ? "You walked away" : "You fall"}
-                            </h2>
+                        <div className="cf-choose">
+                            <div className="cf-title">
+                                {/* Giving up is not the same as being killed, and the engine knows which one
+                                    happened, so the banner says the true thing rather than the convenient one. */}
+                                <span>
+                                    {runState?.done === "won" ? "The run is yours"
+                                        : fight.over === "win" ? "The sand is yours"
+                                            : fight.gaveUp ? "You walked away" : "You fall"}
+                                </span>
+                            </div>
                             <p className="cf-note">
                                 {runState?.done === "won"
                                     ? `All ${RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
@@ -1171,15 +1164,15 @@ export default function CardFightClient({ fixture, run = null }) {
                                             : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
                             </p>
                             <div className="cf-result-btns">
-                                <button type="button" className="cf-btn" onClick={() => router.push("/marketplace/town")}>Leave</button>
+                                <button type="button" className="cf-pill" onClick={() => router.push("/marketplace/town")}>Leave</button>
                                 {runState ? (
-                                    <button type="button" className="cf-btn is-primary" disabled={busy} onClick={startNewRun}>
+                                    <button type="button" className="cf-pill is-primary" disabled={busy} onClick={startNewRun}>
                                         {runState.done ? "New run" : "Give up the run"}
                                     </button>
                                 ) : (
                                     <>
-                                        <button type="button" className="cf-btn" onClick={replay}>Replay this fight</button>
-                                        <button type="button" className="cf-btn is-primary" onClick={newFight}>New fight</button>
+                                        <button type="button" className="cf-pill" onClick={replay}>Replay this fight</button>
+                                        <button type="button" className="cf-pill is-primary" onClick={newFight}>New fight</button>
                                     </>
                                 )}
                             </div>
@@ -1848,49 +1841,45 @@ export default function CardFightClient({ fixture, run = null }) {
                     transform: translate(-50%, -118%) scale(0.94) rotate(-3deg); border: 0;
                     border: 1px solid #ffd75e; border-radius: 10px; box-shadow: 0 14px 26px rgba(0,0,0,0.6); }
 
-                .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 16px;
-                    background: rgba(6,7,10,0.78); }
-                /* ── A PANEL, NOT A DIV ──────────────────────────────────────────────────────────────────
-                   Luke: "when we pop up a model like that, we need a custom sprite for the border of the
-                   model and the background texture." It was a 1px border and a flat fill sitting in front of
-                   a painted arena, which is the same fault the cards had before they were drawn.
-                   The frame is border-image so the corner bosses keep their shape at any panel size, and the
-                   stone fills behind it. "fill" is deliberately NOT used on the slice — the background is its
-                   own layer here because the two want different sizing: the frame stretches, the stone tiles. */
-                .cf-sheet { width: min(460px, 100%); max-height: 82dvh; overflow-y: auto;
-                    padding: 18px 14px; text-align: center;
-                    /* SLICE WIDE ENOUGH TO CONTAIN THE WHOLE CORNER. The band is 57px thick in a 480px
-                       source and the brass corner accent reaches further in than that, so the cut is taken at
-                       96 — past everything the corner is made of. Cutting at 68 last time went THROUGH the
-                       corner and the offcut was stretched down each edge, which is the "sharp rectangles
-                       sticking out behind each of the corners" Luke saw. A slice is only correct if nothing
-                       ornamental straddles it. */
-                    border-style: solid; border-width: 32px; border-color: transparent;
-                    border-image-source: url(/images/cards/chrome/panel-frame.png);
-                    border-image-slice: 96; border-image-repeat: stretch;
-                    background-image: url(/images/cards/chrome/panel-bg.png);
-                    background-size: 320px; background-repeat: repeat; background-origin: padding-box;
-                    box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
-                .cf-sheet h2 { margin: 0 0 6px; font-family: var(--cf-panel-font); font-size: 22px;
-                    font-weight: 700; letter-spacing: 0.02em; color: #f3e7c8;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-                .cf-note { margin: 0 0 12px; font-size: 12px; color: #93a1b3; }
-                .cf-sheet-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
-                .cf-result-ico { font-size: 34px; color: #ff8f9a; }
-                .cf-result-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+                /* ── DIM THE FIGHT, DO NOT COVER IT ──────────────────────────────────────────────────
+                   Spire darkens the room and leaves it there — you can still faintly make out the arena
+                   behind the cards, which is what keeps the reward feeling like part of the fight instead of
+                   a dialog that has interrupted it. */
+                .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center;
+                    padding: 16px; background: rgba(4,5,8,0.88); }
+                .cf-choose { display: grid; justify-items: center; gap: 14px; width: 100%;
+                    animation: cfPop 0.36s cubic-bezier(.2,1.3,.35,1) both; }
 
-                /* ── THE REWARD SHEET ── three cards at their real size, because the choice is between three
-                   things you have to READ, and a shrunken card is a card nobody reads before picking. */
-                .cf-reward { display: grid; justify-items: center; gap: 14px; }
-                .cf-kick { font-family: var(--cf-panel-font); font-size: 13px; font-weight: 700;
-                    letter-spacing: 0.14em; text-transform: uppercase; color: #d9b464;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
-                /* ── THREE ACROSS, ALWAYS ────────────────────────────────────────────────────────────────
-                   NOT flex-wrap. On a 412px phone the panel's own frame and padding eat about 100px, and
-                   three wrapped cards pushed the second row up THROUGH the title. A reward that has to be
-                   scrolled or read around a heading is not a choice presented, it is a form. So the row never
-                   wraps and the cards scale to whatever is left instead — the panel is narrower than a phone,
-                   so this is the number that has to give. */
+                /* ── THE ONE PIECE OF FURNITURE ──────────────────────────────────────────────────────────
+                   A hung cloth banner with the instruction on it, and nothing else on the screen is drawn.
+                   SIZED TO THE ART'S OWN ASPECT (900x200) rather than sliced: the width is capped and the
+                   height follows from it, so the cloth is never stretched out of shape and there is no slice
+                   to get wrong — which is the third time this session that has been the bug. */
+                .cf-title { width: min(360px, 94%); aspect-ratio: 900 / 200; display: grid; place-items: center;
+                    background-image: url(/images/cards/chrome/title-banner.png);
+                    background-size: 100% 100%; background-repeat: no-repeat;
+                    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.6)); }
+                .cf-title span { max-width: 74%; margin-top: -4%; font-family: var(--cf-panel-font);
+                    font-size: clamp(13px, 3.4vw, 17px); font-weight: 700; line-height: 1.1;
+                    color: #33240f; text-align: center; text-wrap: balance; }
+
+                .cf-note { margin: 0; max-width: 32ch; font-size: 13px; color: #b9c3d0; text-align: center; }
+
+                /* ── A PILL, NOT A PLATE ─────────────────────────────────────────────────────────────────
+                   Spire's Skip is a small flat capsule with a bright outline — no metal, no rivets, no
+                   texture. The brass button that used to be here was drawn art doing a job that a border and
+                   a fill do better, and it fought the banner above it for attention. */
+                .cf-pill { padding: 10px 22px; border-radius: 999px; cursor: pointer;
+                    border: 2px solid #c9a253; background: rgba(18,22,30,0.92);
+                    font-family: var(--cf-panel-font); font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
+                    color: #f2e2bd; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+                .cf-pill:hover:not(:disabled) { background: rgba(34,42,55,0.95); border-color: #e8c877; }
+                .cf-pill:active { transform: translateY(1px); }
+                .cf-pill.is-primary { border-color: #ffd75e; color: #2a1c04;
+                    background: linear-gradient(180deg, #ffd75e, #e0a92c); }
+                .cf-pill:disabled { opacity: 0.5; cursor: default; }
+                .cf-result-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
                 .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
                 /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────
                    The card inside is the hand's card at the hand's exact geometry — 96x138, every rule shared
@@ -1904,28 +1893,15 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-offer:hover:not(:disabled) .cf-card, .cf-offer:focus-visible .cf-card {
                     transform: scale(calc(var(--cf-offer-s) + 0.08)) translateY(-4px); }
                 .cf-offer:disabled { opacity: 0.5; cursor: default; }
-                /* ── SLICED, NOT STRETCHED ───────────────────────────────────────────────────────────────
-                   One image pulled across a button of a different aspect drags its shading and its rivets out
-                   of shape with it — the same fault the top bar had, and Luke caught this one too: "the button
-                   sprite clearly looks stretched, the aspect ratio." The flared caps run to x=110 and from
-                   x=495 in a 600x150 source, so the cut is 108 and only the flat middle is allowed to give.
-                   The border width is written as the scale calculation rather than the 33px it works out to,
-                   so changing the button height cannot silently squash the caps. */
-                .cf-btn { position: relative; --cf-btn-h: 46px; height: var(--cf-btn-h);
-                    padding: 0 18px; min-width: 150px; background: none;
-                    border-style: solid; border-color: transparent;
-                    border-width: 0 calc(108 * var(--cf-btn-h) / 150);
-                    border-image-source: url(/images/cards/chrome/panel-button.png);
-                    border-image-slice: 0 108 fill; border-image-repeat: stretch;
-                    font-family: var(--cf-panel-font); font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
-                    color: #f6e9c6; text-shadow: 0 2px 3px rgba(0,0,0,0.9); cursor: pointer;
-                    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
-                .cf-btn:active { transform: translateY(1px); }
-                .cf-btn.is-primary { color: #2a1c04; }
-                .cf-btn.is-primary { filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)) brightness(1.22) saturate(1.25); }
-                .cf-btn:disabled { opacity: 0.55; cursor: default; }
+                /* The peek modal is the one place left that still wants a body around its content — it is a
+                   LIST, not a choice, and a list on a bare dim has no edge to stop at. Flat and quiet: a dark
+                   slab with a hairline, no frame sprite, no texture. */
+                .cf-sheet { width: min(460px, 100%); max-height: 82dvh; overflow-y: auto; padding: 16px;
+                    display: grid; justify-items: center; gap: 12px; text-align: center;
+                    background: rgba(12,15,21,0.96); border: 1px solid rgba(201,162,83,0.35); border-radius: 12px;
+                    box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
+                .cf-sheet-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
                 @media (max-width: 460px) {
-                    .cf-sheet { border-width: 16px; padding: 14px 8px; }
                     .cf-offer { --cf-offer-s: 1.0; }
                     .cf-offers { gap: 6px; }
                 }

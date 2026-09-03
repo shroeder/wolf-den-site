@@ -159,54 +159,28 @@ const PIECES = {
             + "end panels is a plain uniform span of hammered metal: no centrepiece, no crest, no join, no "
             + "ornament, nothing written on it. " + METAL,
     },
-    // ── THE MODAL'S OWN FURNITURE ────────────────────────────────────────────────────────────────────────
-    // Luke: "when we pop up a model like that, we need a custom sprite for the border of the model and the
-    // background texture of the model, and buttons need a custom texture too."
+    // ── THE ONLY FURNITURE A REWARD SCREEN NEEDS ─────────────────────────────────────────────────────────
+    // There used to be three pieces here — an ornate panel frame, a stone background texture and a brass
+    // button — and all three are gone. Looking at Spire's actual card reward screen settled it: there is NO
+    // panel. Three cards sit on the dimmed fight, a painted cloth banner hangs above them with the
+    // instruction on it, and the skip is a small flat pill. That is the entire screen.
     //
-    // Three pieces because a panel is three jobs: an ornate BORDER that must not stretch out of shape, a
-    // BACKGROUND that must tile or stretch without showing a seam, and a BUTTON that has to read as pressable
-    // next to both. The frame is hollow and drawn with a border of even thickness so border-image can slice
-    // it — same trick as the top bar, and for the same reason: the panel is a different size on a phone than
-    // on a desktop and its corners must not squash.
-    "panel-frame": {
-        // ⚠️ THE SLICE HAS TO MATCH THE CORNER, and last time it did not. The drawn corner blocks ran about
-        // 90px into a 480px image and the CSS sliced at 68 — so the cut went THROUGH each corner and the
-        // leftover piece was stretched along the edges. Luke saw it exactly: "sharp rectangles sticking out
-        // behind each of the corners."
-        // The fix is a frame that is easy to slice rather than a cleverer number: an even band with a SMALL
-        // corner accent, so anywhere sensible to cut is a correct place to cut.
-        size: "1024x1024", store: { w: 480, h: 480 }, tint: false,
-        subject: "An empty rectangular panel frame: a moulded band of EXACTLY EVEN THICKNESS on all four "
-            + "sides, no thicker at the corners than along the sides, with a slim brass pinstripe following "
-            + "its inner edge and a small neat brass corner accent tucked INSIDE the band at each corner. "
-            + "Nothing at all inside the opening. " + PANEL,
-    },
-    // Flat and even on purpose: any lighting baked into a background shows up as a bright patch that does not
-    // move when the panel resizes, which is the tell that a texture is a picture.
-    "panel-bg": {
-        size: "1024x1024", store: { w: 420, h: 420 }, tint: false, opaque: true,
-        // ⚠️ "TEXTURE" ALONE GETS YOU AN OBJECT. The first draw came back as a stone DISC floating on
-        // transparency — a picture OF stone rather than a surface made of it — and tiled across a panel it
-        // read as a row of grey moons. What fixes it is saying the thing an image model never assumes: the
-        // fill reaches all four edges, there is no subject, and there is nothing around it.
-        extra: "A FLAT SEAMLESS TILING TEXTURE that completely fills the entire square image from edge to "
-            + "edge with NO transparency anywhere. It is a surface, NOT an object: no shape, no border, no "
-            + "frame, no vignette, no central subject, nothing floating on a background. Every corner and "
-            + "every edge is covered by the same material, evenly lit, with no bright spot and no dark spot.",
-        subject: "Dark charcoal stone. Fine even grain with faint mineral flecks and a few shallow scratches, "
-            + "deep desaturated near-black grey.",
-    },
-    // ── THE PANEL BUTTON ── and it is drawn to be SLICED, not stretched.
-    // Luke: "the button sprite clearly looks stretched, the aspect ratio, I don't like that." He is right and
-    // it is the same fault the top bar had: one image at 3:1 pulled across a button at 4.5:1 pulls everything
-    // in it — the domed shading, the end rivets — out of shape with it. Same answer as the top bar: a cap at
-    // each end that border-image holds at its own aspect, and a plain middle that takes the stretch.
-    "panel-button": {
-        size: "1536x1024", store: { w: 600, h: 150 }, tint: false, extra: SOLID,
-        subject: "A wide horizontal button, EXACTLY THE SAME HEIGHT from end to end, built in three parts: a "
-            + "short ornate CAP at each end carrying a small brass rivet, and between them a long plain "
-            + "unbroken span, gently domed, catching a soft highlight along its whole top edge. The span is "
-            + "completely blank — no lettering, no emblem, no ornament in the middle. " + PANEL,
+    // What we had built was MORE ornate than the reference and less well made, which is exactly why it read
+    // cheap: every extra piece of furniture was another place to notice the difference. So the frame, the
+    // stone and the brass button were deleted and this is what replaced them.
+    //
+    // Drawn to be stretched: the tails are the detail, the middle is plain cloth, so border-image holds the
+    // ends and only the span between them gives.
+    "title-banner": {
+        size: "1536x1024", store: { w: 900, h: 200 }, tint: false,
+        extra: "Drawn FLAT ON, straight from the front, symmetrical left to right, with NO perspective and no "
+            + "tilt. The cloth itself is SOLID and opaque; everything around it is fully transparent. Centred, "
+            + "with a little empty space above and below.",
+        subject: "A long horizontal cloth banner hung across, its two ends flaring out wider than the middle "
+            + "and hanging slightly lower, with ragged torn edges and a notched V cut into each tail. The "
+            + "middle span is smooth, unbroken and COMPLETELY BLANK — no writing, no emblem, no ornament, no "
+            + "stitching across it. Aged parchment-coloured linen, warm pale sand, softly shaded so it reads "
+            + "as hanging cloth rather than a flat strip.",
     },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
