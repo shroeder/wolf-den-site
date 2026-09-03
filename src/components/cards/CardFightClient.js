@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Kreon } from "next/font/google";
+import { Cinzel, Kreon } from "next/font/google";
 import {
     GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiShield, GiSmallFire, GiSwordWound,
 } from "react-icons/gi";
@@ -36,6 +36,12 @@ const IMPACT_MS = 200;
 // to this screen through next/font, so nothing else on the site changes and the file is fetched only by the
 // people who open the fight.
 const cardFont = Kreon({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
+// ── AND A FACE FOR THE PANELS ────────────────────────────────────────────────────────────────────────────
+// Luke: "we need a better font for the button and the title in that model." Kreon is the CARD face — a slab
+// serif sized for body text at 9px — and using it for a heading just makes a big version of small type.
+// Cinzel is cut from Roman inscriptional capitals, which is the same instinct as the stone-and-metal furniture
+// around it, and it only ever appears at heading size where its width costs nothing.
+const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
 const Sprite = ({ src, fallback, className, flip }) => {
     const [bad, setBad] = useState(false);
@@ -861,7 +867,7 @@ export default function CardFightClient({ fixture, run = null }) {
     return (
         // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
         // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
-        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
+        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily, "--cf-panel-font": panelFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
@@ -1125,7 +1131,18 @@ export default function CardFightClient({ fixture, run = null }) {
                                     return (
                                         <button key={id} type="button" className="cf-offer" disabled={busy}
                                             onClick={() => takeCard(id)}>
-                                            <CardFace card={c} art={fixture.petArt?.[c.pet]} />
+                                            {/* ── THE SAME CARD, NOT A SECOND ONE ──────────────────────
+                                                Luke: "we need a shared method that renders cards... we
+                                                already have the perfect render at the bottom of the screen."
+                                                He is right, and the split was subtler than a second
+                                                component: CardFace was always shared, but the LAYOUT that
+                                                makes its parts land — the centred flex column — lives on
+                                                .cf-card, and the offer was a plain button. So the banner
+                                                sized itself against the wrong box and the type plate fell to
+                                                the left. The offer holds an actual .cf-card now and inherits
+                                                every rule the hand does, for ever, including ones added
+                                                later. */}
+                                            <span className="cf-card is-static"><CardFace card={c} art={fixture.petArt?.[c.pet]} /></span>
                                         </button>
                                     );
                                 })}
@@ -1599,7 +1616,7 @@ export default function CardFightClient({ fixture, run = null }) {
                    Luke: "why does the card lose its border when it's played?" — because this rule was hung on
                    .cf-card alone, and the card you are holding and the card performing centre stage are two
                    other elements. A card is a card wherever it is. */
-                .cf-card::after, .cf-drag::after, .cf-played-card::after, .cf-offer::after {
+                .cf-card::after, .cf-drag::after, .cf-played-card::after {
                     content: ""; position: absolute; inset: -1px; z-index: 2; pointer-events: none;
                     background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
@@ -1833,9 +1850,24 @@ export default function CardFightClient({ fixture, run = null }) {
 
                 .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center; padding: 16px;
                     background: rgba(6,7,10,0.78); }
-                .cf-sheet { width: min(420px, 100%); max-height: 82dvh; overflow-y: auto; padding: 16px;
-                    background: #12161f; border: 1px solid #2c3340; border-radius: 14px; text-align: center; }
-                .cf-sheet h2 { margin: 0 0 4px; font-size: 18px; }
+                /* ── A PANEL, NOT A DIV ──────────────────────────────────────────────────────────────────
+                   Luke: "when we pop up a model like that, we need a custom sprite for the border of the
+                   model and the background texture." It was a 1px border and a flat fill sitting in front of
+                   a painted arena, which is the same fault the cards had before they were drawn.
+                   The frame is border-image so the corner bosses keep their shape at any panel size, and the
+                   stone fills behind it. "fill" is deliberately NOT used on the slice — the background is its
+                   own layer here because the two want different sizing: the frame stretches, the stone tiles. */
+                .cf-sheet { width: min(460px, 100%); max-height: 82dvh; overflow-y: auto;
+                    padding: 18px 14px; text-align: center;
+                    border-style: solid; border-width: 22px; border-color: transparent;
+                    border-image-source: url(/images/cards/chrome/panel-frame.png);
+                    border-image-slice: 68; border-image-repeat: stretch;
+                    background-image: url(/images/cards/chrome/panel-bg.png);
+                    background-size: 320px; background-repeat: repeat; background-origin: padding-box;
+                    box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
+                .cf-sheet h2 { margin: 0 0 6px; font-family: var(--cf-panel-font); font-size: 22px;
+                    font-weight: 700; letter-spacing: 0.02em; color: #f3e7c8;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
                 .cf-note { margin: 0 0 12px; font-size: 12px; color: #93a1b3; }
                 .cf-sheet-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
                 .cf-result-ico { font-size: 34px; color: #ff8f9a; }
@@ -1844,20 +1876,46 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* ── THE REWARD SHEET ── three cards at their real size, because the choice is between three
                    things you have to READ, and a shrunken card is a card nobody reads before picking. */
                 .cf-reward { display: grid; justify-items: center; gap: 14px; }
-                .cf-kick { font-size: 11px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
-                    color: #c9a253; }
-                .cf-offers { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-                /* TALLER THAN A CARD IN HAND, on purpose. The hand crops its cards off the bottom edge
-                   because you pick one up to read it; there is no picking up here — this IS the reading, and
-                   "Gain 5 Block and 1 Strength" is two lines that have to fit inside the frame. */
-                .cf-offer { position: relative; width: 104px; height: 172px; padding: 0; background: none;
-                    border: 0; cursor: pointer; transition: transform 140ms ease-out;
-                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)); }
-                .cf-offer:hover:not(:disabled), .cf-offer:focus-visible { transform: translateY(-8px) scale(1.04); }
+                .cf-kick { font-family: var(--cf-panel-font); font-size: 13px; font-weight: 700;
+                    letter-spacing: 0.14em; text-transform: uppercase; color: #d9b464;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+                /* ── THREE ACROSS, ALWAYS ────────────────────────────────────────────────────────────────
+                   NOT flex-wrap. On a 412px phone the panel's own frame and padding eat about 100px, and
+                   three wrapped cards pushed the second row up THROUGH the title. A reward that has to be
+                   scrolled or read around a heading is not a choice presented, it is a form. So the row never
+                   wraps and the cards scale to whatever is left instead — the panel is narrower than a phone,
+                   so this is the number that has to give. */
+                .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
+                /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────
+                   The card inside is the hand's card at the hand's exact geometry — 96x138, every rule shared
+                   — and the only thing this wrapper does is scale it. A reward is read where it stands rather
+                   than picked up, so it wants to be larger; changing any number INSIDE the card to achieve
+                   that is how the two renders drift apart again. */
+                .cf-offer { position: relative; width: calc(96px * var(--cf-offer-s));
+                    height: calc(138px * var(--cf-offer-s)); padding: 0; background: none;
+                    border: 0; cursor: pointer; display: grid; place-items: center; --cf-offer-s: 1.26; }
+                .cf-offer .cf-card { transform: scale(var(--cf-offer-s)); transition: transform 140ms ease-out; }
+                .cf-offer:hover:not(:disabled) .cf-card, .cf-offer:focus-visible .cf-card {
+                    transform: scale(calc(var(--cf-offer-s) + 0.08)) translateY(-4px); }
                 .cf-offer:disabled { opacity: 0.5; cursor: default; }
-                .cf-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid #2c3340; background: #1a202b;
-                    color: #e9edf2; font-weight: 700; font-size: 13px; }
-                .cf-btn.is-primary { border-color: #7a6320; background: linear-gradient(180deg, #ffd75e, #e0a92c); color: #241a03; }
+                /* The button is a struck plate too. Stretched rather than sliced: it is drawn blank and
+                   uniform across its face, so the only thing a stretch moves is the rivets at its ends. */
+                .cf-btn { position: relative; padding: 13px 26px; border: 0; background: none;
+                    font-family: var(--cf-panel-font); font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
+                    color: #f3e7c8; text-shadow: 0 2px 3px rgba(0,0,0,0.85); cursor: pointer;
+                    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.55)); }
+                .cf-btn::before { content: ""; position: absolute; inset: 0; z-index: -1;
+                    background-image: url(/images/cards/chrome/panel-button.png);
+                    background-size: 100% 100%; background-repeat: no-repeat; }
+                .cf-btn:active { transform: translateY(1px); }
+                .cf-btn.is-primary { color: #2a1c04; }
+                .cf-btn.is-primary::before { filter: sepia(0.7) saturate(2.4) hue-rotate(-18deg) brightness(1.18); }
+                .cf-btn:disabled { opacity: 0.55; cursor: default; }
+                @media (max-width: 460px) {
+                    .cf-sheet { border-width: 16px; padding: 14px 8px; }
+                    .cf-offer { --cf-offer-s: 1.0; }
+                    .cf-offers { gap: 6px; }
+                }
 
                 /* Named for this screen so they cannot collide with another component's keyframes — which has
                    happened here before, and the symptom is somebody else's animation playing on your element. */

@@ -142,6 +142,45 @@ const PIECES = {
             + "end panels is a plain uniform span of hammered metal: no centrepiece, no crest, no join, no "
             + "ornament, nothing written on it. " + METAL,
     },
+    // ── THE MODAL'S OWN FURNITURE ────────────────────────────────────────────────────────────────────────
+    // Luke: "when we pop up a model like that, we need a custom sprite for the border of the model and the
+    // background texture of the model, and buttons need a custom texture too."
+    //
+    // Three pieces because a panel is three jobs: an ornate BORDER that must not stretch out of shape, a
+    // BACKGROUND that must tile or stretch without showing a seam, and a BUTTON that has to read as pressable
+    // next to both. The frame is hollow and drawn with a border of even thickness so border-image can slice
+    // it — same trick as the top bar, and for the same reason: the panel is a different size on a phone than
+    // on a desktop and its corners must not squash.
+    "panel-frame": {
+        // tint: false — a panel has no rarity. Without this the tint pass writes three coloured copies nobody
+        // ever loads, which is the same dead weight as any other unread export.
+        size: "1024x1024", store: { w: 480, h: 480 }, tint: false,
+        subject: "An ornate empty rectangular panel frame — a wide moulded border of EVEN THICKNESS on all "
+            + "four sides, with a small raised corner boss at each of the four corners and a bevelled inner "
+            + "lip. Nothing at all inside it. " + METAL,
+    },
+    // Flat and even on purpose: any lighting baked into a background shows up as a bright patch that does not
+    // move when the panel resizes, which is the tell that a texture is a picture.
+    "panel-bg": {
+        size: "1024x1024", store: { w: 420, h: 420 }, tint: false, opaque: true,
+        // ⚠️ "TEXTURE" ALONE GETS YOU AN OBJECT. The first draw came back as a stone DISC floating on
+        // transparency — a picture OF stone rather than a surface made of it — and tiled across a panel it
+        // read as a row of grey moons. What fixes it is saying the thing an image model never assumes: the
+        // fill reaches all four edges, there is no subject, and there is nothing around it.
+        extra: "A FLAT SEAMLESS TILING TEXTURE that completely fills the entire square image from edge to "
+            + "edge with NO transparency anywhere. It is a surface, NOT an object: no shape, no border, no "
+            + "frame, no vignette, no central subject, nothing floating on a background. Every corner and "
+            + "every edge is covered by the same material, evenly lit, with no bright spot and no dark spot.",
+        subject: "Dark charcoal stone. Fine even grain with faint mineral flecks and a few shallow scratches, "
+            + "deep desaturated near-black grey.",
+    },
+    // Wider and more ornate than button-plate, which is the small End turn tab. This one carries a sentence.
+    "panel-button": {
+        size: "1536x1024", store: { w: 360, h: 120 }, tint: false, extra: SOLID,
+        subject: "A wide ornate blank metal button with softly rounded corners, gently domed so it catches "
+            + "the light along the top, a bevelled outer edge and a small rivet at each end — solid, filled, "
+            + "and completely blank with nothing written or struck on it. " + METAL,
+    },
     // The ribbon. Its ENDS are the whole point: they fold and hang below the bar, which is what makes it read
     // as cloth draped over a card rather than a coloured strip.
     banner: {
@@ -180,7 +219,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify({
             model: "gpt-image-1", prompt, size: piece.size,
-            background: "transparent", output_format: "png", quality: "medium", n: 1,
+            background: piece.opaque ? "opaque" : "transparent", output_format: "png", quality: "medium", n: 1,
         }),
     });
     if (!resp.ok) { console.log(`  ${id}: OpenAI ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
@@ -188,8 +227,12 @@ for (const [id, piece] of Object.entries(PIECES)) {
     if (!b64) { console.log(`  ${id}: no image returned`); continue; }
     // Trimmed to the furniture itself, then stored at three times the size it is DRAWN. A card is 84px wide;
     // a 2.5MB full-resolution frame behind it is bytes nobody sees and a phone still has to fetch.
-    const trimmed = await sharp(Buffer.from(b64, "base64"))
-        .trim({ threshold: 8 })
+    // ⚠️ A TEXTURE MUST NOT BE TRIMMED. trim() exists because every other piece here is furniture floating on
+    // transparency and wants its empty margin cut off — but a seamless fill has near-uniform edges BY
+    // DEFINITION, so trim reads the whole image as margin and hands back nothing. The first panel background
+    // came out as a blank white square for exactly this reason.
+    const raw = sharp(Buffer.from(b64, "base64"));
+    const trimmed = await (piece.opaque ? raw : raw.trim({ threshold: 8 }))
         .resize(piece.store.w, piece.store.h, { fit: "fill" })
         .png({ compressionLevel: 9 }).toBuffer();
     fs.writeFileSync(base, trimmed);
