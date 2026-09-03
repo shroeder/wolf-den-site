@@ -43,3 +43,6 @@ scripts/_venv
 
 # one-off measurement scratch (scripts/casino-sim.mjs is the kept tool)
 /measure*.mjs
+
+# Candidate art from scripts/gen-town-npc.mjs — paid for, looked at, not shipped.
+scratch/

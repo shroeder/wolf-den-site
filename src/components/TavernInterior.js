@@ -53,6 +53,21 @@ const NPCS = [
     { key: "bar", art: "barkeep", emoji: "🧔", label: "Barkeep", x: 16 },
     { key: "dice", art: "gambler", emoji: "🎲", label: "Gambler", x: 84 },
 ];
+// The card sharp at the back table — the way into the card run. OWNER-ONLY while the run is a prototype, and
+// he is appended to the room rather than written into NPCS so a member never renders a table they cannot sit
+// at. The page behind him has its own gate (CARDS_UNLOCKED); this is the door, that is the room.
+// x=41 is a MEASURED spot, not a guess: the room art puts fireplaces at ~16% and ~69% and round tables at
+// ~28/41/51/57/85%. At 58% his 168px sprite hung over the right-hand fire and read as a man sitting in it.
+// 41% covers the second table with his own — which is what "he is AT that table" looks like — and keeps him
+// clear of the barkeep (16%) and the gambler (84%).
+const SHARP = { key: "cards", art: "cardsharp", emoji: "🃏", label: "Stranger", x: 41 };
+const SHARP_LINES = [
+    "*shuffles without looking at his hands* Sit. One run, eight rooms. You in?",
+    "*taps the deck twice* Nobody's finished the eighth room yet. Could be you.",
+    "*doesn't look up* Cards are cheaper than dice, friend. Cost you nothing but blood.",
+    "*fans the deck face-down* Pick a road. They all end at the same door.",
+    "*smiles with half his mouth* Health carries between rooms. So do mistakes.",
+];
 
 function Die({ value, held = false, rolling = false, locked = false, small = false, onClick }) {
     const size = small ? 30 : 54;
@@ -86,7 +101,7 @@ function TavAvatar({ a, you = false, onTap }) {
     );
 }
 
-export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, onLeave }) {
+export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, owner = false, onLeave }) {
     const [st, setSt] = useState(null);
     const [viewportW, setViewportW] = useState(360);
     const [pos, setPos] = useState({ x: 50, y: FLOOR_Y, facing: 1, moving: false });
@@ -97,6 +112,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
     const [dragging, setDragging] = useState(false);
     const [station, setStation] = useState(null); // open panel: "dice" (the gambler minigame)
     const [barkeep, setBarkeep] = useState(null); // in-scene barkeep chat { line } — NO modal
+    const [sharp, setSharp] = useState(null);     // in-scene card-sharp chat { line } — same pattern as the barkeep
     const [drinkFx, setDrinkFx] = useState(null); // big drink/round celebration { type, xp, gold, key }
     const [confirmDrink, setConfirmDrink] = useState(null); // { type: "pint" | "round" } → confirm modal before ordering
     const [busy, setBusy] = useState(false);
@@ -215,11 +231,20 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
         drinkFxClear.current = setTimeout(() => setDrinkFx((f) => (f && f.key === key ? null : f)), 1900);
     }, []);
     const engageBarkeep = useCallback(() => {
+        setSharp(null);
         barSay(pick(GREET));
         // Slide the camera over to the barkeep so you're "at the bar".
         const target = clamp((NPCS[0].x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
         setPanExtra(target - clamp((pos.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW)));
     }, [barSay, viewportW, pos.x]);
+    // The card sharp talks in the scene exactly like the barkeep does — a bubble over his head and a tray,
+    // never a modal, because a modal over a room you walked into reads as leaving it.
+    const engageSharp = useCallback(() => {
+        setBarkeep(null);
+        setSharp({ line: pick(SHARP_LINES) });
+        const target = clamp((SHARP.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
+        setPanExtra(target - clamp((pos.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW)));
+    }, [viewportW, pos.x]);
     const askNews = useCallback(() => { const rumors = st?.rumors || []; barSay(rumors.length ? `*leans in* ${rumors[Math.floor(Math.random() * rumors.length)]}` : "*shrugs* Quiet night so far, friend."); }, [st?.rumors, barSay]);
     const askPint = useCallback(async () => {
         const r = await act({ action: "pint" });
@@ -305,13 +330,15 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                     <div className="tv-fire" aria-hidden="true" />
                     <div className="tv-vignette" aria-hidden="true" />
                     {/* NPC characters */}
-                    {NPCS.map((n, i) => {
+                    {(owner ? [...NPCS, SHARP] : NPCS).map((n, i) => {
                         const url = n.art ? npcArt?.[n.art] : null;
                         const isBar = n.key === "bar";
+                        const isSharp = n.key === "cards";
                         return (
-                            <button key={n.key} type="button" className="tv-npc" style={{ left: `${n.x}%`, top: `${FLOOR_Y}%` }} onClick={(e) => { e.stopPropagation(); if (isBar) engageBarkeep(); else openStation(n.key); }}>
+                            <button key={n.key} type="button" className={`tv-npc tv-npc-${n.key}`} style={{ left: `${n.x}%`, top: `${FLOOR_Y}%` }} onClick={(e) => { e.stopPropagation(); if (isBar) engageBarkeep(); else if (isSharp) engageSharp(); else openStation(n.key); }}>
                                 {/* Barkeep talks IN the scene — a speech bubble over his head, plus a big drink/round splash */}
                                 {isBar && barkeep ? <span className="tv-keeper-bubble">{barkeep.line}</span> : null}
+                                {isSharp && sharp ? <span className="tv-keeper-bubble">{sharp.line}</span> : null}
                                 {isBar && drinkFx ? (
                                     <span className="tv-drinkfx" key={drinkFx.key} aria-hidden="true">
                                         {drinkFx.type === "round" ? (
@@ -365,6 +392,15 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
                         <button type="button" className="tv-order tv-order-mini" onClick={askNews} title="Ask for gossip">🗞️</button>
                         <button type="button" className="tv-order tv-order-mini" onClick={() => setBarkeep(null)} aria-label="Step away">✕</button>
                         {(st?.gold || 0) < roundCost ? <CoinCta price={roundCost} have={st?.gold || 0} label="Buy gold" /> : null}
+                    </div>
+                ) : sharp ? (
+                    <div className="tv-keeper-tray" onClick={(e) => e.stopPropagation()}>
+                        <Link href="/marketplace/cards" className="tv-order tv-order-cards">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/cards/chrome/card-back.png" alt="" draggable={false} />
+                            <span className="tv-order-lbl">Sit down<small>eight rooms, one deck</small></span>
+                        </Link>
+                        <button type="button" className="tv-order tv-order-mini" onClick={() => setSharp(null)} aria-label="Step away">✕</button>
                     </div>
                 ) : (
                     /* Quick emotes — float above your head + broadcast to the room */
@@ -643,4 +679,8 @@ const TV_CSS = `
 .tv-order-lbl small { font-weight: 700; font-size: 9.5px; color: #c8a86a; overflow: hidden; text-overflow: ellipsis; }
 .tv-order-mini { flex: 0 0 auto; padding: 7px 11px; font-size: 16px; font-weight: 900; justify-content: center; }
 .tv-order-round { border-color: rgba(255,180,90,0.5); }
+/* The card sharp's row is a LINK, not a button: the global link colour and underline both have to be said
+   again or it renders blue-and-underlined in a row of gold buttons. */
+.tv-order-cards { border-color: rgba(200,170,255,0.45); color: #ffe9c4; text-decoration: none; }
+.tv-order-cards:hover { border-color: rgba(200,170,255,0.8); }
 `;

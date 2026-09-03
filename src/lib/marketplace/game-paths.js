@@ -40,6 +40,9 @@ export const GAME_EXTRA_PATHS = [
     // which is a listed path, so it inherited the shell and nobody noticed it needed its own entry. A room
     // that gets promoted to its own address has to be added here on the same day.
     "/marketplace/trophies",
+    // The cards prototype, owner-only for now. Listed for the same reason the Casino and the Market are: being
+    // gated decides who sees it in the MENU, never whether the shell knows the address.
+    "/marketplace/cards",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

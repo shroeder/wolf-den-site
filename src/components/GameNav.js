@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
+import { GiCardPlay } from "react-icons/gi";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
@@ -50,6 +51,7 @@ const NAV_SPRITE = {
     "/marketplace/market": "market",
     "/marketplace/trophies": "trophies",
     "/marketplace/casino": "casino",
+    "/marketplace/cards": "cards",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -163,6 +165,7 @@ export default function GameNav() {
     const arenaFights = Number(hud?.arena?.fightsLeft) || 0;
     const jeweller = Boolean(hud?.jeweller);
     const casino = Boolean(hud?.casino);
+    const cards = Boolean(hud?.cards);
     const delves = Boolean(hud?.delves?.unlocked);
     const delveRuns = Number(hud?.delves?.runs) || 0;
     const chests = Number(hud?.chests) || 0;
@@ -188,6 +191,7 @@ export default function GameNav() {
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
         ...(casino ? [{ href: "/marketplace/casino", label: "Casino" }] : []),
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
+        ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards" }] : []),
         ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
@@ -341,6 +345,7 @@ export default function GameNav() {
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
             ...(casino ? [{ href: "/marketplace/casino", label: "The Casino", sub: "Nine machines" }] : []),
+            ...(cards ? [{ href: "/marketplace/cards", Icon: GiCardPlay, label: "Cards", sub: "A deck and a road", owner: true }] : []),
             ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [

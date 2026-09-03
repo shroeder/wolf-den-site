@@ -6,6 +6,7 @@ import { arenaNav } from "@/lib/marketplace/arena.js";
 import { MINING_UNLOCKED, miningNav } from "@/lib/marketplace/mining.js";
 import { DELVES_UNLOCKED, getDelveState } from "@/lib/marketplace/delves.js";
 import { COOK_UNLOCKED } from "@/lib/marketplace/cooking.js";
+import { CARDS_UNLOCKED } from "@/lib/marketplace/cards.js";
 import { getChests } from "@/lib/marketplace/chests.js";
 import { getSpinState } from "@/lib/marketplace/spin.js";
 import { getDailyQuests } from "@/lib/marketplace/quests.js";
@@ -52,7 +53,7 @@ export async function GET(request) {
         if (!id) {
             return noStore({
                 signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false },
-                jeweller: false, casino: false, kitchen: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
+                jeweller: false, casino: false, kitchen: false, cards: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
             });
@@ -90,6 +91,10 @@ export async function GET(request) {
             // Unclaimed free chips today — drives the nav badge on /marketplace/casino.
             casinoChips: Boolean(freeChips),
             kitchen: COOK_UNLOCKED(id),
+            // The cards prototype, owner-only. The gate is IMPORTED rather than re-written as isOwner(id) here:
+            // on launch day CARDS_UNLOCKED becomes Boolean(buyerId) in one place, and a second copy of the rule
+            // in the menu would keep the door shut for everyone after the page had opened.
+            cards: CARDS_UNLOCKED(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             mine: {
                 unlocked: Boolean(mining?.unlocked),

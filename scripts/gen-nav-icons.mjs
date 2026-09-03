@@ -106,6 +106,10 @@ const ICONS = {
     // prize you won, it is a WALL you fill. So: the wall itself, with mounted pieces on it, which is also the
     // only honest picture of what the screen contains.
     trophies: "A dark polished wooden wall panel with ornate gold trim, three small mounted trophies fixed to it in a row — a crossed pair of swords, a ship's wheel and a miner's lantern — each on its own little gold plaque",
+    // The card run. The casino note above rules out a fanned hand — at 18px a fan is a smudge — so this is a
+    // SINGLE upright card with a squat stack behind it: a bold rectangle plus a step, which survives the size
+    // and cannot be mistaken for the Compendium's tome (a book is wider than it is tall and has a spine).
+    cards: "A single upright playing CARD standing face-on with a thick cream border and a bold dark wolf-head crest in its centre, a short neat stack of face-down cards sitting just behind and beside it",
     casino: "A small ornate slot machine cabinet seen straight on, its glass showing three glowing symbols in a row, a fat red-knobbed lever on the right side, gold trim around the frame and a lit marquee arch on top",
 };
 
