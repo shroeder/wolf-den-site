@@ -1599,7 +1599,7 @@ export default function CardFightClient({ fixture, run = null }) {
                    Luke: "why does the card lose its border when it's played?" — because this rule was hung on
                    .cf-card alone, and the card you are holding and the card performing centre stage are two
                    other elements. A card is a card wherever it is. */
-                .cf-card::after, .cf-drag::after, .cf-played-card::after {
+                .cf-card::after, .cf-drag::after, .cf-played-card::after, .cf-offer::after {
                     content: ""; position: absolute; inset: -1px; z-index: 2; pointer-events: none;
                     background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
@@ -1847,7 +1847,10 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-kick { font-size: 11px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
                     color: #c9a253; }
                 .cf-offers { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-                .cf-offer { position: relative; width: 96px; height: 138px; padding: 0; background: none;
+                /* TALLER THAN A CARD IN HAND, on purpose. The hand crops its cards off the bottom edge
+                   because you pick one up to read it; there is no picking up here — this IS the reading, and
+                   "Gain 5 Block and 1 Strength" is two lines that have to fit inside the frame. */
+                .cf-offer { position: relative; width: 104px; height: 172px; padding: 0; background: none;
                     border: 0; cursor: pointer; transition: transform 140ms ease-out;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)); }
                 .cf-offer:hover:not(:disabled), .cf-offer:focus-visible { transform: translateY(-8px) scale(1.04); }
