@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun, shopStock, takePerk } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, pickEncounter } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, pickEncounter, removalCost } from "@/lib/marketplace/cards-kit.js";
+
+// A hand is five cards. Below that a deck stops being a deck, so removal has a floor.
+const DECK_FLOOR = 5;
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -87,9 +90,92 @@ export async function POST(request) {
                     }
                     run.at = null;
                 }
-                // The merchant has no shop to open yet. It says so on the map rather than pretending.
-                if (kind === "merchant") { run.at = null; }
+                // ── THE MERCHANT KEEPS YOU ──────────────────────────────────────────────────────
+                // It used to hand you straight back to the map, which made it the one room that was a
+                // promise the game could not keep. The shelf is rolled HERE and stored on the run, so a
+                // reload is not a reroll — the same rule the reward offers follow.
+                if (kind === "merchant") {
+                    run.shop = { stock: await shopStock(buyer.id, run, encSeed), bought: [], removed: false };
+                }
 
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── BUYING ──────────────────────────────────────────────────────────────────────────────
+            // Every refusal below is a real one: you cannot buy what is gone, what you cannot afford, a
+            // potion with no belt slot free, or a perk you already carry. The shelf is the authority on
+            // price, not the request — a POST body is something anybody can write.
+            if (action === "buy") {
+                if (run.at?.kind !== "merchant" || !run.shop) {
+                    return NextResponse.json({ error: "not_in_shop" }, { status: 400 });
+                }
+                const slot = Number(body?.slot);
+                const item = (run.shop.stock || []).find((x) => x.slot === slot);
+                if (!item) return NextResponse.json({ error: "no_such_item" }, { status: 400 });
+                if ((run.shop.bought || []).includes(slot)) {
+                    return NextResponse.json({ error: "already_bought" }, { status: 400 });
+                }
+                if ((run.embers || 0) < item.price) {
+                    return NextResponse.json({ error: "too_few_embers" }, { status: 400 });
+                }
+                if (item.kind === "card") {
+                    run.deck = [...(run.deck || []), item.ref];
+                } else if (item.kind === "potion") {
+                    if ((run.potions || []).length >= POTION_SLOTS) {
+                        return NextResponse.json({ error: "no_potion_slot" }, { status: 400 });
+                    }
+                    run.potions = [...(run.potions || []), item.ref];
+                } else if (item.kind === "perk") {
+                    if (!takePerk(run, item.ref)) {
+                        return NextResponse.json({ error: "already_carried" }, { status: 400 });
+                    }
+                } else {
+                    return NextResponse.json({ error: "bad_item" }, { status: 400 });
+                }
+                run.embers = (run.embers || 0) - item.price;
+                run.shop.bought = [...(run.shop.bought || []), slot];
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── AND THE THING A SHOP IS ACTUALLY FOR ────────────────────────────────────────────────
+            // Everything else in this game makes the deck BIGGER, and a deck that only grows draws its good
+            // cards less often the longer the run goes. This is the only place it can get better instead.
+            //
+            // Once per shop, and the price rises every time across the whole run — theirs is 75 rising 25,
+            // and the escalation is what stops a rich run deleting itself down to four perfect cards.
+            if (action === "remove") {
+                if (run.at?.kind !== "merchant" || !run.shop) {
+                    return NextResponse.json({ error: "not_in_shop" }, { status: 400 });
+                }
+                if (run.shop.removed) return NextResponse.json({ error: "already_removed" }, { status: 400 });
+                const at = Number(body?.index);
+                const deck = run.deck || [];
+                if (!Number.isInteger(at) || at < 0 || at >= deck.length) {
+                    return NextResponse.json({ error: "no_such_card" }, { status: 400 });
+                }
+                // A hand is drawn five at a time; a deck below that stops being a deck.
+                if (deck.length <= DECK_FLOOR) {
+                    return NextResponse.json({ error: "deck_too_small" }, { status: 400 });
+                }
+                const cost = removalCost(run.removals || 0);
+                if ((run.embers || 0) < cost) {
+                    return NextResponse.json({ error: "too_few_embers" }, { status: 400 });
+                }
+                run.deck = deck.filter((_, i) => i !== at);
+                run.embers = (run.embers || 0) - cost;
+                run.removals = (run.removals || 0) + 1;
+                run.shop.removed = true;
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // Back to the sheet. The shelf goes with you — a shop you walked out of is not a shop you can
+            // walk back into, which is what makes the money a decision rather than a running tab.
+            if (action === "leave") {
+                run.at = null;
+                run.shop = null;
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
@@ -104,11 +190,9 @@ export async function POST(request) {
                 // An elite hands over a perk for the health it just cost you.
                 if (run.at?.kind === "elite") {
                     const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
-                    if (got.perk && !(run.perks || []).includes(got.perk)) {
-                        run.perks = [...(run.perks || []), got.perk];
-                        const bump = PERKS[got.perk]?.maxHp || 0;
-                        if (bump) { run.hpMax += bump; run.hp += bump; }
-                    }
+                    // takePerk owns the health bump too — see the note on it. Two copies of that is Ember
+                    // Heart paying its +8 from an elite and not from the shop.
+                    if (got.perk) takePerk(run, got.perk);
                     if (got.embers) run.embers = (run.embers || 0) + got.embers;
                 }
                 if (run.at?.kind === "boss" || run.stop > RUN_LENGTH) {

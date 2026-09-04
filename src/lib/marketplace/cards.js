@@ -5,8 +5,8 @@ import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
-    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS, RUN_LENGTH,
-    STARTER_DECK, buildParty, encounterById, nextRand, pickEncounter, stopAt,
+    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS,
+    RUN_LENGTH, SHOP, STARTER_DECK, buildParty, buildShop, encounterById, nextRand, pickEncounter, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -145,6 +145,8 @@ const newRun = (seed) => ({
     embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
     perks: [],             // kept for the whole run and applied at the start of every fight (PERKS)
     potions: [],           // up to POTION_SLOTS, drunk in a fight (POTIONS)
+    shop: null,            // the merchant's shelf while you are stood in one; cleared on the way out
+    removals: 0,           // cards paid to be rid of, for the escalating price — see removalCost
     // ⚠️ A TIMESTAMP, NOT A FLAG. This key used to be `started: true` further down the object, and adding a
     // clock under the same name left BOTH — the later one won, the top bar subtracted `true` from Date.now()
     // and the run showed as 29,806,893 hours old. One key, one meaning.
@@ -188,15 +190,26 @@ export async function saveRun(buyerId, run) {
  * `tier` gates by how far in you are — the back half of the ladder is where the big cards live, so an early
  * stop cannot hand you Crush.
  */
-export async function cardOffers(buyerId, run) {
+/**
+ * Which cards this member can be handed at all, at this depth.
+ *
+ * Pulled out of cardOffers because the SHOP asks the identical question and a second copy of "what may this
+ * person be offered" is the rule going wrong in one place and not the other. Both callers differ only in how many
+ * they draw and what they charge.
+ */
+export async function eligibleCards(buyerId, run) {
     const owned = await db
         .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId])
         .catch(() => []);
     const have = new Set((owned || []).map((r) => r.ref));
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind).offer;
-    const eligible = Object.values(POOL)
+    return Object.values(POOL)
         .filter((c) => c.tier <= maxTier)
         .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
+}
+
+export async function cardOffers(buyerId, run) {
+    const eligible = await eligibleCards(buyerId, run);
 
     // Threaded off the run's own seed and its stop, so the same run re-offers the same three cards if the
     // page is reloaded before a pick is made — reloading is not a reroll.
@@ -269,4 +282,44 @@ export function grantForRoom(run, row, lane, kind) {
         return out;
     }
     return {};
+}
+
+
+/**
+ * What is on the merchant's shelf this visit.
+ *
+ * Drawn from the same eligible pool the reward screen uses, so the shop cannot sell somebody a card the game
+ * would never have offered them. Priced and discounted in cards-kit; the only thing that needs the database
+ * is which pets they own.
+ */
+export async function shopStock(buyerId, run, seed) {
+    const eligible = await eligibleCards(buyerId, run);
+    let roll = (seed >>> 0) + 104729;
+    const pool = [...eligible];
+    const cardIds = [];
+    while (cardIds.length < SHOP.cards && pool.length) {
+        const [r, next] = nextRand(roll);
+        roll = next;
+        cardIds.push(pool.splice(Math.floor(r * pool.length), 1)[0].id);
+    }
+    // Nothing already carried: a shop offering a perk you hold or a potion slot you cannot fill is a slot
+    // that wastes the visit.
+    const held = new Set(run.perks || []);
+    return buildShop(seed, { cardIds, perkIds: PERK_IDS.filter((id) => !held.has(id)) });
+}
+
+/**
+ * Take a perk into the run, health bump and all.
+ *
+ * ⚠️ THIS EXISTED TWICE THE MOMENT THE SHOP SOLD ONE. The elite payout in the run route already did the
+ * three lines — push it, raise hpMax, raise hp by the same — and a second copy in the buy handler is the
+ * Ember Heart quietly paying its +8 in one place and not the other. Mutates `run` because that is what every
+ * handler in the route does with it.
+ */
+export function takePerk(run, perkId) {
+    if (!perkId || (run.perks || []).includes(perkId)) return false;
+    run.perks = [...(run.perks || []), perkId];
+    const bump = PERKS[perkId]?.maxHp || 0;
+    if (bump) { run.hpMax += bump; run.hp += bump; }
+    return true;
 }

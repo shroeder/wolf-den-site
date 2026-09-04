@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import CardFightClient from "@/components/cards/CardFightClient";
 import CardMap from "@/components/cards/CardMap";
+import CardShop from "@/components/cards/CardShop";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, getCardFightFixture, loadRun, runFixture } from "@/lib/marketplace/cards.js";
 
@@ -50,6 +51,11 @@ export default async function CardsPage({ searchParams }) {
     // treasure — and that is exactly when Spire shows you the sheet. A fight is what happens when you have
     // chosen where to go, not the thing the game opens on.
     if (!run.at && !run.done) return <CardMap run={run} />;
+
+    // ── THE MERCHANT IS A SCREEN, NOT A FIGHT ────────────────────────────────────────────────────────────
+    // Every other room either resolves on entry (rest, chest) or opens the ring. This one stands you in front
+    // of a shelf until you choose to move on, which is why `at` survives it where a rest's does not.
+    if (run.at?.kind === "merchant") return <CardShop run={run} />;
 
     const fixture = await runFixture(buyer.id, run);
     return <CardFightClient fixture={fixture} run={run} />;

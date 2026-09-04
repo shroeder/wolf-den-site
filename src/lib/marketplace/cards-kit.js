@@ -236,7 +236,85 @@ export const POTIONS = {
 };
 export const POTION_IDS = Object.keys(POTIONS);
 
-export const RUN_LENGTH = 15;              // map rows; the boss stands above them
+export const RUN_LENGTH = 15;
+
+// ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
+// The one node that was a promise the game could not keep: you walked onto it and it handed you straight back
+// to the map. Embers have been paid out since the run system shipped — 25 for taking no card, 40 from a chest,
+// 60 from an elite with no perk left — and there has never been anywhere to spend one, which quietly made
+// "take nothing" a choice between a real card and a number that did nothing.
+//
+// Theirs sells seven cards, three potions and three relics, and the rightmost relic is shop-exclusive. Ours is
+// smaller because the run is one act rather than three and the ember income is a fraction of their gold, but
+// the shape is the same: a few cards, a couple of potions, one thing you cannot get anywhere else, one item
+// discounted, and — the part that actually matters — A CARD REMOVAL.
+//
+// ⚠️ REMOVAL IS THE WHOLE REASON A SHOP EXISTS. Every other reward in this game makes the deck BIGGER, and a
+// deck that only grows draws its good cards less often the longer a run goes. Spire prices that at 75 gold
+// rising 25 a time, once per shop, and it is the single most bought thing in the game. Without it a shop is a
+// vending machine; with it, it is the only place the deck can get better instead of longer.
+export const SHOP = {
+    cards: 3,
+    potions: 2,
+    perks: 1,
+    // Priced against what a run actually earns rather than against their gold: a full run sees roughly
+    // 100-200 embers, so one card is most of a chest and the perk is a run's worth of skipped rewards.
+    price: {
+        card: [[38, 50], [60, 76], [92, 115]],   // by the card's own tier
+        potion: [28, 36],
+        perk: [85, 108],
+    },
+    // "Can only be used once per Shop. Its price starts at 75 Gold and increases by 25 each time it is bought
+    // at a shop." Same rule, ember-sized: the escalation is what stops a rich run deleting its whole deck.
+    removeBase: 55,
+    removeStep: 25,
+    // Theirs discounts one card by half. One slot, so the shop has a thing worth looking at rather than a
+    // uniform price list.
+    saleOff: 0.4,
+};
+
+/** What removing a card costs on this visit — see SHOP.removeBase. */
+export const removalCost = (removals = 0) => SHOP.removeBase + SHOP.removeStep * Math.max(0, removals);
+
+const priceIn = ([lo, hi], r) => lo + Math.floor(r * (hi - lo + 1));
+
+/**
+ * The stock on the shelf for this visit.
+ *
+ * Rolled from the room's seed and STORED on the run, so a reload is not a reroll — the same rule the reward
+ * offers already follow. `cardIds` is handed in because deciding which cards a member is even eligible for
+ * needs the database, and this file has never touched it.
+ */
+export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds = PERK_IDS } = {}) {
+    let roll = seed >>> 0;
+    const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
+    const stock = [];
+
+    for (const id of cardIds.slice(0, SHOP.cards)) {
+        const tier = Math.max(1, Math.min(3, POOL[id]?.tier || ALL_CARDS[id]?.tier || 1));
+        stock.push({ kind: "card", ref: id, price: priceIn(SHOP.price.card[tier - 1], next()) });
+    }
+    const pots = [...potionIds];
+    for (let i = 0; i < SHOP.potions && pots.length; i += 1) {
+        const id = pots.splice(Math.floor(next() * pots.length), 1)[0];
+        stock.push({ kind: "potion", ref: id, price: priceIn(SHOP.price.potion, next()) });
+    }
+    // The perk slot is theirs-shop-exclusive in spirit: an elite is the only other source, and an elite costs
+    // health you may not have. Paying for one is the alternative to bleeding for one.
+    const pk = [...perkIds];
+    for (let i = 0; i < SHOP.perks && pk.length; i += 1) {
+        const id = pk.splice(Math.floor(next() * pk.length), 1)[0];
+        stock.push({ kind: "perk", ref: id, price: priceIn(SHOP.price.perk, next()) });
+    }
+
+    // One thing on the shelf is cheap. Chosen last so every price above is rolled before anything is marked.
+    if (stock.length) {
+        const at = Math.floor(next() * stock.length);
+        stock[at] = { ...stock[at], sale: true, price: Math.max(1, Math.round(stock[at].price * (1 - SHOP.saleOff))) };
+    }
+    return stock.map((s, i) => ({ ...s, slot: i }));
+}
+              // map rows; the boss stands above them
 
 export function roomFight(row, kind = "fight") {
     const t = Math.max(0, Math.min(1, (row - 1) / (RUN_LENGTH - 1)));   // 0 at the bottom, 1 at the top
