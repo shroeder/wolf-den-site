@@ -4,7 +4,7 @@ import CardFightClient from "@/components/cards/CardFightClient";
 import CardMap from "@/components/cards/CardMap";
 import CardShop from "@/components/cards/CardShop";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, getCardFightFixture, loadRun, runFixture } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, getCardFightFixture, loadRun, petArtFor, runFixture } from "@/lib/marketplace/cards.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -55,7 +55,14 @@ export default async function CardsPage({ searchParams }) {
     // ── THE MERCHANT IS A SCREEN, NOT A FIGHT ────────────────────────────────────────────────────────────
     // Every other room either resolves on entry (rest, chest) or opens the ring. This one stands you in front
     // of a shelf until you choose to move on, which is why `at` survives it where a rest's does not.
-    if (run.at?.kind === "merchant") return <CardShop run={run} />;
+    // THE SHOP DRAWS ITS STOCK AS CARDS, so it needs the same pet art the fight uses — the portrait in the
+    // window, the rarity that colours the banner and the pet's colour for the stock. Fetched for the three
+    // cards on the shelf and nothing else (petArtFor), because a shelf is not a fight.
+    if (run.at?.kind === "merchant") {
+        const art = await petArtFor((run.shop?.stock || []).filter((s) => s.kind === "card").map((s) => s.ref)
+            .concat(run.deck || []));
+        return <CardShop run={run} art={art} />;
+    }
 
     const fixture = await runFixture(buyer.id, run);
     return <CardFightClient fixture={fixture} run={run} />;

@@ -150,7 +150,7 @@ export default function CardMap({ run }) {
                         onPointerLeave={() => setPeek(null)}
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="cm-ui" src="/images/cards/chrome/ui-potion.png" alt={p.name} />
+                        <img className="cm-ui" src={'/images/cards/potions/' + p.id + '.png'} alt={p.name} />
                     </span>
                 ))}
                 <span className="cm-gap" />
@@ -181,7 +181,7 @@ export default function CardMap({ run }) {
                             onPointerLeave={() => setPeek(null)}
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src="/images/cards/chrome/ui-heart.png" alt={perk.name} />
+                            <img src={'/images/cards/items/' + id + '.png'} alt={perk.name} />
                         </span>
                     );
                 })}

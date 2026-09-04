@@ -277,6 +277,101 @@ const PIECES = {
             + "itself is smooth and unbroken, empty, with nothing written on it. Woven cloth with a stitched "
             + "hem, in pale neutral grey — desaturated, almost no colour of its own.",
     },
+
+    // ── THE MERCHANT'S ROOM ──────────────────────────────────────────────────────────────────────────────
+    // Luke: "the merchant looks nothing like it, it doesn't Slay the Spire."
+    //
+    // He is right, and it is the same fault the map had and the reward screen had, one room later: THE SCREEN
+    // WAS CSS. A gradient, a flex bar, three bordered buttons with the card's NAME TYPED INTO THEM, and a
+    // rectangle around the removal. Theirs is a PLACE — a stall under a slung awning with somebody standing
+    // behind it, the cards laid out as cards, the potions as bottles, the purge as a fire you feed — and the
+    // gap between the two is not styling. Theirs has THINGS in it and ours had text about things.
+    //
+    // ⚠️ THE ROOM MUST NOT COMPETE WITH THE WARES. Everything drawn here is the BACKGROUND of a screen whose
+    // whole job is comparing three cards against a price, so it is deliberately dim, warm and low contrast:
+    // the brightest thing on this screen has to be the card you are deciding about, never the wallpaper
+    // behind it. That is why the room is asked for as lantern-lit gloom rather than as a lit scene, and it is
+    // the one instruction to keep if these are ever redrawn.
+    "shop-room": {
+        size: "1536x1024", store: { w: 900, h: 600 }, tint: false, opaque: true, framing: "scene",
+        extra: "DIM and LOW CONTRAST — the whole image sits in the dark half of the value range, lit by one "
+            + "warm lantern, with the corners and edges falling away into near-black shadow. Nothing bright, "
+            + "nothing white, no strong focal point, no character, no creature, no merchandise, no stall and "
+            + "nothing in the foreground: this is only the empty room behind everything else. Softly out of "
+            + "focus, as though seen past the thing that actually matters.",
+        subject: "The inside of a dark stone alcove beside a mountain road at night: rough dry-stone walls, a "
+            + "heavy timber beam across the top, a worn flagstone floor, and one hanging brass lantern "
+            + "throwing warm amber light onto the stones. Deep cool shadow everywhere the lantern does not "
+            + "reach.",
+    },
+    // THE THING HE ACTUALLY ASKED FOR. Their merchant is most of why their shop reads as a shop rather than as
+    // an inventory screen: a person is standing there and you are buying from HIM. Ours had nobody in it.
+    //
+    // Arms OPEN OVER THE WARES rather than at his sides, because the pose has to say "these are mine and they
+    // are for sale" from a silhouette 200px tall — and looking slightly down and to his right, which is where
+    // the shelf goes, so he is looking at the thing you are looking at.
+    "shop-keeper": {
+        fit: "inside", size: "1024x1536", store: { w: 460, h: 690 }, tint: false,
+        subject: "A hunched, welcoming travelling MERCHANT standing behind his stall, seen from the front from "
+            + "the knees up: a lean fox-faced trader with a long muzzle, warm amber eyes and one notched ear, "
+            + "grinning slyly. He wears a deep hood pushed back off his head, a heavy patched travelling cloak "
+            + "with a thick fur collar, fingerless gloves, and a wide leather belt strung with little brass "
+            + "trinkets, keys, vials and coin pouches. BOTH ARMS ARE SPREAD WIDE AND LOW, palms turned up and "
+            + "open, presenting his wares to the viewer. He is turned very slightly to his right and looking "
+            + "gently DOWNWARD, as though at the goods laid out in front of him. Warm lantern light on his "
+            + "face and shoulders, cool shadow down his back.",
+    },
+    // The awning is what turns a shelf into a STALL. Its scallops and its sag are the detail; the middle is
+    // plain canvas, so border-image can stretch it to any width without smearing the ends.
+    "shop-awning": {
+        size: "1536x1024", store: { w: 1000, h: 280 }, tint: false,
+        extra: "Drawn FLAT ON, straight from the front, symmetrical left to right, with NO perspective and no "
+            + "tilt. The awning itself is SOLID and opaque; everything around it, and everything BELOW its "
+            + "hanging edge, is fully transparent. It spans the full width of the image and is centred, with a "
+            + "little empty space above it.",
+        subject: "A slung market-stall AWNING seen head on: a heavy sagging canvas roof in faded red and cream "
+            + "stripes, hung from a rough timber pole that runs the whole width, its lower edge cut into deep "
+            + "scalloped points with a frayed hem. The canvas is worn, patched and stained, and it dips "
+            + "slightly in the middle under its own weight. Nothing hangs from it and there is nothing "
+            + "underneath it.",
+    },
+    // The wares stand ON something or they float. A plank, drawn to be stretched: the brackets are at the ends
+    // and the span between them is plain wood.
+    "shop-shelf": {
+        size: "1536x1024", store: { w: 1000, h: 150 }, tint: false,
+        extra: "Drawn FLAT ON, straight from the front, symmetrical left to right, with NO perspective, no "
+            + "tilt and NO top surface visible — only the front edge of the plank and its brackets. Solid and "
+            + "opaque, everything around it fully transparent. It spans the full width of the image.",
+        subject: "A heavy weathered oak SHELF plank seen edge on from the front, its grain deep and its front "
+            + "edge chipped, carried at each end by a small blackened iron bracket with a rivet. The span "
+            + "between the two brackets is plain unbroken timber with nothing on it, nothing carved into it "
+            + "and nothing hanging from it.",
+    },
+    // ── THE PURGE ────────────────────────────────────────────────────────────────────────────────────────
+    // Removing a card is the only reason a shop exists (see SHOP in cards-kit) and it was a bordered div with
+    // a heading in it — the quietest thing on the screen where it should be the loudest. Theirs is a big lit
+    // object you walk up to. So is this one: a brazier, and you feed a card to it.
+    "shop-brazier": {
+        fit: "inside", size: "1024x1024", store: { w: 320, h: 320 }, tint: false,
+        subject: "A squat blackened iron BRAZIER on three clawed feet, its shallow bowl heaped with glowing "
+            + "orange coals and a single tall curling flame rising from the centre, throwing warm light up "
+            + "onto its own rim. A few sparks drift above it. Heavy, forged and battered.",
+    },
+    // One thing on the shelf cannot be got anywhere else, and a plinth is how a shop says so.
+    "shop-plinth": {
+        fit: "inside", size: "1024x1024", store: { w: 260, h: 260 }, tint: false,
+        subject: "A small square stone PEDESTAL seen straight on from the front, its top a plain flat slab and "
+            + "its base moulded, carved from pale weathered granite with a thin band of tarnished brass around "
+            + "the neck. Completely bare — nothing standing on it, nothing carved into its face.",
+    },
+    // A price has to sit ON something or it is a number floating over a painting. Small enough that three of
+    // them in a row do not become the loudest thing on the shelf.
+    "shop-tag": {
+        size: "1024x1024", store: { w: 200, h: 130 }, tint: false, extra: SOLID,
+        subject: "A small blank hanging PRICE TAG: a rounded rectangle of scuffed dark leather with a stitched "
+            + "edge and a brass eyelet punched through its top, seen straight on. Its face is completely "
+            + "empty — no writing, no number, no emblem, nothing struck into it.",
+    },
 };
 
 const RETINT = process.argv.includes("--retint");
@@ -300,7 +395,7 @@ for (const [id, piece] of Object.entries(PIECES)) {
         continue;
     }
     if (fs.existsSync(base) && !FORCE) { skipped += 1; continue; }
-    const prompt = housePrompt(piece.subject, { extra: piece.extra || CHROME });
+    const prompt = housePrompt(piece.subject, { framing: piece.framing || "sprite", extra: piece.extra || CHROME });
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -320,7 +415,13 @@ for (const [id, piece] of Object.entries(PIECES)) {
     // came out as a blank white square for exactly this reason.
     const raw = sharp(Buffer.from(b64, "base64"));
     const trimmed = await (piece.opaque ? raw : raw.trim({ threshold: 8 }))
-        .resize(piece.store.w, piece.store.h, { fit: "fill" })
+        // ⚠️ fit MATTERS ONCE A PIECE HAS PROPORTIONS. Everything here used to be furniture that gets
+        // stretched to whatever box it lands in, so "fill" was right and the aspect was nobody's business.
+        // A drawn CHARACTER is not that: trim() cuts the transparent margin off first, which changes the
+        // aspect by however much margin the model happened to leave, and filling a fixed box after that
+        // squashes him by an amount that varies per generation. Objects that are a shape rather than a
+        // texture ask for "inside" and keep it.
+        .resize(piece.store.w, piece.store.h, { fit: piece.fit || "fill" })
         .png({ compressionLevel: 9 }).toBuffer();
     fs.writeFileSync(base, trimmed);
     made += 1;

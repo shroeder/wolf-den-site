@@ -208,6 +208,34 @@ export async function eligibleCards(buyerId, run) {
         .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
 }
 
+/**
+ * The portrait, colour and rarity for a named handful of cards.
+ *
+ * ── NARROW ON PURPOSE ────────────────────────────────────────────────────────────────────────────────────
+ * getCardFightFixture already returns exactly this shape, and calling THAT to paint a shop shelf would drag
+ * the member row, the whole party off the Long Road and every pet in ALL_CARDS along behind it — the same
+ * "reached for the most convenient existing function" fault that had the nav running 78 round trips to read
+ * two fields. One query, for the pets these cards actually name.
+ *
+ * The shape is deliberately identical to `fixture.petArt` because CardFace reads it: a card in the shop and
+ * the same card in the hand must be handed the same object or they are two renderers wearing one name.
+ */
+export async function petArtFor(cardIds = []) {
+    const petIds = [...new Set(cardIds.map((id) => ALL_CARDS[id]?.pet).filter(Boolean))];
+    if (!petIds.length) return {};
+    const sprites = await db
+        .query(`SELECT pet_id, url, flip FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
+        .catch(() => []);
+    return Object.fromEntries((sprites || []).map((r) => {
+        const pet = collectibleById(r.pet_id);
+        return [r.pet_id, {
+            url: r.url, flip: r.flip === true,
+            rarity: pet?.rarity || "common",
+            color: pet?.color || "#9aa0a6",
+        }];
+    }));
+}
+
 export async function cardOffers(buyerId, run) {
     const eligible = await eligibleCards(buyerId, run);
 

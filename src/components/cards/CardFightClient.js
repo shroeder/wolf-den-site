@@ -2,18 +2,23 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cinzel, Kreon } from "next/font/google";
+import { Cinzel } from "next/font/google";
 import {
-    GiBiceps, GiCardDraw, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
-    GiFlame, GiSlowBlob, GiSmallFire, GiSwordWound, GiThunderStruck,
+    GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
+    GiFlame, GiSlowBlob, GiSwordWound,
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, KEYWORDS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn,
-    playCard, startFight, typeLook,
+    playCard, startFight,
 } from "@/lib/marketplace/cards-kit.js";
-import { RARITY_META } from "@/lib/marketplace/rarity.js";
+// ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
+// It moved to CardFace.js the day the merchant started selling cards, along with every rule that paints it —
+// see the note at the top of that file for why the CSS had to travel with the markup and why `Sprite` did
+// NOT. What is left here is the BOX: how big a card is, the moulding around it, and the four states only a
+// fight has (picked, spent, unaffordable, ghosted).
+import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
 // the floating number and the screen jolt are all timed off this one value, because the whole point of the
@@ -29,208 +34,12 @@ const IMPACT_MS = 200;
 // mouse clicks in this codebase — it has already cost one afternoon. Window listeners instead, with a slop
 // threshold below which a press is a tap and not a drag.
 
-// ── THE CARD FACE IS NOT SET IN THE UI FONT ──────────────────────────────────────────────────────────────
-// Luke: "i really dont like the font on the description". It was inheriting the site body face, which is a
-// clean modern sans chosen to make a shop legible — correct for a page and wrong on a painted card, where it
-// reads as a caption pasted onto a game. Kreon is a slab serif with the same weight of stroke as the ink
-// contour the art is drawn with, and is the closest free face to the one Spire sets its own cards in. Scoped
-// to this screen through next/font, so nothing else on the site changes and the file is fetched only by the
-// people who open the fight.
-const cardFont = Kreon({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
 // ── AND A FACE FOR THE PANELS ────────────────────────────────────────────────────────────────────────────
 // Luke: "we need a better font for the button and the title in that model." Kreon is the CARD face — a slab
 // serif sized for body text at 9px — and using it for a heading just makes a big version of small type.
 // Cinzel is cut from Roman inscriptional capitals, which is the same instinct as the stone-and-metal furniture
 // around it, and it only ever appears at heading size where its width costs nothing.
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
-
-const Sprite = ({ src, fallback, className, flip }) => {
-    const [bad, setBad] = useState(false);
-    const url = bad ? fallback : src;
-    if (!url) return <span className={className} aria-hidden="true" />;
-    // eslint-disable-next-line @next/next/no-img-element
-    return (
-        <img
-            className={className} src={url} alt="" draggable="false"
-            style={flip ? { transform: "scaleX(-1)" } : undefined}
-            onError={() => setBad(true)}
-        />
-    );
-};
-
-// ── READING A HAND AT SPEED ──────────────────────────────────────────────────────────────────────────────
-// Nobody reads sentences on a card; they spot the two words that decide the turn. Spire colours its keywords
-// inside the text and that is most of why its cards are legible at a glance, so ours do the same — off the
-// vocabulary the RULES own (cards-kit), not a list this file invented.
-const KEY_RE = new RegExp(`\\b(${KEYWORDS.join("|")})\\b`, "g");
-const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
-    KEYWORDS.includes(part) ? <b key={`k${i}`} className="cf-key">{part}</b> : part
-));
-
-/**
- * ── THE CARD'S SENTENCE, WITH THE REAL NUMBERS IN IT ─────────────────────────────────────────────────────
- * The text is a template over the card's own fields ("Deal {damage} damage."), and the values come from
- * resolveCard, so a Bite thrown at something Vulnerable says nine on its face while it is being aimed.
- *
- * A number that has MOVED is coloured — green when the fight is working for you, red when against — because
- * a nine that looks exactly like the six it replaced is a number nobody notices changing. Only the delta is
- * marked; an unmodified number stays plain, or every card in the hand is a Christmas tree.
- */
-const KEY_FIELD = /\{(\w+)\}/g;
-const withNumbers = (card, live) => {
-    const parts = String(card.text || "").split(KEY_FIELD);
-    return parts.map((part, i) => {
-        // split() on a capturing group alternates literal, capture, literal, capture...
-        if (i % 2 === 0) return <span key={`t${i}`}>{withKeywords(part)}</span>;
-        const base = Number(card[part]) || 0;
-        const now = live && live[part] != null ? Number(live[part]) : base;
-        const cls = now > base ? " is-up" : now < base ? " is-down" : "";
-        return <b key={`n${i}`} className={`cf-num${cls}`}>{now}</b>;
-    });
-};
-
-// A hex from RARITY_META, softened to a wash — the banner is tinted BY the rarity rather than painted in it,
-// or a Legendary card is a solid orange brick with unreadable text on it.
-const rgb = (hex) => {
-    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
-    const n = m ? parseInt(m[1], 16) : 0x9aa0a6;
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-};
-const wash = (hex, alpha) => `rgba(${rgb(hex).join(",")},${alpha})`;
-/** The same colour, darker — the underside of a ribbon, so it reads as folded cloth rather than a flat bar. */
-const shade = (hex, k) => `rgb(${rgb(hex).map((c) => Math.round(c * k)).join(",")})`;
-/**
- * Ink that survives its own background. The pets run from a near-white bunny to a deep slate wolf, and a
- * ribbon painted in the pet's colour cannot assume white text works — on the pale ones it vanishes.
- * Rec. 601 luma, which is the cheap standard and correct enough for a decision with two outcomes.
- */
-const inkOn = (hex) => {
-    const [r, g, b] = rgb(hex);
-    return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#16191f" : "#ffffff";
-};
-/**
- * The colour, sunk toward the card stock. Spire's frame is painted in the CHARACTER's colour — red for the
- * Ironclad, green for the Silent — which is what stops a deck of commons being a tray of grey. Our pets carry
- * their own colours, so the pet's is the frame's, sunk far enough that white text still sits on it.
- */
-const deep = (hex, k) => {
-    const [r, g, b] = rgb(hex);
-    const mix = (c, d) => Math.round(c + (d - c) * k);
-    return `rgb(${mix(r, 20)},${mix(g, 23)},${mix(b, 29)})`;
-};
-/**
- * The card STOCK — the coloured slab the painted moulding sits on.
- *
- * This used to be painted on the card box itself, with the frame laid over the top, and a sliver of it showed
- * all the way down the outside edge: "there is a little green peaking out" (Luke, zoomed in on the frog). A
- * drawn frame has its own silhouette and a CSS box has border-radius, and the two do not agree — so the colour
- * escaped wherever the picture's edge sat inside the box's. It is an inner layer now, inset far enough that
- * the moulding covers its boundary on every side, and the card box paints nothing at all.
- */
-const stockStyle = (hue) => ({
-    background: `linear-gradient(180deg, ${deep(hue, 0.5)} 0%, ${deep(hue, 0.68)} 26%, ${deep(hue, 0.84)} 100%)`,
-});
-
-// ── THE PICTURE IN THE WINDOW, AND WHAT HAPPENS BEFORE IT EXISTS ─────────────────────────────────────────
-// A card shows its pet DOING the thing (scripts/gen-card-art.mjs), full-bleed inside the frame. If that file
-// has not been drawn yet the card falls back to the pet's own portrait sprite, contained rather than cropped —
-// so a new card can be written, played and balanced today and get its illustration whenever. The art is never
-// allowed to be a blocker on the rules.
-const CardArt = ({ card, pet }) => {
-    const [noArt, setNoArt] = useState(false);
-    if (!noArt) {
-        // eslint-disable-next-line @next/next/no-img-element
-        return (
-            <img
-                className="cf-art-full" src={`/images/cards/${card.id}.webp`} alt="" draggable="false"
-                onError={() => setNoArt(true)}
-            />
-        );
-    }
-    return <Sprite src={pet?.url} className="cf-art-img" />;
-};
-
-/**
- * One card face, in the anatomy Spire settled on: the cost hanging off the corner, a name banner whose colour
- * IS the rarity, a framed window for the art, a tab naming the type, and the text underneath with its keywords
- * lit. Every one of those is a channel that does not cost a word — you can tell an Attack from a Skill, and a
- * Legendary from a Common, without reading anything.
- */
-/** The emblem on the type plate. Crossed swords is an attack, a shield is a skill, a flame is a power. */
-// ── THE PLATE SAYS WHAT THE CARD DOES, BECAUSE THE WINDOW ALREADY SAYS WHAT IT IS ────────────────────────
-// Luke: "drawing two cards is not a defensive skill, it's more of a utility." He is right, and the reason it
-// was wrong is that the plate and the window were saying the SAME thing: an attack window comes to a point, a
-// skill window is a rounded rectangle — the shape is already the type — and then the plate underneath showed a
-// shield for every skill in the game. So Hoot, which draws two cards, wore a shield.
-//
-// The plate is free to carry something the shape cannot, so it carries the EFFECT. Shape = what kind of card
-// this is; emblem = what it will do to somebody. Read off the card's own fields in the order that decides how
-// it gets played: a card that deals damage is an attack whatever else it also does.
-const TypeMark = ({ card, kind }) => {
-    const c = card || {};
-    if (c.damage) return <GiCrossedSwords aria-hidden="true" />;
-    if (c.block) return <GiShield aria-hidden="true" />;
-    if (c.heal) return <GiHeartPlus aria-hidden="true" />;
-    if (c.draw || c.energy) return <GiCardDraw aria-hidden="true" />;
-    if (c.strength) return <GiBiceps aria-hidden="true" />;
-    if (c.weak) return <GiSlowBlob aria-hidden="true" />;
-    if (c.vulnerable) return <GiCrackedShield aria-hidden="true" />;
-    // Nothing matched: fall back to the TYPE, which is what this used to be entirely.
-    if (kind === "attack") return <GiCrossedSwords aria-hidden="true" />;
-    if (kind === "power") return <GiThunderStruck aria-hidden="true" />;
-    return <GiSmallFire aria-hidden="true" />;
-};
-
-// ── WHICH PAINTED TINT A RARITY WEARS ────────────────────────────────────────────────────────────────────
-// The chrome is drawn once and tinted into three (scripts/gen-card-chrome.mjs). Nine rarities map onto those
-// three rather than each demanding its own file: grey for common, steel blue through the middle, gold at the
-// top. A rarity nobody has authored a card for yet still gets furniture.
-const chromeTint = (rarity) => {
-    const r = String(rarity || "common");
-    if (r === "common") return "common";
-    return ["rare", "epic"].includes(r) ? "rare" : "legendary";
-};
-
-const CardFace = ({ card, art, dim, live }) => {
-    const meta = RARITY_META[art?.rarity] || RARITY_META.common;
-    const look = typeLook(card.kind);
-    const hue = art?.color || meta.color;
-    const tint = chromeTint(art?.rarity);
-    return (
-        <>
-            <span className="cf-stock" style={stockStyle(hue)} />
-            <span className={`cf-cost${dim ? " is-dim" : ""}`}><i>{card.cost}</i></span>
-            {/* The ribbon sits ABOVE the picture with its folded ends draping over the window's top corners —
-                which is where Spire puts it. Laid fully across the art, its own clipped underside let the
-                picture show through directly under the name, and that reads as the sprite covering it. */}
-            <span className="cf-banner" style={{ backgroundImage: `url(/images/cards/chrome/banner-${tint}.png)` }}>
-                {card.name}
-            </span>
-            {/* THE WINDOW'S SHAPE IS THE CARD'S TYPE. An attack comes to a point at the bottom, a skill is a
-                rounded rectangle — Spire's own tell, and it means you can sort a hand by what the cards DO
-                without reading one of them. The rim is the rarity, painted as the container behind a 2px
-                inset rather than as a border, because a border does not follow a clip-path and the pointed
-                bottom would lose its edge. */}
-            <span className={`cf-art is-${card.kind}`}>
-                <span className="cf-art-in" style={{ background: `radial-gradient(ellipse at 50% 62%, ${wash(hue, 0.34)}, rgba(6,8,12,0.94))` }}>
-                    <CardArt card={card} pet={art} />
-                </span>
-                <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${card.kind}-${tint}.png)` }} />
-            </span>
-            {/* ── THE TYPE PLATE ──────────────────────────────────────────────────────────────────────
-                A painted plaque with an EMBLEM struck on it, not a CSS rectangle with a word in it. Two
-                complaints in one, both Luke's: on a card whose every other edge is painted, the tab was the
-                one piece that still looked like a web page, and the word was doing work the window's shape
-                already does — an attack window comes to a point, a skill is a rounded rectangle, and now the
-                plate under it carries crossed swords or a shield. The word is one line away if it is missed;
-                the `label` it would use is still in the rules. */}
-            <span className="cf-type" style={{ backgroundImage: `url(/images/cards/chrome/plate-${tint}.png)` }} aria-label={look.label}>
-                <TypeMark card={card} kind={card.kind} />
-            </span>
-            <span className="cf-text">{withNumbers(card, live)}</span>
-        </>
-    );
-};
 
 // How long a body takes to go, and how long the line takes to close over it. DIE_MS reaches the stylesheet
 // as --cf-die off the root rather than being written twice: the close-up is timed to start as the last of the
@@ -889,7 +698,7 @@ export default function CardFightClient({ fixture, run = null }) {
     return (
         // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
         // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
-        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": cardFont.style.fontFamily, "--cf-panel-font": panelFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
+        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": CARD_FONT.style.fontFamily, "--cf-panel-font": panelFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
@@ -1700,7 +1509,6 @@ export default function CardFightClient({ fixture, run = null }) {
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55));
                     transform-origin: 50% 130%; transition: transform 140ms ease-out; }
-                .cf-stock { position: absolute; inset: 4px; z-index: 0; border-radius: 6px; }
                 /* The picked card STRAIGHTENS out of the fan, lifts and grows. Its transform is set inline
                    (the fan angle is per-card data), so this rule carries only what does not vary. */
                 .cf-card.is-picked { filter: drop-shadow(0 0 5px rgba(255,215,94,0.85)) drop-shadow(0 10px 16px rgba(0,0,0,0.6)); }
@@ -1724,100 +1532,17 @@ export default function CardFightClient({ fixture, run = null }) {
                    applied to a near-grey slate moves almost nothing — it rendered identical to the affordable
                    cards beside it. There is no hue there to rotate. */
                 .cf-card.is-unaffordable { opacity: 0.86; }
+/* REACHES INTO THE FACE, which only works because this whole block is style jsx GLOBAL
+                   — see the note above it. The diamond is drawn by CardFace now, one component down, and a
+                   SCOPED rule here would match nothing at all: the card would still go dim and the price
+                   would simply never turn red. That is the same trap that once rendered the foe at its
+                   natural 1024px. Keep this block global or move this rule into CardFace with the rest. */
                 .cf-card.is-unaffordable .cf-cost { background: linear-gradient(145deg, #d9534a, #7a1710);
                     border-color: #3d0a06; box-shadow: 0 2px 5px rgba(0,0,0,0.6), 0 0 8px rgba(255,70,50,0.55),
                     inset 0 1px 0 rgba(255,255,255,0.3); }
                 .cf-card.is-unaffordable .cf-cost i { color: #ffe2de; }
                 .cf-card.is-ghosted { opacity: 0.22; }
                 .cf-card.is-static { margin: 0; box-shadow: none; transform: none; }
-                /* A DIAMOND HUNG OFF THE CORNER, in dark stone with a white numeral — theirs, and it reads
-                   better than the amber disc did against a lit card. Rotated square, so the glyph inside is
-                   counter-rotated. */
-                .cf-cost { position: absolute; top: -8px; left: -8px; width: 22px; height: 22px; z-index: 4;
-                    display: grid; place-items: center; transform: rotate(45deg); border-radius: 4px;
-                    background: linear-gradient(145deg, #6b7280, #2c313a); border: 1px solid #10131a;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28); }
-                .cf-cost i { transform: rotate(-45deg); font-style: normal; font-size: 12px; font-weight: 800;
-                    color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
-                .cf-cost.is-dim { background: linear-gradient(145deg, #3a3f47, #23272e); }
-                .cf-cost.is-dim i { color: #96a0ae; }
-                /* THE RIBBON OVERHANGS THE CARD and its ends fold down past the top edge — it is draped over
-                   the card rather than printed on it. Solid rarity colour, white text: on their cards the
-                   ribbon IS the rarity read, so it has to be the strongest colour on the face. */
-                /* LAID OVER THE ART, IN THE PET'S OWN COLOUR. Two faults in one strip: it sat in its own lane
-                   above the picture rather than on it, and keyed to rarity it was a grey bar on every card in
-                   a starting deck — the fox is orange, the frog green, the wolf slate, and those are the
-                   colours a hand should be. Rendered after the art and pulled back up over it, so it overlaps
-                   the top of the window the way a banner nailed across a frame does. */
-                /* THE RIBBON, AND THE BUG THAT WAS IN IT. The clip below makes the two ENDS hang lower than
-                   the bar — folded tails. Laid across the middle of the art, that clipped underside let the
-                   picture show through immediately beneath the name, which reads exactly as "the sprite is
-                   covering the banner" (Luke, off his phone). It belongs above the window with only the tails
-                   draping over its top corners, which is where Spire's sits, and the bar is tall enough now
-                   that the clip takes tail and not text. */
-                /* PAINTED CLOTH, not a clipped div. The folded tails are in the picture now, which is what the
-                   clip-path was faking — and faking badly: its clipped underside was letting the card art show
-                   through beneath the name, which read as the sprite covering the banner. */
-                /* Set in the card face, not the UI face — see the note on cardFont at the top. */
-                .cf-banner { font-family: var(--cf-card-font); font-weight: 700; font-size: 10.5px;
-                    position: relative; z-index: 3; width: calc(100% + 14px);
-                    margin: 4px -7px -6px; padding: 3px 9px 6px;
-                    background-repeat: no-repeat; background-size: 100% 100%;
-                    font-size: 9px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1;
-                    text-align: center; color: #1b1e24; text-shadow: 0 1px 0 rgba(255,255,255,0.35);
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
-                /* FULL BLEED inside a thick coloured window. The sprite floating on a dark panel with margins
-                   read as a sticker stuck to a card; theirs is a painted illustration filling the frame. */
-                /* ── A PAINTED RIM OVER A CLIPPED PICTURE ────────────────────────────────────────────────
-                   The rim is a drawn asset laid on top (one per type, tinted per rarity), and the picture
-                   underneath is clipped to roughly the same silhouette so it cannot spill past the metal.
-                   The clip is inset a shade tighter than the art so the rim covers the cut edge — a clip and
-                   a painted rim never agree to the pixel, and the way to make that invisible is to let the
-                   metal be the thing that ends the picture. */
-                .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
-                    display: block; }
-                .cf-art-in { position: absolute; inset: 3px; display: grid; place-items: center;
-                    border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
-                .cf-rim { position: absolute; inset: 0; z-index: 2; pointer-events: none;
-                    background-repeat: no-repeat; background-size: 100% 100%;
-                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
-                /* ATTACK COMES TO A POINT; a SKILL is a rounded rectangle — Spire's tell for what a card does,
-                   readable before a single word is. Powers have their ring drawn and waiting. */
-                /* Inset INSIDE the painted opening, not flush with the box. A clip that reaches the corners
-                   lets the picture sit outside the shield's shoulders — a sliver of sky above the fox, which
-                   at a glance looks like the art is leaking out of its frame. The metal has to be the last
-                   thing on every edge. */
-                .cf-art.is-attack .cf-art-in { inset: 5px 6px 4px;
-                    clip-path: polygon(2% 0, 98% 0, 98% 58%, 50% 100%, 2% 58%); }
-                .cf-art.is-skill .cf-art-in { border-radius: 9px; }
-                .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
-                /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
-                .cf-type { position: relative; z-index: 3; margin-top: -7px; width: 34px; height: 15px;
-                    display: grid; place-items: center; background-repeat: no-repeat; background-size: 100% 100%;
-                    color: #1b1f27; font-size: 10px; line-height: 1;
-                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
-                /* Bounded, or a two-clause card writes straight out through the side of itself — which is what
-                   Pounce did, and it looked like a rendering fault rather than a card. */
-                /* Clipped, not spilled. The card is a fixed box and a three-line card was writing its last line out
-                   through the bottom edge onto the tray behind it. */
-                /* POSITIONED, or the stock eats it. The card's colour is an absolutely-positioned layer at
-                   z-index 0, and a STATIC element paints below every positioned sibling no matter what order
-                   they are in the markup — so the sentence went under the slab the moment the stock arrived,
-                   and the cards shipped for two commits with no rules text on them at all. The banner and the
-                   type tab survived only because they already carried a z-index of their own. */
-                .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
-                    padding: 4px 9px 0; font-size: 10.5px; line-height: 1.16; text-align: center; color: #eef2f8;
-                    overflow: hidden; overflow-wrap: break-word; }
-                /* The two words that decide the turn, lit. */
-                .cf-key { color: #ffd75e; font-weight: 800; }
-                /* An unmodified number is just text. One the fight has moved is called out — green up, red
-                   down — and nothing else on the card changes, so the eye goes to the digit rather than to a
-                   card that has started glowing. */
-                .cf-num { font-weight: 800; font-style: normal; }
-                .cf-num.is-up { color: #7fe07f; text-shadow: 0 0 6px rgba(80,220,110,0.5); }
-                .cf-num.is-down { color: #ff8f7a; text-shadow: 0 0 6px rgba(255,90,60,0.45); }
 
 
                 /* A little card back with the count struck on it, and its name under it. Ours keeps the word
@@ -1859,10 +1584,6 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 14px;
                     font-weight: 700; color: #1b1f27; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
                 .cf-end:disabled { opacity: 0.55; }
-
-                /* Full-bleed art fills its window; the fallback portrait is CONTAINED, because a pet sprite
-                   cropped to a letterbox loses its head. Two jobs, two fits. */
-                .cf-art-full { width: 100%; height: 100%; object-fit: cover; display: block; }
 
                 /* ── THE AIM ── over everything, hit-testing nothing. */
                 .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;
