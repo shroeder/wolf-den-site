@@ -362,12 +362,30 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // second one would shadow it.
     const counting = celebrating;
     const atRest = phase === "idle" || (phase === "done" && !counting);
-    const locked = busy || spinning || !atRest || broke;
-    // ── BEING BROKE MUST NOT FREEZE THE STEPPER ──────────────────────────────────────────────────────────
-    // `locked` disabled the − and + as well as SPIN, so a player short of chips could not step DOWN to a
-    // stake they COULD afford — while the message directly above the panel said "or step the bet down".
-    // The stepper is the way out of the state; locking it makes the machine's own advice impossible to take.
-    // Mid-spin still freezes it: changing the stake while the reels are turning changes what is being paid.
+    // ── TWO LOCKS, BECAUSE BEING BROKE AND BEING BUSY ARE NOT THE SAME REFUSAL ───────────────────────────
+    // `playing` is "the machine is in the middle of something" and stops everything. `locked` is that PLUS
+    // "you cannot cover this stake", which is right for SPIN and wrong for the stake rows underneath it.
+    const playing = busy || spinning || !atRest;
+    const locked = playing || broke;
+    // ── BEING BROKE MUST NOT FREEZE THE STAKE ROW ────────────────────────────────────────────────────────
+    // This has now been the same bug twice, in two different controls, for the same reason.
+    //
+    // It was the - and + stepper: `locked` disabled them as well as SPIN, so a player short of chips could
+    // not step DOWN to a stake they COULD afford — while the message directly above the panel said "or step
+    // the bet down". Then the stepper was replaced by the four stake buttons, the new buttons were wired to
+    // `locked` because that is what the old ones used, and the fix went with the control it was written for.
+    //
+    // Luke, on The Deep, holding 443 chips with the bet on 500: "cant change selection." Every stake in the
+    // row was dead — including the 25 and the 100 he could pay for — because he could not afford the one that
+    // happened to be selected. The machine's own advice, printed two lines above the row, was impossible to
+    // take, and the only way out was to leave the cabinet.
+    //
+    // The row is the way OUT of being broke, so it can only ever be closed by the machine being busy. Each
+    // button still checks its OWN price (`chips < v`), which is the check that belongs on a stake.
+    //
+    // ⚠️ THERE ARE TWO OF THESE ROWS — the panel's and the Colossal Reels layout's — and they are separate
+    // JSX. Fixing the one you are looking at is how this survived the first repair; both are changed here.
+    // Mid-spin still freezes them: changing the stake while the reels are turning changes what is being paid.
     // ── PRESSING SPIN WHILE THE WIN COUNTS OUT ENDS THE COUNT ────────────────────────────────────────────
     // Luke: "ideally we can hit the spin button when its counting the win to speed up the post spin win
     // count and get to the next spin."
@@ -1075,7 +1093,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                             {stakes.map((v) => (
                                 <button key={v} type="button"
                                     className={`s5-stake${v === bet ? " is-on" : ""}`}
-                                    disabled={locked || Number(chips ?? 0) < v}
+                                    disabled={playing || Number(chips ?? 0) < v}
                                     onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
                                     {v.toLocaleString()}
                                 </button>
@@ -1635,7 +1653,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                     {stakes.map((v) => (
                         <button key={v} type="button"
                             className={`s5-stake${v === bet ? " is-on" : ""}`}
-                            disabled={locked || Number(chips ?? 0) < v}
+                            disabled={playing || Number(chips ?? 0) < v}
                             onClick={() => { onBet?.(v); Cas.chips(); pull(null, v); }}>
                             {v.toLocaleString()}
                         </button>

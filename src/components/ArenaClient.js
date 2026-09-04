@@ -844,15 +844,21 @@ function Recap({ bout, busy, onClose }) {
     const tint = won ? "#ffd75e" : "#ff6f7d";
 
     // ── THE POINTS, COUNTING UP ── a number that lands already-final is just a receipt.
+    // ⚠️ COUNTED IN MAGNITUDE, BECAUSE THE NUMBER GOES BOTH WAYS. `vpGain` is signed, and this stepped
+    // towards it with `Math.max(1, ...)`, which is only ever positive: on a LOSS of 9 the step was +1, the
+    // first tick already satisfied `n + step >= -9`, and the counter jumped straight to the final value. The
+    // animation existed and simply never ran for half the fights on this screen. The sign is the renderer's
+    // business (see ar-vp-num below); this only has to get the size right.
     const gain = Number(r?.vpGain) || 0;
+    const gainSize = Math.abs(gain);
     const [shown, setShown] = useState(0);
     useEffect(() => {
-        if (!gain) return undefined;
-        const step = Math.max(1, Math.round(gain / 18));
-        const t = setInterval(() => setShown((n) => (n + step >= gain ? gain : n + step)), 45);
+        if (!gainSize) return undefined;
+        const step = Math.max(1, Math.round(gainSize / 18));
+        const t = setInterval(() => setShown((n) => (n + step >= gainSize ? gainSize : n + step)), 45);
         return () => clearInterval(t);
-    }, [gain]);
-    useEffect(() => { if (gain && shown === gain) Sfx.tick(4); }, [shown, gain]);
+    }, [gainSize]);
+    useEffect(() => { if (gainSize && shown === gainSize) Sfx.tick(4); }, [shown, gainSize]);
 
     // ── THE FIGHT, READ OFF THE LOG ── these are facts about what you just did, and none of them have ever
     // been shown anywhere. The log is the only record and it scrolls away under the deck.
@@ -917,7 +923,21 @@ function Recap({ bout, busy, onClose }) {
     // A Gauntlet tier and a Road rung have no victory points to give, so they move none — see the settle. The
     // recap has to know that or it promises a currency the fight cannot pay.
     const isPve = !raid && !haul && !r?.fishing && (Number(r?.npcTier) > 0 || Number(r?.rung) > 0);
-    const vpMoved = Number(r?.reward?.vp ?? reward?.vp ?? 0);
+    // ── WHICH WAY THE POINTS WENT, READ OFF THE FIELD THAT HAS AN ANSWER ON A LOSS ───────────────────────
+    // Luke, on a card that said DEFEATED and +9: "I shouldn't get vp if I lose, I should lose vp"; then, on
+    // the challenge list quoting −9 against the same opponent, "but then it shows a positive."
+    //
+    // The RATING WAS NEVER WRONG. finishBout settles `won ? moved : -moved` and the row for that bout holds
+    // -9; the points came off exactly as the list promised. This one line is the whole defect.
+    //
+    // `reward` is assigned inside `if (won)` in the settle, so on a loss it is null and `reward?.vp` is 0 —
+    // not negative, just absent. The sign test below therefore chose "+", and the magnitude came from the
+    // count-up, which had been handed the signed -9 and clamped it to its absolute value. Two halves of one
+    // number, arriving from different places, agreeing on nine and disagreeing on the sign.
+    //
+    // `vpGain` is the settle's own signed figure and is on the recap for both outcomes — it is what `gain`
+    // above already reads. Preferring it here makes the sign and the size come from the SAME field.
+    const vpMoved = Number(r?.vpGain ?? r?.reward?.vp ?? reward?.vp ?? 0);
     const loot = raid ? (raid.loot || [])
         : haul?.chest ? [{ kind: "chest", label: `${haul.chest[0].toUpperCase()}${haul.chest.slice(1)} Chest`, rarity: "off the line" }]
             : [];
@@ -1008,7 +1028,7 @@ function Recap({ bout, busy, onClose }) {
                        than assumed. A member who has just lost rating should see that, not a "+0". */
                     <div className="ar-vp">
                         <span className={`ar-vp-num${vpMoved < 0 ? " is-down" : ""}`}>
-                            {vpMoved < 0 ? "−" : "+"}{money(Math.abs(vpMoved < 0 ? vpMoved : shown))}
+                            {vpMoved < 0 ? "−" : "+"}{money(shown)}
                         </span>
                         <span className="ar-vp-lab">Victory Points</span>
                         {/* ── AND WHAT THAT MADE IT ────────────────────────────────────────────────────
