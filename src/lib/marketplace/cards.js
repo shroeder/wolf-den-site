@@ -6,8 +6,12 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS, RUN_LENGTH,
-    STARTER_DECK, nextRand, stopAt,
+    STARTER_DECK, encounterById, nextRand, pickEncounter, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
+
+// What a fixture builds when nobody named an encounter — the ?seed= replay link, which is one standalone
+// fight with no room around it. Deliberately a middle-band group rather than the easiest one.
+const DEFAULT_GROUP = [{ script: "jackal", hp: 34 }, { script: "bruiser", hp: 52 }, { script: "warden", hp: 44 }];
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
@@ -28,7 +32,11 @@ export const CARDS_UNLOCKED = (buyerId) => isOwner(buyerId);
 //
 // PICKED FROM THE SEED, not from Math.random, so a seed names the same fighter every time — otherwise "play
 // seed 4471 and tell me what you think" means two different fights and the whole point of a seed is gone.
-export async function getCardFightFixture(buyerId, seed, count = 3) {
+// `encounter` is an authored group from ENCOUNTERS — how many stand there, how much health each has, and
+// which script it plays. It decides the SHAPE of the fight; the Road still supplies the faces.
+export async function getCardFightFixture(buyerId, seed, encounter = null) {
+    const group = encounter?.foes?.length ? encounter.foes : DEFAULT_GROUP;
+    const count = group.length;
     // ── A PARTY, PICKED FROM THE SEED ────────────────────────────────────────────────────────────────
     // Three fighters off the Road rather than one, because "which of them do I hit" is the question a hand of
     // cards exists to answer and one enemy cannot ask it. Drawn from the same seed, so a seed still names the
@@ -41,12 +49,7 @@ export async function getCardFightFixture(buyerId, seed, count = 3) {
         const rung = 1 + Math.floor(r * LADDER_SIZE);
         if (!picked.some((f) => f.rung === rung)) picked.push(ladderFoe(rung));
     }
-    // The one in the middle is the big one, so a party reads as having a shape rather than a row of equals.
-    const SHAPES = [
-        { script: "jackal", hp: 34 },
-        { script: "bruiser", hp: 68 },
-        { script: null, hp: 48 },
-    ];
+
 
         // ALL_CARDS, not CARDS: the reward screen shows cards from the whole pet pool, and a card whose portrait
     // was never fetched renders as an empty frame at the exact moment somebody is choosing between three.
@@ -74,11 +77,19 @@ export async function getCardFightFixture(buyerId, seed, count = 3) {
         // Every fighter on the Road is drawn facing RIGHT, because the arena stands them on the left. This
         // screen stands them on the right, so every one of them needs turning around or the fight is two
         // people looking the same way.
+        // ── THE GROUP DECIDES THE FIGHT, THE ROAD DECIDES THE FACES ──────────────────────────────────
+        // Health and behaviour come from the encounter; the name, the sprite and the house come from one of
+        // the hundred fighters on the Long Road, picked off the same seed. So "Maulers" is always two of the
+        // same thing to play against and never the same two people twice, which is the cheapest possible
+        // version of enemy variety — the art bill stays zero and the fights stop being interchangeable.
+        encounter: encounter ? { id: encounter.id, name: encounter.name, pool: encounter.pool } : null,
         foes: picked.map((f, i) => ({
             name: f.name, art: f.sprite, artFallback: f.spriteFallback,
             color: f.color, houseName: f.houseName, rung: f.rung,
-            hp: SHAPES[i % SHAPES.length].hp,
-            script: FOE_SCRIPTS[SHAPES[i % SHAPES.length].script] || null,
+            // hpMax is NOT set here: openFight derives it from `hp` (`hpMax: f.hp || FOE_HP`), and a second
+            // copy of the same fact is the thing that goes stale. The Leech's heal caps against it.
+            hp: group[i].hp,
+            script: FOE_SCRIPTS[group[i].script] || null,
         })),
         // pet_id -> { url, flip, rarity }. A card face is a portrait rather than a combatant, so `flip` is
         // carried but the card does not act on it — a pet looking left on its own card is not wrong, it is a
@@ -207,13 +218,21 @@ export async function runFixture(buyerId, run) {
     // with no room selected is not in a fight at all — the page shows the map instead.
     const room = run.at || { row: run.stop - 1, kind: "fight" };
     const stop = stopAt(room.row + 1, room.kind);
-    const fixture = await getCardFightFixture(buyerId, (run.seed >>> 0) + (room.row * 31 + room.lane) * 104729, stop.foes);
+    // ── THE ROOM PICKS A GROUP, NOT A MULTIPLIER ─────────────────────────────────────────────────────
+    // This used to take three fixed shapes and scale their health by the row, which made every fight on the
+    // climb the same fight in a bigger coat. The band the row falls in now decides which POOL the party is
+    // drawn from — easy, hard, deep, elite or boss — and the group itself carries the health and the script.
+    // `run.recent` is the last two encounters, so the room you just cleared is not the room in front of you.
+    const seed = (run.seed >>> 0) + (room.row * 31 + (room.lane || 0)) * 104729;
+    // ⚠️ THE ROOM'S OWN ID WINS. `enter` picks the group and pushes it onto `run.recent`, so re-rolling here
+    // would run the draw against a memory that now CONTAINS this encounter and hand back a different party
+    // every time the page rendered. Stored once, read for ever after; the pick below is only for a room that
+    // predates this (an in-flight run) or a fight with no room around it.
+    const encounter = encounterById(room.enc) || pickEncounter(seed, room.row + 1, room.kind, run.recent || []);
+    const fixture = await getCardFightFixture(buyerId, seed, encounter);
     return {
         ...fixture,
         stop: { ...stop, of: RUN_LENGTH, row: room.row, kind: room.kind },
-        // The ladder scales what each fighter carries rather than authoring eight sets of enemies: the same
-        // hundred fighters off the Road, standing in a harder line the further in you are.
-        foes: fixture.foes.map((f) => ({ ...f, hp: Math.max(12, Math.round(f.hp * stop.hp)) })),
         hero: { ...fixture.hero, hp: run.hp, hpMax: run.hpMax },
         deck: run.deck,
         perks: run.perks || [],

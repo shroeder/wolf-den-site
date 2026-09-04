@@ -110,7 +110,17 @@ export default function CardMap({ run }) {
         router.refresh();
     }, [busy, router]);
 
-    const bossOpen = trail.some((t) => t.row === RUN_LENGTH - 1);
+    // ── THE BOSS IS A ROOM YOU WALK INTO ─────────────────────────────────────────────────────────────
+    // It used to be a drawing with no node behind it and no handler on it: the sheet showed a boss, lit it up
+    // once you reached the top row, and there was nothing to press. buildMap gives it a real node now and
+    // every room on the last row leads to it, so `open` decides this the same way it decides every other room
+    // and `enter` takes it the same way. `bossNode` falls back to the map's own boss field for a run whose
+    // map was generated before the node existed.
+    const bossNode = useMemo(
+        () => map.nodes.find((n) => n.kind === "boss") || (map.boss ? { ...map.boss, kind: "boss" } : null),
+        [map]
+    );
+    const bossOpen = Boolean(bossNode) && open.has(`${bossNode.row}:${bossNode.lane}`);
     const perks = run.perks || [];
     const potions = (run.potions || []).map((id) => POTIONS[id]).filter(Boolean);
     const deck = useMemo(() => {
@@ -208,7 +218,7 @@ export default function CardMap({ run }) {
                         ))}
                     </svg>
 
-                    {map.nodes.map((n) => {
+                    {map.nodes.filter((n) => n.kind !== "boss").map((n) => {
                         const k = `${n.row}:${n.lane}`;
                         const isOpen = open.has(k);
                         const isTaken = taken.has(k);
@@ -235,12 +245,18 @@ export default function CardMap({ run }) {
                         );
                     })}
 
-                    <div
+                    <button
+                        type="button"
+                        disabled={!bossOpen || busy || !bossNode}
                         className={`cm-node cm-boss${bossOpen ? " is-open" : ""}`}
                         style={{ left: "50%", top: `${((PAD_TOP - 4) / H) * 100}%` }}
+                        onClick={() => bossNode && enter(bossNode)}
+                        onPointerEnter={() => setPeek(LABEL.boss || "Boss")}
+                        onPointerLeave={() => setPeek(null)}
+                        aria-label="The boss"
                     >
                         <Ink kind="boss" className="cm-ink" />
-                    </div>
+                    </button>
                 </div>
                 {/* ── THE SHEET RUNS ON PAST THE LAST ROOM ────────────────────────────────────────────
                     The bottom row is the one you are standing on — the sheet opens there, because you climb

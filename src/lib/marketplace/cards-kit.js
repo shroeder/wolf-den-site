@@ -264,6 +264,7 @@ export const STARTER_DECK = [
 // a jackal that hits small and often and never guards, and a bruiser that spends a turn winding up and then
 // takes a quarter of you off. Which one you kill first is the question three enemies are FOR.
 export const FOE_SCRIPTS = {
+    // ── THE SHALLOWS ─────────────────────────────────────────────────────────────────────────────────
     jackal: [
         { key: "nip", label: "Nip", damage: 6 },
         { key: "snap", label: "Snap", damage: 8 },
@@ -274,7 +275,168 @@ export const FOE_SCRIPTS = {
         { key: "swing", label: "Swing", damage: 13 },
         { key: "crush", label: "Crush", damage: 18 },
     ],
+    // Two beats, both small. What a first fight is for: something that cannot end a run while you are still
+    // learning what the cards do.
+    cur: [
+        { key: "snarl", label: "Snarl", damage: 4 },
+        { key: "bite", label: "Bite", damage: 7 },
+    ],
+
+    // ── THE MIDDLE ───────────────────────────────────────────────────────────────────────────────────
+    // A WALL, and the reason a deck needs one big card. It guards more than a hand of small blows can remove
+    // in a turn, so chipping never gets through — you have to hold a real hit for the beat after the wall.
+    warden: [
+        { key: "wall", label: "Wall", block: 14 },
+        { key: "jab", label: "Jab", damage: 6 },
+        { key: "wall", label: "Wall", block: 14 },
+        { key: "jab", label: "Jab", damage: 9 },
+    ],
+    // It barely hits you. It makes everything ELSE on the board hit you, which is what turns "kill the small
+    // one first" from an obvious move into a real decision.
+    hexer: [
+        { key: "hex", label: "Hex", weak: 2 },
+        { key: "curse", label: "Curse", vulnerable: 2 },
+        { key: "lash", label: "Lash", damage: 7 },
+    ],
+    // One beat, for ever. No wind-up to read and nothing to play around: the only answer is to kill it, which
+    // is what makes a room full of them a race rather than a puzzle.
+    swarm: [
+        { key: "sting", label: "Sting", damage: 5 },
+    ],
+    // A CLOCK. It roars, and every swing after that is worth more than the last. Leave it alive while you
+    // clear the others and the fight you were winning turns over.
+    ramper: [
+        { key: "roar", label: "Roar", strength: 3 },
+        { key: "swing", label: "Swing", damage: 8 },
+        { key: "swing", label: "Swing", damage: 8 },
+    ],
+
+    // ── THE DEEP ─────────────────────────────────────────────────────────────────────────────────────
+    mauler: [
+        { key: "maul", label: "Maul", damage: 16 },
+        { key: "maul", label: "Maul", damage: 16 },
+        { key: "heave", label: "Heave", damage: 24 },
+    ],
+    // It heals back what you take off it, so a deck that deals damage in dribbles never finishes it. That is
+    // the whole question it asks: did you build for a burst.
+    leech: [
+        { key: "drain", label: "Drain", damage: 9, heal: 8 },
+        { key: "drain", label: "Drain", damage: 9, heal: 8 },
+        { key: "gorge", label: "Gorge", damage: 14 },
+    ],
+
+    // ── ELITES ───────────────────────────────────────────────────────────────────────────────────────
+    // Ramps AND guards, so it gets harder to kill at the same rate it gets harder to survive.
+    champion: [
+        { key: "bellow", label: "Bellow", strength: 4 },
+        { key: "guard", label: "Guard", block: 16 },
+        { key: "cleave", label: "Cleave", damage: 15 },
+        { key: "cleave", label: "Cleave", damage: 15 },
+    ],
+    // The whole fight is its third beat, and you can see it coming from the first. Block it or be halved.
+    headsman: [
+        { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
+        { key: "hew", label: "Hew", damage: 12 },
+        { key: "behead", label: "BEHEAD", damage: 30 },
+    ],
+
+    // ── THE BOSS ─────────────────────────────────────────────────────────────────────────────────────
+    // Five beats and every one is a different problem: it musters, it weakens you, it hits, it makes you
+    // fragile, and then it swings the biggest number in the game into the hole it just opened.
+    warlord: [
+        { key: "muster", label: "Muster", strength: 3, block: 12 },
+        { key: "sweep", label: "Sweep", damage: 14, weak: 1 },
+        { key: "hew", label: "Hew", damage: 20 },
+        { key: "dread", label: "Dread", vulnerable: 2 },
+        { key: "ruin", label: "RUIN", damage: 28 },
+    ],
 };
+
+// ── WHAT STANDS IN A ROOM ────────────────────────────────────────────────────────────────────────────────
+// Spire does not make an enemy bigger as you climb — it stops sending that enemy and starts sending a
+// different one. Each act carries its own list, the first two or three fights of an act come from an EASY
+// pool and the rest from a HARD one, every entry has a weight, and the same encounter cannot return within
+// two fights. This is that, over one act of fifteen rows: three bands, authored groups, weights, anti-repeat.
+//
+// WHY IT REPLACES AN HP MULTIPLIER. The room used to build its party from three fixed shapes and multiply
+// their health by the row — the same two fighters all the way up wearing a bigger number. That is the one
+// thing the reference deliberately does not do, and it is why every fight on the climb felt like the last.
+//
+// ⚠️ THE HEALTH NUMBERS ARE READ OFF THE CURVE THEY REPLACE, band by band, so the difficulty lands roughly
+// where it already landed and only the VARIETY is new. This is not a rebalance and should not be read as one.
+export const ENCOUNTERS = [
+    // ── EASY (rows 1-3) — two fighters, nothing that can end a run before it starts.
+    { id: "curs", name: "Stray Curs", pool: "easy", weight: 4, foes: [{ script: "cur", hp: 39 }, { script: "cur", hp: 39 }] },
+    { id: "jackals", name: "Jackal Pair", pool: "easy", weight: 4, foes: [{ script: "jackal", hp: 39 }, { script: "jackal", hp: 39 }] },
+    { id: "lone_bruiser", name: "A Lone Bruiser", pool: "easy", weight: 3, foes: [{ script: "bruiser", hp: 70 }] },
+    { id: "cur_bruiser", name: "Cur and Bruiser", pool: "easy", weight: 3, foes: [{ script: "cur", hp: 30 }, { script: "bruiser", hp: 48 }] },
+    // The debuffs turn up early and cheaply, so the first time Weak matters is not also the first time it
+    // costs somebody the run.
+    { id: "apprentice", name: "Hexer's Apprentice", pool: "easy", weight: 2, foes: [{ script: "hexer", hp: 36 }, { script: "cur", hp: 38 }] },
+
+    // ── HARD (rows 4-9) — three fighters, and the first rooms that ask a question.
+    { id: "pack", name: "The Pack", pool: "hard", weight: 4, foes: [{ script: "jackal", hp: 50 }, { script: "jackal", hp: 50 }, { script: "jackal", hp: 50 }] },
+    { id: "shieldwall", name: "Shield Wall", pool: "hard", weight: 3, foes: [{ script: "warden", hp: 68 }, { script: "bruiser", hp: 80 }] },
+    { id: "coven", name: "The Coven", pool: "hard", weight: 2, foes: [{ script: "hexer", hp: 52 }, { script: "hexer", hp: 52 }, { script: "cur", hp: 44 }] },
+    { id: "swarm", name: "Biting Swarm", pool: "hard", weight: 3, foes: [{ script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }] },
+    { id: "warband", name: "Warband", pool: "hard", weight: 4, foes: [{ script: "bruiser", hp: 58 }, { script: "jackal", hp: 42 }, { script: "ramper", hp: 50 }] },
+    { id: "rising", name: "The Rising", pool: "hard", weight: 3, foes: [{ script: "ramper", hp: 74 }, { script: "warden", hp: 74 }] },
+
+    // ── DEEP (rows 10-15) — the back half, where the big cards have to have arrived.
+    { id: "maulers", name: "Maulers", pool: "deep", weight: 4, foes: [{ script: "mauler", hp: 99 }, { script: "mauler", hp: 99 }] },
+    { id: "bloodletters", name: "Bloodletters", pool: "deep", weight: 3, foes: [{ script: "leech", hp: 70 }, { script: "leech", hp: 70 }, { script: "hexer", hp: 58 }] },
+    { id: "the_wall", name: "The Wall", pool: "deep", weight: 3, foes: [{ script: "warden", hp: 66 }, { script: "warden", hp: 66 }, { script: "mauler", hp: 66 }] },
+    { id: "hunting_party", name: "Hunting Party", pool: "deep", weight: 4, foes: [{ script: "jackal", hp: 58 }, { script: "jackal", hp: 58 }, { script: "mauler", hp: 82 }] },
+    { id: "ascendant", name: "The Ascendant", pool: "deep", weight: 3, foes: [{ script: "ramper", hp: 72 }, { script: "hexer", hp: 60 }, { script: "warden", hp: 66 }] },
+
+    // ── ELITES — the spike you choose to walk into, and the only place a perk comes from.
+    { id: "the_champion", name: "The Champion", pool: "elite", weight: 3, foes: [{ script: "champion", hp: 108 }, { script: "bruiser", hp: 67 }] },
+    { id: "the_headsman", name: "The Headsman", pool: "elite", weight: 3, foes: [{ script: "headsman", hp: 135 }] },
+    { id: "twin_wardens", name: "Twin Wardens", pool: "elite", weight: 2, foes: [{ script: "warden", hp: 88 }, { script: "warden", hp: 88 }] },
+    { id: "bloodgorged", name: "The Bloodgorged", pool: "elite", weight: 2, foes: [{ script: "leech", hp: 88 }, { script: "leech", hp: 88 }] },
+
+    // ── THE BOSS — one of three, so a run does not end the same way twice.
+    { id: "warlord", name: "The Warlord", pool: "boss", weight: 1, foes: [{ script: "warlord", hp: 148 }] },
+    { id: "sundered", name: "The Sundered Pair", pool: "boss", weight: 1, foes: [{ script: "champion", hp: 74 }, { script: "champion", hp: 74 }] },
+    { id: "hollow_king", name: "The Hollow King", pool: "boss", weight: 1, foes: [{ script: "warlord", hp: 108 }, { script: "hexer", hp: 40 }] },
+];
+
+export const encounterById = (id) => ENCOUNTERS.find((e) => e.id === id) || null;
+
+/** Which list a room draws from. `n` is the 1-based row, matching stopAt. */
+export function poolFor(n, kind = "fight") {
+    if (kind === "boss") return "boss";
+    if (kind === "elite") return "elite";
+    if (n <= 3) return "easy";
+    return n <= 9 ? "hard" : "deep";
+}
+
+/**
+ * The party standing in this room.
+ *
+ * Threaded off the run's seed and the room's position like every other roll in this game, so a room re-entered
+ * after a refresh is the same fight. `recent` is the last two encounter ids — the reference's own anti-repeat
+ * window. Without it a weighted draw hands you The Pack three rooms running and the map stops feeling
+ * authored; with it, the thing you just beat is not the thing in the next doorway.
+ *
+ * A pool with nothing left after the exclusion falls back to the whole pool rather than returning nothing,
+ * because a short list plus a two-deep memory can otherwise dead-end a run.
+ */
+export function pickEncounter(seed, n, kind = "fight", recent = []) {
+    const pool = poolFor(n, kind);
+    const all = ENCOUNTERS.filter((e) => e.pool === pool);
+    const fresh = all.filter((e) => !recent.includes(e.id));
+    const list = fresh.length ? fresh : all;
+    const total = list.reduce((sum, e) => sum + (e.weight || 1), 0);
+    const [r] = nextRand(seed >>> 0);
+    let roll = r * total;
+    for (const e of list) {
+        roll -= e.weight || 1;
+        if (roll <= 0) return e;
+    }
+    return list[list.length - 1];
+}
+
 
 // Reads the starter four AND the pet pool. Declared before POOL exists, so it dereferences ALL_CARDS at CALL
 // time rather than closing over a map that is still empty at module-evaluation order.
@@ -665,6 +827,25 @@ export function foeAct(state, i) {
     let hero = state.hero;
     let f = { ...foe, block: 0 };
     const intent = foeIntent(state, i);
+    // ── A FOE'S TURN IS MORE THAN A NUMBER AND A SHIELD ──────────────────────────────────────────────
+    // This read `damage` and `block` and nothing else, while the engine underneath it had carried Strength,
+    // Weak and Vulnerable on BOTH sides since the first card was written — attackDamage reads
+    // attacker.strength, attacker.weak and defender.vulnerable without caring who is who. So every enemy in
+    // the game could only hit you or guard, and the fights felt the same however many fighters were on the
+    // board, because they were the same.
+    //
+    // ORDER IS THE RULE: it buffs itself, then swings with the buff, then leaves what it did to you behind.
+    // A "roar and swing" beat therefore lands harder on the turn it roars, which is what makes a ramping
+    // enemy a clock rather than a slow start.
+    if (intent.strength) {
+        f = { ...f, strength: (f.strength || 0) + intent.strength };
+        events.push({ type: "buff", on: f.id, amount: intent.strength });
+    }
+    if (intent.heal) {
+        const to = Math.min(f.hpMax || f.hp, (f.hp || 0) + intent.heal);
+        events.push({ type: "heal", on: f.id, amount: to - (f.hp || 0) });
+        f = { ...f, hp: to };
+    }
     if (intent.block) {
         f = { ...f, block: f.block + intent.block };
         events.push({ type: "block", on: f.id, amount: intent.block });
@@ -674,6 +855,16 @@ export function foeAct(state, i) {
         hero = land(hero, dealt);
         events.push({ type: "damage", on: "hero", amount: dealt });
     }
+    // Applied AFTER the blow, so the Vulnerable a beat inflicts does not also multiply that same beat — the
+    // card side already works this way and a foe that broke the rule would be reading its own buff twice.
+    if (intent.weak) {
+        hero = { ...hero, weak: (hero.weak || 0) + intent.weak };
+        events.push({ type: "debuff", on: "hero", amount: intent.weak, stat: "weak" });
+    }
+    if (intent.vulnerable) {
+        hero = { ...hero, vulnerable: (hero.vulnerable || 0) + intent.vulnerable };
+        events.push({ type: "debuff", on: "hero", amount: intent.vulnerable, stat: "vulnerable" });
+    }
     const foes = state.foes.map((other, n) => (n === i ? tick({ ...f, beat: (f.beat || 0) + 1 }) : other));
     return {
         state: { ...state, hero, foes, over: hero.hp <= 0 ? "lose" : state.over },
@@ -681,7 +872,11 @@ export function foeAct(state, i) {
         acted: true,
         // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
         // playing an attack animation on an enemy that never attacked. The old code lunged all three.
-        kind: intent.damage ? "attack" : intent.block ? "guard" : "idle",
+        // The screen lunges on "attack" and braces on anything else, so a buff or a debuff reads as a brace
+        // rather than a swing that never came. Attack still wins the tie: a beat that hits AND curses you is
+        // a blow first.
+        kind: intent.damage ? "attack" : (intent.block || intent.strength || intent.heal) ? "guard"
+            : (intent.weak || intent.vulnerable) ? "curse" : "idle",
     };
 }
 

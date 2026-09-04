@@ -992,11 +992,21 @@ export default function CardFightClient({ fixture, run = null }) {
                                     + `${guarded[i] ? " is-guarding" : ""}`}
                                 onClick={() => onFoeTap(i)}
                             >
+                                {/* ── EVERY BEAT IS TELEGRAPHED, INCLUDING THE ONES THAT ARE NOT A BLOW ──
+                                        Spire's whole design rests on you being able to read the enemy's next
+                                        move, and enemies here now buff, curse and heal as well as hit. A pill
+                                        that only drew swords and shields would leave the Hexer's turn blank
+                                        and the Ramper's roar invisible — a fight you cannot plan against,
+                                        which is the opposite of the point. Same four glyphs the cards use. */}
                                 {dead ? null : (
                                     <div className="cf-intent" title={beat.label}>
                                         <span className="cf-intent-marks">
                                             {beat.damage ? <GiCrossedSwords aria-hidden="true" /> : null}
                                             {beat.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
+                                            {beat.strength ? <GiBiceps className="is-buff" aria-hidden="true" /> : null}
+                                            {beat.heal ? <GiHeartPlus className="is-buff" aria-hidden="true" /> : null}
+                                            {beat.weak ? <GiSlowBlob className="is-curse" aria-hidden="true" /> : null}
+                                            {beat.vulnerable ? <GiCrackedShield className="is-curse" aria-hidden="true" /> : null}
                                         </span>
                                         {beat.damage ? <b>{swing}</b> : null}
                                     </div>
@@ -1459,6 +1469,10 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.74); }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
+                /* A buff is the enemy getting better, a curse is you getting worse — two colours, so the row
+                   reads at a glance without anybody learning six glyphs. */
+                .cf-intent-marks .is-buff { color: #ffb45e; }
+                .cf-intent-marks .is-curse { color: #c58bff; }
                 .cf-party .cf-intent-marks { font-size: 17px; }
                 /* ── A KILL TAKES THE THING AWAY, IT DOES NOT LEAVE A BODY ───────────────────────────
                    Spire flashes a dead enemy white and dissolves it out over about half a second, and the

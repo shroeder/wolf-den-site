@@ -122,9 +122,25 @@ export function buildMap(seed) {
         }
     }
 
+    // ── AND THE BOSS IS A ROOM, NOT A PICTURE ───────────────────────────────────────────────────────
+    // The sheet has always DRAWN a boss above the top row, and it was only ever a drawing: no node, no edge,
+    // nothing to walk onto. `reachable()` from the last row returned an empty list, so a run that climbed all
+    // fifteen rows arrived at a dead end — no fight, and no win either, because the route only ends a run on
+    // `at.kind === "boss"` or `stop > RUN_LENGTH` and neither could happen.
+    //
+    // It is a real node now, one lane wide, sitting a row above the sheet, and every room on the last row
+    // leads to it. That is also how theirs works: the top of an act converges on one door.
+    const bossLane = Math.floor((MAP_LANES - 1) / 2);
+    const bossRow = MAP_ROWS;
+    nodes.set(key(bossRow, bossLane), { row: bossRow, lane: bossLane, kind: "boss", next: [] });
+    for (const n of nodes.values()) {
+        if (n.row === MAP_ROWS - 1 && !n.next.includes(bossLane)) n.next.push(bossLane);
+    }
+
     return {
         rows: MAP_ROWS,
         lanes: MAP_LANES,
+        boss: { row: bossRow, lane: bossLane },
         nodes: [...nodes.values()].map((n) => ({ row: n.row, lane: n.lane, kind: n.kind, next: n.next })),
     };
 }

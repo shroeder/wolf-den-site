@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, pickEncounter } from "@/lib/marketplace/cards-kit.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -58,9 +58,18 @@ export async function POST(request) {
                 // AN UNKNOWN DECIDES ITSELF ON ENTRY, which is the whole reason theirs can be a fifth of the
                 // map — a question mark resolved when the map was drawn is just a room with a worse label.
                 const kind = node.kind === "unknown" ? resolveUnknown(run.seed, want.row) : node.kind;
-                run.at = { row: want.row, lane: want.lane, kind };
+                // ── THE GROUP IS CHOSEN ONCE, WHEN YOU WALK IN ───────────────────────────────────
+                // Off the room's own seed, like every other roll here, so a refresh mid-fight finds the same
+                // party. Stamped onto the room because `recent` is about to change: re-rolling later would
+                // draw against a memory that already holds this encounter.
+                const encSeed = (run.seed >>> 0) + (want.row * 31 + want.lane) * 104729;
+                const enc = pickEncounter(encSeed, want.row + 1, kind, run.recent || []);
+                run.at = { row: want.row, lane: want.lane, kind, enc: enc?.id || null };
                 run.stop = want.row + 1;
                 run.trail = [...(run.trail || []), { row: want.row, lane: want.lane }];
+                // Two deep, which is the reference's own window: what you just fought, and what you fought
+                // before that, cannot be what is standing in the next doorway.
+                if (enc?.id) run.recent = [enc.id, ...(run.recent || [])].slice(0, 2);
 
                 // A rest is not a fight: it heals and hands you straight back to the map.
                 if (kind === "rest") {
