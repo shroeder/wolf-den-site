@@ -1026,6 +1026,19 @@ export default function CardFightClient({ fixture, run = null }) {
                                 </span>
                                 <span className="cf-shade" aria-hidden="true" />
                                 {dead ? null : <Bar unit={foe} guarding={guarded[i]} pending={pendingFor(foe, i)} />}
+                                {/* ── WHAT IT IS, THEN WHO IT IS ─────────────────────────────────────────
+                                    Nothing named the enemies at all before this, which quietly wasted the
+                                    whole moveset design: you cannot learn that a Warden guards for 14 if
+                                    nothing ever tells you the thing in front of you is a Warden. The
+                                    creature leads because it is the half that repeats; the Road fighter
+                                    whose portrait it is wearing sits under it as the flavour it always was. */}
+                                {dead ? null : (
+                                    <span className="cf-who">
+                                        <b>{foe.foeName || foe.name}</b>
+                                        {foe.foeName && foe.name && foe.foeName !== foe.name
+                                            ? <i>{foe.name}</i> : null}
+                                    </span>
+                                )}
                             </div>
                         );
                     })}
@@ -1469,6 +1482,31 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.74); }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
+                /* Under the health bar, centred on the body. Small caps for the creature so it reads as a
+                   TYPE rather than a person, and the fighter's own name quieter beneath it. */
+                /* ── AND THEY HAVE TO NOT RUN INTO EACH OTHER ────────────────────────────────────────
+                   Measured at 390 wide: the three fighter cells are 98px and OVERLAP by about 20px each, so
+                   three names left to size themselves came out 3px apart — which is not a collision by the
+                   numbers and reads as one line of text at 9.5px. Clipped to the cell with a real gutter, so
+                   a long fighter name ellipsises instead of shoving up against its neighbour. */
+                .cf-who { display: flex; flex-direction: column; align-items: center; gap: 1px;
+                    margin-top: 2px; line-height: 1.1; text-align: center; pointer-events: none;
+                    max-width: 100%; padding: 0 6px; box-sizing: border-box; }
+                .cf-who b, .cf-who i { display: block; max-width: 100%;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .cf-who b { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+                    color: #f0e2c6; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+                .cf-who i { font-size: 9.5px; font-style: normal; color: #a89a86;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+                /* ── THE FLAVOUR LINE IS A WIDE-SCREEN LUXURY ────────────────────────────────────────
+                   Clipping it was not enough and could not be: the fighter cells OVERLAP by about 20px at
+                   phone width, so two centred names land 3px apart however narrow you make them, and 3px at
+                   9.5px reads as one run-on line — "The Drowned Boy THE LODE ITSELF". The creature names sit
+                   comfortably apart at the same width because they are short, and they are the half that
+                   matters: JACKAL is what you are learning, the Road fighter is decoration. So the phone
+                   keeps the type and drops the person, and the desktop, which has the room, shows both. */
+                .cf-who i { display: none; }
+                @media (min-width: 700px) { .cf-who i { display: block; } }
                 /* A buff is the enemy getting better, a curse is you getting worse — two colours, so the row
                    reads at a glance without anybody learning six glyphs. */
                 .cf-intent-marks .is-buff { color: #ffb45e; }

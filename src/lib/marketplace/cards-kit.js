@@ -259,98 +259,198 @@ export const STARTER_DECK = [
     "pounce",
 ];
 
-// ── AND THE PARTY DOES NOT SWING IN UNISON ───────────────────────────────────────────────────────────────
-// Three copies of one script is one enemy standing in three places. These two sit either side of the default:
-// a jackal that hits small and often and never guards, and a bruiser that spends a turn winding up and then
-// takes a quarter of you off. Which one you kill first is the question three enemies are FOR.
+// ── A MOVESET, NOT A LOOP ────────────────────────────────────────────────────────────────────────────────
+// These were arrays cycled on `beat % length`, which means an enemy is solved the first time you meet it: see
+// a Warden once and you know its next four beats for ever, in every fight, for the rest of the run.
+//
+// That is not how the reference does it, and the difference is the whole reason its enemies stay interesting.
+// A Jaw Worm ALWAYS opens Chomp, and after that it is 59% Bellow / 41% Thrash — readable, never memorised. A
+// Louse is 75% Bite / 25% its special and "cannot use the same move three times in a row". So: a fixed
+// opener, weighted transitions off the last move, and a cap on repeats.
+//
+// ⚠️ THE NEXT MOVE IS CHOSEN WHEN THE PREVIOUS ONE RESOLVES, not when the turn comes around, because the
+// intent has to be on screen for the whole of YOUR turn. That is the contract the pill depends on: what it
+// shows is what will happen, decided already. `foe.next` holds it and `foe.recent` remembers what has just
+// been thrown so `limit` can be enforced.
+//
+// `after` is keyed by the move just played; weights are relative and need not sum to anything. `limit` is the
+// most times a move may appear CONSECUTIVELY.
 export const FOE_SCRIPTS = {
     // ── THE SHALLOWS ─────────────────────────────────────────────────────────────────────────────────
-    jackal: [
-        { key: "nip", label: "Nip", damage: 6 },
-        { key: "snap", label: "Snap", damage: 8 },
-        { key: "worry", label: "Worry", damage: 5 },
-    ],
-    bruiser: [
-        { key: "brace", label: "Brace", block: 9 },
-        { key: "swing", label: "Swing", damage: 13 },
-        { key: "crush", label: "Crush", damage: 18 },
-    ],
-    // Two beats, both small. What a first fight is for: something that cannot end a run while you are still
-    // learning what the cards do.
-    cur: [
-        { key: "snarl", label: "Snarl", damage: 4 },
-        { key: "bite", label: "Bite", damage: 7 },
-    ],
+    cur: {
+        open: "snarl",
+        moves: { snarl: { key: "snarl", label: "Snarl", damage: 4 }, bite: { key: "bite", label: "Bite", damage: 7 } },
+        after: { snarl: [["bite", 70], ["snarl", 30]], bite: [["snarl", 55], ["bite", 45]] },
+        limit: { bite: 2, snarl: 2 },
+    },
+    jackal: {
+        open: "nip",
+        moves: {
+            nip: { key: "nip", label: "Nip", damage: 6 },
+            snap: { key: "snap", label: "Snap", damage: 8 },
+            worry: { key: "worry", label: "Worry", damage: 5 },
+        },
+        after: { nip: [["snap", 55], ["worry", 45]], snap: [["worry", 50], ["nip", 50]], worry: [["nip", 45], ["snap", 55]] },
+        limit: { snap: 2 },
+    },
+    bruiser: {
+        // Always braces first, so the shape of the fight is legible from turn one: it is winding up.
+        open: "brace",
+        moves: {
+            brace: { key: "brace", label: "Brace", block: 9 },
+            swing: { key: "swing", label: "Swing", damage: 13 },
+            crush: { key: "crush", label: "Crush", damage: 18 },
+        },
+        after: { brace: [["swing", 60], ["crush", 40]], swing: [["crush", 45], ["brace", 55]], crush: [["brace", 70], ["swing", 30]] },
+        limit: { crush: 1, swing: 2 },
+    },
 
     // ── THE MIDDLE ───────────────────────────────────────────────────────────────────────────────────
-    // A WALL, and the reason a deck needs one big card. It guards more than a hand of small blows can remove
-    // in a turn, so chipping never gets through — you have to hold a real hit for the beat after the wall.
-    warden: [
-        { key: "wall", label: "Wall", block: 14 },
-        { key: "jab", label: "Jab", damage: 6 },
-        { key: "wall", label: "Wall", block: 14 },
-        { key: "jab", label: "Jab", damage: 9 },
-    ],
-    // It barely hits you. It makes everything ELSE on the board hit you, which is what turns "kill the small
-    // one first" from an obvious move into a real decision.
-    hexer: [
-        { key: "hex", label: "Hex", weak: 2 },
-        { key: "curse", label: "Curse", vulnerable: 2 },
-        { key: "lash", label: "Lash", damage: 7 },
-    ],
-    // One beat, for ever. No wind-up to read and nothing to play around: the only answer is to kill it, which
-    // is what makes a room full of them a race rather than a puzzle.
-    swarm: [
-        { key: "sting", label: "Sting", damage: 5 },
-    ],
-    // A CLOCK. It roars, and every swing after that is worth more than the last. Leave it alive while you
-    // clear the others and the fight you were winning turns over.
-    ramper: [
-        { key: "roar", label: "Roar", strength: 3 },
-        { key: "swing", label: "Swing", damage: 8 },
-        { key: "swing", label: "Swing", damage: 8 },
-    ],
+    // A WALL, and the reason a deck needs one big card: it guards more than a hand of small blows can remove
+    // in a turn, so you have to hold a real hit for the beat after the wall.
+    warden: {
+        open: "wall",
+        moves: {
+            wall: { key: "wall", label: "Wall", block: 14 },
+            jab: { key: "jab", label: "Jab", damage: 6 },
+            hew: { key: "hew", label: "Hew", damage: 11 },
+        },
+        after: { wall: [["jab", 55], ["hew", 45]], jab: [["wall", 65], ["hew", 35]], hew: [["wall", 70], ["jab", 30]] },
+        limit: { wall: 2 },
+    },
+    // It barely hits you. It makes everything ELSE on the board hit harder, which is what turns "kill the
+    // small one first" from an obvious move into a real decision.
+    hexer: {
+        open: "hex",
+        moves: {
+            hex: { key: "hex", label: "Hex", weak: 2 },
+            curse: { key: "curse", label: "Curse", vulnerable: 2 },
+            lash: { key: "lash", label: "Lash", damage: 7 },
+        },
+        after: { hex: [["curse", 45], ["lash", 55]], curse: [["lash", 60], ["hex", 40]], lash: [["hex", 45], ["curse", 45], ["lash", 10]] },
+        limit: { hex: 1, curse: 1, lash: 2 },
+    },
+    // One move and no wind-up. Nothing to play around, only a race — which is a different kind of pressure
+    // from anything else on this list, and the reason a room of them is not just a room of small enemies.
+    swarm: {
+        open: "sting",
+        moves: { sting: { key: "sting", label: "Sting", damage: 5 } },
+        after: { sting: [["sting", 100]] },
+    },
+    // A CLOCK. It roars, and every swing after that is worth more. Leave it alive while you clear the others
+    // and the fight you were winning turns over. It cannot roar twice running, so the ramp is paid for.
+    ramper: {
+        open: "roar",
+        moves: {
+            roar: { key: "roar", label: "Roar", strength: 3 },
+            swing: { key: "swing", label: "Swing", damage: 8 },
+            rend: { key: "rend", label: "Rend", damage: 12 },
+        },
+        after: { roar: [["swing", 60], ["rend", 40]], swing: [["rend", 40], ["roar", 35], ["swing", 25]], rend: [["roar", 50], ["swing", 50]] },
+        limit: { roar: 1, swing: 2 },
+    },
 
     // ── THE DEEP ─────────────────────────────────────────────────────────────────────────────────────
-    mauler: [
-        { key: "maul", label: "Maul", damage: 16 },
-        { key: "maul", label: "Maul", damage: 16 },
-        { key: "heave", label: "Heave", damage: 24 },
-    ],
+    mauler: {
+        open: "maul",
+        moves: {
+            maul: { key: "maul", label: "Maul", damage: 16 },
+            heave: { key: "heave", label: "Heave", damage: 24 },
+            snort: { key: "snort", label: "Snort", block: 10 },
+        },
+        after: { maul: [["maul", 40], ["heave", 45], ["snort", 15]], heave: [["snort", 40], ["maul", 60]], snort: [["heave", 55], ["maul", 45]] },
+        limit: { maul: 2, heave: 1 },
+    },
     // It heals back what you take off it, so a deck that deals damage in dribbles never finishes it. That is
     // the whole question it asks: did you build for a burst.
-    leech: [
-        { key: "drain", label: "Drain", damage: 9, heal: 8 },
-        { key: "drain", label: "Drain", damage: 9, heal: 8 },
-        { key: "gorge", label: "Gorge", damage: 14 },
-    ],
+    leech: {
+        open: "drain",
+        moves: {
+            drain: { key: "drain", label: "Drain", damage: 9, heal: 8 },
+            gorge: { key: "gorge", label: "Gorge", damage: 14 },
+            writhe: { key: "writhe", label: "Writhe", block: 8, heal: 5 },
+        },
+        after: { drain: [["drain", 35], ["gorge", 40], ["writhe", 25]], gorge: [["drain", 65], ["writhe", 35]], writhe: [["drain", 55], ["gorge", 45]] },
+        limit: { drain: 2, gorge: 1 },
+    },
 
     // ── ELITES ───────────────────────────────────────────────────────────────────────────────────────
     // Ramps AND guards, so it gets harder to kill at the same rate it gets harder to survive.
-    champion: [
-        { key: "bellow", label: "Bellow", strength: 4 },
-        { key: "guard", label: "Guard", block: 16 },
-        { key: "cleave", label: "Cleave", damage: 15 },
-        { key: "cleave", label: "Cleave", damage: 15 },
-    ],
-    // The whole fight is its third beat, and you can see it coming from the first. Block it or be halved.
-    headsman: [
-        { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
-        { key: "hew", label: "Hew", damage: 12 },
-        { key: "behead", label: "BEHEAD", damage: 30 },
-    ],
+    champion: {
+        open: "bellow",
+        moves: {
+            bellow: { key: "bellow", label: "Bellow", strength: 4 },
+            guard: { key: "guard", label: "Guard", block: 16 },
+            cleave: { key: "cleave", label: "Cleave", damage: 15 },
+        },
+        after: { bellow: [["cleave", 65], ["guard", 35]], guard: [["cleave", 75], ["bellow", 25]], cleave: [["cleave", 35], ["guard", 35], ["bellow", 30]] },
+        limit: { bellow: 1, cleave: 2 },
+    },
+    // The whole fight is BEHEAD, and you can see it coming a turn ahead. Block it or be halved. It cannot
+    // follow itself, so surviving one buys you a breath rather than another one immediately.
+    headsman: {
+        open: "sharpen",
+        moves: {
+            sharpen: { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
+            hew: { key: "hew", label: "Hew", damage: 12 },
+            behead: { key: "behead", label: "BEHEAD", damage: 30 },
+        },
+        after: { sharpen: [["hew", 55], ["behead", 45]], hew: [["behead", 60], ["sharpen", 40]], behead: [["sharpen", 65], ["hew", 35]] },
+        limit: { behead: 1, hew: 2 },
+    },
 
     // ── THE BOSS ─────────────────────────────────────────────────────────────────────────────────────
-    // Five beats and every one is a different problem: it musters, it weakens you, it hits, it makes you
-    // fragile, and then it swings the biggest number in the game into the hole it just opened.
-    warlord: [
-        { key: "muster", label: "Muster", strength: 3, block: 12 },
-        { key: "sweep", label: "Sweep", damage: 14, weak: 1 },
-        { key: "hew", label: "Hew", damage: 20 },
-        { key: "dread", label: "Dread", vulnerable: 2 },
-        { key: "ruin", label: "RUIN", damage: 28 },
-    ],
+    // Five moves and every one is a different problem: it musters, it weakens you, it hits, it makes you
+    // fragile, and then it swings the biggest number in the game into the hole it just opened. RUIN can only
+    // follow DREAD, so the worst thing it does is always announced by the thing before it.
+    warlord: {
+        open: "muster",
+        moves: {
+            muster: { key: "muster", label: "Muster", strength: 3, block: 12 },
+            sweep: { key: "sweep", label: "Sweep", damage: 14, weak: 1 },
+            hew: { key: "hew", label: "Hew", damage: 20 },
+            dread: { key: "dread", label: "Dread", vulnerable: 2 },
+            ruin: { key: "ruin", label: "RUIN", damage: 28 },
+        },
+        after: {
+            muster: [["sweep", 50], ["hew", 50]],
+            sweep: [["hew", 45], ["dread", 40], ["muster", 15]],
+            hew: [["dread", 45], ["muster", 30], ["sweep", 25]],
+            dread: [["ruin", 100]],
+            ruin: [["muster", 55], ["sweep", 45]],
+        },
+        limit: { hew: 2, sweep: 2 },
+    },
 };
+
+/** The plain default, for a foe handed no script of its own. */
+export const FOE_SCRIPT = FOE_SCRIPTS.jackal;
+
+/**
+ * What this creature will throw NEXT, decided the moment the last one resolved.
+ *
+ * `recent` is the run of moves already played, newest first, so `limit` can refuse a move that has appeared
+ * too many times consecutively. If every option is refused the cap is ignored rather than returning nothing —
+ * a creature with one move (the Swarm) would otherwise have nothing legal to do.
+ */
+export function pickNextMove(script, played, recent, rngSeed) {
+    if (!script?.moves) return { key: null, rng: rngSeed };
+    const keys = Object.keys(script.moves);
+    const table = (script.after && script.after[played]) || keys.map((k) => [k, 1]);
+    const runOf = (key) => {
+        let n = 0;
+        for (const k of recent) { if (k === key) n += 1; else break; }
+        return n;
+    };
+    let opts = table.filter(([k]) => script.moves[k] && runOf(k) < (script.limit?.[k] ?? Infinity));
+    if (!opts.length) opts = table.filter(([k]) => script.moves[k]);
+    if (!opts.length) return { key: script.open || keys[0], rng: rngSeed };
+    const total = opts.reduce((n, [, w]) => n + (w || 1), 0);
+    const [r, rng] = nextRand(rngSeed >>> 0);
+    let roll = r * total;
+    for (const [k, w] of opts) { roll -= (w || 1); if (roll <= 0) return { key: k, rng }; }
+    return { key: opts[opts.length - 1][0], rng };
+}
 
 // ── AN ENEMY IS A CREATURE, NOT A SLOT IN A ROOM ─────────────────────────────────────────────────────────
 // The first cut of this authored HEALTH ON THE ENCOUNTER — a warden was 44 in one group and 88 in another,
@@ -550,12 +650,6 @@ export const typeLook = (kind) => TYPE_LOOK[kind] || TYPE_LOOK.skill;
 //
 // So the script stays where it started and the foe's health went up instead: the heave now lands on turn 3,
 // three Hops very nearly cover it, and reading is worth about four HP over a fight.
-export const FOE_SCRIPT = [
-    { key: "lunge", label: "Lunge", damage: 11 },
-    { key: "guard", label: "Guarded Swing", damage: 7, block: 6 },
-    { key: "heave", label: "Heave", damage: 16 },
-];
-
 // ── THE MATH, IN SPIRE'S ORDER ───────────────────────────────────────────────────────────────────────────
 // Strength is added to the printed number FIRST, then Weak takes a quarter off the attacker, then Vulnerable
 // adds half again to what the target takes, flooring at each step. The order is not decoration: 6 damage with
@@ -698,9 +792,13 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
         foes: party.map((f, i) => ({
             id: `f${i}`,
             name: f.name || "Something", art: f.art || null, artFallback: f.artFallback || null,
+            // WHAT it is, beside WHO it is. `name` is the Long Road fighter whose portrait this is; `foeName`
+            // is the creature — Warden, Mauler, Headsman — and that is the half a player can actually learn.
+            // Carried through the engine because the screen has no other way to reach it.
+            foe: f.foe || null, foeName: f.foeName || null,
             color: f.color || "#ff8f6a", houseName: f.houseName || null,
             hp: f.hp || FOE_HP, hpMax: f.hp || FOE_HP,
-            script: Array.isArray(f.script) && f.script.length ? f.script : FOE_SCRIPT,
+            script: f.script?.moves ? f.script : FOE_SCRIPT,
             // ALL START AT THE TOP OF THEIR OWN SCRIPT. Starting each one a beat further in was meant to
             // stop a party swinging in unison, and instead opened every fight with three enemies on their
             // heaviest beat at once: 35 damage on turn one against 70 health, measured. What makes three
@@ -709,6 +807,12 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
             // length and in shape.
             block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0,
+            // ── WHAT IT WILL DO, DECIDED BEFORE YOUR TURN STARTS ─────────────────────────────────
+            // Every creature opens on a fixed move, the way a Jaw Worm always opens Chomp: an opening beat
+            // that could be anything is a turn you cannot plan, and the whole design rests on planning.
+            // `recent` is the run of moves just thrown, newest first, which is what `limit` reads.
+            next: (f.script?.moves ? f.script : FOE_SCRIPT).open,
+            recent: [],
         })),
         hand: [], draw, discard: [],
         over: null,
@@ -721,8 +825,10 @@ export const livingFoes = (state) => (state?.foes || []).filter((f) => f.hp > 0)
 /** What this foe will do when you end your turn — the whole reason the fight is a puzzle. */
 export const foeIntent = (state, i = 0) => {
     const foe = state?.foes?.[i];
-    const script = foe?.script?.length ? foe.script : FOE_SCRIPT;
-    return script[(foe?.beat || 0) % script.length];
+    const script = foe?.script?.moves ? foe.script : FOE_SCRIPT;
+    // Whatever was chosen when its last move resolved. Falls back to the opener for a foe that has not moved
+    // yet, and to the first move at all for a script whose `open` names something that is not there.
+    return script.moves[foe?.next] || script.moves[script.open] || Object.values(script.moves)[0];
 };
 
 /** What that intent will actually land for, after Strength, Weak and your Vulnerable. Shown, never hidden. */
@@ -924,9 +1030,19 @@ export function foeAct(state, i) {
         hero = { ...hero, vulnerable: (hero.vulnerable || 0) + intent.vulnerable };
         events.push({ type: "debuff", on: "hero", amount: intent.vulnerable, stat: "vulnerable" });
     }
-    const foes = state.foes.map((other, n) => (n === i ? tick({ ...f, beat: (f.beat || 0) + 1 }) : other));
+    // ── AND IT DECIDES ITS NEXT MOVE NOW, NOT WHEN ITS TURN COMES ROUND ─────────────────────────────
+    // The pill has to show the truth for the whole of your turn, so the choice happens the moment this one
+    // resolves. Threaded off the fight's own rng rather than Math.random, so a seed still replays a fight
+    // beat for beat — the one property that makes "play seed 4471 and tell me what you think" mean anything.
+    const script = f.script?.moves ? f.script : FOE_SCRIPT;
+    const played = f.next;
+    const recent = [played, ...(f.recent || [])].slice(0, 4);
+    const { key, rng } = pickNextMove(script, played, recent, state.rng);
+    const foes = state.foes.map((other, n) => (
+        n === i ? tick({ ...f, beat: (f.beat || 0) + 1, next: key || script.open, recent }) : other
+    ));
     return {
-        state: { ...state, hero, foes, over: hero.hp <= 0 ? "lose" : state.over },
+        state: { ...state, hero, foes, rng, over: hero.hp <= 0 ? "lose" : state.over },
         events,
         acted: true,
         // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
