@@ -159,10 +159,19 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
                LEFT JOIN (SELECT buyer_id, COUNT(*)::int AS deco_count FROM mkt_deco_placement GROUP BY buyer_id) d ON d.buyer_id = b.id
                LEFT JOIN (SELECT buyer_id::text AS buyer_id, COUNT(*)::int AS pet_count FROM mkt_pet_level GROUP BY buyer_id) p ON p.buyer_id = b.id::text
                LEFT JOIN mkt_farm_rating fr ON fr.owner_id = b.id AND fr.rater_id = $1
-               LEFT JOIN LATERAL (
-                   SELECT MAX(v.created_at) AS at FROM mkt_pet_visit v
-                    WHERE v.owner_id = $1 AND v.petter_id = b.id AND v.created_at > NOW() - INTERVAL '3 days'
-               ) pv ON TRUE
+               -- ⚠️ NOT A LATERAL. As a LATERAL this ran ONCE PER MEMBER — 112 full scans of mkt_pet_visit
+               -- for one neighbour strip, because the ORDER BY forces the join over every aliased member
+               -- before the LIMIT. mkt_pet_visit is small enough that Postgres correctly picks a seq scan,
+               -- so each loop read the whole table: 213,000 rows to decorate eight cards. It is the single
+               -- biggest access pattern in the database — 47 MILLION sequential scans of that one table,
+               -- 47.5 billion tuples, more than every other table combined. Aggregated once and joined on
+               -- petter_id it is ONE scan, and returns byte-identical rows (checked against the lateral for
+               -- every owner with visits in the window).
+               LEFT JOIN (
+                   SELECT petter_id, MAX(created_at) AS at FROM mkt_pet_visit
+                    WHERE owner_id = $1 AND created_at > NOW() - INTERVAL '3 days'
+                    GROUP BY petter_id
+               ) pv ON pv.petter_id = b.id
                LEFT JOIN mkt_farm_rating rin ON rin.owner_id = $1 AND rin.rater_id = b.id
                     AND rin.updated_at > NOW() - INTERVAL '3 days'
                LEFT JOIN mkt_friendship fx ON fx.status = 'accepted'
