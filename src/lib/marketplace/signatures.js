@@ -122,11 +122,7 @@ export const ITEM_SIGNATURES = {
     deadeye_mask: { label: "Deadeye", ticketOnCrit: true }, // mythic — luck
     cultist_hood: { label: "Dark Ritual", xpOnHit: true }, // legendary — scholar
     gs2_crown_supreme: { label: "Coronation", onslaught: true }, // mythic — declone from Perfect Sight: an opener
-    golden_crown: { label: "Midas Touch", goldOnHit: true }, // mythic — gold
     ancient_halo: { label: "Sanctified", xpOnHit: true }, // mythic
-    patrons_crown: { label: "Patron's Blessing", firstHitCrit: true }, // mythic
-    bigspender_crown: { label: "Big Spender", creditBonus: 0.09 }, // mythic — +9% coins on store-credit buys
-    whale_crown: { label: "Leviathan", giantSlayer: true }, // mythic
     gs_god_helm: { label: "Divine Sight", attuned: true }, // mythic — declone from Perfect Sight: divine = element-attuned
     gs_sovereign_crown: { label: "Sovereign", warbanner: true }, // mythic — rally the realm
     gs2_apex_crown: { label: "Apex", firstHitMult: 3 }, // mythic
@@ -196,8 +192,6 @@ export const ITEM_SIGNATURES = {
     serpent_coil: { label: "Venomstrike", beastbond: true }, // legendary
     gs_champion_amulet: { label: "Champion's Heart", packTactics: true }, // legendary
     gs2_heart_amulet: { label: "Packheart", beastbond: true }, // legendary
-    playmat_medallion: { label: "Home Turf", loginCoupon: true }, // legendary — chance at a shop coupon
-    premium_playmat_medallion: { label: "Grandmaster", loginCoupon: true }, // legendary — chance at a shop coupon
 
     // ===== Rings — luck / prospector / prestige / bursts =====
     eternity_band: { label: "Endless", bloodlust: true }, // mythic
@@ -205,15 +199,9 @@ export const ITEM_SIGNATURES = {
     gs2_infinity_ring: { label: "Infinity", highroller: true }, // mythic
     infinity_loop: { label: "Eternal Loop", bloodlust: true }, // mythic
     kings_eternal: { label: "Everking", warbanner: true, cheerFirstStrike: true }, // mythic — rally leader (first cheer of the day also strikes)
-    founders_ring: { label: "Founder's Will", warbanner: true }, // mythic
-    collectors_signet: { label: "Collector", loginPetGamble: true }, // legendary — gamble a pet (destroys the item)
     kings_ring: { label: "King's Command", packTactics: true }, // legendary
     ring_titans: { label: "Titan Grip", giantSlayer: true }, // legendary
     warlord_ring: { label: "War Banner", packTactics: true }, // legendary
-    highroller_ring: { label: "High Roller", dailySpin: true }, // legendary — a guaranteed extra wheel spin each day
-    premium_signet: { label: "Prestige", loginPotion: true, cheerXp: true }, // legendary — daily gift consumable + bonus XP on cheers
-    credit25_ring: { label: "Investor", creditBonus: 0.03 }, // legendary — +3% coins on store-credit buys
-    credit50_ring: { label: "Benefactor", creditBonus: 0.06 }, // legendary — +6% coins on store-credit buys
     gs_royal_signet: { label: "Royal Seal", goldOnHit: true }, // legendary
     gs2_kings_band: { label: "Crown Jewel", ticketOnCrit: true }, // legendary
 

@@ -21,8 +21,6 @@ import { ITEMS, isOwnerOnlyItem, itemById } from "@/lib/marketplace/items.js";
 // each one's reward text is read straight off the item rather than retyped here.
 const SHOWCASE = [
     "starter_pack_charm",
-    "restock_signet",
-    "collectors_signet",
     "ascendant_crown",
     "eternal_wolf_crown",
     "eternal_infinity",

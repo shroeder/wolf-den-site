@@ -179,80 +179,33 @@ export const ITEM_SOURCE_LABEL = {
     boss_drop: "Dropped by the weekly boss",
     elite: "The elite tiers — chests from Ascendant up",
     bounty_reward: "Paid out by a bounty",
-    // ⚠️ NOT "handed over the counter in the shop" any more. Of the 44 admin items, FOUR carry a real
-    // redemption (chargeReward); the other forty are trophies with nothing behind them — free_binder,
-    // free_playmat, free_sleeves, skip_line and the rest are written in REWARDS and attached to no item.
-    // The old wording read as an invitation, and members acted on it: one came in to show a binder because
-    // the Binder Charm said the counter would do something about it. Say what is true — the shop gives
-    // these out when it feels like it — and let itemSourceLabel() below say the other thing for the four
-    // that really are redeemable.
-    admin: "A gift from the shop — handed out, not asked for",
+    // Every admin item that survives carries a chargeReward, so this says the one true thing: you own it
+    // already and you hand it IN. It used to read "Handed over the counter in the shop" across 44 items,
+    // 41 of which redeemed nothing, and members came in to ask for those.
+    admin: "Redeemed at the counter in the shop",
     season: "Won at a rung of the Long Road, in one season only",
 };
 
-// The "how do I get this" line a member reads. A FUNCTION rather than a bare lookup because the honest
-// answer for an admin item depends on the item: the four with a chargeReward are genuinely redeemed at the
-// counter, and the rest are gifts. Every screen that shows a source must call this, never the table.
+// The "how do I get this" line a member reads. One function, so a screen can never invent its own wording
+// for a source — which is how 41 items came to advertise a trip to the counter for nothing.
 export function itemSourceLabel(item) {
-    if (!item?.source) return null;
-    if (item.source === "admin" && item.chargeReward) return "Redeemed at the counter in the shop";
-    return ITEM_SOURCE_LABEL[item.source] || null;
+    return item?.source ? ITEM_SOURCE_LABEL[item.source] || null : null;
 }
 
 export const REWARDS = {
     // Small freebies (fixed, low value)
-    free_snack: "Free snack from the counter",
-    free_drink: "Free drink from the cooler",
-    free_dice: "Free set of dice",
-    free_sleeves: "Free pack of card sleeves",
-    free_deckbox: "Free deck box",
-    free_promo: "Free promo card",
-    free_playmat: "Free playmat",
-    free_playmat_premium: "Free premium playmat (up to $30)",
-    free_event_entry: "Free entry to a Friday event",
-    tournament_seat: "Free tournament entry (up to $15)",
-    free_grab_bag: "Free mystery grab bag",
-    free_bundle_30: "Free themed bundle (up to $30)",
     // Packs & singles (all value-capped)
-    free_single_5: "Free single card (up to $5)",
-    free_pack_5: "Free booster pack (up to $5)",
-    free_pack_10: "Free booster pack (up to $10)",
-    free_pack_25: "Free premium pack (up to $25)",
     // Store credit (fixed amounts)
     store_credit_5: "$5 store credit",
     store_credit_10: "$10 store credit",
-    store_credit_25: "$25 store credit",
     store_credit_30: "$30 store credit",
     // Discounts — CAPPED so a big purchase can't blow the perk open
-    discount_5_any: "5% off any purchase (up to $10 off)",
-    discount_10_over_100: "10% off $100+ (up to $25 off)",
-    discount_15_over_150: "15% off $150+ (up to $40 off)",
-    discount_20_over_200: "20% off $200+ (up to $60 off)",
     // Trade & BOGO — CAPPED
-    trade_bonus_10: "+10% trade-in bonus (up to $10 extra)",
-    buy2get1_singles: "Buy 2 get 1 free on singles (free card up to $10, equal or lesser value)",
     // More freebies + accessories (capped)
-    free_toploaders: "Free 25-pack of toploaders",
-    free_storage_box: "Free cardboard storage box",
-    free_binder: "Free 9-pocket binder (up to $15)",
-    free_premium_sleeves: "Free premium sleeves (up to $12)",
-    birthday_pack: "Birthday free pack (up to $10)",
-    free_pack_15: "Free booster pack (up to $15)",
-    box_break_slot: "A free slot in a box break (up to $20)",
-    free_grading: "$15 off a card grading submission",
-    store_credit_50: "$50 store credit",
-    discount_25_over_300: "25% off $300+ (up to $90 off)",
     // Non-monetary prestige perks (zero cost — great to earn)
-    skip_line: "Skip the line at your next event",
-    first_restock_pick: "First pick at the next restock",
-    reserved_seat: "A reserved seat at any event this month",
-    wall_of_champions: "Your name on the Wall of Champions for a month",
     // ELITE rewards — reserved for Ascendant/Eternal gear. Gated behind the rarest drops in the game and
     // long (up to 1-year) cooldowns, so they can be genuinely big while still value-capped.
-    elite_credit_100: "$100 store credit",
     store_credit_100: "$100 store credit",
-    elite_box_120: "Free sealed booster box (up to $120)",
-    elite_grail: "One 'grail' card of your choice (up to $150), on the house",
 };
 
 const ICONS = {
@@ -284,7 +237,6 @@ export const ITEMS = [
     { id: "leather_cap", name: "Leather Cap", slot: "helmet", rarity: "common", icon: "GiCrestedHelmet", flavor: "Keeps the rain off.", stats: { ferocity: 10 }, reqLevel: 2, source: "level", sort: 30 },
     { id: "horned_helm", name: "Horned Helm", slot: "helmet", rarity: "rare", icon: "GiHornedHelm", flavor: "Intimidation, mostly.", stats: { might: 11, crit_chance: 5 }, reqLevel: 14, source: "level", sort: 32 },
     { id: "overlord_helm", name: "Overlord Helm", slot: "helmet", rarity: "legendary", icon: "GiOverlordHelm", flavor: "Rule with iron.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "boss_drop", sort: 34 },
-    { id: "golden_crown", name: "Golden Crown", slot: "helmet", rarity: "mythic", icon: "GiCrown", flavor: "Wear your status.", stats: { might: 13, fortune: 27 }, reqLevel: 60, reqBadge: "boss_champion", source: "admin", sort: 36 },
 
     // --- Chest ---
     { id: "leather_armor", name: "Leather Armor", slot: "chest", rarity: "common", icon: "GiLeatherArmor", flavor: "Broken in.", stats: { ferocity: 10 }, reqLevel: 2, source: "level", sort: 40 },
@@ -307,8 +259,6 @@ export const ITEMS = [
     // --- Rings (some charged with real-world perks) ---
     { id: "ring_of_might", name: "Ring of Might", slot: "ring", rarity: "common", icon: "GiPowerRing", flavor: "A small edge.", stats: { might: 7, crit_chance: 4 }, reqLevel: 8, source: "level", sort: 80 },
     { id: "ring_of_fortune", name: "Ring of Fortune", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Luck on your finger.", stats: { fortune: 16 }, sea: { bounty: 3 }, depth: { prospect: 3 }, reqLevel: 20, source: "level", sort: 82 },
-    { id: "collectors_signet", name: "Collector's Signet", slot: "ring", rarity: "legendary", icon: "GiSkullSignet", flavor: "The store remembers its own.", stats: { might: 5, fortune: 8 }, reqLevel: 25, source: "admin", sort: 84 },
-    { id: "merchants_band", name: "Merchant's Band", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "A friend of the house.", stats: { fortune: 10 }, reqLevel: 30, source: "admin", sort: 86 },
 
     // ===== CHEST LOOT (source: "chest") — only obtained by opening loot chests. Wide spread across every
     // rarity + the whole level range so chests always have something to give. =====
@@ -530,52 +480,18 @@ export const ITEMS = [
     // -- Rings --
     { id: "bone_ring", name: "Bone Ring", slot: "ring", rarity: "common", icon: "GiFangedSkull", flavor: "A grim little band.", stats: { might: 6, crit_chance: 5 }, reqLevel: 5, source: "chest", sort: 470 },
     { id: "droplet_ring", name: "Droplet Ring", slot: "ring", rarity: "rare", icon: "GiDropletSplash", flavor: "A bead of pure luck.", stats: { fortune: 16 }, sea: { plunder: 3 }, reqLevel: 20, source: "chest", sort: 471 },
+    // ===== THE THREE REAL REDEMPTIONS (source: "admin") — an item you already own, handed IN at the
+    // counter to burn a charge for store credit. Forty-one siblings were deleted on 2026-09-03: they were
+    // trophies whose names promised a real-world thing (a binder, a playmat, a skipped queue) that was
+    // never wired to anything, and members read the Compendium line as an invitation to come and ask.
+    // ⚠️ Do not add another one without a chargeReward. A perk with nothing behind it is a promise the
+    // counter has to keep. =====
 
-    // ===== REAL-WORLD PERK ITEMS (source: "admin", charged) — the owner hands these out; they never drop
-    // from loot. Redeemed in-store via the admin app (burns a charge + starts the cooldown). Modest stats:
-    // the perk is the prize. Reuse existing icons to stay build-safe. =====
-    { id: "coppers_token", name: "Copper Patron Token", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "Good for a cold one.", stats: { fortune: 6, ferocity: 3 }, reqLevel: 5, source: "admin", earnable: true, sort: 500 },
-    { id: "sleeve_charm", name: "Sleeve Charm", slot: "amulet", rarity: "common", icon: "GiGemPendant", flavor: "Protect your cards.", stats: { ferocity: 6, fortune: 3 }, reqLevel: 5, source: "admin", earnable: true, sort: 501 },
-    { id: "singles_signet", name: "Singles Signet", slot: "ring", rarity: "rare", icon: "GiSwirlRing", flavor: "One for the collection.", stats: { might: 6, fortune: 6 }, reqLevel: 10, source: "admin", earnable: true, sort: 502 },
-    { id: "deckbox_charm", name: "Deckbox Charm", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "A home for your deck.", stats: { ferocity: 12 }, reqLevel: 12, source: "admin", sort: 503 },
-    { id: "event_pass", name: "Friday Night Pass", slot: "amulet", rarity: "rare", icon: "GiPrayerBeads", flavor: "See you at the table.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", earnable: true, sort: 504 },
-    { id: "patrons_band", name: "Patron's Band", slot: "ring", rarity: "epic", icon: "GiPowerRing", flavor: "A friend of the house.", stats: { might: 6, fortune: 8 }, reqLevel: 15, source: "admin", sort: 505 },
-    { id: "bargainers_signet", name: "Bargainer's Signet", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "Every little bit helps.", stats: { fortune: 14 }, reqLevel: 18, source: "admin", sort: 506 },
-    { id: "grabbag_charm", name: "Lucky Grab Charm", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "You never know.", stats: { fortune: 14 }, reqLevel: 20, source: "admin", sort: 507 },
-    { id: "traders_charm", name: "Trader's Charm", slot: "amulet", rarity: "epic", icon: "GiIntricateNecklace", flavor: "Deal from strength.", stats: { fortune: 14 }, reqLevel: 22, source: "admin", sort: 508 },
-    { id: "highroller_ring", name: "High Roller's Ring", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "Spend big, save big.", stats: { fortune: 16 }, reqLevel: 30, source: "admin", sort: 509 },
-    { id: "playmat_medallion", name: "Playmat Medallion", slot: "amulet", rarity: "legendary", icon: "GiTribalPendant", flavor: "Play in style.", stats: { ferocity: 16 }, reqLevel: 30, source: "admin", sort: 510 },
-    { id: "premium_signet", name: "Premium Signet", slot: "ring", rarity: "legendary", icon: "GiFireRing", flavor: "For the discerning collector.", stats: { might: 8, fortune: 8 }, reqLevel: 35, source: "admin", sort: 511 },
-    { id: "patrons_crown", name: "Patron's Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "The house bows to you.", stats: { might: 8, fortune: 8 }, reqLevel: 40, source: "admin", sort: 512 },
-    { id: "founders_ring", name: "Founder's Ring", slot: "ring", rarity: "mythic", icon: "GiEngagementRing", flavor: "First among the pack.", stats: { might: 8, crit_chance: 8 }, reqLevel: 40, source: "admin", sort: 513 },
 
-    // ===== REAL-WORLD PERKS — WAVE 2 (source: "admin", charged, all value-capped). =====
-    { id: "snack_token", name: "Snack Token", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "Fuel for the grind.", stats: { ferocity: 5, might: 4 }, reqLevel: 5, source: "admin", earnable: true, sort: 520 },
-    { id: "dice_charm", name: "Dice Charm", slot: "amulet", rarity: "common", icon: "GiGemPendant", flavor: "Roll high.", stats: { fortune: 6, crit_chance: 3 }, reqLevel: 5, source: "admin", earnable: true, sort: 521 },
-    { id: "promo_signet", name: "Promo Signet", slot: "ring", rarity: "rare", icon: "GiSkullRing", flavor: "A little something extra.", stats: { might: 6, fortune: 6 }, reqLevel: 10, source: "admin", earnable: true, sort: 522 },
-    { id: "starter_pack_charm", name: "Starter Pack Charm", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "Everyone starts somewhere.", stats: { fortune: 12 }, reqLevel: 10, source: "admin", charged: true, charges: 2, cooldownDays: 30, earnable: true, chargeReward: "store_credit_10", chargeRewardLabel: REWARDS.store_credit_10, sort: 523 },
-    { id: "credit5_token", name: "Credit Token", slot: "amulet", rarity: "rare", icon: "GiGems", flavor: "Money in the bank.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", sort: 524 },
-    { id: "tournament_pass", name: "Tournament Pass", slot: "amulet", rarity: "epic", icon: "GiPrayerBeads", flavor: "See you in the top cut.", stats: { crit_chance: 14 }, reqLevel: 15, source: "admin", sort: 525 },
-    { id: "credit10_signet", name: "Credit Signet", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "Spend it well.", stats: { fortune: 14 }, reqLevel: 18, source: "admin", sort: 526 },
-    { id: "bundle_charm", name: "Bundle Charm", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "The whole kit.", stats: { fortune: 14 }, reqLevel: 20, source: "admin", sort: 527 },
-    { id: "premium_playmat_medallion", name: "Premium Playmat Medallion", slot: "amulet", rarity: "legendary", icon: "GiIntricateNecklace", flavor: "Play in real style.", stats: { ferocity: 16 }, reqLevel: 30, source: "admin", sort: 528 },
-    { id: "credit25_ring", name: "Credit Ring", slot: "ring", rarity: "legendary", icon: "GiFireRing", flavor: "A tidy sum.", stats: { might: 8, fortune: 8 }, reqLevel: 35, source: "admin", sort: 529 },
-    { id: "bigspender_crown", name: "Big Spender's Crown", slot: "helmet", rarity: "mythic", icon: "GiCrown", flavor: "Go big.", stats: { might: 8, fortune: 8 }, reqLevel: 40, source: "admin", sort: 530 },
+    { id: "starter_pack_charm", name: "Starter Pack Charm", slot: "amulet", rarity: "rare", icon: "GiFeatherNecklace", flavor: "Everyone starts somewhere.", stats: { fortune: 12 }, reqLevel: 10, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "store_credit_10", chargeRewardLabel: REWARDS.store_credit_10, sort: 523 },
 
-    // ===== REAL-WORLD PERKS — WAVE 3 (source: "admin", charged). Non-monetary prestige perks are earnable. =====
-    { id: "toploader_charm", name: "Toploader Charm", slot: "amulet", rarity: "common", icon: "GiCharm", flavor: "Keep 'em mint.", stats: { ferocity: 6, crit_chance: 3 }, reqLevel: 5, source: "admin", earnable: true, sort: 531 },
-    { id: "linecutter_token", name: "Line-Cutter Token", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "Straight to the front.", stats: { might: 6, crit_chance: 4 }, reqLevel: 5, source: "admin", charged: true, charges: 3, cooldownDays: 14, earnable: true, chargeReward: "store_credit_5", chargeRewardLabel: REWARDS.store_credit_5, sort: 532 },
-    { id: "box_charm", name: "Storage Charm", slot: "amulet", rarity: "common", icon: "GiBeltArmor", flavor: "A home for the collection.", stats: { ferocity: 5, fortune: 4 }, reqLevel: 5, source: "admin", earnable: true, sort: 533 },
-    { id: "restock_signet", name: "Restock Signet", slot: "ring", rarity: "rare", icon: "GiSkullSignet", flavor: "First in line for the good stuff.", stats: { might: 6, fortune: 6 }, reqLevel: 10, source: "admin", earnable: true, sort: 534 },
-    { id: "reserved_seat_charm", name: "Reserved Seat Charm", slot: "amulet", rarity: "rare", icon: "GiPrayerBeads", flavor: "Your spot's saved.", stats: { fortune: 12 }, reqLevel: 12, source: "admin", earnable: true, sort: 535 },
+    { id: "linecutter_token", name: "Line-Cutter Token", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "Straight to the front.", stats: { might: 6, crit_chance: 4 }, reqLevel: 5, source: "admin", charged: true, charges: 3, cooldownDays: 14, chargeReward: "store_credit_5", chargeRewardLabel: REWARDS.store_credit_5, sort: 532 },
     { id: "premium_sleeve_charm", name: "Premium Sleeve Charm", slot: "amulet", rarity: "rare", icon: "GiIntricateNecklace", flavor: "Protect in style.", stats: { ferocity: 12 }, reqLevel: 12, source: "admin", charged: true, charges: 2, cooldownDays: 30, chargeReward: "store_credit_10", chargeRewardLabel: REWARDS.store_credit_10, sort: 537 },
-    { id: "birthday_charm", name: "Birthday Charm", slot: "amulet", rarity: "rare", icon: "GiHeartNecklace", flavor: "Happy birthday from the Den.", stats: { fortune: 12 }, reqLevel: 10, source: "admin", sort: 538 },
-    { id: "champions_plaque", name: "Champion's Plaque", slot: "helmet", rarity: "epic", icon: "GiCrown", flavor: "Immortalized on the wall.", stats: { might: 8, fortune: 6 }, reqLevel: 20, source: "admin", earnable: true, sort: 539 },
-    { id: "pack15_charm", name: "Big Pack Charm", slot: "amulet", rarity: "epic", icon: "GiEmeraldNecklace", flavor: "Go for the chase.", stats: { crit_chance: 11, crit_power: 11 }, reqLevel: 20, source: "admin", sort: 540 },
-    { id: "boxbreak_charm", name: "Box Break Charm", slot: "amulet", rarity: "epic", icon: "GiGems", flavor: "In on the action.", stats: { fortune: 14 }, reqLevel: 22, source: "admin", sort: 541 },
-    { id: "grading_charm", name: "Grading Charm", slot: "amulet", rarity: "epic", icon: "GiTribalPendant", flavor: "Slab the gem mints.", stats: { ferocity: 14 }, reqLevel: 22, source: "admin", sort: 542 },
-    { id: "credit50_ring", name: "Grand Credit Ring", slot: "ring", rarity: "legendary", icon: "GiBigDiamondRing", flavor: "A serious sum.", stats: { might: 8, fortune: 8 }, reqLevel: 40, source: "admin", sort: 543 },
-    { id: "whale_crown", name: "Whale's Crown", slot: "helmet", rarity: "mythic", icon: "GiQueenCrown", flavor: "Spend like a legend.", stats: { might: 8, fortune: 8 }, reqLevel: 45, source: "admin", sort: 544 },
 
     // ===== GOLD SHOP GEAR (source: "xp_shop") — buyable with gold across the full price ladder, a real
     // gold sink. Budget-neutral stats (no power creep); the top tier carries a signature for prestige. =====
