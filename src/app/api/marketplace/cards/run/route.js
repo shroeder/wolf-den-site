@@ -34,7 +34,23 @@ export async function POST(request) {
             // route never reached, and then the map on screen stops describing the run.
             if (action === "enter") {
                 const want = { row: Number(body?.row), lane: Number(body?.lane) };
-                const legal = reachable(run.map, run.at ? { row: run.at.row, lane: run.at.lane } : null)
+                // ── WHERE YOU ARE STANDING WHEN YOU CHOOSE IS THE LAST ROOM YOU TOOK ─────────────────
+                // ⚠️ THIS CHECKED `run.at`, AND `run.at` IS NULL EXACTLY WHEN THIS RUNS. It means "the room
+                // I am inside right now", and it is cleared the moment a room finishes — by a rest, by a
+                // chest, by the merchant, by taking a card, by a win. Choosing where to go next only ever
+                // happens in that state, so the check was always reading null, and `reachable(map, null)`
+                // returns THE ENTRY ROW. Every run could therefore walk row 0 and nothing else, for ever.
+                //
+                // CardMap has always drawn the right thing — it opens `reachable(map, trail[last])` — so the
+                // screen offered the correct next rooms and the server answered 400 to every one of them.
+                // Measured on a real run: the client offered 1:0, the server allowed 0:0, 0:5, 0:2 and 0:3,
+                // and POST enter {row:1,lane:0} came back `unreachable`. Nothing happened when you tapped.
+                //
+                // The trail's last entry is the same room `run.at` names while a room is open, and it is
+                // still there once the room closes — so it is the one source both sides can agree on, which
+                // is the whole reason they disagreed. Same expression as CardMap's `last`.
+                const from = (run.trail || []).length ? run.trail[run.trail.length - 1] : null;
+                const legal = reachable(run.map, from)
                     .some((n) => n.row === want.row && n.lane === want.lane);
                 if (!legal) return NextResponse.json({ error: "unreachable" }, { status: 400 });
 

@@ -242,6 +242,17 @@ export default function CardMap({ run }) {
                         <Ink kind="boss" className="cm-ink" />
                     </div>
                 </div>
+                {/* ── THE SHEET RUNS ON PAST THE LAST ROOM ────────────────────────────────────────────
+                    The bottom row is the one you are standing on — the sheet opens there, because you climb
+                    it — and the Return ribbon is pinned to the bottom-left of the same box. On a phone those
+                    are the same place: measured at 390x844, the ribbon covered 0-158 x 774-826 and the run's
+                    ONLY reachable room sat at 23-55 x 758-790 underneath it. A hit-test at the room's dead
+                    centre returned `cm-return`, so the tap opening the run could not be made at all.
+                    (The wide layout never showed it — the ribbon is far left of a centred column there.)
+                    A tail of dead parchment gives the scroll somewhere to go, so the opening scroll can put
+                    the row at the 62% it always meant to and the ribbon has only sheet underneath it. Height
+                    covers the ribbon's band (18px up, 52 tall) plus a node's half-height and a margin. */}
+                <div className="cm-tail" aria-hidden="true" />
             </div>
 
             {/* ── THE LEGEND ── on the scroll, where theirs is. */}
@@ -308,6 +319,8 @@ export default function CardMap({ run }) {
                 .cm-inner { position: relative; width: min(520px, 100%); margin: 0 auto;
                     background: linear-gradient(180deg, #c9bb9a, #bdad89); }
                 .cm-svg { display: block; width: 100%; height: auto; }
+                /* Same parchment as the sheet's bottom edge, so it reads as more map rather than a gap. */
+                .cm-tail { width: min(520px, 100%); margin: 0 auto; height: 96px; background: #bdad89; }
 
                 /* ── OPAQUE INK ─────────────────────────────────────────────────────────────────────────
                    No alpha anywhere on these strokes. With alpha, two routes crossing drew twice and the
