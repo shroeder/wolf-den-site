@@ -352,54 +352,113 @@ export const FOE_SCRIPTS = {
     ],
 };
 
+// ── AN ENEMY IS A CREATURE, NOT A SLOT IN A ROOM ─────────────────────────────────────────────────────────
+// The first cut of this authored HEALTH ON THE ENCOUNTER — a warden was 44 in one group and 88 in another,
+// which meant "warden" was not an enemy at all, only a moveset wearing whatever body the room handed it.
+// Luke: "I feel like they hand set each enemy." He is right, and the reference is unambiguous about it: a Jaw
+// Worm is 40-44 in Act 1 AND in Act 3, and a Louse is 10-15 whether it stands alone, in a pair or in a three.
+// The monster owns its health and its moveset; the ENCOUNTER only says which monsters turn up and how many.
+//
+// That matters for more than tidiness. A player can only learn "a Warden guards for 14 and has about seventy
+// health" if a Warden is always that. Health that moves with the room makes every fight a fresh measurement,
+// which is the opposite of the readability the whole telegraphed-intent design is buying.
+//
+// HP IS A RANGE, ROLLED PER FIGHT, for the same reason theirs is: an exact integer invites arithmetic, a range
+// invites judgement. Rolled off the room's seed, so a refresh finds the same creature.
+export const FOES = {
+    // ── THE SMALL ONES — the easy pool's whole cast.
+    cur:      { id: "cur",      name: "Cur",       hp: [28, 34],   script: "cur" },
+    jackal:   { id: "jackal",   name: "Jackal",    hp: [40, 46],   script: "jackal" },
+    swarmlet: { id: "swarmlet", name: "Biter",     hp: [24, 30],   script: "swarm" },
+
+    // ── THE MIDDLE — what the hard pool is built from.
+    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [56, 64],   script: "bruiser" },
+    hexer:    { id: "hexer",    name: "Hexer",     hp: [42, 50],   script: "hexer" },
+    warden:   { id: "warden",   name: "Warden",    hp: [58, 66],   script: "warden" },
+    ramper:   { id: "ramper",   name: "Ravener",   hp: [54, 62],   script: "ramper" },
+
+    // ── THE DEEP — bigger creatures, not bigger versions of the same ones.
+    mauler:   { id: "mauler",   name: "Mauler",    hp: [84, 94],   script: "mauler" },
+    leech:    { id: "leech",    name: "Bloodleech", hp: [76, 86],  script: "leech" },
+
+    // ── ELITE-ONLY. Theirs are dedicated monsters — a Gremlin Nob is never a normal room — so an elite here
+    // is never two ordinary enemies standing closer together either.
+    champion: { id: "champion", name: "Champion",  hp: [124, 138], script: "champion" },
+    headsman: { id: "headsman", name: "Headsman",  hp: [158, 176], script: "headsman" },
+    sentinel: { id: "sentinel", name: "Sentinel",  hp: [88, 100],  script: "warden" },
+    gorger:   { id: "gorger",   name: "Gorger",    hp: [88, 100],  script: "leech" },
+
+    // ── THE BOSS.
+    warlord:  { id: "warlord",  name: "Warlord",   hp: [185, 205], script: "warlord" },
+};
+
+/** A creature's health for this fight — its own range, rolled off the room's seed. */
+export function foeHp(foeId, seed) {
+    const def = FOES[foeId];
+    if (!def) return 40;
+    const [lo, hi] = def.hp;
+    const [r] = nextRand(seed >>> 0);
+    return lo + Math.floor(r * (hi - lo + 1));
+}
+
 // ── WHAT STANDS IN A ROOM ────────────────────────────────────────────────────────────────────────────────
 // Spire does not make an enemy bigger as you climb — it stops sending that enemy and starts sending a
-// different one. Each act carries its own list, the first two or three fights of an act come from an EASY
-// pool and the rest from a HARD one, every entry has a weight, and the same encounter cannot return within
-// two fights. This is that, over one act of fifteen rows: three bands, authored groups, weights, anti-repeat.
+// different one. Each act carries its own list, the first two or three fights come from an EASY pool and the
+// rest from a HARD one, every entry has a weight, and the same encounter cannot return within two fights.
+// This is that, over one act of fifteen rows: three bands, authored groups, weights, anti-repeat.
 //
-// WHY IT REPLACES AN HP MULTIPLIER. The room used to build its party from three fixed shapes and multiply
-// their health by the row — the same two fighters all the way up wearing a bigger number. That is the one
-// thing the reference deliberately does not do, and it is why every fight on the climb felt like the last.
-//
-// ⚠️ THE HEALTH NUMBERS ARE READ OFF THE CURVE THEY REPLACE, band by band, so the difficulty lands roughly
-// where it already landed and only the VARIETY is new. This is not a rebalance and should not be read as one.
+// An encounter names CREATURES. It carries no numbers of its own, which is the whole correction above.
 export const ENCOUNTERS = [
-    // ── EASY (rows 1-3) — two fighters, nothing that can end a run before it starts.
-    { id: "curs", name: "Stray Curs", pool: "easy", weight: 4, foes: [{ script: "cur", hp: 39 }, { script: "cur", hp: 39 }] },
-    { id: "jackals", name: "Jackal Pair", pool: "easy", weight: 4, foes: [{ script: "jackal", hp: 39 }, { script: "jackal", hp: 39 }] },
-    { id: "lone_bruiser", name: "A Lone Bruiser", pool: "easy", weight: 3, foes: [{ script: "bruiser", hp: 70 }] },
-    { id: "cur_bruiser", name: "Cur and Bruiser", pool: "easy", weight: 3, foes: [{ script: "cur", hp: 30 }, { script: "bruiser", hp: 48 }] },
+    // ── EASY (rows 1-3) — small things, and nothing that can end a run before it starts.
+    { id: "curs", name: "Stray Curs", pool: "easy", weight: 4, foes: ["cur", "cur"] },
+    { id: "jackals", name: "Jackal Pair", pool: "easy", weight: 4, foes: ["jackal", "jackal"] },
+    { id: "lone_bruiser", name: "A Lone Bruiser", pool: "easy", weight: 3, foes: ["bruiser"] },
+    { id: "cur_bruiser", name: "Cur and Bruiser", pool: "easy", weight: 3, foes: ["cur", "bruiser"] },
     // The debuffs turn up early and cheaply, so the first time Weak matters is not also the first time it
     // costs somebody the run.
-    { id: "apprentice", name: "Hexer's Apprentice", pool: "easy", weight: 2, foes: [{ script: "hexer", hp: 36 }, { script: "cur", hp: 38 }] },
+    { id: "apprentice", name: "Hexer's Apprentice", pool: "easy", weight: 2, foes: ["hexer", "cur"] },
 
     // ── HARD (rows 4-9) — three fighters, and the first rooms that ask a question.
-    { id: "pack", name: "The Pack", pool: "hard", weight: 4, foes: [{ script: "jackal", hp: 50 }, { script: "jackal", hp: 50 }, { script: "jackal", hp: 50 }] },
-    { id: "shieldwall", name: "Shield Wall", pool: "hard", weight: 3, foes: [{ script: "warden", hp: 68 }, { script: "bruiser", hp: 80 }] },
-    { id: "coven", name: "The Coven", pool: "hard", weight: 2, foes: [{ script: "hexer", hp: 52 }, { script: "hexer", hp: 52 }, { script: "cur", hp: 44 }] },
-    { id: "swarm", name: "Biting Swarm", pool: "hard", weight: 3, foes: [{ script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }, { script: "swarm", hp: 37 }] },
-    { id: "warband", name: "Warband", pool: "hard", weight: 4, foes: [{ script: "bruiser", hp: 58 }, { script: "jackal", hp: 42 }, { script: "ramper", hp: 50 }] },
-    { id: "rising", name: "The Rising", pool: "hard", weight: 3, foes: [{ script: "ramper", hp: 74 }, { script: "warden", hp: 74 }] },
+    { id: "pack", name: "The Pack", pool: "hard", weight: 4, foes: ["jackal", "jackal", "jackal"] },
+    { id: "shieldwall", name: "Shield Wall", pool: "hard", weight: 3, foes: ["warden", "bruiser"] },
+    { id: "coven", name: "The Coven", pool: "hard", weight: 2, foes: ["hexer", "hexer", "cur"] },
+    { id: "swarm", name: "Biting Swarm", pool: "hard", weight: 3, foes: ["swarmlet", "swarmlet", "swarmlet", "swarmlet"] },
+    { id: "warband", name: "Warband", pool: "hard", weight: 4, foes: ["bruiser", "jackal", "ramper"] },
+    { id: "rising", name: "The Rising", pool: "hard", weight: 3, foes: ["ramper", "warden"] },
 
-    // ── DEEP (rows 10-15) — the back half, where the big cards have to have arrived.
-    { id: "maulers", name: "Maulers", pool: "deep", weight: 4, foes: [{ script: "mauler", hp: 99 }, { script: "mauler", hp: 99 }] },
-    { id: "bloodletters", name: "Bloodletters", pool: "deep", weight: 3, foes: [{ script: "leech", hp: 70 }, { script: "leech", hp: 70 }, { script: "hexer", hp: 58 }] },
-    { id: "the_wall", name: "The Wall", pool: "deep", weight: 3, foes: [{ script: "warden", hp: 66 }, { script: "warden", hp: 66 }, { script: "mauler", hp: 66 }] },
-    { id: "hunting_party", name: "Hunting Party", pool: "deep", weight: 4, foes: [{ script: "jackal", hp: 58 }, { script: "jackal", hp: 58 }, { script: "mauler", hp: 82 }] },
-    { id: "ascendant", name: "The Ascendant", pool: "deep", weight: 3, foes: [{ script: "ramper", hp: 72 }, { script: "hexer", hp: 60 }, { script: "warden", hp: 66 }] },
+    // ── DEEP (rows 10-15) — bigger creatures, where the big cards have to have arrived.
+    { id: "maulers", name: "Maulers", pool: "deep", weight: 4, foes: ["mauler", "mauler"] },
+    { id: "bloodletters", name: "Bloodletters", pool: "deep", weight: 3, foes: ["leech", "leech", "hexer"] },
+    { id: "the_wall", name: "The Wall", pool: "deep", weight: 3, foes: ["warden", "warden", "mauler"] },
+    { id: "hunting_party", name: "Hunting Party", pool: "deep", weight: 4, foes: ["jackal", "jackal", "mauler"] },
+    { id: "ascendant", name: "The Ascendant", pool: "deep", weight: 3, foes: ["ramper", "hexer", "warden"] },
 
-    // ── ELITES — the spike you choose to walk into, and the only place a perk comes from.
-    { id: "the_champion", name: "The Champion", pool: "elite", weight: 3, foes: [{ script: "champion", hp: 108 }, { script: "bruiser", hp: 67 }] },
-    { id: "the_headsman", name: "The Headsman", pool: "elite", weight: 3, foes: [{ script: "headsman", hp: 135 }] },
-    { id: "twin_wardens", name: "Twin Wardens", pool: "elite", weight: 2, foes: [{ script: "warden", hp: 88 }, { script: "warden", hp: 88 }] },
-    { id: "bloodgorged", name: "The Bloodgorged", pool: "elite", weight: 2, foes: [{ script: "leech", hp: 88 }, { script: "leech", hp: 88 }] },
+    // ── ELITES — the spike you choose to walk into, and the only place a perk comes from. Built from
+    //    creatures that appear NOWHERE else, so meeting one is an event rather than a bigger version of Tuesday.
+    { id: "the_champion", name: "The Champion", pool: "elite", weight: 3, foes: ["champion", "bruiser"] },
+    { id: "the_headsman", name: "The Headsman", pool: "elite", weight: 3, foes: ["headsman"] },
+    { id: "twin_sentinels", name: "Twin Sentinels", pool: "elite", weight: 2, foes: ["sentinel", "sentinel"] },
+    { id: "bloodgorged", name: "The Bloodgorged", pool: "elite", weight: 2, foes: ["gorger", "gorger"] },
 
     // ── THE BOSS — one of three, so a run does not end the same way twice.
-    { id: "warlord", name: "The Warlord", pool: "boss", weight: 1, foes: [{ script: "warlord", hp: 148 }] },
-    { id: "sundered", name: "The Sundered Pair", pool: "boss", weight: 1, foes: [{ script: "champion", hp: 74 }, { script: "champion", hp: 74 }] },
-    { id: "hollow_king", name: "The Hollow King", pool: "boss", weight: 1, foes: [{ script: "warlord", hp: 108 }, { script: "hexer", hp: 40 }] },
+    { id: "warlord", name: "The Warlord", pool: "boss", weight: 1, foes: ["warlord"] },
+    { id: "sundered", name: "The Sundered Pair", pool: "boss", weight: 1, foes: ["champion", "champion"] },
+    { id: "hollow_king", name: "The Hollow King", pool: "boss", weight: 1, foes: ["warlord", "hexer"] },
 ];
+
+/**
+ * The creatures standing in this room, with the health each rolled for this fight.
+ *
+ * Each gets its own slice of the seed, so two Curs in one room are not obliged to be identical twins — which
+ * is the small thing that stops a pair reading as one enemy drawn twice.
+ */
+export function buildParty(encounter, seed) {
+    const ids = encounter?.foes?.length ? encounter.foes : ["jackal", "bruiser", "warden"];
+    return ids.map((foeId, i) => {
+        const def = FOES[foeId] || FOES.jackal;
+        return { foe: def.id, name: def.name, script: def.script, hp: foeHp(def.id, (seed >>> 0) + i * 2654435761) };
+    });
+}
 
 export const encounterById = (id) => ENCOUNTERS.find((e) => e.id === id) || null;
 

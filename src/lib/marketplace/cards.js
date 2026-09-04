@@ -6,12 +6,9 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS, RUN_LENGTH,
-    STARTER_DECK, encounterById, nextRand, pickEncounter, stopAt,
+    STARTER_DECK, buildParty, encounterById, nextRand, pickEncounter, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
 
-// What a fixture builds when nobody named an encounter — the ?seed= replay link, which is one standalone
-// fight with no room around it. Deliberately a middle-band group rather than the easiest one.
-const DEFAULT_GROUP = [{ script: "jackal", hp: 34 }, { script: "bruiser", hp: 52 }, { script: "warden", hp: 44 }];
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
@@ -35,7 +32,9 @@ export const CARDS_UNLOCKED = (buyerId) => isOwner(buyerId);
 // `encounter` is an authored group from ENCOUNTERS — how many stand there, how much health each has, and
 // which script it plays. It decides the SHAPE of the fight; the Road still supplies the faces.
 export async function getCardFightFixture(buyerId, seed, encounter = null) {
-    const group = encounter?.foes?.length ? encounter.foes : DEFAULT_GROUP;
+    // The creatures and the health they rolled for THIS fight. buildParty owns both, because the encounter
+    // only names which monsters turn up — see the note on FOES.
+    const group = buildParty(encounter, seed);
     const count = group.length;
     // ── A PARTY, PICKED FROM THE SEED ────────────────────────────────────────────────────────────────
     // Three fighters off the Road rather than one, because "which of them do I hit" is the question a hand of
@@ -89,6 +88,11 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
             // hpMax is NOT set here: openFight derives it from `hp` (`hpMax: f.hp || FOE_HP`), and a second
             // copy of the same fact is the thing that goes stale. The Leech's heal caps against it.
             hp: group[i].hp,
+            // What KIND of thing this is, beside whose face it is wearing. The Road fighter supplies the
+            // portrait and the name; the creature supplies the health, the moveset and — once the screen
+            // shows it — the thing a player can actually learn.
+            foe: group[i].foe,
+            foeName: group[i].name,
             script: FOE_SCRIPTS[group[i].script] || null,
         })),
         // pet_id -> { url, flip, rarity }. A card face is a portrait rather than a combatant, so `flip` is
