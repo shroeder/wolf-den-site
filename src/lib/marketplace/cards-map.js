@@ -150,12 +150,25 @@ export function buildMap(seed) {
  *
  * This is the detail that makes their 22% affordable: a question mark that resolved at generation would just
  * be a room with a worse label on it. Deciding late is what makes walking into one a real moment.
+ *
+ * ⚠️ IT USED TO BE HALF FIGHTS, AND THAT IS THE NUMBER THAT WAS WRONG. Luke: "did we do the map like Slay the
+ * Spire in terms of encounters? it feels like it's not quite right, very thin on camp sites." The MAP is
+ * theirs to the weight — 53/22/12/8/5, elites and rests held off the first five floors — but a fifth of it is
+ * question marks, and half of those were coming back as another fight. Counted properly that made the real
+ * mix about 64% fight and 12% rest, which is a harder, more repetitive act than theirs and exactly what a
+ * campfire shortage feels like.
+ *
+ * THE HONEST FIX IS EVENTS, and we do not have them: theirs resolves a "?" to an EVENT about six times in
+ * seven — a written room with a choice in it — and a fight barely one time in ten. Until those are authored,
+ * a question mark leans the way theirs does, toward the things that are NOT another fight, and the campfire
+ * is in the mix because a fire you did not expect is the closest thing we have to a good event.
  */
 export function resolveUnknown(seed, row) {
     const [r] = nextRand(((seed >>> 0) + row * 7919) >>> 0);
-    if (r < 0.5) return "fight";
-    if (r < 0.75) return "treasure";
-    return "merchant";
+    if (r < 0.30) return "treasure";
+    if (r < 0.55) return "rest";
+    if (r < 0.80) return "merchant";
+    return "fight";
 }
 
 /** The rooms reachable from where you are standing: the ones this room's edges point at. */

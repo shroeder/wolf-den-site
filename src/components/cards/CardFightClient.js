@@ -1231,12 +1231,23 @@ export default function CardFightClient({ fixture, run = null }) {
                    scale the bar's height implies: 195 source px x (bar height / 120 source px). Written as
                    that calculation rather than the 94px it works out to, so changing --cf-bar-h cannot
                    silently squash the caps again — which is the whole bug this replaced. */
+                /* ⚠️ AND THE MIDDLE IS TILED, NOT STRETCHED. The fill keyword handed the source's 810px middle to
+                   whatever width the bar happened to be — fine at 1280, ruinous at 375: the span between the
+                   caps is about 186px there, so the stonework was squeezed four and a half times and its
+                   grain smeared into long horizontal streaks. Luke: "it stretches out the river looking
+                   things." The middle is a 120px tile cut out of that same span (mirrored down its centre so
+                   its two edges match and the repeat has no seam) and repeated at the SAME scale the caps are
+                   drawn at — auto 100% against a 120-tall source is exactly the border-image's own scale, so
+                   the stone runs continuously from cap to cap at any width.
+                   clip: padding-box keeps the tile out of the border area, which is where the caps live. */
                 .cf-top-plate { position: absolute; inset: 0; z-index: 0; pointer-events: none;
                     border-style: solid; border-color: transparent;
                     border-width: 0 calc(195 * var(--cf-bar-h) / 120);
                     border-image-source: url(/images/cards/chrome/top-bar.png);
-                    border-image-slice: 0 195 fill;
+                    border-image-slice: 0 195;
                     border-image-repeat: stretch;
+                    background: url(/images/cards/chrome/top-bar-mid.png) repeat-x center / auto 100%;
+                    background-clip: padding-box;
                     filter: brightness(0.62) saturate(0.9) drop-shadow(0 3px 9px rgba(0,0,0,0.6)); }
                 /* Three of them, and space-between now spaces the GROUPS rather than the widgets. */
                 .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
@@ -1583,7 +1594,14 @@ export default function CardFightClient({ fixture, run = null }) {
                     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
                 .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 14px;
                     font-weight: 700; color: #1b1f27; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
-                .cf-end:disabled { opacity: 0.55; }
+                /* ⚠️ IT DOES NOT GO TRANSPARENT. Luke: "end turn goes transparent when I use it, which I don't
+                   really like." Fading a control to 55% opacity lets the ARENA through it — the stone floor
+                   and the fighters read straight through the plate for the second the enemies are acting, and
+                   a solid object you can suddenly see through is a hole in the screen, not a busy button. It
+                   is a plate that has gone COLD instead: still solid, still there, just unlit. */
+                .cf-end:disabled .cf-end-art { filter: brightness(0.66) saturate(0.75)
+                    drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+                .cf-end:disabled .cf-end-label { color: #4a505c; text-shadow: 0 1px 0 rgba(255,255,255,0.18); }
 
                 /* ── THE AIM ── over everything, hit-testing nothing. */
                 .cf-aim { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: 4900;

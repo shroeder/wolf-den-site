@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import CardFightClient from "@/components/cards/CardFightClient";
 import CardMap from "@/components/cards/CardMap";
+import CardRoom from "@/components/cards/CardRoom";
 import CardShop from "@/components/cards/CardShop";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, getCardFightFixture, loadRun, petArtFor, runFixture } from "@/lib/marketplace/cards.js";
@@ -52,9 +53,14 @@ export default async function CardsPage({ searchParams }) {
     // chosen where to go, not the thing the game opens on.
     if (!run.at && !run.done) return <CardMap run={run} />;
 
+    // ── THE FIRE AND THE CHEST ARE ROOMS TOO ─────────────────────────────────────────────────────────────
+    // Both used to resolve inside the enter handler and clear `at` on the way through, so the map was the
+    // only screen that ever knew they had happened — a heal and a payout with nothing to look at. See the
+    // note in CardRoom. They stand you in the room now and `leave` is what puts you back on the sheet.
+    if (run.at?.kind === "rest" || run.at?.kind === "treasure") return <CardRoom run={run} />;
+
     // ── THE MERCHANT IS A SCREEN, NOT A FIGHT ────────────────────────────────────────────────────────────
-    // Every other room either resolves on entry (rest, chest) or opens the ring. This one stands you in front
-    // of a shelf until you choose to move on, which is why `at` survives it where a rest's does not.
+    // Three of the five rooms stand you in a place now; only a fight and an elite open the ring.
     // THE SHOP DRAWS ITS STOCK AS CARDS, so it needs the same pet art the fight uses — the portrait in the
     // window, the rarity that colours the banner and the pet's colour for the stock. Fetched for the three
     // cards on the shelf and nothing else (petArtFor), because a shelf is not a fight.

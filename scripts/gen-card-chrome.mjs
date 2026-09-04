@@ -193,6 +193,15 @@ const PIECES = {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
         subject: "A simple skull face seen head-on wearing a small pointed crown: two round eye sockets, square teeth, three crown points. Nothing else.",
     },
+    // ⚠️ THE ONE MARK THAT WAS NEVER DRAWN. Every other room on the sheet is a stamped symbol and the unknown
+    // was a text "?" in the page's UI font — Luke: "the question mark is teeny." It was not a size bug: width
+    // and height do nothing to an inline <b>, so the one room in five that is a question mark was rendering at
+    // whatever the body font felt like while the marks either side of it were 26px pictograms.
+    "map-unknown": {
+        size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
+        subject: "A single bold QUESTION MARK, drawn as one thick confident brush stroke with its dot beneath "
+            + "it. Nothing else — no circle around it, no box, no shadow.",
+    },
     // ── THE REST OF WHAT THEIR MAP SCREEN IS MADE OF ─────────────────────────────────────────────────────
     // Luke: "we need to generate sprites where they use sprites... why did you invent a return? They use a
     // sprite, that red sprite looking thing." Every one of these was CSS pretending to be art.
@@ -363,6 +372,36 @@ const PIECES = {
         subject: "A small square stone PEDESTAL seen straight on from the front, its top a plain flat slab and "
             + "its base moulded, carved from pale weathered granite with a thin band of tarnished brass around "
             + "the neck. Completely bare — nothing standing on it, nothing carved into its face.",
+    },
+    // ── THE TWO ROOMS THAT WERE NEVER ROOMS ──────────────────────────────────────────────────────────────
+    // A rest and a chest both used to resolve the moment you stepped on them: heal, or pay, and back to the
+    // sheet with a number quietly different. Luke, on walking into one: "I clicked the question mark
+    // encounter and it did nothing." It had paid him 40 embers. Both are screens now, and a screen needs
+    // something drawn on it — these two objects are the whole of what they are.
+    //
+    // They share the merchant's alcove (shop-room.png) rather than getting a backdrop each: it was asked for
+    // as an empty lantern-lit room with nothing in the foreground, which is exactly what a fire or a chest
+    // wants to stand in, and a second and third painting of the same stonework is a bill for no difference.
+    "room-fire": {
+        fit: "inside", size: "1024x1024", store: { w: 420, h: 420 }, tint: false,
+        subject: "A CAMPFIRE burning on bare ground: three charred logs leaning together over a bed of glowing "
+            + "orange embers, with tall warm flames rising from the middle and a few sparks drifting up. A "
+            + "rolled travelling blanket and a battered tin cup rest beside the stones ringing it. Warm, "
+            + "inviting and safe, lit entirely by its own fire.",
+    },
+    "room-chest": {
+        fit: "inside", size: "1024x1024", store: { w: 380, h: 380 }, tint: false,
+        subject: "A heavy CLOSED treasure chest seen straight on: a domed lid of dark banded oak bound with "
+            + "blackened iron straps and brass rivets, a big tarnished brass lock plate at the front, standing "
+            + "on short clawed feet. Battered and old, dusted along its top. Shut tight — no glow, nothing "
+            + "spilling out of it.",
+    },
+    "room-chest-open": {
+        fit: "inside", size: "1024x1024", store: { w: 380, h: 380 }, tint: false,
+        subject: "The same heavy treasure chest with its domed lid thrown wide OPEN, the inside blazing with "
+            + "warm golden light that spills up over the rim and washes the iron straps, a scatter of loose "
+            + "coins tumbling over its front edge. Dark banded oak, blackened iron straps, brass rivets, short "
+            + "clawed feet.",
     },
     // A price has to sit ON something or it is a number floating over a painting. Small enough that three of
     // them in a row do not become the loudest thing on the shelf.

@@ -38,6 +38,12 @@ const MARK = {
     merchant: "/images/cards/chrome/map-merchant.png",
     treasure: "/images/cards/chrome/map-treasure.png",
     boss: "/images/cards/chrome/map-boss.png",
+    // ⚠️ THE ONE ROOM IN FIVE THAT WAS STILL TYPOGRAPHY. Every other mark is a stamped pictogram and the
+    // unknown was a text "?" in an inline <b> — Luke: "the question mark is teeny." It could not be fixed
+    // with a font-size either, because the sizing on .cm-ink is width/height and neither does anything to
+    // inline text. It is a drawn mark now, like the other six, and the fallback below is dead code kept
+    // only so a kind nobody has drawn yet still renders something.
+    unknown: "/images/cards/chrome/map-unknown.png",
 };
 const LABEL = {
     fight: "Enemy", elite: "Elite", rest: "Rest", merchant: "Merchant",
@@ -394,9 +400,9 @@ export default function CardMap({ run }) {
                     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
                 .cm-legend-title { justify-self: center; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
                 .cm-leg { display: flex; align-items: center; gap: 7px; }
-                /* Unknown is a "?" glyph, not an image, and width/height do NOTHING to an inline <b> — that
-                   row's mark was narrower than the rest and its label sat left of every other one. A grid
-                   box makes the glyph occupy the same 15px the sprites do. */
+                /* The grid box is kept for the fallback <b>: width and height do NOTHING to inline text, so
+                   any kind that ever loses its drawing would otherwise sit narrower than the rest and drag
+                   its label left of every other one. Every kind has a mark today. */
                 .cm-leg-ink { flex: 0 0 15px; width: 15px; height: 15px; object-fit: contain;
                     display: grid; place-items: center; font-size: 12px; }
 

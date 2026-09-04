@@ -74,22 +74,19 @@ export async function POST(request) {
                 // before that, cannot be what is standing in the next doorway.
                 if (enc?.id) run.recent = [enc.id, ...(run.recent || [])].slice(0, 2);
 
-                // A rest is not a fight: it heals and hands you straight back to the map.
-                if (kind === "rest") {
-                    run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
-                    run.at = null;
-                }
-                // Chests and elites pay out here. Both are seeded off the room, so a refresh mid-room cannot
-                // roll a second reward — the Drowned Admiral's scroll taught that a reward path with no
-                // record of itself is the one that silently goes wrong.
-                if (kind === "treasure") {
-                    const got = grantForRoom(run, want.row, want.lane, "treasure");
-                    run.embers = (run.embers || 0) + (got.embers || 0);
-                    if (got.potion && (run.potions || []).length < POTION_SLOTS) {
-                        run.potions = [...(run.potions || []), got.potion];
-                    }
-                    run.at = null;
-                }
+                // ⚠️ A REST AND A CHEST ARE ROOMS YOU STAND IN. Both of them used to resolve RIGHT HERE —
+                // heal 30% and clear `at`, or pay the chest out and clear `at` — so walking into either one
+                // dropped you back on the map with a number quietly different. Luke, on a question mark that
+                // had turned into a chest: "I clicked the question mark encounter and it did nothing." It had
+                // paid him 40 embers and a potion; there was simply nothing to see.
+                //
+                // That is the merchant's own lesson (see the note on the shop below): a room that resolves on
+                // entry is not a room, it is a number. Two of the five things on the map were invisible, which
+                // is most of why the sheet feels like fights with gaps in it — and it is why the campfires
+                // read as missing even at their full Spire weight. They open screens now; `at` survives them
+                // exactly as the merchant's does, and `leave` is what clears it.
+                if (kind === "rest") run.at.rested = false;
+                if (kind === "treasure") run.at.opened = null;
                 // ── THE MERCHANT KEEPS YOU ──────────────────────────────────────────────────────
                 // It used to hand you straight back to the map, which made it the one room that was a
                 // promise the game could not keep. The shelf is rolled HERE and stored on the run, so a
@@ -98,6 +95,41 @@ export async function POST(request) {
                     run.shop = { stock: await shopStock(buyer.id, run, encSeed), bought: [], removed: false };
                 }
 
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── THE CAMPFIRE ────────────────────────────────────────────────────────────────────────
+            // Once, and it has to be asked for. The heal is unchanged — 30% of max, which is what it paid
+            // when it happened TO you on the way past — but sitting down is now a thing you do, and a thing
+            // you can see having happened. `rested` is on the room rather than the run so a refresh at the
+            // fire cannot buy a second one.
+            if (action === "rest") {
+                if (run.at?.kind !== "rest") return NextResponse.json({ error: "not_at_fire" }, { status: 400 });
+                if (run.at.rested) return NextResponse.json({ error: "already_rested" }, { status: 400 });
+                const before = run.hp;
+                run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
+                run.at = { ...run.at, rested: true, healed: run.hp - before };
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── THE CHEST ───────────────────────────────────────────────────────────────────────────
+            // Seeded off the room, so a refresh with the lid open cannot roll a second one — the Drowned
+            // Admiral's scroll taught that a reward path with no record of itself is the one that silently
+            // goes wrong. What it held is STORED, because the screen has to be able to show it again.
+            if (action === "open") {
+                if (run.at?.kind !== "treasure") return NextResponse.json({ error: "no_chest" }, { status: 400 });
+                if (run.at.opened) return NextResponse.json({ error: "already_open" }, { status: 400 });
+                const got = grantForRoom(run, run.at.row, run.at.lane, "treasure");
+                run.embers = (run.embers || 0) + (got.embers || 0);
+                // A full belt is not a lost potion quietly: the chest says what it could not give you.
+                const belted = got.potion && (run.potions || []).length < POTION_SLOTS;
+                if (belted) run.potions = [...(run.potions || []), got.potion];
+                run.at = {
+                    ...run.at,
+                    opened: { embers: got.embers || 0, potion: belted ? got.potion : null, spilled: Boolean(got.potion && !belted) },
+                };
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
