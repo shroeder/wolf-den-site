@@ -214,7 +214,31 @@ async function upsertCardBatch(cards) {
             market_price_subtype = EXCLUDED.market_price_subtype,
             upc = COALESCE(EXCLUDED.upc, tcg_cards.upc),
             price_updated_at = NOW(),
-            updated_at = NOW()`,
+            updated_at = NOW()
+         -- ── ONLY WRITE WHAT ACTUALLY CHANGED ──────────────────────────────────────────────────────
+         -- Without this WHERE, every nightly run rewrote all 362,450 cards whether TCGplayer had touched
+         -- them or not. An unchanged row still costs a new row version, a WAL record and an update to all
+         -- five indexes: measured at 319,580 dirtied pages and 924 MB of WAL per run, the largest write in
+         -- the database by an order of magnitude, and it evicts the real working set from Neon's cache
+         -- every night at 06:00 UTC. Most nights most cards have not moved.
+         --
+         -- Row-wise IS DISTINCT FROM, not a chain of !=, because half these columns are nullable and
+         -- NULL != NULL is NULL — a chain of != quietly stops updating a card the moment one field goes
+         -- null. upc is tested separately because it is COALESCEd above: an incoming NULL means "no news",
+         -- not "clear it".
+         --
+         -- ⚠️ price_updated_at NO LONGER MOVES ON EVERY ROW EVERY NIGHT. The job's own comment used to lean
+         -- on that to answer "did the cron run yesterday?" — job_run answers that now, which is what it was
+         -- added for. What price_updated_at means from here is "when this card's data last changed", which
+         -- is the more useful of the two anyway.
+         WHERE (tcg_cards.set_id, tcg_cards.game, tcg_cards.name, tcg_cards.clean_name, tcg_cards.number,
+                tcg_cards.rarity, tcg_cards.image_url, tcg_cards.url, tcg_cards.market_price,
+                tcg_cards.market_price_subtype)
+            IS DISTINCT FROM
+               (EXCLUDED.set_id, EXCLUDED.game, EXCLUDED.name, EXCLUDED.clean_name, EXCLUDED.number,
+                EXCLUDED.rarity, EXCLUDED.image_url, EXCLUDED.url, EXCLUDED.market_price,
+                EXCLUDED.market_price_subtype)
+            OR (EXCLUDED.upc IS NOT NULL AND EXCLUDED.upc IS DISTINCT FROM tcg_cards.upc)`,
         values
     );
 }
