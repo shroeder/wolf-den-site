@@ -5,6 +5,7 @@ import ShopBrowser from "@/components/ShopBrowser";
 import StoreCreditCallout from "@/components/StoreCreditCallout";
 import ViewPing from "@/components/ViewPing";
 import { listShopInventory } from "@/lib/consignment/square";
+import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
 
@@ -20,11 +21,25 @@ export const metadata = {
 // Render against the live inventory + arrivals feed, not a build-time snapshot.
 export const dynamic = "force-dynamic";
 
+// ── THE STOREFRONT WAS MAKING 24 SQUARE API CALLS PER VIEW ───────────────────────────────────────────────────
+// Measured: /shop took 7.1 SECONDS, repeatably, warm. It is not the database — the feed query behind it
+// returns 1,552 rows in 326 ms. It is listShopInventory(), which paginates Square's catalogue with a
+// cursor loop (categories, then items), then fetches inventory counts and image URLs. Twenty-four sequential
+// HTTPS calls at ~280 ms each is the seven seconds, near enough exactly.
+//
+// The page still renders per request — force-dynamic stays, arrivals and callouts are live. What is cached is
+// the CATALOGUE, which is refreshed by a cron every half hour anyway, so a five-minute window is strictly
+// fresher than the data the "Just in" strip beside it is drawn from.
+//
+// Per-instance, like every other use of shared(): the win is that one lambda serving a crawler sweep makes 24
+// calls instead of 24 per page.
+const SHOP_CATALOGUE_TTL = TTL.ART;
+
 const JUST_IN_WINDOW_HOURS = 24 * 7;
 
 export default async function ShopPage() {
     let [categories, justInItems] = await Promise.all([
-        listShopInventory().catch(() => null),
+        shared("shop:catalogue", SHOP_CATALOGUE_TTL, () => listShopInventory()).catch(() => null),
         listRecentChanges({ windowHours: JUST_IN_WINDOW_HOURS }).catch(() => []),
     ]);
     if (categories) {
