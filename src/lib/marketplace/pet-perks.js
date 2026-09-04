@@ -382,7 +382,13 @@ function perkDescRaw(key, v, level = 1) {
         case "petXp": return `+${v}% pet XP from tending your farm while equipped`;
         case "angling": return `+${v} angling — your casts hook better fish`;
         case "reelStrength": return `+${v} reel strength — big fish are far less likely to break the line`;
-        case "seafaring": return `+${v} dig stamina on every voyage — that many more holes before you are done`;
+        // ── AND IT SAYS THE CAP, BECAUSE THE CAP IS THE WHOLE STORY ─────────────────────────────────────
+        // SYSTEM_PASSIVE_CAP holds seafaring at 4 for the entire owned collection, so once you are at four
+        // every further sea pet adds exactly nothing to it. GrayKitsune, who owns four of the six: "I obtained
+        // a Jellyfish which gives +4 Seafaring and pet stats still only say +4.. and I also stayed at the same
+        // amount of total digs as I had before obtaining the pet." He read a card promising +4 and a total
+        // that did not move, and correctly filed it as a bug. It is the cap, and the card never mentioned it.
+        case "seafaring": return `+${v} dig stamina on every voyage — that many more holes before you are done (capped at +${SYSTEM_PASSIVE_CAP.seafaring} across your whole collection)`;
         // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────
         // Every one states the exact number and exactly what it changes. "+2 seed luck" tells a member nothing;
         // "1 harvest in 12 comes up double" tells them whether they want it.

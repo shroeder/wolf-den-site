@@ -988,6 +988,9 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     ).catch(() => null);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
 
+    // Which foe the blow actually landed on. Usually the one tapped; on a redirect it is the one engageEnemy
+    // handed over instead, and the screen needs to know so it kills the right body on the board.
+    let struck = enemyId;
     const loot = [];
     // (Chests are RARE from skirmish foes now — only the occasional lucky win-drop below, no guaranteed chest.)
 
@@ -1019,12 +1022,31 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         if (enemyId) {
             const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
             if (claim?.ok) {
+                // ── STRIKE THE FOE YOU WERE GIVEN, NOT THE ONE YOU ASKED FOR ─────────────────────────
+                // engageEnemy REDIRECTS. If the foe you named is dead or held by somebody else it claims a
+                // free one instead and says so — deliberately, because "you may not hit that bandit" is an
+                // honest and useless answer. It returns the id it actually claimed.
+                //
+                // This line then struck `enemyId`, the one that was asked for and refused. So on every
+                // redirect the damage went to a foe this member does not hold — one already dead (the blow
+                // lands on nothing and the plaza sees no change) or one somebody else is mid-fight with —
+                // while the foe actually claimed for them was never touched and stayed locked to their name.
+                //
+                // Sunflower Jinxx, after a raid: "It's still giving me a different mob than what I click on
+                // multiple times a raid. I killed 83 this time and I'd say about 15 times it was not what I
+                // clicked on, nor was it one near by." The redirect picks `ORDER BY slot LIMIT 1` — the
+                // lowest slot in the wave — which is why the foe it lands on is never the one beside you.
+                //
+                // `foeId` is the claim's own id everywhere below: the strike, the shared-boss unit, and what
+                // goes back to the screen so it animates the body that actually fell.
+                const foeId = claim.enemyId ?? enemyId;
+                struck = foeId;
                 foeKind = claim.kind || null;
                 // A won duel drops an ordinary foe outright. A SHARED boss takes one unit instead — see
                 // sharedHitFor — because otherwise the first bout to finish kills it whatever its health is,
                 // and everybody else's fight was decoration.
                 const share = sharedHitFor(claim.kind);
-                const st = await strikeEnemy(buyerId, enemyId, share || claim.hpMax).catch(() => null);
+                const st = await strikeEnemy(buyerId, foeId, share || claim.hpMax).catch(() => null);
                 if (st?.ok && st.waveCleared) {
                     // Wave down. Next wave, or the chieftain, or — after the chieftain — the raid is WON.
                     if (st.wave >= CHIEFTAIN_WAVE) {
@@ -1093,6 +1115,8 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
 
     return {
         ok: true, win: sim.win, events: sim.events, reward: { xp, coin, loot }, firstDuel, hp, wave,
+        // The foe that actually took the blow — see the redirect note above. The client marks THIS one dying.
+        struck, redirected: String(struck) !== String(enemyId),
         wins: Number(mine?.hits || 0), foeEmoji: type.emoji || "🗡️", cleared,
         grade: grade.key, gradeLabel: grade.label,
         // Tell the client the spoils are done, so it can say so instead of silently paying zero.

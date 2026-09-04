@@ -287,6 +287,9 @@ function bulkLine(o) {
     return { name: "Something", sub: "", rarity: rarityOf(o) };
 }
 
+// Sentence case for the start of a line — dustReason is written to sit mid-sentence in the summary row.
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 // The honest version of "there was nothing for you in here". A chest rolls a RARITY and pays dust only when
 // it can find no un-owned item at that rarity or beneath it — so the thing to name is the pool it searched,
 // with the count, which also answers the question underneath the complaint: am I close?
@@ -458,10 +461,18 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             <div className="chest-reward-name">
                                 {reveal?.parts ? `+${reveal.parts.n} ${reveal.parts.name}` : `+${reveal?.gold} gold`}
                             </div>
+                            {/* ── THE SAME HONEST SENTENCE THE SUMMARY ROW GETS ───────────────────────────
+                                `dustReason` shipped for the summary list and this card was left on the old
+                                copy — which is the one you actually stare at when a chest opens. It claimed
+                                "you own every piece it could have given you", a thing the member can open
+                                their own compendium and disprove. Sunflower Jinxx: "my 3 wooden chests say I
+                                have all gear possible...." She does not own everything; she owns everything
+                                a WOODEN chest can reach, which is a different and much smaller sentence.
+                                One function now, so the two views cannot drift again. */}
                             <div className="chest-reward-sub muted">
                                 {reveal?.parts
-                                    ? `You own every piece it could have given you — so it paid the forge instead. +${reveal?.gold} gold as well.`
-                                    : "You already own that gear — take the dust!"}
+                                    ? `${cap(dustReason(reveal))} — so it paid the forge instead. +${reveal?.gold} gold as well.`
+                                    : cap(dustReason(reveal))}
                             </div>
                         </>
                     )}

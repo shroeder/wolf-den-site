@@ -1120,7 +1120,14 @@ export default function TownClient({ initial, frozen = false }) {
         if (!r?.ok) return; // too_fast / no_event
         if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
         if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), drops: h.drops + ((r.reward.loot || []).length || 0) }));
-        setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] }, grade: r.grade || null, gradeLabel: r.gradeLabel || null, capped: Boolean(r.capped), cleared: r.cleared || null });
+        // ── THE BODY THAT FALLS IS THE ONE THE SERVER HIT ────────────────────────────────────────────────
+        // `r.struck` is the foe the blow actually landed on. It is normally the one tapped, but engageEnemy
+        // redirects when yours is dead or held, and closeDuel marks `d.enemyId` dying — so on a redirect the
+        // plaza used to animate the wrong body and leave the real corpse standing until the next poll.
+        setDuel({ enemyId: r.struck ?? enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] }, grade: r.grade || null, gradeLabel: r.gradeLabel || null, capped: Boolean(r.capped), cleared: r.cleared || null });
+        // And say it out loud, the same way the engage path does — otherwise you swing at a bandit on the left
+        // and a different one falls over with no explanation.
+        if (r.redirected) { setRaidNote("That one was already down — you hit another."); setTimeout(() => setRaidNote(null), 2600); }
     }, [state?.event]);
     const closeDuel = useCallback(() => {
         const d = duel; setDuel(null);

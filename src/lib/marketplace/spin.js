@@ -91,7 +91,10 @@ function prizeDesc(p) {
         case "gold": return p.mini
             ? `The MINI JACKPOT — instantly bank ${goldShown(p.amount).toLocaleString()} gold.`
             : `Instantly bank ${goldShown(p.amount).toLocaleString()} gold.`;
-        case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level.`;
+        // Flat, like the tomes — see the note on scroll_wisdom. A wheel prize is a fixed reward for a token,
+        // not payment for effort, so awardXp takes it with `flat: true` and Happy Hour does not touch it.
+        // SoullessShiitake won 500 during a Happy Hour, expected 1,000, and reported it. Say so on the card.
+        case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level. Fixed — Happy Hour does not multiply it.`;
         case "consumable": return CONSUMABLES[p.consumable]?.desc || p.label;
         case "seed": return "A random farm seed to plant and grow in your pasture.";
         case "decoration": return "A random farm decoration you don't own yet — yours to place, and to keep placing.";

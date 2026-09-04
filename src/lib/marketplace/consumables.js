@@ -36,8 +36,14 @@ import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooki
 //   farm_rating       → +`amount` EXTRA farm-rating charges today
 //   sail_tailwind     → buyable gust: shave `hours` off your current voyage
 export const CONSUMABLES = {
-    scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP.", price: 1500, effect: { type: "xp", amount: 500 } },
-    scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP.", price: 5000, effect: { type: "xp", amount: 2000 } },
+    // ── THEY SAY THEY DO NOT RIDE HAPPY HOUR, BECAUSE THEY DO NOT ────────────────────────────────────────
+    // awardXp takes `flat: true` for anything bought at a fixed price, deliberately: a scroll that multiplied
+    // would make the shop a gold->XP arbitrage (27,500 gold bought 12,000 XP normally and 48,048 during a 4x).
+    // That rule is right and it was invisible. SoullessShiitake used about SIXTEEN tomes during a Happy Hour
+    // expecting double and got single every time, then reported it as a bug — which is what an unwritten rule
+    // costs. The sentence is cheaper than the complaint.
+    scroll_wisdom: { name: "Tome of Wisdom", emoji: "📜", kind: "scroll", desc: "Instantly gain 500 XP. Fixed — Happy Hour does not multiply it.", price: 1500, effect: { type: "xp", amount: 500 } },
+    scroll_ancient: { name: "Ancient Codex", emoji: "📖", kind: "scroll", desc: "Instantly gain 2,000 XP. Fixed — Happy Hour does not multiply it.", price: 5000, effect: { type: "xp", amount: 2000 } },
     pot_adrenaline: { name: "Adrenaline Vial", emoji: "🧪", kind: "potion", desc: "Gain +2 manual daily strikes today.", price: 1200, effect: { type: "strikes", amount: 2 } },
     pot_secondwind: { name: "Second Wind", emoji: "🌀", kind: "potion", desc: "Gain +5 manual daily strikes today.", price: 3200, effect: { type: "strikes", amount: 5 } },
     pot_berserker: { name: "Berserker's Brew", emoji: "🍺", kind: "potion", desc: "DOUBLE your daily strike damage for 24 hours.", price: 4000, effect: { type: "damage", mult: 2, hours: 24 } },
