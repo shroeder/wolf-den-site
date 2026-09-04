@@ -3,6 +3,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { invalidate, shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage, detectFacing, storeImage } from "@/lib/marketplace/openai-image.js";
 import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
@@ -49,7 +50,10 @@ const SPRITE_ATTEMPTS = 1;
 // timestamp) and are instead bounded by MAX_SPRITE_ATTEMPTS. Ceiling on image cost ≈ roster size / day.
 const REGEN_COOLDOWN_HOURS = 24;
 export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=3`;
-export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
+// CACHED AT THE SOURCE. shared-cache.js lists "default hero" among the things TTL.ART exists for, and the
+// Town wrapped it — but boss.js and the admin route call it raw, and the boss screen is one of the busiest
+// on the site. An art URL that changes when somebody regenerates it does not need re-reading per request.
+export const getDefaultSpriteUrl = () => shared("art:defaultSprite", TTL.ART, () => getSetting(DEFAULT_SPRITE_KEY));
 
 // Turns a member's built DiceBear avatar into a 2D game-art character ("sprite") via OpenAI, in the same
 // style as the boss art. The cron job (server-side) trickles a few per day; the admin app can also
@@ -363,6 +367,7 @@ export async function setDefaultSpriteFromImage(base64) {
     const url = await storeImage(buffer, "marketplace/sprite");
     const blob = { url };
     await setSetting(DEFAULT_SPRITE_KEY, blob.url);
+    invalidate("art:defaultSprite");   // a fresh hero must show up now, not in five minutes
     return blob.url;
 }
 
@@ -378,6 +383,7 @@ export async function generateDefaultSprite() {
         meta: { origin: "admin", label: "Default hero sprite" },
     });
     await setSetting(DEFAULT_SPRITE_KEY, url);
+    invalidate("art:defaultSprite");   // a fresh hero must show up now, not in five minutes
     return url;
 }
 

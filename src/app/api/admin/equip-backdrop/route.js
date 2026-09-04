@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { generateSceneImage } from "@/lib/marketplace/openai-image.js";
+import { invalidate } from "@/lib/marketplace/shared-cache.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -36,6 +37,7 @@ export async function POST(request) {
         try {
             const url = await generateSceneImage(PROMPT, { pathPrefix: "marketplace/equip-bg", meta: { origin: "admin", label: "Equip backdrop" } });
             await setSetting("equip_backdrop_url", url);
+            invalidate("art:equipBackdrop");   // paired with the cache on the inventory page
             return noStore({ ok: true, url });
         } catch (error) {
             return internalError(error, { event: "admin.equip_backdrop.generate.failure" });

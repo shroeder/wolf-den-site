@@ -4,6 +4,7 @@ import ViewPing from "@/components/ViewPing";
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
+import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getSetting } from "@/lib/settings.js";
 import { db } from "@/lib/db";
 
@@ -26,7 +27,9 @@ export default async function InventoryPage() {
     const [profile, spriteRow, backdropUrl] = await Promise.all([
         getProfile(buyer.id).catch(() => null),
         db.queryOne(`SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null),
-        getSetting("equip_backdrop_url").catch(() => null),
+        // The busiest path on the site reading a backdrop URL that changes when somebody uploads one.
+        // TTL.ART is what this cache is for; the admin route drops the key when it writes a new one.
+        shared("art:equipBackdrop", TTL.ART, () => getSetting("equip_backdrop_url").catch(() => null)),
     ]);
 
     return (
