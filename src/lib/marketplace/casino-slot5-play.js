@@ -211,6 +211,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     // that a payline or a bonus" had no answer for most wins — see the header of casino-win-source.js. The
     // split rides on the chip event because that is the row the admin report reads: it is the ledger, it
     // cannot miss a payout, and it goes back further than casino_play telemetry does.
+    // The first slot of the row, minus the part of it the Gem Vault has not paid on screen yet. `r.winAgain.row`
+    // never needs this — it is the row from BEFORE this spin, so this spin's bonus was never in it.
+    const hideBonus = (row) => row.map((v, i) => (i === 0 ? Math.max(0, v - (r.meterBonus || 0)) : v));
+
     const gold = spinSources(r, stake);
     const from = splitChips(won, gold);
     let chips = null;
@@ -263,7 +267,10 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // chips wrote 27 into the row, every slot read four times too big, and the total promised
             // 606 for a payout of about 152. Converted here, with chipsFor, exactly like the pups and
             // the geode and the win itself. Stored in multiples, shown in chips.
-            recent: (r.winAgain ? r.winAgain.row : (r.meter || []))
+            // ⚠️ BOTH ROWS GO OUT WITHOUT THE BONUS — see `next` below for why. `recent` matters as much
+            // as `next` does: on an ORDINARY spin it is the row as it now stands, i.e. the one carrying this
+            // spin's fresh entry, so leaving the bonus in here would leak it just as loudly.
+            recent: (r.winAgain ? r.winAgain.row : hideBonus(r.meter || []))
                 .map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
             // ── AND WHAT THE ROW LOOKS LIKE ONCE THE DUST SETTLES ───────────────────────────────
             // `recent` on a firing spin is the row that was PAID, because the animation lights those
@@ -272,7 +279,18 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
             // "I spun once, and got 401, but it put 113 and 8." Those two were the old row, still on
             // screen after the payout that consumed them. This is the row AFTER, so the bar can settle
             // onto it instead of lying about what it is holding.
-            next: (r.meter || []).map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
+            // ── SENT WITHOUT THE BONUS, AND TOPPED UP ONCE IT HAS BEEN PLAYED ──────────────────
+            // The row now banks the WHOLE spin, the Gem Vault included (see playSpin). But this response is
+            // built before the player has touched a cover, so shipping the finished row would put the
+            // bonus's answer above the reels — the exact leak Luke caught: "it already won in the top left
+            // as a win-it-again before I even played the pick'em game."
+            //
+            // So the row goes out holding only what the reels paid, and `topUp` carries the rest. The screen
+            // adds it to the first slot when the Gem Vault closes, which is also the better moment for it:
+            // the bonus you just played visibly lands in the meter instead of having been there all along.
+            // The row SAVED above is the full one, so a reload mid-bonus settles on the right number.
+            next: hideBonus(r.meter || []).map((v) => (v > 0 ? chipsFor(stake, v) : 0)),
+            topUp: r.meterBonus > 0 ? chipsFor(stake, r.meterBonus) : 0,
             cleared: Boolean(r.winAgain),
             fired: r.winAgain ? { total: chipsFor(stake, r.winAgain.paid), cascades: r.winAgain.cascades } : null,
         } : null,

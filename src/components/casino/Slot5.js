@@ -229,6 +229,22 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     // in `after()`, when the last cascade has been paid and the number on the counter is the number that
     // went into the slot.
     const [shownMeter, setShownMeter] = useState(null);
+    // ── THE BONUS LANDS IN THE ROW WHEN THE BONUS IS OVER ────────────────────────────────────────────────
+    // The row banks the whole spin, the Gem Vault included, but the server sends it without that part and
+    // hands the amount over as `topUp` — otherwise the first slot would be showing the pick'em's answer
+    // before a single cover had been turned (see the note on `next` in casino-slot5-play.js).
+    //
+    // `recent` is skipped on a FIRING spin: there it is the row from before this pull, the one the lights
+    // walk and the payout was made of, and this spin's bonus was never part of it. `next` always takes it —
+    // that is the row the bar settles onto, and the row the server has already saved in full.
+    const bankMeterBonus = useCallback(() => {
+        setShownMeter((prev) => {
+            const up = prev?.topUp || 0;
+            if (!up) return prev;
+            const add = (row) => (row?.length ? [row[0] + up, ...row.slice(1)] : row);
+            return { ...prev, recent: prev.cleared ? prev.recent : add(prev.recent), next: add(prev.next), topUp: 0 };
+        });
+    }, []);
     const afterMeter = useRef(null);
     const [pays, setPays] = useState(false);       // is the paytable open
     const [freeIdx, setFreeIdx] = useState(-1);    // which free spin is on screen
@@ -979,7 +995,7 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
     if (phase === "gems" && result?.gems) {
         return (
             <div className="s5 is-bonus">
-                <GemVault gems={result.gems} bet={bet} onDone={() => setPhase("done")} />
+                <GemVault gems={result.gems} bet={bet} onDone={() => { bankMeterBonus(); setPhase("done"); }} />
             </div>
         );
     }

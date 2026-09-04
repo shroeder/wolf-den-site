@@ -566,14 +566,15 @@ const VAULT = {
     // boom" that fires every fourth spin is a celebration that has stopped being one, and `winAgain.need`
     // is the dial for that if Luke wants it rarer than he first specced.
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
+    // Trimmed 2% (x0.98) to pay for the row surviving its own payout — see winAgain.need.
     pays: {
-        wolf: { 3: 3.19, 4: 24.5, 5: 317 },
-        chest: { 3: 0.927, 4: 7.06, 5: 69.8 },
-        laurel: { 3: 0.331, 4: 2.07, 5: 16.5 },
-        doubloon: { 3: 0.146, 4: 0.701, 5: 4.99 },
-        bone: { 3: 0.0973, 4: 0.361, 5: 1.45 },
+        wolf: { 3: 3.13, 4: 24, 5: 311 },
+        chest: { 3: 0.908, 4: 6.92, 5: 68.4 },
+        laurel: { 3: 0.324, 4: 2.03, 5: 16.2 },
+        doubloon: { 3: 0.143, 4: 0.687, 5: 4.89 },
+        bone: { 3: 0.0954, 4: 0.354, 5: 1.42 },
     },
-    scatterPays: { 3: 0.682, 4: 3.54, 5: 21.9 },
+    scatterPays: { 3: 0.668, 4: 3.47, 5: 21.5 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
     // Luke, with a reference machine in hand: "I wanted the Vault slot machine laid out like this — where
     // it cascades, and then you can win it again. So every time you win an amount, that goes up top. And
@@ -600,11 +601,29 @@ const VAULT = {
     // reach three or more. Six is the first rung that is rare enough to be an event — 1 spin in 22.7 — and
     // that is long enough for the row to fill, age, and start pushing good spins off the end, which is the
     // tension the whole thing was built for.
-    // `need` is the cascades it takes to fire. Luke asked for 5 ("change the win it again to be 5 cascades
-    // instead of 3") — it was actually 6 at the time, not 3, so this makes it fire MORE often rather than
-    // less. That costs return: the note above records what happened when it moved the other way. Re-swept
-    // after the change; see the paytable multiplier.
-    winAgain: { slots: 5, need: 5, label: "WIN IT AGAIN" },
+    // ── BACK TO SIX, AND WHY THAT REVERSES AN EARLIER REQUEST ────────────────────────────────────────
+    // Luke asked for 5 ("change the win it again to be 5 cascades instead of 3"), and this puts it back to 6.
+    // The reason he wanted 5 no longer exists: at the time, FIRING WIPED THE ROW, so a rare fire meant a row
+    // that spent most of its life empty and a feature you hardly saw pay. The row survives its own payout now
+    // (see playSpin), so the row is always full and every fire pays the whole of it.
+    //
+    // That made the feature worth roughly twice as much per fire, and at 1-in-12 it took the cabinet to
+    // 111.4%. The floor is ~0.95 across the machines (see chip-rate.js), so it had to come back 16 points.
+    // Swept over 300k spins x 4 seeds, holding the row at five slots, these all land on target:
+    //
+    //     row of 5, need 5, table -26%   95.2%   <- every spin pays a quarter less, all day
+    //     row of 4, need 5, table -17%   95.1%   <- shorter row AND a stingier base game
+    //     row of 3, need 5, table  -7%   94.9%   <- the row stops looking like the reference cabinet
+    //     row of 5, need 6, table  -2%   95.7%   <- THIS
+    //
+    // The last one is the only one that leaves the base game and the cabinet's face alone: same five slots,
+    // same reels, a paytable trim small enough that no single spin shows it, and the whole cost taken out of
+    // how OFTEN the feature fires — 1 spin in 23 rather than 1 in 12. It also restores what the note above
+    // argued for on its own terms: six is "rare enough to be an event", and long enough for the row to fill,
+    // age, and start pushing good spins off the end.
+    //
+    // If the fire rate matters more than the base game, the other three rows are a one-line swap.
+    winAgain: { slots: 5, need: 6, label: "WIN IT AGAIN" },
     second: { kind: "gems", label: "The Gem Vault" },
 };
 
@@ -1668,7 +1687,20 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
         // understand that it's rigged." He is exactly right, and it is the worst kind of leak: the screen
         // telling you the outcome of a game it is about to pretend to ask you to play. The row records the
         // REELS — what the spin visibly paid — and the bonus pays itself on its own screen.
-        const reelWin = total - (gems?.total || 0);
+        // ── WHAT GOES UP TOP IS THE WHOLE SPIN, BONUS INCLUDED ───────────────────────────
+        // Luke: "winning the bonus did not put that bonus number in there, which it should have."
+        //
+        // It used to be the reels only, and for a reason that still holds: `total` is final the instant the
+        // response is built, so a row drawn from it would show the Gem Vault's answer BEFORE the player has
+        // touched a cover — Luke, on that: "we definitely don't want to show people that, because then
+        // they'll understand that it's rigged." That was solved by leaving the bonus OUT of the row, which
+        // also left it out of the meter, which is the thing being fixed here.
+        //
+        // So the split moved to WHEN rather than WHETHER. The row banks the whole spin; `meterBonus` is the
+        // part of it the screen must not show yet, and the play layer sends the row without it and tops the
+        // slot up once the Gem Vault has paid itself. The number is the same either way; the player just
+        // does not get to read it early.
+        const spinWin = total;
 
         // ── IT PAYS THE ROW THAT WAS THERE, THEN THIS SPIN GOES ON TOP ────────────────────────
         // Luke: "the amount that goes up top is AFTER winning it again, not before."
@@ -1688,47 +1720,40 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
             total += paid * bet;
             winAgain = { paid, cascades: chain.cascades, need: m.winAgain.need,
                 slots: m.winAgain.slots, label: m.winAgain.label, row: nextMeter };
-            // ── AND THE TOTAL GOES BACK TO THE TOP LEFT ─────────────────────────────────
-            // Luke: "winning it again should take the total amount won and put it in the top left of the
-            // win it again row."
+            // ── HOW THE ROW USED TO BE REBUILT, AND WHY IT NO LONGER IS ─────────────────
+            // Two bugs were fixed on this line before it stopped rebuilding the row at all, and both are
+            // worth keeping because they are the reason the rule is what it is.
             //
-            // It used to clear to empty, so the biggest thing that happens on this cabinet ended with a
-            // blank row and nothing to show for it. Seeding the next row with what you just won is what
-            // makes the meter a RUN rather than a series of unrelated cycles: the 19 you just collected is
-            // the first rung of the next one, and a good fire leaves you already halfway to the next.
+            // It was `[paid]` — reseeded with the METER's payout and nothing else, so the reels' own win on
+            // a firing spin was computed and then thrown away. Luke: "I spun once, and got 401, but it put
+            // 113 and 8"; then "I got 30 and it completely removed everything and put 121". Measured over
+            // 60,000 spins that hit all 4,892 fires and discarded 1,404,085 in banked wins — MORE than the
+            // meter paid out in the same run (777,157).
             //
-            // It compounds, which is the point and also the cost — see the paytable note; the sweep pays
-            // for it.
-            // ── AND THE SPIN THAT FIRED IT STILL BANKS ITS OWN WIN ──────────────────────
-            // Luke: "I spun once, and got 401, but it put 113 and 8"; then, one spin later, "I got 30 and
-            // it completely removed everything and put 121".
+            // Then it was `[reelWin]` — this spin's own win, which fixed the arithmetic and left the row
+            // going from five entries to one on every fire. That is the thing Luke came back about: "it
+            // just clears out the whole thing, except for the one win on the left."
             //
-            // Both are this line. It was `[paid]` — the row reseeded with the METER's payout and nothing
-            // else, so the reels' own win on a firing spin was computed, named `reelWin`, and then never
-            // used. Measured over 60,000 spins: that happened on all 4,892 fires and threw away 1,404,085
-            // in banked wins, which is MORE than the meter paid out in the same run (777,157). The one
-            // rule this whole feature has — "every time you win an amount, that goes up top" — was off on
-            // exactly the spins a player is paying most attention to.
+            // ── AND THE ROW SURVIVES ITS OWN PAYOUT ─────────────────────────────────────
+            // Luke: "for winning again, don't reseed." It used to reset to a single entry — this spin's win
+            // and nothing else — so the biggest moment on the cabinet ended by throwing four slots away, and
+            // from the seat that reads as the machine wiping the row it just paid you for.
             //
-            // From the seat it reads as the machine forgetting the spin you just watched: 280 off the
-            // reels plus 121 from the row is 401 on the counter, and the row comes back holding 121.
+            // Now a fire is an ordinary push: the row pays out, this spin goes on the front, and everything
+            // else ages one place along exactly as it does on any other spin. The row is a rolling record of
+            // your last five wins, full stop — there is no longer any spin that treats it differently.
             //
-            // So the top-left is what the SPIN paid off the reels. The gem collection stays out of it,
-            // for the reason on `reelWin`: the row is
-            // drawn the instant the response lands, and a pick'em you have not played yet must not have
-            // its answer sitting above the reels.
-            // It banks THIS SPIN'S OWN WIN, not that win plus the payout. Both fix the bug; the
-            // difference is what it costs. Carrying the payout forward as well compounds — the row is
-            // seeded with everything the spin was worth, so the next fire pays at least that again —
-            // and swept at 250,000 spins it takes The Vault to 111.2% against a floor of 98.6-105.7,
-            // which check:slot5 fails as "one of them is the smart pick". This lands at 101.2%, in the
-            // middle of the pack, with no other cabinet touched.
-            nextMeter = [Math.max(0, reelWin) / bet];
+            // ⚠️ THIS IS THE EXPENSIVE HALF OF THE FEATURE. A row that is never consumed pays the same
+            // banked win out more than once, and at the old settings that took The Vault from 95.1% to
+            // 111.4% — swept, 300k spins, four seeds. `need` went 5 -> 6 and the table took 2% to pay for
+            // it; see the note on winAgain.need.
+            nextMeter = [Math.max(0, spinWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
             return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain,
-                meter: nextMeter.slice(0, m.winAgain.slots), total, bet };
+                meter: nextMeter, meterBonus: (gems?.total || 0) / bet, total, bet };
         }
         // A spin that did not fire pushes its own win on and ages the rest one place along.
-        nextMeter = [Math.max(0, reelWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
+        nextMeter = [Math.max(0, spinWin) / bet, ...nextMeter].slice(0, m.winAgain.slots);
     }
-    return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter, total, bet };
+    return { grid, base, chain, free, locked, hold, built, warren, gems, winAgain, meter: nextMeter,
+        meterBonus: (gems?.total || 0) / bet, total, bet };
 }
