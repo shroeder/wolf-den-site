@@ -6,7 +6,7 @@ import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
-import { PERKS, POTIONS, cardById, removalCost } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTIONS, POTION_SLOTS, cardById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -59,10 +59,25 @@ function itemFace(item) {
     return { name: k?.name || item.ref, text: k?.text || "" };
 }
 
-/** The price, on a hanging leather tag. Struck onto a drawn object rather than floating over the painting. */
-const PriceTag = ({ price, sold, sale }) => (
-    <span className={`cs-tag${sold ? " is-sold" : ""}${sale ? " is-sale" : ""}`}>
-        {sold ? "Sold" : <><GiFlame aria-hidden="true" />{price}</>}
+/**
+ * The price, on a hanging leather tag. Struck onto a drawn object rather than floating over the painting.
+ *
+ * ⚠️ A PRICE THAT DOES NOT SAY WHETHER YOU CAN PAY IT IS HALF A PRICE. Luke, stood in the shop holding 25
+ * embers in front of six tags reading 23, 35, 36, 43, 44 and 103: "I can't tell which I can afford." Every
+ * one of them was the same amber whether it was in reach or not, so reading the shelf meant doing arithmetic
+ * against the top bar six times. In reach is amber; out of reach is cold, and the thing wearing it dims.
+ *
+ * A SALE KEEPS ITS OLD PRICE BESIDE IT. The discount slot has been rolling since the shop was written (see
+ * buildShop) and its only tell was #ffd75e instead of #ffb45e — which on a phone is not a tell at all.
+ */
+const PriceTag = ({ price, sold, sale, poor, was }) => (
+    <span className={`cs-tag${sold ? " is-sold" : ""}${sale && !sold ? " is-sale" : ""}${poor && !sold ? " is-poor" : ""}`}>
+        {sold ? "Sold" : (
+            <>
+                {sale && was ? <s>{was}</s> : null}
+                <GiFlame aria-hidden="true" />{price}
+            </>
+        )}
     </span>
 );
 
@@ -71,6 +86,12 @@ export default function CardShop({ run, art = {} }) {
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState(null);
     const [picking, setPicking] = useState(false);
+    // ⚠️ NOTHING IS BOUGHT BY THE TAP THAT SHOWS IT TO YOU. Luke: "I can't inspect any before buying." The
+    // shelf was the whole description — a name, a kind and a number — so what a Whetstone or a Blood Tonic
+    // actually DID lived in a `title` attribute, which is a thing a mouse can hover and a phone cannot. And
+    // the tap that would have told you was the tap that spent the embers. Every price on this screen is most
+    // of a run's income and every purchase is final, so the shelf opens the thing first and buys second.
+    const [look, setLook] = useState(null);
 
     const embers = run.embers || 0;
     const stock = run.shop?.stock || [];
@@ -82,6 +103,20 @@ export default function CardShop({ run, art = {} }) {
 
     const cards = stock.filter((s) => s.kind === "card");
     const goods = stock.filter((s) => s.kind !== "card");
+
+    // ── THE THING BEING LOOKED AT ────────────────────────────────────────────────────────────────────────
+    // Read off the live stock rather than off the copy that was tapped, so a purchase or a refusal lands on
+    // the open sheet instead of leaving it showing what the shelf looked like a second ago.
+    const shown = look === null ? null : stock.find((s) => s.slot === look) || null;
+    const shownFace = shown ? itemFace(shown) : null;
+    const shownCard = shown?.kind === "card" ? cardById(shown.ref) : null;
+    const shownGone = shown ? bought.includes(shown.slot) : false;
+    const shortBy = shown ? shown.price - embers : 0;
+    const beltFull = shown?.kind === "potion" && potions.length >= POTION_SLOTS;
+
+    // HE POINTS AT THE CHEAP ONE. A merchant with a sale on who does not mention it is a merchant with a
+    // secret; the discount is the only reason this shelf is worth a second look.
+    const onSale = stock.find((s) => s.sale && !bought.includes(s.slot));
 
     const post = useCallback(async (body) => {
         if (busy) return;
@@ -96,6 +131,7 @@ export default function CardShop({ run, art = {} }) {
             return;
         }
         setPicking(false);
+        setLook(null);
         router.refresh();
     }, [busy, router]);
 
@@ -137,7 +173,9 @@ export default function CardShop({ run, art = {} }) {
                     {/* HE SAYS IT, rather than a red line under a heading. There is a person on this screen
                         now, so the one place the screen talks back belongs to him. */}
                     <p className={`cs-say${said ? " is-live" : ""}`} role="status">
-                        {said || "Everything's for sale. The fire's extra."}
+                        {said || (onSale
+                            ? `The ${itemFace(onSale).name}'s marked down today. The fire's extra.`
+                            : "Everything's for sale. The fire's extra.")}
                     </p>
                 </div>
 
@@ -159,15 +197,16 @@ export default function CardShop({ run, art = {} }) {
                                     <button
                                         key={item.slot}
                                         type="button"
-                                        className={`cs-buy${gone ? " is-gone" : ""}`}
-                                        disabled={busy || gone || poor}
-                                        aria-label={`${card.name}, ${item.price} embers`}
-                                        onClick={() => post({ action: "buy", slot: item.slot })}
+                                        className={`cs-buy${gone ? " is-gone" : ""}${poor && !gone ? " is-poor" : ""}`}
+                                        disabled={busy || gone}
+                                        aria-label={`${card.name}, ${item.price} embers${poor ? ", more than you have" : ""}. Look closer.`}
+                                        onClick={() => { setSaid(null); setLook(item.slot); }}
                                     >
+                                        {item.sale && !gone ? <span className="cs-flag">Sale</span> : null}
                                         <span className="cf-card">
                                             <CardFace card={card} art={art[card.pet]} dim={poor && !gone} />
                                         </span>
-                                        <PriceTag price={item.price} sold={gone} sale={item.sale} />
+                                        <PriceTag price={item.price} sold={gone} sale={item.sale} poor={poor} was={item.was} />
                                     </button>
                                 );
                             })}
@@ -192,12 +231,12 @@ export default function CardShop({ run, art = {} }) {
                                     <button
                                         key={item.slot}
                                         type="button"
-                                        className={`cs-good${gone ? " is-gone" : ""}${item.kind === "perk" ? " is-perk" : ""}`}
-                                        disabled={busy || gone || poor}
-                                        title={`${face.name} — ${face.text}`}
-                                        aria-label={`${face.name}, ${item.price} embers. ${face.text}`}
-                                        onClick={() => post({ action: "buy", slot: item.slot })}
+                                        className={`cs-good${gone ? " is-gone" : ""}${poor && !gone ? " is-poor" : ""}${item.kind === "perk" ? " is-perk" : ""}`}
+                                        disabled={busy || gone}
+                                        aria-label={`${face.name}, ${item.price} embers${poor ? ", more than you have" : ""}. ${face.text} Look closer.`}
+                                        onClick={() => { setSaid(null); setLook(item.slot); }}
                                     >
+                                        {item.sale && !gone ? <span className="cs-flag">Sale</span> : null}
                                         <span className="cs-obj">
                                             {item.kind === "perk" ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
@@ -208,7 +247,7 @@ export default function CardShop({ run, art = {} }) {
                                         </span>
                                         <b className="cs-goodname">{face.name}</b>
                                         <span className="cs-kind">{LABEL[item.kind] || item.kind}</span>
-                                        <PriceTag price={item.price} sold={gone} sale={item.sale} />
+                                        <PriceTag price={item.price} sold={gone} sale={item.sale} poor={poor} was={item.was} />
                                     </button>
                                 );
                             })}
@@ -219,6 +258,70 @@ export default function CardShop({ run, art = {} }) {
                 </div>
             </div>
 
+            {/* ── PICKING IT UP OFF THE SHELF ──────────────────────────────────────────────────────────────
+                What the shelf cannot hold: the whole card at a size you can read, what a potion or a trinket
+                DOES, and the one number that decides everything — what you are holding against what it costs.
+                A card already wore its rules on the shelf; a potion and a trinket wore a name and the word
+                POTION, and a shop that will not say what it is selling is asking to be trusted with a run's
+                entire income.
+                ⚠️ AN ITEM YOU CANNOT AFFORD STILL OPENS. It is the one the player most needs to read: the
+                whole question in a shop is whether to save for the trinket, and that cannot be answered by a
+                button that refuses to do anything when it is pressed. */}
+            {shown ? (
+                <div className="cs-look" role="dialog" aria-modal="true" aria-label={shownFace.name}>
+                    <button type="button" className="cs-look-out" aria-label="Put it back" onClick={() => setLook(null)} />
+                    <div className="cs-look-in">
+                        <div className="cs-look-art">
+                            {shownCard ? (
+                                <span className="cf-card"><CardFace card={shownCard} art={art[shownCard.pet]} /></span>
+                            ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="cs-look-obj" src={goodsArt(shown)} alt="" />
+                            )}
+                        </div>
+                        {/* A CARD ALREADY SAYS ALL OF THIS. Its name is on the banner, its type is the plate
+                            and the window's shape, and its rules are printed across the middle — a name, a
+                            kind and the text repeated underneath it is the same sentence three times. Only
+                            the objects, which are a picture and nothing else, need the words. */}
+                        {!shownCard ? (
+                            <>
+                                <b className="cs-look-name">{shownFace.name}</b>
+                                <span className="cs-kind">{LABEL[shown.kind] || shown.kind}</span>
+                                <p className="cs-look-text">{shownFace.text}</p>
+                            </>
+                        ) : null}
+
+                        {/* THE PRICE AND THE PURSE ON ONE LINE, because the decision is the difference
+                            between them and nothing else on this screen puts them together. */}
+                        <div className="cs-look-price">
+                            <PriceTag price={shown.price} sold={shownGone} sale={shown.sale} poor={shortBy > 0} was={shown.was} />
+                            <span className="cs-look-purse">
+                                {shown.sale && shown.was ? <em>{Math.round((1 - shown.price / shown.was) * 100)}% off · </em> : null}
+                                you have <b><GiFlame aria-hidden="true" />{embers.toLocaleString()}</b>
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            className="cs-look-buy"
+                            disabled={busy || shownGone || shortBy > 0 || beltFull}
+                            onClick={() => post({ action: "buy", slot: shown.slot })}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="cs-look-plate" src="/images/cards/chrome/button-plate.png" alt="" />
+                            <span className="cs-look-label">
+                                {shownGone ? "Sold"
+                                    : shortBy > 0 ? `${shortBy} embers short`
+                                        : beltFull ? "Belt's full"
+                                            : busy ? "…" : "Buy it"}
+                            </span>
+                        </button>
+                        {said ? <p className="cs-look-say" role="status">{said}</p> : null}
+                        <button type="button" className="cs-look-no" onClick={() => setLook(null)}>Put it back</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* ── THE BRAZIER ──────────────────────────────────────────────────────────────────────────────
                 ⚠️ THE LOUDEST THING ON THE SCREEN, ON PURPOSE. Removing a card is the only reason a shop
                 exists (see SHOP in cards-kit): every other reward in this game makes the deck bigger, and a
@@ -227,16 +330,23 @@ export default function CardShop({ run, art = {} }) {
                 it. */}
             <button
                 type="button"
-                className={`cs-burn${removed ? " is-cold" : ""}`}
-                disabled={busy || removed || embers < cost || deck.length <= 5}
-                onClick={() => setPicking((v) => !v)}
+                className={`cs-burn${removed ? " is-cold" : ""}${!removed && embers < cost ? " is-poor" : ""}`}
+                disabled={busy || removed || deck.length <= 5}
+                onClick={() => {
+                    // ⚠️ IT SAYS WHY. Greyed out and inert, the most important thing in the shop was also the
+                    // only one that would not explain itself — see REFUSAL above; a control that does nothing
+                    // when it is pressed reads as broken, not as expensive.
+                    if (embers < cost) { setSaid(`${cost - embers} embers short of a burning.`); return; }
+                    setSaid(null);
+                    setPicking((v) => !v);
+                }}
             >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="cs-brazier" src="/images/cards/chrome/shop-brazier.png" alt="" />
                 <span className="cs-burn-say">
                     <span className="cs-burn-top">
                         <b>{picking ? "Never mind" : "Burn a card"}</b>
-                        {!removed ? <PriceTag price={cost} /> : null}
+                        {!removed ? <PriceTag price={cost} poor={embers < cost} /> : null}
                     </span>
                     <i>
                         {removed
@@ -370,8 +480,29 @@ export default function CardShop({ run, art = {} }) {
                     font-family: var(--cf-card-font); font-size: 12px; font-weight: 800; color: #ffb45e;
                     font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
-                .cs-tag.is-sale { color: #ffd75e; }
+                /* A SALE KEEPS THE OLD NUMBER, struck. A colour on its own was not a discount anybody could
+                   see — it was two ambers eight hex apart on a phone in a dim room. */
+                .cs-tag.is-sale { color: #ffe08a; }
+                .cs-tag.is-sale s { color: #a08a6d; font-size: 10px; font-weight: 700; text-decoration-thickness: 1px; }
+                /* ⚠️ OUT OF REACH IS COLD. This and the dimming on the object are the two channels that answer
+                   "which of these can I afford" without doing sums against the top bar. */
+                .cs-tag.is-poor { color: #b0806f; }
                 .cs-tag.is-sold { color: #9d8a72; }
+
+                /* ── THE CHEAP ONE, FLAGGED ── the same leather the prices hang on, pinned at an angle so it
+                   reads as something the keeper stuck on this morning. */
+                .cs-flag { position: absolute; top: -7px; right: -6px; z-index: 6; padding: 5px 8px 4px;
+                    background: url(/images/cards/chrome/shop-tag.png) center/100% 100% no-repeat;
+                    transform: rotate(7deg); font-size: 8.5px; font-weight: 800; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: #ffe08a; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); pointer-events: none; }
+
+                /* WHAT YOU CANNOT PAY FOR GOES COLD ON THE SHELF. Both filters restate the drop shadow they
+                   are overriding — a filter is one property, and a rule that sets it without the shadow takes
+                   the object off the plank it is standing on. */
+                .cs-buy.is-poor .cf-card { filter: grayscale(0.5) brightness(0.78) drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
+                .cs-good.is-poor .cs-obj { filter: grayscale(0.5) brightness(0.78); }
+                .cs-good.is-poor .cs-goodname { color: #b9ac98; }
 
                 /* ── A POTION OR A TRINKET ── the object, its name, and what kind of thing it is. */
 /* padding-bottom CLEARS THE TAG. It hangs at bottom: 0 and it is ~28px tall, so at 16px it
@@ -411,6 +542,55 @@ export default function CardShop({ run, art = {} }) {
                     line-height: 1.35; color: #c8b09a; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cs-burn .cs-tag { position: static; transform: none; flex: 0 0 auto; }
                 .cs-foot { width: min(1000px, 100%); display: flex; }
+
+                .cs-burn.is-poor .cs-brazier { filter: grayscale(0.5) brightness(0.72)
+                    drop-shadow(0 6px 9px rgba(0,0,0,0.7)); }
+
+                /* ── PICKING IT UP OFF THE SHELF ─────────────────────────────────────────────────────────
+                   Over the room, not a panel pushed into the column: you are holding one thing and looking
+                   at it, and everything else in the shop can wait. */
+                .cs-look { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+                    padding: 14px; }
+                .cs-look-out { position: absolute; inset: 0; border: 0; padding: 0;
+                    background: rgba(4,5,8,0.86); cursor: pointer; }
+                .cs-look-in { position: relative; width: min(330px, 100%); max-height: 90vh; overflow-y: auto;
+                    display: flex; flex-direction: column; align-items: center; gap: 2px;
+                    padding: 14px 16px 12px; border-radius: 12px; background: rgba(9,10,14,0.97);
+                    box-shadow: inset 0 0 0 1px rgba(255,180,94,0.2), 0 16px 34px rgba(0,0,0,0.85); }
+                /* THE CARD AT A SIZE YOU CAN READ. Scaled rather than re-laid-out: every measure inside
+                   CardFace is a fixed pixel — the banner, the window, the plate — and a second set of them
+                   for "the big one" is two cards that drift apart. 96x138 at 1.6 is 154x221. */
+                .cs-look-art { height: 226px; display: grid; place-items: center; }
+                .cs-look .cf-card { transform: scale(1.6); }
+                .cs-look-obj { max-width: 150px; max-height: 170px; object-fit: contain;
+                    filter: drop-shadow(0 8px 12px rgba(0,0,0,0.75)); }
+                .cs-look-name { font-size: 17px; letter-spacing: 0.02em; color: #ffcf9a;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                .cs-look-text { margin: 5px 0 8px; text-align: center; font-family: var(--cf-card-font);
+                    font-size: 13.5px; line-height: 1.4; color: #e7d8bf; }
+                /* THE PRICE AND THE PURSE, TOGETHER. The difference between these two numbers is the entire
+                   decision, and until now they were at opposite ends of the screen. */
+                .cs-look-price { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+                .cs-look-price .cs-tag { position: static; transform: none; }
+                .cs-look-purse { font-size: 11.5px; letter-spacing: 0.03em; color: #a8977f; }
+                .cs-look-purse em { font-style: normal; color: #ffe08a; }
+                .cs-look-purse b { display: inline-flex; align-items: center; gap: 2px; color: #ffb45e;
+                    font-variant-numeric: tabular-nums; }
+                .cs-look-buy { position: relative; width: 176px; height: 46px; padding: 0; border: 0;
+                    background: none; cursor: pointer; display: grid; place-items: center; }
+                .cs-look-plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill;
+                    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.7)); }
+                .cs-look-label { position: relative; font-family: var(--cf-card-font); font-size: 14.5px;
+                    font-weight: 700; letter-spacing: 0.03em; color: #ffe6d2;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                .cs-look-buy:disabled { cursor: default; }
+                .cs-look-buy:disabled .cs-look-plate { filter: grayscale(0.7) brightness(0.62); }
+                .cs-look-buy:disabled .cs-look-label { color: #b0806f; }
+                /* HE ANSWERS HERE TOO — his line is behind the sheet, and a refusal you cannot see is the
+                   silent button all over again. */
+                .cs-look-say { margin: 8px 0 0; text-align: center; font-size: 12px; color: #ffcf9a; }
+                .cs-look-no { margin-top: 6px; border: 0; background: none; cursor: pointer;
+                    font: inherit; font-size: 12px; letter-spacing: 0.05em; color: #9d8a72; }
 
                 /* ── CHOOSING WHAT TO BURN ── */
                 .cs-pick { width: min(1000px, 100%); padding: 10px; border-radius: 10px;

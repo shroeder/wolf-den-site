@@ -308,9 +308,15 @@ export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds 
     }
 
     // One thing on the shelf is cheap. Chosen last so every price above is rolled before anything is marked.
+    //
+    // `was` is the price it WOULD have been, kept only so the shelf can strike it through. A discount nobody
+    // can see is not a discount: this slot has been rolling since the shop was written and the only tell was
+    // the tag's number being a slightly different yellow, so the first thing Luke said stood in front of it
+    // was that the merchant ought to put something on sale.
     if (stock.length) {
         const at = Math.floor(next() * stock.length);
-        stock[at] = { ...stock[at], sale: true, price: Math.max(1, Math.round(stock[at].price * (1 - SHOP.saleOff))) };
+        const was = stock[at].price;
+        stock[at] = { ...stock[at], sale: true, was, price: Math.max(1, Math.round(was * (1 - SHOP.saleOff))) };
     }
     return stock.map((s, i) => ({ ...s, slot: i }));
 }
