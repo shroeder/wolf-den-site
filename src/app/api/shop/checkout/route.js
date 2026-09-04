@@ -253,6 +253,9 @@ export async function POST(request) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
             }
 
+            // ⚠️ NO `cached: true` HERE, AND THAT IS THE POINT. The cart VIEW reads a catalogue up to a minute
+            // old so it doesn't cost seven seconds; this line is what the member is BILLED from, so it takes
+            // the live read. If the catalogue moved while they were deciding, the 409 below is what says so.
             const cart = await getCartSummary(cartId, { fulfillmentMode: fulfillment.fulfillmentMode });
 
             if (!cart.items.length) {

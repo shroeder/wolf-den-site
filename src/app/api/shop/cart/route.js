@@ -39,7 +39,9 @@ export async function GET(request) {
         try {
             const cartId = await getCartIdFromCookies();
             const fulfillmentMode = new URL(request.url).searchParams.get("mode") || null;
-            const cart = await getCartSummary(cartId, { fulfillmentMode });
+            // The catalogue behind this view is cached (TTL.CART). Cart CONTENTS are not — they are read from
+            // the database on every call — so an item a member just added always appears at once.
+            const cart = await getCartSummary(cartId, { fulfillmentMode, cached: true });
 
             return NextResponse.json(cart, {
                 headers: {
@@ -72,7 +74,7 @@ export async function POST(request) {
 
             if (action === "clear") {
                 await clearCartItems(cartId);
-                return NextResponse.json(await getCartSummary(cartId));
+                return NextResponse.json(await getCartSummary(cartId, { cached: true }));
             }
 
             const catalogObjectId = String(body.catalogObjectId || "").trim();
@@ -83,7 +85,7 @@ export async function POST(request) {
 
             if (action === "remove") {
                 await setCartItemQuantity(cartId, catalogObjectId, 0);
-                return NextResponse.json(await getCartSummary(cartId));
+                return NextResponse.json(await getCartSummary(cartId, { cached: true }));
             }
 
             if (action === "update") {
@@ -95,11 +97,11 @@ export async function POST(request) {
 
                 if (requestedQuantity <= 0) {
                     await setCartItemQuantity(cartId, catalogObjectId, 0);
-                    return NextResponse.json(await getCartSummary(cartId));
+                    return NextResponse.json(await getCartSummary(cartId, { cached: true }));
                 }
             }
 
-            const item = await findShopItemByVariationId(catalogObjectId);
+            const item = await findShopItemByVariationId(catalogObjectId, { cached: true });
 
             if (!item || !Number.isFinite(item.quantity) || item.quantity < 1) {
                 return NextResponse.json({ error: "Item not found or out of stock." }, { status: 409 });
@@ -117,7 +119,7 @@ export async function POST(request) {
                 }
 
                 await setCartItemQuantity(cartId, catalogObjectId, nextQuantity);
-                return NextResponse.json(await getCartSummary(cartId));
+                return NextResponse.json(await getCartSummary(cartId, { cached: true }));
             }
 
             if (action === "update") {
@@ -137,7 +139,7 @@ export async function POST(request) {
                 }
 
                 await setCartItemQuantity(cartId, catalogObjectId, Math.max(0, nextQuantity));
-                return NextResponse.json(await getCartSummary(cartId));
+                return NextResponse.json(await getCartSummary(cartId, { cached: true }));
             }
 
             return badRequest("Unsupported cart action.");

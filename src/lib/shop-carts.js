@@ -1,6 +1,13 @@
 import "server-only";
 
-import { calculateOnlineFeeCents, getShopSalesTaxRate, listShopInventory, toPriceCents } from "@/lib/consignment/square";
+import {
+    calculateOnlineFeeCents,
+    getShopSalesTaxRate,
+    listShopInventory,
+    listShopInventoryShared,
+    toPriceCents,
+} from "@/lib/consignment/square";
+import { TTL } from "@/lib/marketplace/shared-cache.js";
 import { db } from "@/lib/db";
 import { shopShippingCents, shopTaxCents } from "@/lib/shop-pricing";
 import {
@@ -213,7 +220,19 @@ export async function clearCartItems(cartId) {
     );
 }
 
-export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
+// ── `cached` IS OFF BY DEFAULT, AND THAT DEFAULT IS THE SAFETY ───────────────────────────────────────────────
+// This function costs 24 sequential Square calls — seven seconds — because of the listShopInventory() below,
+// and it is BOTH the cart view and the thing checkout charges from (checkout/route.js reads the summary and
+// bills `subtotalCents` from it, refusing the sale on `hasUnavailableItems`). Those two want opposite things.
+//
+// So the price a member LOOKS at may be up to a minute old, and the price a member PAYS is read live at the
+// moment of payment. If the catalogue moved in between, checkout returns the 409 it already had — an honest
+// "your cart changed" — instead of quietly billing a stale number.
+//
+// Off by default so the money path keeps the live read WITHOUT having to ask for it: a call site added later
+// is correct until someone deliberately opts it out. Only the cart view, its mutations and the shipping-rate
+// quote pass `cached: true`.
+export async function getCartSummary(cartId, { fulfillmentMode = null, cached = false } = {}) {
     await ensureCart(cartId);
 
     const [rows, categories] = await Promise.all([
@@ -224,7 +243,7 @@ export async function getCartSummary(cartId, { fulfillmentMode = null } = {}) {
              ORDER BY created_at ASC`,
             [cartId]
         ),
-        listShopInventory(),
+        cached ? listShopInventoryShared(TTL.CART) : listShopInventory(),
     ]);
 
     const inventoryMap = toInventoryMap(categories);

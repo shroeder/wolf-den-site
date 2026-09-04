@@ -25,6 +25,7 @@ const store = new Map();
 
 export const TTL = {
     ART: 300_000,     // 5 min — town art, pet sprites, chest art, default hero
+    CART: 60_000,     // 60 s  — the Square catalogue behind a CART VIEW. Checkout re-reads it LIVE.
     SLOW: 30_000,     // 30 s  — projects, bonuses, event-live flag
     LIVE: 2_500,      // 2.5 s — who's online, global chat
 };

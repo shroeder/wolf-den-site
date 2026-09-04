@@ -52,7 +52,7 @@ export async function POST(request) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });
             }
 
-            const cart = await getCartSummary(cartId, { fulfillmentMode: "shipping" });
+            const cart = await getCartSummary(cartId, { fulfillmentMode: "shipping", cached: true });
 
             if (!cart.items.length) {
                 return jsonNoStore({ error: "Cart is empty." }, { status: 409 });

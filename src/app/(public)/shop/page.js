@@ -4,8 +4,8 @@ import RewardsCallout from "@/components/RewardsCallout";
 import ShopBrowser from "@/components/ShopBrowser";
 import StoreCreditCallout from "@/components/StoreCreditCallout";
 import ViewPing from "@/components/ViewPing";
-import { listShopInventory } from "@/lib/consignment/square";
-import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
+import { listShopInventoryShared } from "@/lib/consignment/square";
+import { TTL } from "@/lib/marketplace/shared-cache.js";
 import { listRecentChanges } from "@/lib/inventory-feed/feed";
 import { attachSetNames } from "@/lib/shop-set-tags";
 
@@ -39,7 +39,7 @@ const JUST_IN_WINDOW_HOURS = 24 * 7;
 
 export default async function ShopPage() {
     let [categories, justInItems] = await Promise.all([
-        shared("shop:catalogue", SHOP_CATALOGUE_TTL, () => listShopInventory()).catch(() => null),
+        listShopInventoryShared(SHOP_CATALOGUE_TTL).catch(() => null),
         listRecentChanges({ windowHours: JUST_IN_WINDOW_HOURS }).catch(() => []),
     ]);
     if (categories) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const SQUARE_API_BASE = "https://connect.squareup.com";
@@ -934,6 +935,24 @@ export async function listShopInventory() {
     return result;
 }
 
+// ── ONE CATALOGUE, AND EACH CALLER SAYS HOW STALE IT WILL TAKE ───────────────────────────────────────────────
+// listShopInventory() is TWENTY-FOUR sequential Square calls, ~280 ms each — seven seconds. Three request
+// paths need the same catalogue, and they do NOT agree on staleness, so the TTL belongs to the CALLER rather
+// than to this function:
+//
+//   · /shop          TTL.ART  (5 min) — a storefront listing, beside a "Just in" strip a cron refreshes every 30.
+//   · the cart       TTL.CART (60 s)  — money-adjacent, so a tighter window.
+//   · checkout       NOT CACHED       — it charges from what it reads. It calls listShopInventory() directly.
+//
+// shared() compares the entry's age against the ttl the CALLER passes, so one key serves all of them: the cart
+// refreshes an entry older than a minute, /shop reuses whatever is under five, and both get the fresh result.
+// The crons (reconcile, product alerts) also stay uncached — they write a feed from the truth.
+export const SHOP_CATALOGUE_KEY = "shop:catalogue";
+
+export function listShopInventoryShared(ttl = TTL.ART) {
+    return shared(SHOP_CATALOGUE_KEY, ttl, listShopInventory);
+}
+
 // Scanned cards are pushed to Square with SKU "TCG-<tcgplayerProductId>"
 // (accounting_app SquareTransactionsService.buildSquareVariationSku). This matches that pattern.
 const TCG_SKU_PATTERN = /^TCG-(\d+)$/i;
@@ -1345,14 +1364,16 @@ export async function getMysteryBagPriceInfoFromSquare() {
     };
 }
 
-export async function findShopItemByVariationId(variationId) {
+// `cached` is opt-in and OFF by default: this answers "is there stock?", so a caller that has not thought
+// about staleness gets the live answer. The cart passes it — see the comment on getCartSummary.
+export async function findShopItemByVariationId(variationId, { cached = false } = {}) {
     const normalizedVariationId = String(variationId || "").trim();
 
     if (!normalizedVariationId) {
         return null;
     }
 
-    const categories = await listShopInventory();
+    const categories = cached ? await listShopInventoryShared(TTL.CART) : await listShopInventory();
 
     for (const category of categories) {
         const item = category.items.find((entry) => entry.id === normalizedVariationId);
