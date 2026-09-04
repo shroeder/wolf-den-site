@@ -246,7 +246,23 @@ export async function resolveBuyerSession(token) {
     // It reads to the account as being signed out, which is the least informative failure available — there
     // is no banner to screenshot and nothing that says which of the two accounts gave it away.
     if (row.banned_at) return null;
-    await db.query(`UPDATE mkt_buyer_session SET last_used_at = NOW() WHERE id = $1`, [row.session_id]);
+    // ── THE MOST EXPENSIVE STATEMENT IN THE DATABASE, UNTIL THIS LINE ────────────────────────────────────
+    // Every authenticated request came through here and wrote this row: 6,242,841 UPDATEs in three weeks,
+    // 10,508 seconds of execution — 30.3% of ALL database CPU, more than the next four statements combined,
+    // for a column nothing reads. It is a write, so each one dirties a page and writes WAL, which is the
+    // expensive kind of cheap.
+    //
+    // The predicate makes it self-throttling: one write per session per five minutes, and the rest cost a
+    // single index probe that matches nothing. Five minutes is chosen because the column exists to answer
+    // "when was this session last seen", and nobody has ever needed that answer to the second.
+    //
+    // ⚠️ NOT read-then-write. Two requests from the same phone land at once; a single conditional UPDATE has
+    // no window between the check and the write.
+    await db.query(
+        `UPDATE mkt_buyer_session SET last_used_at = NOW()
+          WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '5 minutes')`,
+        [row.session_id]
+    );
     return { sessionId: row.session_id, buyer: mapBuyer(row) };
 }
 

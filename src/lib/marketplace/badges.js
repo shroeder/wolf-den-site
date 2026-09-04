@@ -737,6 +737,31 @@ export async function getBadgeBoard(buyerId) {
 
 // Grant any unlockable badges the member now qualifies for. Returns the newly-granted badge defs (so a
 // caller can celebrate them). Best-effort and idempotent — a held badge is skipped, nothing is revoked.
+// ── THE SAFETY-NET SWEEP, AT MOST ONCE AN HOUR ───────────────────────────────────────────────────────────────
+// For the ONE caller that runs on every page load: /api/marketplace/auth/me. Every other caller is an event
+// that just earned something (a boss kill, an auction sale, a bounty) and must still sweep immediately — so
+// the throttle lives here, at the call site's own door, and never inside syncEarnedBadges itself.
+//
+// THE CLAIM IS THE UPDATE. `WHERE badges_synced_at < NOW() - INTERVAL '1 hour' RETURNING id` both tests and
+// takes the slot in one statement, so two tabs opening together cannot both win it. No row back, no sweep.
+//
+// It replaced 266,838 sweeps in three weeks with about one an hour per active member. Each sweep was reading
+// ~22 MB of mkt_activity_event and ~12 MB of boss_hit; between them they were 28% of every buffer this
+// database touched. See migrations/428.
+export async function syncEarnedBadgesHourly(buyerId) {
+    if (!buyerId) return [];
+    const claimed = await db
+        .queryOne(
+            `UPDATE mkt_buyer SET badges_synced_at = NOW()
+              WHERE id = $1 AND (badges_synced_at IS NULL OR badges_synced_at < NOW() - INTERVAL '1 hour')
+          RETURNING id`,
+            [buyerId]
+        )
+        .catch(() => null);
+    if (!claimed) return [];
+    return syncEarnedBadges(buyerId);
+}
+
 export async function syncEarnedBadges(buyerId) {
     if (!buyerId) return [];
     const all = await listBadges().catch(() => []);

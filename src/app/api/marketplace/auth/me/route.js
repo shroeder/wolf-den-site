@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 
-import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadgesHourly } from "@/lib/marketplace/badges.js";
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { getProfile } from "@/lib/marketplace/profile.js";
@@ -24,7 +24,10 @@ export async function GET(request) {
                 // no-op once claimed). Covers races where a pending row lands after account creation.
                 after(() => claimPendingPurchases(account.id, account.email));
                 // Grant any unlockable badges the member now qualifies for (level, spend, tenure, …).
-                after(() => syncEarnedBadges(account.id));
+                // HOURLY, not every call: this endpoint answers "who am I" on every page load, and the sweep
+                // behind it was the single biggest reader in the database. Every path that can actually earn
+                // a badge still sweeps the instant it happens; this is the net under them. See badges.js.
+                after(() => syncEarnedBadgesHourly(account.id));
                 // Enrich with the first-class profile (name/alias/avatar/badges) so every surface can
                 // show it. Keep displayName for back-compat with existing consumers.
                 const profile = await getProfile(account.id);
