@@ -397,6 +397,12 @@ export default function CardMap({ run }) {
                     color: #1b2430; font-size: 11.5px;
                     background-image: url(/images/cards/chrome/legend-scroll.png);
                     background-size: 100% 100%; background-repeat: no-repeat;
+                    /* ⚠️ IT IS A KEY, NOT A CONTROL, AND IT SITS ON TOP OF THE LANES. There is nothing on this
+                       scroll to press, and it covers the top-right corner of the sheet — so without this, a
+                       room that scrolls underneath it becomes a room you cannot walk into, and the tap dies
+                       silently on a piece of paper. The same z-order trap the farm's decorations and the map's
+                       own Return ribbon have both sprung before. */
+                    pointer-events: none;
                     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
                 .cm-legend-title { justify-self: center; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
                 .cm-leg { display: flex; align-items: center; gap: 7px; }
@@ -443,6 +449,17 @@ export default function CardMap({ run }) {
                     .cm-who { display: none; }
                     .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 19px 48px 18px; }
                     .cm-node { width: 32px; height: 32px; }
+                }
+                /* ── AND ON A SHORT SCREEN THE KEY GETS OUT OF THE WAY ────────────────────────────────────
+                   A phone is 441px tall once the browser's own chrome is off it, and the scroll at its 520px
+                   width was 128 wide by about 250 tall — a third of the width and better than half the height
+                   of the map, sitting on top of the right-hand lanes. Theirs is pinned in the corner of a
+                   screen four times this size, where the same panel is a twelfth of it.
+                   SCALED, not re-padded: two thirds of the scroll's height is the painted rolls at its top and
+                   bottom, and squeezing the padding to shrink it compresses those rolls into flat bands. A
+                   transform takes the whole drawing down together and the art keeps its proportions. */
+                @media (max-height: 560px) {
+                    .cm-legend { transform: scale(0.68); transform-origin: top right; }
                 }
             `}</style>
         </div>

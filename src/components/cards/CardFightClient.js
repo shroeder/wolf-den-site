@@ -1742,6 +1742,18 @@ export default function CardFightClient({ fixture, run = null }) {
                     background: linear-gradient(180deg, #ffd75e, #e0a92c); }
                 .cf-pill:disabled { opacity: 0.5; cursor: default; }
                 .cf-result-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+                /* ── REFUSING IS NOT THE LOUDEST THING ON A SCREEN ABOUT THREE CARDS ─────────────────────
+                   The reward's skip wore the full pill — gold ring, dark plate, a shadow under it — and on a
+                   phone it came out as the brightest, widest object on the screen, under three cards that are
+                   the entire decision. Spire's skip is a small quiet button below the offers; the cards are
+                   what the eye is meant to land on. Quieter, not hidden: the +25 keeps its ember colour,
+                   because a skip that pays in secret is one nobody presses on purpose (see the note on the
+                   button itself). Direct child, so the result screen's Leave and New run are untouched. */
+                .cf-choose > .cf-pill { padding: 7px 15px; font-size: 12.5px; border-width: 1px;
+                    border-color: rgba(201,162,83,0.4); background: rgba(12,15,20,0.82); color: #b7aa92;
+                    box-shadow: none; }
+                .cf-choose > .cf-pill:hover:not(:disabled) { background: rgba(28,34,45,0.9);
+                    border-color: rgba(232,200,119,0.7); color: #f2e2bd; }
 
                 .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
                 /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────

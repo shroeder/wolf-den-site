@@ -491,7 +491,15 @@ export default function CardShop({ run, art = {} }) {
 
                 /* ── THE CHEAP ONE, FLAGGED ── the same leather the prices hang on, pinned at an angle so it
                    reads as something the keeper stuck on this morning. */
-                .cs-flag { position: absolute; top: -7px; right: -6px; z-index: 6; padding: 5px 8px 4px;
+                /* ⚠️ IT STAYS INSIDE ITS OWN CARD. At right: -6px the flag reached 6px past this card's edge,
+                   and the next card's cost diamond hangs 8px off ITS left — with an 8px gap between them
+                   that put a SALE tag across the neighbour's energy cost at 375 wide. A badge that belongs to
+                   one thing must not be able to touch the thing beside it. */
+                /* AND IT COVERS NO WORDS. Pulled inside the card it stopped touching the neighbour and
+                   started sitting across this card's own NAME banner instead — "Shell Up" read as "Shell".
+                   Dropped below the banner it lands on the top corner of the picture, which is the one part
+                   of a card with nothing to read on it: a sticker on the goods rather than over the label. */
+                .cs-flag { position: absolute; top: 19px; right: 2px; z-index: 6; padding: 4px 7px 3px;
                     background: url(/images/cards/chrome/shop-tag.png) center/100% 100% no-repeat;
                     transform: rotate(7deg); font-size: 8.5px; font-weight: 800; letter-spacing: 0.14em;
                     text-transform: uppercase; color: #ffe08a; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
