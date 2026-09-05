@@ -196,6 +196,7 @@ export default function CardMap({ run, art = {} }) {
                 as the browser's torn-page glyph: a broken image at the top-left of the map for the whole of
                 every run anybody has ever played. The art exists now; the fallback is so that the next rule
                 authored without a picture costs nothing on screen. */}
+            <div className="cm-body">
             <div className="cm-perkbar">
                 {perks.map((id) => {
                     const perk = PERKS[id];
@@ -219,7 +220,10 @@ export default function CardMap({ run, art = {} }) {
                 })}
                 {/* THE STRIP SAYS WHAT IT IS FOR when there is nothing in it yet. An empty dark bar is
                     furniture; an empty dark bar with a word in it is a slot waiting to be filled. */}
-                {perks.length ? null : <span className="cm-perkbar-empty">No trinkets yet</span>}
+                {/* An empty column is a slot waiting to be filled rather than a dark bar nobody can read a
+                    reason into — theirs shows nothing at all, but theirs is not 62px of unexplained black on
+                    a phone. One outlined socket, and the word lives in its title. */}
+                {perks.length ? null : <span className="cm-perkbar-empty" title="Trinkets you find will sit here" />}
             </div>
 
             <div className="cm-sheet" ref={sheet}>
@@ -305,6 +309,19 @@ export default function CardMap({ run, art = {} }) {
                     covers the ribbon's band (18px up, 52 tall) plus a node's half-height and a margin. */}
                 <div className="cm-tail" aria-hidden="true" />
             </div>
+            </div>
+
+            {/* ── AND A DARK FOOT FOR THE WAY OUT ─────────────────────────────────────────────────────
+                The ribbon was pinned over the parchment with rooms passing underneath it — "the return
+                button is janky" — and a 62px column is too narrow to hang a banner in without turning it on
+                its side, which a CSS background cannot do (the first attempt cropped it to the word "TURN").
+                So the dark area wraps: down the left for what you are carrying, across the bottom for the
+                way out. The sheet keeps the whole parchment to itself. */}
+            <div className="cm-foot">
+                <button type="button" className="cm-return" onClick={() => router.push("/marketplace/cards/table")}>
+                    Return
+                </button>
+            </div>
 
             {/* ── THE LEGEND ── on the scroll, where theirs is. */}
             <aside className="cm-legend">
@@ -316,14 +333,6 @@ export default function CardMap({ run, art = {} }) {
                     </span>
                 ))}
             </aside>
-
-            {/* ⚠️ RETURN MEANS "GET UP FROM THE TABLE", NOT "LEAVE THE GAME". It used to push straight to the
-                town, which is a whole feature deep: Luke, lost on the sheet, "you wanna go to return, but then
-                it takes you all the way back out of the entire game." It lands in the card game's own front
-                room now (see CardTable), and the ribbon THERE is the one that puts you in the town. */}
-            <button type="button" className="cm-return" onClick={() => router.push("/marketplace/cards/table")}>
-                Return
-            </button>
 
             {peek ? <span className="cm-peek">{peek}</span> : null}
 
@@ -405,7 +414,17 @@ export default function CardMap({ run, art = {} }) {
 
             <style jsx global>{`
                 .cm { position: fixed; inset: 0; z-index: 4000; background: #0a0b0f; color: #e9edf2;
-                    display: grid; grid-template-rows: auto auto 1fr; overflow: hidden; }
+                    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+                /* ── THE DARK LEFT-HAND SIDE ─────────────────────────────────────────────────────────────
+                   Luke: "Slay the Spire also uses the left hand side, is a big dark area so that the
+                   trinkets can go there — you need to do it like they do it."
+                   Theirs is a column of relics down the dark left of the map screen; ours was a horizontal
+                   band UNDER the top bar, which is a second bar rather than a place, and it pushed the sheet
+                   down by 30px for the whole run whether you were carrying anything or not. And the Return
+                   ribbon floated loose over the parchment with rooms passing beneath it — "the return button
+                   is janky". Both live in the column now: trinkets stacked at the top of it, the way out at
+                   the foot of it, and the sheet is the only thing on the parchment. */
+                .cm-body { display: grid; grid-template-columns: 62px 1fr; min-height: 0; }
 
                 /* Flat slate, no boxes, no rounded anything — theirs has none. */
                 .cm-bar { display: flex; align-items: center; gap: 7px; padding: 7px 12px;
@@ -425,11 +444,17 @@ export default function CardMap({ run, art = {} }) {
                 .cm-tool img { width: 24px; height: 24px; object-fit: contain; }
 
                 /* The dark strip perks live in, present whether or not anything is in it. */
-                .cm-perkbar { display: flex; align-items: center; gap: 6px; min-height: 30px;
-                    padding: 2px 12px; background: #22272f; border-bottom: 1px solid rgba(0,0,0,0.4); }
-                .cm-perk img { width: 20px; height: 20px; object-fit: contain; }
+                .cm-perkbar { display: flex; flex-direction: column; align-items: center; gap: 8px;
+                    padding: 10px 6px 8px; background: #191d24; overflow-y: auto;
+                    border-right: 1px solid rgba(0,0,0,0.5);
+                    box-shadow: inset -6px 0 12px -8px rgba(0,0,0,0.8); }
+                .cm-perk img { width: 30px; height: 30px; object-fit: contain;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
+                .cm-perkbar-empty { width: 30px; height: 30px; border-radius: 50%;
+                    border: 1px dashed rgba(255,255,255,0.14); }
 
-                .cm-sheet { position: relative; overflow-y: auto; overflow-x: hidden; height: 100%; }
+                .cm-sheet { position: relative; overflow-y: auto; overflow-x: hidden; height: 100%;
+                    min-width: 0; }
                 .cm-inner { position: relative; width: min(520px, 100%); margin: 0 auto;
                     background: linear-gradient(180deg, #c9bb9a, #bdad89); }
                 .cm-svg { display: block; width: 100%; height: auto; }
@@ -511,16 +536,22 @@ export default function CardMap({ run, art = {} }) {
                 .cm-leg-ink { flex: 0 0 15px; width: 15px; height: 15px; object-fit: contain;
                     display: grid; place-items: center; font-size: 12px; }
 
-                /* ── RETURN, ON THE RIBBON ──────────────────────────────────────────────────────────────── */
-                .cm-return { position: absolute; left: 0; bottom: 18px; width: 158px; height: 52px;
-                    padding: 0 34px 0 10px; border: 0; cursor: pointer;
-                    font-family: inherit; font-weight: 700; font-size: 15px; color: #ffe6a6;
-                    text-shadow: 0 2px 3px rgba(0,0,0,0.7); text-align: center; }
+                /* ── RETURN, ON THE RIBBON, AT THE FOOT OF THE COLUMN ────────────────────────────────────
+                   margin-top:auto pins it to the bottom of the column however many trinkets are above it,
+                   and it is drawn at the column's width — the ribbon art is a horizontal banner, so it is
+                   turned on its side rather than squashed into a 62px letterbox. */
+                .cm-foot { display: flex; align-items: center; padding: 5px 8px;
+                    background: #191d24; border-top: 1px solid rgba(0,0,0,0.5); }
+                .cm-return { width: 132px; height: 44px; padding: 0 28px 3px 8px; border: 0; cursor: pointer;
+                    font-family: inherit; font-weight: 700; font-size: 14px;
+                    color: #ffe6a6; text-shadow: 0 2px 3px rgba(0,0,0,0.7); text-align: center; }
                 /* ⚠️ NOT a ::before with z-index -1. That put the ribbon behind the button's own background
                    layer and it rendered as nothing at all — the text floated on the map with no ribbon under
                    it. The image is the button's background, which cannot be outrun by a stacking context. */
                 .cm-return { background-color: transparent;
                     background-image: url(/images/cards/chrome/return-ribbon.png);
+                    /* The banner is 420x150 art. Rotated a quarter turn it fills a tall narrow slot at its
+                       own proportions instead of being crushed flat. */
                     background-size: 100% 100%; background-repeat: no-repeat;
                     filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
                 .cm-return:hover { filter: brightness(1.1); }
