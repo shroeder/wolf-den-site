@@ -23,24 +23,35 @@ import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
 // the damage. A collection screen that starts handing out advantages is a second game with no balance.
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
-const FILTERS = [
+// ── FIVE DOORS, ONE ROW ──────────────────────────────────────────────────────────────────────────────────
+// Three of these filter the cards and two swap the grid for a catalogue, which is normally an argument for
+// two rows of chrome. It is one row on purpose: on a phone a second row of tabs costs more height than the
+// thing it is organising, and every one of them is the same question — show me this part of the game.
+const TABS = [
     { key: "all", label: "All" },
     { key: "mine", label: "Mine" },
     { key: "locked", label: "Locked" },
+    { key: "trinkets", label: "Trinkets" },
+    { key: "potions", label: "Potions" },
 ];
 
-export default function CardCollection({ cards, art, counts }) {
+export default function CardCollection({ cards, art, trinkets = [], potions = [], counts }) {
     const router = useRouter();
     const [filter, setFilter] = useState("all");
     // The card you pressed, held big with its pet named underneath. A 96px card is a card you can identify;
     // it is not a card you can READ, and the whole point of a cabinet is reading the thing.
     const [look, setLook] = useState(null);
 
+    const items = filter === "trinkets" ? trinkets : filter === "potions" ? potions : null;
     const shown = useMemo(
-        () => cards.filter((c) => (filter === "all" ? true : filter === "mine" ? c.owned : !c.owned)),
+        () => (filter === "all" ? cards : filter === "mine" ? cards.filter((c) => c.owned)
+            : filter === "locked" ? cards.filter((c) => !c.owned) : []),
         [cards, filter]
     );
     const looked = look ? cards.find((c) => c.id === look) : null;
+    const count = (key) => (key === "all" ? counts.total : key === "mine" ? counts.owned
+        : key === "locked" ? counts.total - counts.owned
+            : key === "trinkets" ? trinkets.length : potions.length);
 
     return (
         <div className={`cc ${panelFont.className}`} style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
@@ -57,21 +68,42 @@ export default function CardCollection({ cards, art, counts }) {
                     and the card is drawn as what it grew into.
                 </p>
                 <div className="cc-tabs" role="tablist">
-                    {FILTERS.map((f) => (
+                    {TABS.map((f) => (
                         <button
                             key={f.key}
                             type="button"
                             role="tab"
                             aria-selected={filter === f.key}
                             className={`cc-tab${filter === f.key ? " is-on" : ""}`}
-                            onClick={() => setFilter(f.key)}
+                            onClick={() => { setLook(null); setFilter(f.key); }}
                         >
                             {f.label}
-                            <em>{f.key === "all" ? counts.total : f.key === "mine" ? counts.owned : counts.total - counts.owned}</em>
+                            <em>{count(f.key)}</em>
                         </button>
                     ))}
                 </div>
             </div>
+
+            {/* ── THE TRINKETS AND THE POTIONS ────────────────────────────────────────────────────────
+                Not cards, and not drawn as cards: a trinket works by sitting on the strip and a potion is
+                drunk, so pretending either is a playable card would be the screen lying about the rules.
+                They get the shape the game already uses for a thing with a rule on it — sprite, name,
+                sentence — plus the one line a run never tells you, which is where they come from. */}
+            {items ? (
+                <div className="cc-items">
+                    {items.map((it) => (
+                        <span key={it.id} className="cc-item">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={it.art} alt="" draggable="false" />
+                            <span>
+                                <b>{it.name}</b>
+                                <i>{it.text}</i>
+                                <em>{it.from}</em>
+                            </span>
+                        </span>
+                    ))}
+                </div>
+            ) : null}
 
             <div className="cc-grid">
                 {shown.map((c) => (
@@ -89,7 +121,7 @@ export default function CardCollection({ cards, art, counts }) {
 
                             ⚠️ UNDER THE CARD, NOT ON IT. Pinned inside the frame it landed squarely on the
                             card's last line of rules text — the one thing on a locked card worth reading. */}
-                        {c.owned ? null : <span className="cc-lock">{art[c.pet]?.name || c.pet}</span>}
+                        {c.owned ? null : <span className="cc-lock">{c.need || art[c.pet]?.name || c.pet}</span>}
                     </button>
                 ))}
                 {shown.length ? null : <p className="cc-none">Nothing here yet.</p>}
@@ -105,7 +137,11 @@ export default function CardCollection({ cards, art, counts }) {
                                 ? art[looked.pet]?.level > 1
                                     ? `Yours, at level ${art[looked.pet].level}.`
                                     : "Yours. Equip the pet and level it, and this card grows with it."
-                                : "You do not own this pet yet, so this card cannot be dealt to you."}
+                                : looked.need
+                                    // EARNED, NOT COLLECTED — and the sentence has to say what to go and do,
+                                    // because that is the only actionable half of the word "locked".
+                                    ? `${looked.need}, and this one joins the deck.`
+                                    : "You do not own this pet yet, so this card cannot be dealt to you."}
                         </p>
                         <button type="button" className="cc-close" onClick={() => setLook(null)}>Close</button>
                     </div>
@@ -143,7 +179,9 @@ export default function CardCollection({ cards, art, counts }) {
                     gap: 8px; padding: 10px 0 8px; }
                 .cc-say { margin: 0; max-width: 460px; text-align: center; font-size: 12.5px; line-height: 1.4;
                     color: #c3b49c; font-style: italic; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-                .cc-tabs { display: flex; gap: 6px; }
+                /* WRAPS, because five pills is 420px of tabs on a 375px phone and a row that overflows hides
+                   the first and last one — which here are "All" and "Potions", the two you reach for most. */
+                .cc-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
                 .cc-tab { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px;
                     border-radius: 999px; cursor: pointer; font: inherit; font-size: 12.5px;
                     border: 1px solid rgba(201,162,83,0.35); background: rgba(12,15,21,0.8); color: #c9bda6; }
@@ -162,6 +200,19 @@ export default function CardCollection({ cards, art, counts }) {
                 .cc-lock { max-width: 96px; font-size: 10px; line-height: 1.2; letter-spacing: 0.04em;
                     color: #9d8f79; }
                 .cc-none { color: #8e8069; font-size: 13px; }
+
+                /* ── THE CATALOGUE ROWS ── the carrying panel's shape from the map, because a trinket read on
+                   the sheet and the same trinket read here should not be two different objects. */
+                .cc-items { width: min(560px, 100%); display: grid; gap: 8px; }
+                .cc-item { display: flex; align-items: center; gap: 12px; padding: 9px 11px; border-radius: 10px;
+                    background: rgba(12,15,21,0.86); box-shadow: inset 0 0 0 1px rgba(201,162,83,0.22); }
+                .cc-item img { width: 44px; height: 44px; flex: 0 0 44px; object-fit: contain;
+                    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cc-item b { display: block; font-size: 14px; color: #ffd9a6; }
+                .cc-item i { display: block; margin-top: 1px; font-style: normal; font-size: 12.5px;
+                    line-height: 1.35; color: #d3d9e2; }
+                .cc-item em { display: block; margin-top: 3px; font-style: normal; font-size: 11px;
+                    letter-spacing: 0.03em; color: #8e8069; }
 
                 .cc .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun, shopStock, takePerk } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, bumpCardProgress, cardOffers, grantForRoom, loadRun, saveRun, shopStock, takePerk } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter, removalCost, upgradedId } from "@/lib/marketplace/cards-kit.js";
 
@@ -57,6 +57,14 @@ export async function POST(request) {
                     .some((n) => n.row === want.row && n.lane === want.lane);
                 if (!legal) return NextResponse.json({ error: "unreachable" }, { status: 400 });
 
+                // ── AND IT COUNTS ───────────────────────────────────────────────────────────────────
+                // Every room you walk into is a room walked into, for ever — see migration 432. Counted HERE
+                // rather than on the way out, because half the rooms in this game (a fight you lose, a
+                // merchant you leave empty-handed) have no way out that the server hears about.
+                //
+                // ⚠️ NOT AWAITED INTO THE RESPONSE PATH ON PURPOSE? No — awaited. Vercel kills work a handler
+                // did not wait for, and a counter that increments only when the phone is fast is a counter
+                // nobody can trust. One upsert, on a tap the player already waited for.
                 const node = run.map.nodes.find((n) => n.row === want.row && n.lane === want.lane);
                 // AN UNKNOWN DECIDES ITSELF ON ENTRY, which is the whole reason theirs can be a fifth of the
                 // map — a question mark resolved when the map was drawn is just a room with a worse label.
@@ -95,6 +103,7 @@ export async function POST(request) {
                     run.shop = { stock: await shopStock(buyer.id, run, encSeed), bought: [], removed: false };
                 }
 
+                await bumpCardProgress(buyer.id, "rooms", { bestStop: run.stop });
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
@@ -131,8 +140,13 @@ export async function POST(request) {
                 }
                 if (!canUpgrade(deck[at])) return NextResponse.json({ error: "already_sharp" }, { status: 400 });
                 const was = cardById(deck[at]);
-                run.deck = deck.map((id, i) => (i === at ? upgradedId(id) : id));
-                run.at = { ...run.at, rested: true, smithed: was?.name || null };
+                const now = upgradedId(deck[at]);
+                run.deck = deck.map((id, i) => (i === at ? now : id));
+                // THE ID TRAVELS, NOT ONLY THE NAME. The fire draws the card it just changed (see CardRoom),
+                // and a name is not something a card renderer can look up — "Bite" is not "bite+". `smithed`
+                // stays as the name so a run that was mid-fire when this shipped still says what it did.
+                run.at = { ...run.at, rested: true, smithed: was?.name || null, smithedId: now };
+                await bumpCardProgress(buyer.id, "smiths");
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
@@ -190,6 +204,7 @@ export async function POST(request) {
                 }
                 run.embers = (run.embers || 0) - item.price;
                 run.shop.bought = [...(run.shop.bought || []), slot];
+                await bumpCardProgress(buyer.id, "buys");
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
@@ -221,6 +236,7 @@ export async function POST(request) {
                 run.deck = deck.filter((_, i) => i !== at);
                 run.embers = (run.embers || 0) - cost;
                 run.removals = (run.removals || 0) + 1;
+                await bumpCardProgress(buyer.id, "burns");
                 run.shop.removed = true;
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
@@ -250,7 +266,13 @@ export async function POST(request) {
                     if (got.perk) takePerk(run, got.perk);
                     if (got.embers) run.embers = (run.embers || 0) + got.embers;
                 }
-                if (run.at?.kind === "boss" || run.stop > RUN_LENGTH) {
+                const wasBoss = run.at?.kind === "boss" || run.stop > RUN_LENGTH;
+                // WON IS WON, and an elite or a boss is also its own line in the ledger — those are the two
+                // counts the harder unlocks are keyed to, and they are the two a player remembers doing.
+                await bumpCardProgress(buyer.id, "fights", { bestStop: run.stop });
+                if (run.at?.kind === "elite") await bumpCardProgress(buyer.id, "elites");
+                if (wasBoss) await bumpCardProgress(buyer.id, "bosses");
+                if (wasBoss) {
                     run.done = "won";
                     run.offers = null;
                 } else {

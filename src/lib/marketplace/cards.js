@@ -6,7 +6,8 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS,
-    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, buildParty, buildShop, cardById, encounterById, nextRand, pickEncounter, stopAt,
+    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty, buildShop, cardById, encounterById,
+    nextRand, pickEncounter, stopAt, unlockedCards,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -167,6 +168,9 @@ export async function loadRun(buyerId, { create = true } = {}) {
     // replayed from its seed alone.
     const run = newRun(Math.floor(Math.random() * 900000) + 1000);
     await saveRun(buyerId, run);
+    // A RUN STARTED IS A RUN COUNTED. It is the one counter nothing else can infer: a member who opens the
+    // game, walks two rooms and dies has played, and the ladder in UNLOCKS should be able to say so.
+    await bumpCardProgress(buyerId, "runs");
     return run;
 }
 
@@ -211,12 +215,57 @@ export async function ownedPetIds(buyerId) {
     return new Set((owned || []).map((r) => r.ref));
 }
 
+/**
+ * The lifetime counters this member has earned, as a plain object with every field present.
+ *
+ * ⚠️ ZEROES, NOT NULL. Everything downstream compares numbers (meetsNeed), and a missing row is a member who
+ * has not played rather than an error — so the absent case is the same shape as the present one and nothing
+ * has to guard for it.
+ */
+const NO_PROGRESS = { rooms: 0, fights: 0, elites: 0, bosses: 0, smiths: 0, burns: 0, buys: 0, best_stop: 0, runs: 0 };
+export async function cardProgress(buyerId) {
+    const row = await db.queryOne(
+        `SELECT rooms, fights, elites, bosses, smiths, burns, buys, best_stop, runs
+           FROM mkt_cards_progress WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+    return { ...NO_PROGRESS, ...(row || {}) };
+}
+
+/**
+ * Count something the player just did, and remember the deepest they have been.
+ *
+ * ONE STATEMENT, and it is an upsert: the row may not exist, two taps can land together, and neither case is
+ * worth a read first. `best_stop` is a GREATEST rather than a set, because walking into stop 3 after a run
+ * that reached 14 must not undo the fourteen.
+ *
+ * ⚠️ FIELD NAMES ARE NOT USER INPUT — they are chosen from this whitelist. Interpolating a column name into
+ * SQL is how a counter becomes an injection, and the parameterised driver cannot help with an identifier.
+ */
+const COUNTERS = new Set(["rooms", "fights", "elites", "bosses", "smiths", "burns", "buys", "runs"]);
+export async function bumpCardProgress(buyerId, field, { bestStop = 0 } = {}) {
+    if (!COUNTERS.has(field)) return;
+    await db.query(
+        `INSERT INTO mkt_cards_progress (buyer_id, ${field}, best_stop, updated_at)
+         VALUES ($1, 1, $2, NOW())
+         ON CONFLICT (buyer_id) DO UPDATE
+            SET ${field} = mkt_cards_progress.${field} + 1,
+                best_stop = GREATEST(mkt_cards_progress.best_stop, EXCLUDED.best_stop),
+                updated_at = NOW()`,
+        [buyerId, Math.max(0, Math.floor(Number(bestStop) || 0))]
+    ).catch(() => {});
+}
+
 export async function eligibleCards(buyerId, run) {
-    const have = await ownedPetIds(buyerId);
+    const [have, progress] = await Promise.all([ownedPetIds(buyerId), cardProgress(buyerId)]);
+    const earned = unlockedCards(progress);
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind).offer;
-    return Object.values(POOL)
+    // A CARD YOU EARNED BY PLAYING IGNORES THE PET GATE. That is the entire point of it — see the note above
+    // UNLOCKS — but it still obeys DEPTH, because tier is about what a fight at this stop should be handing
+    // you and has nothing to do with how you came by the card.
+    return [...Object.values(POOL), ...Object.values(UNLOCKS)]
         .filter((c) => c.tier <= maxTier)
-        .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
+        .filter((c) => earned.has(c.id) || have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
 }
 
 // ── THE CARD IS YOUR PET, AT THE LEVEL YOU HAVE IT AT ────────────────────────────────────────────────────

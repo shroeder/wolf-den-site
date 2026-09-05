@@ -130,7 +130,20 @@ export default function CardRoom({ run, art = {} }) {
                     not a reward, it is an accounting entry. */}
                 {done ? (
                     <div className="cr-got">
-                        {isFire && at.smithed ? (
+                        {/* ── WHAT CAME OUT OF THE COALS ─────────────────────────────────────────────
+                            A sentence saying "Bite came out sharper" is the payout-you-cannot-see fault
+                            this whole screen was built to fix, one size smaller: the thing that changed is
+                            a CARD, and Spire shows you the upgraded card. So does this — the same face, with
+                            its title green and its improved numbers lit, which is the only way "sharper"
+                            means anything specific. */}
+                        {isFire && at.smithedId && cardById(at.smithedId) ? (
+                            <span className="cr-smithed">
+                                <span className="cf-card">
+                                    <CardFace card={cardById(at.smithedId)} art={art[cardById(at.smithedId).pet]} />
+                                </span>
+                                <b>Sharper.</b>
+                            </span>
+                        ) : isFire && at.smithed ? (
                             <span className="cr-gain">{at.smithed} came out sharper.</span>
                         ) : isFire ? (
                             <span className="cr-gain">
@@ -278,6 +291,16 @@ export default function CardRoom({ run, art = {} }) {
                     text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cr-gain img { width: 22px; height: 22px; object-fit: contain; }
                 .cr-gain.is-lost { font-size: 12.5px; font-weight: 400; color: #a8977f; }
+                .cr-smithed { display: flex; flex-direction: column; align-items: center; gap: 4px;
+                    animation: cr-sharp 0.5s cubic-bezier(.2,1.3,.35,1) both; }
+                .cr-smithed b { font-family: var(--cf-card-font); font-size: 14px; color: #9be08a;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                /* It arrives out of the fire rather than appearing: a card that pops into place reads as the
+                   thing that just happened, which is the whole point of showing it. */
+                @keyframes cr-sharp {
+                    0% { opacity: 0; transform: translateY(14px) scale(0.86); }
+                    100% { opacity: 1; transform: none; }
+                }
 
                 .cr-do { position: relative; width: 210px; height: 50px; margin-top: 6px; padding: 0; border: 0;
                     background: none; cursor: pointer; display: grid; place-items: center; }

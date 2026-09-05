@@ -7,7 +7,7 @@ import {
     GiSlowBlob, GiSmallFire, GiThunderStruck,
 } from "react-icons/gi";
 
-import { KEYWORDS, typeLook } from "@/lib/marketplace/cards-kit.js";
+import { KEYWORDS, typeLook, upgradedFields } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
 // ── ONE CARD, DRAWN THE SAME WHEREVER IT IS ──────────────────────────────────────────────────────────────────
@@ -120,12 +120,17 @@ const textSize = (card, live) => {
 };
 const withNumbers = (card, live) => {
     const parts = String(card.text || "").split(KEY_FIELD);
+    // ── AND THE ONES THE FIRE MOVED STAY GREEN ───────────────────────────────────────────────────────────
+    // Spire lights an upgraded card's improved numbers permanently, not only while something in the fight is
+    // moving them, and it is the same green: green means "better than the card this started as", whether the
+    // reason is a Smith or a Vulnerable. A Bite+ sitting in the shop reads as upgraded before you buy it.
+    const sharpened = upgradedFields(card);
     return parts.map((part, i) => {
         // split() on a capturing group alternates literal, capture, literal, capture...
         if (i % 2 === 0) return <span key={`t${i}`}>{withKeywords(part)}</span>;
         const base = Number(card[part]) || 0;
         const now = live && live[part] != null ? Number(live[part]) : base;
-        const cls = now > base ? " is-up" : now < base ? " is-down" : "";
+        const cls = now > base ? " is-up" : now < base ? " is-down" : sharpened.has(part) ? " is-up" : "";
         return <b key={`n${i}`} className={`cf-num${cls}`}>{now}</b>;
     });
 };
@@ -239,7 +244,11 @@ export default function CardFace({ card, art, dim, live }) {
             {/* The ribbon sits ABOVE the picture with its folded ends draping over the window's top corners —
                 which is where Spire puts it. Laid fully across the art, its own clipped underside let the
                 picture show through directly under the name, and that reads as the sprite covering it. */}
-            <span className="cf-banner" style={{ backgroundImage: `url(/images/cards/chrome/banner-${tint}.png)` }}>
+            {/* THE TITLE GOES GREEN WITH THE "+", exactly as theirs does. The mark alone was doing the whole
+                job of telling a hand of eight which Bite is the good one, and a "+" at 9px on a cloth banner
+                is not a thing anybody spots mid-fight. */}
+            <span className={`cf-banner${card.upgraded ? " is-sharp" : ""}`}
+                style={{ backgroundImage: `url(/images/cards/chrome/banner-${tint}.png)` }}>
                 {card.name}
             </span>
             {/* ── THE PET'S LEVEL, ON THE NAMEPLATE ───────────────────────────────────────────────────
@@ -330,6 +339,9 @@ export default function CardFace({ card, art, dim, live }) {
                     text-align: center; color: #1b1e24; text-shadow: 0 1px 0 rgba(255,255,255,0.35);
                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+                /* Dark green on cream, not the hand's bright green on slate: the banner is a LIGHT cloth and
+                   #7fe07f on it is unreadable. Same signal, legible on its own background. */
+                .cf-banner.is-sharp { color: #10541c; }
                 /* ── A PAINTED RIM OVER A CLIPPED PICTURE ────────────────────────────────────────────────
                    The rim is a drawn asset laid on top (one per type, tinted per rarity), and the picture
                    underneath is clipped to roughly the same silhouette so it cannot spill past the metal.

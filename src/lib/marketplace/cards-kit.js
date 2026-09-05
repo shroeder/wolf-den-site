@@ -122,6 +122,50 @@ export const CARDS = {
 //
 // `tier` is what a stop is allowed to offer, not a power level for its own sake: early stops offer 1, the
 // back half opens 2, and 3 only appears after the elite. `pet` must be a real id in collectibles.js.
+// ── PRICED AGAINST SLAY THE SPIRE, CARD BY CARD ──────────────────────────────────────────────────────────
+// Luke: "all decks should be balanced against slay the spire." Not as a feeling — as a ledger. Every card in
+// this game is one of theirs wearing an animal, and this is which one, so the next person to add a card has a
+// column to put it in rather than a number to invent.
+//
+// THE UNIT IS ENERGY. Spire's whole economy is three energy a turn, and its commons buy about six to ten
+// points of effect with one of them (Strike 6 damage, Defend 5 Block, Twin Strike 5x2, Iron Wave 5+5);
+// uncommons ten to thirteen (Shrug It Off 8 Block + a card, Inflame +2 Strength, Ghostly Armor 10 Block);
+// rares more (Bludgeon 32 for three). A card that beats that band for its cost is not exciting, it is the
+// only card anybody takes.
+//
+//   OURS            COST  THEIRS                          NOTE
+//   Bite / Strike    1    Strike, 6                       the starter attack, identical
+//   Hop / Defend     1    Defend, 5 Block                 identical
+//   Pounce / Bash    2    Bash, 8 + 2 Vulnerable          identical
+//   Purr             1    (none)                          ours: a 5 heal in the starter deck, Spire has none
+//   Swipe            1    Headbutt, 9                     9 for one is their top common attack
+//   Peck             0    Anger, 6 (adds a copy)          3 without the copy
+//   Scuttle          1    Defend+, 8 Block                a common defend one rung up
+//   Quills           1    Iron Wave-ish, 5 Block + 1 Str  Str instead of the damage half
+//   Swarm            1    Twin Strike, 5x2                3x3 = 9, more surface for Strength
+//   Sting            1    Sucker Punch, 7 + 1 Weak        5 + 1 Weak
+//   Hoot             1    Acrobatics-ish, draw 2          no discard, so 2 rather than 3
+//   Shell Up         2    Ghostly Armor / Impervious      16, between their 10-for-one and 30-for-two
+//   Coils            1    Uppercut's half, 6 + 2 Vuln     one energy, no Weak
+//   Rally            1    Inflame, +2 Strength            identical
+//   Mend             1    Bandage Up-ish, heal 8 + 4 Blk  stays in the deck, so it heals less than Reaper
+//   Screech          1    Piercing Wail, 6 Weak to all    2 Weak, because ours does not exhaust
+//   Stampede         1    Cleave, 8 to ALL                identical
+//   Gorge            2    Clothesline band, 12-14         18 with no rider
+//   Tide             0    Prepared-ish, 4 Block + a card  zero-cost cycling
+//   Fetch            0    Prepared, draw 1                zero-cost cycling
+//   Maul             2    Sword Boomerang / Whirlwind     8x3, a rare's damage for two
+//   Firebreath       2    Reaper band, AoE + rider        11 to all + Vulnerable
+//   Ink Cloud        1    Shrug It Off, 8 Block + a card  8 + two cards, tier 3
+//   Crush            3    Bludgeon, 32                    identical
+//   Ascend           2    Inflame + Defend                +3 Strength and 5 Block
+//   Phoenix Fire     2    Reaper-ish                      heal 14 + 2 Strength, the mythic's card
+//
+// THE STARTER DECK IS THEIRS TOO: five Bites, three Hops, a Purr and a Pounce — Spire deals five Strikes,
+// four Defends and a Bash. One Defend is a Purr here, which is the only deliberate difference in the ten.
+//
+// The eight cards playing earns you are priced the same way and carry their reference in their own comments
+// (see UNLOCKS below).
 export const POOL = {
     // ── TIER 1 ── the shape of the deck, not the ceiling of it.
     swipe: { id: "swipe", pet: "bear_cub", name: "Swipe", cost: 1, kind: "attack", target: "foe", tier: 1,
@@ -145,14 +189,18 @@ export const POOL = {
     sting: { id: "sting", pet: "scorpion", name: "Sting", cost: 1, kind: "attack", target: "foe", tier: 1,
         damage: 5, weak: 1, text: "Deal {damage} damage. Apply {weak} Weak.",
         upgrade: { damage: 7, weak: 2 } },
+    // ⚠️ 14 FOR TWO WAS THE WORST BLOCK IN THE GAME PER ENERGY — below Ghostly Armor (10 for one) and below
+    // our own Scuttle (8 for one). The game's big defend has to be worth the turn it costs.
     shell: { id: "shell", pet: "turtle", name: "Shell Up", cost: 2, kind: "skill", target: "self", tier: 1,
-        block: 14, text: "Gain {block} Block.",
-        upgrade: { block: 19 } },
+        block: 16, text: "Gain {block} Block.",
+        upgrade: { block: 21 } },
 
     // ── TIER 2 ── the cards a deck is actually built around.
-    stampede: { id: "stampede", pet: "kangaroo", name: "Stampede", cost: 2, kind: "attack", target: "foe", tier: 2,
-        damage: 7, all: true, text: "Deal {damage} damage to ALL enemies.",
-        upgrade: { damage: 10 } },
+    // ⚠️ WAS 7 TO ALL FOR TWO ENERGY, which is half of Cleave: theirs is 8 to every enemy for ONE, and it is
+    // a common. A card that costs double and hits for less is not a choice anybody makes twice.
+    stampede: { id: "stampede", pet: "kangaroo", name: "Stampede", cost: 1, kind: "attack", target: "foe", tier: 2,
+        damage: 8, all: true, text: "Deal {damage} damage to ALL enemies.",
+        upgrade: { damage: 11 } },
     screech: { id: "screech", pet: "bat", name: "Screech", cost: 1, kind: "skill", target: "foe", tier: 2,
         weak: 2, all: true, text: "Apply {weak} Weak to ALL enemies.",
         upgrade: { weak: 3 } },
@@ -182,14 +230,20 @@ export const POOL = {
     firebreath: { id: "firebreath", pet: "dragon_whelp", name: "Firebreath", cost: 2, kind: "attack", target: "foe", tier: 3,
         damage: 11, all: true, vulnerable: 1, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable.",
         upgrade: { damage: 15 } },
+    // 10 Block AND two cards for one energy beat every skill in Spire's first act (Shrug It Off is 8 and one
+    // card). Eight keeps it the best skill in this deck without making the rest of the tier pointless.
     inkcloud: { id: "inkcloud", pet: "squid", name: "Ink Cloud", cost: 1, kind: "skill", target: "self", tier: 3,
-        block: 10, draw: 2, text: "Gain {block} Block. Draw 2 cards.",
-        upgrade: { block: 14 } },
+        block: 8, draw: 2, text: "Gain {block} Block. Draw 2 cards.",
+        upgrade: { block: 12 } },
     crush: { id: "crush", pet: "kraken", name: "Crush", cost: 3, kind: "attack", target: "foe", tier: 3,
         damage: 32, text: "Deal {damage} damage.",
         upgrade: { damage: 42 } },
-    ascend: { id: "ascend", pet: "griffin", name: "Ascend", cost: 1, kind: "power", target: "self", tier: 3,
-        strength: 3, text: "Gain {strength} Strength.",
+    // ⚠️ IT WAS RALLY, ONLY BETTER. +3 Strength for one energy against Rally's +2 for the same one — the
+    // rare was a strict upgrade of the uncommon, which is the one shape a ladder must never have (nobody
+    // takes Rally once Ascend exists, and Inflame, the card both are copied from, is +2 for one). It costs
+    // two now and carries Block, so it is a different question rather than a bigger number.
+    ascend: { id: "ascend", pet: "griffin", name: "Ascend", cost: 2, kind: "power", target: "self", tier: 3,
+        strength: 3, block: 5, text: "Gain {strength} Strength. Gain {block} Block.",
         upgrade: { strength: 4 } },
     phoenixfire: { id: "phoenixfire", pet: "radiant_phoenix", name: "Phoenix Fire", cost: 2, kind: "skill", target: "self", tier: 3,
         heal: 14, strength: 2, text: "Heal {heal}. Gain {strength} Strength.",
@@ -200,8 +254,84 @@ export const POOL = {
 // choice of three every time — see the note above POOL.
 export const BASIC_UNLOCKS = ["swipe", "scuttle", "peck", "hoot", "coils", "rally"];
 
-/** Every card the game knows about: the starter four plus the whole pet pool. */
-export const ALL_CARDS = { ...CARDS, ...POOL };
+// ── THE CARDS PLAYING EARNS YOU ──────────────────────────────────────────────────────────────────────────
+// Luke: "we need unlocks as you play, like new cards you get access to."
+//
+// Every card until now was keyed to a PET — own the animal, meet its card — which is the right spine for a
+// game built on a collection and leaves one hole: the game itself gave you nothing for playing it. Spire
+// hands you new cards for runs completed, and the reason it works is that the reward is CONTENT rather than
+// power: nothing here is stronger than what a tier-1 pet card already does, it is simply not in the deck you
+// started with.
+//
+// THE FICTION: the deck is the animals you know. Most of them you own; these you MET on the road, which is
+// why they arrive by playing rather than by collecting, and why they ignore the pet gate entirely.
+//
+// ⚠️ EACH ONE IS PRICED OFF A SPIRE CARD, named in its comment. That is the whole balance argument for this
+// set — a new card is not a new idea about numbers, it is one of theirs wearing an animal (see the ledger in
+// the note above POOL).
+export const UNLOCKS = {
+    // Anger is 0-cost 6 damage and puts a copy in your discard; without the copy, 6 for nothing is a rare's
+    // worth of value, so this is the same idea at 4.
+    nip: { id: "nip", pet: "bunny", name: "Nip", cost: 0, kind: "attack", target: "foe", tier: 1,
+        damage: 4, text: "Deal {damage} damage.",
+        upgrade: { damage: 6 },
+        need: { rooms: 10 }, how: "Walk into 10 rooms" },
+    // Shrug It Off: 8 Block, draw 1, one energy.
+    fleece: { id: "fleece", pet: "sheep", name: "Fleece", cost: 1, kind: "skill", target: "self", tier: 1,
+        block: 7, draw: 1, text: "Gain {block} Block. Draw 1 card.",
+        upgrade: { block: 10 },
+        need: { fights: 10 }, how: "Win 10 fights" },
+    // Iron Wave: 5 damage and 5 Block for one.
+    waddle: { id: "waddle", pet: "penguin", name: "Waddle", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 5, block: 5, text: "Deal {damage} damage. Gain {block} Block.",
+        upgrade: { damage: 7, block: 7 },
+        need: { buys: 5 }, how: "Buy 5 things from the merchant" },
+    // Twin Strike is 5 twice for one; three of three is the same 9-10 with more surface for Strength.
+    flock: { id: "flock", pet: "hen", name: "Flock", cost: 1, kind: "attack", target: "foe", tier: 2,
+        damage: 3, hits: 3, text: "Deal {damage} damage three times.",
+        upgrade: { damage: 4 },
+        need: { best_stop: 8 }, how: "Reach stop 8 of a run" },
+    // ⚠️ THE FIRST DRAFT OF THIS CARD WAS SCREECH. Two Weak to every enemy for one energy is exactly what
+    // Screech already does, and an unlock that hands you a card you can already be offered is not a reward.
+    // This is the other half of Uppercut instead — both debuffs, one target, no damage — which nothing else
+    // in the deck does.
+    dazzle: { id: "dazzle", pet: "butterfly", name: "Dazzle", cost: 1, kind: "skill", target: "foe", tier: 2,
+        weak: 2, vulnerable: 2, text: "Apply {weak} Weak and {vulnerable} Vulnerable.",
+        upgrade: { weak: 3, vulnerable: 3 },
+        need: { elites: 1 }, how: "Beat an elite" },
+    // Uppercut is 13 for two with two debuffs; a plain two-energy attack in that band is 14-16.
+    thunder: { id: "thunder", pet: "eagle", name: "Thunderstoop", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 14, text: "Deal {damage} damage.",
+        upgrade: { damage: 18 },
+        need: { smiths: 5 }, how: "Sharpen 5 cards at a fire" },
+    // Bandage Up heals 4 for nothing but exhausts; ours stays, so it is one energy for 6 and a little Block.
+    mudbath: { id: "mudbath", pet: "axolotl", name: "Mud Bath", cost: 1, kind: "skill", target: "self", tier: 2,
+        heal: 6, block: 4, text: "Heal {heal}. Gain {block} Block.",
+        upgrade: { heal: 9 },
+        need: { burns: 3 }, how: "Burn 3 cards out of a deck" },
+    // Inflame: +2 Strength for one energy, permanent for the fight. The draw is the boss's payment.
+    warcry: { id: "warcry", pet: "warbanner_wolf", name: "War Cry", cost: 1, kind: "power", target: "self", tier: 3,
+        strength: 2, draw: 1, text: "Gain {strength} Strength. Draw 1 card.",
+        upgrade: { strength: 3 },
+        need: { bosses: 1 }, how: "Beat the boss" },
+};
+
+/**
+ * Which of the unlockable cards this member has earned, and why the rest are still shut.
+ *
+ * PURE, off the counters — see migration 432 for why the ladder lives here rather than in a table. A member
+ * who has never played gets an empty set and a list of eight things to go and do; the same call answers the
+ * cabinet's "locked, and here is what opens it".
+ */
+export const UNLOCK_IDS = Object.keys(UNLOCKS);
+export const meetsNeed = (progress, need) => Object.entries(need || {})
+    .every(([k, v]) => Number(progress?.[k] || 0) >= Number(v));
+export const unlockedCards = (progress) => new Set(
+    UNLOCK_IDS.filter((id) => meetsNeed(progress, UNLOCKS[id].need))
+);
+
+/** Every card the game knows about: the starter four, the whole pet pool, and what playing earns. */
+export const ALL_CARDS = { ...CARDS, ...POOL, ...UNLOCKS };
 
 // ── HOW HARD A ROOM IS ───────────────────────────────────────────────────────────────────────────────────
 // This was an eight-entry ladder, one row per stop, back when a run was a straight line. The map is fifteen
@@ -825,6 +955,24 @@ export const baseIdOf = (id) => (isUpgraded(id) ? String(id).slice(0, -1) : Stri
 /** Can this copy still go to the fire? Upgraded once is upgraded — theirs works the same way. */
 export const canUpgrade = (id) => !isUpgraded(id) && Boolean(ALL_CARDS[baseIdOf(id)]?.upgrade);
 export const upgradedId = (id) => (canUpgrade(id) ? `${baseIdOf(id)}${UPGRADE_MARK}` : String(id || ""));
+/**
+ * Which of a card's numbers the fire actually changed.
+ *
+ * Spire prints an upgraded card's improved numbers in GREEN and its title with a "+" — that pairing is the
+ * whole readability of an upgraded deck: you can tell at a glance which copy of Strike is the good one AND
+ * what about it is good, without holding the base card in your head. We had the "+" and nothing else, so a
+ * Bite+ read as a Bite with a punctuation mark.
+ *
+ * Authored, not derived: the fields come off the card's own `upgrade` block, so a card whose upgrade changes
+ * its COST lights the cost and a card whose upgrade changes two numbers lights both.
+ */
+const NO_FIELDS = new Set();
+export const upgradedFields = (card) => {
+    if (!card?.upgraded) return NO_FIELDS;
+    const base = ALL_CARDS[baseIdOf(card.id)];
+    return new Set(Object.keys(base?.upgrade || {}));
+};
+
 export const cardById = (id) => {
     const raw = String(id || "");
     if (!raw) return null;
