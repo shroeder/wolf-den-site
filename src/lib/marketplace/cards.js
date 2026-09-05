@@ -10,6 +10,8 @@ import {
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 
 // ── THE CARD GAME'S DOOR, AND THE ONE THING THE SERVER DOES FOR IT ───────────────────────────────────────────
 // The rules live in cards-kit.js and run in the browser (see the note at the top of that file: the fight pays
@@ -53,14 +55,17 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
         // ALL_CARDS, not CARDS: the reward screen shows cards from the whole pet pool, and a card whose portrait
     // was never fetched renders as an empty frame at the exact moment somebody is choosing between three.
     const petIds = [...new Set(Object.values(ALL_CARDS).map((c) => c.pet))];
-    const [me, sprites] = await Promise.all([
+    // ⚠️ THE FIGHT ASKS THE SAME QUESTION THE SHOP DOES, so it asks it in the same place. This used to read
+    // mkt_pet_sprite here and petArtFor read it there, and the day the cards started showing a pet at the
+    // level you have it at, one of the two would have kept drawing level-1 portraits — the hand and the
+    // shelf disagreeing about the same animal. One resolver, two callers (petArtMap).
+    const [me, petArt] = await Promise.all([
         db.queryOne(
             `SELECT COALESCE(NULLIF(display_name, ''), alias) AS name, avatar_sprite_url, avatar_sprite_flip
                FROM mkt_buyer WHERE id = $1`,
             [buyerId]
         ).catch(() => null),
-        db.query(`SELECT pet_id, url, flip FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
-            .catch(() => []),
+        petArtMap(buyerId, petIds),
     ]);
 
     return {
@@ -111,14 +116,7 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
         // fox and a green one around a frog read as ONE object, where a red card around that same fox reads as
         // a fox in somebody else's frame. Type has the window's shape and the word on the tab, which is all
         // Spire gives it too.
-        petArt: Object.fromEntries((sprites || []).map((r) => {
-            const pet = collectibleById(r.pet_id);
-            return [r.pet_id, {
-                url: r.url, flip: r.flip === true,
-                rarity: pet?.rarity || "common",
-                color: pet?.color || "#9aa0a6",
-            }];
-        })),
+        petArt,
     };
 }
 
@@ -199,15 +197,107 @@ export async function saveRun(buyerId, run) {
  * person be offered" is the rule going wrong in one place and not the other. Both callers differ only in how many
  * they draw and what they charge.
  */
-export async function eligibleCards(buyerId, run) {
+/**
+ * Which pets this member owns, as a Set of pet ids.
+ *
+ * Pulled out of eligibleCards because the COLLECTION screen asks the identical question — "whose cards can
+ * this person be handed" — and a second copy of that query is the door and the display disagreeing about what
+ * you own the day the rule changes.
+ */
+export async function ownedPetIds(buyerId) {
     const owned = await db
         .query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId])
         .catch(() => []);
-    const have = new Set((owned || []).map((r) => r.ref));
+    return new Set((owned || []).map((r) => r.ref));
+}
+
+export async function eligibleCards(buyerId, run) {
+    const have = await ownedPetIds(buyerId);
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind).offer;
     return Object.values(POOL)
         .filter((c) => c.tier <= maxTier)
         .filter((c) => have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
+}
+
+// ── THE CARD IS YOUR PET, AT THE LEVEL YOU HAVE IT AT ────────────────────────────────────────────────────
+// Luke: "design the way cards reflect their pets level."
+//
+// The cards were always the pets — that is why this feature's art bill is zero — but every card drew the pet's
+// LEVEL 1 portrait, the same picture for a bear somebody has fed for six weeks and a bear they were handed
+// yesterday. The game already draws each pet five more times as it levels (mkt_pet_sprite_level, and the
+// enshrined forms at six), and the farm, the arena and the level-up screen all show them. The deck did not.
+//
+// So a card carries its pet's level: THE ART IS THE ART YOU EARNED, picked by the same rule every other render
+// site uses (pickPetSpriteForLevel — the highest sprite at or below your level, the stone's form if it is
+// enshrined), and the face wears a small numeral so the change is legible rather than mysterious.
+//
+// ⚠️ IT CHANGES NOTHING THE RULES CAN SEE. Deliberately: `damage`, `block` and `cost` come out of cards-kit
+// and a level-5 bear hits for exactly what a level-1 bear hits for. A run whose numbers depend on how long you
+// have owned a pet is a run nobody can balance and a fight nobody can hand somebody else — and the whole
+// argument for the deck being your collection dies the moment the collection is also the power curve. What
+// levelling buys you here is the picture, which is what it buys you everywhere else in the Den.
+//
+// ⚠️ TWO QUERIES, NOT FIVE. The sprites (base + every evolved rung) come back in one UNION, and the member's
+// levels come back with their stones joined on, so this costs one extra round trip against what it replaced
+// no matter how many cards are on the screen — see the round-trip note in CLAUDE.md.
+async function petArtMap(buyerId, petIds) {
+    if (!petIds.length) return {};
+    const [sprites, mine] = await Promise.all([
+        db.query(
+            `SELECT pet_id, 1 AS level, NULL::text AS variant, url, flip
+               FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL
+              UNION ALL
+             SELECT pet_id, level, variant, url, flip
+               FROM mkt_pet_sprite_level WHERE pet_id = ANY($1) AND url IS NOT NULL`,
+            [petIds]
+        ).catch(() => []),
+        buyerId
+            ? db.query(
+                // ⚠️ ::text ON BOTH SIDES OF THE JOIN. mkt_pet_level.buyer_id is UUID and
+                // mkt_pet_enshrined.buyer_id is TEXT, so joining them raw is "operator does not exist: uuid =
+                // text" — which db.query swallows into an empty array, and an empty array here is not an
+                // error anybody sees: every card simply goes back to its level-1 portrait. The whole feature
+                // fails silently and correctly-looking. (The same trap the marketplace's buyer_id columns
+                // have sprung before; the parameter comparisons are fine, it is column-to-column that breaks.)
+                `SELECT l.pet_id, l.xp, e.stone
+                   FROM mkt_pet_level l
+                   LEFT JOIN mkt_pet_enshrined e
+                          ON e.buyer_id::text = l.buyer_id::text AND e.pet_id = l.pet_id
+                  WHERE l.buyer_id = $1 AND l.pet_id = ANY($2)`,
+                [buyerId, petIds]
+            ).catch(() => [])
+            : [],
+    ]);
+
+    const base = {};
+    const levels = {};
+    for (const r of sprites || []) {
+        if (Number(r.level) === 1) { base[r.pet_id] = { url: r.url, flip: r.flip === true }; continue; }
+        // The same keying getPetSpriteLevelData uses: a rung is its number, and level six is "6:light" /
+        // "6:dark" because which stone was spent is written on the animal for the rest of its life.
+        const key = r.variant ? `${r.level}:${r.variant}` : String(r.level);
+        (levels[r.pet_id] ||= {})[key] = { url: r.url, flip: r.flip === true };
+    }
+    const owned = new Map((mine || []).map((r) => [r.pet_id, r]));
+
+    const out = {};
+    for (const petId of petIds) {
+        const pet = collectibleById(petId);
+        const row = owned.get(petId);
+        const level = row ? petLevelForXp(row.xp, pet?.rarity) : 1;
+        const art = pickPetSpriteForLevel(base[petId], levels[petId], level, row?.stone || null);
+        if (!art?.url) continue;
+        out[petId] = {
+            url: art.url, flip: art.flip === true,
+            rarity: pet?.rarity || "common",
+            color: pet?.color || "#9aa0a6",
+            // What the FACE shows. `level` is the rung the picture is drawn at; `stone` is the enshrined form,
+            // which is a sixth level with a name rather than a number. The NAME travels too, because the card
+            // knows its pet by id ("Your bear_01 is level 3" is not a sentence to read out to anybody).
+            level, stone: row?.stone || null, name: pet?.name || petId,
+        };
+    }
+    return out;
 }
 
 /**
@@ -222,22 +312,11 @@ export async function eligibleCards(buyerId, run) {
  * The shape is deliberately identical to `fixture.petArt` because CardFace reads it: a card in the shop and
  * the same card in the hand must be handed the same object or they are two renderers wearing one name.
  */
-export async function petArtFor(cardIds = []) {
+export async function petArtFor(buyerId, cardIds = []) {
     // cardById, not ALL_CARDS: an upgraded copy travels as "bite+" and a raw table lookup misses it,
     // which would draw the card with an empty window at the exact moment somebody is choosing it.
     const petIds = [...new Set(cardIds.map((id) => cardById(id)?.pet).filter(Boolean))];
-    if (!petIds.length) return {};
-    const sprites = await db
-        .query(`SELECT pet_id, url, flip FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
-        .catch(() => []);
-    return Object.fromEntries((sprites || []).map((r) => {
-        const pet = collectibleById(r.pet_id);
-        return [r.pet_id, {
-            url: r.url, flip: r.flip === true,
-            rarity: pet?.rarity || "common",
-            color: pet?.color || "#9aa0a6",
-        }];
-    }));
+    return petArtMap(buyerId, petIds);
 }
 
 export async function cardOffers(buyerId, run) {

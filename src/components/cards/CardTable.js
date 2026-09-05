@@ -71,6 +71,14 @@ export default function CardTable({ run }) {
                     <img className="ct-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                     <span className="ct-do-label">{going ? "…" : live ? "Sit back down" : "Sit down"}</span>
                 </button>
+
+                {/* ── THE CABINET, FROM THE FRONT ROOM ────────────────────────────────────────────────
+                    The collection is the thing you can look at when you do NOT want to start a run, which is
+                    exactly what a front room is for. Quiet, under the button: the sharp is asking you to sit,
+                    not to browse. */}
+                <button type="button" className="ct-see" onClick={() => router.push("/marketplace/cards/collection")}>
+                    See every card
+                </button>
             </div>
 
             {/* The same ribbon the map and the rooms leave on, and from here it does what it says. */}
@@ -118,6 +126,14 @@ export default function CardTable({ run }) {
                     color: #ffe6d2; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .ct-do:disabled { cursor: default; }
                 .ct-do:disabled .ct-plate { filter: grayscale(0.7) brightness(0.62); }
+                /* A LINK, NOT A SECOND PLATE. Two painted buttons of the same weight is a screen asking two
+                   questions; this one is a door in the corner of the room. */
+                .ct-see { margin-top: -2px; padding: 4px 8px; border: 0; background: none; cursor: pointer;
+                    font: inherit; font-size: 12.5px; letter-spacing: 0.04em; color: #c3b49c;
+                    text-decoration: underline; text-underline-offset: 3px;
+                    text-decoration-color: rgba(195,180,156,0.4);
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                .ct-see:hover { color: #ffe6d2; }
 
                 /* ⚠️ PINNED, AND NOTHING UNDERNEATH IT. The map's own ribbon covered the run's only reachable
                    room on a phone (see the note in CardMap), and the first cut of this screen sprang the same

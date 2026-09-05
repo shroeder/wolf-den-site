@@ -228,6 +228,32 @@ export default function CardFace({ card, art, dim, live }) {
             <span className="cf-banner" style={{ backgroundImage: `url(/images/cards/chrome/banner-${tint}.png)` }}>
                 {card.name}
             </span>
+            {/* ── THE PET'S LEVEL, ON THE NAMEPLATE ───────────────────────────────────────────────────
+                The picture in the window is already the level you have this pet at (see petArtMap): a bear
+                you have fed for six weeks is drawn as the bear you fed. Without a number that is a mystery —
+                two people compare screenshots of Swipe and one of them has a different animal on it — so the
+                rung is written where a rung goes, at the left end of the nameplate.
+
+                ⚠️ ON THE LEFT EDGE BECAUSE OF THE FAN, AND BELOW THE COST BECAUSE OF THE FIRST TRY. The hand
+                overlaps each card with the NEXT one, so only a 46px strip down the LEFT of each card is ever
+                visible (see `overlap` in CardFightClient) — which is also why the cost diamond lives there.
+                A badge in the top-right corner would exist on the last card in the hand and nowhere else.
+                Put at the top-left it collided with the cost gem, which hangs from -8 to 14 and had a "6"
+                sitting half under it; dropped 18px it sits on the window's rim with the cost above it and
+                the name beside it, and it is still inside the strip the fan leaves you.
+
+                LEVEL 1 WEARS NOTHING. Every card in a starter deck would otherwise carry a "1" that says
+                only "this is normal", and a mark that is on everything is furniture rather than information.
+                An enshrined pet says so with its stone's colour rather than a seventh numeral. */}
+            {art?.level > 1 ? (
+                <span
+                    className={`cf-lv${art.stone ? ` is-${art.stone}` : ""}`}
+                    aria-label={`Your ${art.name || card.pet} is level ${art.level}`}
+                    title={`Your ${art.name || card.pet} is level ${art.level}${art.stone ? `, enshrined in ${art.stone}` : ""}`}
+                >
+                    {art.level}
+                </span>
+            ) : null}
             {/* THE WINDOW'S SHAPE IS THE CARD'S TYPE. An attack comes to a point at the bottom, a skill is a
                 rounded rectangle — Spire's own tell, and it means you can sort a hand by what the cards DO
                 without reading one of them. The rim is the rarity, painted as the container behind a 2px
@@ -287,6 +313,21 @@ export default function CardFace({ card, art, dim, live }) {
                    The clip is inset a shade tighter than the art so the rim covers the cut edge — a clip and
                    a painted rim never agree to the pixel, and the way to make that invisible is to let the
                    metal be the thing that ends the picture. */
+                /* Brass, small, and sitting ON the cloth rather than beside it — a stamped rung on the
+                   nameplate. It shares the cost diamond's z-index so the banner cannot paint over it. */
+                .cf-lv { position: absolute; top: 21px; left: 1px; z-index: 4;
+                    min-width: 13px; height: 13px; padding: 0 2px; border-radius: 3px;
+                    display: grid; place-items: center;
+                    background: linear-gradient(160deg, #d8a349, #8a5f1e); border: 1px solid #3a2708;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,236,190,0.5);
+                    font-family: var(--cf-card-font); font-size: 9px; font-weight: 800; line-height: 1;
+                    color: #2a1c05; text-shadow: 0 1px 0 rgba(255,235,190,0.35); }
+                /* THE SIXTH RUNG IS NOT A NUMBER, IT IS A STONE. An enshrined pet wears the form the stone
+                   gave it in the window; the plate says which rock was spent. */
+                .cf-lv.is-light { background: linear-gradient(160deg, #fff3cf, #d9bd76); border-color: #6b5a28; }
+                .cf-lv.is-dark { background: linear-gradient(160deg, #9f8ad6, #4a3a7a); border-color: #241a3f;
+                    color: #f2ecff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+
                 .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
                     display: block; }
                 .cf-art-in { position: absolute; inset: 3px; display: grid; place-items: center;

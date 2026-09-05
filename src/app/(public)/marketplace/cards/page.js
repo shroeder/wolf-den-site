@@ -51,7 +51,10 @@ export default async function CardsPage({ searchParams }) {
     // `at` is null whenever the run is between rooms — at the start, after a card is taken, after a rest or a
     // treasure — and that is exactly when Spire shows you the sheet. A fight is what happens when you have
     // chosen where to go, not the thing the game opens on.
-    if (!run.at && !run.done) return <CardMap run={run} />;
+    // The sheet draws your DECK as cards now (see the note in CardMap), so it needs the same pet art the shop
+    // and the ring use — which is also what carries each pet's LEVEL onto the face. Only the deck's pets are
+    // asked for, so a fifteen-card deck costs the same two round trips a three-card shelf does.
+    if (!run.at && !run.done) return <CardMap run={run} art={await petArtFor(buyer.id, run.deck || [])} />;
 
     // ── THE FIRE AND THE CHEST ARE ROOMS TOO ─────────────────────────────────────────────────────────────
     // Both used to resolve inside the enter handler and clear `at` on the way through, so the map was the
@@ -60,7 +63,7 @@ export default async function CardsPage({ searchParams }) {
     if (run.at?.kind === "rest" || run.at?.kind === "treasure") {
         // The fire draws your DECK now (it can sharpen a card), so it needs the same pet art the shop and the
         // ring use. A chest needs none of it and pays for none of it.
-        const art = run.at.kind === "rest" ? await petArtFor(run.deck || []) : {};
+        const art = run.at.kind === "rest" ? await petArtFor(buyer.id, run.deck || []) : {};
         return <CardRoom run={run} art={art} />;
     }
 
@@ -70,7 +73,7 @@ export default async function CardsPage({ searchParams }) {
     // window, the rarity that colours the banner and the pet's colour for the stock. Fetched for the three
     // cards on the shelf and nothing else (petArtFor), because a shelf is not a fight.
     if (run.at?.kind === "merchant") {
-        const art = await petArtFor((run.shop?.stock || []).filter((s) => s.kind === "card").map((s) => s.ref)
+        const art = await petArtFor(buyer.id, (run.shop?.stock || []).filter((s) => s.kind === "card").map((s) => s.ref)
             .concat(run.deck || []));
         return <CardShop run={run} art={art} />;
     }

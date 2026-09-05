@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
+import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { PERKS, POTIONS, RUN_LENGTH, cardById } from "@/lib/marketplace/cards-kit.js";
 
@@ -69,11 +70,23 @@ const Ink = ({ kind, className }) => (MARK[kind]
     ? <img className={className} src={MARK[kind]} alt="" draggable="false" />
     : <b className={className}>?</b>);
 
-export default function CardMap({ run }) {
+export default function CardMap({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [peek, setPeek] = useState(null);
     const [deckOpen, setDeckOpen] = useState(false);
+    // ── WHAT YOU ARE CARRYING, ON A SCREEN YOU CAN OPEN ──────────────────────────────────────────────
+    // Luke: "seeing perks from the map like Slay the Spire."
+    //
+    // Theirs is a row of relics you can point at and read. Ours was a row of 22px sprites whose only
+    // explanation was `onPointerEnter` — a HOVER, on a game played on a phone. There is no hover on a
+    // touchscreen: the strip was six unlabelled pictures, and the thing the perk actually does (the whole
+    // reason the strip exists) could not be read at all on the device it is played on.
+    //
+    // So the strip is pressable now and it opens the list: every perk and every potion, sprite, name and
+    // rule, in one panel. The hover peek stays for a mouse, because a tooltip is faster than a panel when
+    // you have one — but it is no longer the only way in.
+    const [carry, setCarry] = useState(null);
     // ⚠️ NULL UNTIL MOUNTED. Seeding this with Date.now() means the server renders one number and the client
     // renders a different one a moment later, and React throws the whole tree away and re-renders it —
     // "server rendered text didn't match the client". A clock is the classic case: there is no value the
@@ -149,15 +162,18 @@ export default function CardMap({ run }) {
                 <b className="cm-em">{run.embers || 0}</b>
                 {/* EMPTY SLOTS ARE NOT DRAWN. Luke: "if it's an empty potion slot, just don't show anything." */}
                 {potions.map((p, i) => (
-                    <span
+                    <button
                         key={`${p.id}${i}`}
+                        type="button"
                         className="cm-potion"
+                        aria-label={`${p.name} — ${p.text}`}
                         onPointerEnter={() => setPeek(`${p.name} — ${p.text}`)}
                         onPointerLeave={() => setPeek(null)}
+                        onClick={() => setCarry(p.id)}
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cm-ui" src={'/images/cards/potions/' + p.id + '.png'} alt={p.name} />
-                    </span>
+                    </button>
                 ))}
                 <span className="cm-gap" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -179,18 +195,28 @@ export default function CardMap({ run }) {
             <div className="cm-perkbar">
                 {perks.map((id) => {
                     const perk = PERKS[id];
+                    // ⚠️ A PERK THE RULES NO LONGER KNOW MUST NOT TAKE THE SHEET WITH IT. Runs outlive edits
+                    // to cards-kit — this one has been open seven hours — and `perk.name` on an id that was
+                    // renamed is a crash on the map, which is the screen you cannot get out of a run without.
+                    if (!perk) return null;
                     return (
-                        <span
+                        <button
                             key={id}
+                            type="button"
                             className="cm-perk"
+                            aria-label={`${perk.name} — ${perk.text}`}
                             onPointerEnter={() => setPeek(`${perk.name} — ${perk.text}`)}
                             onPointerLeave={() => setPeek(null)}
+                            onClick={() => setCarry(id)}
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={'/images/cards/items/' + id + '.png'} alt={perk.name} />
-                        </span>
+                        </button>
                     );
                 })}
+                {/* THE STRIP SAYS WHAT IT IS FOR when there is nothing in it yet. An empty dark bar is
+                    furniture; an empty dark bar with a word in it is a slot waiting to be filled. */}
+                {perks.length ? null : <span className="cm-perkbar-empty">No trinkets yet</span>}
             </div>
 
             <div className="cm-sheet" ref={sheet}>
@@ -298,19 +324,71 @@ export default function CardMap({ run }) {
 
             {peek ? <span className="cm-peek">{peek}</span> : null}
 
+            {/* ── YOUR DECK, AS CARDS ─────────────────────────────────────────────────────────────────
+                It was a list of names with the rules text in italics beside them — which is the shop's old
+                fault exactly ("it doesn't Slay the Spire"): the thing you are deciding about never appears.
+                A deck you cannot SEE is a deck you cannot plan with, and now that the picture on a card is
+                the pet at the level you have it at, the list was also the one screen hiding the collection
+                it is made of. Same CardFace the fight and the shelf draw; only the box is this screen's. */}
             {deckOpen ? (
                 <div className="cm-over" onClick={() => setDeckOpen(false)} role="presentation">
-                    <div className="cm-deck" onClick={(e) => e.stopPropagation()} role="presentation">
+                    <div className="cm-deck" onClick={(e) => e.stopPropagation()} role="presentation"
+                        style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
                         <h2>Your deck — {(run.deck || []).length} cards</h2>
                         <div className="cm-deck-list">
                             {deck.map(({ card, n }) => (
-                                <span key={card.id} className="cm-deck-row">
-                                    <b>{n}x</b> {card.name}
-                                    <i>{String(card.text).replace(/\{(\w+)\}/g, (_, f) => card[f])}</i>
+                                <span key={card.id} className="cm-deck-card">
+                                    <span className="cf-card"><CardFace card={card} art={art[card.pet]} /></span>
+                                    {/* A count, not four copies of the same picture: a starter deck is five
+                                        Bites and a shelf of identical cards reads as a rendering bug. */}
+                                    {n > 1 ? <b className="cm-deck-n">×{n}</b> : null}
                                 </span>
                             ))}
                         </div>
                         <button type="button" className="cm-close" onClick={() => setDeckOpen(false)}>Close</button>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* ── WHAT YOU ARE CARRYING ───────────────────────────────────────────────────────────────
+                Every trinket and every potion, with the rule written out. Opened by pressing any of them —
+                see the note by `carry` — and the one you pressed is lit, so a press on the third relic
+                answers the question you asked rather than handing you a list to search. */}
+            {carry ? (
+                <div className="cm-over" onClick={() => setCarry(null)} role="presentation">
+                    <div className="cm-carry" onClick={(e) => e.stopPropagation()} role="presentation">
+                        <h2>What you&rsquo;re carrying</h2>
+                        {perks.length || potions.length ? null : (
+                            <p className="cm-carry-none">Nothing yet. Trinkets come out of chests and elites.</p>
+                        )}
+                        {perks.map((id) => {
+                            const perk = PERKS[id];
+                            if (!perk) return null;
+                            return (
+                                <span key={id} className={`cm-carry-row${carry === id ? " is-lit" : ""}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={'/images/cards/items/' + id + '.png'} alt="" />
+                                    <span>
+                                        <b>{perk.name}</b>
+                                        <i>{perk.text}</i>
+                                    </span>
+                                </span>
+                            );
+                        })}
+                        {potions.map((p, i) => (
+                            <span key={`${p.id}${i}`} className={`cm-carry-row${carry === p.id ? " is-lit" : ""}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={'/images/cards/potions/' + p.id + '.png'} alt="" />
+                                <span>
+                                    <b>{p.name} <em>potion</em></b>
+                                    <i>{p.text}</i>
+                                </span>
+                            </span>
+                        ))}
+                        {/* WHERE A POTION IS DRUNK IS NOT HERE, and saying so is cheaper than a dead button:
+                            they are used in a fight, on the belt above the hand. */}
+                        {potions.length ? <p className="cm-carry-note">Potions are drunk in a fight.</p> : null}
+                        <button type="button" className="cm-close" onClick={() => setCarry(null)}>Close</button>
                     </div>
                 </div>
             ) : null}
@@ -410,6 +488,13 @@ export default function CardMap({ run }) {
                     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
                 .cm-legend-title { justify-self: center; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
                 .cm-leg { display: flex; align-items: center; gap: 7px; }
+                /* A PERK IS A BUTTON NOW, so it has to stop looking like a browser one: no plate, no border,
+                   just the sprite, with a press that reads. */
+                .cm-perk { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; }
+                .cm-perk:active { transform: translateY(1px); }
+                .cm-potion { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; }
+                .cm-potion:active { transform: translateY(1px); }
+                .cm-perkbar-empty { font-size: 11px; letter-spacing: 0.06em; color: #6d7583; }
                 /* The grid box is kept for the fallback <b>: width and height do NOTHING to inline text, so
                    any kind that ever loses its drawing would otherwise sit narrower than the rest and drag
                    its label left of every other one. Every kind has a mark today. */
@@ -440,10 +525,41 @@ export default function CardMap({ run }) {
                     display: grid; gap: 10px; background: rgba(12,15,21,0.96); border-radius: 12px;
                     border: 1px solid rgba(201,162,83,0.35); }
                 .cm-deck h2 { margin: 0; font-size: 17px; color: #f3e7c8; text-align: center; }
-                .cm-deck-list { display: grid; gap: 5px; }
-                .cm-deck-row { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; color: #dbe2ea; }
-                .cm-deck-row b { color: #ffd08a; }
-                .cm-deck-row i { font-style: normal; color: #8e96a3; }
+                /* ── THE DECK, LAID OUT AS CARDS ── the same box the campfire's picker uses, because a card
+                   on this screen and the same card at the fire have to be one object. */
+                .cm-deck-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+                .cm-deck-card { position: relative; }
+                .cm-deck-n { position: absolute; right: -3px; bottom: 4px; z-index: 5;
+                    min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
+                    display: grid; place-items: center; background: rgba(10,12,16,0.92);
+                    border: 1px solid rgba(201,162,83,0.6); color: #ffd08a; font-size: 11px; font-weight: 800; }
+                .cm .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                    display: flex; flex-direction: column; align-items: center;
+                    background: none; border: 0; border-radius: 9px;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
+                .cm .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                    pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
+                    background-repeat: no-repeat; background-size: 100% 100%; }
+
+                /* ── THE RELIC LIST ── Spire's, in our furniture: a sprite, a name, and the rule in full. */
+                .cm-carry { width: min(420px, 100%); max-height: 78dvh; overflow-y: auto; padding: 16px;
+                    display: grid; gap: 9px; background: rgba(12,15,21,0.96); border-radius: 12px;
+                    border: 1px solid rgba(201,162,83,0.35); }
+                .cm-carry h2 { margin: 0; font-size: 17px; color: #f3e7c8; text-align: center; }
+                .cm-carry-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px;
+                    border-radius: 9px; background: rgba(255,255,255,0.03); }
+                /* THE ONE YOU PRESSED IS LIT. Opening a list of six because you asked about one of them and
+                   then having to find it again is the panel wasting the tap that opened it. */
+                .cm-carry-row.is-lit { background: rgba(201,162,83,0.16);
+                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.5); }
+                .cm-carry-row img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 34px;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+                .cm-carry-row b { display: block; font-size: 13.5px; color: #ffd9a6; }
+                .cm-carry-row b em { font-style: normal; font-size: 10.5px; letter-spacing: 0.08em;
+                    text-transform: uppercase; color: #9d8a72; }
+                .cm-carry-row i { display: block; margin-top: 1px; font-style: normal; font-size: 12px;
+                    line-height: 1.35; color: #c6cdd6; }
+                .cm-carry-none, .cm-carry-note { margin: 0; text-align: center; font-size: 12px; color: #8e96a3; }
                 .cm-close { justify-self: center; padding: 8px 20px; border-radius: 999px; cursor: pointer;
                     border: 2px solid #c9a253; background: rgba(18,22,30,0.92); color: #f2e2bd;
                     font-family: inherit; font-weight: 700; }
