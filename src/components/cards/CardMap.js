@@ -288,7 +288,11 @@ export default function CardMap({ run }) {
                 ))}
             </aside>
 
-            <button type="button" className="cm-return" onClick={() => router.push("/marketplace/town")}>
+            {/* ⚠️ RETURN MEANS "GET UP FROM THE TABLE", NOT "LEAVE THE GAME". It used to push straight to the
+                town, which is a whole feature deep: Luke, lost on the sheet, "you wanna go to return, but then
+                it takes you all the way back out of the entire game." It lands in the card game's own front
+                room now (see CardTable), and the ribbon THERE is the one that puts you in the town. */}
+            <button type="button" className="cm-return" onClick={() => router.push("/marketplace/cards/table")}>
                 Return
             </button>
 

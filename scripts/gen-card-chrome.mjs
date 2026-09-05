@@ -403,6 +403,29 @@ const PIECES = {
             + "coins tumbling over its front edge. Dark banded oak, blackened iron straps, brass rivets, short "
             + "clawed feet.",
     },
+    // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────
+    // Luke: "it's weird when you're looking at the map that you kinda get lost, and you wanna go to return,
+    // but then it takes you all the way back out of the entire game. I think it should take you to like a
+    // screen like we do for our other features." So the card game gets a front room, and the fiction already
+    // exists — the Tavern's card sharp says "sit down, eight rooms, one deck". This is that table.
+    "table-room": {
+        size: "1536x1024", store: { w: 900, h: 600 }, tint: false, opaque: true, framing: "scene",
+        extra: "DIM and LOW CONTRAST — the whole image sits in the dark half of the value range, lit by one "
+            + "hanging lamp over the middle, with the corners falling away into near-black. Nothing bright, no "
+            + "strong focal point, no character, no cards and nothing in the foreground: only the empty back "
+            + "room behind everything else. Softly out of focus.",
+        subject: "The back room of an old tavern: rough plaster and dark timber walls, a shuttered window, a "
+            + "stone floor, a low beamed ceiling with a single iron lamp hanging on a chain over the centre of "
+            + "the room, and the suggestion of empty chairs against the wall.",
+    },
+    "table-sharp": {
+        fit: "inside", size: "1024x1536", store: { w: 460, h: 690 }, tint: false,
+        subject: "A lean anthropomorphic RACCOON card sharp seen from the front, seated behind a table with "
+            + "his sleeves rolled and his paws resting on the cloth, one card held loosely between two claws. "
+            + "A battered waistcoat over a collarless shirt, a crooked grin, a tilted flat cap, a gold ring in "
+            + "one ear. Warm lamplight on his face and shoulders from above, cool shadow behind him. He is "
+            + "looking straight at the viewer, amused, as though waiting for you to sit.",
+    },
     // A price has to sit ON something or it is a number floating over a painting. Small enough that three of
     // them in a row do not become the loudest thing on the shelf.
     "shop-tag": {

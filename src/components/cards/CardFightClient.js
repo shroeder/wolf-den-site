@@ -1053,7 +1053,10 @@ export default function CardFightClient({ fixture, run = null }) {
                                             : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
                             </p>
                             <div className="cf-result-btns">
-                                <button type="button" className="cf-pill" onClick={() => router.push("/marketplace/town")}>Leave</button>
+                                {/* Leaves to the table, not to the town — same as the map's ribbon. A run that
+                                    just ended is exactly when you want the sharp in front of you asking for
+                                    another, and the ribbon there is still one press from the street. */}
+                                <button type="button" className="cf-pill" onClick={() => router.push("/marketplace/cards/table")}>Leave</button>
                                 {runState ? (
                                     <button type="button" className="cf-pill is-primary" disabled={busy} onClick={startNewRun}>
                                         {runState.done ? "New run" : "Give up the run"}

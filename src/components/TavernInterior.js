@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import SceneMusic from "@/components/SceneMusic";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
+import { RUN_LENGTH } from "@/lib/marketplace/cards-kit.js";
 import CoinCta from "@/components/CoinCta";
 import Coin from "@/components/Coin";
 
@@ -61,9 +62,12 @@ const NPCS = [
 // 41% covers the second table with his own — which is what "he is AT that table" looks like — and keeps him
 // clear of the barkeep (16%) and the gambler (84%).
 const SHARP = { key: "cards", art: "cardsharp", emoji: "🃏", label: "Stranger", x: 41 };
+// ⚠️ THE NUMBER IS IMPORTED, NEVER TYPED. He said "eight rooms" for a month after the act was re-priced to
+// fifteen, which nobody caught because the map is the only place the real length is written down — and the
+// card game's own front room now prints "Stop 2 of 15" under the same character's chin.
 const SHARP_LINES = [
-    "*shuffles without looking at his hands* Sit. One run, eight rooms. You in?",
-    "*taps the deck twice* Nobody's finished the eighth room yet. Could be you.",
+    `*shuffles without looking at his hands* Sit. One run, ${RUN_LENGTH} rooms. You in?`,
+    `*taps the deck twice* Nobody's finished the ${RUN_LENGTH}th room yet. Could be you.`,
     "*doesn't look up* Cards are cheaper than dice, friend. Cost you nothing but blood.",
     "*fans the deck face-down* Pick a road. They all end at the same door.",
     "*smiles with half his mouth* Health carries between rooms. So do mistakes.",
@@ -398,7 +402,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, ow
                         <Link href="/marketplace/cards" className="tv-order tv-order-cards">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/cards/chrome/card-back.png" alt="" draggable={false} />
-                            <span className="tv-order-lbl">Sit down<small>eight rooms, one deck</small></span>
+                            <span className="tv-order-lbl">Sit down<small>{RUN_LENGTH} rooms, one deck</small></span>
                         </Link>
                         <button type="button" className="tv-order tv-order-mini" onClick={() => setSharp(null)} aria-label="Step away">✕</button>
                     </div>
