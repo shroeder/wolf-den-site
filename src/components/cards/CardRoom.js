@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
-import { CARD_FONT } from "@/components/cards/CardFace";
-import { POTIONS } from "@/lib/marketplace/cards-kit.js";
+import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
+import { POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -33,8 +33,10 @@ const ROOM = {
     rest: {
         who: "The Campfire",
         art: "/images/cards/chrome/room-fire.png",
-        say: "Nobody's tending it. It'll burn a while yet.",
+        say: "Sit a while, or put a card in the coals. Not both.",
         done: "Warmer. The dark can wait a minute longer.",
+        // A fire that says the same thing whichever choice you made is a fire that did not notice.
+        doneSmith: "Beaten thin and folded back. It'll bite harder now.",
         verb: "Sit and rest",
     },
     treasure: {
@@ -47,10 +49,13 @@ const ROOM = {
     },
 };
 
-export default function CardRoom({ run }) {
+export default function CardRoom({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState(null);
+    // The fire asks a question now (see the note by the buttons) and the answer is a card, so the
+    // picker is the same shape the brazier in the shop already uses.
+    const [picking, setPicking] = useState(false);
 
     const at = run.at || {};
     const room = ROOM[at.kind] || ROOM.rest;
@@ -59,15 +64,17 @@ export default function CardRoom({ run }) {
 
     const heal = Math.ceil((run.hpMax || 1) * 0.3);
     const whole = run.hp >= run.hpMax;
+    const deck = run.deck || [];
+    const sharpenable = deck.filter((id) => canUpgrade(id));
     const loot = at.opened || null;
     const gotPotion = loot?.potion ? POTIONS[loot.potion] : null;
 
-    const post = useCallback(async (action) => {
+    const post = useCallback(async (action, extra = {}) => {
         if (busy) return;
         setBusy(true);
         setSaid(null);
         const r = await fetch("/api/marketplace/cards/run", {
-            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }),
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }),
         }).then((x) => x.json()).catch(() => null);
         setBusy(false);
         // ⚠️ "YOU ALREADY DID THAT" IS NOT AN ERROR TO SHOW. The button disappears once the room is resolved,
@@ -79,6 +86,7 @@ export default function CardRoom({ run }) {
             setSaid("It doesn't budge.");
             return;
         }
+        setPicking(false);
         router.refresh();
     }, [busy, router]);
 
@@ -114,7 +122,7 @@ export default function CardRoom({ run }) {
                     alt=""
                 />
                 <p className={`cr-say${done ? " is-done" : ""}`} role="status">
-                    {said || (done ? room.done : room.say)}
+                    {said || (done ? ((isFire && at.smithed && room.doneSmith) || room.done) : room.say)}
                 </p>
 
                 {/* ── WHAT IT GAVE YOU ── written out, in the room, before you leave it. The whole complaint
@@ -122,7 +130,9 @@ export default function CardRoom({ run }) {
                     not a reward, it is an accounting entry. */}
                 {done ? (
                     <div className="cr-got">
-                        {isFire ? (
+                        {isFire && at.smithed ? (
+                            <span className="cr-gain">{at.smithed} came out sharper.</span>
+                        ) : isFire ? (
                             <span className="cr-gain">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src="/images/cards/chrome/ui-heart.png" alt="" />
@@ -148,19 +158,64 @@ export default function CardRoom({ run }) {
                     </div>
                 ) : null}
 
+                {/* ── ONE OR THE OTHER ──────────────────────────────────────────
+                    Their campfire is Rest or Smith and you may only do one, which is the whole reason a fire is
+                    a decision rather than a free stop: the health you need now against a deck that is
+                    permanently better. Ours only ever healed, and the sim is blunt about what that cost — a
+                    deck that GROWS and never improves was putting out 13 damage a turn at row 8 against 10.7
+                    at row 1, which is why the act was unfinishable at any monster size. */}
                 {!done ? (
-                    <button
-                        type="button"
-                        className="cr-do"
-                        disabled={busy || (isFire && whole)}
-                        onClick={() => post(isFire ? "rest" : "open")}
-                    >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="cr-plate" src="/images/cards/chrome/button-plate.png" alt="" />
-                        <span className="cr-do-label">
-                            {busy ? "…" : isFire ? (whole ? "Nothing to mend" : `${room.verb} — heal ${heal}`) : room.verb}
-                        </span>
-                    </button>
+                    <div className="cr-choices">
+                        <button
+                            type="button"
+                            className="cr-do"
+                            disabled={busy || (isFire && whole)}
+                            onClick={() => post(isFire ? "rest" : "open")}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="cr-plate" src="/images/cards/chrome/button-plate.png" alt="" />
+                            <span className="cr-do-label">
+                                {busy ? "…" : isFire ? (whole ? "Nothing to mend" : `${room.verb} — heal ${heal}`) : room.verb}
+                            </span>
+                        </button>
+                        {isFire ? (
+                            <button
+                                type="button"
+                                className="cr-do"
+                                disabled={busy || !sharpenable.length}
+                                onClick={() => { setSaid(null); setPicking((v) => !v); }}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="cr-plate" src="/images/cards/chrome/button-plate.png" alt="" />
+                                <span className="cr-do-label">
+                                    {picking ? "Never mind" : sharpenable.length ? "Sharpen a card" : "Nothing left to sharpen"}
+                                </span>
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                {/* Real cards, for the same reason the burn picker draws them: choosing which copy of Bite
+                    becomes the good one off a list of names is choosing blind. */}
+                {picking && !done ? (
+                    <div className="cr-pick" role="dialog" aria-label="Choose a card to sharpen">
+                        <p className="cr-pick-head">Hold one in the fire.</p>
+                        <div className="cr-pick-deck">
+                            {deck.map((id, i) => {
+                                const c = cardById(id);
+                                if (!c) return null;
+                                const can = canUpgrade(id);
+                                return (
+                                    <button key={`${id}-${i}`} type="button"
+                                        className={`cr-card${can ? "" : " is-done"}`} disabled={busy || !can}
+                                        aria-label={can ? `Sharpen ${c.name}` : `${c.name}, already sharpened`}
+                                        onClick={() => post("smith", { index: i })}>
+                                        <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 ) : null}
             </div>
 
@@ -229,6 +284,26 @@ export default function CardRoom({ run }) {
                 .cr-do:disabled .cr-plate { filter: grayscale(0.7) brightness(0.62); }
                 .cr-do:disabled .cr-do-label { color: #b0806f; }
 
+                .cr-choices { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+                /* ── WHICH CARD GOES IN THE COALS ── */
+                .cr-pick { width: 100%; margin-top: 8px; padding: 10px; border-radius: 10px;
+                    background: rgba(8,9,12,0.86); box-shadow: inset 0 0 0 1px rgba(255,180,94,0.18); }
+                .cr-pick-head { margin: 0 0 8px; text-align: center; font-size: 13px; color: #ffcf9a; }
+                .cr-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+                    max-height: 42vh; overflow-y: auto; }
+                .cr-card { padding: 0; border: 0; background: none; cursor: pointer; }
+                .cr-card:disabled { cursor: default; }
+                /* A copy that has already been to the fire is still SHOWN — a deck with its upgrades hidden is
+                   a deck you cannot plan with — it simply cannot be chosen again. */
+                .cr-card.is-done { opacity: 0.45; filter: grayscale(0.55); }
+                .cr .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                    display: flex; flex-direction: column; align-items: center;
+                    background: none; border: 0; border-radius: 9px;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
+                .cr .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                    pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
+                    background-repeat: no-repeat; background-size: 100% 100%; }
+
                 .cr-foot { width: min(680px, 100%); display: flex; padding-bottom: 4px; }
                 .cr-leave { width: 132px; height: 46px; padding: 0 0 3px 8px; border: 0;
                     background: transparent url(/images/cards/chrome/return-ribbon.png) center/100% 100% no-repeat;
@@ -239,6 +314,17 @@ export default function CardRoom({ run }) {
                 @media (min-width: 760px) {
                     .cr-art { width: min(360px, 40vw); }
                     .cr-say { font-size: 14px; max-width: 420px; }
+                }
+                /* ⚠️ BOTH ANSWERS HAVE TO BE ON THE SCREEN. A phone leaves 441px once the browser's chrome is
+                   off it, and a 300px fire plus a line of flavour pushed "Sharpen a card" under the fold — so
+                   the half of the campfire that is new was invisible unless you thought to scroll. Exactly the
+                   trap the shop's Move on ribbon sprang. The fire is the room, not the decision. */
+                @media (max-height: 560px) {
+                    .cr-art { width: min(190px, 46vw); }
+                    .cr-say { font-size: 12px; }
+                    .cr-stage { gap: 6px; padding-top: 4px; }
+                    .cr-do { height: 44px; width: 190px; }
+                    .cr-do-label { font-size: 13.5px; }
                 }
             `}</style>
         </div>

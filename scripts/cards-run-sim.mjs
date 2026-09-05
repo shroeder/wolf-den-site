@@ -24,7 +24,22 @@ import { buildMap, reachable, resolveUnknown } from "../src/lib/marketplace/card
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const RUNS = Number(arg("--runs", 1200));
 
-const scriptOf = (name) => m.FOE_SCRIPTS[name] || m.FOE_SCRIPTS.cur;
+// ── TWO DIALS, FOR FINDING THE NUMBER RATHER THAN ARGUING ABOUT IT ───────────────────────────────────────────
+// --dmgx and --hpx scale every foe's damage and health at RUNTIME, so a hundred candidate balances can be
+// measured before one of them is written into the tables. Nothing here changes the game; it changes the copy
+// of the game this simulator is playing.
+const DMGX = Number(arg("--dmgx", 1));
+const POTION_DROP = Number(arg("--potions", 0));
+const HPX = Number(arg("--hpx", 1));
+const scriptOf = (name) => {
+    const src = m.FOE_SCRIPTS[name] || m.FOE_SCRIPTS.cur;
+    if (DMGX === 1) return src;
+    const moves = {};
+    for (const [k, mv] of Object.entries(src.moves || {})) {
+        moves[k] = { ...mv, ...(mv.damage ? { damage: Math.max(1, Math.round(mv.damage * DMGX)) } : {}) };
+    }
+    return { ...src, moves };
+};
 const dmgOf = (c) => m.cardById(c.id)?.damage || 0;
 const blockOf = (c) => m.cardById(c.id)?.block || 0;
 
@@ -43,7 +58,11 @@ function fight(seed, party, hp, deck, perks = [], hpMax = m.HERO_HP) {
     let guard = 0;
     while (!st.over && guard < 600) {
         guard += 1;
-        const incoming = m.intentDamage(st);
+        // ⚠️ THE WHOLE PARTY, NOT THE FIRST ONE. `intentDamage(state, i)` is ONE creature's swing and defaults
+        // to index 0; `incomingTotal` is the room. Blocking against a third of what is coming and eating the
+        // rest is exactly how this simulator concluded the act was unsurvivable — and it is the same mistake
+        // a player makes when they read the board wrong, which is precisely why the number in cards-kit exists.
+        const incoming = m.incomingTotal(st);
         // ── KILL IT IF IT CAN BE KILLED ──────────────────────────────────────────────────────────────────
         // The best play in this game is almost always removing a body: it takes a whole creature's damage off
         // every remaining turn at once. A policy that does not look for lethal is measuring a worse player
@@ -56,17 +75,25 @@ function fight(seed, party, hp, deck, perks = [], hpMax = m.HERO_HP) {
             st = m.playCard(st, lethal.uid, t.i).state;
             continue;
         }
-        // Cover what is coming whenever it is worth a card, not only when it is large.
-        if (incoming > st.hero.block) {
+        // ── COVER THE WHOLE SWING, NOT A THIRD OF IT ─────────────────────────────────────────────────────
+        // The first cut played ONE block card against whatever was coming and then went back to attacking, so
+        // against a twenty-point turn it took fifteen on the chin every time and the act read as unsurvivable.
+        // Nobody plays like that. A competent hand keeps laying block until the incoming is covered or the
+        // cards run out, and only then spends what is left on damage — which is the single biggest difference
+        // between a player who finishes an act and one who does not.
+        if (incoming >= 5 && st.hero.block < incoming) {
             const blocker = playable.find((c) => blockOf(c));
-            if (blocker && incoming >= 5) { st = m.playCard(st, blocker.uid).state; continue; }
+            if (blocker) { st = m.playCard(st, blocker.uid).state; continue; }
         }
         const hitter = st.hand.filter((c) => dmgOf(c) && m.canPlay(st, c.uid)).sort((a, b) => dmgOf(b) - dmgOf(a))[0];
         if (hitter) {
-            // Whatever is closest to dying: one less body is one less turn of being hit, which is the single
-            // biggest lever a player has and the reason a fight's length is set by its TOTAL health.
-            const alive = st.foes.map((f, i) => ({ f, i })).filter((x) => x.f.hp > 0).sort((a, b) => a.f.hp - b.f.hp);
-            st = m.playCard(st, hitter.uid, alive[0]?.i ?? 0).state;
+            // Closest to dying, but NOT through a wall of armour if there is bare skin on the board: throwing a
+            // six-damage card into nine points of block is the commonest way a real hand wastes a turn, and a
+            // policy that does it is measuring the game badly rather than measuring a bad player.
+            const soft = alive.filter((x) => (x.f.block || 0) < dmgOf(hitter));
+            const pickFrom = soft.length ? soft : alive;
+            const t = pickFrom.slice().sort((a, b) => a.f.hp - b.f.hp)[0];
+            st = m.playCard(st, hitter.uid, t?.i ?? 0).state;
             continue;
         }
         const other = st.hand.find((c) => m.canPlay(st, c.uid));
@@ -109,7 +136,18 @@ function runOnce(seed) {
             || open[Math.floor(next() * open.length)];
         at = pick;
         const kind = pick.kind === "unknown" ? resolveUnknown(seed, pick.row) : pick.kind;
-        if (kind === "rest") { hp = Math.min(hpMax, hp + Math.ceil(hpMax * 0.3)); continue; }
+        if (kind === "rest") {
+            // ── REST OR SMITH, AND A PLAYER PICKS THE ONE THEY NEED ──────────────────────────────────
+            // Theirs is one or the other and so is ours. Hurt enough that the next room could end the run?
+            // Sit down. Otherwise put the biggest card you own in the coals, because a deck that improves is
+            // the only thing that keeps up with an act that gets harder.
+            const hurt = hp / hpMax < 0.62;
+            const best = deck.map((id, i) => ({ id, i, d: m.cardById(id)?.damage || 0 }))
+                .filter((c) => m.canUpgrade(c.id)).sort((a, b) => b.d - a.d)[0];
+            if (hurt || !best) hp = Math.min(hpMax, hp + Math.ceil(hpMax * 0.3));
+            else deck = deck.map((id, i) => (i === best.i ? m.upgradedId(id) : id));
+            continue;
+        }
         if (kind === "treasure") {
             embers += 40;
             if (next() < 0.55 && potions.length < m.POTION_SLOTS) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
@@ -132,9 +170,10 @@ function runOnce(seed) {
         const encSeed = (seed >>> 0) + (pick.row * 31 + pick.lane) * 104729;
         const enc = m.pickEncounter(encSeed, pick.row + 1, kind, recent);
         if (enc?.id) recent = [enc.id, ...recent].slice(0, 2);
-        const party = m.buildParty(enc, encSeed);
+        const party = m.buildParty(enc, encSeed)
+            .map((f) => (HPX === 1 ? f : { ...f, hp: Math.max(1, Math.round(f.hp * HPX)) }));
         // A tonic before a room you are not walking out of. Crude, and roughly what people do.
-        if (hp / hpMax < 0.4 && potions.includes("blood")) {
+        if (hp / hpMax < 0.45 && potions.includes("blood")) {
             potions = potions.filter((x) => x !== "blood");
             hp = Math.min(hpMax, hp + (m.POTIONS.blood?.heal || 12));
         }
@@ -153,6 +192,13 @@ function runOnce(seed) {
         if (st.over === "lose") return { won: false, row: pick.row + 1, hp: 0, log, deck: deck.length };
         // The starting relic pays here, exactly where the route pays it: after the win, before the reward.
         hp = Math.min(hpMax, st.hero.hp + perks.reduce((n, id) => n + (m.PERKS[id]?.healAfter || 0), 0));
+        // ── A WON FIGHT SOMETIMES HANDS YOU A BOTTLE ─────────────────────────────────────────────────
+        // Theirs drops a potion off roughly two combats in five, and three slots of them is a real second
+        // resource: the thing that gets you through the room you should not have survived. Ours came only
+        // out of chests, which is about one a run. POTION_DROP is the dial being tested here.
+        if (next() < POTION_DROP && potions.length < m.POTION_SLOTS) {
+            potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+        }
         // An elite pays a perk for the health it just cost — and Ember Heart raises the bar it is measured against.
         if (kind === "elite") {
             const open = m.PERK_IDS.filter((id) => !perks.includes(id));
@@ -165,8 +211,24 @@ function runOnce(seed) {
         } else embers += 0;
         if (kind === "boss") return { won: true, row: pick.row + 1, hp, log, deck: deck.length };
         embers += 15;
+        // ── THREE ON THE TABLE, AND YOU TAKE THE BEST ONE ───────────────────────────────────────────
+        // This took a RANDOM card of the tier, which is not what anybody does and badly understates how fast a
+        // deck grows: the reward screen offers three and the whole skill of it is picking. Scored the way a
+        // player scores at a glance — what it does, per point of energy it costs — with block worth a little
+        // less than damage because a turn spent not dying is a turn the fight got longer.
         const tier = POOL_BY_TIER[offerTier(pick.row)] || POOL_BY_TIER[0];
-        if (tier.length) deck = [...deck, tier[Math.floor(next() * tier.length)]];
+        if (tier.length) {
+            const offer = [0, 1, 2].map(() => tier[Math.floor(next() * tier.length)]);
+            const worth = (id) => {
+                const c = m.cardById(id) || {};
+                const hits = c.hits || 1;
+                const raw = (c.damage || 0) * hits * (c.all ? 1.6 : 1) + (c.block || 0) * 0.8
+                    + (c.heal || 0) * 0.7 + (c.strength || 0) * 6 + (c.draw || 0) * 4 + (c.energy || 0) * 5
+                    + (c.vulnerable || 0) * 2 + (c.weak || 0) * 2;
+                return raw / Math.max(1, c.cost || 1);
+            };
+            deck = [...deck, offer.slice().sort((a, b) => worth(b) - worth(a))[0]];
+        }
     }
     return { won: false, row: at?.row ?? 0, hp, log, deck: deck.length };
 }
@@ -176,6 +238,16 @@ const fights = runs.flatMap((r) => r.log);
 const band = (row) => (row <= 3 ? "rows 1-3 " : row <= 9 ? "rows 4-9 " : "rows 10-15");
 const avg = (xs, f) => (xs.length ? xs.reduce((n, x) => n + f(x), 0) / xs.length : 0);
 
+if (process.argv.includes("--brief")) {
+    const wonB = runs.filter((r) => r.won).length;
+    const early = fights.filter((f) => f.row <= 3 && f.kind === "fight");
+    const mid = fights.filter((f) => f.row > 3 && f.row <= 9 && f.kind === "fight");
+    console.log(`  dmgx ${DMGX.toFixed(2)}  hpx ${HPX.toFixed(2)}  |  finished ${((wonB / RUNS) * 100).toFixed(0).padStart(3)}%`
+        + `  |  died row ${avg(runs.filter((r) => !r.won), (r) => r.row).toFixed(1)}`
+        + `  |  early ${avg(early, (f) => f.turns).toFixed(1)}t ${avg(early, (f) => f.lost).toFixed(0)}hp`
+        + `  |  mid ${avg(mid, (f) => f.turns).toFixed(1)}t ${avg(mid, (f) => f.lost).toFixed(0)}hp`);
+    process.exit(0);
+}
 console.log(`\n${RUNS} runs, ${fights.length} fights. Hero ${m.HERO_HP} hp, ${m.STARTER_DECK.length}-card starter, ${m.ENERGY_PER_TURN} energy.\n`);
 console.log("                  fights   party hp   turns   hp lost   deaths   deck   dmg/turn");
 for (const key of ["rows 1-3 ", "rows 4-9 ", "rows 10-15"]) {

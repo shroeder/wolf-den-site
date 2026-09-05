@@ -125,53 +125,75 @@ export const CARDS = {
 export const POOL = {
     // ── TIER 1 ── the shape of the deck, not the ceiling of it.
     swipe: { id: "swipe", pet: "bear_cub", name: "Swipe", cost: 1, kind: "attack", target: "foe", tier: 1,
-        damage: 9, text: "Deal {damage} damage." },
+        damage: 9, text: "Deal {damage} damage.",
+        upgrade: { damage: 12 } },
     quill: { id: "quill", pet: "hedgehog", name: "Quills", cost: 1, kind: "skill", target: "self", tier: 1,
-        block: 5, strength: 1, text: "Gain {block} Block and 1 Strength." },
+        block: 5, strength: 1, text: "Gain {block} Block and 1 Strength.",
+        upgrade: { block: 8 } },
     peck: { id: "peck", pet: "raven", name: "Peck", cost: 0, kind: "attack", target: "foe", tier: 1,
-        damage: 3, text: "Deal {damage} damage." },
+        damage: 3, text: "Deal {damage} damage.",
+        upgrade: { damage: 5 } },
     scuttle: { id: "scuttle", pet: "crab", name: "Scuttle", cost: 1, kind: "skill", target: "self", tier: 1,
-        block: 8, text: "Gain {block} Block." },
+        block: 8, text: "Gain {block} Block.",
+        upgrade: { block: 11 } },
     swarm: { id: "swarm", pet: "honeybee", name: "Swarm", cost: 1, kind: "attack", target: "foe", tier: 1,
-        damage: 3, hits: 3, text: "Deal {damage} damage three times." },
+        damage: 3, hits: 3, text: "Deal {damage} damage three times.",
+        upgrade: { damage: 4 } },
     hoot: { id: "hoot", pet: "owl", name: "Hoot", cost: 1, kind: "skill", target: "self", tier: 1,
-        draw: 2, text: "Draw 2 cards." },
+        draw: 2, text: "Draw 2 cards.",
+        upgrade: { draw: 3 } },
     sting: { id: "sting", pet: "scorpion", name: "Sting", cost: 1, kind: "attack", target: "foe", tier: 1,
-        damage: 5, weak: 1, text: "Deal {damage} damage. Apply {weak} Weak." },
+        damage: 5, weak: 1, text: "Deal {damage} damage. Apply {weak} Weak.",
+        upgrade: { damage: 7, weak: 2 } },
     shell: { id: "shell", pet: "turtle", name: "Shell Up", cost: 2, kind: "skill", target: "self", tier: 1,
-        block: 14, text: "Gain {block} Block." },
+        block: 14, text: "Gain {block} Block.",
+        upgrade: { block: 19 } },
 
     // ── TIER 2 ── the cards a deck is actually built around.
     stampede: { id: "stampede", pet: "kangaroo", name: "Stampede", cost: 2, kind: "attack", target: "foe", tier: 2,
-        damage: 7, all: true, text: "Deal {damage} damage to ALL enemies." },
+        damage: 7, all: true, text: "Deal {damage} damage to ALL enemies.",
+        upgrade: { damage: 10 } },
     screech: { id: "screech", pet: "bat", name: "Screech", cost: 1, kind: "skill", target: "foe", tier: 2,
-        weak: 2, all: true, text: "Apply {weak} Weak to ALL enemies." },
+        weak: 2, all: true, text: "Apply {weak} Weak to ALL enemies.",
+        upgrade: { weak: 3 } },
     coils: { id: "coils", pet: "serpent", name: "Coils", cost: 1, kind: "attack", target: "foe", tier: 2,
-        damage: 6, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable." },
+        damage: 6, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable.",
+        upgrade: { damage: 9, vulnerable: 3 } },
     rally: { id: "rally", pet: "wolf_pup", name: "Rally", cost: 1, kind: "power", target: "self", tier: 2,
-        strength: 2, text: "Gain {strength} Strength." },
+        strength: 2, text: "Gain {strength} Strength.",
+        upgrade: { strength: 3 } },
     tide: { id: "tide", pet: "dolphin", name: "Tide", cost: 0, kind: "skill", target: "self", tier: 2,
-        block: 4, draw: 1, text: "Gain {block} Block. Draw 1 card." },
+        block: 4, draw: 1, text: "Gain {block} Block. Draw 1 card.",
+        upgrade: { block: 7 } },
     gorge: { id: "gorge", pet: "gorilla", name: "Gorge", cost: 2, kind: "attack", target: "foe", tier: 2,
-        damage: 18, text: "Deal {damage} damage." },
+        damage: 18, text: "Deal {damage} damage.",
+        upgrade: { damage: 24 } },
     fetch: { id: "fetch", pet: "raccoon", name: "Fetch", cost: 0, kind: "skill", target: "self", tier: 2,
-        energy: 1, draw: 1, text: "Gain 1 energy. Draw 1 card." },
+        energy: 1, draw: 1, text: "Gain 1 energy. Draw 1 card.",
+        upgrade: { draw: 2 } },
     mend: { id: "mend", pet: "panda", name: "Mend", cost: 1, kind: "skill", target: "self", tier: 2,
-        heal: 8, block: 4, text: "Heal {heal}. Gain {block} Block." },
+        heal: 8, block: 4, text: "Heal {heal}. Gain {block} Block.",
+        upgrade: { heal: 12, block: 7 } },
 
     // ── TIER 3 ── only after the elite, and they should feel like it.
     maul: { id: "maul", pet: "lion_cub", name: "Maul", cost: 2, kind: "attack", target: "foe", tier: 3,
-        damage: 8, hits: 3, text: "Deal {damage} damage three times." },
+        damage: 8, hits: 3, text: "Deal {damage} damage three times.",
+        upgrade: { damage: 11 } },
     firebreath: { id: "firebreath", pet: "dragon_whelp", name: "Firebreath", cost: 2, kind: "attack", target: "foe", tier: 3,
-        damage: 11, all: true, vulnerable: 1, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable." },
+        damage: 11, all: true, vulnerable: 1, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable.",
+        upgrade: { damage: 15 } },
     inkcloud: { id: "inkcloud", pet: "squid", name: "Ink Cloud", cost: 1, kind: "skill", target: "self", tier: 3,
-        block: 10, draw: 2, text: "Gain {block} Block. Draw 2 cards." },
+        block: 10, draw: 2, text: "Gain {block} Block. Draw 2 cards.",
+        upgrade: { block: 14 } },
     crush: { id: "crush", pet: "kraken", name: "Crush", cost: 3, kind: "attack", target: "foe", tier: 3,
-        damage: 32, text: "Deal {damage} damage." },
+        damage: 32, text: "Deal {damage} damage.",
+        upgrade: { damage: 42 } },
     ascend: { id: "ascend", pet: "griffin", name: "Ascend", cost: 1, kind: "power", target: "self", tier: 3,
-        strength: 3, text: "Gain {strength} Strength." },
+        strength: 3, text: "Gain {strength} Strength.",
+        upgrade: { strength: 4 } },
     phoenixfire: { id: "phoenixfire", pet: "radiant_phoenix", name: "Phoenix Fire", cost: 2, kind: "skill", target: "self", tier: 3,
-        heal: 14, strength: 2, text: "Heal {heal}. Gain {strength} Strength." },
+        heal: 14, strength: 2, text: "Heal {heal}. Gain {strength} Strength.",
+        upgrade: { heal: 18, strength: 3 } },
 };
 
 // The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
@@ -408,9 +430,21 @@ export const FOE_SCRIPTS = {
     },
     bruiser: {
         // Always braces first, so the shape of the fight is legible from turn one: it is winding up.
+        //
+        // ⚠️ A WIND-UP, NOT A WALL. Traced through a real Warden-and-Bruiser room: the Bruiser braced for nine
+        // on turn 2, turn 5 and turn 7, and the player's Bite — six damage, the commonest card in the starter
+        // deck — landed on it for NOTHING three separate times. Two of the four middle creatures had a
+        // recurring block move and the pair of them share a room, so better than a third of everything the
+        // deck put out was being absorbed. That is what made the middle band run six and a half turns while
+        // its health said four, and no amount of shaving hit points was ever going to fix it, because the
+        // problem was never how much health they had.
+        //
+        // Their act 1 has no blocking enemy at all — block is the PLAYER's verb there — so the brace keeps its
+        // telegraph and loses most of its wall. The Warden below stays the one creature that really guards,
+        // which is the whole of its identity.
         open: "brace",
         moves: {
-            brace: { key: "brace", label: "Brace", block: 9 },
+            brace: { key: "brace", label: "Brace", block: 5 },
             swing: { key: "swing", label: "Swing", damage: 10 },
             crush: { key: "crush", label: "Crush", damage: 14 },
         },
@@ -430,7 +464,7 @@ export const FOE_SCRIPTS = {
         // it is one card rather than a whole turn.
         open: "wall",
         moves: {
-            wall: { key: "wall", label: "Wall", block: 8 },
+            wall: { key: "wall", label: "Wall", block: 7 },
             jab: { key: "jab", label: "Jab", damage: 6 },
             hew: { key: "hew", label: "Hew", damage: 9 },
         },
@@ -475,9 +509,9 @@ export const FOE_SCRIPTS = {
     mauler: {
         open: "maul",
         moves: {
-            maul: { key: "maul", label: "Maul", damage: 13 },
-            heave: { key: "heave", label: "Heave", damage: 19 },
-            snort: { key: "snort", label: "Snort", block: 10 },
+            maul: { key: "maul", label: "Maul", damage: 9 },
+            heave: { key: "heave", label: "Heave", damage: 13 },
+            snort: { key: "snort", label: "Snort", block: 6 },
         },
         after: { maul: [["maul", 40], ["heave", 45], ["snort", 15]], heave: [["snort", 40], ["maul", 60]], snort: [["heave", 55], ["maul", 45]] },
         limit: { maul: 2, heave: 1 },
@@ -487,9 +521,9 @@ export const FOE_SCRIPTS = {
     leech: {
         open: "drain",
         moves: {
-            drain: { key: "drain", label: "Drain", damage: 9, heal: 8 },
-            gorge: { key: "gorge", label: "Gorge", damage: 12 },
-            writhe: { key: "writhe", label: "Writhe", block: 8, heal: 5 },
+            drain: { key: "drain", label: "Drain", damage: 8, heal: 6 },
+            gorge: { key: "gorge", label: "Gorge", damage: 9 },
+            writhe: { key: "writhe", label: "Writhe", block: 5, heal: 5 },
         },
         after: { drain: [["drain", 35], ["gorge", 40], ["writhe", 25]], gorge: [["drain", 65], ["writhe", 35]], writhe: [["drain", 55], ["gorge", 45]] },
         limit: { drain: 2, gorge: 1 },
@@ -500,9 +534,9 @@ export const FOE_SCRIPTS = {
     champion: {
         open: "bellow",
         moves: {
-            bellow: { key: "bellow", label: "Bellow", strength: 3 },
-            guard: { key: "guard", label: "Guard", block: 11 },
-            cleave: { key: "cleave", label: "Cleave", damage: 13 },
+            bellow: { key: "bellow", label: "Bellow", strength: 2 },
+            guard: { key: "guard", label: "Guard", block: 8 },
+            cleave: { key: "cleave", label: "Cleave", damage: 11 },
         },
         after: { bellow: [["cleave", 65], ["guard", 35]], guard: [["cleave", 75], ["bellow", 25]], cleave: [["cleave", 35], ["guard", 35], ["bellow", 30]] },
         limit: { bellow: 1, cleave: 2 },
@@ -513,8 +547,8 @@ export const FOE_SCRIPTS = {
         open: "sharpen",
         moves: {
             sharpen: { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
-            hew: { key: "hew", label: "Hew", damage: 12 },
-            behead: { key: "behead", label: "BEHEAD", damage: 24 },
+            hew: { key: "hew", label: "Hew", damage: 10 },
+            behead: { key: "behead", label: "BEHEAD", damage: 20 },
         },
         after: { sharpen: [["hew", 55], ["behead", 45]], hew: [["behead", 60], ["sharpen", 40]], behead: [["sharpen", 65], ["hew", 35]] },
         limit: { behead: 1, hew: 2 },
@@ -528,10 +562,10 @@ export const FOE_SCRIPTS = {
         open: "muster",
         moves: {
             muster: { key: "muster", label: "Muster", strength: 3, block: 12 },
-            sweep: { key: "sweep", label: "Sweep", damage: 14, weak: 1 },
-            hew: { key: "hew", label: "Hew", damage: 20 },
+            sweep: { key: "sweep", label: "Sweep", damage: 10, weak: 1 },
+            hew: { key: "hew", label: "Hew", damage: 15 },
             dread: { key: "dread", label: "Dread", vulnerable: 2 },
-            ruin: { key: "ruin", label: "RUIN", damage: 28 },
+            ruin: { key: "ruin", label: "RUIN", damage: 20 },
         },
         after: {
             muster: [["sweep", 50], ["hew", 50]],
@@ -608,30 +642,30 @@ export function pickNextMove(script, played, recent, rngSeed) {
 // telegraphed wind-up behind a Brace, which is exactly the Jaw Worm's shape. Length was the whole defect.
 export const FOES = {
     // ── THE SMALL ONES — the easy pool's whole cast.
-    cur:      { id: "cur",      name: "Cur",       hp: [14, 18],   script: "cur" },
-    jackal:   { id: "jackal",   name: "Jackal",    hp: [20, 24],   script: "jackal" },
-    swarmlet: { id: "swarmlet", name: "Biter",     hp: [12, 16],   script: "swarm" },
+    cur:      { id: "cur",      name: "Cur",       hp: [11, 15],   script: "cur" },
+    jackal:   { id: "jackal",   name: "Jackal",    hp: [15, 19],   script: "jackal" },
+    swarmlet: { id: "swarmlet", name: "Biter",     hp: [9, 13],    script: "swarm" },
 
     // ── THE MIDDLE — what the hard pool is built from.
-    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [36, 42],   script: "bruiser" },
-    hexer:    { id: "hexer",    name: "Hexer",     hp: [26, 32],   script: "hexer" },
-    warden:   { id: "warden",   name: "Warden",    hp: [34, 40],   script: "warden" },
-    ramper:   { id: "ramper",   name: "Ravener",   hp: [32, 38],   script: "ramper" },
+    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [30, 36],   script: "bruiser" },
+    hexer:    { id: "hexer",    name: "Hexer",     hp: [20, 26],   script: "hexer" },
+    warden:   { id: "warden",   name: "Warden",    hp: [26, 32],   script: "warden" },
+    ramper:   { id: "ramper",   name: "Ravener",   hp: [26, 32],   script: "ramper" },
 
     // ── THE DEEP — bigger creatures, not bigger versions of the same ones.
-    mauler:   { id: "mauler",   name: "Mauler",    hp: [58, 66],   script: "mauler" },
-    leech:    { id: "leech",    name: "Bloodleech", hp: [52, 60],  script: "leech" },
+    mauler:   { id: "mauler",   name: "Mauler",    hp: [40, 46],   script: "mauler" },
+    leech:    { id: "leech",    name: "Bloodleech", hp: [36, 42],  script: "leech" },
 
     // ── ELITE-ONLY. Theirs are dedicated monsters — a Gremlin Nob is never a normal room — so an elite here
     // is never two ordinary enemies standing closer together either.
-    champion: { id: "champion", name: "Champion",  hp: [84, 92],   script: "champion" },
-    headsman: { id: "headsman", name: "Headsman",  hp: [106, 116], script: "headsman" },
+    champion: { id: "champion", name: "Champion",  hp: [74, 82],   script: "champion" },
+    headsman: { id: "headsman", name: "Headsman",  hp: [96, 106],  script: "headsman" },
     sentinel: { id: "sentinel", name: "Sentinel",  hp: [40, 46],   script: "warden" },
     gorger:   { id: "gorger",   name: "Gorger",    hp: [50, 58],   script: "leech" },
 
     // ── THE BOSS. The one number that goes UP: theirs are 140-250 and a boss is meant to be the wall at the
     // top of the act, so cutting the road to it and leaving the door the same size is the wrong trade.
-    warlord:  { id: "warlord",  name: "Warlord",   hp: [210, 235], script: "warlord" },
+    warlord:  { id: "warlord",  name: "Warlord",   hp: [150, 168], script: "warlord" },
 };
 
 /** A creature's health for this fight — its own range, rolled off the room's seed. */
@@ -669,6 +703,19 @@ export const ENCOUNTERS = [
     { id: "rising", name: "The Rising", pool: "hard", weight: 3, foes: ["ramper", "warden"] },
 
     // ── DEEP (rows 10-15) — bigger creatures, where the big cards have to have arrived.
+    //
+    // ⚠️ THIS BAND WAS AN ACT 2 WEARING ACT 1'S CLOTHES. Swept in the sim, no global cut to monster health or
+    // damage could make the run finishable: at thirty percent off EVERYTHING the opening rooms went trivial
+    // (2.9 turns, four health) and runs still only completed three times in ten, because the difficulty was
+    // never spread — it was piled at the top. Rows 10-15 were costing 38 health a fight and the elites 30,
+    // against a deck that by then has grown by five cards and sharpened maybe two.
+    //
+    // The reason is structural and it is worth writing down, because it is the thing the next act fixes: we
+    // compressed three acts of DIFFICULTY into one act of PROGRESSION. Their act 3 monsters are met by a deck
+    // of thirty cards with ten upgrades and eight relics; ours were met on floor 12 by fifteen cards and two.
+    // So the deep band is priced as the TOP OF AN ACT 1 — their hardest act 1 room is about ninety-five health
+    // across the party — and the Mauler and the Bloodleech keep their shape for act 2, where a 190-point room
+    // is exactly right and the deck arriving at it will have earned the difference.
     { id: "maulers", name: "Maulers", pool: "deep", weight: 4, foes: ["mauler", "mauler"] },
     { id: "bloodletters", name: "Bloodletters", pool: "deep", weight: 3, foes: ["leech", "leech", "hexer"] },
     { id: "the_wall", name: "The Wall", pool: "deep", weight: 3, foes: ["warden", "warden", "mauler"] },
@@ -745,7 +792,32 @@ export function pickEncounter(seed, n, kind = "fight", recent = []) {
 export const perkSum = (perks, field) => (perks || [])
     .reduce((n, id) => n + (Number(PERKS[id]?.[field]) || 0), 0);
 
-export const cardById = (id) => ALL_CARDS[id] || null;
+// ── A CARD, UPGRADED OR NOT ──────────────────────────────────────────────────────────────────────────────
+// ⚠️ THE DECK IS A LIST OF IDS AND IT HAS TO STAY ONE. A run's deck is stored as strings and read by a dozen
+// places — the shop's burn picker, the reward screen, the pet art fetch, the engine's own shuffle — so an
+// upgrade cannot be a second field hung off some of them. It is a SUFFIX: "bite" is a Bite and "bite+" is a
+// Bite that has been to the fire, which means every list, every count and every stored run keeps working and
+// an upgraded copy travels as itself.
+//
+// The numbers come off the card's own `upgrade` block, which is authored per card rather than derived — a
+// blanket "+30% to the biggest number" would upgrade Peck by one point and Crush by ten, and the whole reason
+// a Smith is a decision is that some cards are transformed by it and some are barely moved.
+export const UPGRADE_MARK = "+";
+export const isUpgraded = (id) => String(id || "").endsWith(UPGRADE_MARK);
+export const baseIdOf = (id) => (isUpgraded(id) ? String(id).slice(0, -1) : String(id || ""));
+/** Can this copy still go to the fire? Upgraded once is upgraded — theirs works the same way. */
+export const canUpgrade = (id) => !isUpgraded(id) && Boolean(ALL_CARDS[baseIdOf(id)]?.upgrade);
+export const upgradedId = (id) => (canUpgrade(id) ? `${baseIdOf(id)}${UPGRADE_MARK}` : String(id || ""));
+export const cardById = (id) => {
+    const raw = String(id || "");
+    if (!raw) return null;
+    const base = ALL_CARDS[baseIdOf(raw)];
+    if (!base) return null;
+    if (!isUpgraded(raw)) return base;
+    // The name carries the mark, because the one thing a player has to be able to see at a glance in a hand of
+    // eight is which copy of Bite is the good one.
+    return { ...base, ...(base.upgrade || {}), id: raw, name: `${base.name}${UPGRADE_MARK}`, upgraded: true };
+};
 
 // ── THE WORDS THAT MEAN SOMETHING ────────────────────────────────────────────────────────────────────────
 // Spire colours its keywords inside the card text — "Gain 5 Block", "Apply 2 Vulnerable" — and that colouring

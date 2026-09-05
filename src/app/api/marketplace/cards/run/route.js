@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardOffers, grantForRoom, loadRun, saveRun, shopStock, takePerk } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, pickEncounter, removalCost } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter, removalCost, upgradedId } from "@/lib/marketplace/cards-kit.js";
 
 // A hand is five cards. Below that a deck stops being a deck, so removal has a floor.
 const DECK_FLOOR = 5;
@@ -110,6 +110,29 @@ export async function POST(request) {
                 const before = run.hp;
                 run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
                 run.at = { ...run.at, rested: true, healed: run.hp - before };
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── THE SMITH ───────────────────────────────────────────────────────────────────────────
+            // ⚠️ ONE OR THE OTHER, AND THAT IS THE WHOLE POINT. Their campfire is Rest or Smith and you may
+            // only do one, which is what turns a fire into a decision instead of a free stop: health now, or
+            // a deck that is permanently better. Both write `rested`, so the room is spent either way.
+            //
+            // A card is upgraded ONCE. `canUpgrade` is the authority — it refuses a copy that already carries
+            // the mark and a card with no upgrade authored — so the deck can never grow a "bite++".
+            if (action === "smith") {
+                if (run.at?.kind !== "rest") return NextResponse.json({ error: "not_at_fire" }, { status: 400 });
+                if (run.at.rested) return NextResponse.json({ error: "already_rested" }, { status: 400 });
+                const at = Number(body?.index);
+                const deck = run.deck || [];
+                if (!Number.isInteger(at) || at < 0 || at >= deck.length) {
+                    return NextResponse.json({ error: "no_such_card" }, { status: 400 });
+                }
+                if (!canUpgrade(deck[at])) return NextResponse.json({ error: "already_sharp" }, { status: 400 });
+                const was = cardById(deck[at]);
+                run.deck = deck.map((id, i) => (i === at ? upgradedId(id) : id));
+                run.at = { ...run.at, rested: true, smithed: was?.name || null };
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }

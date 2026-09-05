@@ -57,7 +57,12 @@ export default async function CardsPage({ searchParams }) {
     // Both used to resolve inside the enter handler and clear `at` on the way through, so the map was the
     // only screen that ever knew they had happened — a heal and a payout with nothing to look at. See the
     // note in CardRoom. They stand you in the room now and `leave` is what puts you back on the sheet.
-    if (run.at?.kind === "rest" || run.at?.kind === "treasure") return <CardRoom run={run} />;
+    if (run.at?.kind === "rest" || run.at?.kind === "treasure") {
+        // The fire draws your DECK now (it can sharpen a card), so it needs the same pet art the shop and the
+        // ring use. A chest needs none of it and pays for none of it.
+        const art = run.at.kind === "rest" ? await petArtFor(run.deck || []) : {};
+        return <CardRoom run={run} art={art} />;
+    }
 
     // ── THE MERCHANT IS A SCREEN, NOT A FIGHT ────────────────────────────────────────────────────────────
     // Three of the five rooms stand you in a place now; only a fight and an elite open the ring.

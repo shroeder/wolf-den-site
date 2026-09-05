@@ -6,7 +6,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS,
-    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, buildParty, buildShop, encounterById, nextRand, pickEncounter, stopAt,
+    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, buildParty, buildShop, cardById, encounterById, nextRand, pickEncounter, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -223,7 +223,9 @@ export async function eligibleCards(buyerId, run) {
  * the same card in the hand must be handed the same object or they are two renderers wearing one name.
  */
 export async function petArtFor(cardIds = []) {
-    const petIds = [...new Set(cardIds.map((id) => ALL_CARDS[id]?.pet).filter(Boolean))];
+    // cardById, not ALL_CARDS: an upgraded copy travels as "bite+" and a raw table lookup misses it,
+    // which would draw the card with an empty window at the exact moment somebody is choosing it.
+    const petIds = [...new Set(cardIds.map((id) => cardById(id)?.pet).filter(Boolean))];
     if (!petIds.length) return {};
     const sprites = await db
         .query(`SELECT pet_id, url, flip FROM mkt_pet_sprite WHERE pet_id = ANY($1) AND url IS NOT NULL`, [petIds])
