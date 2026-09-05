@@ -10,7 +10,7 @@ import {
 
 import {
     DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
-    intentDamage, resolveCard, splitDamage, startFoeTurn,
+    intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     playCard, startFight,
 } from "@/lib/marketplace/cards-kit.js";
 // ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
@@ -780,7 +780,7 @@ export default function CardFightClient({ fixture, run = null }) {
                 {/* The ladder position belongs HERE, in the HUD, the way Spire keeps its floor number up top —
                     not on the reward banner, which only ever needs to say what to do. */}
                 <div className="cf-turn">
-                    {run ? `Stop ${runState?.stop || run.stop} of ${RUN_LENGTH} · ` : ""}Turn {fight.turn}
+                    {run ? `${stopLabel(runState?.stop || run.stop)} · ` : ""}Turn {fight.turn}
                     {run ? (
                         <b className="cf-embers"><GiFlame aria-hidden="true" />{runState?.embers || 0}</b>
                     ) : null}
@@ -982,7 +982,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     <div className="cf-ask" onClick={(e) => e.stopPropagation()}>
                         <b>Give up the run?</b>
                         <p className="cf-note">
-                            {`It ends at stop ${runState?.stop || run?.stop || 1} of ${RUN_LENGTH}, and the next one starts from nothing.`}
+                            {`It ends at ${stopLabel(runState?.stop || run?.stop || 1, { capital: false })}, and the next one starts from nothing.`}
                         </p>
                         <div className="cf-ask-btns">
                             <button type="button" className="cf-pill is-primary" onClick={() => setAskGiveUp(false)}>
@@ -1003,7 +1003,7 @@ export default function CardFightClient({ fixture, run = null }) {
                         <b>{run ? "Give up the run?" : "Walk away from this fight?"}</b>
                         <p className="cf-note">
                             {run
-                                ? `It ends here, at stop ${runState?.stop || run.stop} of ${RUN_LENGTH}. The deck, the embers and the trinkets go with it.`
+                                ? `It ends here, at ${stopLabel(runState?.stop || run.stop, { capital: false })}. The deck, the embers and the trinkets go with it.`
                                 : "The fight ends and nothing is kept."}
                         </p>
                         <div className="cf-ask-btns">
@@ -1102,7 +1102,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                 {runState?.done === "won"
                                     ? `All ${RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
                                     : runState?.done === "dead"
-                                        ? `You made it to stop ${runState.stop} of ${RUN_LENGTH}.`
+                                        ? `You made it to ${stopLabel(runState.stop, { capital: false })}.`
                                         : fight.over === "win"
                                             ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
                                             : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}

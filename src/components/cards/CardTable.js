@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import { RUN_LENGTH } from "@/lib/marketplace/cards-kit.js";
+import { RUN_LENGTH, stopLabel } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────────
 // The card game had no front room. Every other feature in the Den has one — the mine has a shaft head, the
@@ -56,7 +56,7 @@ export default function CardTable({ run }) {
                     A front room that cannot tell you how far in you are is a door with a picture on it. */}
                 {live ? (
                     <p className="ct-state">
-                        Stop {Math.min(run.stop || 1, RUN_LENGTH)} of {RUN_LENGTH}
+                        {stopLabel(run.stop || 1)}
                         <span className="ct-dot" aria-hidden="true">·</span>
                         <b className="ct-hp">{run.hp}/{run.hpMax}</b> health
                         <span className="ct-dot" aria-hidden="true">·</span>

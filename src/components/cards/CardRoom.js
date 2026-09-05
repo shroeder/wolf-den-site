@@ -232,8 +232,14 @@ export default function CardRoom({ run, art = {} }) {
                 .cr { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;
                     padding: 0 10px 18px; background: #0a0b0f; color: #efe3cd; }
+                /* ⚠️ THE SAME LANTERN THE MERCHANT WAS STANDING IN. This is the shop's alcove and it has one
+                   hanging lamp at dead centre; on a phone a cover-sized background shows the art's whole
+                   height and only its middle third, so the lamp sits directly behind whatever object this
+                   room is — a faint golden box hanging in the campfire's smoke. The crop moves to the plain
+                   stonework at the left of the painting, exactly as the shop's does, and comes back to centre
+                   on a wide screen where there is room for both. */
                 .cr-room { position: fixed; inset: 0; z-index: -1;
-                    background: #0a0b0f url(/images/cards/chrome/shop-room.png) center/cover no-repeat; }
+                    background: #0a0b0f url(/images/cards/chrome/shop-room.png) left center/cover no-repeat; }
                 .cr-room::after { content: ""; position: absolute; inset: 0;
                     background: radial-gradient(ellipse at 50% 46%, rgba(10,11,15,0.05), rgba(6,7,10,0.9) 76%); }
 
@@ -312,6 +318,7 @@ export default function CardRoom({ run, art = {} }) {
                 .cr-leave:disabled { opacity: 0.5; cursor: default; }
 
                 @media (min-width: 760px) {
+                    .cr-room { background-position: center; }
                     .cr-art { width: min(360px, 40vw); }
                     .cr-say { font-size: 14px; max-width: 420px; }
                 }

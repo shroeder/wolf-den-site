@@ -277,6 +277,23 @@ export const POTION_IDS = Object.keys(POTIONS);
 
 export const RUN_LENGTH = 15;
 
+/**
+ * How far in you are, in words.
+ *
+ * ⚠️ THE BOSS IS NOT STOP 16 OF 15. The sheet is RUN_LENGTH rows and the boss is a room ABOVE the last one,
+ * so `stop` reads 16 the moment you walk into it — and the game said "Stop 16 of 15" in the fight HUD and
+ * then, on the screen that tells you how it ended, "You made it to stop 16 of 15." The bot walked into it on
+ * its first run to the top; a player walks into it on the best run they have had.
+ *
+ * One function, because the same sentence is printed in the HUD, on the death card, in the abandon dialog and
+ * on the front room's summary line, and four copies of an off-by-one is four places to fix it next time.
+ */
+export const stopLabel = (stop, { capital = true } = {}) => {
+    const n = Math.max(1, Math.floor(Number(stop) || 1));
+    if (n > RUN_LENGTH) return capital ? "The boss" : "the boss";
+    return `${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
+};
+
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // The one node that was a promise the game could not keep: you walked onto it and it handed you straight back
 // to the map. Embers have been paid out since the run system shipped — 25 for taking no card, 40 from a chest,
