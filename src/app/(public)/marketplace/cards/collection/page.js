@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import CardCollection from "@/components/cards/CardCollection";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardProgress, ownedPetIds, petArtFor } from "@/lib/marketplace/cards.js";
-import { ALL_CARDS, BASIC_UNLOCKS, CARDS, PERKS, POTIONS, UNLOCKS, unlockedCards } from "@/lib/marketplace/cards-kit.js";
+import {
+    ALL_CARDS, BASIC_UNLOCKS, CARDS, PERKS, POTIONS, STARTER_PERK, UNLOCKS, unlockedCards,
+} from "@/lib/marketplace/cards-kit.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -62,7 +64,12 @@ export default async function CardCollectionPage() {
     const trinkets = Object.values(PERKS).map((p) => ({
         id: p.id, name: p.name, text: p.text,
         art: `/images/cards/items/${p.id}.png`,
-        from: "Elites and chests, or the merchant's shelf",
+        // ONE OF THEM IS NOT FOUND, IT IS ISSUED. Warm Blood is what every run opens holding (theirs is
+        // Burning Blood), and telling somebody to go and look for it in a chest is telling them to hunt for
+        // the thing already on their strip.
+        from: p.id === STARTER_PERK
+            ? "You start every run holding this one"
+            : "Elites and chests, or the merchant's shelf",
     }));
     const potions = Object.values(POTIONS).map((p) => ({
         id: p.id, name: p.name, text: p.text,

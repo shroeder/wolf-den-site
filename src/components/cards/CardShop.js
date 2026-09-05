@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
-import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
+import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import { PERKS, POTIONS, POTION_SLOTS, cardById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -154,8 +154,9 @@ export default function CardShop({ run, art = {} }) {
                 <b className="cs-em">{embers.toLocaleString()}</b>
                 {/* EMPTY SLOTS ARE NOT DRAWN — Luke, on the map's bar. Same rule here. */}
                 {potions.map((p, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={`${p.id}${i}`} className="cs-ui" src={`/images/cards/potions/${p.id}.png`} alt={p.name} title={`${p.name} — ${p.text}`} />
+                    <span key={`${p.id}${i}`} title={`${p.name} — ${p.text}`}>
+                        <Sprite className="cs-ui" src={`/images/cards/potions/${p.id}.png`} />
+                    </span>
                 ))}
             </div>
 
@@ -242,8 +243,7 @@ export default function CardShop({ run, art = {} }) {
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img className="cs-plinth" src="/images/cards/chrome/shop-plinth.png" alt="" />
                                             ) : null}
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img className="cs-goodart" src={goodsArt(item)} alt="" />
+                                            <Sprite className="cs-goodart" src={goodsArt(item)} />
                                         </span>
                                         <b className="cs-goodname">{face.name}</b>
                                         <span className="cs-kind">{LABEL[item.kind] || item.kind}</span>
@@ -275,8 +275,7 @@ export default function CardShop({ run, art = {} }) {
                             {shownCard ? (
                                 <span className="cf-card"><CardFace card={shownCard} art={art[shownCard.pet]} /></span>
                             ) : (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="cs-look-obj" src={goodsArt(shown)} alt="" />
+                                <Sprite className="cs-look-obj" src={goodsArt(shown)} />
                             )}
                         </div>
                         {/* A CARD ALREADY SAYS ALL OF THIS. Its name is on the banner, its type is the plate

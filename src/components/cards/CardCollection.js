@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
+import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 
 // ── EVERY CARD IN THE GAME, AND WHOSE IT IS ──────────────────────────────────────────────────────────────
 // Luke: "overall card collection", alongside "design the way cards reflect their pets level". The two are one
@@ -93,8 +93,7 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                 <div className="cc-items">
                     {items.map((it) => (
                         <span key={it.id} className="cc-item">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={it.art} alt="" draggable="false" />
+                            <Sprite src={it.art} />
                             <span>
                                 <b>{it.name}</b>
                                 <i>{it.text}</i>
@@ -124,7 +123,10 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                         {c.owned ? null : <span className="cc-lock">{c.need || art[c.pet]?.name || c.pet}</span>}
                     </button>
                 ))}
-                {shown.length ? null : <p className="cc-none">Nothing here yet.</p>}
+                {/* Only when the CARD grid is the thing on screen and it is empty. It was printing
+                    "Nothing here yet." under a full list of trinkets, which is the screen contradicting
+                    itself in the same scroll. */}
+                {shown.length || items ? null : <p className="cc-none">Nothing here yet.</p>}
             </div>
 
             {looked ? (

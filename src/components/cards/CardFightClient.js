@@ -11,7 +11,7 @@ import {
 import {
     DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
-    playCard, startFight,
+    drinkPotion, playCard, startFight, PERKS, POTIONS,
 } from "@/lib/marketplace/cards-kit.js";
 // ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
 // It moved to CardFace.js the day the merchant started selling cards, along with every rule that paints it —
@@ -308,6 +308,37 @@ export default function CardFightClient({ fixture, run = null }) {
     // The screen it leads to has known this all along; its own comment reads "Spire has no in-combat forfeit
     // at all — abandoning is a menu action behind an 'are you sure'". So this is that "are you sure", and it
     // says what it costs: which stop you are on and that the run ends here.
+    // ── THE BELT ─────────────────────────────────────────────────────────────────────────────────────────
+    // ⚠️ THERE WAS NOWHERE TO DRINK A POTION. Chests dropped them, the merchant sold them, four screens drew
+    // them on the top bar, the carrying panel said "potions are drunk in a fight" and the run route has had a
+    // `drink` action since they landed — and the fight, the one screen where a potion does anything, had no
+    // potion in it at all. Every bottle ever handed out is still on the belt.
+    //
+    // The order is deliberate: resolve it in the ENGINE first so the screen shows the heal/block/cards
+    // immediately, then tell the server the bottle is gone. A potion that waits for a round trip before the
+    // block appears is a potion you drink twice.
+    const [drinking, setDrinking] = useState(null);
+    const onDrink = useCallback(async (slot) => {
+        const id = (runState?.potions || [])[slot];
+        if (!id || !POTIONS[id] || fight.over || drinking !== null) return;
+        setDrinking(slot);
+        // ⚠️ THE HEALED HP, NOT THE HP IN THE CLOSURE. `setFight` does not change `fight` under this function,
+        // so posting fight.hero.hp sends the number from BEFORE the potion — measured: drink a Blood Tonic at
+        // 50/70 and the run row still said 50. The fight's own end-of-fight report would have corrected it,
+        // which is exactly what makes it the dangerous kind of wrong: the twelve health is only missing if
+        // you close the tab mid-fight, so it looks fine every time you watch it.
+        const next = drinkPotion(fight, id);
+        setFight(next);
+        await post("drink", { slot, hp: next.hero.hp });
+        setDrinking(null);
+        return next;
+    }, [runState, fight, drinking, post]);
+
+    // What the run is carrying, resolved once — the fight state keeps perk IDS because the engine only needs
+    // the numbers off them (perkSum), and the screen needs the names and the pictures.
+    const perksHeld = (runState?.perks || fight.perks || []).map((id) => PERKS[id]).filter(Boolean);
+    const [perkPeek, setPerkPeek] = useState(null);
+
     const [askForfeit, setAskForfeit] = useState(false);
     // The result panel carries the same weapon: "Give up the run" is one press from ending a live run, and it
     // sits beside Leave on a screen people are tapping through quickly.
@@ -757,6 +788,24 @@ export default function CardFightClient({ fixture, run = null }) {
                             <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
                             <span className="cf-pile-n">{fight.discard.length}</span>
                         </button>
+                        {/* ── AND WHAT IS ON YOUR BELT ────────────────────────────────────────────────
+                            Beside the piles because it is the same kind of fact — a resource you are holding
+                            — and because the right-hand group is the two things that END a turn and must not
+                            grow a third neighbour. EMPTY SLOTS ARE NOT DRAWN, the rule the whole game's bars
+                            already follow. */}
+                        {(runState?.potions || []).map((id, i) => POTIONS[id] ? (
+                            <button
+                                key={`${id}${i}`}
+                                type="button"
+                                className={`cf-potion${drinking === i ? " is-going" : ""}`}
+                                disabled={Boolean(fight.over) || drinking !== null}
+                                onClick={() => onDrink(i)}
+                                title={`${POTIONS[id].name} — ${POTIONS[id].text}`}
+                                aria-label={`Drink ${POTIONS[id].name}: ${POTIONS[id].text}`}
+                            >
+                                <Sprite src={`/images/cards/potions/${id}.png`} className="cf-potion-art" />
+                            </button>
+                        ) : null)}
                     </div>
                     <div className="cf-top-group">
                         <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
@@ -779,6 +828,38 @@ export default function CardFightClient({ fixture, run = null }) {
 
                 {/* The ladder position belongs HERE, in the HUD, the way Spire keeps its floor number up top —
                     not on the reward banner, which only ever needs to say what to do. */}
+                {/* ── THE TRINKETS, IN THE ONE ROOM WHERE THEY FIRE ──────────────────────────────────
+                    ⚠️ THE FIGHT WAS THE ONLY SCREEN THAT NEVER SHOWED THEM. The map's strip has them, the
+                    shop's bar has them, the campfire's bar has them — and the fight, where Tin Shield puts
+                    six Block on you at turn one and Warm Blood pays out when you win, drew nothing. So the
+                    six Block you started with had no visible cause, which is the same class of hole as the
+                    payout with no screen: the game doing something for you and never saying what.
+
+                    Spire keeps its relics along the top of the fight for exactly this reason. Ours sit on
+                    the stop/turn line, which is the only strip up here with room, and they are TAPPABLE for
+                    the rule — the map taught that a hover is not an explanation on a phone. */}
+                {perksHeld.length ? (
+                    <div className="cf-trinkets">
+                        {perksHeld.map((perk) => (
+                            <button
+                                key={perk.id}
+                                type="button"
+                                className={`cf-trinket${perkPeek === perk.id ? " is-lit" : ""}`}
+                                onClick={() => setPerkPeek(perkPeek === perk.id ? null : perk.id)}
+                                title={`${perk.name} — ${perk.text}`}
+                                aria-label={`${perk.name} — ${perk.text}`}
+                            >
+                                <Sprite src={`/images/cards/items/${perk.id}.png`} className="cf-trinket-art" />
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+                {perkPeek && PERKS[perkPeek] ? (
+                    <p className="cf-trinket-say" role="status">
+                        <b>{PERKS[perkPeek].name}</b> {PERKS[perkPeek].text}
+                    </p>
+                ) : null}
+
                 <div className="cf-turn">
                     {run ? `${stopLabel(runState?.stop || run.stop)} · ` : ""}Turn {fight.turn}
                     {run ? (
@@ -1642,6 +1723,42 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* A little card back with the count struck on it, and its name under it. Ours keeps the word
                    where Spire drops it, because a draw pile and a discard pile drawn from the same back are
                    otherwise the same picture twice. */
+                /* ── THE TRINKET STRIP ── small, quiet, and above the turn line rather than in the control
+                   bar: these are things that are ALREADY working, not things you press to make happen. */
+                /* ⚠️ ABSOLUTE, UNDER THE BAR, LIKE THE TURN LINE. In the flow it landed at top: 4px —
+                   directly beneath the control bar, which is absolutely positioned over the board — so the
+                   strip was in the DOM, visible, 375px wide, and behind the painted plate. Measured before
+                   it was believed. It hangs off the same offset the turn line uses, one line lower. */
+                .cf-trinkets { position: absolute; top: calc(84px + env(safe-area-inset-top)); left: 50%;
+                    transform: translateX(-50%); z-index: 3;
+                    display: flex; justify-content: center; gap: 5px; }
+                .cf-trinket { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0;
+                    border-radius: 50%; }
+                .cf-trinket-art { width: 22px; height: 22px; object-fit: contain;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+                .cf-trinket.is-lit .cf-trinket-art { filter: drop-shadow(0 0 6px rgba(255,214,140,0.9))
+                    drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+                /* ⚠️ ABOVE THE FIGHTERS. At z-index 3 the plate was painted and then a foe was painted on top
+                   of it — the sentence's second line read as "fight you w" with a swordsman across the rest. */
+                .cf-trinket-say { position: absolute; top: calc(110px + env(safe-area-inset-top)); left: 50%;
+                    transform: translateX(-50%); z-index: 9;
+                    margin: 0; max-width: 280px; text-align: center; font-size: 11.5px;
+                    line-height: 1.35; color: #d8cbb4;
+                    /* ON A PLATE. It floats over the middle of the board, which is where the enemies stand —
+                       unbacked, the sentence and a foe's sprite were the same picture. */
+                    padding: 4px 10px; border-radius: 8px; background: rgba(8,9,12,0.9);
+                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.28); }
+                .cf-trinket-say b { color: #ffd9a6; }
+
+                /* A BOTTLE IS A BUTTON, and it has to read as one at 26px on a painted bar: no plate, no
+                   border, a lift on press and a fade while the server catches up. */
+                .cf-potion { padding: 0 1px; background: none; border: 0; cursor: pointer; line-height: 0; }
+                .cf-potion-art { width: 26px; height: 26px; object-fit: contain;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
+                .cf-potion:active .cf-potion-art { transform: translateY(1px); }
+                .cf-potion:disabled { cursor: default; }
+                .cf-potion.is-going .cf-potion-art { opacity: 0.35; }
+
                 .cf-pile { position: relative; width: 34px; padding: 0; background: none; border: 0;
                     display: flex; flex-direction: column; align-items: center; }
                 .cf-pile-art { width: 30px; height: 42px; object-fit: contain;
@@ -1980,7 +2097,10 @@ function Bar({ unit, guarding, pending }) {
                 .cfb-track { position: relative; height: 8px; border-radius: 1px; overflow: visible;
                     background: rgba(8,4,6,0.9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.8); }
                 .cfb-track.is-guarded { box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 0 0 1px rgba(150,205,255,0.75); }
-                .cfb-guard { position: absolute; left: -13px; top: 50%; transform: translateY(-50%);
+                /* ⚠️ FAR ENOUGH OUT THAT ITS NUMBER IS NOT PART OF THE HEALTH NUMBER. At -13px the shield's
+                   "6" sat flush against a bar reading "50 / 70" and the two ran together as "650 / 70" —
+                   which is not a small misreading on the one number a fight is decided by. */
+                .cfb-guard { position: absolute; left: -21px; top: 50%; transform: translateY(-50%);
                     display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
                     color: #bfe2ff; font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
                 /* The shield lands rather than appears. */

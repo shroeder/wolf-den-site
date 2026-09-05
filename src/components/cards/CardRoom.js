@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
-import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
+import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import { POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
@@ -105,9 +105,9 @@ export default function CardRoom({ run, art = {} }) {
                 <img className="cr-ui" src="/images/cards/chrome/ui-ember.png" alt="" />
                 <b className="cr-em">{(run.embers || 0).toLocaleString()}</b>
                 {(run.potions || []).map((id, i) => POTIONS[id] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={`${id}${i}`} className="cr-ui" src={`/images/cards/potions/${id}.png`}
-                        alt={POTIONS[id].name} title={`${POTIONS[id].name} — ${POTIONS[id].text}`} />
+                    <span key={`${id}${i}`} title={`${POTIONS[id].name} — ${POTIONS[id].text}`}>
+                        <Sprite className="cr-ui" src={`/images/cards/potions/${id}.png`} />
+                    </span>
                 ) : null)}
             </div>
 
@@ -158,8 +158,7 @@ export default function CardRoom({ run, art = {} }) {
                                 ) : null}
                                 {gotPotion ? (
                                     <span className="cr-gain">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={`/images/cards/potions/${gotPotion.id}.png`} alt="" />
+                                        <Sprite src={`/images/cards/potions/${gotPotion.id}.png`} />
                                         {gotPotion.name}
                                     </span>
                                 ) : null}

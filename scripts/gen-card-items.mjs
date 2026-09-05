@@ -59,6 +59,13 @@ const PERK_ART = {
         + "candle burning low inside it, throwing warm light through the cracks.",
     iron_ration: "A hard dark travel biscuit and a strip of dried meat bound together with twine in a scrap of "
         + "waxed cloth, plain and dense.",
+    // ⚠️ THE ONE EVERY RUN OPENS HOLDING, AND IT HAD NO PICTURE. Warm Blood is the starter trinket — theirs is
+    // Burning Blood, the relic the Ironclad never plays without — so it is on the strip at the top-left of the
+    // map for the whole of every run, and it was rendering as a browser's torn-page glyph with the words
+    // "Warm Blood" beside it. Nobody wrote its prompt, and the generator skips what it has no prompt for
+    // SILENTLY, which is why a missing picture on the most-seen object in the game survived this long.
+    warm_blood: "A small stoppered glass vial of dark red blood held in a cage of blackened iron straps, the "
+        + "liquid inside lit from within by a slow ember glow, warm and alive rather than gory.",
 };
 
 const JOBS = [
@@ -74,6 +81,11 @@ const JOBS = [
 
 const FORCE = process.argv.includes("--force");
 const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
+
+// ⚠️ AND IT SAYS SO, LOUDLY. A rule authored without art used to fall through this loop with one quiet line
+// in the middle of the output; the thing it produces is a broken-image glyph on a live screen, which is worth
+// a line at the END where the count is read.
+const noPrompt = JOBS.filter((j) => !j.subject).map((j) => j.id);
 
 let made = 0, skipped = 0, spent = 0;
 for (const job of JOBS) {
@@ -110,3 +122,8 @@ for (const job of JOBS) {
 }
 
 console.log(`\ndrew ${made}, skipped ${skipped} — about $${spent.toFixed(2)}`);
+if (noPrompt.length) {
+    console.log(`
+⚠️  NO PROMPT WRITTEN, SO NO PICTURE DRAWN: ${noPrompt.join(", ")}`);
+    console.log("   Each of these renders as a broken image wherever the game shows it. Add them to PERK_ART / POTION_ART.");
+}

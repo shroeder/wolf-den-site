@@ -1321,6 +1321,33 @@ export function playCard(state, uid, targetIndex = 0) {
 }
 
 /**
+ * ── DRINK ONE ───────────────────────────────────────────────────────────────────────────────────────────
+ * ⚠️ THE WHOLE POTION LOOP EXISTED EXCEPT THIS. Chests drop them, the merchant sells them, the belt on the
+ * top bar of the map, the shop and both rooms draws them, the carrying panel explains them, and the run
+ * route has had a `drink` action since the day potions landed — and there has never been anywhere to drink
+ * one. Every potion a member has ever been handed is still on their belt. It is the same class of hole as
+ * the campfire that healed you with no screen: a reward the game hands out and never lets you spend.
+ *
+ * A potion is a CARD WITH NO COST that never entered the deck, so it resolves through the same fields
+ * (block, heal, strength, draw, energy) rather than a second set of rules — which is also why POTIONS reads
+ * like a card: the day one wants damage, `damage` already works.
+ *
+ * Not undoable and not free of consequence: the caller posts `drink` so the run drops the bottle, and the
+ * hand it draws into is the hand you are holding.
+ */
+export function drinkPotion(state, potionId) {
+    const potion = POTIONS[potionId];
+    if (!potion || state.over) return state;
+    let next = { ...state, hero: { ...state.hero } };
+    if (potion.block) next.hero.block = (next.hero.block || 0) + potion.block;
+    if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
+    if (potion.heal) next.hero.hp = Math.min(next.hero.hpMax, next.hero.hp + potion.heal);
+    if (potion.energy) next.energy = (next.energy || 0) + potion.energy;
+    if (potion.draw) next = drawCards(next, potion.draw);
+    return next;
+}
+
+/**
  * Give up. Ends the fight as a loss, which is the honest reading: the foe is still standing.
  *
  * In the rules rather than done by poking the state from the screen, for the same reason everything else is —

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import CardFace, { CARD_FONT } from "@/components/cards/CardFace";
+import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { PERKS, POTIONS, RUN_LENGTH, cardById } from "@/lib/marketplace/cards-kit.js";
 
@@ -171,8 +171,7 @@ export default function CardMap({ run, art = {} }) {
                         onPointerLeave={() => setPeek(null)}
                         onClick={() => setCarry(p.id)}
                     >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="cm-ui" src={'/images/cards/potions/' + p.id + '.png'} alt={p.name} />
+                        <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
                     </button>
                 ))}
                 <span className="cm-gap" />
@@ -192,6 +191,11 @@ export default function CardMap({ run, art = {} }) {
 
             {/* ── THE DARK STRIP THE PERKS SIT IN ── Luke: "they have an empty space on the left that's dark,
                 and that's where they show their perks." It is always there, occupied or not. */}
+            {/* ⚠️ EVERY SPRITE ON THIS SCREEN GOES THROUGH <Sprite>, not <img>. Warm Blood — the trinket
+                EVERY run opens holding — had no picture drawn for it, and a raw <img> renders a missing file
+                as the browser's torn-page glyph: a broken image at the top-left of the map for the whole of
+                every run anybody has ever played. The art exists now; the fallback is so that the next rule
+                authored without a picture costs nothing on screen. */}
             <div className="cm-perkbar">
                 {perks.map((id) => {
                     const perk = PERKS[id];
@@ -209,8 +213,7 @@ export default function CardMap({ run, art = {} }) {
                             onPointerLeave={() => setPeek(null)}
                             onClick={() => setCarry(id)}
                         >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={'/images/cards/items/' + id + '.png'} alt={perk.name} />
+                            <Sprite src={`/images/cards/items/${id}.png`} />
                         </button>
                     );
                 })}
@@ -375,8 +378,7 @@ export default function CardMap({ run, art = {} }) {
                             if (!perk) return null;
                             return (
                                 <span key={id} className={`cm-carry-row${carry === id ? " is-lit" : ""}`}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={'/images/cards/items/' + id + '.png'} alt="" />
+                                    <Sprite src={`/images/cards/items/${id}.png`} />
                                     <span>
                                         <b>{perk.name}</b>
                                         <i>{perk.text}</i>
@@ -386,8 +388,7 @@ export default function CardMap({ run, art = {} }) {
                         })}
                         {potions.map((p, i) => (
                             <span key={`${p.id}${i}`} className={`cm-carry-row${carry === p.id ? " is-lit" : ""}`}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={'/images/cards/potions/' + p.id + '.png'} alt="" />
+                                <Sprite src={`/images/cards/potions/${p.id}.png`} />
                                 <span>
                                     <b>{p.name} <em>potion</em></b>
                                     <i>{p.text}</i>
