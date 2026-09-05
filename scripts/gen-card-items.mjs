@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
-import { PERKS, POTIONS } from "../src/lib/marketplace/cards-kit.js";
+import { BOSS_PERKS, PERKS, POTIONS } from "../src/lib/marketplace/cards-kit.js";
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -66,6 +66,18 @@ const PERK_ART = {
     // SILENTLY, which is why a missing picture on the most-seen object in the game survived this long.
     warm_blood: "A small stoppered glass vial of dark red blood held in a cage of blackened iron straps, the "
         + "liquid inside lit from within by a slow ember glow, warm and alive rather than gory.",
+    // ── THE BOSS TRINKETS ── bigger, older and obviously worth killing something for. Theirs read as relics
+    // rather than as equipment, so these are objects with a history: a crown, a banner, a hide.
+    ember_crown: "A heavy blackened iron crown with tall uneven points, its band set with three glowing "
+        + "orange embers that light the metal from within, scorched and battle-worn.",
+    war_banner: "A short war banner on a broken spear shaft: dark red cloth with a pale wolf-head sigil, the "
+        + "hem torn and the shaft bound with leather cord.",
+    stone_hide: "A thick slab of grey scaled hide bound into a shoulder guard with iron rivets and leather "
+        + "straps, heavy and cracked like weathered stone.",
+    deep_pockets: "A fat leather coin pouch, its drawstring loose and a spill of dull gold coins caught "
+        + "half-out of the mouth, the leather worn pale at the seams.",
+    old_wolf: "An old grey wolf skull with one cracked fang, bound at the brow with a strip of red cloth and "
+        + "a single brass ring, dignified rather than grisly.",
 };
 
 const JOBS = [
@@ -73,7 +85,10 @@ const JOBS = [
         id: p.id, dir: "public/images/cards/potions", subject: POTION_ART[p.id],
         store: 256,
     })),
-    ...Object.values(PERKS).map((k) => ({
+    // BOSS TRINKETS LIVE IN THE SAME FOLDER as the ordinary ones, because every screen that draws a trinket
+    // looks it up by id in one place — see takePerk on why there is one catalogue as far as the rest of the
+    // game is concerned.
+    ...Object.values({ ...PERKS, ...BOSS_PERKS }).map((k) => ({
         id: k.id, dir: "public/images/cards/items", subject: PERK_ART[k.id],
         store: 256,
     })),

@@ -11,7 +11,7 @@ import {
 import {
     DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
-    drinkPotion, playCard, startFight, PERKS, POTIONS,
+    drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
 // ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
 // It moved to CardFace.js the day the merchant started selling cards, along with every rule that paints it —
@@ -69,7 +69,11 @@ export default function CardFightClient({ fixture, run = null }) {
         // The run row already knows the answer, so the screen believes it: offers pending = this room is
         // over, show the reward. `gaveUp` stays false and the reported flag is pre-set below, so nothing
         // re-posts a win that was already banked.
-        if (run?.offers?.length) return { ...fresh, over: "win" };
+        // ⚠️ AND THE SAME IS TRUE OF A BOSS TRINKET WAITING TO BE TAKEN. Three relics on the table means the
+        // boss is already dead; without this, a reload between killing it and choosing would stand the boss
+        // back up at full health with its reward still pending — the card-reward hole again, on the one fight
+        // in the act you would least like to be asked to do twice.
+        if (run?.offers?.length || run?.bossOffers?.length) return { ...fresh, over: "win" };
         // ── AND A FIGHT LEFT HALF-FOUGHT IS PICKED BACK UP ───────────────────────────────────────────
         // The run holds the engine state at the end of every turn (see "save" in the run route), so a phone
         // that locked itself in a pocket comes back to the same turn, the same hand and the same wounded
@@ -110,7 +114,7 @@ export default function CardFightClient({ fixture, run = null }) {
 
     // A resumed reward has ALREADY been reported — see the note in the initialiser. Without this the effect
     // below sees `over: "win"` on the first render and posts the win a second time.
-    if (reported.current === null && run?.offers?.length) reported.current = "win";
+    if (reported.current === null && (run?.offers?.length || run?.bossOffers?.length)) reported.current = "win";
 
     // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
     // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
@@ -368,7 +372,7 @@ export default function CardFightClient({ fixture, run = null }) {
 
     // What the run is carrying, resolved once — the fight state keeps perk IDS because the engine only needs
     // the numbers off them (perkSum), and the screen needs the names and the pictures.
-    const perksHeld = (runState?.perks || fight.perks || []).map((id) => PERKS[id]).filter(Boolean);
+    const perksHeld = (runState?.perks || fight.perks || []).map((id) => perkById(id)).filter(Boolean);
     const [perkPeek, setPerkPeek] = useState(null);
 
     const [askForfeit, setAskForfeit] = useState(false);
@@ -610,6 +614,13 @@ export default function CardFightClient({ fixture, run = null }) {
         if (next) router.refresh();
     };
     const startNewRun = async () => { await post("restart"); router.refresh(); };
+    // ── TAKE THE BOSS TRINKET AND WALK INTO THE NEXT ACT ─────────────────────────────────────────────────
+    // One press, one request: the server puts the trinket on the strip, deals a new sheet and clears the
+    // fight, and `refresh` lands on the map of the act you have just opened.
+    const takeBossPerk = async (id) => {
+        const next = await post("bosspick", { id });
+        if (next) router.refresh();
+    };
 
     const dragCard = drag?.moved ? cardById(fight.hand.find((c) => c.uid === drag.uid)?.id) : null;
 
@@ -894,14 +905,14 @@ export default function CardFightClient({ fixture, run = null }) {
                         ))}
                     </div>
                 ) : null}
-                {perkPeek && PERKS[perkPeek] ? (
+                {perkPeek && perkById(perkPeek) ? (
                     <p className="cf-trinket-say" role="status">
-                        <b>{PERKS[perkPeek].name}</b> {PERKS[perkPeek].text}
+                        <b>{perkById(perkPeek).name}</b> {perkById(perkPeek).text}
                     </p>
                 ) : null}
 
                 <div className="cf-turn">
-                    {run ? `${stopLabel(runState?.stop || run.stop)} · ` : ""}Turn {fight.turn}
+                    {run ? `${stopLabel(runState?.stop || run.stop, { act: runState?.act || run.act })} · ` : ""}Turn {fight.turn}
                     {run ? (
                         <b className="cf-embers"><GiFlame aria-hidden="true" />{runState?.embers || 0}</b>
                     ) : null}
@@ -1103,7 +1114,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     <div className="cf-ask" onClick={(e) => e.stopPropagation()}>
                         <b>Give up the run?</b>
                         <p className="cf-note">
-                            {`It ends at ${stopLabel(runState?.stop || run?.stop || 1, { capital: false })}, and the next one starts from nothing.`}
+                            {`It ends at ${stopLabel(runState?.stop || run?.stop || 1, { capital: false, act: runState?.act || run?.act })}, and the next one starts from nothing.`}
                         </p>
                         <div className="cf-ask-btns">
                             <button type="button" className="cf-pill is-primary" onClick={() => setAskGiveUp(false)}>
@@ -1124,7 +1135,7 @@ export default function CardFightClient({ fixture, run = null }) {
                         <b>{run ? "Give up the run?" : "Walk away from this fight?"}</b>
                         <p className="cf-note">
                             {run
-                                ? `It ends here, at ${stopLabel(runState?.stop || run.stop, { capital: false })}. The deck, the embers and the trinkets go with it.`
+                                ? `It ends here, at ${stopLabel(runState?.stop || run.stop, { capital: false, act: runState?.act || run.act })}. The deck, the embers and the trinkets go with it.`
                                 : "The fight ends and nothing is kept."}
                         </p>
                         <div className="cf-ask-btns">
@@ -1173,7 +1184,32 @@ export default function CardFightClient({ fixture, run = null }) {
                         they won is a click between the deed and the payoff. So while the offers are still
                         coming back from the server this shows nothing rather than flashing a result sheet,
                         which is where "The sand is yours" was appearing for half a second mid-run. */}
-                    {runState && fight.over === "win" && !runState.done && !runState.offers?.length ? (
+                    {/* ── THE BOSS PAYS IN SOMETHING THAT CHANGES THE DECK ────────────────────────────
+                        Luke, having killed one: "the run isn't supposed to end when you beat the boss... you
+                        get a really powerful enhancement that you get to choose from, and then you keep
+                        going." So a boss win deals three boss trinkets instead of three cards, and taking one
+                        opens the next act. This sits FIRST because a boss win sets bossOffers and never
+                        offers cards, and the two must not both be able to match. */}
+                    {runState && fight.over === "win" && runState.bossOffers?.length ? (
+                        <div className="cf-choose">
+                            <div className="cf-title"><span>The boss is down</span></div>
+                            <p className="cf-note">Take one, and the next act opens.</p>
+                            <div className="cf-bossoffers">
+                                {runState.bossOffers.map((id) => {
+                                    const perk = BOSS_PERKS[id];
+                                    if (!perk) return null;
+                                    return (
+                                        <button key={id} type="button" className="cf-bossperk" disabled={busy}
+                                            onClick={() => takeBossPerk(id)}>
+                                            <Sprite src={`/images/cards/items/${id}.png`} className="cf-bossperk-art" />
+                                            <b>{perk.name}</b>
+                                            <i>{perk.text}</i>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : runState && fight.over === "win" && !runState.done && !runState.offers?.length ? (
                         <div className="cf-choose"><div className="cf-title"><span>…</span></div></div>
                     ) : runState && fight.over === "win" && runState.offers?.length ? (
                         <div className="cf-choose">
@@ -1223,7 +1259,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                 {runState?.done === "won"
                                     ? `All ${RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
                                     : runState?.done === "dead"
-                                        ? `You made it to ${stopLabel(runState.stop, { capital: false })}.`
+                                        ? `You made it to ${stopLabel(runState.stop, { capital: false, act: runState.act })}.`
                                         : fight.over === "win"
                                             ? `Turn ${fight.turn}, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
                                             : `${fight.foes.filter((f) => f.hp > 0).length} of them still standing.`}
@@ -2009,6 +2045,28 @@ export default function CardFightClient({ fixture, run = null }) {
                     box-shadow: none; }
                 .cf-choose > .cf-pill:hover:not(:disabled) { background: rgba(28,34,45,0.9);
                     border-color: rgba(232,200,119,0.7); color: #f2e2bd; }
+
+                /* ── THE BOSS TRINKETS ── not cards, so not drawn as cards: a picture, a name and the rule
+                   in full, because every one of these changes how the rest of the run is played and none of
+                   them can be read at a glance from a sprite. Stacked on a phone, three across on a desk. */
+                .cf-bossoffers { display: grid; gap: 8px; width: min(340px, 92vw); }
+                .cf-bossperk { display: grid; grid-template-columns: 46px 1fr; grid-template-rows: auto auto;
+                    gap: 2px 12px; align-items: center; padding: 10px 12px; cursor: pointer; text-align: left;
+                    border-radius: 12px; border: 1px solid rgba(201,162,83,0.4);
+                    background: rgba(16,20,28,0.94); box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
+                .cf-bossperk:hover:not(:disabled) { border-color: #ffce7a;
+                    background: rgba(40,32,20,0.96); }
+                .cf-bossperk:disabled { opacity: 0.5; cursor: default; }
+                .cf-bossperk-art { grid-row: 1 / 3; width: 46px; height: 46px; object-fit: contain;
+                    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
+                .cf-bossperk b { font-family: var(--cf-card-font); font-size: 15px; color: #ffd9a6; }
+                .cf-bossperk i { font-style: normal; font-size: 12.5px; line-height: 1.35; color: #d3d9e2; }
+                @media (min-width: 760px) {
+                    .cf-bossoffers { grid-template-columns: repeat(3, 1fr); width: min(760px, 94vw); }
+                    .cf-bossperk { grid-template-columns: 1fr; grid-template-rows: auto auto auto;
+                        justify-items: center; text-align: center; gap: 6px; padding: 14px; }
+                    .cf-bossperk-art { grid-row: auto; width: 56px; height: 56px; }
+                }
 
                 .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
                 /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────

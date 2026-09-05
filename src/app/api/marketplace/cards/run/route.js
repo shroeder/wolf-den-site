@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, bumpCardProgress, cardOffers, grantForRoom, loadRun, saveRun, shopStock, takePerk } from "@/lib/marketplace/cards.js";
+import {
+    CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, saveRun,
+    shopStock, takePerk,
+} from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { PERKS, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter, removalCost, upgradedId } from "@/lib/marketplace/cards-kit.js";
+import {
+    ACTS, BOSS_PERKS, PERKS, perkById, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter,
+    removalCost, upgradedId,
+} from "@/lib/marketplace/cards-kit.js";
 
 // A hand is five cards. Below that a deck stops being a deck, so removal has a floor.
 const DECK_FLOOR = 5;
@@ -258,7 +264,7 @@ export async function POST(request) {
                 run.fight = null;           // won: there is no fight to come back to, only a reward
                 // Iron Ration pays here — after a win, before the reward, so the number on the card is the
                 // number you keep.
-                const ration = (run.perks || []).reduce((n, id) => n + (PERKS[id]?.healAfter || 0), 0);
+                const ration = (run.perks || []).reduce((n, id) => n + (perkById(id)?.healAfter || 0), 0);
                 if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
                 // An elite hands over a perk for the health it just cost you.
                 if (run.at?.kind === "elite") {
@@ -275,11 +281,40 @@ export async function POST(request) {
                 if (run.at?.kind === "elite") await bumpCardProgress(buyer.id, "elites");
                 if (wasBoss) await bumpCardProgress(buyer.id, "bosses");
                 if (wasBoss) {
-                    run.done = "won";
+                    // ── THE BOSS IS A GATE ───────────────────────────────────────────────────────────
+                    // Luke, having just killed one: "the run isn't supposed to end when you beat the boss...
+                    // you get a really powerful enhancement that you get to choose from, and then you keep
+                    // going." Which is Spire exactly: the relic is the payment for the act, and the next act
+                    // opens harder. Ending here finished every good run at the moment the deck got
+                    // interesting.
+                    //
+                    // The LAST act still ends — a game with no end is not a run — and that is the only place
+                    // `done: "won"` is set now.
                     run.offers = null;
+                    if ((run.act || 1) >= ACTS) {
+                        run.done = "won";
+                        run.bossOffers = null;
+                    } else {
+                        run.bossOffers = bossOffers(run);
+                    }
                 } else {
                     run.offers = await cardOffers(buyer.id, run);
                 }
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
+            // ── TAKE THE BOSS TRINKET, AND WALK INTO THE NEXT ACT ───────────────────────────────────
+            // One request, because they are one decision: there is no state worth having between "I choose
+            // the crown" and "act two is dealt". Legal only against the three actually on the table, which is
+            // also what makes a replayed request harmless — once they are cleared there is nothing to take.
+            if (action === "bosspick") {
+                const id = String(body?.id || "");
+                if (!run.bossOffers?.includes(id) || !BOSS_PERKS[id]) {
+                    return NextResponse.json({ error: "no_such_boss_perk" }, { status: 400 });
+                }
+                takePerk(run, id);
+                nextAct(run);
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }

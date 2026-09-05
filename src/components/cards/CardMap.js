@@ -6,7 +6,7 @@ import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
-import { PERKS, POTIONS, RUN_LENGTH, cardById } from "@/lib/marketplace/cards-kit.js";
+import { POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -159,9 +159,10 @@ export default function CardMap({ run, art = {} }) {
                 legend — the ones you cannot are cold, and the trail behind you is drawn in brass. The key is
                 still there for anybody who wants it: one small button that opens over the map and leaves. */}
             <div className="cm-bar">
-                {/* The act has a name, and a wide screen has the room to say it. A phone does not, and the
-                   phone is what this is played on, so it is the first thing to go. */}
-                <span className="cm-who">The Sand</span>
+                {/* THE ACT HAS A NAME — The Sand, The Deep, The Spire — and a wide screen has room to say it.
+                   A phone does not, and the phone is what this is played on, so it is the first thing to go;
+                   the act still travels on the fight's own line and on the front room's summary. */}
+                <span className={`cm-who${(run.act || 1) > 1 ? " is-deep" : ""}`}>{actName(run.act || 1)}</span>
                 <Sprite className="cm-ui" src="/images/cards/chrome/ui-heart.png" />
                 <b className="cm-hp">{run.hp}/{run.hpMax}</b>
                 <Sprite className="cm-ui" src="/images/cards/chrome/ui-ember.png" />
@@ -171,7 +172,7 @@ export default function CardMap({ run, art = {} }) {
                     their own; both were furniture for something you own between zero and four of. They sit
                     beside the potions now — one row, one tap each, and nothing at all when empty. */}
                 {perks.map((id) => {
-                    const perk = PERKS[id];
+                    const perk = perkById(id);
                     if (!perk) return null;
                     return (
                         <button key={id} type="button" className="cm-hold" onClick={() => setCarry(id)}
@@ -333,7 +334,7 @@ export default function CardMap({ run, art = {} }) {
                             <p className="cm-panel-note">Nothing yet. Trinkets come out of chests and elites.</p>
                         )}
                         {perks.map((id) => {
-                            const perk = PERKS[id];
+                            const perk = perkById(id);
                             if (!perk) return null;
                             return (
                                 <span key={id} className={`cm-carry-row${carry === id ? " is-lit" : ""}`}>
@@ -373,6 +374,10 @@ export default function CardMap({ run, art = {} }) {
                 .cm-gap { flex: 1 1 auto; }
                 .cm-who { display: none; font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
                     color: #e6ecf4; margin-right: 4px; }
+                /* ⚠️ PAST THE FIRST BOSS IT EARNS THE SPACE ON A PHONE TOO. "The Sand" on act one is telling
+                   somebody the name of the only place they have ever been; "The Deep" on act two is telling
+                   them the boss they just killed bought them something. */
+                .cm-who.is-deep { display: inline; font-size: 12.5px; color: #ffd9a6; white-space: nowrap; }
                 .cm-hold { padding: 0 1px; border: 0; background: none; cursor: pointer; line-height: 0; }
                 .cm-hold:active { transform: translateY(1px); }
                 .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;

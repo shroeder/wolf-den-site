@@ -5,9 +5,9 @@ import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
-    ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS,
-    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty, buildShop, cardById, encounterById,
-    nextRand, pickEncounter, stopAt, unlockedCards,
+    ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
+    POTION_IDS, POTION_SLOTS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty, buildShop,
+    cardById, encounterById, nextRand, pickEncounter, stopAt, unlockedCards,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -138,6 +138,10 @@ const newRun = (seed) => ({
     // null when the player is looking at the map; `trail` is every room already taken, which is the only way
     // the sheet can draw where you have been.
     map: buildMap(seed >>> 0),
+    // WHICH ACT THIS IS. A run that has never seen a boss is act 1 and says nothing about acts anywhere;
+    // beating one moves this and rebuilds the sheet (nextAct).
+    act: 1,
+    bossOffers: null,   // the three boss trinkets on the table, between the boss dying and the next act
     at: null,
     trail: [],
     hp: 70, hpMax: 70,
@@ -259,7 +263,7 @@ export async function bumpCardProgress(buyerId, field, { bestStop = 0 } = {}) {
 export async function eligibleCards(buyerId, run) {
     const [have, progress] = await Promise.all([ownedPetIds(buyerId), cardProgress(buyerId)]);
     const earned = unlockedCards(progress);
-    const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind).offer;
+    const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind, run.act || 1).offer;
     // A CARD YOU EARNED BY PLAYING IGNORES THE PET GATE. That is the entire point of it — see the note above
     // UNLOCKS — but it still obeys DEPTH, because tier is about what a fight at this stop should be handing
     // you and has nothing to do with how you came by the card.
@@ -394,7 +398,7 @@ export async function runFixture(buyerId, run) {
     // The room being stood in decides the fight: its row sets the curve, its kind sets the shape. A run
     // with no room selected is not in a fight at all — the page shows the map instead.
     const room = run.at || { row: run.stop - 1, kind: "fight" };
-    const stop = stopAt(room.row + 1, room.kind);
+    const stop = stopAt(room.row + 1, room.kind, run.act || 1);
     // ── THE ROOM PICKS A GROUP, NOT A MULTIPLIER ─────────────────────────────────────────────────────
     // This used to take three fixed shapes and scale their health by the row, which made every fight on the
     // climb the same fight in a bigger coat. The band the row falls in now decides which POOL the party is
@@ -476,10 +480,68 @@ export async function shopStock(buyerId, run, seed) {
  * Ember Heart quietly paying its +8 in one place and not the other. Mutates `run` because that is what every
  * handler in the route does with it.
  */
+/**
+ * Put a trinket on the strip and pay whatever it costs on the way in.
+ *
+ * ⚠️ TWO CATALOGUES, ONE FUNCTION. The ordinary trinkets come out of PERKS and the boss ones out of
+ * BOSS_PERKS, and every reader of a run — the engine's perkSum, the map's strip, the carrying panel — looks
+ * a perk up by id without caring which list it came from. A second "take a boss perk" path is how the +20
+ * max health from The Old Wolf gets paid twice, or not at all.
+ *
+ * A BOSS TRINKET CAN COST YOU SOMETHING, which is what makes it a decision rather than a prize: `maxHpDown`
+ * is the Coffee Dripper trade — the energy is worth more than the health, but only if you can survive it.
+ * `embers` pays out once, here, because a trinket that quietly changes your purse is a trinket nobody sees.
+ */
 export function takePerk(run, perkId) {
-    if (!perkId || (run.perks || []).includes(perkId)) return false;
+    const perk = PERKS[perkId] || BOSS_PERKS[perkId];
+    if (!perk || (run.perks || []).includes(perkId)) return false;
     run.perks = [...(run.perks || []), perkId];
-    const bump = PERKS[perkId]?.maxHp || 0;
-    if (bump) { run.hpMax += bump; run.hp += bump; }
+    if (perk.maxHp) { run.hpMax += perk.maxHp; run.hp += perk.maxHp; }
+    if (perk.maxHpDown) {
+        run.hpMax = Math.max(10, run.hpMax - perk.maxHpDown);
+        run.hp = Math.max(1, Math.min(run.hp, run.hpMax));
+    }
+    if (perk.embers) run.embers = (run.embers || 0) + perk.embers;
     return true;
+}
+
+/**
+ * The three boss trinkets on the table, and the act that follows them.
+ *
+ * Threaded off the run's own seed and its act, so reloading the choice screen re-offers the same three — the
+ * same rule the card rewards and the merchant's shelf already follow. One you already carry cannot be offered
+ * again; with five in the catalogue and one taken per boss, act three still has a real choice.
+ */
+export function bossOffers(run) {
+    const held = new Set(run.perks || []);
+    const pool = BOSS_PERK_IDS.filter((id) => !held.has(id));
+    let roll = (run.seed >>> 0) + (run.act || 1) * 9176;
+    const out = [];
+    while (out.length < 3 && pool.length) {
+        const [r, next] = nextRand(roll);
+        roll = next;
+        out.push(pool.splice(Math.floor(r * pool.length), 1)[0]);
+    }
+    return out;
+}
+
+/**
+ * Walk out of one act and into the next: a new sheet, the same deck, the health you finished on.
+ *
+ * ⚠️ A NEW MAP MEANS A NEW SEED FOR THE MAP AND NOT FOR THE RUN. The run's seed is what makes a run
+ * reproducible; the act is mixed into buildMap instead, so act two of run 4471 is always the same act two.
+ * `stop` keeps counting from where it was — the ladder reads it for the curve inside an act — and the trail
+ * has to be emptied or the new sheet opens with the last act's path drawn across it.
+ */
+export function nextAct(run) {
+    run.act = (run.act || 1) + 1;
+    run.map = buildMap(((run.seed >>> 0) + run.act * 7717) >>> 0);
+    run.trail = [];
+    run.at = null;
+    run.stop = 1;
+    run.offers = null;
+    run.bossOffers = null;
+    run.fight = null;
+    run.shop = null;
+    return run;
 }

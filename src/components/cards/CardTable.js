@@ -56,7 +56,7 @@ export default function CardTable({ run }) {
                     A front room that cannot tell you how far in you are is a door with a picture on it. */}
                 {live ? (
                     <p className="ct-state">
-                        {stopLabel(run.stop || 1)}
+                        {stopLabel(run.stop || 1, { act: run.act })}
                         <span className="ct-dot" aria-hidden="true">·</span>
                         <b className="ct-hp">{run.hp}/{run.hpMax}</b> health
                         <span className="ct-dot" aria-hidden="true">·</span>

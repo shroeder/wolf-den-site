@@ -407,6 +407,57 @@ export const POTION_IDS = Object.keys(POTIONS);
 
 export const RUN_LENGTH = 15;
 
+// ── THE RUN IS THREE ACTS, NOT ONE ───────────────────────────────────────────────────────────────────────
+// Luke, having just killed the boss: "the run isn't supposed to end when you beat the boss. Look at how Slay
+// the Spire does it — when you beat the boss of the first one you get a really powerful enhancement that you
+// get to choose from, and then you keep going."
+//
+// He is describing the shape of their whole game and the reason a run is a run rather than a level: the boss
+// is a GATE, not an ending. You pay for it in health, you are paid in a relic strong enough to change how you
+// play, and the next act opens harder. Ending at the first boss meant our best runs finished at the exact
+// moment the deck became interesting.
+export const ACTS = 3;
+export const ACT_NAMES = ["The Sand", "The Deep", "The Spire"];
+export const actName = (act) => ACT_NAMES[Math.max(0, Math.min(ACT_NAMES.length - 1, (act || 1) - 1))];
+
+// ── THE BOSS TRINKETS ────────────────────────────────────────────────────────────────────────────────────
+// Theirs are the relics you only ever get from a boss and they are deliberately game-changing, most with a
+// cost attached — Coffee Dripper buys +1 energy every turn and takes away resting; Philosopher's Stone buys
+// the same energy and gives every enemy Strength. That trade is the whole design: a boss relic should change
+// what your deck IS, not add six per cent to it.
+//
+// ⚠️ `energyEach` IS A NEW FIELD AND THE ENGINE HAD TO LEARN IT. Every perk until now paid on the FIRST turn
+// (see beginTurn); +1 energy a turn for the rest of the run is the first thing in this game that changes
+// every turn of every fight, which is exactly why it is worth a boss.
+export const BOSS_PERKS = {
+    ember_crown: { id: "ember_crown", name: "Ember Crown", icon: "energy", energyEach: 1, maxHpDown: 8,
+        text: "+1 energy every turn. -8 max health." },
+    war_banner: { id: "war_banner", name: "War Banner", icon: "sword", strength: 3,
+        text: "Start every fight with 3 Strength." },
+    stone_hide: { id: "stone_hide", name: "Stone Hide", icon: "shield", block: 12,
+        text: "Start every fight with 12 Block." },
+    deep_pockets: { id: "deep_pockets", name: "Deep Pockets", icon: "ember", embers: 150, draw: 1,
+        text: "150 embers now, and one extra card on your first turn." },
+    old_wolf: { id: "old_wolf", name: "The Old Wolf", icon: "heart", maxHp: 20, healAfter: 4,
+        text: "+20 max health, healed for it now, and heal 4 after every win." },
+};
+export const BOSS_PERK_IDS = Object.keys(BOSS_PERKS);
+
+/**
+ * ⚠️ EVERY READER OF A TRINKET LOOKS IT UP HERE, NOT IN PERKS.
+ *
+ * The boss trinkets are authored in their own object because they are a different KIND of reward — one per
+ * act, chosen, powerful enough to carry a cost — but nothing downstream cares about that. The strip on the
+ * map, the carrying panel, the fight's own row, the shop's shelf and, most of all, perkSum inside the engine
+ * all ask the same question: what does the thing with this id do?
+ *
+ * Measured before it was believed: with the lookups pointing at PERKS alone, an Ember Crown taken off the
+ * first boss did not appear on the bar and — far worse — perkSum could not see it, so its whole reason for
+ * existing (+1 energy every turn) silently did nothing.
+ */
+export const ALL_PERKS = { ...PERKS, ...BOSS_PERKS };
+export const perkById = (id) => ALL_PERKS[String(id || "")] || null;
+
 /**
  * How far in you are, in words.
  *
@@ -418,10 +469,13 @@ export const RUN_LENGTH = 15;
  * One function, because the same sentence is printed in the HUD, on the death card, in the abandon dialog and
  * on the front room's summary line, and four copies of an off-by-one is four places to fix it next time.
  */
-export const stopLabel = (stop, { capital = true } = {}) => {
+export const stopLabel = (stop, { capital = true, act = 0 } = {}) => {
     const n = Math.max(1, Math.floor(Number(stop) || 1));
-    if (n > RUN_LENGTH) return capital ? "The boss" : "the boss";
-    return `${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
+    // THE ACT IS ONLY WORTH SAYING ONCE THERE IS MORE THAN ONE. A run that has never been past the first
+    // boss should not be reading "Act 1" at itself on every screen.
+    const where = act > 1 ? `Act ${act} · ` : "";
+    if (n > RUN_LENGTH) return `${where}${capital ? "The boss" : "the boss"}`;
+    return `${where}${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
 };
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -508,19 +562,25 @@ export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds 
 }
               // map rows; the boss stands above them
 
-export function roomFight(row, kind = "fight") {
+// ⚠️ AND THE ACT IS PART OF THE PRICE NOW. Their act 2 is not act 1 with more rooms — the same shapes hit
+// harder and the good cards start appearing sooner, which is what makes the relic you just won feel like it
+// was needed rather than like a lap of honour. 35% more health per act, and the card tiers open a rung early.
+const actScale = (act) => 1 + 0.35 * (Math.max(1, Math.min(ACTS, act || 1)) - 1);
+export function roomFight(row, kind = "fight", act = 1) {
     const t = Math.max(0, Math.min(1, (row - 1) / (RUN_LENGTH - 1)));   // 0 at the bottom, 1 at the top
-    if (kind === "boss") return { foes: 1, hp: 3.2 + t, offer: 3 };
-    if (kind === "elite") return { foes: 2, hp: 1.35 + t * 0.6, offer: t > 0.55 ? 3 : 2 };
+    const k = actScale(act);
+    const tierUp = (n) => Math.min(3, n + (act > 1 ? 1 : 0));
+    if (kind === "boss") return { foes: 1, hp: (3.2 + t) * k, offer: 3 };
+    if (kind === "elite") return { foes: 2, hp: (1.35 + t * 0.6) * k, offer: tierUp(t > 0.55 ? 3 : 2) };
     return {
         foes: row < 3 ? 2 : 3,
-        hp: 0.7 + t * 0.75,
-        offer: t < 0.3 ? 1 : t < 0.7 ? 2 : 3,
+        hp: (0.7 + t * 0.75) * k,
+        offer: tierUp(t < 0.3 ? 1 : t < 0.7 ? 2 : 3),
     };
 }
 
 // Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
-export const stopAt = (n, kind = "fight") => ({ n, kind, ...roomFight(n, kind) });
+export const stopAt = (n, kind = "fight", act = 1) => ({ n, kind, act, ...roomFight(n, kind, act) });
 
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",
@@ -937,7 +997,7 @@ export function pickEncounter(seed, n, kind = "fight", recent = []) {
 // time rather than closing over a map that is still empty at module-evaluation order.
 /** What the carried perks add up to for one field. */
 export const perkSum = (perks, field) => (perks || [])
-    .reduce((n, id) => n + (Number(PERKS[id]?.[field]) || 0), 0);
+    .reduce((n, id) => n + (Number(ALL_PERKS[id]?.[field]) || 0), 0);
 
 // ── A CARD, UPGRADED OR NOT ──────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE DECK IS A LIST OF IDS AND IT HAS TO STAY ONE. A run's deck is stored as strings and read by a dozen
@@ -1120,7 +1180,9 @@ function beginTurn(state) {
     const opened = {
         ...state,
         turn: state.turn + 1,
-        energy: state.energyMax + (first ? perkSum(state.perks, "energy") : 0),
+        // `energy` is a first-turn gift (Old Lantern); `energyEach` is a boss trinket and pays EVERY turn.
+        energy: state.energyMax + perkSum(state.perks, "energyEach")
+            + (first ? perkSum(state.perks, "energy") : 0),
         hero: { ...state.hero, block: first ? state.hero.block : 0 },
     };
     return drawCards(opened, DRAW_PER_TURN + (first ? perkSum(state.perks, "draw") : 0));

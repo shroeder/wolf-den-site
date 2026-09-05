@@ -6,7 +6,7 @@ import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
-import { PERKS, POTIONS, POTION_SLOTS, cardById, removalCost } from "@/lib/marketplace/cards-kit.js";
+import { POTIONS, POTION_SLOTS, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -55,7 +55,7 @@ function itemFace(item) {
         const p = POTIONS[item.ref];
         return { name: p?.name || item.ref, text: p?.text || "" };
     }
-    const k = PERKS[item.ref];
+    const k = perkById(item.ref);
     return { name: k?.name || item.ref, text: k?.text || "" };
 }
 
