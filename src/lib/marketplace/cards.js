@@ -6,7 +6,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL, POTION_IDS, POTION_SLOTS,
-    RUN_LENGTH, SHOP, STARTER_DECK, buildParty, buildShop, encounterById, nextRand, pickEncounter, stopAt,
+    RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, buildParty, buildShop, encounterById, nextRand, pickEncounter, stopAt,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -143,7 +143,9 @@ const newRun = (seed) => ({
     trail: [],
     hp: 70, hpMax: 70,
     embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
-    perks: [],             // kept for the whole run and applied at the start of every fight (PERKS)
+    // ⚠️ YOU START HOLDING ONE. Theirs does — every character opens with a relic and the Ironclad's heals 6
+    // after every win. See STARTER_PERK: it is what makes an act survivable without making a fight easy.
+    perks: [STARTER_PERK],
     potions: [],           // up to POTION_SLOTS, drunk in a fight (POTIONS)
     shop: null,            // the merchant's shelf while you are stood in one; cleared on the way out
     removals: 0,           // cards paid to be rid of, for the escalating price — see removalCost

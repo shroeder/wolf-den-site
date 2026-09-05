@@ -219,8 +219,25 @@ export const PERKS = {
         text: "One extra energy on your first turn." },
     iron_ration: { id: "iron_ration", name: "Iron Ration", icon: "ration", healAfter: 5,
         text: "Heal 5 after every fight you win." },
+    // Theirs: Burning Blood. The relic the Ironclad opens every single run holding — see STARTER_PERK below.
+    warm_blood: { id: "warm_blood", name: "Warm Blood", icon: "heart", healAfter: 6,
+        text: "Heal 6 after every fight you win." },
 };
-export const PERK_IDS = Object.keys(PERKS);
+// ── THE ONE YOU START WITH ───────────────────────────────────────────────────────────────────────────────
+// ⚠️ EVERY SPIRE CHARACTER OPENS THE GAME HOLDING A RELIC, and the Ironclad's is Burning Blood: heal 6 after
+// every combat won. It reads as a small thing and it is worth more than any card in the starter deck — nine
+// fights in an act is fifty-four health, which is most of a second health bar.
+//
+// We had nothing of the kind, and the sim says that absence WAS the act's difficulty. With the foe health
+// priced to their act 1 the opening rooms came out right — 42 party health, 3.8 turns, 13 lost — and runs
+// still died at row 5.9, because nothing ever gave any of it back except two campfires. An act is an
+// attrition problem, and theirs hands you the answer to it in the first second of the game.
+//
+// It is NOT in PERK_IDS: an elite that hands over the perk you already started with is a wasted elite, and a
+// shop that sells it is a shelf slot spent on nothing. See buildShop and grantForRoom, which both draw from
+// PERK_IDS and so cannot reach it.
+export const STARTER_PERK = "warm_blood";
+export const PERK_IDS = Object.keys(PERKS).filter((id) => id !== STARTER_PERK);
 
 // ── POTIONS ──────────────────────────────────────────────────────────────────────────────────────────────
 // Three slots, carried between fights, drunk on the turn you need them. Theirs sit in the top bar beside the
@@ -359,6 +376,18 @@ export const STARTER_DECK = [
 //
 // `after` is keyed by the move just played; weights are relative and need not sum to anything. `limit` is the
 // most times a move may appear CONSECUTIVELY.
+// ⚠️ AND THE OTHER HALF OF THE SAME PROBLEM IS HOW HARD THEY HIT ────────────────────────────────────────────
+// Pricing the health against their act 1 fixed the opening rooms and moved the wall rather than removing it:
+// runs kept dying around row 6, losing THIRTY health a fight in the middle band. The sim says why. A Spire
+// act-1 room of three enemies is three Louses — five to seven each, about eighteen a turn between them. Ours
+// was a Bruiser, a Jackal and a Ravener: thirteen, eight and twelve with a ramp on top, better than thirty a
+// turn, which is nearly half the hero's whole bar every round. Two to three creatures all swinging like a
+// boss is a different game from one creature swinging like a boss.
+//
+// So the middle and deep bands come down to where a party of them totals what one of theirs does, and the
+// telegraphed wind-ups (Crush, Heave, BEHEAD) stay the biggest number on the board because a wind-up you can
+// see and cover is the whole shape of the fight. Nothing in the easy pool moved: a Cur at 4/7 and a Jackal at
+// 5/8 already ARE a Louse and a Fungi Beast.
 export const FOE_SCRIPTS = {
     // ── THE SHALLOWS ─────────────────────────────────────────────────────────────────────────────────
     cur: {
@@ -382,8 +411,8 @@ export const FOE_SCRIPTS = {
         open: "brace",
         moves: {
             brace: { key: "brace", label: "Brace", block: 9 },
-            swing: { key: "swing", label: "Swing", damage: 13 },
-            crush: { key: "crush", label: "Crush", damage: 18 },
+            swing: { key: "swing", label: "Swing", damage: 10 },
+            crush: { key: "crush", label: "Crush", damage: 14 },
         },
         after: { brace: [["swing", 60], ["crush", 40]], swing: [["crush", 45], ["brace", 55]], crush: [["brace", 70], ["swing", 30]] },
         limit: { crush: 1, swing: 2 },
@@ -393,11 +422,17 @@ export const FOE_SCRIPTS = {
     // A WALL, and the reason a deck needs one big card: it guards more than a hand of small blows can remove
     // in a turn, so you have to hold a real hit for the beat after the wall.
     warden: {
+        // ⚠️ EIGHT, NOT FOURTEEN. A wall is a good idea at the wrong size: fourteen block against a starter
+        // deck whose best card deals nine means the whole turn is spent getting back to zero, and the sim
+        // showed it — ramper+warden ran 7.3 turns and cost 30 health, the worst room in the act, met two
+        // hundred times in eight hundred runs. Theirs has almost no blocking enemies in act 1 at all; the
+        // Shelled Parasite is an ACT 2 creature. Eight is still a wall you have to hold a real hit for, and
+        // it is one card rather than a whole turn.
         open: "wall",
         moves: {
-            wall: { key: "wall", label: "Wall", block: 14 },
+            wall: { key: "wall", label: "Wall", block: 8 },
             jab: { key: "jab", label: "Jab", damage: 6 },
-            hew: { key: "hew", label: "Hew", damage: 11 },
+            hew: { key: "hew", label: "Hew", damage: 9 },
         },
         after: { wall: [["jab", 55], ["hew", 45]], jab: [["wall", 65], ["hew", 35]], hew: [["wall", 70], ["jab", 30]] },
         limit: { wall: 2 },
@@ -426,9 +461,11 @@ export const FOE_SCRIPTS = {
     ramper: {
         open: "roar",
         moves: {
-            roar: { key: "roar", label: "Roar", strength: 3 },
-            swing: { key: "swing", label: "Swing", damage: 8 },
-            rend: { key: "rend", label: "Rend", damage: 12 },
+            // TWO. Their ramping enemy is the Cultist: +3 a turn, but it has 48 health and is dead in
+            // three or four. A ramp is priced by how many turns it gets, and ours were getting seven.
+            roar: { key: "roar", label: "Roar", strength: 2 },
+            swing: { key: "swing", label: "Swing", damage: 7 },
+            rend: { key: "rend", label: "Rend", damage: 10 },
         },
         after: { roar: [["swing", 60], ["rend", 40]], swing: [["rend", 40], ["roar", 35], ["swing", 25]], rend: [["roar", 50], ["swing", 50]] },
         limit: { roar: 1, swing: 2 },
@@ -438,8 +475,8 @@ export const FOE_SCRIPTS = {
     mauler: {
         open: "maul",
         moves: {
-            maul: { key: "maul", label: "Maul", damage: 16 },
-            heave: { key: "heave", label: "Heave", damage: 24 },
+            maul: { key: "maul", label: "Maul", damage: 13 },
+            heave: { key: "heave", label: "Heave", damage: 19 },
             snort: { key: "snort", label: "Snort", block: 10 },
         },
         after: { maul: [["maul", 40], ["heave", 45], ["snort", 15]], heave: [["snort", 40], ["maul", 60]], snort: [["heave", 55], ["maul", 45]] },
@@ -451,7 +488,7 @@ export const FOE_SCRIPTS = {
         open: "drain",
         moves: {
             drain: { key: "drain", label: "Drain", damage: 9, heal: 8 },
-            gorge: { key: "gorge", label: "Gorge", damage: 14 },
+            gorge: { key: "gorge", label: "Gorge", damage: 12 },
             writhe: { key: "writhe", label: "Writhe", block: 8, heal: 5 },
         },
         after: { drain: [["drain", 35], ["gorge", 40], ["writhe", 25]], gorge: [["drain", 65], ["writhe", 35]], writhe: [["drain", 55], ["gorge", 45]] },
@@ -463,9 +500,9 @@ export const FOE_SCRIPTS = {
     champion: {
         open: "bellow",
         moves: {
-            bellow: { key: "bellow", label: "Bellow", strength: 4 },
-            guard: { key: "guard", label: "Guard", block: 16 },
-            cleave: { key: "cleave", label: "Cleave", damage: 15 },
+            bellow: { key: "bellow", label: "Bellow", strength: 3 },
+            guard: { key: "guard", label: "Guard", block: 11 },
+            cleave: { key: "cleave", label: "Cleave", damage: 13 },
         },
         after: { bellow: [["cleave", 65], ["guard", 35]], guard: [["cleave", 75], ["bellow", 25]], cleave: [["cleave", 35], ["guard", 35], ["bellow", 30]] },
         limit: { bellow: 1, cleave: 2 },
@@ -477,7 +514,7 @@ export const FOE_SCRIPTS = {
         moves: {
             sharpen: { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
             hew: { key: "hew", label: "Hew", damage: 12 },
-            behead: { key: "behead", label: "BEHEAD", damage: 30 },
+            behead: { key: "behead", label: "BEHEAD", damage: 24 },
         },
         after: { sharpen: [["hew", 55], ["behead", 45]], hew: [["behead", 60], ["sharpen", 40]], behead: [["sharpen", 65], ["hew", 35]] },
         limit: { behead: 1, hew: 2 },
@@ -549,31 +586,52 @@ export function pickNextMove(script, played, recent, rngSeed) {
 //
 // HP IS A RANGE, ROLLED PER FIGHT, for the same reason theirs is: an exact integer invites arithmetic, a range
 // invites judgement. Rolled off the room's seed, so a refresh finds the same creature.
+// ⚠️ THESE NUMBERS ARE SET AGAINST SLAY THE SPIRE'S ACT 1, NOT AGAINST EACH OTHER ────────────────────────────
+// Luke: "our enemies have a lot more health than their enemies right from the get-go of the game." Measured
+// over 800 simulated runs (scripts/cards-run-sim.mjs), the old table played like this:
+//
+//     rows 1-3:  75 party hp   5.4 turns   24.5 hp lost a fight      0 of 800 runs finished
+//
+// Theirs opens on 20-30 (two Louses) and 40-54 (a Jaw Worm, a Cultist, a Slaver), and those fights are over
+// in two to three turns. Ours were seventy-five points of health against a starter deck that deals about
+// thirteen a turn — six turns, and every extra turn is another whole round of being hit. THAT is what a
+// health total actually sets: not "how tough", but "how many times it swings before it dies". A third of the
+// hero's health per fight, three fights to a corpse, average death at row 3.9 and the boss never once seen.
+//
+// So every line below is priced off the creature it corresponds to in their act 1, and the sim is the check:
+//     cur      = Louse            jackal  = Fungi Beast     swarmlet = a Gremlin
+//     bruiser  = Jaw Worm         hexer   = Blue Slaver     warden   = Looter/Slaver
+//     champion = Gremlin Nob      headsman= Lagavulin       sentinel = a Sentry
+//     warlord  = an act 1 boss (theirs are 140-250)
+//
+// Damage is deliberately UNTOUCHED. Their act 1 hits for 5-12 a beat and so does ours; the bruiser's 18 is a
+// telegraphed wind-up behind a Brace, which is exactly the Jaw Worm's shape. Length was the whole defect.
 export const FOES = {
     // ── THE SMALL ONES — the easy pool's whole cast.
-    cur:      { id: "cur",      name: "Cur",       hp: [28, 34],   script: "cur" },
-    jackal:   { id: "jackal",   name: "Jackal",    hp: [40, 46],   script: "jackal" },
-    swarmlet: { id: "swarmlet", name: "Biter",     hp: [24, 30],   script: "swarm" },
+    cur:      { id: "cur",      name: "Cur",       hp: [14, 18],   script: "cur" },
+    jackal:   { id: "jackal",   name: "Jackal",    hp: [20, 24],   script: "jackal" },
+    swarmlet: { id: "swarmlet", name: "Biter",     hp: [12, 16],   script: "swarm" },
 
     // ── THE MIDDLE — what the hard pool is built from.
-    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [56, 64],   script: "bruiser" },
-    hexer:    { id: "hexer",    name: "Hexer",     hp: [42, 50],   script: "hexer" },
-    warden:   { id: "warden",   name: "Warden",    hp: [58, 66],   script: "warden" },
-    ramper:   { id: "ramper",   name: "Ravener",   hp: [54, 62],   script: "ramper" },
+    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [36, 42],   script: "bruiser" },
+    hexer:    { id: "hexer",    name: "Hexer",     hp: [26, 32],   script: "hexer" },
+    warden:   { id: "warden",   name: "Warden",    hp: [34, 40],   script: "warden" },
+    ramper:   { id: "ramper",   name: "Ravener",   hp: [32, 38],   script: "ramper" },
 
     // ── THE DEEP — bigger creatures, not bigger versions of the same ones.
-    mauler:   { id: "mauler",   name: "Mauler",    hp: [84, 94],   script: "mauler" },
-    leech:    { id: "leech",    name: "Bloodleech", hp: [76, 86],  script: "leech" },
+    mauler:   { id: "mauler",   name: "Mauler",    hp: [58, 66],   script: "mauler" },
+    leech:    { id: "leech",    name: "Bloodleech", hp: [52, 60],  script: "leech" },
 
     // ── ELITE-ONLY. Theirs are dedicated monsters — a Gremlin Nob is never a normal room — so an elite here
     // is never two ordinary enemies standing closer together either.
-    champion: { id: "champion", name: "Champion",  hp: [124, 138], script: "champion" },
-    headsman: { id: "headsman", name: "Headsman",  hp: [158, 176], script: "headsman" },
-    sentinel: { id: "sentinel", name: "Sentinel",  hp: [88, 100],  script: "warden" },
-    gorger:   { id: "gorger",   name: "Gorger",    hp: [88, 100],  script: "leech" },
+    champion: { id: "champion", name: "Champion",  hp: [84, 92],   script: "champion" },
+    headsman: { id: "headsman", name: "Headsman",  hp: [106, 116], script: "headsman" },
+    sentinel: { id: "sentinel", name: "Sentinel",  hp: [40, 46],   script: "warden" },
+    gorger:   { id: "gorger",   name: "Gorger",    hp: [50, 58],   script: "leech" },
 
-    // ── THE BOSS.
-    warlord:  { id: "warlord",  name: "Warlord",   hp: [185, 205], script: "warlord" },
+    // ── THE BOSS. The one number that goes UP: theirs are 140-250 and a boss is meant to be the wall at the
+    // top of the act, so cutting the road to it and leaving the door the same size is the wrong trade.
+    warlord:  { id: "warlord",  name: "Warlord",   hp: [210, 235], script: "warlord" },
 };
 
 /** A creature's health for this fight — its own range, rolled off the room's seed. */
