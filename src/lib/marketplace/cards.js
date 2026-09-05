@@ -97,6 +97,10 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
             // How much it curls for when first hit — a Louse's whole identity, and the one creature field
             // that has to survive the trip from the rules to the fight (see `land` in cards-kit).
             curl: group[i].curl || 0,
+            plate: group[i].plate || 0,
+            thorns: group[i].thorns || 0,
+            onDeath: group[i].onDeath || null,
+            split: group[i].split || null,
             // What KIND of thing this is, beside whose face it is wearing. The Road fighter supplies the
             // portrait and the name; the creature supplies the health, the moveset and — once the screen
             // shows it — the thing a player can actually learn.

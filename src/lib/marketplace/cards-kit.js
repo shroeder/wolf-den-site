@@ -252,6 +252,35 @@ export const POOL = {
 
 // The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
 // choice of three every time — see the note above POOL.
+// ── THE JUNK THEY PUT IN YOUR DECK ───────────────────────────────────────────────────────────────────────
+// Luke: "just do what they do and stop treating ours like it's real."
+//
+// Half their bestiary attacks the DECK rather than the health bar, and this was the biggest thing the enemies
+// were missing: a Slimed is a card that sits in your hand doing nothing, a Wound is a card you drew instead of
+// a Strike, a Burn hurts you for still holding it, a Dazed cannot even be discarded by playing it. That is
+// what makes an Acid Slime different from a bigger Jackal, and until now every one of those moves was carrying
+// a shrug of Frail instead.
+//
+// ⚠️ THEY ARE REAL CARDS IN THE REAL DECK, not a counter on the side. They are drawn, they take a slot in
+// your hand, they are shuffled back with everything else — which is the whole point of them — and they leave
+// when the fight does, because they are never written to run.deck.
+//
+//   `unplayable`  the card cannot be played at all (Wound, Dazed)
+//   `ethereal`    it exhausts itself at the end of the turn if still held (Dazed)
+//   `burn`        it hurts you at the end of the turn if still held (Burn)
+//   `exhaust`     played once and gone for the fight (Slimed, which is at least a way to be rid of it)
+export const STATUS_CARDS = {
+    slimed: { id: "slimed", name: "Slimed", cost: 1, kind: "status", target: "self", status: true,
+        exhaust: true, text: "Exhaust." },
+    wound: { id: "wound", name: "Wound", cost: 0, kind: "status", target: "self", status: true,
+        unplayable: true, text: "Unplayable." },
+    dazed: { id: "dazed", name: "Dazed", cost: 0, kind: "status", target: "self", status: true,
+        unplayable: true, ethereal: true, text: "Unplayable. Ethereal." },
+    burn: { id: "burn", name: "Burn", cost: 0, kind: "status", target: "self", status: true,
+        unplayable: true, burn: 2, text: "Unplayable. At the end of your turn, take 2 damage." },
+};
+export const STATUS_IDS = Object.keys(STATUS_CARDS);
+
 export const BASIC_UNLOCKS = ["swipe", "scuttle", "peck", "hoot", "coils", "rally"];
 
 // ── THE CARDS PLAYING EARNS YOU ──────────────────────────────────────────────────────────────────────────
@@ -330,8 +359,9 @@ export const unlockedCards = (progress) => new Set(
     UNLOCK_IDS.filter((id) => meetsNeed(progress, UNLOCKS[id].need))
 );
 
-/** Every card the game knows about: the starter four, the whole pet pool, and what playing earns. */
-export const ALL_CARDS = { ...CARDS, ...POOL, ...UNLOCKS };
+/** Every card the game knows about: the starter four, the whole pet pool, what playing earns — and the junk
+ *  their enemies deal into your deck, which is a card like any other as far as every renderer is concerned. */
+export const ALL_CARDS = { ...CARDS, ...POOL, ...UNLOCKS, ...STATUS_CARDS };
 
 // ── HOW HARD A ROOM IS ───────────────────────────────────────────────────────────────────────────────────
 // This was an eight-entry ladder, one row per stop, back when a run was a straight line. The map is fifteen
@@ -1401,6 +1431,13 @@ export function buildParty(encounter, seed) {
             foe: def.id, name: def.name, script: def.script,
             hp: foeHp(def.id, seeded),
             curl: foeCurl(def.id, seeded),
+            // Everything else that is true of the creature rather than of its turn — see the note in
+            // startFight. A creature that loses its armour or its death rattle between the rules and the
+            // fight is a creature that does not behave like the one in the table.
+            plate: def.plate || 0,
+            thorns: def.thorns || 0,
+            onDeath: def.onDeath || null,
+            split: def.split || null,
         };
     });
 }
@@ -1600,10 +1637,80 @@ export function splitDamage(unit, amount) {
     return { absorbed, toHp: Math.max(0, amount - absorbed) };
 }
 
+/**
+ * ── WHAT HAPPENS WHEN A CREATURE FALLS APART ─────────────────────────────────────────────────────────────
+ * Two of their mechanics live here because both are "the board changed because something took damage", and
+ * both have to run identically whether the blow came from a card or from another creature.
+ *
+ * SPLITTING: their Slime Boss becomes two Large Slimes at half health, and each keeps the parent's CURRENT
+ * health rather than half of it — the reason the split is frightening is that it doubles the bodies without
+ * halving the problem. The parent leaves the board.
+ *
+ * DEATH TRIGGERS: a Fungi Beast's spore cloud (Vulnerable on you as it dies), a Darkling's reincarnation.
+ * Marked `reaped` once run, because the corpse stays on the board until the fight ends and this must not
+ * fire on every subsequent pass.
+ *
+ * Returns the new foes and the events they earned; the caller owns the hero, because a spore cloud lands on
+ * them and a split does not.
+ */
+function reap(foes, hero) {
+    const events = [];
+    let out = [];
+    let touched = hero;
+    for (const f of foes) {
+        if (f.hp > 0 && f.split && !f.hasSplit && f.hp <= Math.floor((f.hpMax || f.hp) / 2)) {
+            const parts = (f.split.into || []).map((id, n) => {
+                const def = FOES[id] || {};
+                const script = FOE_SCRIPTS[def.script] || f.script;
+                return {
+                    ...f,
+                    id: `${f.id}s${n}`,
+                    name: def.name || f.name, foe: def.id || f.foe, foeName: def.name || f.foeName,
+                    hp: f.hp, hpMax: f.hp,
+                    script, next: script.open, recent: [], beat: 0, block: 0,
+                    split: null, hasSplit: true, summoned: true,
+                };
+            });
+            events.push({ type: "split", on: f.id, into: parts.length });
+            out = [...out, ...parts];
+            continue;
+        }
+        if (f.hp <= 0 && f.onDeath && !f.reaped) {
+            const d = f.onDeath;
+            if (d.vulnerable) {
+                touched = { ...touched, vulnerable: (touched.vulnerable || 0) + d.vulnerable };
+                events.push({ type: "debuff", on: "hero", amount: d.vulnerable, stat: "vulnerable" });
+            }
+            if (d.weak) {
+                touched = { ...touched, weak: (touched.weak || 0) + d.weak };
+                events.push({ type: "debuff", on: "hero", amount: d.weak, stat: "weak" });
+            }
+            if (d.damage) {
+                touched = land(touched, d.damage);
+                events.push({ type: "damage", on: "hero", amount: d.damage });
+            }
+            // REBIRTH: the Awakened One stands back up once, at a health of its own. Same field, because it
+            // is the same question — what does this creature do the moment it dies.
+            if (d.rebirth) {
+                out = [...out, { ...f, hp: d.rebirth, hpMax: d.rebirth, reaped: true, block: 0, beat: 0 }];
+                events.push({ type: "rebirth", on: f.id });
+                continue;
+            }
+            out = [...out, { ...f, reaped: true }];
+            continue;
+        }
+        out = [...out, f];
+    }
+    return { foes: out, hero: touched, events };
+}
+
 /** Block eats damage first, and only what is left reaches HP. */
 function land(unit, amount) {
     const absorbed = Math.min(unit.block || 0, amount);
     const hit = { ...unit, block: (unit.block || 0) - absorbed, hp: Math.max(0, unit.hp - (amount - absorbed)) };
+    // ── PLATED ARMOR ── permanent block that comes back every turn and wears down one point per blow that
+    // reaches it. The Shelled Parasite and Deca are built on it: a wall you erode rather than break.
+    if ((hit.plate || 0) > 0 && amount > 0) hit.plate = Math.max(0, hit.plate - 1);
     // ── CURL UP ─────────────────────────────────────────────────────────────────────────────────────────
     // Once, on the first blow that reaches it, and only while it is alive. `curl` is spent rather than
     // remembered with a flag, so a creature carries one number instead of a number and a boolean that can
@@ -1626,6 +1733,33 @@ const tick = (unit) => ({
 // ── DRAWING ──────────────────────────────────────────────────────────────────────────────────────────────
 // When the draw pile runs dry mid-draw the discard is shuffled back in and drawing continues, which is why
 // this is a loop and not a slice. A card drawn into a full hand goes straight to the discard.
+/**
+ * Put `n` copies of a status card into the fight, wherever their enemy puts them.
+ *
+ * `where` is their own vocabulary: "discard" is the commonest (Slimed, most Wounds), "draw" is the nastier
+ * one (a Dazed shuffled into your draw pile is a dead card in a hand you have not seen yet), and "hand" is
+ * the immediate version. Uids are minted off a counter on the state so two Wounds are two different cards to
+ * every list that holds them.
+ */
+function dealStatus(state, id, n = 1, where = "discard") {
+    if (!STATUS_CARDS[id] || n <= 0) return state;
+    let { draw, discard, hand, rng } = state;
+    let minted = state.minted || 0;
+    for (let i = 0; i < n; i += 1) {
+        minted += 1;
+        const card = { uid: `s${minted}`, id };
+        if (where === "hand" && hand.length < HAND_MAX) hand = [...hand, card];
+        else if (where === "draw") {
+            // Shuffled in, not placed on top — theirs is a shuffle and the difference is whether you can
+            // plan around it.
+            const at = Math.floor(nextRand(rng)[0] * (draw.length + 1));
+            [rng] = [nextRand(rng)[1]];
+            draw = [...draw.slice(0, at), card, ...draw.slice(at)];
+        } else discard = [...discard, card];
+    }
+    return { ...state, draw, discard, hand, rng, minted };
+}
+
 function drawCards(state, n) {
     let { draw, discard, hand, rng } = state;
     for (let i = 0; i < n; i += 1) {
@@ -1723,9 +1857,17 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // of phase — a jackal that nips, a bruiser that spends a turn bracing, and one that builds to a
             // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
             // length and in shape.
-            block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0,
+            block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0, intangible: 0,
             // Spent by the first blow that reaches it — see `land`. Zero on everything that does not curl.
             curl: Math.max(0, Number(f.curl) || 0),
+            // ── AND THE REST OF WHAT A CREATURE IS ──────────────────────────────────────────────
+            // Plated armour, thorns, what it does when it dies and what it comes apart into. All of it is
+            // authored on the creature in FOES rather than on its script, because none of it is a MOVE — it
+            // is true of the thing whether or not it is its turn.
+            plate: Math.max(0, Number(f.plate) || 0),
+            thorns: Math.max(0, Number(f.thorns) || 0),
+            onDeath: f.onDeath || null,
+            split: f.split || null,
             // ── WHAT IT WILL DO, DECIDED BEFORE YOUR TURN STARTS ─────────────────────────────────
             // Every creature opens on a fixed move, the way a Jaw Worm always opens Chomp: an opening beat
             // that could be anything is a turn you cannot plan, and the whole design rests on planning.
@@ -1770,7 +1912,10 @@ export const incomingTotal = (state) => (state?.foes || [])
 export const canPlay = (state, uid) => {
     if (!state || state.over) return false;
     const card = cardById(state.hand.find((c) => c.uid === uid)?.id);
-    return Boolean(card) && card.cost <= state.energy;
+    // ⚠️ UNPLAYABLE IS A RULE, NOT A UI STATE. A Wound in your hand is a card you cannot spend energy on at
+    // all, and the check belongs here rather than in the screen: the screen asks this function whether a card
+    // is playable before it will let you drag one.
+    return Boolean(card) && !card.unplayable && card.cost <= state.energy;
 };
 
 /**
@@ -1804,9 +1949,20 @@ export function playCard(state, uid, targetIndex = 0) {
         for (let swing = 0; swing < (card.hits || 1); swing += 1) {
             for (const i of targets) {
                 if (!(foes[i].hp > 0)) continue;
-                const dealt = attackDamage(card.damage, hero, foes[i]);
+                // ── INTANGIBLE ── everything that reaches it is one. Nemesis spends alternate turns like
+                // this and it is the reason you cannot simply out-damage it: a 32-damage Crush and a Peck
+                // are the same card while it holds.
+                const raw = attackDamage(card.damage, hero, foes[i]);
+                const dealt = (foes[i].intangible || 0) > 0 ? Math.min(1, raw) : raw;
                 hitFoe(i, (f) => land(f, dealt));
                 events.push({ type: "damage", on: foes[i].id, amount: dealt });
+                // ── THORNS ── a Spiker hurts you for touching it, before Block, every single swing. A
+                // three-hit card into a room of Spikers is a decision you have to make on purpose.
+                const thorns = foes[i].thorns || 0;
+                if (thorns > 0) {
+                    hero = land(hero, thorns);
+                    events.push({ type: "damage", on: "hero", amount: thorns, thorns: true });
+                }
             }
         }
     }
@@ -1846,6 +2002,12 @@ export function playCard(state, uid, targetIndex = 0) {
         hero = { ...hero, strength: (hero.strength || 0) + card.strength };
         events.push({ type: "buff", on: "hero", key: "Strength", amount: card.strength });
     }
+
+    // Anything that just died or came apart, before the state is handed back.
+    const reaped = reap(foes, hero);
+    foes = reaped.foes;
+    hero = reaped.hero;
+    events.push(...reaped.events);
 
     let next = {
         ...state,
@@ -1924,7 +2086,15 @@ export const forfeit = (state) => (state?.over ? state : { ...state, over: "lose
 /** Your debuffs tick, and the party is on notice. Nothing swings yet. */
 export function startFoeTurn(state) {
     if (!state || state.over) return { state, events: [] };
-    return { state: { ...state, hero: tick(state.hero) }, events: [] };
+    // ── PLATED ARMOR COMES BACK EVERY TURN, INTANGIBLE RUNS OUT ─────────────────────────────────────────
+    // Theirs: the armour is re-applied at the start of the creature's turn (which is why chipping it costs
+    // you a card a turn), and Intangible is a duration like Weak.
+    const foes = (state.foes || []).map((f) => (f.hp > 0 ? {
+        ...f,
+        block: (f.block || 0) + (f.plate || 0),
+        intangible: Math.max(0, (f.intangible || 0) - 1),
+    } : f));
+    return { state: { ...state, foes, hero: tick(state.hero) }, events: [] };
 }
 
 /**
@@ -1941,6 +2111,9 @@ export function foeAct(state, i) {
 
     const events = [];
     let hero = state.hero;
+    // Status dealt this beat rides on a copy of the whole state, because dealStatus touches the draw pile,
+    // the discard and the rng — three things this function otherwise never looks at.
+    let stateAfterStatus = state;
     let f = { ...foe, block: 0 };
     const intent = foeIntent(state, i);
     // ── A FOE'S TURN IS MORE THAN A NUMBER AND A SHIELD ──────────────────────────────────────────────
@@ -1953,6 +2126,14 @@ export function foeAct(state, i) {
     // ORDER IS THE RULE: it buffs itself, then swings with the buff, then leaves what it did to you behind.
     // A "roar and swing" beat therefore lands harder on the turn it roars, which is what makes a ramping
     // enemy a clock rather than a slow start.
+    // ── WHAT IT DOES FOR THE THING NEXT TO IT ───────────────────────────────────────────────────────
+    // ⚠️ HALF THEIR SUPPORT CREATURES POINT AT THEIR ALLIES, not at themselves: the Mystic heals the party,
+    // the Centurion protects the Mystic, Donu buffs Deca and Deca guards Donu. A move with `allies` lands on
+    // every living creature in the room including the caster, which is theirs exactly, and it is the
+    // difference between "kill the small one first" being a preference and being the fight.
+    let allyBuff = null;
+    if (intent.allies) allyBuff = { strength: intent.strength || 0, block: intent.block || 0, heal: intent.heal || 0 };
+
     if (intent.strength) {
         f = { ...f, strength: (f.strength || 0) + intent.strength };
         events.push({ type: "buff", on: f.id, amount: intent.strength });
@@ -1987,6 +2168,14 @@ export function foeAct(state, i) {
     }
     // Applied AFTER the blow, so the Vulnerable a beat inflicts does not also multiply that same beat — the
     // card side already works this way and a foe that broke the rule would be reading its own buff twice.
+    // ── THEIR JUNK, DEALT ───────────────────────────────────────────────────────────────────────────
+    // `status` is the move's own line: { id, n, where }. This is the Slimed, the Wound, the Dazed and the
+    // Burn — the half of their bestiary that attacks the deck instead of the bar.
+    if (intent.status) {
+        const { id, n = 1, where = "discard" } = intent.status;
+        stateAfterStatus = dealStatus(stateAfterStatus, id, n, where);
+        events.push({ type: "status", on: "hero", key: STATUS_CARDS[id]?.name || id, amount: n });
+    }
     if (intent.frail) {
         hero = { ...hero, frail: (hero.frail || 0) + intent.frail };
         events.push({ type: "debuff", on: "hero", amount: intent.frail, stat: "frail" });
@@ -2007,11 +2196,65 @@ export function foeAct(state, i) {
     const played = f.next;
     const recent = [played, ...(f.recent || [])].slice(0, 4);
     const { key, rng } = pickNextMove(script, played, recent, state.rng);
-    const foes = state.foes.map((other, n) => (
+    let foes = stateAfterStatus.foes.map((other, n) => (
         n === i ? tick({ ...f, beat: (f.beat || 0) + 1, next: key || script.open, recent }) : other
     ));
+    // ── AND WHAT IT DID FOR THE OTHERS ──────────────────────────────────────────────────────────────
+    // Applied after its own beat resolved, so a Mystic that heals 16 heals the creature beside it for 16 and
+    // itself for 16 — which is theirs. The caster has already taken its own share above, so it is skipped.
+    if (allyBuff) {
+        foes = foes.map((other, n) => {
+            if (n === i || !(other.hp > 0)) return other;
+            const healed = allyBuff.heal
+                ? Math.min(other.hpMax || other.hp, other.hp + allyBuff.heal) : other.hp;
+            if (allyBuff.heal) events.push({ type: "heal", on: other.id, amount: healed - other.hp });
+            if (allyBuff.strength) events.push({ type: "buff", on: other.id, amount: allyBuff.strength });
+            if (allyBuff.block) events.push({ type: "block", on: other.id, amount: allyBuff.block });
+            return {
+                ...other,
+                hp: healed,
+                strength: (other.strength || 0) + (allyBuff.strength || 0),
+                block: (other.block || 0) + (allyBuff.block || 0),
+            };
+        });
+    }
+    // ── AND WHAT IT CALLED IN ───────────────────────────────────────────────────────────────────────
+    // A Gremlin Leader rallies two gremlins, a Collector spawns torch heads, a Reptomancer puts daggers on
+    // the board. `summon` names creature ids out of FOES and they arrive at full health with their own
+    // scripts — a new body in the room, not a number on an old one.
+    //
+    // ⚠️ THE ROOM HAS A CEILING. Five is what the screen lays out and what their own fights hold; anything
+    // called in past that is simply not called in, rather than rendering off the edge of a phone.
+    if (intent.summon?.length && foes.length < 5) {
+        const room = 5 - foes.length;
+        let seed = rng;
+        for (const id of intent.summon.slice(0, room)) {
+            const def = FOES[id];
+            if (!def) continue;
+            const hp = foeHp(id, seed);
+            [, seed] = nextRand(seed);
+            foes = [...foes, {
+                id: `f${foes.length}`,
+                name: def.name, foe: def.id, foeName: def.name,
+                // A summoned creature has no portrait of its own — the fixture only fetched faces for the
+                // party that opened the room — so it wears its summoner's, which reads as its brood.
+                art: f.art || null, artFallback: f.artFallback || null, color: f.color || "#ff8f6a",
+                hp, hpMax: hp, script: FOE_SCRIPTS[def.script] || FOE_SCRIPT,
+                block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0, curl: foeCurl(id, seed),
+                plate: def.plate || 0, thorns: def.thorns || 0, intangible: 0,
+                next: (FOE_SCRIPTS[def.script] || FOE_SCRIPT).open,
+                recent: [], summoned: true,
+            }];
+            events.push({ type: "summon", on: `f${foes.length - 1}`, name: def.name });
+        }
+    }
+    const reaped = reap(foes, hero);
+    foes = reaped.foes;
+    hero = reaped.hero;
+    events.push(...reaped.events);
+
     return {
-        state: { ...state, hero, foes, rng, over: hero.hp <= 0 ? "lose" : state.over },
+        state: { ...stateAfterStatus, hero, foes, rng, over: hero.hp <= 0 ? "lose" : state.over },
         events,
         acted: true,
         // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
@@ -2027,7 +2270,23 @@ export function foeAct(state, i) {
 /** The party is done: your hand goes to the discard and the next turn opens. */
 export function finishFoeTurn(state) {
     if (!state) return { state, events: [] };
-    const spent = { ...state, discard: [...state.discard, ...state.hand], hand: [] };
+    // ── WHAT THE JUNK IN YOUR HAND COSTS YOU ────────────────────────────────────────────────────────────
+    // Their order, exactly: Burn hurts you for still holding it, Ethereal cards exhaust rather than going to
+    // the discard, and everything else is discarded. A Burn you could not get rid of is two damage a turn
+    // for the rest of the fight, which is the entire reason it is frightening.
+    let hero = state.hero;
+    let burned = 0;
+    for (const entry of state.hand) {
+        const card = ALL_CARDS[entry.id];
+        if (card?.burn) burned += card.burn;
+    }
+    if (burned > 0) hero = land(hero, burned);
+    const kept = state.hand.filter((entry) => !ALL_CARDS[entry.id]?.ethereal);
+    const spent = {
+        ...state, hero,
+        over: hero.hp <= 0 ? "lose" : state.over,
+        discard: [...state.discard, ...kept], hand: [],
+    };
     if (spent.over === "lose") return { state: spent, events: [{ type: "over", result: "lose" }] };
     return { state: beginTurn(spent), events: [] };
 }
