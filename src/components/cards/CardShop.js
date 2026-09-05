@@ -542,15 +542,22 @@ export default function CardShop({ run, art = {} }) {
                 .cs-good:disabled { cursor: default; }
                 .cs-good.is-gone { opacity: 0.4; filter: grayscale(0.6); }
                 .cs-good:hover:not(:disabled), .cs-good:focus-visible { transform: translateY(-5px); }
-                .cs-obj { position: relative; height: 74px; width: 100%; display: grid; place-items: end center; }
+                .cs-obj { position: relative; height: 84px; width: 100%; display: grid; place-items: end center; }
                 .cs-goodart { position: relative; z-index: 2; max-width: 64px; max-height: 66px;
                     object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.7)); }
-                /* The trinket stands ON something, because it is the one thing here an elite is the only other
-                   source of. The plinth is behind it and its own height is what lifts the object. */
+                /* ── THE TRINKET STANDS ON THE PLINTH, WHICH MEANS ON ITS TOP SURFACE ────────────────────
+                   ⚠️ IT WAS SUNK INTO THE STONE. Luke, on the shelf: "I think that it is supposed to be on
+                   the pedestal." Both the plinth and the object were bottom-aligned in the same box and the
+                   object was lifted by a guessed 26px, so a lantern drawn 46px tall sat with its feet a third
+                   of the way UP a column that renders 55px tall — inside the stone rather than on it.
+
+                   The numbers are measured off the art now instead of guessed: shop-plinth.png is 244x260 and
+                   its flat cap ends about 14% down, so at 52px wide it renders 55px tall with a top surface
+                   47px above the shelf. That is where the object's feet go. */
                 .cs-plinth { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-                    z-index: 1; width: 62px; object-fit: contain; opacity: 0.95;
+                    z-index: 1; width: 52px; object-fit: contain; opacity: 0.95;
                     filter: drop-shadow(0 4px 6px rgba(0,0,0,0.7)); }
-                .cs-good.is-perk .cs-goodart { max-height: 46px; margin-bottom: 26px; }
+                .cs-good.is-perk .cs-goodart { max-height: 36px; margin-bottom: 47px; }
                 .cs-goodname { font-family: var(--cf-card-font); font-size: 11.5px; line-height: 1.15;
                     text-align: center; color: #efe3cd; text-shadow: 0 1px 3px rgba(0,0,0,0.95); }
                 .cs-kind { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #9d8a72; }

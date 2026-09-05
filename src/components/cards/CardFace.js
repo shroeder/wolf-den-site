@@ -255,26 +255,33 @@ export default function CardFace({ card, art, dim, live }) {
                 The picture in the window is already the level you have this pet at (see petArtMap): a bear
                 you have fed for six weeks is drawn as the bear you fed. Without a number that is a mystery —
                 two people compare screenshots of Swipe and one of them has a different animal on it — so the
-                rung is written where a rung goes, at the left end of the nameplate.
+                rung is written where a rung goes: a row of stars along the foot of the card. Luke: "we should
+                use stars to reflect pet level across the bottom of the card, not the gold number thing." He is
+                right about both halves — a numeral is a thing you read and then have to know the scale of,
+                where five stars against a possible six is a quantity you take in without counting, and the
+                bottom rail is the one band on a card with nothing on it.
 
-                ⚠️ ON THE LEFT EDGE BECAUSE OF THE FAN, AND BELOW THE COST BECAUSE OF THE FIRST TRY. The hand
-                overlaps each card with the NEXT one, so only a 46px strip down the LEFT of each card is ever
-                visible (see `overlap` in CardFightClient) — which is also why the cost diamond lives there.
-                A badge in the top-right corner would exist on the last card in the hand and nowhere else.
-                Put at the top-left it collided with the cost gem, which hangs from -8 to 14 and had a "6"
-                sitting half under it; dropped 18px it sits on the window's rim with the cost above it and
-                the name beside it, and it is still inside the strip the fan leaves you.
+                ⚠️ THE FAN STILL DECIDES WHERE IT GOES. The hand overlaps each card with the NEXT one, so
+                only a strip down the LEFT of each card is ever visible — which is why the cost diamond lives
+                there, and why the first two attempts at this mark were a badge at the top-left (it collided
+                with the cost gem) and then one on the window rim. Stars along the BOTTOM are read from the
+                left, so the strip the fan leaves you shows the first two or three of them: enough to know
+                the card is levelled at all, with the whole row there the moment you raise it.
 
                 LEVEL 1 WEARS NOTHING. Every card in a starter deck would otherwise carry a "1" that says
                 only "this is normal", and a mark that is on everything is furniture rather than information.
                 An enshrined pet says so with its stone's colour rather than a seventh numeral. */}
             {art?.level > 1 ? (
                 <span
-                    className={`cf-lv${art.stone ? ` is-${art.stone}` : ""}`}
+                    className={`cf-stars${art.stone ? ` is-${art.stone}` : ""}`}
                     aria-label={`Your ${art.name || card.pet} is level ${art.level}`}
                     title={`Your ${art.name || card.pet} is level ${art.level}${art.stone ? `, enshrined in ${art.stone}` : ""}`}
                 >
-                    {art.level}
+                    {Array.from({ length: Math.min(6, art.level) }, (_, i) => (
+                        <svg key={i} className="cf-star" viewBox="0 0 20 19" aria-hidden="true">
+                            <path d="M10 0l2.9 6.2 6.8.9-5 4.7 1.3 6.8L10 15.3 3.9 18.6l1.3-6.8-5-4.7 6.8-.9z" />
+                        </svg>
+                    ))}
                 </span>
             ) : null}
             {/* THE WINDOW'S SHAPE IS THE CARD'S TYPE. An attack comes to a point at the bottom, a skill is a
@@ -348,20 +355,19 @@ export default function CardFace({ card, art, dim, live }) {
                    The clip is inset a shade tighter than the art so the rim covers the cut edge — a clip and
                    a painted rim never agree to the pixel, and the way to make that invisible is to let the
                    metal be the thing that ends the picture. */
-                /* Brass, small, and sitting ON the cloth rather than beside it — a stamped rung on the
-                   nameplate. It shares the cost diamond's z-index so the banner cannot paint over it. */
-                .cf-lv { position: absolute; top: 21px; left: 1px; z-index: 4;
-                    min-width: 13px; height: 13px; padding: 0 2px; border-radius: 3px;
-                    display: grid; place-items: center;
-                    background: linear-gradient(160deg, #d8a349, #8a5f1e); border: 1px solid #3a2708;
-                    box-shadow: 0 1px 2px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,236,190,0.5);
-                    font-family: var(--cf-card-font); font-size: 9px; font-weight: 800; line-height: 1;
-                    color: #2a1c05; text-shadow: 0 1px 0 rgba(255,235,190,0.35); }
-                /* THE SIXTH RUNG IS NOT A NUMBER, IT IS A STONE. An enshrined pet wears the form the stone
-                   gave it in the window; the plate says which rock was spent. */
-                .cf-lv.is-light { background: linear-gradient(160deg, #fff3cf, #d9bd76); border-color: #6b5a28; }
-                .cf-lv.is-dark { background: linear-gradient(160deg, #9f8ad6, #4a3a7a); border-color: #241a3f;
-                    color: #f2ecff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+                /* ── THE LEVEL, IN STARS, ALONG THE FOOT ────────────────────────────────────────────────
+                   Small and gold on the card stock, sitting inside the moulding's bottom rail. Drawn as SVG
+                   rather than set as a character: a star glyph is a different shape in every font and a
+                   different WIDTH on every phone, and six of them have to fit inside 96px on every one. */
+                .cf-stars { position: absolute; left: 0; right: 0; bottom: 4px; z-index: 4;
+                    display: flex; justify-content: center; gap: 1.5px; pointer-events: none; }
+                .cf-star { width: 8px; height: 8px; fill: #ffcb5e;
+                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.85)); }
+                /* THE SIXTH RUNG IS NOT A NUMBER AND NOT A STAR EITHER, IT IS A STONE. An enshrined pet wears
+                   the form the stone gave it in the window; down here the stars take the stone's colour. */
+                .cf-stars.is-light .cf-star { fill: #fff4d2; }
+                .cf-stars.is-dark .cf-star { fill: #b9a4ef;
+                    filter: drop-shadow(0 0 3px rgba(150,110,255,0.6)) drop-shadow(0 1px 1px rgba(0,0,0,0.85)); }
 
                 .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
                     display: block; }

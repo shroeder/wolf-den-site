@@ -817,7 +817,7 @@ export default function CardFightClient({ fixture, run = null }) {
                              and forfeit is deliberately the small one next to it.  */}
                 <div className="cf-top">
                     <div className="cf-top-plate" aria-hidden="true" />
-                    <div className="cf-top-group">
+                    <div className="cf-top-group is-left">
                         <button type="button" className="cf-pile" onClick={() => setPeek("draw")} aria-label={`Draw pile, ${fight.draw.length} cards`}>
                             <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
                             <span className="cf-pile-n">{fight.draw.length}</span>
@@ -831,6 +831,7 @@ export default function CardFightClient({ fixture, run = null }) {
                             — and because the right-hand group is the two things that END a turn and must not
                             grow a third neighbour. EMPTY SLOTS ARE NOT DRAWN, the rule the whole game's bars
                             already follow. */}
+                        <span className="cf-belt">
                         {(runState?.potions || []).map((id, i) => POTIONS[id] ? (
                             <button
                                 key={`${id}${i}`}
@@ -844,6 +845,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                 <Sprite src={`/images/cards/potions/${id}.png`} className="cf-potion-art" />
                             </button>
                         ) : null)}
+                        </span>
                     </div>
                     <div className="cf-top-group">
                         <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
@@ -1452,7 +1454,22 @@ export default function CardFightClient({ fixture, run = null }) {
                     background-clip: padding-box;
                     filter: brightness(0.62) saturate(0.9) drop-shadow(0 3px 9px rgba(0,0,0,0.6)); }
                 /* Three of them, and space-between now spaces the GROUPS rather than the widgets. */
-                .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; }
+                /* ── NOTHING ON THIS BAR MAY PUSH END TURN OFF THE GLASS ─────────────────────────────────
+                   ⚠️ Luke, holding three potions: "when I have too many potions the End turn button bleeds
+                   off the edge." The left group grows by 27px a bottle and the row is space-between, so a
+                   third potion shoved the right-hand group past the right edge — and the right-hand group is
+                   End turn, the button every single turn needs.
+
+                   The two OUTER groups are now fixed (flex: 0 0 auto): the piles and the belt on the left,
+                   the two buttons on the right. The belt is the only thing here whose width is not known in
+                   advance, so it is the only thing allowed to give — it shrinks and scrolls sideways inside
+                   its own lane rather than spending the button's pixels. */
+                .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px;
+                    flex: 0 0 auto; min-width: 0; }
+                .cf-top-group.is-left { flex: 0 1 auto; }
+                .cf-belt { display: flex; align-items: center; gap: 4px; min-width: 0;
+                    overflow-x: auto; scrollbar-width: none; }
+                .cf-belt::-webkit-scrollbar { display: none; }
                 .cf-forfeit { display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
                     background: rgba(10,12,16,0.5); border: 1px solid #39424f; border-radius: 999px;
                     color: #9aa6b4; font-size: 15px; }
