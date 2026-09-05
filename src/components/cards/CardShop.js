@@ -399,8 +399,20 @@ export default function CardShop({ run, art = {} }) {
                 /* THE ROOM IS BEHIND EVERYTHING AND FIXED, so scrolling the wares does not scroll the wall.
                    cover and not 100% 100%: it is a painting of a place, and stretching a place to a phone's
                    aspect bends the stonework. */
+                /* ⚠️ THE LANTERN CANNOT HANG BEHIND HIM. The room is a stone arch with one hanging lantern
+                   at dead centre, and on a phone a cover-sized background shows the WHOLE height of the art and only the middle
+                   third of its width — which parks the lantern's glowing orange body exactly behind the
+                   merchant's waist. He read as a man standing in a fire, or wearing a brazier for a skirt: a
+                   pale orange column under his robe that nothing in the scene explained. Sliding the crop off
+                   centre moves the lantern out from behind him and costs nothing, because the room is a wall. LEFT rather
+                   than a few per cent off centre: the art is 900px wide shown at 1200+, so the lantern
+                   half a screen over becomes a metre-wide blurry yellow box in the corner — worse than
+                   the glow it replaced. The far left of that painting is plain warm-lit stonework,
+                   which is what a stall wants behind it.
+                   The wide layout never had it — he sits in the left column there and the lantern is far to
+                   his right — so the shift is undone at 760 along with the rest of the desktop layout. */
                 .cs-room { position: fixed; inset: 0; z-index: -1;
-                    background: #0a0b0f url(/images/cards/chrome/shop-room.png) center/cover no-repeat; }
+                    background: #0a0b0f url(/images/cards/chrome/shop-room.png) left center/cover no-repeat; }
                 .cs-room::after { content: ""; position: absolute; inset: 0;
                     background: radial-gradient(ellipse at 50% 34%, rgba(10,11,15,0.10), rgba(6,7,10,0.86) 78%); }
 
@@ -477,17 +489,27 @@ export default function CardShop({ run, art = {} }) {
                     z-index: 4; min-width: 54px; padding: 7px 8px 5px;
                     display: inline-flex; align-items: center; justify-content: center; gap: 3px;
                     background: url(/images/cards/chrome/shop-tag.png) center/100% 100% no-repeat;
-                    font-family: var(--cf-card-font); font-size: 12px; font-weight: 800; color: #ffb45e;
-                    font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
-                /* A SALE KEEPS THE OLD NUMBER, struck. A colour on its own was not a discount anybody could
-                   see — it was two ambers eight hex apart on a phone in a dim room. */
-                .cs-tag.is-sale { color: #ffe08a; }
-                .cs-tag.is-sale s { color: #a08a6d; font-size: 10px; font-weight: 700; text-decoration-thickness: 1px; }
+                    font-family: var(--cf-card-font); font-size: 12px; font-weight: 800; color: #fff0d4;
+                    font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)) saturate(0.9) brightness(0.94); }
+                /* ⚠️ THE TEXT COLOURS FOLLOW THE TAG THEY SIT ON. They were amber-on-charcoal, chosen against a
+                   near-black plate; the plate is warm mid-brown leather now (see shop-tag in gen-card-chrome)
+                   and amber on tan is two shades of the same thing. Cream reads; the state is carried by the
+                   TAG going cold, not by a hue the leather is already wearing. */
+                .cs-tag.is-sale { color: #fff6de; }
+                /* THE OLD PRICE HAS TO BE READABLE TO BE A DISCOUNT. Struck dark brown it disappeared into
+                   the leather it is printed on — a smudge beside the new number rather than the thing being
+                   beaten. Pale and a step down in weight: subordinate to the price, still a number. */
+                .cs-tag.is-sale s { color: #e8d4b6; opacity: 0.85; font-size: 10px; font-weight: 700;
+                    text-decoration-thickness: 1px; }
                 /* ⚠️ OUT OF REACH IS COLD. This and the dimming on the object are the two channels that answer
-                   "which of these can I afford" without doing sums against the top bar. */
-                .cs-tag.is-poor { color: #b0806f; }
-                .cs-tag.is-sold { color: #9d8a72; }
+                   "which of these can I afford" without doing sums against the top bar. On the old charcoal
+                   tag a text colour was enough; on leather it is not — the whole plaque goes grey and dark,
+                   which is legible at 54px across in a dim room and a hex value is not. */
+                .cs-tag.is-poor { color: #c9b6a2;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)) grayscale(0.8) brightness(0.6); }
+                .cs-tag.is-sold { color: #d8c8b4;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)) grayscale(0.85) brightness(0.55); }
 
                 /* ── THE CHEAP ONE, FLAGGED ── the same leather the prices hang on, pinned at an angle so it
                    reads as something the keeper stuck on this morning. */
@@ -502,7 +524,7 @@ export default function CardShop({ run, art = {} }) {
                 .cs-flag { position: absolute; top: 19px; right: 2px; z-index: 6; padding: 4px 7px 3px;
                     background: url(/images/cards/chrome/shop-tag.png) center/100% 100% no-repeat;
                     transform: rotate(7deg); font-size: 8.5px; font-weight: 800; letter-spacing: 0.14em;
-                    text-transform: uppercase; color: #ffe08a; text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+                    text-transform: uppercase; color: #fff6de; text-shadow: 0 1px 2px rgba(0,0,0,0.95);
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); pointer-events: none; }
 
                 /* WHAT YOU CANNOT PAY FOR GOES COLD ON THE SHELF. Both filters restate the drop shadow they
@@ -624,6 +646,7 @@ export default function CardShop({ run, art = {} }) {
                         align-items: end; padding-top: 10px; }
                     .cs-awning { grid-column: 1 / -1; max-width: 100%; height: 68px; }
                     .cs-keep { margin-top: -18px; align-self: end; }
+                    .cs-room { background-position: center; }
                     .cs-keeper { width: 240px; max-width: 100%; }
                     .cs-say { font-size: 13px; }
                     .cs-wares { margin-top: 0; }

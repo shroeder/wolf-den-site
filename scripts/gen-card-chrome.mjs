@@ -173,17 +173,33 @@ const PIECES = {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
         subject: "A simple round monster face seen head-on: two small curved horns on top, two eyes and a wide grinning mouth. Almost a mask. No nose, no ears, no hair, no neck.",
     },
+    // ⚠️ THE ONE MARK THAT CAME BACK PAINTED. Every other room on the sheet is flat black ink with the
+    // parchment showing through its gaps — the boss skull is a black outline you can see the paper inside.
+    // The elite came back as a black outline filled with WHITE, so on a tan map it is the only mark wearing a
+    // sticker, and the white sits a shade off the paper wherever the sheet is shaded. INK already says "clean
+    // empty gaps"; a skull is the shape where a model reads "empty" as "bone-coloured", so it is said again
+    // here in the subject, in the terms it got wrong.
     "map-elite": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A simple horned SKULL face seen head-on: two big curved horns, two round empty eye sockets and a row of square teeth. The same simple mask shape as the monster face but broader and bonier.",
+        subject: "A simple horned SKULL face seen head-on: two big curved horns, two round eye sockets and a "
+            + "row of square teeth. The same simple mask shape as the monster face but broader and bonier. "
+            + "⚠️ EVERY PART OF IT IS BLACK INK ON NOTHING: the skull is a bold black outline and the space "
+            + "INSIDE it is EMPTY and fully transparent — no white fill, no cream, no bone colour, no grey, "
+            + "no paper behind it. The eye sockets and the gaps between the teeth are holes, not white paint.",
     },
     "map-rest": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
         subject: "A simple campfire: two crossed logs with one rounded flame above them. Three shapes in total.",
     },
+    // ⚠️ "A COIN SYMBOL" DREW A DOLLAR SIGN. The mark on the sheet was a money bag with a $ struck into its
+    // belly — a United States currency symbol on a hand-drawn medieval map, in a game whose money is embers
+    // and gold. It is the one mark on the sheet that could not be from this world, and at 22px the $ is also
+    // the only thing on it you can read. A round coin says the same word and belongs here.
     "map-merchant": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
-        subject: "A simple round money pouch with a knotted neck and a coin symbol on its belly. One shape.",
+        subject: "A simple plump money POUCH with a knotted neck, and one round COIN leaning against its foot "
+            + "at the bottom right. Two shapes, nothing else. Its belly is BLANK: no lettering, no numerals, "
+            + "no dollar sign, no currency symbol of any kind struck into it.",
     },
     "map-treasure": {
         size: "1024x1024", store: { w: 160, h: 160 }, tint: false, extra: INK,
@@ -239,10 +255,25 @@ const PIECES = {
             + "swallow-tail point and its left end running flat off the edge. Smooth painted fabric with a "
             + "soft fold shadow, a thin darker red hem, and nothing written on it.",
     },
+    // ⚠️ "TEARDROP" DREW AN ONION. The first roll came back as a fat blob with a little hook off the top,
+    // widest at the TOP and rounded at the bottom — a fig, or a garlic bulb — and it sat on the top bar
+    // beside the ember count for two days. Luke: "the ember sprite up there looks malformed."
+    //
+    // WHAT WAS WRONG WITH THE PROMPT: "teardrop shaped" describes a drop of water, which is round at the
+    // bottom and pointed at the top only if you say so, and nothing in it said which end was the TIP. A flame
+    // is defined by its direction — broad and bright at the base, tapering to a point at the top — so that is
+    // what this says now, twice, and it names the thing it must not become.
+    //
+    // It is also the same idea as the flame on the price tags (GiFlame, react-icons/gi), which is the shape
+    // to match: a simple licking flame anyone reads at 20px.
     "ui-ember": {
         size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
-        subject: "A single bright ember flame, teardrop shaped, glowing orange at its heart and fading to a "
-            + "deeper red at the edges, with a soft warm glow. Simple and rounded, no logs, no smoke.",
+        subject: "A single small FLAME standing upright, pointing UP: WIDEST at its base and tapering to a "
+            + "narrow curling TIP at the top, with one small tongue of fire licking off to the side. A bright "
+            + "yellow-white core at the bottom, warm orange through the body, deep red at the outer edge. A "
+            + "simple bold flame silhouette that reads instantly at the size of a fingernail. NOT a round "
+            + "blob, NOT an onion or a fig or a bulb, NOT a raindrop, NOT wider at the top than the bottom. "
+            + "No logs, no coals, no smoke, no sparks, no ring of glow around it.",
     },
     "ui-mapbook": {
         size: "1024x1024", store: { w: 120, h: 120 }, tint: false, extra: SOLID,
@@ -432,19 +463,112 @@ const PIECES = {
     },
     // A price has to sit ON something or it is a number floating over a painting. Small enough that three of
     // them in a row do not become the loudest thing on the shelf.
+    //
+    // ⚠️ THREE FAULTS IN THE FIRST ONE, AND ONLY THE LAST IS ABOUT TASTE. Luke: "the shop tag sprite needs work."
+    //
+    //   · IT WAS NEAR-BLACK. The prompt said "dark leather" and the model went to charcoal-navy, which is the
+    //     colour of the item overlay it hangs on — so on that screen the tag vanished and the price floated
+    //     over nothing, which is the exact complaint the tag was drawn to answer.
+    //   · IT HAD A CORD AND AN EYELET ON TOP. This sprite is a CSS background at `100% 100%`, so it is
+    //     stretched to whatever the text inside it measures — 54x25 for a price, smaller and rotated for the
+    //     SALE flag. Anything sticking out of the silhouette stretches with it: the knot smeared into a black
+    //     smudge sitting directly over the number, and on the flag it read as a hair on the screen.
+    //   · The stitching was one shade off the leather, so at 54px it was texture, not an edge.
+    //
+    // So: a plaque, mid-brown, no hardware above it, and the detail it does have is SYMMETRIC — the same at
+    // both ends, so a stretch cannot land it somewhere silly.
     "shop-tag": {
         size: "1024x1024", store: { w: 200, h: 130 }, tint: false, extra: SOLID,
-        subject: "A small blank hanging PRICE TAG: a rounded rectangle of scuffed dark leather with a stitched "
-            + "edge and a brass eyelet punched through its top, seen straight on. Its face is completely "
-            + "empty — no writing, no number, no emblem, nothing struck into it.",
+        subject: "A small blank PRICE PLAQUE: a wide rounded-rectangle of warm MID-BROWN tanned leather, "
+            + "clearly lighter than a black background, lit softly from above, with a pale ochre stitched line "
+            + "running just inside its edge and one small brass rivet at the middle of the LEFT edge and "
+            + "another at the middle of the RIGHT edge. Its face is completely empty — no writing, no number, "
+            + "no emblem, nothing struck into it. Nothing hangs from it and nothing sticks out past its "
+            + "outline: NO cord, NO string, NO loop, NO knot, NO eyelet or hole at the top, no hook, no nail.",
     },
 };
 
 const RETINT = process.argv.includes("--retint");
 const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
 const FORCE = process.argv.includes("--force");
+
+// ── DRAW SEVERAL, LOOK, THEN STORE ONE ───────────────────────────────────────────────────────────────────
+// This script wrote its one roll straight into public/ and that is how a malformed piece shipped: the ember
+// on the top bar came out as an upside-down onion with a hook on it, was never seen beside an alternative,
+// and sat in the bar for two days. Luke: "the ember sprite up there looks malformed."
+//
+// gen-town-npc.mjs has had candidates and a contact sheet since the town NPCs; this is the same two flags, on
+// the generator that draws everything the card game is made of.
+//
+//   node scripts/gen-card-chrome.mjs --only ui-ember --n 3     draw 3 → scratch/chrome/ + a contact sheet
+//   node scripts/gen-card-chrome.mjs --only ui-ember --pick 2  store candidate 2, at its proper size
+//
+// The sheet is composited on SLATE (#3d4550) rather than white, because that is the top bar these glyphs
+// actually sit on, and a dark-on-dark fault is invisible against a white page — the same reason the NPC
+// sheet uses a checkerboard.
+const N = (() => { const i = process.argv.indexOf("--n"); return i > -1 ? Number(process.argv[i + 1]) : 0; })();
+const PICK = (() => { const i = process.argv.indexOf("--pick"); return i > -1 ? Number(process.argv[i + 1]) : 0; })();
+const SCRATCH = "scratch/chrome";
+if ((N || PICK) && (!only || only.size !== 1)) throw new Error("--n / --pick need exactly one --only <id>");
 // The three the cards actually use today. Everything above eternal tints the same way if it is ever needed.
 const TINTS = ["common", "rare", "legendary"];
+
+// The one place a piece turns into pixels, so candidates and the live file cannot drift apart.
+async function draw(piece) {
+    const prompt = housePrompt(piece.subject, { framing: piece.framing || "sprite", extra: piece.extra || CHROME });
+    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+            model: "gpt-image-1", prompt, size: piece.size,
+            background: piece.opaque ? "opaque" : "transparent", output_format: "png", quality: "medium", n: 1,
+        }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status} ${(await resp.text()).slice(0, 160)}`);
+    const b64 = (await resp.json())?.data?.[0]?.b64_json;
+    if (!b64) throw new Error("no image returned");
+    return Buffer.from(b64, "base64");
+}
+
+// Trim, then down to the size it is DRAWN at. See the notes in the main loop: a texture must not be trimmed,
+// and a piece with real proportions asks for fit "inside" rather than being squashed into its box.
+const store = (buf, piece) => (piece.opaque ? sharp(buf) : sharp(buf).trim({ threshold: 8 }))
+    .resize(piece.store.w, piece.store.h, { fit: piece.fit || "fill" }).png({ compressionLevel: 9 }).toBuffer();
+
+if (N || PICK) {
+    const id = [...only][0];
+    const piece = PIECES[id];
+    if (!piece) throw new Error(`no piece named "${id}"`);
+    fs.mkdirSync(SCRATCH, { recursive: true });
+    if (PICK) {
+        const file = `${SCRATCH}/${id}-${PICK}.png`;
+        if (!fs.existsSync(file)) throw new Error(`no candidate at ${file} — run with --n first`);
+        fs.writeFileSync(`${OUT}/${id}.png`, await store(fs.readFileSync(file), piece));
+        console.log(`ok  ${id} #${PICK} → ${OUT}/${id}.png`);
+    } else {
+        console.log(`${N} image(s) at medium — about $${(N * (piece.size === "1024x1024" ? 0.042 : 0.063)).toFixed(2)}`);
+        const tiles = [];
+        for (let i = 1; i <= N; i++) {
+            const buf = await draw(piece);
+            fs.writeFileSync(`${SCRATCH}/${id}-${i}.png`, buf);
+            // Each candidate at the size it will be SEEN at, blown back up with nearest-neighbour beside the
+            // full-size draw: a glyph that reads at 512 and turns to mush at 20 is the fault this catches.
+            const shown = await sharp(buf).trim({ threshold: 8 }).resize(240, 240, { fit: "inside" }).png().toBuffer();
+            const tiny = await sharp(buf).trim({ threshold: 8 }).resize(24, 24, { fit: "inside" })
+                .resize(240, 240, { kernel: "nearest", fit: "inside" }).png().toBuffer();
+            tiles.push({ shown, tiny });
+            console.log(`  #${i} drawn`);
+        }
+        const sheet = await sharp({ create: { width: 260 * N, height: 520, channels: 4, background: "#3d4550" } })
+            .composite(tiles.flatMap(({ shown, tiny }, i) => [
+                { input: shown, left: 260 * i + 10, top: 10 }, { input: tiny, left: 260 * i + 10, top: 270 },
+            ])).png().toBuffer();
+        fs.writeFileSync(`${SCRATCH}/${id}-sheet.png`, sheet);
+        console.log(`
+contact sheet → ${SCRATCH}/${id}-sheet.png    then: --only ${id} --pick <n>`);
+    }
+    process.exit(0);
+}
 
 let made = 0, skipped = 0, spent = 0;
 for (const [id, piece] of Object.entries(PIECES)) {
