@@ -65,6 +65,7 @@ export async function POST(request) {
                 // ⚠️ NOT AWAITED INTO THE RESPONSE PATH ON PURPOSE? No — awaited. Vercel kills work a handler
                 // did not wait for, and a counter that increments only when the phone is fast is a counter
                 // nobody can trust. One upsert, on a tap the player already waited for.
+                run.fight = null;           // whatever was held belonged to the room you are leaving
                 const node = run.map.nodes.find((n) => n.row === want.row && n.lane === want.lane);
                 // AN UNKNOWN DECIDES ITSELF ON ENTRY, which is the whole reason theirs can be a fifth of the
                 // map — a question mark resolved when the map was drawn is just a room with a worse label.
@@ -254,6 +255,7 @@ export async function POST(request) {
             if (action === "won") {
                 // The fight is over and won. Bank the health it was won on, then put three cards on the table.
                 run.hp = Math.max(1, Math.min(run.hpMax, Math.round(Number(body.hp) || run.hp)));
+                run.fight = null;           // won: there is no fight to come back to, only a reward
                 // Iron Ration pays here — after a win, before the reward, so the number on the card is the
                 // number you keep.
                 const ration = (run.perks || []).reduce((n, id) => n + (PERKS[id]?.healAfter || 0), 0);
@@ -289,6 +291,7 @@ export async function POST(request) {
                 if (!run.offers?.includes(id)) return NextResponse.json({ error: "no_such_offer" }, { status: 400 });
                 run.deck = [...run.deck, id];
                 run.offers = null;
+                run.fight = null;           // the fight it came from is finished with
                 run.at = null;              // back to the sheet to choose where next
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
@@ -301,6 +304,7 @@ export async function POST(request) {
                 // deck and the means to fix it later".
                 run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
+                run.fight = null;
                 run.at = null;
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
@@ -308,6 +312,28 @@ export async function POST(request) {
 
             // A potion is spent from the RUN, not from the fight: the fight reports what it did, and the run
             // is what remembers the bottle is empty. Kept here so a refresh mid-fight cannot un-drink one.
+            // ── A FIGHT THAT SURVIVES A LOCKED PHONE ────────────────────────────────────────────────
+            // ⚠️ THE ROOM RESTARTED. The run row banks your health when a fight ENDS, so a reload in the
+            // middle of one rebuilt the room from the seed: the foes back at full health, your health back to
+            // what you walked in on, and the beating you had just taken undone. That is a lost fight if you
+            // were winning and a free retry if you were not — the exact thing the run row exists to prevent,
+            // which it already does for every other room in the game.
+            //
+            // The engine state IS the fight (pure, seeded, serialisable — see the note at the top of
+            // cards-kit), so holding it is holding the room. Written at the END of a turn, not per card: a
+            // turn is the unit somebody would be annoyed to replay, and it is one write for ten taps.
+            if (action === "save") {
+                const snap = body?.fight;
+                // Shape-checked rather than trusted. It is the owner's own prototype and the engine runs in
+                // the browser anyway, but a malformed blob here is a run that cannot be loaded at all.
+                if (!snap || typeof snap !== "object" || !Array.isArray(snap.hand) || !Array.isArray(snap.foes)) {
+                    return NextResponse.json({ error: "bad_fight" }, { status: 400 });
+                }
+                run.fight = snap;
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
             if (action === "drink") {
                 const idx = Number(body?.slot);
                 if (!Number.isInteger(idx) || !(run.potions || [])[idx]) {
@@ -323,6 +349,7 @@ export async function POST(request) {
 
             if (action === "dead") {
                 run.done = "dead";
+                run.fight = null;              // the room is over; nothing to come back to
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }

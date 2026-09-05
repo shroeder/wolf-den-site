@@ -49,16 +49,44 @@ const CLOSE_MS = 340;
 
 export default function CardFightClient({ fixture, run = null }) {
     const router = useRouter();
-    const [fight, setFight] = useState(() => startFight({
-        seed: fixture.seed,
-        hero: fixture.hero,
-        foes: fixture.foes,
-        // A run brings its own deck; a bare ?seed= fight does not and falls back to the starter ten.
-        deck: fixture.deck || null,
-        // Perks change how a fight OPENS — the block you start on, your Strength, your first hand — so they
-        // are handed to the engine at the start rather than checked somewhere in the turn loop.
-        perks: fixture.perks || [],
-    }));
+    const [fight, setFight] = useState(() => {
+        const fresh = startFight({
+            seed: fixture.seed,
+            hero: fixture.hero,
+            foes: fixture.foes,
+            // A run brings its own deck; a bare ?seed= fight does not and falls back to the starter ten.
+            deck: fixture.deck || null,
+            // Perks change how a fight OPENS — the block you start on, your Strength, your first hand — so
+            // they are handed to the engine at the start rather than checked somewhere in the turn loop.
+            perks: fixture.perks || [],
+        });
+        // ⚠️ THREE CARDS ON THE TABLE MEANS THE FIGHT IS ALREADY WON. A reward sits on the run between the
+        // win and the pick — and that gap is exactly where a phone locks itself, a tab reloads, or somebody
+        // taps the back button. Coming back rebuilt the room from scratch: the same foes at FULL health, your
+        // post-win health, and the three cards still sitting unclaimed on the run. Fight it again and the win
+        // posts again, which re-rolls the offers and pays an elite's trinket a second time.
+        //
+        // The run row already knows the answer, so the screen believes it: offers pending = this room is
+        // over, show the reward. `gaveUp` stays false and the reported flag is pre-set below, so nothing
+        // re-posts a win that was already banked.
+        if (run?.offers?.length) return { ...fresh, over: "win" };
+        // ── AND A FIGHT LEFT HALF-FOUGHT IS PICKED BACK UP ───────────────────────────────────────────
+        // The run holds the engine state at the end of every turn (see "save" in the run route), so a phone
+        // that locked itself in a pocket comes back to the same turn, the same hand and the same wounded
+        // foes rather than to a fresh room. `hero.art` and the foe sprites are NOT in the held state — they
+        // are fixture data and can change under a stored run — so the pictures come from the fixture and
+        // only the numbers come from the snapshot.
+        if (run?.fight?.hand && run.fight.foes?.length === fresh.foes.length) {
+            return {
+                ...run.fight,
+                hero: { ...run.fight.hero, art: fresh.hero.art, flip: fresh.hero.flip, name: fresh.hero.name },
+                foes: run.fight.foes.map((f, i) => ({
+                    ...f, art: fresh.foes[i]?.art ?? f.art, flip: fresh.foes[i]?.flip ?? f.flip,
+                })),
+            };
+        }
+        return fresh;
+    });
     // ── THE RUN LIVES BESIDE THE FIGHT, NOT INSIDE IT ────────────────────────────────────────────────
     // cards-kit knows about ONE fight and should keep knowing about one fight: it is pure, it is seeded, and
     // the day it moves behind an API it has to move without dragging a run's worth of bookkeeping with it.
@@ -79,6 +107,10 @@ export default function CardFightClient({ fixture, run = null }) {
         if (d?.run) setRunState(d.run);
         return d?.run || null;
     }, []);
+
+    // A resumed reward has ALREADY been reported — see the note in the initialiser. Without this the effect
+    // below sees `over: "win"` on the first render and posts the win a second time.
+    if (reported.current === null && run?.offers?.length) reported.current = "win";
 
     // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
     // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
@@ -407,6 +439,12 @@ export default function CardFightClient({ fixture, run = null }) {
             pushFloats(done.events);
             setActor(null);
             setActing(false);
+            // ── HELD, ONCE A TURN ────────────────────────────────────────────────────────────────
+            // Here rather than per card: a turn is the unit somebody would mind replaying, and one write
+            // covers ten taps. Not for a fight that just ended — `won`/`dead` are posted by the effect
+            // above and they clear the held fight themselves — and not for a bare ?seed= fight, which has
+            // no run to hold anything.
+            if (run && !done.state.over) post("save", { fight: done.state });
         }, at + 220));
         turnTimers.current = timers;
     }, [fight, acting, pushFloats]);
