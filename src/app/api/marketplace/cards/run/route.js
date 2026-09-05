@@ -81,7 +81,7 @@ export async function POST(request) {
                 // party. Stamped onto the room because `recent` is about to change: re-rolling later would
                 // draw against a memory that already holds this encounter.
                 const encSeed = (run.seed >>> 0) + (want.row * 31 + want.lane) * 104729;
-                const enc = pickEncounter(encSeed, want.row + 1, kind, run.recent || []);
+                const enc = pickEncounter(encSeed, want.row + 1, kind, run.recent || [], run.act || 1);
                 run.at = { row: want.row, lane: want.lane, kind, enc: enc?.id || null };
                 run.stop = want.row + 1;
                 run.trail = [...(run.trail || []), { row: want.row, lane: want.lane }];

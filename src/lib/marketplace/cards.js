@@ -409,11 +409,14 @@ export async function runFixture(buyerId, run) {
     // would run the draw against a memory that now CONTAINS this encounter and hand back a different party
     // every time the page rendered. Stored once, read for ever after; the pick below is only for a room that
     // predates this (an in-flight run) or a fight with no room around it.
-    const encounter = encounterById(room.enc) || pickEncounter(seed, room.row + 1, room.kind, run.recent || []);
+    const encounter = encounterById(room.enc) || pickEncounter(seed, room.row + 1, room.kind, run.recent || [], run.act || 1);
     const fixture = await getCardFightFixture(buyerId, seed, encounter);
     return {
         ...fixture,
         stop: { ...stop, of: RUN_LENGTH, row: room.row, kind: room.kind },
+        // WHICH ROOM THE FIGHT IS IN. The act decides the backdrop as well as the bestiary — see
+        // gen-card-scenes.mjs — and the screen has no other way to know which act it is drawing.
+        act: run.act || 1,
         hero: { ...fixture.hero, hp: run.hp, hpMax: run.hpMax },
         deck: run.deck,
         perks: run.perks || [],

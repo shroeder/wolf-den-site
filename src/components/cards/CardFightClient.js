@@ -44,6 +44,13 @@ const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: 
 // How long a body takes to go, and how long the line takes to close over it. DIE_MS reaches the stylesheet
 // as --cf-die off the root rather than being written twice: the close-up is timed to start as the last of the
 // sprite fades, and two numbers that must agree should not be two numbers.
+// The three rooms of the run, by act. A fixture with no act (a bare ?seed= fight) gets the first one.
+const ACT_SCENE = {
+    1: "/images/cards/scene-arena.webp",
+    2: "/images/cards/scene-deep.webp",
+    3: "/images/cards/scene-spire.webp",
+};
+
 const DIE_MS = 460;
 const CLOSE_MS = 340;
 
@@ -802,7 +809,13 @@ export default function CardFightClient({ fixture, run = null }) {
         }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
-                <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
+                {/* ── THE ROOM CHANGES WITH THE ACT ────────────────────────────────────────────────
+                    One arena stood behind every fight in the game, so act two was act one with bigger
+                    numbers and the screen said so. Theirs changes the room at every act and it is most of
+                    why the acts feel different before you have read a single enemy. Same layout in all
+                    three — the floor line sits at the same height, which is what the fighters are placed
+                    against. */}
+                <Sprite src={ACT_SCENE[fixture.act || 1] || ACT_SCENE[1]} className="cf-bg" />
 
                 {/* ── EVERYTHING BUT THE CARDS LIVES UP HERE ──────────────────────────────────────────
                     Luke's call, looking at the restaged screen: the piles, the energy and End Turn go to the

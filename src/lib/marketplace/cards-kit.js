@@ -475,7 +475,11 @@ export const stopLabel = (stop, { capital = true, act = 0 } = {}) => {
     // boss should not be reading "Act 1" at itself on every screen.
     const where = act > 1 ? `Act ${act} · ` : "";
     if (n > RUN_LENGTH) return `${where}${capital ? "The boss" : "the boss"}`;
-    return `${where}${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
+    // ⚠️ SHORTER ONCE THE ACT IS ON IT. "ACT 2 · STOP 6 OF 15 · TURN 1" is 27 characters at 11px with wide
+    // letter-spacing, and it wrapped onto a second line on a 375px phone — with the "1" of the turn alone
+    // underneath. The act buys the room, so the "of" pays for it.
+    if (act > 1) return `${where}${capital ? "Stop" : "stop"} ${n}/${RUN_LENGTH}`;
+    return `${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
 };
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -562,9 +566,12 @@ export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds 
 }
               // map rows; the boss stands above them
 
-// ⚠️ AND THE ACT IS PART OF THE PRICE NOW. Their act 2 is not act 1 with more rooms — the same shapes hit
-// harder and the good cards start appearing sooner, which is what makes the relic you just won feel like it
-// was needed rather than like a lap of honour. 35% more health per act, and the card tiers open a rung early.
+// ⚠️ AND THE ACT IS PART OF THE PRICE — BUT NOT AS A MULTIPLIER ON A CREATURE. The first cut of this scaled
+// `hp` here by 35% an act, which was a difficulty slider wearing a bestiary; nothing downstream even read it
+// (a foe's health comes from its own range in FOES, by design — see the note there). An act is harder because
+// it SENDS DIFFERENT THINGS: the Deep opens with Drowned and Barnacles where the Sand opened with Curs, and
+// its boss has 200 health where the Warlord has 150. What survives here is the card tier, which does open a
+// rung early per act, because a deck that has beaten a boss should be offered the cards that beat the next.
 const actScale = (act) => 1 + 0.35 * (Math.max(1, Math.min(ACTS, act || 1)) - 1);
 export function roomFight(row, kind = "fight", act = 1) {
     const t = Math.max(0, Math.min(1, (row - 1) / (RUN_LENGTH - 1)));   // 0 at the bottom, 1 at the top
@@ -618,6 +625,106 @@ export const STARTER_DECK = [
 // see and cover is the whole shape of the fight. Nothing in the easy pool moved: a Cur at 4/7 and a Jackal at
 // 5/8 already ARE a Louse and a Fungi Beast.
 export const FOE_SCRIPTS = {
+    // ══ THE DEEP — ACT TWO ═══════════════════════════════════════════════════════════════════════════════
+    // Luke: "how is enemy variety between acts?" It was none: the same eleven creatures in all three acts
+    // with 35% more health, which is a difficulty slider wearing a bestiary. Their act 2 is not act 1 harder,
+    // it is DIFFERENT PRESSURE — the Byrd flies, the Chosen hexes, the Shelled Parasite is a wall you cannot
+    // out-hit — so the deck you built for act 1 has to be re-thought rather than re-rolled.
+    //
+    // The Deep asks the question act 1 never does: it takes your health slowly and steadily rather than in
+    // spikes, and it punishes a deck of small blows.
+    drowned: {
+        // Grapples: a hit that also makes your NEXT turn worse. Weak on the wind-down instead of the wind-up.
+        open: "grasp",
+        moves: {
+            grasp: { key: "grasp", label: "Grasp", damage: 9 },
+            drag: { key: "drag", label: "Drag Under", damage: 6, weak: 1 },
+            wail: { key: "wail", label: "Wail", weak: 2 },
+        },
+        after: { grasp: [["drag", 55], ["wail", 45]], drag: [["grasp", 65], ["wail", 35]], wail: [["grasp", 70], ["drag", 30]] },
+        limit: { drag: 2, wail: 1 },
+    },
+    barnacle: {
+        // The act-2 wall, and a real one — theirs is the Shelled Parasite, which is exactly where a blocking
+        // enemy belongs. Twelve is more than any single starter card can remove, so it has to be answered
+        // with a turn rather than with a card.
+        open: "shell",
+        moves: {
+            shell: { key: "shell", label: "Shell", block: 12 },
+            scrape: { key: "scrape", label: "Scrape", damage: 8 },
+            rasp: { key: "rasp", label: "Rasp", damage: 5, vulnerable: 1 },
+        },
+        after: { shell: [["scrape", 60], ["rasp", 40]], scrape: [["shell", 65], ["rasp", 35]], rasp: [["shell", 70], ["scrape", 30]] },
+        limit: { shell: 2, scrape: 2 },
+    },
+    tidecaller: {
+        // It heals the thing you are trying to kill. Nothing in act 1 does that, and it turns "which one
+        // first" from a preference into the whole fight.
+        open: "chant",
+        moves: {
+            chant: { key: "chant", label: "Chant", heal: 9 },
+            surge: { key: "surge", label: "Surge", damage: 10 },
+            brine: { key: "brine", label: "Brine", vulnerable: 2 },
+        },
+        after: { chant: [["surge", 60], ["brine", 40]], surge: [["chant", 55], ["brine", 45]], brine: [["surge", 70], ["chant", 30]] },
+        limit: { chant: 1, brine: 1 },
+    },
+    leviathan: {
+        // ACT TWO'S BOSS. One creature, three beats, and the biggest single hit in the game so far — a wall
+        // of its own on the turn it coils, so the swallow cannot simply be raced.
+        open: "coil",
+        moves: {
+            coil: { key: "coil", label: "Coil", block: 14, strength: 2 },
+            churn: { key: "churn", label: "Churn", damage: 11, weak: 1 },
+            swallow: { key: "swallow", label: "Swallow", damage: 22 },
+        },
+        after: { coil: [["churn", 55], ["swallow", 45]], churn: [["swallow", 60], ["coil", 40]], swallow: [["coil", 75], ["churn", 25]] },
+        limit: { swallow: 1, coil: 1 },
+    },
+
+    // ══ THE SPIRE — ACT THREE ════════════════════════════════════════════════════════════════════════════
+    // The top of the run, met by a deck of twenty-odd cards with upgrades and two boss trinkets. It is
+    // allowed to hit like it.
+    emberling: {
+        // A clock that gets worse, like the Ramper, but it starts small enough to ignore — which is the trap.
+        open: "flare",
+        moves: {
+            flare: { key: "flare", label: "Flare", strength: 3 },
+            spit: { key: "spit", label: "Spit", damage: 8 },
+        },
+        after: { flare: [["spit", 75], ["flare", 25]], spit: [["spit", 55], ["flare", 45]] },
+        limit: { flare: 2 },
+    },
+    colossus: {
+        // The longest wind-up in the game and the hardest landing. Everything about it is legible a turn
+        // ahead, which is the only thing that makes 26 fair.
+        open: "gather",
+        moves: {
+            gather: { key: "gather", label: "Gather", block: 16, strength: 3 },
+            fall: { key: "fall", label: "Fall", damage: 26 },
+            sweep: { key: "sweep", label: "Sweep", damage: 12, vulnerable: 1 },
+        },
+        after: { gather: [["fall", 70], ["sweep", 30]], fall: [["gather", 80], ["sweep", 20]], sweep: [["gather", 60], ["fall", 40]] },
+        limit: { fall: 1, gather: 1 },
+    },
+    spire_warden: {
+        // ACT THREE'S BOSS: it does all three jobs — guards, debuffs and hits — so no single answer covers it.
+        open: "toll",
+        moves: {
+            toll: { key: "toll", label: "Toll", weak: 2, vulnerable: 2 },
+            ward: { key: "ward", label: "Ward", block: 18 },
+            hammer: { key: "hammer", label: "Hammer", damage: 20 },
+            rain: { key: "rain", label: "Ember Rain", damage: 9, strength: 2 },
+        },
+        after: {
+            toll: [["hammer", 55], ["ward", 45]],
+            ward: [["hammer", 50], ["rain", 50]],
+            hammer: [["ward", 45], ["rain", 35], ["toll", 20]],
+            rain: [["hammer", 60], ["ward", 40]],
+        },
+        limit: { hammer: 2, ward: 1, toll: 1 },
+    },
+
     // ── THE SHALLOWS ─────────────────────────────────────────────────────────────────────────────────
     cur: {
         open: "snarl",
@@ -873,6 +980,27 @@ export const FOES = {
     // ── THE BOSS. The one number that goes UP: theirs are 140-250 and a boss is meant to be the wall at the
     // top of the act, so cutting the road to it and leaving the door the same size is the wrong trade.
     warlord:  { id: "warlord",  name: "Warlord",   hp: [150, 168], script: "warlord" },
+
+    // ══ THE DEEP — ACT TWO ═══════════════════════════════════════════════════════════════════════════════
+    // ⚠️ A SCRIPT IS NOT A CREATURE. buildParty resolves an encounter through THIS table and falls back to
+    // `FOES.jackal` for anything missing — so the whole act-two bestiary, authored and scripted, stood in the
+    // room as jackals with jackal health and jackal moves until these seven lines existed. It was visible in
+    // one screenshot: a Drowned in the first slot labelled JACKAL.
+    //
+    // AND THE HEALTH IS THE ACT'S DIFFICULTY. There is no per-act multiplier on a creature — Spire does not
+    // make a Louse bigger in act 2, it stops sending Louses — so an act gets harder by sending heavier things.
+    drowned:   { id: "drowned",   name: "Drowned",   hp: [26, 32],   script: "drowned" },
+    barnacle:  { id: "barnacle",  name: "Barnacle",  hp: [34, 40],   script: "barnacle" },
+    tidecaller:{ id: "tidecaller",name: "Tidecaller",hp: [24, 30],   script: "tidecaller" },
+    leviathan: { id: "leviathan", name: "Leviathan", hp: [96, 110],  script: "leviathan" },
+    // The same creature at boss size. A separate id rather than a multiplier, so the elite and the boss can
+    // be tuned apart — which is the whole reason The Maw is a room you may choose and this one is not.
+    deep_king: { id: "deep_king", name: "The Leviathan", hp: [196, 218], script: "leviathan" },
+
+    // ══ THE SPIRE — ACT THREE ════════════════════════════════════════════════════════════════════════════
+    emberling: { id: "emberling", name: "Emberling", hp: [30, 36],   script: "emberling" },
+    colossus:  { id: "colossus",  name: "Colossus",  hp: [58, 66],   script: "colossus" },
+    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [240, 268], script: "spire_warden" },
 };
 
 /** A creature's health for this fight — its own range, rolled off the room's seed. */
@@ -940,6 +1068,40 @@ export const ENCOUNTERS = [
     { id: "warlord", name: "The Warlord", pool: "boss", weight: 1, foes: ["warlord"] },
     { id: "sundered", name: "The Sundered Pair", pool: "boss", weight: 1, foes: ["champion", "champion"] },
     { id: "hollow_king", name: "The Hollow King", pool: "boss", weight: 1, foes: ["warlord", "hexer"] },
+
+    // ══ ACT TWO — THE DEEP ═══════════════════════════════════════════════════════════════════════════════
+    // Pools are named by act from here down (see poolFor). Act one keeps the unprefixed names it has always
+    // had, so every stored run and every seed that has ever been played still resolves to the same rooms.
+    { id: "d_pair", name: "Drowned Pair", pool: "2:easy", weight: 4, foes: ["drowned", "drowned"] },
+    { id: "d_crust", name: "The Encrusted", pool: "2:easy", weight: 3, foes: ["barnacle", "cur"] },
+    { id: "d_caller", name: "A Tidecaller", pool: "2:easy", weight: 3, foes: ["tidecaller", "jackal"] },
+    { id: "d_wall", name: "Barnacle Wall", pool: "2:hard", weight: 4, foes: ["barnacle", "barnacle", "drowned"] },
+    { id: "d_choir", name: "The Choir", pool: "2:hard", weight: 4, foes: ["tidecaller", "drowned", "drowned"] },
+    { id: "d_undertow", name: "Undertow", pool: "2:hard", weight: 3, foes: ["drowned", "warden", "hexer"] },
+    { id: "d_deepwatch", name: "The Deep Watch", pool: "2:deep", weight: 4, foes: ["barnacle", "mauler", "tidecaller"] },
+    { id: "d_drowning", name: "The Drowning", pool: "2:deep", weight: 4, foes: ["drowned", "drowned", "leech"] },
+    { id: "d_current", name: "Against the Current", pool: "2:deep", weight: 3, foes: ["tidecaller", "champion"] },
+    { id: "d_elite_maw", name: "The Maw", pool: "2:elite", weight: 3, foes: ["leviathan"] },
+    { id: "d_elite_pair", name: "Shellbacks", pool: "2:elite", weight: 3, foes: ["barnacle", "barnacle"] },
+    { id: "d_elite_choir", name: "The Drowned Choir", pool: "2:elite", weight: 2, foes: ["tidecaller", "tidecaller", "drowned"] },
+    { id: "d_boss", name: "The Leviathan", pool: "2:boss", weight: 1, foes: ["deep_king"] },
+    { id: "d_boss_court", name: "The Tide Court", pool: "2:boss", weight: 1, foes: ["tidecaller", "deep_king"] },
+
+    // ══ ACT THREE — THE SPIRE ════════════════════════════════════════════════════════════════════════════
+    { id: "s_sparks", name: "Sparks", pool: "3:easy", weight: 4, foes: ["emberling", "emberling"] },
+    { id: "s_watch", name: "Spire Watch", pool: "3:easy", weight: 3, foes: ["colossus"] },
+    { id: "s_forge", name: "The Forge Gang", pool: "3:easy", weight: 3, foes: ["emberling", "bruiser", "cur"] },
+    { id: "s_hammers", name: "The Hammers", pool: "3:hard", weight: 4, foes: ["colossus", "emberling"] },
+    { id: "s_ember", name: "Ember Choir", pool: "3:hard", weight: 4, foes: ["emberling", "emberling", "hexer"] },
+    { id: "s_ascent", name: "The Ascent", pool: "3:hard", weight: 3, foes: ["colossus", "warden", "emberling"] },
+    { id: "s_summit", name: "The Summit", pool: "3:deep", weight: 4, foes: ["colossus", "colossus"] },
+    { id: "s_pyre", name: "The Pyre", pool: "3:deep", weight: 4, foes: ["emberling", "emberling", "mauler"] },
+    { id: "s_last", name: "The Last Guard", pool: "3:deep", weight: 3, foes: ["champion", "colossus"] },
+    { id: "s_elite_titan", name: "A Titan", pool: "3:elite", weight: 3, foes: ["colossus", "colossus"] },
+    { id: "s_elite_forge", name: "The Forge Heart", pool: "3:elite", weight: 3, foes: ["emberling", "emberling", "emberling"] },
+    { id: "s_elite_king", name: "The Ash King", pool: "3:elite", weight: 2, foes: ["warlord", "emberling"] },
+    { id: "s_boss", name: "The Spire Warden", pool: "3:boss", weight: 1, foes: ["spire_warden"] },
+    { id: "s_boss_twin", name: "Warden and Titan", pool: "3:boss", weight: 1, foes: ["spire_warden", "colossus"] },
 ];
 
 /**
@@ -959,11 +1121,20 @@ export function buildParty(encounter, seed) {
 export const encounterById = (id) => ENCOUNTERS.find((e) => e.id === id) || null;
 
 /** Which list a room draws from. `n` is the 1-based row, matching stopAt. */
-export function poolFor(n, kind = "fight") {
-    if (kind === "boss") return "boss";
-    if (kind === "elite") return "elite";
-    if (n <= 3) return "easy";
-    return n <= 9 ? "hard" : "deep";
+/**
+ * Which pool a room draws from — and which ACT'S pool.
+ *
+ * ⚠️ ACT ONE KEEPS THE UNPREFIXED NAMES. Every run in the database was written before acts existed and every
+ * seed anyone has ever played resolves through here; renaming act one's pools would re-roll all of them.
+ * Acts two and three prefix theirs, and an act with no encounters authored for a band falls back to act
+ * one's, so a half-written bestiary is a duller run rather than a crash.
+ */
+export function poolFor(n, kind = "fight", act = 1) {
+    const band = kind === "boss" ? "boss" : kind === "elite" ? "elite" : n <= 3 ? "easy" : n <= 9 ? "hard" : "deep";
+    const a = Math.max(1, Math.floor(Number(act) || 1));
+    if (a <= 1) return band;
+    const named = `${a}:${band}`;
+    return ENCOUNTERS.some((e) => e.pool === named) ? named : band;
 }
 
 /**
@@ -977,8 +1148,8 @@ export function poolFor(n, kind = "fight") {
  * A pool with nothing left after the exclusion falls back to the whole pool rather than returning nothing,
  * because a short list plus a two-deep memory can otherwise dead-end a run.
  */
-export function pickEncounter(seed, n, kind = "fight", recent = []) {
-    const pool = poolFor(n, kind);
+export function pickEncounter(seed, n, kind = "fight", recent = [], act = 1) {
+    const pool = poolFor(n, kind, act);
     const all = ENCOUNTERS.filter((e) => e.pool === pool);
     const fresh = all.filter((e) => !recent.includes(e.id));
     const list = fresh.length ? fresh : all;
