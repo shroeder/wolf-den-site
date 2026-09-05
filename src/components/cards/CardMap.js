@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
@@ -60,11 +60,6 @@ const H = PAD_TOP + (RUN_LENGTH - 1) * ROW_H + PAD_BOTTOM;
 const xOf = (lane) => 10 + (lane / (MAP_LANES - 1)) * (W - 20);
 const yOf = (row) => H - PAD_BOTTOM - row * ROW_H;
 
-const clock = (ms) => {
-    const s = Math.max(0, Math.floor(ms / 1000));
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
-
 const Ink = ({ kind, className }) => (MARK[kind]
     // eslint-disable-next-line @next/next/no-img-element
     ? <img className={className} src={MARK[kind]} alt="" draggable="false" />
@@ -73,8 +68,10 @@ const Ink = ({ kind, className }) => (MARK[kind]
 export default function CardMap({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
-    const [peek, setPeek] = useState(null);
     const [deckOpen, setDeckOpen] = useState(false);
+    // The legend, behind a button. See the note in the render: a key pinned open over the sheet was covering
+    // the quarter of the map you most needed to look at.
+    const [keyOpen, setKeyOpen] = useState(false);
     // ── WHAT YOU ARE CARRYING, ON A SCREEN YOU CAN OPEN ──────────────────────────────────────────────
     // Luke: "seeing perks from the map like Slay the Spire."
     //
@@ -87,11 +84,6 @@ export default function CardMap({ run, art = {} }) {
     // rule, in one panel. The hover peek stays for a mouse, because a tooltip is faster than a panel when
     // you have one — but it is no longer the only way in.
     const [carry, setCarry] = useState(null);
-    // ⚠️ NULL UNTIL MOUNTED. Seeding this with Date.now() means the server renders one number and the client
-    // renders a different one a moment later, and React throws the whole tree away and re-renders it —
-    // "server rendered text didn't match the client". A clock is the classic case: there is no value the
-    // server can print that will still be right when the browser reads it, so it prints nothing.
-    const [now, setNow] = useState(null);
     const sheet = useRef(null);
 
     const map = run.map;
@@ -102,12 +94,6 @@ export default function CardMap({ run, art = {} }) {
         () => new Set(reachable(map, last).map((n) => `${n.row}:${n.lane}`)),
         [map, last]
     );
-
-    useEffect(() => {
-        setNow(Date.now());
-        const t = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(t);
-    }, []);
 
     // You climb this sheet, so it opens at the bottom.
     useLayoutEffect(() => {
@@ -148,82 +134,67 @@ export default function CardMap({ run, art = {} }) {
         return [...counted.entries()].map(([id, n]) => ({ card: cardById(id), n })).filter((x) => x.card);
     }, [run.deck]);
 
+    // Where you are standing: the pip on the sheet, and the room the live routes lead out of.
+    const here = last ? `${last.row}:${last.lane}` : null;
+
     return (
         <div className={`cm ${panelFont.className}`}>
-            {/* ── THE TOP BAR ── flat, no boxes, sprites and coloured numerals. Theirs has not one rounded
-                rectangle on it and that is most of why it reads as part of the game rather than as chrome. */}
-            <div className="cm-bar">
-                <span className="cm-who">The Sand</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="cm-ui" src="/images/cards/chrome/ui-heart.png" alt="" />
-                <b className="cm-hp">{run.hp}/{run.hpMax}</b>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="cm-ui" src="/images/cards/chrome/ui-ember.png" alt="" />
-                <b className="cm-em">{run.embers || 0}</b>
-                {/* EMPTY SLOTS ARE NOT DRAWN. Luke: "if it's an empty potion slot, just don't show anything." */}
-                {potions.map((p, i) => (
-                    <button
-                        key={`${p.id}${i}`}
-                        type="button"
-                        className="cm-potion"
-                        aria-label={`${p.name} — ${p.text}`}
-                        onPointerEnter={() => setPeek(`${p.name} — ${p.text}`)}
-                        onPointerLeave={() => setPeek(null)}
-                        onClick={() => setCarry(p.id)}
-                    >
-                        <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
-                    </button>
-                ))}
-                <span className="cm-gap" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img className="cm-ui" src="/images/cards/chrome/ui-floor.png" alt="" />
-                <b className="cm-fl">{last ? last.row + 1 : 0}</b>
-                <span className="cm-clock">{now ? clock(now - (run.startedAt || now)) : "0:00"}</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <button type="button" className="cm-tool is-on" aria-label="Map">
-                    <img src="/images/cards/chrome/ui-mapbook.png" alt="" />
-                </button>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <button type="button" className="cm-tool" aria-label="Your deck" onClick={() => setDeckOpen(true)}>
-                    <img src="/images/cards/chrome/ui-deckbook.png" alt="" />
-                </button>
-            </div>
+            {/* ══ THE DESCENT ═════════════════════════════════════════════════════════════════════════════
+                Third design of this screen, and the first that is not a photocopy of Spire's parchment.
+                Luke: "let's just redo the map entirely, it looks terrible... I like functionally how it works
+                but I really don't like the way it's looking on screen, and I especially don't like that the
+                legend covers everything up. Make it more mobile centric."
 
-            {/* ── THE DARK STRIP THE PERKS SIT IN ── Luke: "they have an empty space on the left that's dark,
-                and that's where they show their perks." It is always there, occupied or not. */}
-            {/* ⚠️ EVERY SPRITE ON THIS SCREEN GOES THROUGH <Sprite>, not <img>. Warm Blood — the trinket
-                EVERY run opens holding — had no picture drawn for it, and a raw <img> renders a missing file
-                as the browser's torn-page glyph: a broken image at the top-left of the map for the whole of
-                every run anybody has ever played. The art exists now; the fallback is so that the next rule
-                authored without a picture costs nothing on screen. */}
-            <div className="cm-body">
-            <div className="cm-perkbar">
+                WHAT WAS WRONG, and none of it was the rooms or the routes — those he likes:
+                  · A CREAM SHEET in a game whose every other screen is a dark room. The map was the only lit
+                    thing in the Den and it read as a page torn out of a different game.
+                  · A LEGEND THE SIZE OF A HAND covering the top-right quarter of that sheet, permanently, on
+                    the one screen where you are trying to see where you can go. A key you cannot move is
+                    worse than no key, and it is only wanted until you have learnt six pictures.
+                  · A BLACK GUTTER down the left holding a single dashed circle, and a banner nailed to the
+                    floor. Chrome eating a third of a phone to say nothing.
+
+                WHAT IT IS NOW: the dark the rest of the game is made of, with light only where you can act.
+                The rooms you can reach are lit AND NAMED — which is the thing that actually retires the
+                legend — the ones you cannot are cold, and the trail behind you is drawn in brass. The key is
+                still there for anybody who wants it: one small button that opens over the map and leaves. */}
+            <div className="cm-bar">
+                {/* The act has a name, and a wide screen has the room to say it. A phone does not, and the
+                   phone is what this is played on, so it is the first thing to go. */}
+                <span className="cm-who">The Sand</span>
+                <Sprite className="cm-ui" src="/images/cards/chrome/ui-heart.png" />
+                <b className="cm-hp">{run.hp}/{run.hpMax}</b>
+                <Sprite className="cm-ui" src="/images/cards/chrome/ui-ember.png" />
+                <b className="cm-em">{run.embers || 0}</b>
+
+                {/* WHAT YOU ARE CARRYING, INLINE. The trinkets had a band of their own, and then a column of
+                    their own; both were furniture for something you own between zero and four of. They sit
+                    beside the potions now — one row, one tap each, and nothing at all when empty. */}
                 {perks.map((id) => {
                     const perk = PERKS[id];
-                    // ⚠️ A PERK THE RULES NO LONGER KNOW MUST NOT TAKE THE SHEET WITH IT. Runs outlive edits
-                    // to cards-kit — this one has been open seven hours — and `perk.name` on an id that was
-                    // renamed is a crash on the map, which is the screen you cannot get out of a run without.
                     if (!perk) return null;
                     return (
-                        <button
-                            key={id}
-                            type="button"
-                            className="cm-perk"
-                            aria-label={`${perk.name} — ${perk.text}`}
-                            onPointerEnter={() => setPeek(`${perk.name} — ${perk.text}`)}
-                            onPointerLeave={() => setPeek(null)}
-                            onClick={() => setCarry(id)}
-                        >
-                            <Sprite src={`/images/cards/items/${id}.png`} />
+                        <button key={id} type="button" className="cm-hold" onClick={() => setCarry(id)}
+                            aria-label={`${perk.name} — ${perk.text}`}>
+                            <Sprite className="cm-ui" src={`/images/cards/items/${id}.png`} />
                         </button>
                     );
                 })}
-                {/* THE STRIP SAYS WHAT IT IS FOR when there is nothing in it yet. An empty dark bar is
-                    furniture; an empty dark bar with a word in it is a slot waiting to be filled. */}
-                {/* An empty column is a slot waiting to be filled rather than a dark bar nobody can read a
-                    reason into — theirs shows nothing at all, but theirs is not 62px of unexplained black on
-                    a phone. One outlined socket, and the word lives in its title. */}
-                {perks.length ? null : <span className="cm-perkbar-empty" title="Trinkets you find will sit here" />}
+                {potions.map((p, i) => (
+                    <button key={`${p.id}${i}`} type="button" className="cm-hold" onClick={() => setCarry(p.id)}
+                        aria-label={`${p.name} — ${p.text}`}>
+                        <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
+                    </button>
+                ))}
+
+                <span className="cm-gap" />
+                <Sprite className="cm-ui" src="/images/cards/chrome/ui-floor.png" />
+                <b className="cm-fl">{last ? last.row + 1 : 0}</b>
+                <button type="button" className="cm-tool" aria-label="Your deck" onClick={() => setDeckOpen(true)}>
+                    <Sprite src="/images/cards/chrome/ui-deckbook.png" />
+                </button>
+                <button type="button" className="cm-tool cm-key" aria-label="What the marks mean"
+                    onClick={() => setKeyOpen(true)}>?</button>
             </div>
 
             <div className="cm-sheet" ref={sheet}>
@@ -235,15 +206,14 @@ export default function CardMap({ run, art = {} }) {
                             const x2 = xOf(lane);
                             const y2 = yOf(n.row + 1);
                             const walked = taken.has(`${n.row}:${n.lane}`) && taken.has(`${n.row + 1}:${lane}`);
-                            const bend = ROW_H * 0.28;
-                            // A per-edge dash offset so no two routes tick in step — theirs are hand-drawn and
-                            // no two dashes line up. Derived from position, so it is stable across renders.
-                            const off = ((n.row * 7 + n.lane * 3 + lane) % 5) * 1.3;
+                            // THE ROUTE OUT OF WHERE YOU STAND IS ITS OWN STATE: walked is history, live is
+                            // the decision in front of you, and the rest is the shape of the act to come.
+                            const live = here === `${n.row}:${n.lane}` && open.has(`${n.row + 1}:${lane}`);
+                            const bend = ROW_H * 0.3;
                             return (
                                 <path
                                     key={`${n.row}-${n.lane}-${lane}`}
-                                    className={`cm-edge${walked ? " is-walked" : ""}`}
-                                    strokeDashoffset={off}
+                                    className={`cm-edge${walked ? " is-walked" : ""}${live ? " is-live" : ""}`}
                                     d={`M ${x1} ${y1} C ${x1} ${y1 - bend}, ${x2} ${y2 + bend}, ${x2} ${y2}`}
                                 />
                             );
@@ -251,7 +221,7 @@ export default function CardMap({ run, art = {} }) {
                         {map.nodes.filter((n) => n.row === RUN_LENGTH - 1).map((n) => (
                             <path
                                 key={`boss-${n.lane}`}
-                                className="cm-edge"
+                                className={`cm-edge${here === `${n.row}:${n.lane}` && bossOpen ? " is-live" : ""}`}
                                 d={`M ${xOf(n.lane)} ${yOf(n.row)} C ${xOf(n.lane)} ${yOf(n.row) - ROW_H * 0.4}, ${W / 2} ${PAD_TOP + ROW_H * 0.4}, ${W / 2} ${PAD_TOP - 4}`}
                             />
                         ))}
@@ -261,25 +231,23 @@ export default function CardMap({ run, art = {} }) {
                         const k = `${n.row}:${n.lane}`;
                         const isOpen = open.has(k);
                         const isTaken = taken.has(k);
+                        const isHere = here === k;
                         return (
                             <button
                                 key={k}
                                 type="button"
                                 disabled={!isOpen || busy}
-                                className={`cm-node${isOpen ? " is-open" : ""}${isTaken ? " is-taken" : ""}`}
+                                className={`cm-node${isOpen ? " is-open" : ""}${isTaken ? " is-taken" : ""}${isHere ? " is-here" : ""}`}
                                 style={{ left: `${xOf(n.lane)}%`, top: `${(yOf(n.row) / H) * 100}%` }}
                                 onClick={() => enter(n)}
-                                onPointerEnter={() => setPeek(LABEL[n.kind])}
-                                onPointerLeave={() => setPeek(null)}
                                 aria-label={`${LABEL[n.kind]}, floor ${n.row + 1}`}
                             >
-                                {/* The visited ring is a DRAWING, hung behind a shrunken mark — theirs is a
-                                    brush circle with the ends not quite meeting, not a border-radius. */}
-                                {isTaken ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="cm-ring" src="/images/cards/chrome/map-visited.png" alt="" />
-                                ) : null}
+                                <span className="cm-disc" aria-hidden="true" />
                                 <Ink kind={n.kind} className="cm-ink" />
+                                {/* ⚠️ THIS IS WHAT REPLACED THE LEGEND. A room you can walk into says what it
+                                    is, in one word, right under it — so the six pictures are learnt in a
+                                    single run rather than looked up on a scroll pinned over the map. */}
+                                {isOpen ? <i className="cm-name">{LABEL[n.kind]}</i> : null}
                             </button>
                         );
                     })}
@@ -290,77 +258,61 @@ export default function CardMap({ run, art = {} }) {
                         className={`cm-node cm-boss${bossOpen ? " is-open" : ""}`}
                         style={{ left: "50%", top: `${((PAD_TOP - 4) / H) * 100}%` }}
                         onClick={() => bossNode && enter(bossNode)}
-                        onPointerEnter={() => setPeek(LABEL.boss || "Boss")}
-                        onPointerLeave={() => setPeek(null)}
                         aria-label="The boss"
                     >
+                        <span className="cm-disc" aria-hidden="true" />
                         <Ink kind="boss" className="cm-ink" />
+                        <i className="cm-name">The Boss</i>
                     </button>
                 </div>
-                {/* ── THE SHEET RUNS ON PAST THE LAST ROOM ────────────────────────────────────────────
-                    The bottom row is the one you are standing on — the sheet opens there, because you climb
-                    it — and the Return ribbon is pinned to the bottom-left of the same box. On a phone those
-                    are the same place: measured at 390x844, the ribbon covered 0-158 x 774-826 and the run's
-                    ONLY reachable room sat at 23-55 x 758-790 underneath it. A hit-test at the room's dead
-                    centre returned `cm-return`, so the tap opening the run could not be made at all.
-                    (The wide layout never showed it — the ribbon is far left of a centred column there.)
-                    A tail of dead parchment gives the scroll somewhere to go, so the opening scroll can put
-                    the row at the 62% it always meant to and the ribbon has only sheet underneath it. Height
-                    covers the ribbon's band (18px up, 52 tall) plus a node's half-height and a margin. */}
+                {/* The trail runs on past the last room, so the opening scroll can put your row where it
+                    means to and the foot has empty ground under it rather than a room. */}
                 <div className="cm-tail" aria-hidden="true" />
             </div>
-            </div>
 
-            {/* ── AND A DARK FOOT FOR THE WAY OUT ─────────────────────────────────────────────────────
-                The ribbon was pinned over the parchment with rooms passing underneath it — "the return
-                button is janky" — and a 62px column is too narrow to hang a banner in without turning it on
-                its side, which a CSS background cannot do (the first attempt cropped it to the word "TURN").
-                So the dark area wraps: down the left for what you are carrying, across the bottom for the
-                way out. The sheet keeps the whole parchment to itself. */}
+            {/* ── THE FOOT ── one line of type: the way out, and what to do. No banner nailed to the floor. */}
             <div className="cm-foot">
-                <button type="button" className="cm-return" onClick={() => router.push("/marketplace/cards/table")}>
-                    Return
+                <button type="button" className="cm-leave" onClick={() => router.push("/marketplace/cards/table")}>
+                    &lsaquo; Leave
                 </button>
+                <span className="cm-hint">{busy ? "…" : "Tap a lit room"}</span>
             </div>
 
-            {/* ── THE LEGEND ── on the scroll, where theirs is. */}
-            <aside className="cm-legend">
-                <b className="cm-legend-title">Legend</b>
-                {["unknown", "merchant", "treasure", "rest", "fight", "elite"].map((kind) => (
-                    <span key={kind} className="cm-leg">
-                        <Ink kind={kind} className="cm-leg-ink" />
-                        {LABEL[kind]}
-                    </span>
-                ))}
-            </aside>
+            {/* ── THE KEY, WHEN IT IS ASKED FOR ─────────────────────────────────────────────────────── */}
+            {keyOpen ? (
+                <div className="cm-over" onClick={() => setKeyOpen(false)} role="presentation">
+                    <div className="cm-panel" onClick={(e) => e.stopPropagation()} role="presentation">
+                        <h2>What the marks mean</h2>
+                        <div className="cm-keys">
+                            {["unknown", "merchant", "treasure", "rest", "fight", "elite", "boss"].map((kind) => (
+                                <span key={kind} className="cm-keyrow">
+                                    <span className="cm-keymark"><Ink kind={kind} className="cm-ink" /></span>
+                                    {LABEL[kind]}
+                                </span>
+                            ))}
+                        </div>
+                        <p className="cm-panel-note">Lit rooms are the ones you can walk into from here.</p>
+                        <button type="button" className="cm-close" onClick={() => setKeyOpen(false)}>Close</button>
+                    </div>
+                </div>
+            ) : null}
 
-            {peek ? <span className="cm-peek">{peek}</span> : null}
-
-            {/* ── YOUR DECK, AS CARDS ─────────────────────────────────────────────────────────────────
-                It was a list of names with the rules text in italics beside them — which is the shop's old
-                fault exactly ("it doesn't Slay the Spire"): the thing you are deciding about never appears.
-                A deck you cannot SEE is a deck you cannot plan with, and now that the picture on a card is
-                the pet at the level you have it at, the list was also the one screen hiding the collection
-                it is made of. Same CardFace the fight and the shelf draw; only the box is this screen's. */}
+            {/* ── YOUR DECK, AS CARDS ── the same CardFace the fight and the shelf draw; only the box around
+                it belongs to this screen. A deck you cannot see is a deck you cannot plan with. */}
             {deckOpen ? (
                 <div className="cm-over" onClick={() => setDeckOpen(false)} role="presentation">
-                    <div className="cm-deck" onClick={(e) => e.stopPropagation()} role="presentation"
+                    <div className="cm-panel is-wide" onClick={(e) => e.stopPropagation()} role="presentation"
                         style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
                         <h2>Your deck — {(run.deck || []).length} cards</h2>
                         <div className="cm-deck-list">
                             {deck.map(({ card, n }) => (
                                 <span key={card.id} className="cm-deck-card">
                                     <span className="cf-card"><CardFace card={card} art={art[card.pet]} /></span>
-                                    {/* A count, not four copies of the same picture: a starter deck is five
-                                        Bites and a shelf of identical cards reads as a rendering bug. */}
                                     {n > 1 ? <b className="cm-deck-n">×{n}</b> : null}
                                 </span>
                             ))}
                         </div>
-                        {/* THE CABINET IS ONE PRESS FROM THE DECK, because "what else is out there" is the
-                            question a deck screen puts in your head — you are looking at twelve cards and
-                            wondering what the other fourteen are. */}
-                        <div className="cm-deck-foot">
+                        <div className="cm-panel-foot">
                             <button type="button" className="cm-close" onClick={() => setDeckOpen(false)}>Close</button>
                             <button type="button" className="cm-see"
                                 onClick={() => router.push("/marketplace/cards/collection")}>
@@ -371,16 +323,14 @@ export default function CardMap({ run, art = {} }) {
                 </div>
             ) : null}
 
-            {/* ── WHAT YOU ARE CARRYING ───────────────────────────────────────────────────────────────
-                Every trinket and every potion, with the rule written out. Opened by pressing any of them —
-                see the note by `carry` — and the one you pressed is lit, so a press on the third relic
-                answers the question you asked rather than handing you a list to search. */}
+            {/* ── WHAT YOU ARE CARRYING ── opened by pressing any trinket or potion; the one you pressed is
+                lit, so a press on the third relic answers the question you actually asked. */}
             {carry ? (
                 <div className="cm-over" onClick={() => setCarry(null)} role="presentation">
-                    <div className="cm-carry" onClick={(e) => e.stopPropagation()} role="presentation">
+                    <div className="cm-panel" onClick={(e) => e.stopPropagation()} role="presentation">
                         <h2>What you&rsquo;re carrying</h2>
                         {perks.length || potions.length ? null : (
-                            <p className="cm-carry-none">Nothing yet. Trinkets come out of chests and elites.</p>
+                            <p className="cm-panel-note">Nothing yet. Trinkets come out of chests and elites.</p>
                         )}
                         {perks.map((id) => {
                             const perk = PERKS[id];
@@ -388,186 +338,160 @@ export default function CardMap({ run, art = {} }) {
                             return (
                                 <span key={id} className={`cm-carry-row${carry === id ? " is-lit" : ""}`}>
                                     <Sprite src={`/images/cards/items/${id}.png`} />
-                                    <span>
-                                        <b>{perk.name}</b>
-                                        <i>{perk.text}</i>
-                                    </span>
+                                    <span><b>{perk.name}</b><i>{perk.text}</i></span>
                                 </span>
                             );
                         })}
                         {potions.map((p, i) => (
                             <span key={`${p.id}${i}`} className={`cm-carry-row${carry === p.id ? " is-lit" : ""}`}>
                                 <Sprite src={`/images/cards/potions/${p.id}.png`} />
-                                <span>
-                                    <b>{p.name} <em>potion</em></b>
-                                    <i>{p.text}</i>
-                                </span>
+                                <span><b>{p.name} <em>potion</em></b><i>{p.text}</i></span>
                             </span>
                         ))}
-                        {/* WHERE A POTION IS DRUNK IS NOT HERE, and saying so is cheaper than a dead button:
-                            they are used in a fight, on the belt above the hand. */}
-                        {potions.length ? <p className="cm-carry-note">Potions are drunk in a fight.</p> : null}
+                        {potions.length ? <p className="cm-panel-note">Potions are drunk in a fight.</p> : null}
                         <button type="button" className="cm-close" onClick={() => setCarry(null)}>Close</button>
                     </div>
                 </div>
             ) : null}
 
             <style jsx global>{`
-                .cm { position: fixed; inset: 0; z-index: 4000; background: #0a0b0f; color: #e9edf2;
-                    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
-                /* ── THE DARK LEFT-HAND SIDE ─────────────────────────────────────────────────────────────
-                   Luke: "Slay the Spire also uses the left hand side, is a big dark area so that the
-                   trinkets can go there — you need to do it like they do it."
-                   Theirs is a column of relics down the dark left of the map screen; ours was a horizontal
-                   band UNDER the top bar, which is a second bar rather than a place, and it pushed the sheet
-                   down by 30px for the whole run whether you were carrying anything or not. And the Return
-                   ribbon floated loose over the parchment with rooms passing beneath it — "the return button
-                   is janky". Both live in the column now: trinkets stacked at the top of it, the way out at
-                   the foot of it, and the sheet is the only thing on the parchment. */
-                .cm-body { display: grid; grid-template-columns: 62px 1fr; min-height: 0; }
+                .cm { position: fixed; inset: 0; z-index: 4000; color: #e9edf2;
+                    display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
+                    /* The ground the rest of the game is made of: near-black, warmed from below as though
+                       the trail is lit from where you are standing. */
+                    background:
+                        radial-gradient(120% 55% at 50% 100%, rgba(94,63,32,0.45), rgba(0,0,0,0) 62%),
+                        linear-gradient(180deg, #0b0d12 0%, #12151c 55%, #0b0d12 100%); }
 
-                /* Flat slate, no boxes, no rounded anything — theirs has none. */
-                .cm-bar { display: flex; align-items: center; gap: 7px; padding: 7px 12px;
-                    background: #3d4550; border-bottom: 1px solid rgba(0,0,0,0.35); }
-                .cm-who { font-size: 15px; font-weight: 700; color: #f2f4f7; margin-right: 6px; }
+                /* ── THE BAR ── one row, small, and everything on it is a thing you can press. */
+                .cm-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px;
+                    background: rgba(10,12,17,0.92); border-bottom: 1px solid rgba(255,255,255,0.06); }
                 .cm-ui { width: 21px; height: 21px; object-fit: contain; }
-                .cm-hp { font-size: 15px; font-weight: 700; color: #ff5f5f; font-variant-numeric: tabular-nums; }
-                .cm-em { font-size: 15px; font-weight: 700; color: #ffb63d;
-                    font-variant-numeric: tabular-nums; }
-                .cm-fl { font-size: 15px; font-weight: 700; color: #e8ecf1; font-variant-numeric: tabular-nums; }
-                .cm-potion { display: inline-flex; }
-                .cm-gap { flex: 1; }
-                .cm-clock { font-size: 13px; color: #aeb6c2; font-variant-numeric: tabular-nums; margin: 0 4px; }
-                .cm-tool { display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
-                    border: 0; background: none; cursor: pointer; opacity: 0.72; }
-                .cm-tool.is-on, .cm-tool:hover { opacity: 1; }
+                .cm-hp { font-size: 14px; font-weight: 700; color: #ff8f7a; font-variant-numeric: tabular-nums; }
+                .cm-em { font-size: 14px; font-weight: 700; color: #ffb63d; font-variant-numeric: tabular-nums; }
+                .cm-fl { font-size: 14px; font-weight: 700; color: #cdd6e2; font-variant-numeric: tabular-nums; }
+                .cm-gap { flex: 1 1 auto; }
+                .cm-who { display: none; font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
+                    color: #e6ecf4; margin-right: 4px; }
+                .cm-hold { padding: 0 1px; border: 0; background: none; cursor: pointer; line-height: 0; }
+                .cm-hold:active { transform: translateY(1px); }
+                .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;
+                    display: grid; place-items: center; }
                 .cm-tool img { width: 24px; height: 24px; object-fit: contain; }
+                .cm-key { border-radius: 50%; font: inherit; font-size: 14px; font-weight: 700;
+                    color: #a9b6c6; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
+                .cm-key:hover { color: #ffe6a6; box-shadow: inset 0 0 0 1px rgba(255,214,140,0.5); }
 
-                /* The dark strip perks live in, present whether or not anything is in it. */
-                .cm-perkbar { display: flex; flex-direction: column; align-items: center; gap: 8px;
-                    padding: 10px 6px 8px; background: #191d24; overflow-y: auto;
-                    border-right: 1px solid rgba(0,0,0,0.5);
-                    box-shadow: inset -6px 0 12px -8px rgba(0,0,0,0.8); }
-                .cm-perk img { width: 30px; height: 30px; object-fit: contain;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
-                .cm-perkbar-empty { width: 30px; height: 30px; border-radius: 50%;
-                    border: 1px dashed rgba(255,255,255,0.14); }
-
+                /* ── THE TRAIL ── full bleed, and the only thing on it is the act. */
                 .cm-sheet { position: relative; overflow-y: auto; overflow-x: hidden; height: 100%;
-                    min-width: 0; }
-                .cm-inner { position: relative; width: min(520px, 100%); margin: 0 auto;
-                    background: linear-gradient(180deg, #c9bb9a, #bdad89); }
+                    overscroll-behavior: contain; }
+                .cm-inner { position: relative; width: min(460px, 100%); margin: 0 auto; }
                 .cm-svg { display: block; width: 100%; height: auto; }
-                /* Same parchment as the sheet's bottom edge, so it reads as more map rather than a gap. */
-                .cm-tail { width: min(520px, 100%); margin: 0 auto; height: 96px; background: #bdad89; }
+                .cm-tail { height: 40px; }
 
-                /* ── OPAQUE INK ─────────────────────────────────────────────────────────────────────────
-                   No alpha anywhere on these strokes. With alpha, two routes crossing drew twice and the
-                   overlap went darker — Luke: "when they overlap each other they multiply the transparency."
-                   A flat colour looks identical whether one line is there or three, which is what theirs does.
-                   The dash pattern is uneven on purpose; a regular one reads as a plot. */
-                .cm-edge { fill: none; stroke: #8f8c78; stroke-width: 0.9;
-                    stroke-dasharray: 2.6 2.9 1.5 3.2; stroke-linecap: round; }
-                .cm-edge.is-walked { stroke: #2b2418; stroke-width: 1.25; stroke-dasharray: 3.2 2.4; }
+                /* ── THE ROUTES ── three states, three different questions: where you have been, where you
+                   can step, and the shape of everything still ahead. */
+                .cm-edge { fill: none; stroke: rgba(150,167,190,0.16); stroke-width: 0.7;
+                    stroke-linecap: round; stroke-dasharray: 2.2 2.6; }
+                .cm-edge.is-walked { stroke: rgba(201,162,83,0.5); stroke-dasharray: none; stroke-width: 0.9; }
+                /* The step in front of you, drawn like a live wire. */
+                .cm-edge.is-live { stroke: #ffce7a; stroke-width: 1.1; stroke-dasharray: 2.2 2.2;
+                    filter: drop-shadow(0 0 1.4px rgba(255,190,90,0.9)); animation: cmFlow 1.1s linear infinite; }
+                @keyframes cmFlow { to { stroke-dashoffset: -4.4; } }
 
-                /* ── A MARK, AND NOTHING ELSE ───────────────────────────────────────────────────────────
-                   No disc, no ring, no border: theirs is a bare brush mark on the paper and it survives the
-                   routes because it is thick. Three states and one hover. */
-                .cm-node { position: absolute; transform: translate(-50%, -50%); width: 36px; height: 36px;
-                    display: grid; place-items: center; padding: 0; border: 0; background: none;
-                    cursor: default; transition: transform 120ms ease-out; }
-                .cm-ink { width: 100%; height: 100%; object-fit: contain; opacity: 0.3; }
+                /* ── THE ROOMS ── 46px of touch target, which is the number a thumb wants. The disc is what
+                   you see; the button is what you hit. */
+                .cm-node { position: absolute; width: 46px; height: 46px; transform: translate(-50%, -50%);
+                    padding: 0; border: 0; background: none; cursor: default;
+                    display: grid; place-items: center; }
+                .cm-disc { position: absolute; inset: 4px; border-radius: 50%;
+                    background: radial-gradient(circle at 50% 38%, #232936, #141821 70%);
+                    box-shadow: inset 0 0 0 1px rgba(160,180,205,0.18), 0 2px 5px rgba(0,0,0,0.6); }
+                /* The mark is BLACK INK drawn for parchment (map-*.png). Inverted, it is chalk on slate — the
+                   same six drawings keep working on a ground they were never drawn for. */
+                .cm-ink { position: relative; width: 24px; height: 24px; object-fit: contain;
+                    filter: invert(1); opacity: 0.42; }
+
+                .cm-node.is-taken .cm-disc { background: #101319;
+                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.35); }
+                .cm-node.is-taken .cm-ink { opacity: 0.3; }
+                /* YOU ARE HERE — the one room on the sheet that is not a choice, so it is marked rather than
+                   lit: a brass ring, no glow, no pulse. */
+                .cm-node.is-here .cm-disc { box-shadow: inset 0 0 0 2px #c9a253, 0 2px 8px rgba(0,0,0,0.7); }
+                .cm-node.is-here .cm-ink { opacity: 0.75; }
+
+                /* A ROOM YOU CAN WALK INTO IS THE BRIGHTEST THING ON THE SCREEN. Everything else here is
+                   information; these are the only buttons. */
                 .cm-node.is-open { cursor: pointer; }
-                .cm-node.is-open .cm-ink { opacity: 1; }
-                /* Hover is a WHITE STICKER OUTLINE round the mark's own silhouette — stacked drop-shadows,
-                   because that is the only thing that follows an alpha shape rather than a box. */
-                .cm-node.is-open:hover { transform: translate(-50%, -50%) scale(1.1); }
-                .cm-node.is-open:hover .cm-ink {
-                    filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff)
-                            drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)
-                            drop-shadow(1px 1px 0 #fff) drop-shadow(-1px -1px 0 #fff); }
-                /* Visited: a small mark inside the drawn ring. */
-                .cm-node.is-taken .cm-ink { width: 52%; height: 52%; opacity: 0.92; }
-                .cm-ring { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
-                    opacity: 0.92; pointer-events: none; }
-                .cm-boss { width: 52px; height: 52px; }
-                .cm-boss .cm-ink { opacity: 0.42; }
-                .cm-boss.is-open .cm-ink { opacity: 1; }
+                .cm-node.is-open .cm-disc {
+                    background: radial-gradient(circle at 50% 36%, #4a3a24, #221a11 72%);
+                    box-shadow: inset 0 0 0 2px #ffce7a, 0 0 14px rgba(255,190,90,0.45), 0 3px 8px rgba(0,0,0,0.7);
+                    animation: cmBreathe 2.4s ease-in-out infinite; }
+                .cm-node.is-open .cm-ink { opacity: 1;
+                    filter: invert(1) sepia(0.55) saturate(2.4) hue-rotate(-14deg); }
+                .cm-node.is-open:active .cm-disc { transform: scale(0.94); }
+                @keyframes cmBreathe {
+                    0%, 100% { box-shadow: inset 0 0 0 2px #ffce7a, 0 0 12px rgba(255,190,90,0.35), 0 3px 8px rgba(0,0,0,0.7); }
+                    50% { box-shadow: inset 0 0 0 2px #ffe0a4, 0 0 20px rgba(255,200,110,0.6), 0 3px 8px rgba(0,0,0,0.7); }
+                }
+                /* THE NAME UNDER A LIT ROOM. This is the legend now: it only ever says the handful of things
+                   you are being asked to choose between, and it can never be in the way because it is
+                   attached to the thing it names. */
+                .cm-name { position: absolute; top: 46px; left: 50%; transform: translateX(-50%);
+                    font-style: normal; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+                    color: #ffd9a6; white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0,0.95); }
 
-                /* ── THE LEGEND, ON A SCROLL ────────────────────────────────────────────────────────────── */
-                /* The curls at each end of the scroll are part of the picture, so the list has to start
-                   BELOW the top one and stop above the bottom one — at 26px of padding the title sat on the
-                   roll and "Elite" fell off the end. */
-                /* ⚠️ THE SIDE PADDING IS PIXELS, AND NEVER A PERCENTAGE. The rolls are WIDER than the paper —
-                   the written surface spans 14%–85% of the art — so the list has to start 14% of the SCROLL'S
-                   width in, and 12px did not reach it: the marks sat out on the rolled edge. A percentage
-                   looks like the fix and is not: percentage padding resolves against the CONTAINING BLOCK,
-                   which here is .cm (the whole viewport), so 14% became 55px on a 128px-wide scroll, the
-                   text was shoved past the right roll, and it bled off the other side instead. These are 14%
-                   and 15% of 146 and of 128, worked out by hand. Re-do the sums if either width changes. */
-                .cm-legend { position: absolute; right: 6px; top: 78px; width: 146px; padding: 52px 22px 54px 21px;
-                    /* justify-CONTENT centres the whole list as one block on the paper; justify-ITEMS keeps
-                       the rows left-aligned to each other so the marks still read as a column. Left-aligned
-                       alone leaves the block hugging the left roll, because the longest row is well short of
-                       the paper's width. */
-                    display: grid; gap: 5px; justify-content: center; justify-items: start;
-                    color: #1b2430; font-size: 11.5px;
-                    background-image: url(/images/cards/chrome/legend-scroll.png);
-                    background-size: 100% 100%; background-repeat: no-repeat;
-                    /* ⚠️ IT IS A KEY, NOT A CONTROL, AND IT SITS ON TOP OF THE LANES. There is nothing on this
-                       scroll to press, and it covers the top-right corner of the sheet — so without this, a
-                       room that scrolls underneath it becomes a room you cannot walk into, and the tap dies
-                       silently on a piece of paper. The same z-order trap the farm's decorations and the map's
-                       own Return ribbon have both sprung before. */
-                    pointer-events: none;
-                    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
-                .cm-legend-title { justify-self: center; font-size: 14px; font-weight: 700; margin-bottom: 2px; }
-                .cm-leg { display: flex; align-items: center; gap: 7px; }
-                /* A PERK IS A BUTTON NOW, so it has to stop looking like a browser one: no plate, no border,
-                   just the sprite, with a press that reads. */
-                .cm-perk { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; }
-                .cm-perk:active { transform: translateY(1px); }
-                .cm-potion { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; }
-                .cm-potion:active { transform: translateY(1px); }
-                .cm-perkbar-empty { font-size: 11px; letter-spacing: 0.06em; color: #6d7583; }
-                /* The grid box is kept for the fallback <b>: width and height do NOTHING to inline text, so
-                   any kind that ever loses its drawing would otherwise sit narrower than the rest and drag
-                   its label left of every other one. Every kind has a mark today. */
-                .cm-leg-ink { flex: 0 0 15px; width: 15px; height: 15px; object-fit: contain;
-                    display: grid; place-items: center; font-size: 12px; }
+                .cm-boss { width: 62px; height: 62px; }
+                .cm-boss .cm-ink { width: 32px; height: 32px; }
+                .cm-boss .cm-disc { background: radial-gradient(circle at 50% 36%, #3a1c1c, #150c0c 72%);
+                    box-shadow: inset 0 0 0 2px rgba(214,106,86,0.55), 0 3px 10px rgba(0,0,0,0.75); }
+                .cm-boss .cm-name { top: 62px; color: #ff9e86; }
+                .cm-boss.is-open .cm-disc { box-shadow: inset 0 0 0 2px #ff9e86,
+                    0 0 20px rgba(230,110,80,0.5), 0 3px 10px rgba(0,0,0,0.75); }
+                .cm-boss.is-open .cm-ink { filter: invert(1) sepia(0.5) saturate(3) hue-rotate(-30deg); }
 
-                /* ── RETURN, ON THE RIBBON, AT THE FOOT OF THE COLUMN ────────────────────────────────────
-                   margin-top:auto pins it to the bottom of the column however many trinkets are above it,
-                   and it is drawn at the column's width — the ribbon art is a horizontal banner, so it is
-                   turned on its side rather than squashed into a 62px letterbox. */
-                .cm-foot { display: flex; align-items: center; padding: 5px 8px;
-                    background: #191d24; border-top: 1px solid rgba(0,0,0,0.5); }
-                .cm-return { width: 132px; height: 44px; padding: 0 28px 3px 8px; border: 0; cursor: pointer;
-                    font-family: inherit; font-weight: 700; font-size: 14px;
-                    color: #ffe6a6; text-shadow: 0 2px 3px rgba(0,0,0,0.7); text-align: center; }
-                /* ⚠️ NOT a ::before with z-index -1. That put the ribbon behind the button's own background
-                   layer and it rendered as nothing at all — the text floated on the map with no ribbon under
-                   it. The image is the button's background, which cannot be outrun by a stacking context. */
-                .cm-return { background-color: transparent;
-                    background-image: url(/images/cards/chrome/return-ribbon.png);
-                    /* The banner is 420x150 art. Rotated a quarter turn it fills a tall narrow slot at its
-                       own proportions instead of being crushed flat. */
-                    background-size: 100% 100%; background-repeat: no-repeat;
-                    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
-                .cm-return:hover { filter: brightness(1.1); }
+                /* ── THE FOOT ── a line of type, not a banner. */
+                .cm-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+                    padding: 9px 14px; background: rgba(10,12,17,0.92);
+                    border-top: 1px solid rgba(255,255,255,0.06); }
+                .cm-leave { padding: 4px 2px; border: 0; background: none; cursor: pointer; font: inherit;
+                    font-size: 14px; letter-spacing: 0.04em; color: #c3b49c; }
+                .cm-leave:hover { color: #ffe6d2; }
+                /* A HINT, NOT A HEADLINE. At 11.5px uppercase and letter-spaced it was reading as loud as
+                   the thing it is describing; it exists for the first run and then wants to disappear. */
+                .cm-hint { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+                    color: #56606f; }
 
-                .cm-peek { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-                    max-width: 62vw; padding: 6px 12px; border-radius: 4px; font-size: 11.5px;
-                    text-align: center; background: rgba(10,12,16,0.92); color: #f2e2bd; }
-
+                /* ── PANELS ── one shape for the key, the deck and the belt. */
                 .cm-over { position: fixed; inset: 0; z-index: 4100; display: grid; place-items: center;
-                    padding: 16px; background: rgba(4,5,8,0.88); }
-                .cm-deck { width: min(460px, 100%); max-height: 78dvh; overflow-y: auto; padding: 16px;
-                    display: grid; gap: 10px; background: rgba(12,15,21,0.96); border-radius: 12px;
-                    border: 1px solid rgba(201,162,83,0.35); }
-                .cm-deck h2 { margin: 0; font-size: 17px; color: #f3e7c8; text-align: center; }
-                /* ── THE DECK, LAID OUT AS CARDS ── the same box the campfire's picker uses, because a card
-                   on this screen and the same card at the fire have to be one object. */
+                    padding: 16px; background: rgba(4,5,8,0.9); }
+                .cm-panel { width: min(360px, 100%); max-height: 82dvh; overflow-y: auto; padding: 16px;
+                    display: grid; gap: 10px; justify-items: center; text-align: center;
+                    background: rgba(14,17,24,0.98); border-radius: 14px;
+                    border: 1px solid rgba(201,162,83,0.35); box-shadow: 0 18px 50px rgba(0,0,0,0.75); }
+                .cm-panel.is-wide { width: min(520px, 100%); }
+                .cm-panel h2 { margin: 0; font-size: 17px; color: #f3e7c8; }
+                .cm-panel-note { margin: 0; font-size: 12px; color: #8e96a3; }
+                .cm-panel-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+                    justify-content: center; }
+                .cm-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; justify-items: start; }
+                .cm-keyrow { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #dbe2ea; }
+                .cm-keymark { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+                    background: #171b23; box-shadow: inset 0 0 0 1px rgba(160,180,205,0.18); }
+                .cm-keymark .cm-ink { width: 18px; height: 18px; opacity: 0.85; }
+
+                .cm-carry-row { align-self: stretch; display: flex; align-items: center; gap: 10px;
+                    padding: 7px 9px; border-radius: 9px; text-align: left; background: rgba(255,255,255,0.03); }
+                .cm-carry-row.is-lit { background: rgba(201,162,83,0.16);
+                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.5); }
+                .cm-carry-row img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 34px;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+                .cm-carry-row b { display: block; font-size: 13.5px; color: #ffd9a6; }
+                .cm-carry-row b em { font-style: normal; font-size: 10.5px; letter-spacing: 0.08em;
+                    text-transform: uppercase; color: #9d8a72; }
+                .cm-carry-row i { display: block; margin-top: 1px; font-style: normal; font-size: 12px;
+                    line-height: 1.35; color: #c6cdd6; }
+
                 .cm-deck-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
                 .cm-deck-card { position: relative; }
                 .cm-deck-n { position: absolute; right: -3px; bottom: 4px; z-index: 5;
@@ -582,51 +506,23 @@ export default function CardMap({ run, art = {} }) {
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
 
-                /* ── THE RELIC LIST ── Spire's, in our furniture: a sprite, a name, and the rule in full. */
-                .cm-carry { width: min(420px, 100%); max-height: 78dvh; overflow-y: auto; padding: 16px;
-                    display: grid; gap: 9px; background: rgba(12,15,21,0.96); border-radius: 12px;
-                    border: 1px solid rgba(201,162,83,0.35); }
-                .cm-carry h2 { margin: 0; font-size: 17px; color: #f3e7c8; text-align: center; }
-                .cm-carry-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px;
-                    border-radius: 9px; background: rgba(255,255,255,0.03); }
-                /* THE ONE YOU PRESSED IS LIT. Opening a list of six because you asked about one of them and
-                   then having to find it again is the panel wasting the tap that opened it. */
-                .cm-carry-row.is-lit { background: rgba(201,162,83,0.16);
-                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.5); }
-                .cm-carry-row img { width: 34px; height: 34px; object-fit: contain; flex: 0 0 34px;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
-                .cm-carry-row b { display: block; font-size: 13.5px; color: #ffd9a6; }
-                .cm-carry-row b em { font-style: normal; font-size: 10.5px; letter-spacing: 0.08em;
-                    text-transform: uppercase; color: #9d8a72; }
-                .cm-carry-row i { display: block; margin-top: 1px; font-style: normal; font-size: 12px;
-                    line-height: 1.35; color: #c6cdd6; }
-                .cm-carry-none, .cm-carry-note { margin: 0; text-align: center; font-size: 12px; color: #8e96a3; }
-                .cm-deck-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-                    justify-content: center; }
+                .cm-close { padding: 8px 20px; border-radius: 999px; cursor: pointer;
+                    border: 2px solid #c9a253; background: rgba(18,22,30,0.92); color: #f2e2bd;
+                    font: inherit; font-weight: 700; }
                 .cm-see { padding: 4px 8px; border: 0; background: none; cursor: pointer; font: inherit;
                     font-size: 12.5px; color: #c3b49c; text-decoration: underline; text-underline-offset: 3px;
                     text-decoration-color: rgba(195,180,156,0.4); }
                 .cm-see:hover { color: #ffe6d2; }
-                .cm-close { justify-self: center; padding: 8px 20px; border-radius: 999px; cursor: pointer;
-                    border: 2px solid #c9a253; background: rgba(18,22,30,0.92); color: #f2e2bd;
-                    font-family: inherit; font-weight: 700; }
 
-                @media (max-width: 520px) {
-                    .cm-bar { gap: 5px; padding: 6px 8px; }
-                    .cm-who { display: none; }
-                    .cm-legend { width: 128px; top: 72px; font-size: 10.5px; padding: 46px 19px 48px 18px; }
-                    .cm-node { width: 32px; height: 32px; }
-                }
-                /* ── AND ON A SHORT SCREEN THE KEY GETS OUT OF THE WAY ────────────────────────────────────
-                   A phone is 441px tall once the browser's own chrome is off it, and the scroll at its 520px
-                   width was 128 wide by about 250 tall — a third of the width and better than half the height
-                   of the map, sitting on top of the right-hand lanes. Theirs is pinned in the corner of a
-                   screen four times this size, where the same panel is a twelfth of it.
-                   SCALED, not re-padded: two thirds of the scroll's height is the painted rolls at its top and
-                   bottom, and squeezing the padding to shrink it compresses those rolls into flat bands. A
-                   transform takes the whole drawing down together and the art keeps its proportions. */
-                @media (max-height: 560px) {
-                    .cm-legend { transform: scale(0.68); transform-origin: top right; }
+                /* A wide screen gets a wider trail and bigger rooms. It does not get a different map. */
+                @media (min-width: 760px) {
+                    .cm-who { display: inline; }
+                    .cm-inner { width: min(560px, 100%); }
+                    .cm-node { width: 54px; height: 54px; }
+                    .cm-ink { width: 28px; height: 28px; }
+                    .cm-name { top: 54px; font-size: 11.5px; }
+                    .cm-boss { width: 74px; height: 74px; }
+                    .cm-boss .cm-name { top: 74px; }
                 }
             `}</style>
         </div>
