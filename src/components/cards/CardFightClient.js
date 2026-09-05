@@ -299,8 +299,22 @@ export default function CardFightClient({ fixture, run = null }) {
     }, [fight, pushFloats]);
 
     // Giving up ends the fight as a loss, decided in the rules rather than by poking the state from here.
+    // ── THE ONE BUTTON THAT CAN END A RUN, AND IT ASKED NOTHING ─────────────────────────────────────────
+    // ⚠️ THIS WAS ONE TAP FROM FIFTEEN ROOMS OF PROGRESS. The forfeit is an unlabelled 22px door in the top
+    // bar, forty pixels from End turn — the button you press every single turn — and pressing it forfeited
+    // the fight IMMEDIATELY, which posts `dead` and marks the run over. On a phone that is a mis-tap away, and
+    // there is nothing to undo it with: a run is one row and it is overwritten.
+    //
+    // The screen it leads to has known this all along; its own comment reads "Spire has no in-combat forfeit
+    // at all — abandoning is a menu action behind an 'are you sure'". So this is that "are you sure", and it
+    // says what it costs: which stop you are on and that the run ends here.
+    const [askForfeit, setAskForfeit] = useState(false);
+    // The result panel carries the same weapon: "Give up the run" is one press from ending a live run, and it
+    // sits beside Leave on a screen people are tapping through quickly.
+    const [askGiveUp, setAskGiveUp] = useState(false);
     const onForfeit = useCallback(() => {
         if (fight.over) return;
+        setAskForfeit(false);
         setFight(forfeit(fight));
     }, [fight]);
 
@@ -753,7 +767,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     <div className="cf-top-group">
                         {/* A door rather than a word — it is the one control up here you are not meant to
                             reach for. */}
-                        <button type="button" className="cf-forfeit" onClick={onForfeit} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
+                        <button type="button" className="cf-forfeit" onClick={() => setAskForfeit(true)} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
                             <GiExitDoor aria-hidden="true" />
                         </button>
                         <button type="button" className="cf-end" onClick={onEndTurn} disabled={Boolean(fight.over) || acting}>
@@ -963,6 +977,47 @@ export default function CardFightClient({ fixture, run = null }) {
                 </div>
             ) : null}
 
+            {askGiveUp ? (
+                <div className="cf-over" onClick={() => setAskGiveUp(false)}>
+                    <div className="cf-ask" onClick={(e) => e.stopPropagation()}>
+                        <b>Give up the run?</b>
+                        <p className="cf-note">
+                            {`It ends at stop ${runState?.stop || run?.stop || 1} of ${RUN_LENGTH}, and the next one starts from nothing.`}
+                        </p>
+                        <div className="cf-ask-btns">
+                            <button type="button" className="cf-pill is-primary" onClick={() => setAskGiveUp(false)}>
+                                Keep the run
+                            </button>
+                            <button type="button" className="cf-pill cf-ask-yes" disabled={busy}
+                                onClick={() => { setAskGiveUp(false); startNewRun(); }}>
+                                Give it up
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {askForfeit ? (
+                <div className="cf-over" onClick={() => setAskForfeit(false)}>
+                    <div className="cf-ask" onClick={(e) => e.stopPropagation()}>
+                        <b>{run ? "Give up the run?" : "Walk away from this fight?"}</b>
+                        <p className="cf-note">
+                            {run
+                                ? `It ends here, at stop ${runState?.stop || run.stop} of ${RUN_LENGTH}. The deck, the embers and the trinkets go with it.`
+                                : "The fight ends and nothing is kept."}
+                        </p>
+                        <div className="cf-ask-btns">
+                            <button type="button" className="cf-pill is-primary" onClick={() => setAskForfeit(false)}>
+                                Keep fighting
+                            </button>
+                            <button type="button" className="cf-pill cf-ask-yes" onClick={onForfeit}>
+                                {run ? "Give up" : "Walk away"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             {peek ? (
                 <div className="cf-over" onClick={() => setPeek(null)}>
                     <div className="cf-sheet" onClick={(e) => e.stopPropagation()}>
@@ -1058,7 +1113,16 @@ export default function CardFightClient({ fixture, run = null }) {
                                     another, and the ribbon there is still one press from the street. */}
                                 <button type="button" className="cf-pill" onClick={() => router.push("/marketplace/cards/table")}>Leave</button>
                                 {runState ? (
-                                    <button type="button" className="cf-pill is-primary" disabled={busy} onClick={startNewRun}>
+                                    // A FINISHED RUN STARTS A NEW ONE ON ONE PRESS; A LIVE ONE ASKS FIRST.
+                                    // Same button, same place, and the difference is whether pressing it
+                                    // destroys anything — "New run" after a death costs nothing, "Give up the
+                                    // run" while one is standing costs the whole climb.
+                                    <button
+                                        type="button"
+                                        className={`cf-pill${runState.done ? " is-primary" : " cf-ask-yes"}`}
+                                        disabled={busy}
+                                        onClick={runState.done ? startNewRun : () => setAskGiveUp(true)}
+                                    >
                                         {runState.done ? "New run" : "Give up the run"}
                                     </button>
                                 ) : (
@@ -1707,6 +1771,22 @@ export default function CardFightClient({ fixture, run = null }) {
                    a dialog that has interrupted it. */
                 .cf-over { position: fixed; inset: 0; z-index: 5200; display: grid; place-items: center;
                     padding: 16px; background: rgba(4,5,8,0.88); }
+                /* ── ARE YOU SURE ── quiet, and the safe answer is the one wearing the primary colour.
+                   The destructive one is a plain pill, because a red button next to a red-lit fight screen
+                   is the most eye-catching thing on it, and the thing you want somebody to press here is
+                   "Keep fighting". */
+                .cf-ask { width: min(320px, 100%); padding: 18px; display: grid; justify-items: center;
+                    gap: 10px; text-align: center; border-radius: 12px; background: rgba(12,15,21,0.97);
+                    border: 1px solid rgba(201,162,83,0.35); box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
+                .cf-ask b { font-size: 16px; color: #f3e7c8; }
+                .cf-ask-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+                /* ⚠️ .cf-pill FIRST, OR THIS LOSES. Same specificity and defined later in the sheet, so a bare
+                   .cf-ask-yes was overruled and the destructive answer came out wearing the same gold as the
+                   safe one. */
+                .cf-pill.cf-ask-yes { border-color: rgba(190,90,70,0.55); color: #e8a894;
+                    background: rgba(28,14,12,0.75); }
+                .cf-pill.cf-ask-yes:hover:not(:disabled) { border-color: rgba(230,110,85,0.85); color: #ffcbb8; }
+
                 .cf-choose { display: grid; justify-items: center; gap: 14px; width: 100%;
                     animation: cfPop 0.36s cubic-bezier(.2,1.3,.35,1) both; }
 

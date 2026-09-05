@@ -345,7 +345,16 @@ export default function CardMap({ run, art = {} }) {
                                 </span>
                             ))}
                         </div>
-                        <button type="button" className="cm-close" onClick={() => setDeckOpen(false)}>Close</button>
+                        {/* THE CABINET IS ONE PRESS FROM THE DECK, because "what else is out there" is the
+                            question a deck screen puts in your head — you are looking at twelve cards and
+                            wondering what the other fourteen are. */}
+                        <div className="cm-deck-foot">
+                            <button type="button" className="cm-close" onClick={() => setDeckOpen(false)}>Close</button>
+                            <button type="button" className="cm-see"
+                                onClick={() => router.push("/marketplace/cards/collection")}>
+                                See every card
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -560,6 +569,12 @@ export default function CardMap({ run, art = {} }) {
                 .cm-carry-row i { display: block; margin-top: 1px; font-style: normal; font-size: 12px;
                     line-height: 1.35; color: #c6cdd6; }
                 .cm-carry-none, .cm-carry-note { margin: 0; text-align: center; font-size: 12px; color: #8e96a3; }
+                .cm-deck-foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+                    justify-content: center; }
+                .cm-see { padding: 4px 8px; border: 0; background: none; cursor: pointer; font: inherit;
+                    font-size: 12.5px; color: #c3b49c; text-decoration: underline; text-underline-offset: 3px;
+                    text-decoration-color: rgba(195,180,156,0.4); }
+                .cm-see:hover { color: #ffe6d2; }
                 .cm-close { justify-self: center; padding: 8px 20px; border-radius: 999px; cursor: pointer;
                     border: 2px solid #c9a253; background: rgba(18,22,30,0.92); color: #f2e2bd;
                     font-family: inherit; font-weight: 700; }

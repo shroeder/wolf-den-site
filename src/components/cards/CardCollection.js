@@ -83,9 +83,12 @@ export default function CardCollection({ cards, art, counts }) {
                         aria-label={`${c.name}${c.owned ? "" : " — locked"}`}
                     >
                         <span className="cf-card"><CardFace card={c} art={art[c.pet]} dim={!c.owned} /></span>
-                        {/* WHY it is locked, on the card itself. "Locked" on its own is the game telling you
-                            no and not telling you what to do about it; the answer is always the same and it
-                            is always somewhere else in the Den — go and get that animal. */}
+                        {/* WHY it is locked, and WHOSE it is. "Locked" on its own is the game telling you no
+                            without telling you what to do about it; the answer is always the same and always
+                            somewhere else in the Den — go and get that animal.
+
+                            ⚠️ UNDER THE CARD, NOT ON IT. Pinned inside the frame it landed squarely on the
+                            card's last line of rules text — the one thing on a locked card worth reading. */}
                         {c.owned ? null : <span className="cc-lock">{art[c.pet]?.name || c.pet}</span>}
                     </button>
                 ))}
@@ -150,14 +153,14 @@ export default function CardCollection({ cards, art, counts }) {
 
                 .cc-grid { width: min(760px, 100%); display: flex; flex-wrap: wrap; justify-content: center;
                     gap: 10px; }
-                .cc-slot { position: relative; padding: 0; border: 0; background: none; cursor: pointer; }
+                .cc-slot { position: relative; padding: 0; border: 0; background: none; cursor: pointer;
+                    display: flex; flex-direction: column; align-items: center; gap: 3px; }
                 /* LOCKED IS COLD AND STILL LEGIBLE. A card you cannot have is greyed rather than hidden — the
                    point of the cabinet is the empty slots. */
                 .cc-slot.is-locked .cf-card { filter: grayscale(0.85) brightness(0.5)
                     drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
-                .cc-lock { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
-                    max-width: 88%; padding: 2px 6px; border-radius: 4px; background: rgba(8,9,12,0.9);
-                    font-size: 9.5px; letter-spacing: 0.04em; color: #b7a68d; }
+                .cc-lock { max-width: 96px; font-size: 10px; line-height: 1.2; letter-spacing: 0.04em;
+                    color: #9d8f79; }
                 .cc-none { color: #8e8069; font-size: 13px; }
 
                 .cc .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;

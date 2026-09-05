@@ -104,6 +104,20 @@ const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
  * moving its numbers, so it shows what it is worth, not what it would hit for.
  */
 const KEY_FIELD = /\{(\w+)\}/g;
+/**
+ * How much room this card's sentence needs, as a class rather than a computed style — see the note by
+ * `.cf-text`. Measured on the sentence with its NUMBERS IN, because "Deal {damage} damage" is nine characters
+ * shorter than what a level-5 Crush actually prints, and it is the printed line that has to fit.
+ */
+const textSize = (card, live) => {
+    const filled = String(card.text || "").replace(KEY_FIELD, (_, f) => {
+        const now = live && live[f] != null ? live[f] : card[f];
+        return String(now ?? "");
+    });
+    if (filled.length > 58) return " is-tiny";
+    if (filled.length > 40) return " is-small";
+    return "";
+};
 const withNumbers = (card, live) => {
     const parts = String(card.text || "").split(KEY_FIELD);
     return parts.map((part, i) => {
@@ -275,7 +289,16 @@ export default function CardFace({ card, art, dim, live }) {
             <span className="cf-type" style={{ backgroundImage: `url(/images/cards/chrome/plate-${tint}.png)` }} aria-label={look.label}>
                 <TypeMark card={card} kind={card.kind} />
             </span>
-            <span className="cf-text">{withNumbers(card, live)}</span>
+            {/* ── A LONG SENTENCE GETS A SMALLER ONE ──────────────────────────────────────────────────
+                The card is 96x138 everywhere it appears, and its text box holds four lines at 10.5px. Most
+                cards are one sentence and never come close; Firebreath ("Deal 11 damage to ALL enemies.
+                Apply 1 Vulnerable.") is sixty-three characters and its last word — the word that says what
+                the card DOES to you — was simply cut off by the bottom of the frame. A card whose rules you
+                cannot finish reading is not a card.
+
+                Stepped rather than fluid, because two sizes at a glance read as a design and a continuous
+                scale reads as a bug: the cabinet would show twenty-six cards in twenty-six type sizes. */}
+            <span className={`cf-text${textSize(card, live)}`}>{withNumbers(card, live)}</span>
 
             {/* ⚠️ GLOBAL, FOR THE SAME REASON THE FIGHT'S BLOCK IS. styled-jsx scopes a rule to the
                 elements THIS component renders — and the picture in the window is rendered by <CardArt> and
@@ -359,9 +382,20 @@ export default function CardFace({ card, art, dim, live }) {
                    they are in the markup — so the sentence went under the slab the moment the stock arrived,
                    and the cards shipped for two commits with no rules text on them at all. The banner and the
                    type tab survived only because they already carried a z-index of their own. */
+                /* ⚠️ 12px OF SIDE PADDING, NOT 9. The moulding is a PICTURE laid over the card's edges
+                   (frame.png, drawn with real rails), and the text box only knew about the box — so the
+                   longest line on a card ran under the metal and came out with its first and last letters
+                   sliced off: "Deal 11 damage to" reading as ")eal 11 damage tc" on the Firebreath card,
+                   which looks like a rendering fault rather than a wide word. The rails are ~11px at this
+                   size; the sentence stops before them and wraps instead. */
                 .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
-                    padding: 4px 9px 0; font-size: 10.5px; line-height: 1.16; text-align: center; color: #eef2f8;
+                    padding: 4px 12px 0; font-size: 10.5px; line-height: 1.16; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
+                /* THE SIDE PADDING DOES NOT SHRINK WITH THE TYPE. It is there to clear the moulding's rails,
+                   which are the same width whatever size the sentence is set at — buying two characters a
+                   line back by moving the text under the metal is trading one clipped word for another. */
+                .cf-text.is-small { font-size: 9.5px; line-height: 1.12; }
+                .cf-text.is-tiny { font-size: 8.6px; line-height: 1.1; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
                 /* An unmodified number is just text. One the fight has moved is called out — green up, red
