@@ -207,11 +207,29 @@ export default function CardRoom({ run, art = {} }) {
                     </div>
                 ) : null}
 
-                {/* Real cards, for the same reason the burn picker draws them: choosing which copy of Bite
-                    becomes the good one off a list of names is choosing blind. */}
+                {/* ── THE DECK, OVER THE ROOM ────────────────────────────────────────────────────────
+                    Real cards, for the same reason the burn picker draws them: choosing which copy of Bite
+                    becomes the good one off a list of names is choosing blind.
+
+                    ⚠️ A MODAL, NOT A PANEL IN THE FLOW. Luke, on a phone with the picker open: "this should
+                    be a modal on top." It was appended to the stage, so opening it pushed the fire off the
+                    top of the screen and put a twelve-card grid under the buttons — you scrolled a room to
+                    read your own deck, and the bottom row was cut by the fold. Every other "choose one of
+                    these" in this game is over the room: the shop's look, the map's deck, the fight's piles.
+                    Tapping the scrim closes it, which is the gesture all of those already answer to. */}
                 {picking && !done ? (
-                    <div className="cr-pick" role="dialog" aria-label="Choose a card to sharpen">
-                        <p className="cr-pick-head">Hold one in the fire.</p>
+                    <div className="cr-pick-over" onClick={() => setPicking(false)} role="presentation">
+                    <div className="cr-pick" role="dialog" aria-label="Choose a card to sharpen"
+                        onClick={(e) => e.stopPropagation()}>
+                        {/* ⚠️ THE WAY OUT STAYS ON SCREEN. A twelve-card deck fills the panel and the panel
+                            scrolls, so a close button at the BOTTOM is a button you have to go looking for —
+                            the scrim closes it too, but a scrim is not a thing anybody is told about. */}
+                        <div className="cr-pick-bar">
+                            <p className="cr-pick-head">Hold one in the fire.</p>
+                            <button type="button" className="cr-pick-close" onClick={() => setPicking(false)}>
+                                Never mind
+                            </button>
+                        </div>
                         <div className="cr-pick-deck">
                             {deck.map((id, i) => {
                                 const c = cardById(id);
@@ -227,6 +245,7 @@ export default function CardRoom({ run, art = {} }) {
                                 );
                             })}
                         </div>
+                    </div>
                     </div>
                 ) : null}
             </div>
@@ -314,11 +333,23 @@ export default function CardRoom({ run, art = {} }) {
 
                 .cr-choices { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
                 /* ── WHICH CARD GOES IN THE COALS ── */
-                .cr-pick { width: 100%; margin-top: 8px; padding: 10px; border-radius: 10px;
-                    background: rgba(8,9,12,0.86); box-shadow: inset 0 0 0 1px rgba(255,180,94,0.18); }
-                .cr-pick-head { margin: 0 0 8px; text-align: center; font-size: 13px; color: #ffcf9a; }
-                .cr-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-                    max-height: 42vh; overflow-y: auto; }
+                .cr-pick-over { position: fixed; inset: 0; z-index: 4100; display: grid; place-items: center;
+                    padding: 14px; background: rgba(4,5,8,0.88); }
+                .cr-pick { width: min(560px, 100%); max-height: 84dvh; overflow-y: auto; padding: 14px;
+                    display: grid; gap: 10px; justify-items: center; border-radius: 12px;
+                    background: rgba(12,15,21,0.97); border: 1px solid rgba(201,162,83,0.35);
+                    box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
+                .cr-pick-bar { position: sticky; top: -14px; z-index: 2; align-self: stretch;
+                    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+                    margin: -14px -14px 0; padding: 12px 14px;
+                    background: rgba(12,15,21,0.98); border-bottom: 1px solid rgba(201,162,83,0.22); }
+                .cr-pick-close { padding: 6px 14px; border-radius: 999px; cursor: pointer;
+                    border: 2px solid #c9a253; background: rgba(18,22,30,0.92); color: #f2e2bd;
+                    font: inherit; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+                .cr-pick-head { margin: 0; text-align: left; font-size: 14px; color: #ffcf9a; }
+                /* The panel scrolls, not the grid inside it — a scroller inside a scroller on a phone is
+                   two things that both eat the same drag. */
+                .cr-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
                 .cr-card { padding: 0; border: 0; background: none; cursor: pointer; }
                 .cr-card:disabled { cursor: default; }
                 /* A copy that has already been to the fire is still SHOWN — a deck with its upgrades hidden is

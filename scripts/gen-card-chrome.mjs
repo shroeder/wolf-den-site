@@ -479,12 +479,20 @@ const PIECES = {
     // both ends, so a stretch cannot land it somewhere silly.
     "shop-tag": {
         size: "1024x1024", store: { w: 200, h: 130 }, tint: false, extra: SOLID,
+        // ⚠️ AND THE RIVETS HAD TO GO TOO. Luke, on a phone: "the tag sprite's ring is deformed." They were
+        // symmetric, which is what the last note was worried about — but they were also ROUND, and this
+        // sprite is a CSS background stretched to whatever the price measures: 200x130 of art inside a
+        // 54x25 box. A circle under a 3.7:1 squash is an oval with a dark ring round it, which at that size
+        // reads as a little knot tied to the side of the tag. Nothing round survives that, so there is
+        // nothing round on it: the only detail is a line that runs PARALLEL to the edge, which stretches
+        // into a longer line and stays a line.
         subject: "A small blank PRICE PLAQUE: a wide rounded-rectangle of warm MID-BROWN tanned leather, "
-            + "clearly lighter than a black background, lit softly from above, with a pale ochre stitched line "
-            + "running just inside its edge and one small brass rivet at the middle of the LEFT edge and "
-            + "another at the middle of the RIGHT edge. Its face is completely empty — no writing, no number, "
-            + "no emblem, nothing struck into it. Nothing hangs from it and nothing sticks out past its "
-            + "outline: NO cord, NO string, NO loop, NO knot, NO eyelet or hole at the top, no hook, no nail.",
+            + "clearly lighter than a black background, lit softly from above, with a pale ochre stitched "
+            + "line running just inside its edge, following the outline all the way round. Its face is "
+            + "completely empty — no writing, no number, no emblem, nothing struck into it. It has NO "
+            + "hardware of any kind: no rivets, no studs, no buttons, no nails, no eyelets, no rings, no "
+            + "buckles, no metal at all. Nothing hangs from it and nothing sticks out past its outline: no "
+            + "cord, no string, no loop, no knot, no hole, no hook. Flat leather and one stitched line.",
     },
 };
 
