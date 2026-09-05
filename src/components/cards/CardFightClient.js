@@ -2192,6 +2192,13 @@ function Bar({ unit, guarding, pending }) {
                         <GiSwordWound aria-hidden="true" />{unit.weak}
                     </span>
                 ) : null}
+                {/* FRAIL is the third of their three basic debuffs and the only one that attacks a defensive
+                    hand: a status you are carrying and cannot see is a status you will misplay around. */}
+                {unit.frail > 0 ? (
+                    <span className="cfb-tag is-frail" title={`Frail ${unit.frail} — gains 25% less Block`}>
+                        <GiCrackedShield aria-hidden="true" />{unit.frail}
+                    </span>
+                ) : null}
                 {unit.strength > 0 ? (
                     <span className="cfb-tag is-str" title={`Strength ${unit.strength}`}>
                         <GiBiceps aria-hidden="true" />{unit.strength}
@@ -2271,6 +2278,7 @@ function Bar({ unit, guarding, pending }) {
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }
+                .cfb-tag.is-frail { color: #b6a6ff; border-color: #453a6e; }
                 .cfb-tag.is-vuln { color: #ffcf6a; border-color: #6e5a24; }
                 .cfb-tag.is-weak { color: #c8a6ff; border-color: #4c3d6e; }
                 .cfb-tag.is-str { color: #ff9f6a; border-color: #6e4a2c; }

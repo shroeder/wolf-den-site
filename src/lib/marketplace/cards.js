@@ -94,6 +94,9 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
             // hpMax is NOT set here: openFight derives it from `hp` (`hpMax: f.hp || FOE_HP`), and a second
             // copy of the same fact is the thing that goes stale. The Leech's heal caps against it.
             hp: group[i].hp,
+            // How much it curls for when first hit — a Louse's whole identity, and the one creature field
+            // that has to survive the trip from the rules to the fight (see `land` in cards-kit).
+            curl: group[i].curl || 0,
             // What KIND of thing this is, beside whose face it is wearing. The Road fighter supplies the
             // portrait and the name; the creature supplies the health, the moveset and — once the screen
             // shows it — the thing a player can actually learn.

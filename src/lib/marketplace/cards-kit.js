@@ -625,177 +625,503 @@ export const STARTER_DECK = [
 // see and cover is the whole shape of the fight. Nothing in the easy pool moved: a Cur at 4/7 and a Jackal at
 // 5/8 already ARE a Louse and a Fungi Beast.
 export const FOE_SCRIPTS = {
-    // ══ THE DEEP — ACT TWO ═══════════════════════════════════════════════════════════════════════════════
-    // Luke: "how is enemy variety between acts?" It was none: the same eleven creatures in all three acts
-    // with 35% more health, which is a difficulty slider wearing a bestiary. Their act 2 is not act 1 harder,
-    // it is DIFFERENT PRESSURE — the Byrd flies, the Chosen hexes, the Shelled Parasite is a wall you cannot
-    // out-hit — so the deck you built for act 1 has to be re-thought rather than re-rolled.
-    //
-    // The Deep asks the question act 1 never does: it takes your health slowly and steadily rather than in
-    // spikes, and it punishes a deck of small blows.
-    drowned: {
-        // Grapples: a hit that also makes your NEXT turn worse. Weak on the wind-down instead of the wind-up.
-        open: "grasp",
-        moves: {
-            grasp: { key: "grasp", label: "Grasp", damage: 9 },
-            drag: { key: "drag", label: "Drag Under", damage: 6, weak: 1 },
-            wail: { key: "wail", label: "Wail", weak: 2 },
-        },
-        after: { grasp: [["drag", 55], ["wail", 45]], drag: [["grasp", 65], ["wail", 35]], wail: [["grasp", 70], ["drag", 30]] },
-        limit: { drag: 2, wail: 1 },
-    },
-    barnacle: {
-        // The act-2 wall, and a real one — theirs is the Shelled Parasite, which is exactly where a blocking
-        // enemy belongs. Twelve is more than any single starter card can remove, so it has to be answered
-        // with a turn rather than with a card.
-        open: "shell",
-        moves: {
-            shell: { key: "shell", label: "Shell", block: 12 },
-            scrape: { key: "scrape", label: "Scrape", damage: 8 },
-            rasp: { key: "rasp", label: "Rasp", damage: 5, vulnerable: 1 },
-        },
-        after: { shell: [["scrape", 60], ["rasp", 40]], scrape: [["shell", 65], ["rasp", 35]], rasp: [["shell", 70], ["scrape", 30]] },
-        limit: { shell: 2, scrape: 2 },
-    },
-    tidecaller: {
-        // It heals the thing you are trying to kill. Nothing in act 1 does that, and it turns "which one
-        // first" from a preference into the whole fight.
-        open: "chant",
-        moves: {
-            chant: { key: "chant", label: "Chant", heal: 9 },
-            surge: { key: "surge", label: "Surge", damage: 10 },
-            brine: { key: "brine", label: "Brine", vulnerable: 2 },
-        },
-        after: { chant: [["surge", 60], ["brine", 40]], surge: [["chant", 55], ["brine", 45]], brine: [["surge", 70], ["chant", 30]] },
-        limit: { chant: 1, brine: 1 },
-    },
-    leviathan: {
-        // ACT TWO'S BOSS. One creature, three beats, and the biggest single hit in the game so far — a wall
-        // of its own on the turn it coils, so the swallow cannot simply be raced.
-        open: "coil",
-        moves: {
-            coil: { key: "coil", label: "Coil", block: 14, strength: 2 },
-            churn: { key: "churn", label: "Churn", damage: 11, weak: 1 },
-            swallow: { key: "swallow", label: "Swallow", damage: 22 },
-        },
-        after: { coil: [["churn", 55], ["swallow", 45]], churn: [["swallow", 60], ["coil", 40]], swallow: [["coil", 75], ["churn", 25]] },
-        limit: { swallow: 1, coil: 1 },
-    },
+    // ══ THEIR MOVESETS, NUMBER FOR NUMBER ════════════════════════════════════════════════════════════════
+    // Every script below names the creature of theirs it is priced from and carries that creature's damage,
+    // block and debuff values at Ascension 0, with their opener and their transition weights. Where our
+    // engine has no equivalent of a mechanic — status cards shuffled into your deck, splitting, summoning,
+    // mode shift, thorns, artifact — the comment says what was traded for it. Nothing here is invented.
 
-    // ══ THE SPIRE — ACT THREE ════════════════════════════════════════════════════════════════════════════
-    // The top of the run, met by a deck of twenty-odd cards with upgrades and two boss trinkets. It is
-    // allowed to hit like it.
-    emberling: {
-        // A clock that gets worse, like the Ramper, but it starts small enough to ignore — which is the trap.
-        open: "flare",
-        moves: {
-            flare: { key: "flare", label: "Flare", strength: 3 },
-            spit: { key: "spit", label: "Spit", damage: 8 },
-        },
-        after: { flare: [["spit", 75], ["flare", 25]], spit: [["spit", 55], ["flare", 45]] },
-        limit: { flare: 2 },
+    // ── ACT ONE ──────────────────────────────────────────────────────────────────────────────────────────
+    louse: {
+        // Red Louse: Bite 6, Grow (+3 Strength). Curl Up 3-7 is on the creature, not the script (FOES).
+        open: "bite",
+        moves: { bite: { key: "bite", label: "Bite", damage: 6 }, grow: { key: "grow", label: "Grow", strength: 3 } },
+        after: { bite: [["bite", 75], ["grow", 25]], grow: [["bite", 100]] },
+        limit: { bite: 2, grow: 1 },
     },
-    colossus: {
-        // The longest wind-up in the game and the hardest landing. Everything about it is legible a turn
-        // ahead, which is the only thing that makes 26 fair.
-        open: "gather",
-        moves: {
-            gather: { key: "gather", label: "Gather", block: 16, strength: 3 },
-            fall: { key: "fall", label: "Fall", damage: 26 },
-            sweep: { key: "sweep", label: "Sweep", damage: 12, vulnerable: 1 },
-        },
-        after: { gather: [["fall", 70], ["sweep", 30]], fall: [["gather", 80], ["sweep", 20]], sweep: [["gather", 60], ["fall", 40]] },
-        limit: { fall: 1, gather: 1 },
+    louse_g: {
+        // Green Louse: Bite 6, Spit Web (Weak 2). Same 75/25 split as its red cousin.
+        open: "bite",
+        moves: { bite: { key: "bite", label: "Bite", damage: 6 }, web: { key: "web", label: "Spit Web", weak: 2 } },
+        after: { bite: [["bite", 75], ["web", 25]], web: [["bite", 100]] },
+        limit: { bite: 2, web: 1 },
     },
-    spire_warden: {
-        // ACT THREE'S BOSS: it does all three jobs — guards, debuffs and hits — so no single answer covers it.
-        open: "toll",
-        moves: {
-            toll: { key: "toll", label: "Toll", weak: 2, vulnerable: 2 },
-            ward: { key: "ward", label: "Ward", block: 18 },
-            hammer: { key: "hammer", label: "Hammer", damage: 20 },
-            rain: { key: "rain", label: "Ember Rain", damage: 9, strength: 2 },
-        },
-        after: {
-            toll: [["hammer", 55], ["ward", 45]],
-            ward: [["hammer", 50], ["rain", 50]],
-            hammer: [["ward", 45], ["rain", 35], ["toll", 20]],
-            rain: [["hammer", 60], ["ward", 40]],
-        },
-        limit: { hammer: 2, ward: 1, toll: 1 },
-    },
-
-    // ── THE SHALLOWS ─────────────────────────────────────────────────────────────────────────────────
     cur: {
-        open: "snarl",
-        moves: { snarl: { key: "snarl", label: "Snarl", damage: 4 }, bite: { key: "bite", label: "Bite", damage: 7 } },
-        after: { snarl: [["bite", 70], ["snarl", 30]], bite: [["snarl", 55], ["bite", 45]] },
-        limit: { bite: 2, snarl: 2 },
+        // Acid Slime (S): Lick (Weak 1) and Tackle 3, alternating.
+        open: "lick",
+        moves: { lick: { key: "lick", label: "Lick", weak: 1 }, tackle: { key: "tackle", label: "Tackle", damage: 3 } },
+        after: { lick: [["tackle", 100]], tackle: [["lick", 100]] },
     },
     jackal: {
-        open: "nip",
-        moves: {
-            nip: { key: "nip", label: "Nip", damage: 6 },
-            snap: { key: "snap", label: "Snap", damage: 8 },
-            worry: { key: "worry", label: "Worry", damage: 5 },
-        },
-        after: { nip: [["snap", 55], ["worry", 45]], snap: [["worry", 50], ["nip", 50]], worry: [["nip", 45], ["snap", 55]] },
-        limit: { snap: 2 },
+        // Spike Slime (S): Tackle 5, every turn, forever. The simplest creature in their game.
+        open: "tackle",
+        moves: { tackle: { key: "tackle", label: "Tackle", damage: 5 } },
+        after: { tackle: [["tackle", 100]] },
     },
     bruiser: {
-        // Always braces first, so the shape of the fight is legible from turn one: it is winding up.
-        //
-        // ⚠️ A WIND-UP, NOT A WALL. Traced through a real Warden-and-Bruiser room: the Bruiser braced for nine
-        // on turn 2, turn 5 and turn 7, and the player's Bite — six damage, the commonest card in the starter
-        // deck — landed on it for NOTHING three separate times. Two of the four middle creatures had a
-        // recurring block move and the pair of them share a room, so better than a third of everything the
-        // deck put out was being absorbed. That is what made the middle band run six and a half turns while
-        // its health said four, and no amount of shaving hit points was ever going to fix it, because the
-        // problem was never how much health they had.
-        //
-        // Their act 1 has no blocking enemy at all — block is the PLAYER's verb there — so the brace keeps its
-        // telegraph and loses most of its wall. The Warden below stays the one creature that really guards,
-        // which is the whole of its identity.
-        open: "brace",
+        // Acid Slime (M): Corrosive Spit 7 (+1 Slimed), Tackle 10, Lick (Weak 1).
+        // ⚠️ NO STATUS CARDS in this engine, so the Slimed is traded for the Frail their slimes also push —
+        // the point of the move is that it makes your NEXT turn worse, and Frail does that with what we have.
+        open: "spit",
         moves: {
-            brace: { key: "brace", label: "Brace", block: 5 },
-            swing: { key: "swing", label: "Swing", damage: 10 },
-            crush: { key: "crush", label: "Crush", damage: 14 },
+            spit: { key: "spit", label: "Corrosive Spit", damage: 7, frail: 1 },
+            tackle: { key: "tackle", label: "Tackle", damage: 10 },
+            lick: { key: "lick", label: "Lick", weak: 1 },
         },
-        after: { brace: [["swing", 60], ["crush", 40]], swing: [["crush", 45], ["brace", 55]], crush: [["brace", 70], ["swing", 30]] },
-        limit: { crush: 1, swing: 2 },
+        after: { spit: [["tackle", 40], ["lick", 30], ["spit", 30]], tackle: [["spit", 40], ["lick", 30], ["tackle", 30]], lick: [["spit", 40], ["tackle", 60]] },
+        limit: { spit: 2, tackle: 2, lick: 1 },
+    },
+    warden: {
+        // Spike Slime (M): Flame Tackle 8 (+1 Slimed) and Lick (Frail 1). Same trade as above.
+        open: "flame",
+        moves: {
+            flame: { key: "flame", label: "Flame Tackle", damage: 8, frail: 1 },
+            lick: { key: "lick", label: "Lick", frail: 1 },
+        },
+        after: { flame: [["lick", 30], ["flame", 70]], lick: [["flame", 100]] },
+        limit: { flame: 3, lick: 1 },
+    },
+    hexer: {
+        // Fungi Beast: Bite 6, Grow (+3 Strength). Its spore cloud on death (Vulnerable 2) has no home in an
+        // engine with no death triggers, so it is not pretended at.
+        open: "bite",
+        moves: { bite: { key: "bite", label: "Bite", damage: 6 }, grow: { key: "grow", label: "Grow", strength: 3 } },
+        after: { bite: [["bite", 60], ["grow", 40]], grow: [["bite", 100]] },
+        limit: { bite: 2, grow: 1 },
+    },
+    ramper: {
+        // Cultist: Incantation once (Ritual +3 a turn), then Dark Strike 6 for ever.
+        // ⚠️ RITUAL IS A PER-TURN GRANT and we have no per-turn foe effect, so the strength rides on the
+        // strike itself: it opens with the ritual and then grows by 3 with every swing, which is the same
+        // curve one turn later.
+        open: "ritual",
+        moves: {
+            ritual: { key: "ritual", label: "Incantation", strength: 3 },
+            strike: { key: "strike", label: "Dark Strike", damage: 6, strength: 3 },
+        },
+        after: { ritual: [["strike", 100]], strike: [["strike", 100]] },
+    },
+    mauler: {
+        // Jaw Worm: always opens Chomp 11; then Bellow (+3 Strength, 6 Block) 45%, Thrash (7 damage, 5
+        // Block) 30%, Chomp 25%, with their own repeat caps.
+        open: "chomp",
+        moves: {
+            chomp: { key: "chomp", label: "Chomp", damage: 11 },
+            thrash: { key: "thrash", label: "Thrash", damage: 7, block: 5 },
+            bellow: { key: "bellow", label: "Bellow", strength: 3, block: 6 },
+        },
+        after: {
+            chomp: [["bellow", 45], ["thrash", 30], ["chomp", 25]],
+            thrash: [["bellow", 45], ["chomp", 30], ["thrash", 25]],
+            bellow: [["chomp", 45], ["thrash", 55]],
+        },
+        limit: { chomp: 1, thrash: 2, bellow: 1 },
+    },
+    leech: {
+        // Looter: Mug 10 twice, then Lunge 12, then Smoke Bomb and escape. Nothing escapes here, so the
+        // smoke bomb is a block wall of the same size — the turn you cannot hit it, kept as a turn you
+        // struggle to.
+        open: "mug",
+        moves: {
+            mug: { key: "mug", label: "Mug", damage: 10 },
+            lunge: { key: "lunge", label: "Lunge", damage: 12 },
+            smoke: { key: "smoke", label: "Smoke Bomb", block: 6 },
+        },
+        after: { mug: [["mug", 50], ["lunge", 50]], lunge: [["smoke", 60], ["mug", 40]], smoke: [["lunge", 100]] },
+        limit: { mug: 2, smoke: 1 },
+    },
+    // ── ACT ONE ELITES ──
+    champion: {
+        // Gremlin Nob: Bellow (+2 Strength) on turn one, then Skull Bash 6 + Vulnerable 2 and Rush 14.
+        open: "bellow",
+        moves: {
+            bellow: { key: "bellow", label: "Bellow", strength: 2 },
+            skull: { key: "skull", label: "Skull Bash", damage: 6, vulnerable: 2 },
+            rush: { key: "rush", label: "Rush", damage: 14 },
+        },
+        after: { bellow: [["skull", 33], ["rush", 67]], skull: [["rush", 100]], rush: [["skull", 33], ["rush", 67]] },
+        limit: { rush: 2 },
+    },
+    headsman: {
+        // Lagavulin: asleep for three turns behind 8 Block, then Attack 18 and Siphon Soul (-1 Strength).
+        // ⚠️ NO NEGATIVE STRENGTH ON THE HERO in this engine; Siphon Soul is carried as Weak 1, which is the
+        // closest thing we have to "your hits get smaller".
+        open: "sleep",
+        moves: {
+            sleep: { key: "sleep", label: "Asleep", block: 8 },
+            attack: { key: "attack", label: "Attack", damage: 18 },
+            siphon: { key: "siphon", label: "Siphon Soul", weak: 1, frail: 1 },
+        },
+        after: { sleep: [["sleep", 60], ["attack", 40]], attack: [["attack", 60], ["siphon", 40]], siphon: [["attack", 100]] },
+        limit: { sleep: 3, attack: 2, siphon: 1 },
+    },
+    sentinel: {
+        // Sentry: Bolt (2 Dazed) and Beam 9, strictly alternating. Dazed is a status card, so the Bolt is
+        // carried as Frail 1 — a turn where your deck works worse, which is what Dazed buys them.
+        open: "bolt",
+        moves: {
+            bolt: { key: "bolt", label: "Bolt", frail: 1 },
+            beam: { key: "beam", label: "Beam", damage: 9 },
+        },
+        after: { bolt: [["beam", 100]], beam: [["bolt", 100]] },
+    },
+    // ── ACT ONE BOSSES ──
+    warlord: {
+        // The Guardian, 240: Charging Up (9 Block), Fierce Bash 32, Vent Steam (Weak 2 + Vulnerable 2),
+        // Whirlwind 5x4, Roll Attack 9, Twin Slam 8x2. Mode Shift is a damage-threshold mechanic we do not
+        // have, so the defensive half is kept as the Charging Up beat rather than faked.
+        open: "charge",
+        moves: {
+            charge: { key: "charge", label: "Charging Up", block: 9 },
+            bash: { key: "bash", label: "Fierce Bash", damage: 32 },
+            vent: { key: "vent", label: "Vent Steam", weak: 2, vulnerable: 2 },
+            whirl: { key: "whirl", label: "Whirlwind", damage: 5, hits: 4 },
+            twin: { key: "twin", label: "Twin Slam", damage: 8, hits: 2 },
+        },
+        after: {
+            charge: [["bash", 100]],
+            bash: [["vent", 60], ["whirl", 40]],
+            vent: [["whirl", 100]],
+            whirl: [["charge", 60], ["twin", 40]],
+            twin: [["charge", 100]],
+        },
+        limit: { bash: 1, whirl: 1, charge: 1 },
+    },
+    slime_king: {
+        // Slime Boss, 140: Goop Spray (5 Slimed), Preparing, Slam 35, on a strict three-beat cycle, and it
+        // SPLITS at half health. No status cards and no splitting here: the spray is the debuff turn it
+        // really is (Frail 2 + Weak 1) and the split is traded for a Rage — it comes apart into strength
+        // rather than into two bodies, so half health still changes the fight.
+        open: "goop",
+        moves: {
+            goop: { key: "goop", label: "Goop Spray", frail: 2, weak: 1 },
+            prepare: { key: "prepare", label: "Preparing", block: 10 },
+            slam: { key: "slam", label: "Slam", damage: 35 },
+            rage: { key: "rage", label: "Rage", strength: 5, block: 10 },
+        },
+        after: { goop: [["prepare", 100]], prepare: [["slam", 100]], slam: [["rage", 35], ["goop", 65]], rage: [["goop", 100]] },
+        limit: { slam: 1, rage: 1 },
+    },
+    hexghost: {
+        // Hexaghost, 250: Activate, then Divider (six hits), then a fixed loop of Sear, Tackle 6x2, Inflame
+        // (+2 Strength) and Inferno. The burn cards it deals are traded for Frail, and Divider's damage is
+        // its "hero HP / 12 + 1" formula taken at a full bar: six hits of six.
+        open: "activate",
+        moves: {
+            activate: { key: "activate", label: "Activate", block: 12 },
+            divider: { key: "divider", label: "Divider", damage: 6, hits: 6 },
+            sear: { key: "sear", label: "Sear", damage: 6, frail: 1 },
+            tackle: { key: "tackle", label: "Tackle", damage: 6, hits: 2 },
+            inflame: { key: "inflame", label: "Inflame", strength: 2, block: 12 },
+            inferno: { key: "inferno", label: "Inferno", damage: 3, hits: 6 },
+        },
+        after: {
+            activate: [["divider", 100]],
+            divider: [["sear", 100]],
+            sear: [["tackle", 100]],
+            tackle: [["inflame", 100]],
+            inflame: [["tackle", 60], ["inferno", 40]],
+            inferno: [["sear", 100]],
+        },
+        limit: { divider: 1, inferno: 1 },
     },
 
-    // ── THE MIDDLE ───────────────────────────────────────────────────────────────────────────────────
-    // A WALL, and the reason a deck needs one big card: it guards more than a hand of small blows can remove
-    // in a turn, so you have to hold a real hit for the beat after the wall.
-    warden: {
-        // ⚠️ EIGHT, NOT FOURTEEN. A wall is a good idea at the wrong size: fourteen block against a starter
-        // deck whose best card deals nine means the whole turn is spent getting back to zero, and the sim
-        // showed it — ramper+warden ran 7.3 turns and cost 30 health, the worst room in the act, met two
-        // hundred times in eight hundred runs. Theirs has almost no blocking enemies in act 1 at all; the
-        // Shelled Parasite is an ACT 2 creature. Eight is still a wall you have to hold a real hit for, and
-        // it is one card rather than a whole turn.
-        open: "wall",
+    // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
+    drowned: {
+        // Byrd: Peck 1x5, Swoop 12, Caw (+1 Strength), Headbutt 3. It flies, which we have no equivalent for
+        // — flying is a damage-halving state on THEM, and the nearest honest thing is simply not to fake it.
+        open: "peck",
         moves: {
-            wall: { key: "wall", label: "Wall", block: 7 },
-            jab: { key: "jab", label: "Jab", damage: 6 },
-            hew: { key: "hew", label: "Hew", damage: 9 },
+            peck: { key: "peck", label: "Peck", damage: 1, hits: 5 },
+            swoop: { key: "swoop", label: "Swoop", damage: 12 },
+            caw: { key: "caw", label: "Caw", strength: 1 },
+            headbutt: { key: "headbutt", label: "Headbutt", damage: 3 },
         },
-        after: { wall: [["jab", 55], ["hew", 45]], jab: [["wall", 65], ["hew", 35]], hew: [["wall", 70], ["jab", 30]] },
-        limit: { wall: 2 },
+        after: { peck: [["swoop", 40], ["caw", 30], ["headbutt", 30]], swoop: [["peck", 60], ["caw", 40]], caw: [["peck", 55], ["swoop", 45]], headbutt: [["peck", 100]] },
+        limit: { peck: 2, swoop: 1 },
     },
-    // It barely hits you. It makes everything ELSE on the board hit harder, which is what turns "kill the
-    // small one first" from an obvious move into a real decision.
-    hexer: {
-        open: "hex",
+    barnacle: {
+        // Shelled Parasite: opens behind 14 Plated Armor, then Double Strike 6x2, Suck 10 (heals itself for
+        // it), and Fell 18 + Frail 2. The plating is a block wall on the opening beat.
+        open: "plate",
         moves: {
-            hex: { key: "hex", label: "Hex", weak: 2 },
-            curse: { key: "curse", label: "Curse", vulnerable: 2 },
-            lash: { key: "lash", label: "Lash", damage: 7 },
+            plate: { key: "plate", label: "Plated Armor", block: 14 },
+            double: { key: "double", label: "Double Strike", damage: 6, hits: 2 },
+            suck: { key: "suck", label: "Suck", damage: 10, heal: 10 },
+            fell: { key: "fell", label: "Fell", damage: 18, frail: 2 },
         },
-        after: { hex: [["curse", 45], ["lash", 55]], curse: [["lash", 60], ["hex", 40]], lash: [["hex", 45], ["curse", 45], ["lash", 10]] },
-        limit: { hex: 1, curse: 1, lash: 2 },
+        after: { plate: [["double", 50], ["suck", 50]], double: [["suck", 40], ["fell", 60]], suck: [["double", 50], ["fell", 50]], fell: [["plate", 40], ["double", 60]] },
+        limit: { fell: 1, suck: 2 },
+    },
+    tidecaller: {
+        // Mystic: Heal 16, Buff (+2 Strength), Attack 8. Theirs heals and buffs its ALLIES; ours has no way
+        // to reach across the party, so both land on itself — the same problem for the player one body over.
+        open: "heal",
+        moves: {
+            heal: { key: "heal", label: "Heal", heal: 16 },
+            buff: { key: "buff", label: "Encourage", strength: 2 },
+            attack: { key: "attack", label: "Attack", damage: 8 },
+        },
+        after: { heal: [["attack", 60], ["buff", 40]], buff: [["attack", 100]], attack: [["heal", 45], ["buff", 25], ["attack", 30]] },
+        limit: { heal: 1, buff: 1, attack: 2 },
+    },
+    centurion: {
+        // Centurion: Slash 12, Fury 6x3, and a defensive beat. Its Protect goes on an ally in theirs.
+        open: "slash",
+        moves: {
+            slash: { key: "slash", label: "Slash", damage: 12 },
+            fury: { key: "fury", label: "Fury", damage: 6, hits: 3 },
+            guard: { key: "guard", label: "Protect", block: 15 },
+        },
+        after: { slash: [["fury", 50], ["guard", 50]], fury: [["guard", 60], ["slash", 40]], guard: [["slash", 60], ["fury", 40]] },
+        limit: { guard: 1, fury: 2 },
+    },
+    chosen: {
+        // Chosen: Poke 5x2, Zap, Debilitate (Vulnerable 3), Drain (Weak 3, heals), Hex.
+        open: "poke",
+        moves: {
+            poke: { key: "poke", label: "Poke", damage: 5, hits: 2 },
+            hex: { key: "hex", label: "Hex", vulnerable: 3 },
+            drain: { key: "drain", label: "Drain", weak: 3, heal: 10 },
+            zap: { key: "zap", label: "Zap", damage: 21 },
+        },
+        after: { poke: [["hex", 40], ["zap", 40], ["drain", 20]], hex: [["zap", 60], ["poke", 40]], drain: [["poke", 60], ["zap", 40]], zap: [["poke", 50], ["drain", 30], ["hex", 20]] },
+        limit: { zap: 1, hex: 1, drain: 1 },
+    },
+    sphere: {
+        // Spheric Guardian: twenty health behind forty Block, then Slam 10x2 and Harden. The whole creature
+        // is the armour, which is why its health is a rounding error and its block is not.
+        open: "activate",
+        moves: {
+            activate: { key: "activate", label: "Activate", block: 40 },
+            slam: { key: "slam", label: "Slam", damage: 10, hits: 2 },
+            harden: { key: "harden", label: "Harden", block: 15 },
+        },
+        after: { activate: [["slam", 100]], slam: [["harden", 60], ["slam", 40]], harden: [["slam", 100]] },
+        limit: { slam: 2, harden: 1 },
+    },
+    snecko: {
+        // Snecko: Perplexing Glare (Confused), Tail Whip 8 + Vulnerable 2, Bite 15. Confusion re-rolls your
+        // card costs and there is no such thing here, so the glare carries the debuffs it is a set-up for.
+        open: "glare",
+        moves: {
+            glare: { key: "glare", label: "Perplexing Glare", weak: 2, vulnerable: 2 },
+            tail: { key: "tail", label: "Tail Whip", damage: 8, vulnerable: 2 },
+            bite: { key: "bite", label: "Bite", damage: 15 },
+        },
+        after: { glare: [["bite", 65], ["tail", 35]], bite: [["bite", 45], ["tail", 55]], tail: [["bite", 100]] },
+        limit: { bite: 2, glare: 1 },
+    },
+    // ── ACT TWO ELITES ──
+    taskmaster: {
+        // Taskmaster: Scouring Whip 7, which also deals Wounds into your deck. Frail in place of the wounds.
+        open: "whip",
+        moves: { whip: { key: "whip", label: "Scouring Whip", damage: 7, frail: 1 } },
+        after: { whip: [["whip", 100]] },
+    },
+    warcaller: {
+        // Gremlin Leader: Rally (summons two gremlins), Encourage (+3 Strength and Block to the gang), Stab
+        // 6x3. No summoning here, so Rally is the buff turn it functionally is when the gang is already out.
+        open: "stab",
+        moves: {
+            stab: { key: "stab", label: "Stab", damage: 6, hits: 3 },
+            rally: { key: "rally", label: "Rally", strength: 3, block: 10 },
+            encourage: { key: "encourage", label: "Encourage", strength: 3 },
+        },
+        after: { stab: [["rally", 45], ["encourage", 30], ["stab", 25]], rally: [["stab", 100]], encourage: [["stab", 100]] },
+        limit: { stab: 2, rally: 1 },
+    },
+    stabber: {
+        // Book of Stabbing: Multi-Stab, which is 6 damage a hit and gains a hit as the fight goes on, and
+        // Single Stab 21. The growth rides on Strength here, which reaches the same place a turn slower.
+        open: "multi",
+        moves: {
+            multi: { key: "multi", label: "Multi-Stab", damage: 6, hits: 3, strength: 1 },
+            single: { key: "single", label: "Single Stab", damage: 21 },
+        },
+        after: { multi: [["multi", 70], ["single", 30]], single: [["multi", 100]] },
+        limit: { multi: 3 },
+    },
+    // ── ACT TWO BOSSES ──
+    leviathan: {
+        // Bronze Automaton, 300: Spawn orbs, Flail 7x2, Boost (9 Block, +3 Strength), Hyper Beam 45, then a
+        // Stunned turn. The orbs are the one part we cannot build, and the stun after the beam is kept
+        // because it is the window the whole fight is designed around.
+        open: "boost",
+        moves: {
+            boost: { key: "boost", label: "Boost", block: 9, strength: 3 },
+            flail: { key: "flail", label: "Flail", damage: 7, hits: 2 },
+            beam: { key: "beam", label: "Hyper Beam", damage: 45 },
+            stunned: { key: "stunned", label: "Stunned", block: 0 },
+        },
+        after: { boost: [["flail", 100]], flail: [["boost", 45], ["beam", 55]], beam: [["stunned", 100]], stunned: [["boost", 100]] },
+        limit: { flail: 2, beam: 1 },
+    },
+    champ: {
+        // The Champ, 420: Heavy Slash 16, Defensive Stance (15 Block), Execute 10x2, Face Slap 12 with Frail
+        // and Vulnerable, Anger (+6 Strength, 20 Block). Their "below half health" gloat phase has no home
+        // in a moveset without health triggers.
+        open: "slash",
+        moves: {
+            slash: { key: "slash", label: "Heavy Slash", damage: 16 },
+            stance: { key: "stance", label: "Defensive Stance", block: 15 },
+            execute: { key: "execute", label: "Execute", damage: 10, hits: 2 },
+            slap: { key: "slap", label: "Face Slap", damage: 12, frail: 2, vulnerable: 2 },
+            anger: { key: "anger", label: "Anger", strength: 6, block: 20 },
+        },
+        after: {
+            slash: [["stance", 35], ["slap", 35], ["execute", 30]],
+            stance: [["slash", 50], ["execute", 50]],
+            execute: [["anger", 40], ["slash", 60]],
+            slap: [["execute", 55], ["stance", 45]],
+            anger: [["execute", 60], ["slash", 40]],
+        },
+        limit: { slash: 2, anger: 1, slap: 1 },
+    },
+    collector: {
+        // The Collector, 282: Fireball 18, Buff (+3 Strength, 15 Block), Mega Debuff (Weak 3 and Vulnerable
+        // 3), and it summons torch heads — the summoning is the part that does not exist here.
+        open: "fire",
+        moves: {
+            fire: { key: "fire", label: "Fireball", damage: 18 },
+            buff: { key: "buff", label: "Buff", strength: 3, block: 15 },
+            mega: { key: "mega", label: "Mega Debuff", weak: 3, vulnerable: 3 },
+        },
+        after: { fire: [["buff", 40], ["mega", 25], ["fire", 35]], buff: [["fire", 100]], mega: [["fire", 100]] },
+        limit: { fire: 2, mega: 1 },
+    },
+
+    // ══ ACT THREE — THE SPIRE (their Beyond) ═════════════════════════════════════════════════════════════
+    emberling: {
+        // Darkling: Chomp 9, Nip 7-11, Harden (12 Block, +2 Strength). Reincarnation needs a death trigger.
+        open: "nip",
+        moves: {
+            nip: { key: "nip", label: "Nip", damage: 9 },
+            chomp: { key: "chomp", label: "Chomp", damage: 9 },
+            harden: { key: "harden", label: "Harden", block: 12, strength: 2 },
+        },
+        after: { nip: [["chomp", 50], ["harden", 50]], chomp: [["nip", 45], ["harden", 55]], harden: [["chomp", 60], ["nip", 40]] },
+        limit: { harden: 1 },
+    },
+    colossus: {
+        // Orb Walker: Laser 10 with Burns, Claw 15, and it grows by 3 Strength as it goes. Burn is a status
+        // card, so the laser carries Frail instead.
+        open: "laser",
+        moves: {
+            laser: { key: "laser", label: "Laser", damage: 10, frail: 1 },
+            claw: { key: "claw", label: "Claw", damage: 15, strength: 3 },
+        },
+        after: { laser: [["claw", 60], ["laser", 40]], claw: [["laser", 55], ["claw", 45]] },
+        limit: { claw: 2, laser: 2 },
+    },
+    spiker: {
+        // Spiker: Cut 7, and Spike, which is Thorns in theirs — damage back when you hit it. We have no
+        // reactive damage, so the spike is the guard it looks like.
+        open: "cut",
+        moves: { cut: { key: "cut", label: "Cut", damage: 7 }, spike: { key: "spike", label: "Spike", block: 5, strength: 2 } },
+        after: { cut: [["cut", 60], ["spike", 40]], spike: [["cut", 100]] },
+        limit: { cut: 2, spike: 1 },
+    },
+    repulsor: {
+        // Repulsor: Bash 11 and Repulse, which deals Dazed. Frail again in place of the status card.
+        open: "bash",
+        moves: { bash: { key: "bash", label: "Bash", damage: 11 }, repulse: { key: "repulse", label: "Repulse", frail: 2 } },
+        after: { bash: [["bash", 55], ["repulse", 45]], repulse: [["bash", 100]] },
+        limit: { bash: 2, repulse: 1 },
+    },
+    writhing: {
+        // Writhing Mass, 160: Flail 15, Wither 10 + Weak, Multi-Strike 7x3, Strong Strike 32, and Implant.
+        open: "flail",
+        moves: {
+            flail: { key: "flail", label: "Flail", damage: 15 },
+            wither: { key: "wither", label: "Wither", damage: 10, weak: 2 },
+            multi: { key: "multi", label: "Multi-Strike", damage: 7, hits: 3 },
+            strong: { key: "strong", label: "Strong Strike", damage: 32 },
+        },
+        after: { flail: [["wither", 35], ["multi", 40], ["strong", 25]], wither: [["multi", 50], ["flail", 50]], multi: [["strong", 40], ["flail", 60]], strong: [["wither", 55], ["multi", 45]] },
+        limit: { strong: 1, multi: 2 },
+    },
+    // ── ACT THREE ELITES ──
+    giant_head: {
+        // Giant Head, 500: Count 13, Glare (Weak 1), and It Is Time — a 40-damage ender it starts throwing
+        // after five turns. The wind-up is kept as a rare heavy beat rather than a turn counter.
+        open: "glare",
+        moves: {
+            glare: { key: "glare", label: "Glare", weak: 1 },
+            count: { key: "count", label: "Count", damage: 13 },
+            time: { key: "time", label: "It Is Time", damage: 40 },
+        },
+        after: { glare: [["count", 100]], count: [["count", 55], ["glare", 25], ["time", 20]], time: [["count", 100]] },
+        limit: { count: 3, time: 1 },
+    },
+    nemesis: {
+        // Nemesis, 185: Scythe 45, Attack 6x3, and Intangible on alternate turns — a damage floor of 1 that
+        // this engine has no concept of, kept as the heavy guard it plays like.
+        open: "triple",
+        moves: {
+            triple: { key: "triple", label: "Attack", damage: 6, hits: 3 },
+            scythe: { key: "scythe", label: "Scythe", damage: 45 },
+            veil: { key: "veil", label: "Veil", block: 25 },
+        },
+        after: { triple: [["veil", 45], ["scythe", 25], ["triple", 30]], veil: [["triple", 60], ["scythe", 40]], scythe: [["veil", 100]] },
+        limit: { scythe: 1, veil: 1 },
+    },
+    reptomancer: {
+        // Reptomancer, 180-190: Snake Strike 13x2, Big Bite 30, and it summons daggers — the summon being
+        // the part with no home here.
+        open: "snake",
+        moves: {
+            snake: { key: "snake", label: "Snake Strike", damage: 13, hits: 2 },
+            bite: { key: "bite", label: "Big Bite", damage: 30 },
+            coil: { key: "coil", label: "Coil", block: 18, strength: 2 },
+        },
+        after: { snake: [["bite", 40], ["coil", 30], ["snake", 30]], bite: [["coil", 55], ["snake", 45]], coil: [["snake", 60], ["bite", 40]] },
+        limit: { snake: 2, bite: 1 },
+    },
+    // ── ACT THREE BOSSES ──
+    spire_warden: {
+        // Awakened One, 300 then 320: Slash 20, Soul Strike 6x4, Dark Echo 40, Tackle 20. Its rebirth is a
+        // second health bar, which is a death trigger, which we do not have.
+        open: "echo",
+        moves: {
+            echo: { key: "echo", label: "Dark Echo", damage: 40 },
+            slash: { key: "slash", label: "Slash", damage: 20 },
+            soul: { key: "soul", label: "Soul Strike", damage: 6, hits: 4 },
+            tackle: { key: "tackle", label: "Tackle", damage: 20, strength: 2 },
+        },
+        after: { echo: [["slash", 50], ["soul", 50]], slash: [["soul", 45], ["tackle", 55]], soul: [["slash", 50], ["tackle", 50]], tackle: [["soul", 60], ["slash", 40]] },
+        limit: { echo: 1, slash: 2 },
+    },
+    time_eater: {
+        // Time Eater, 456: Reverberate 7x3, Head Slam 26 with Draw Reduction, Ripple (20 Block, Weak and
+        // Vulnerable), and Haste, which heals it to half. Draw reduction has no home; the slam keeps Frail.
+        open: "rever",
+        moves: {
+            rever: { key: "rever", label: "Reverberate", damage: 7, hits: 3 },
+            slam: { key: "slam", label: "Head Slam", damage: 26, frail: 2 },
+            ripple: { key: "ripple", label: "Ripple", block: 20, weak: 1, vulnerable: 1 },
+            haste: { key: "haste", label: "Haste", heal: 40, block: 20 },
+        },
+        after: { rever: [["slam", 40], ["ripple", 35], ["rever", 25]], slam: [["ripple", 60], ["rever", 40]], ripple: [["rever", 55], ["slam", 45]], haste: [["rever", 100]] },
+        limit: { slam: 1, ripple: 1, haste: 1 },
+    },
+    donu: {
+        // Donu, 250: Circle of Power (+3 Strength to both of them) and Beam 10x2.
+        open: "circle",
+        moves: {
+            circle: { key: "circle", label: "Circle of Power", strength: 3 },
+            beam: { key: "beam", label: "Beam", damage: 10, hits: 2 },
+        },
+        after: { circle: [["beam", 100]], beam: [["circle", 100]] },
+    },
+    deca: {
+        // Deca, 250: Square of Protection (16 Block to both, and Plated Armor) and Beam 10x2.
+        open: "square",
+        moves: {
+            square: { key: "square", label: "Square of Protection", block: 16 },
+            beam: { key: "beam", label: "Beam", damage: 10, hits: 2 },
+        },
+        after: { square: [["beam", 100]], beam: [["square", 100]] },
     },
     // One move and no wind-up. Nothing to play around, only a race — which is a different kind of pressure
     // from anything else on this list, and the reason a room of them is not just a room of small enemies.
@@ -803,92 +1129,6 @@ export const FOE_SCRIPTS = {
         open: "sting",
         moves: { sting: { key: "sting", label: "Sting", damage: 5 } },
         after: { sting: [["sting", 100]] },
-    },
-    // A CLOCK. It roars, and every swing after that is worth more. Leave it alive while you clear the others
-    // and the fight you were winning turns over. It cannot roar twice running, so the ramp is paid for.
-    ramper: {
-        open: "roar",
-        moves: {
-            // TWO. Their ramping enemy is the Cultist: +3 a turn, but it has 48 health and is dead in
-            // three or four. A ramp is priced by how many turns it gets, and ours were getting seven.
-            roar: { key: "roar", label: "Roar", strength: 2 },
-            swing: { key: "swing", label: "Swing", damage: 7 },
-            rend: { key: "rend", label: "Rend", damage: 10 },
-        },
-        after: { roar: [["swing", 60], ["rend", 40]], swing: [["rend", 40], ["roar", 35], ["swing", 25]], rend: [["roar", 50], ["swing", 50]] },
-        limit: { roar: 1, swing: 2 },
-    },
-
-    // ── THE DEEP ─────────────────────────────────────────────────────────────────────────────────────
-    mauler: {
-        open: "maul",
-        moves: {
-            maul: { key: "maul", label: "Maul", damage: 9 },
-            heave: { key: "heave", label: "Heave", damage: 13 },
-            snort: { key: "snort", label: "Snort", block: 6 },
-        },
-        after: { maul: [["maul", 40], ["heave", 45], ["snort", 15]], heave: [["snort", 40], ["maul", 60]], snort: [["heave", 55], ["maul", 45]] },
-        limit: { maul: 2, heave: 1 },
-    },
-    // It heals back what you take off it, so a deck that deals damage in dribbles never finishes it. That is
-    // the whole question it asks: did you build for a burst.
-    leech: {
-        open: "drain",
-        moves: {
-            drain: { key: "drain", label: "Drain", damage: 8, heal: 6 },
-            gorge: { key: "gorge", label: "Gorge", damage: 9 },
-            writhe: { key: "writhe", label: "Writhe", block: 5, heal: 5 },
-        },
-        after: { drain: [["drain", 35], ["gorge", 40], ["writhe", 25]], gorge: [["drain", 65], ["writhe", 35]], writhe: [["drain", 55], ["gorge", 45]] },
-        limit: { drain: 2, gorge: 1 },
-    },
-
-    // ── ELITES ───────────────────────────────────────────────────────────────────────────────────────
-    // Ramps AND guards, so it gets harder to kill at the same rate it gets harder to survive.
-    champion: {
-        open: "bellow",
-        moves: {
-            bellow: { key: "bellow", label: "Bellow", strength: 2 },
-            guard: { key: "guard", label: "Guard", block: 8 },
-            cleave: { key: "cleave", label: "Cleave", damage: 11 },
-        },
-        after: { bellow: [["cleave", 65], ["guard", 35]], guard: [["cleave", 75], ["bellow", 25]], cleave: [["cleave", 35], ["guard", 35], ["bellow", 30]] },
-        limit: { bellow: 1, cleave: 2 },
-    },
-    // The whole fight is BEHEAD, and you can see it coming a turn ahead. Block it or be halved. It cannot
-    // follow itself, so surviving one buys you a breath rather than another one immediately.
-    headsman: {
-        open: "sharpen",
-        moves: {
-            sharpen: { key: "sharpen", label: "Sharpen", strength: 2, block: 8 },
-            hew: { key: "hew", label: "Hew", damage: 10 },
-            behead: { key: "behead", label: "BEHEAD", damage: 20 },
-        },
-        after: { sharpen: [["hew", 55], ["behead", 45]], hew: [["behead", 60], ["sharpen", 40]], behead: [["sharpen", 65], ["hew", 35]] },
-        limit: { behead: 1, hew: 2 },
-    },
-
-    // ── THE BOSS ─────────────────────────────────────────────────────────────────────────────────────
-    // Five moves and every one is a different problem: it musters, it weakens you, it hits, it makes you
-    // fragile, and then it swings the biggest number in the game into the hole it just opened. RUIN can only
-    // follow DREAD, so the worst thing it does is always announced by the thing before it.
-    warlord: {
-        open: "muster",
-        moves: {
-            muster: { key: "muster", label: "Muster", strength: 3, block: 12 },
-            sweep: { key: "sweep", label: "Sweep", damage: 10, weak: 1 },
-            hew: { key: "hew", label: "Hew", damage: 15 },
-            dread: { key: "dread", label: "Dread", vulnerable: 2 },
-            ruin: { key: "ruin", label: "RUIN", damage: 20 },
-        },
-        after: {
-            muster: [["sweep", 50], ["hew", 50]],
-            sweep: [["hew", 45], ["dread", 40], ["muster", 15]],
-            hew: [["dread", 45], ["muster", 30], ["sweep", 25]],
-            dread: [["ruin", 100]],
-            ruin: [["muster", 55], ["sweep", 45]],
-        },
-        limit: { hew: 2, sweep: 2 },
     },
 };
 
@@ -955,52 +1195,74 @@ export function pickNextMove(script, played, recent, rngSeed) {
 // Damage is deliberately UNTOUCHED. Their act 1 hits for 5-12 a beat and so does ours; the bruiser's 18 is a
 // telegraphed wind-up behind a Brace, which is exactly the Jaw Worm's shape. Length was the whole defect.
 export const FOES = {
-    // ── THE SMALL ONES — the easy pool's whole cast.
-    cur:      { id: "cur",      name: "Cur",       hp: [11, 15],   script: "cur" },
-    jackal:   { id: "jackal",   name: "Jackal",    hp: [15, 19],   script: "jackal" },
-    swarmlet: { id: "swarmlet", name: "Biter",     hp: [9, 13],    script: "swarm" },
-
-    // ── THE MIDDLE — what the hard pool is built from.
-    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [30, 36],   script: "bruiser" },
-    hexer:    { id: "hexer",    name: "Hexer",     hp: [20, 26],   script: "hexer" },
-    warden:   { id: "warden",   name: "Warden",    hp: [26, 32],   script: "warden" },
-    ramper:   { id: "ramper",   name: "Ravener",   hp: [26, 32],   script: "ramper" },
-
-    // ── THE DEEP — bigger creatures, not bigger versions of the same ones.
-    mauler:   { id: "mauler",   name: "Mauler",    hp: [40, 46],   script: "mauler" },
-    leech:    { id: "leech",    name: "Bloodleech", hp: [36, 42],  script: "leech" },
-
-    // ── ELITE-ONLY. Theirs are dedicated monsters — a Gremlin Nob is never a normal room — so an elite here
-    // is never two ordinary enemies standing closer together either.
-    champion: { id: "champion", name: "Champion",  hp: [74, 82],   script: "champion" },
-    headsman: { id: "headsman", name: "Headsman",  hp: [96, 106],  script: "headsman" },
-    sentinel: { id: "sentinel", name: "Sentinel",  hp: [40, 46],   script: "warden" },
-    gorger:   { id: "gorger",   name: "Gorger",    hp: [50, 58],   script: "leech" },
-
-    // ── THE BOSS. The one number that goes UP: theirs are 140-250 and a boss is meant to be the wall at the
-    // top of the act, so cutting the road to it and leaving the door the same size is the wrong trade.
-    warlord:  { id: "warlord",  name: "Warlord",   hp: [150, 168], script: "warlord" },
-
-    // ══ THE DEEP — ACT TWO ═══════════════════════════════════════════════════════════════════════════════
-    // ⚠️ A SCRIPT IS NOT A CREATURE. buildParty resolves an encounter through THIS table and falls back to
-    // `FOES.jackal` for anything missing — so the whole act-two bestiary, authored and scripted, stood in the
-    // room as jackals with jackal health and jackal moves until these seven lines existed. It was visible in
-    // one screenshot: a Drowned in the first slot labelled JACKAL.
+    // ══ PRICED OFF THEIR BESTIARY, CREATURE BY CREATURE ══════════════════════════════════════════════════
+    // Luke: "enemies should match in difficulty exactly with Slay the Spire — movesets, HP amounts, enemy
+    // sets, for each act, including elites and the bosses."
     //
-    // AND THE HEALTH IS THE ACT'S DIFFICULTY. There is no per-act multiplier on a creature — Spire does not
-    // make a Louse bigger in act 2, it stops sending Louses — so an act gets harder by sending heavier things.
-    drowned:   { id: "drowned",   name: "Drowned",   hp: [26, 32],   script: "drowned" },
-    barnacle:  { id: "barnacle",  name: "Barnacle",  hp: [34, 40],   script: "barnacle" },
-    tidecaller:{ id: "tidecaller",name: "Tidecaller",hp: [24, 30],   script: "tidecaller" },
-    leviathan: { id: "leviathan", name: "Leviathan", hp: [96, 110],  script: "leviathan" },
-    // The same creature at boss size. A separate id rather than a multiplier, so the elite and the boss can
-    // be tuned apart — which is the whole reason The Maw is a room you may choose and this one is not.
-    deep_king: { id: "deep_king", name: "The Leviathan", hp: [196, 218], script: "leviathan" },
+    // So every health range and every number in FOE_SCRIPTS below is theirs, at Ascension 0, and the comment
+    // on each line names the creature it is priced from. Ours keep OUR names and wear the Long Road's faces:
+    // the numbers are a balance decision anybody can check, but shipping a game with their creature names in
+    // it is a different thing entirely and not one worth doing.
+    //
+    // ⚠️ WHERE OUR ENGINE CANNOT DO THEIR TRICK, THE COMMENT SAYS SO. We have damage, multi-hit, block,
+    // strength, weak, vulnerable, frail, heal and curl-up. We do NOT have status cards shuffled into your
+    // deck (Slimed, Dazed, Burn), splitting, mode-shift, minion summoning or artifact. Where one of those was
+    // the creature's whole identity, the entry says what was traded for it rather than pretending.
 
-    // ══ THE SPIRE — ACT THREE ════════════════════════════════════════════════════════════════════════════
-    emberling: { id: "emberling", name: "Emberling", hp: [30, 36],   script: "emberling" },
-    colossus:  { id: "colossus",  name: "Colossus",  hp: [58, 66],   script: "colossus" },
-    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [240, 268], script: "spire_warden" },
+    // ══ ACT ONE — THE SAND (their Exordium) ═══════════════════════════════════════════════════════════════
+    louse:    { id: "louse",    name: "Biter",     hp: [10, 15],   script: "louse",    curl: [3, 7] },   // Red Louse 10-15, Curl Up 3-7
+    louse_g:  { id: "louse_g",  name: "Spitter",   hp: [11, 17],   script: "louse_g",  curl: [3, 7] },   // Green Louse 11-17
+    cur:      { id: "cur",      name: "Cur",       hp: [8, 12],    script: "cur" },                      // Acid Slime (S) 8-12
+    jackal:   { id: "jackal",   name: "Jackal",    hp: [10, 14],   script: "jackal" },                   // Spike Slime (S) 10-14
+    bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [28, 32],   script: "bruiser" },                  // Acid Slime (M) 28-32
+    warden:   { id: "warden",   name: "Warden",    hp: [28, 32],   script: "warden" },                   // Spike Slime (M) 28-32
+    hexer:    { id: "hexer",    name: "Hexer",     hp: [22, 28],   script: "hexer" },                    // Fungi Beast 22-28
+    ramper:   { id: "ramper",   name: "Ravener",   hp: [48, 54],   script: "ramper" },                   // Cultist 48-54
+    mauler:   { id: "mauler",   name: "Mauler",    hp: [40, 44],   script: "mauler" },                   // Jaw Worm 40-44
+    leech:    { id: "leech",    name: "Bloodleech", hp: [44, 48],  script: "leech" },                    // Looter 44-48
+    swarmlet: { id: "swarmlet", name: "Biter",     hp: [10, 15],   script: "louse",    curl: [3, 7] },   // kept: old runs name it
+    // ── ACT ONE ELITES ──
+    champion: { id: "champion", name: "Champion",  hp: [82, 86],   script: "champion" },                 // Gremlin Nob 82-86
+    headsman: { id: "headsman", name: "Headsman",  hp: [109, 111], script: "headsman" },                 // Lagavulin 109-111
+    sentinel: { id: "sentinel", name: "Sentinel",  hp: [38, 42],   script: "sentinel" },                 // Sentry 38-42
+    gorger:   { id: "gorger",   name: "Gorger",    hp: [40, 44],   script: "mauler" },                   // a second Jaw Worm shape
+    // ── ACT ONE BOSSES ──
+    warlord:  { id: "warlord",  name: "Warlord",   hp: [240, 240], script: "warlord" },                  // The Guardian 240
+    slime_king: { id: "slime_king", name: "The Gorging King", hp: [140, 140], script: "slime_king" },    // Slime Boss 140
+    hexghost: { id: "hexghost", name: "The Sixfold", hp: [250, 250], script: "hexghost" },               // Hexaghost 250
+
+    // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
+    drowned:    { id: "drowned",    name: "Drowned",    hp: [25, 31],   script: "drowned" },             // Byrd 25-31
+    barnacle:   { id: "barnacle",   name: "Barnacle",   hp: [68, 72],   script: "barnacle" },            // Shelled Parasite 68-72
+    tidecaller: { id: "tidecaller", name: "Tidecaller", hp: [48, 56],   script: "tidecaller" },          // Mystic 48-56
+    centurion:  { id: "centurion",  name: "Centurion",  hp: [76, 80],   script: "centurion" },           // Centurion 76-80
+    chosen:     { id: "chosen",     name: "The Chosen", hp: [95, 99],   script: "chosen" },              // Chosen 95-99
+    sphere:     { id: "sphere",     name: "Sphere",     hp: [20, 20],   script: "sphere" },              // Spheric Guardian 20
+    snecko:     { id: "snecko",     name: "Snecko",     hp: [114, 120], script: "snecko" },              // Snecko 114-120
+    // ── ACT TWO ELITES ──
+    taskmaster: { id: "taskmaster", name: "Taskmaster", hp: [54, 60],   script: "taskmaster" },          // Taskmaster 54-60
+    gremlin_lead: { id: "gremlin_lead", name: "The Warcaller", hp: [140, 148], script: "warcaller" },    // Gremlin Leader 140-148
+    stabber:    { id: "stabber",    name: "The Stabbing Book", hp: [160, 162], script: "stabber" },      // Book of Stabbing 160-162
+    // ── ACT TWO BOSSES ──
+    deep_king:  { id: "deep_king",  name: "The Leviathan", hp: [300, 300], script: "leviathan" },        // Bronze Automaton 300
+    champ:      { id: "champ",      name: "The Champ",  hp: [420, 420], script: "champ" },               // The Champ 420
+    collector:  { id: "collector",  name: "The Collector", hp: [282, 282], script: "collector" },        // The Collector 282
+
+    // ══ ACT THREE — THE SPIRE (their Beyond) ═════════════════════════════════════════════════════════════
+    emberling:  { id: "emberling",  name: "Emberling",  hp: [48, 56],   script: "emberling" },           // Darkling 48-56
+    colossus:   { id: "colossus",   name: "Colossus",   hp: [90, 96],   script: "colossus" },            // Orb Walker 90-96
+    spiker:     { id: "spiker",     name: "Spiker",     hp: [42, 56],   script: "spiker" },              // Spiker 42-56
+    repulsor:   { id: "repulsor",   name: "Repulsor",   hp: [29, 35],   script: "repulsor" },            // Repulsor 29-35
+    writhing:   { id: "writhing",   name: "The Writhing", hp: [160, 160], script: "writhing" },          // Writhing Mass 160
+    // ── ACT THREE ELITES ──
+    giant_head: { id: "giant_head", name: "The Giant",  hp: [500, 500], script: "giant_head" },          // Giant Head 500
+    nemesis:    { id: "nemesis",    name: "Nemesis",    hp: [185, 185], script: "nemesis" },             // Nemesis 185
+    reptomancer:{ id: "reptomancer",name: "The Serpent Caller", hp: [180, 190], script: "reptomancer" }, // Reptomancer 180-190
+    // ── ACT THREE BOSSES ──
+    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [300, 320], script: "spire_warden" }, // Awakened One 300/320
+    time_eater: { id: "time_eater", name: "The Hour Eater", hp: [456, 456], script: "time_eater" },      // Time Eater 456
+    donu:       { id: "donu",       name: "Donu",       hp: [250, 250], script: "donu" },                // Donu 250
+    deca:       { id: "deca",       name: "Deca",       hp: [250, 250], script: "deca" },                // Deca 250
 };
 
 /** A creature's health for this fight — its own range, rolled off the room's seed. */
@@ -1012,6 +1274,16 @@ export function foeHp(foeId, seed) {
     return lo + Math.floor(r * (hi - lo + 1));
 }
 
+/** How much this creature curls for when it is first hit, rolled off the same seed. 0 for anything that does
+ *  not curl — see the note in `land`. */
+export function foeCurl(foeId, seed) {
+    const range = FOES[foeId]?.curl;
+    if (!range) return 0;
+    const [lo, hi] = range;
+    const [r] = nextRand((seed >>> 0) + 991);
+    return lo + Math.floor(r * (hi - lo + 1));
+}
+
 // ── WHAT STANDS IN A ROOM ────────────────────────────────────────────────────────────────────────────────
 // Spire does not make an enemy bigger as you climb — it stops sending that enemy and starts sending a
 // different one. Each act carries its own list, the first two or three fights come from an EASY pool and the
@@ -1020,88 +1292,98 @@ export function foeHp(foeId, seed) {
 //
 // An encounter names CREATURES. It carries no numbers of its own, which is the whole correction above.
 export const ENCOUNTERS = [
-    // ── EASY (rows 1-3) — small things, and nothing that can end a run before it starts.
-    { id: "curs", name: "Stray Curs", pool: "easy", weight: 4, foes: ["cur", "cur"] },
-    { id: "jackals", name: "Jackal Pair", pool: "easy", weight: 4, foes: ["jackal", "jackal"] },
-    { id: "lone_bruiser", name: "A Lone Bruiser", pool: "easy", weight: 3, foes: ["bruiser"] },
-    { id: "cur_bruiser", name: "Cur and Bruiser", pool: "easy", weight: 3, foes: ["cur", "bruiser"] },
-    // The debuffs turn up early and cheaply, so the first time Weak matters is not also the first time it
-    // costs somebody the run.
-    { id: "apprentice", name: "Hexer's Apprentice", pool: "easy", weight: 2, foes: ["hexer", "cur"] },
-
-    // ── HARD (rows 4-9) — three fighters, and the first rooms that ask a question.
-    { id: "pack", name: "The Pack", pool: "hard", weight: 4, foes: ["jackal", "jackal", "jackal"] },
-    { id: "shieldwall", name: "Shield Wall", pool: "hard", weight: 3, foes: ["warden", "bruiser"] },
-    { id: "coven", name: "The Coven", pool: "hard", weight: 2, foes: ["hexer", "hexer", "cur"] },
-    { id: "swarm", name: "Biting Swarm", pool: "hard", weight: 3, foes: ["swarmlet", "swarmlet", "swarmlet", "swarmlet"] },
-    { id: "warband", name: "Warband", pool: "hard", weight: 4, foes: ["bruiser", "jackal", "ramper"] },
-    { id: "rising", name: "The Rising", pool: "hard", weight: 3, foes: ["ramper", "warden"] },
-
-    // ── DEEP (rows 10-15) — bigger creatures, where the big cards have to have arrived.
+    // ══ THEIR ENCOUNTER TABLES, ACT BY ACT ═══════════════════════════════════════════════════════════════
+    // Luke: "enemy sets... for each act, including elites and the bosses." So these are their pools: the two
+    // or three rooms an act opens with, the strong pool it draws from after that, the three elites and the
+    // three bosses. Each line names the room of theirs it mirrors. The creatures are ours (see FOES) and the
+    // numbers are theirs.
     //
-    // ⚠️ THIS BAND WAS AN ACT 2 WEARING ACT 1'S CLOTHES. Swept in the sim, no global cut to monster health or
-    // damage could make the run finishable: at thirty percent off EVERYTHING the opening rooms went trivial
-    // (2.9 turns, four health) and runs still only completed three times in ten, because the difficulty was
-    // never spread — it was piled at the top. Rows 10-15 were costing 38 health a fight and the elites 30,
-    // against a deck that by then has grown by five cards and sharpened maybe two.
-    //
-    // The reason is structural and it is worth writing down, because it is the thing the next act fixes: we
-    // compressed three acts of DIFFICULTY into one act of PROGRESSION. Their act 3 monsters are met by a deck
-    // of thirty cards with ten upgrades and eight relics; ours were met on floor 12 by fifteen cards and two.
-    // So the deep band is priced as the TOP OF AN ACT 1 — their hardest act 1 room is about ninety-five health
-    // across the party — and the Mauler and the Bloodleech keep their shape for act 2, where a 190-point room
-    // is exactly right and the deck arriving at it will have earned the difference.
-    { id: "maulers", name: "Maulers", pool: "deep", weight: 4, foes: ["mauler", "mauler"] },
-    { id: "bloodletters", name: "Bloodletters", pool: "deep", weight: 3, foes: ["leech", "leech", "hexer"] },
-    { id: "the_wall", name: "The Wall", pool: "deep", weight: 3, foes: ["warden", "warden", "mauler"] },
-    { id: "hunting_party", name: "Hunting Party", pool: "deep", weight: 4, foes: ["jackal", "jackal", "mauler"] },
-    { id: "ascendant", name: "The Ascendant", pool: "deep", weight: 3, foes: ["ramper", "hexer", "warden"] },
+    // WEIGHTS ARE EVEN inside a pool unless theirs is not — their strong pools are close to uniform and the
+    // anti-repeat window (pickEncounter) does the work of stopping the same room twice.
 
-    // ── ELITES — the spike you choose to walk into, and the only place a perk comes from. Built from
-    //    creatures that appear NOWHERE else, so meeting one is an event rather than a bigger version of Tuesday.
-    { id: "the_champion", name: "The Champion", pool: "elite", weight: 3, foes: ["champion", "bruiser"] },
-    { id: "the_headsman", name: "The Headsman", pool: "elite", weight: 3, foes: ["headsman"] },
-    { id: "twin_sentinels", name: "Twin Sentinels", pool: "elite", weight: 2, foes: ["sentinel", "sentinel"] },
-    { id: "bloodgorged", name: "The Bloodgorged", pool: "elite", weight: 2, foes: ["gorger", "gorger"] },
+    // ── ACT ONE, THE FIRST THREE ROOMS ── their weak pool, and it is only ever these four.
+    { id: "cultist", name: "A Cultist", pool: "easy", weight: 3, foes: ["ramper"] },
+    { id: "jaw", name: "Jaw Worm", pool: "easy", weight: 3, foes: ["mauler"] },
+    { id: "two_louses", name: "Two Biters", pool: "easy", weight: 3, foes: ["louse", "louse_g"] },
+    { id: "small_slimes", name: "Small Slimes", pool: "easy", weight: 3, foes: ["cur", "jackal"] },
 
-    // ── THE BOSS — one of three, so a run does not end the same way twice.
-    { id: "warlord", name: "The Warlord", pool: "boss", weight: 1, foes: ["warlord"] },
-    { id: "sundered", name: "The Sundered Pair", pool: "boss", weight: 1, foes: ["champion", "champion"] },
-    { id: "hollow_king", name: "The Hollow King", pool: "boss", weight: 1, foes: ["warlord", "hexer"] },
+    // ── ACT ONE, EVERY OTHER ROOM ── their strong pool.
+    { id: "gremlin_gang", name: "The Gang", pool: "hard", weight: 2, foes: ["cur", "jackal", "louse", "louse_g"] },
+    { id: "large_slime", name: "A Large Slime", pool: "hard", weight: 3, foes: ["bruiser"] },
+    { id: "large_spike", name: "A Spike Slime", pool: "hard", weight: 3, foes: ["warden"] },
+    { id: "three_louses", name: "Three Biters", pool: "hard", weight: 3, foes: ["louse", "louse_g", "louse"] },
+    { id: "two_fungi", name: "Two Fungi", pool: "hard", weight: 3, foes: ["hexer", "hexer"] },
+    { id: "looter", name: "A Looter", pool: "hard", weight: 3, foes: ["leech"] },
+    { id: "thugs", name: "Exordium Thugs", pool: "hard", weight: 3, foes: ["ramper", "leech"] },
+    { id: "wildlife", name: "Exordium Wildlife", pool: "hard", weight: 3, foes: ["mauler", "hexer"] },
+    // Their act 1 has no third band; ours has fifteen rows where theirs has sixteen floors, so the deep band
+    // is the strong pool with the heavier halves of it — the same rooms, weighted toward the ones that hurt.
+    { id: "deep_slimes", name: "Slime Pair", pool: "deep", weight: 3, foes: ["bruiser", "warden"] },
+    { id: "deep_wildlife", name: "The Wildlife", pool: "deep", weight: 3, foes: ["mauler", "hexer", "louse"] },
+    { id: "deep_thugs", name: "The Thugs", pool: "deep", weight: 3, foes: ["ramper", "leech", "louse_g"] },
+    { id: "deep_worms", name: "Jaw Worms", pool: "deep", weight: 2, foes: ["mauler", "gorger"] },
 
-    // ══ ACT TWO — THE DEEP ═══════════════════════════════════════════════════════════════════════════════
-    // Pools are named by act from here down (see poolFor). Act one keeps the unprefixed names it has always
-    // had, so every stored run and every seed that has ever been played still resolves to the same rooms.
-    { id: "d_pair", name: "Drowned Pair", pool: "2:easy", weight: 4, foes: ["drowned", "drowned"] },
-    { id: "d_crust", name: "The Encrusted", pool: "2:easy", weight: 3, foes: ["barnacle", "cur"] },
-    { id: "d_caller", name: "A Tidecaller", pool: "2:easy", weight: 3, foes: ["tidecaller", "jackal"] },
-    { id: "d_wall", name: "Barnacle Wall", pool: "2:hard", weight: 4, foes: ["barnacle", "barnacle", "drowned"] },
-    { id: "d_choir", name: "The Choir", pool: "2:hard", weight: 4, foes: ["tidecaller", "drowned", "drowned"] },
-    { id: "d_undertow", name: "Undertow", pool: "2:hard", weight: 3, foes: ["drowned", "warden", "hexer"] },
-    { id: "d_deepwatch", name: "The Deep Watch", pool: "2:deep", weight: 4, foes: ["barnacle", "mauler", "tidecaller"] },
-    { id: "d_drowning", name: "The Drowning", pool: "2:deep", weight: 4, foes: ["drowned", "drowned", "leech"] },
-    { id: "d_current", name: "Against the Current", pool: "2:deep", weight: 3, foes: ["tidecaller", "champion"] },
-    { id: "d_elite_maw", name: "The Maw", pool: "2:elite", weight: 3, foes: ["leviathan"] },
-    { id: "d_elite_pair", name: "Shellbacks", pool: "2:elite", weight: 3, foes: ["barnacle", "barnacle"] },
-    { id: "d_elite_choir", name: "The Drowned Choir", pool: "2:elite", weight: 2, foes: ["tidecaller", "tidecaller", "drowned"] },
+    // ── ACT ONE ELITES ── theirs, all three.
+    { id: "the_champion", name: "The Gremlin Nob", pool: "elite", weight: 3, foes: ["champion"] },
+    { id: "the_headsman", name: "The Sleeper", pool: "elite", weight: 3, foes: ["headsman"] },
+    { id: "twin_sentinels", name: "Three Sentries", pool: "elite", weight: 3, foes: ["sentinel", "sentinel", "sentinel"] },
+    { id: "bloodgorged", name: "The Gorged", pool: "elite", weight: 1, foes: ["gorger", "hexer"] },
+
+    // ── ACT ONE BOSSES ── theirs, all three.
+    { id: "warlord", name: "The Guardian", pool: "boss", weight: 1, foes: ["warlord"] },
+    { id: "sundered", name: "The Gorging King", pool: "boss", weight: 1, foes: ["slime_king"] },
+    { id: "hollow_king", name: "The Sixfold", pool: "boss", weight: 1, foes: ["hexghost"] },
+
+    // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
+    { id: "d_sphere", name: "A Sphere", pool: "2:easy", weight: 3, foes: ["sphere"] },
+    { id: "d_chosen", name: "The Chosen", pool: "2:easy", weight: 3, foes: ["chosen"] },
+    { id: "d_parasite", name: "Shelled Parasite", pool: "2:easy", weight: 3, foes: ["barnacle"] },
+    { id: "d_byrds", name: "Three Byrds", pool: "2:easy", weight: 3, foes: ["drowned", "drowned", "drowned"] },
+    { id: "d_thieves", name: "Two Thieves", pool: "2:easy", weight: 2, foes: ["leech", "leech"] },
+
+    { id: "d_chosen_byrds", name: "Chosen and Byrds", pool: "2:hard", weight: 3, foes: ["chosen", "drowned", "drowned"] },
+    { id: "d_sentry_sphere", name: "Sentry and Sphere", pool: "2:hard", weight: 3, foes: ["sentinel", "sphere"] },
+    { id: "d_snecko", name: "A Snecko", pool: "2:hard", weight: 3, foes: ["snecko"] },
+    { id: "d_centurion", name: "Centurion and Mystic", pool: "2:hard", weight: 3, foes: ["centurion", "tidecaller"] },
+    { id: "d_cultist_chosen", name: "Cultist and Chosen", pool: "2:hard", weight: 3, foes: ["ramper", "chosen"] },
+    { id: "d_three_cultists", name: "Three Cultists", pool: "2:hard", weight: 3, foes: ["ramper", "ramper", "ramper"] },
+    { id: "d_parasite_fungi", name: "Parasite and Fungi", pool: "2:hard", weight: 3, foes: ["barnacle", "hexer"] },
+
+    { id: "d_deep_court", name: "The Tide Court", pool: "2:deep", weight: 3, foes: ["centurion", "tidecaller", "drowned"] },
+    { id: "d_deep_shell", name: "The Shellbacks", pool: "2:deep", weight: 3, foes: ["barnacle", "sphere"] },
+    { id: "d_deep_chosen", name: "The Chosen Pair", pool: "2:deep", weight: 3, foes: ["chosen", "chosen"] },
+    { id: "d_deep_snecko", name: "Snecko and Byrds", pool: "2:deep", weight: 2, foes: ["snecko", "drowned"] },
+
+    { id: "d_elite_leader", name: "The Warcaller", pool: "2:elite", weight: 3, foes: ["gremlin_lead"] },
+    { id: "d_elite_task", name: "The Taskmaster", pool: "2:elite", weight: 3, foes: ["taskmaster", "leech", "leech"] },
+    { id: "d_elite_book", name: "The Stabbing Book", pool: "2:elite", weight: 3, foes: ["stabber"] },
+
     { id: "d_boss", name: "The Leviathan", pool: "2:boss", weight: 1, foes: ["deep_king"] },
-    { id: "d_boss_court", name: "The Tide Court", pool: "2:boss", weight: 1, foes: ["tidecaller", "deep_king"] },
+    { id: "d_boss_champ", name: "The Champ", pool: "2:boss", weight: 1, foes: ["champ"] },
+    { id: "d_boss_collector", name: "The Collector", pool: "2:boss", weight: 1, foes: ["collector"] },
 
-    // ══ ACT THREE — THE SPIRE ════════════════════════════════════════════════════════════════════════════
-    { id: "s_sparks", name: "Sparks", pool: "3:easy", weight: 4, foes: ["emberling", "emberling"] },
-    { id: "s_watch", name: "Spire Watch", pool: "3:easy", weight: 3, foes: ["colossus"] },
-    { id: "s_forge", name: "The Forge Gang", pool: "3:easy", weight: 3, foes: ["emberling", "bruiser", "cur"] },
-    { id: "s_hammers", name: "The Hammers", pool: "3:hard", weight: 4, foes: ["colossus", "emberling"] },
-    { id: "s_ember", name: "Ember Choir", pool: "3:hard", weight: 4, foes: ["emberling", "emberling", "hexer"] },
-    { id: "s_ascent", name: "The Ascent", pool: "3:hard", weight: 3, foes: ["colossus", "warden", "emberling"] },
-    { id: "s_summit", name: "The Summit", pool: "3:deep", weight: 4, foes: ["colossus", "colossus"] },
-    { id: "s_pyre", name: "The Pyre", pool: "3:deep", weight: 4, foes: ["emberling", "emberling", "mauler"] },
-    { id: "s_last", name: "The Last Guard", pool: "3:deep", weight: 3, foes: ["champion", "colossus"] },
-    { id: "s_elite_titan", name: "A Titan", pool: "3:elite", weight: 3, foes: ["colossus", "colossus"] },
-    { id: "s_elite_forge", name: "The Forge Heart", pool: "3:elite", weight: 3, foes: ["emberling", "emberling", "emberling"] },
-    { id: "s_elite_king", name: "The Ash King", pool: "3:elite", weight: 2, foes: ["warlord", "emberling"] },
+    // ══ ACT THREE — THE SPIRE (their Beyond) ═════════════════════════════════════════════════════════════
+    { id: "s_darklings", name: "Three Darklings", pool: "3:easy", weight: 3, foes: ["emberling", "emberling", "emberling"] },
+    { id: "s_orb", name: "An Orb Walker", pool: "3:easy", weight: 3, foes: ["colossus"] },
+    { id: "s_shapes", name: "Three Shapes", pool: "3:easy", weight: 3, foes: ["repulsor", "spiker", "repulsor"] },
+
+    { id: "s_writhing", name: "The Writhing Mass", pool: "3:hard", weight: 3, foes: ["writhing"] },
+    { id: "s_four_shapes", name: "Four Shapes", pool: "3:hard", weight: 3, foes: ["spiker", "repulsor", "spiker", "repulsor"] },
+    { id: "s_jaw_horde", name: "Jaw Worm Horde", pool: "3:hard", weight: 3, foes: ["mauler", "mauler", "gorger"] },
+    { id: "s_sphere_shapes", name: "Sphere and Shapes", pool: "3:hard", weight: 3, foes: ["sphere", "spiker", "repulsor"] },
+    { id: "s_orb_darkling", name: "Orb Walker and Darklings", pool: "3:hard", weight: 3, foes: ["colossus", "emberling", "emberling"] },
+
+    { id: "s_deep_summit", name: "The Summit", pool: "3:deep", weight: 3, foes: ["colossus", "colossus"] },
+    { id: "s_deep_mass", name: "Mass and Shapes", pool: "3:deep", weight: 3, foes: ["writhing", "spiker"] },
+    { id: "s_deep_dark", name: "The Darkling Nest", pool: "3:deep", weight: 3, foes: ["emberling", "emberling", "colossus"] },
+
+    { id: "s_elite_giant", name: "The Giant", pool: "3:elite", weight: 3, foes: ["giant_head"] },
+    { id: "s_elite_nemesis", name: "Nemesis", pool: "3:elite", weight: 3, foes: ["nemesis"] },
+    { id: "s_elite_repto", name: "The Serpent Caller", pool: "3:elite", weight: 3, foes: ["reptomancer", "spiker"] },
+
     { id: "s_boss", name: "The Spire Warden", pool: "3:boss", weight: 1, foes: ["spire_warden"] },
-    { id: "s_boss_twin", name: "Warden and Titan", pool: "3:boss", weight: 1, foes: ["spire_warden", "colossus"] },
+    { id: "s_boss_time", name: "The Hour Eater", pool: "3:boss", weight: 1, foes: ["time_eater"] },
+    { id: "s_boss_pair", name: "Donu and Deca", pool: "3:boss", weight: 1, foes: ["donu", "deca"] },
 ];
 
 /**
@@ -1114,7 +1396,12 @@ export function buildParty(encounter, seed) {
     const ids = encounter?.foes?.length ? encounter.foes : ["jackal", "bruiser", "warden"];
     return ids.map((foeId, i) => {
         const def = FOES[foeId] || FOES.jackal;
-        return { foe: def.id, name: def.name, script: def.script, hp: foeHp(def.id, (seed >>> 0) + i * 2654435761) };
+        const seeded = (seed >>> 0) + i * 2654435761;
+        return {
+            foe: def.id, name: def.name, script: def.script,
+            hp: foeHp(def.id, seeded),
+            curl: foeCurl(def.id, seeded),
+        };
     });
 }
 
@@ -1282,11 +1569,20 @@ export function attackDamage(base, attacker = {}, defender = {}) {
  * modified Block permanently in hand and cannot do the same for damage. When Dexterity and Frail arrive they
  * belong HERE, in this function, and nothing that renders a card will need to know they exist.
  */
+/** Block gained while Frail is 25% less, rounded down — theirs exactly. */
+export function blockGain(base, unit = {}) {
+    const n = Math.max(0, Number(base) || 0);
+    return (unit.frail || 0) > 0 ? Math.floor(n * 0.75) : n;
+}
+
 export function resolveCard(card, attacker = {}, defender = null) {
     if (!card) return {};
     const out = {};
     if (card.damage) out.damage = attackDamage(card.damage, attacker, defender || {});
-    if (card.block) out.block = card.block;
+    // ⚠️ THROUGH blockGain, NOT RAW. This function is what the CARD FACE prints as well as what the engine
+    // applies (see the note above it), so a Frail that only bit at resolution time would show 8 on the card
+    // and give you 6 — the exact class of two-sources-of-truth bug the templated card text exists to prevent.
+    if (card.block) out.block = blockGain(card.block, attacker);
     if (card.heal) out.heal = card.heal;
     if (card.vulnerable) out.vulnerable = card.vulnerable;
     if (card.weak) out.weak = card.weak;
@@ -1307,7 +1603,15 @@ export function splitDamage(unit, amount) {
 /** Block eats damage first, and only what is left reaches HP. */
 function land(unit, amount) {
     const absorbed = Math.min(unit.block || 0, amount);
-    return { ...unit, block: (unit.block || 0) - absorbed, hp: Math.max(0, unit.hp - (amount - absorbed)) };
+    const hit = { ...unit, block: (unit.block || 0) - absorbed, hp: Math.max(0, unit.hp - (amount - absorbed)) };
+    // ── CURL UP ─────────────────────────────────────────────────────────────────────────────────────────
+    // Once, on the first blow that reaches it, and only while it is alive. `curl` is spent rather than
+    // remembered with a flag, so a creature carries one number instead of a number and a boolean that can
+    // disagree — and a saved fight resumed mid-room (run.fight) cannot come back with the curl re-armed.
+    if (hit.curl > 0 && hit.hp > 0 && amount > 0) {
+        return { ...hit, block: (hit.block || 0) + hit.curl, curl: 0 };
+    }
+    return hit;
 }
 
 // Debuffs tick down at the end of the turn of whoever is CARRYING them, so two Vulnerable applied on your turn
@@ -1316,6 +1620,7 @@ const tick = (unit) => ({
     ...unit,
     vulnerable: Math.max(0, (unit.vulnerable || 0) - 1),
     weak: Math.max(0, (unit.weak || 0) - 1),
+    frail: Math.max(0, (unit.frail || 0) - 1),
 });
 
 // ── DRAWING ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -1419,6 +1724,8 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
             // length and in shape.
             block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0,
+            // Spent by the first blow that reaches it — see `land`. Zero on everything that does not curl.
+            curl: Math.max(0, Number(f.curl) || 0),
             // ── WHAT IT WILL DO, DECIDED BEFORE YOUR TURN STARTS ─────────────────────────────────
             // Every creature opens on a fixed move, the way a Jaw Worm always opens Chomp: an opening beat
             // that could be anything is a turn you cannot plan, and the whole design rests on planning.
@@ -1446,7 +1753,11 @@ export const foeIntent = (state, i = 0) => {
 /** What that intent will actually land for, after Strength, Weak and your Vulnerable. Shown, never hidden. */
 export const intentDamage = (state, i = 0) => {
     const intent = foeIntent(state, i);
-    return intent?.damage ? attackDamage(intent.damage, state.foes[i], state.hero) : 0;
+    if (!intent?.damage) return 0;
+    // ⚠️ TIMES THE HITS. The pill is the promise the whole turn is planned against — "can I afford to take
+    // this" — and a Whirlwind that says 5 and lands 20 is the worst possible version of that promise.
+    const swings = Math.max(1, Math.floor(Number(intent.hits) || 1));
+    return attackDamage(intent.damage, state.foes[i], state.hero) * swings;
 };
 
 /**
@@ -1500,8 +1811,9 @@ export function playCard(state, uid, targetIndex = 0) {
         }
     }
     if (card.block) {
-        hero = { ...hero, block: (hero.block || 0) + card.block };
-        events.push({ type: "block", on: "hero", amount: card.block });
+        const gained = blockGain(card.block, hero);
+        hero = { ...hero, block: (hero.block || 0) + gained };
+        events.push({ type: "block", on: "hero", amount: gained });
     }
     // HEALING, which is the other half of what a target means: a card can point at YOU. Capped at your own
     // maximum — a heal is not a way to grow.
@@ -1655,12 +1967,30 @@ export function foeAct(state, i) {
         events.push({ type: "block", on: f.id, amount: intent.block });
     }
     if (intent.damage) {
-        const dealt = attackDamage(intent.damage, f, hero);
-        hero = land(hero, dealt);
-        events.push({ type: "damage", on: "hero", amount: dealt });
+        // ── AND A MULTI-HIT SWINGS ONCE PER HIT ─────────────────────────────────────────────────────
+        // ⚠️ `hits` HAS WORKED ON CARDS SINCE SWARM AND WAS IGNORED ON THIS SIDE. The moment their bestiary
+        // arrived it stopped being cosmetic: the Guardian's Whirlwind is 5x4, Hexaghost's Divider is 6x6 and
+        // the Awakened One's Soul Strike is 6x4 — every one of which would have landed for a single hit,
+        // making three bosses a quarter of their real weight.
+        //
+        // Resolved as REPEATED SMALL BLOWS rather than one big one, exactly as the card side does it: four
+        // hits of five chew through Block where one hit of twenty does not, and that difference is the whole
+        // reason a multi-hit exists.
+        const swings = Math.max(1, Math.floor(Number(intent.hits) || 1));
+        let dealt = 0;
+        for (let h = 0; h < swings; h += 1) {
+            const blow = attackDamage(intent.damage, f, hero);
+            hero = land(hero, blow);
+            dealt += blow;
+        }
+        events.push({ type: "damage", on: "hero", amount: dealt, hits: swings });
     }
     // Applied AFTER the blow, so the Vulnerable a beat inflicts does not also multiply that same beat — the
     // card side already works this way and a foe that broke the rule would be reading its own buff twice.
+    if (intent.frail) {
+        hero = { ...hero, frail: (hero.frail || 0) + intent.frail };
+        events.push({ type: "debuff", on: "hero", amount: intent.frail, stat: "frail" });
+    }
     if (intent.weak) {
         hero = { ...hero, weak: (hero.weak || 0) + intent.weak };
         events.push({ type: "debuff", on: "hero", amount: intent.weak, stat: "weak" });
