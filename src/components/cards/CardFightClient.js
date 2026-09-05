@@ -698,7 +698,14 @@ export default function CardFightClient({ fixture, run = null }) {
     return (
         // The font's class goes on the root and reaches the faces through a variable, so the piles, the HUD
         // and the buttons stay in the site's own face — a card is set in a card font, a button is not.
-        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{ "--cf-card-font": CARD_FONT.style.fontFamily, "--cf-panel-font": panelFont.style.fontFamily, "--cf-die": `${DIE_MS}ms` }}>
+        <div className={`cf${shaking ? " is-shaking" : ""}`} style={{
+            "--cf-card-font": CARD_FONT.style.fontFamily,
+            "--cf-panel-font": panelFont.style.fontFamily,
+            "--cf-die": `${DIE_MS}ms`,
+            // How many bodies share the floor. Read by --cf-figure's width cap — see the note there. Taken
+            // from the party as it was DEALT, dead ones included, so nobody grows when a foe drops.
+            "--cf-crowd": Math.max(1, (fight.foes || []).length),
+        }}>
             {/* ── THE FIELD ─────────────────────────────────────────────────────────────────────────── */}
             <div className={`cf-field${aiming ? " is-aiming" : ""}`} ref={fieldRef}>
                 <Sprite src="/images/cards/scene-arena.webp" className="cf-bg" />
@@ -1098,8 +1105,17 @@ export default function CardFightClient({ fixture, run = null }) {
                        being read. Sizing the box square makes the number mean what it says, and makes
                        "everyone is the same scale" true rather than merely written down.
                        Capped against the viewport WIDTH as well, because four figures side by side on a narrow
-                       phone are limited by how much floor there is, not by how tall the screen is. */
-                    --cf-figure: min(clamp(68px, 15.5vh, 130px), 25vw);
+                       phone are limited by how much floor there is, not by how tall the screen is.
+
+                       ⚠️ AND THE WIDTH CAP KNOWS HOW MANY ARE STANDING THERE. It was a flat 25vw, which is
+                       exactly the right number for three and a quarter of the screen too much for four: the
+                       Biting Swarm is four swarmlets, and at 375 the fourth one stood off the right-hand edge
+                       with its health bar reading "26 / 2". A hard number was being asked to be correct for a
+                       party size it never knew. 75vw shared between them is the same 25 at three, so nothing
+                       about the fights that already looked right moves, and it is 18.75 at four. The count
+                       comes in on the field as --cf-crowd and never changes mid-fight — a corpse keeps its
+                       slot, so the survivors do not grow every time one falls. */
+                    --cf-figure: min(clamp(68px, 15.5vh, 130px), calc(75vw / var(--cf-crowd, 3)));
                     /* ── WHERE THE GROUND IS ─────────────────────────────────────────────────────────────
                        How far the fighters' feet stand above the bottom of the screen: the hand, plus the gap,
                        plus the health bar and the shadow above it. A fixed number of pixels, because every
