@@ -418,6 +418,10 @@ const PIECES = {
             + "stone floor, a low beamed ceiling with a single iron lamp hanging on a chain over the centre of "
             + "the room, and the suggestion of empty chairs against the wall.",
     },
+    // ⚠️ THE SAME MAN AS THE TAVERN'S `cardsharp` (town-art.js). He was a hooded human on the tavern floor and
+    // a raccoon at this table for a day — one job, two species — until the tavern sprite was redrawn to match.
+    // Flat cap, waistcoat over a collarless shirt, rolled sleeves, gold ring, crooked grin: change him here and
+    // change him there, or he splits in half again.
     "table-sharp": {
         fit: "inside", size: "1024x1536", store: { w: 460, h: 690 }, tint: false,
         subject: "A lean anthropomorphic RACCOON card sharp seen from the front, seated behind a table with "
