@@ -171,10 +171,26 @@ const stockStyle = (hue) => ({
 // has not been drawn yet the card falls back to the pet's own portrait sprite, contained rather than cropped —
 // so a new card can be written, played and balanced today and get its illustration whenever. The art is never
 // allowed to be a blocker on the rules.
+// ── A CARD WITH NO ANIMAL ON IT ──────────────────────────────────────────────────────────────────────────
+// The junk their enemies deal into your deck is a card like any other to every list that holds it, but it is
+// not one of our pets — there is nothing to put in the window. Theirs draw them as a distinct, ugly object so
+// they read as WRONG at a glance in a fan of your own cards, and that legibility is the whole point: you need
+// to see the dead card without reading it. A grey glyph, no portrait, no rarity.
+const STATUS_MARK = {
+    slimed: GiSlowBlob,
+    dazed: GiThunderStruck,
+    wound: GiCrackedShield,
+    burn: GiSmallFire,
+};
+
 const CardArt = ({ card, pet }) => {
     const [noArt, setNoArt] = useState(false);
     const img = useRef(null);
     useEffect(() => { if (alreadyFailed(img.current)) setNoArt(true); }, [card.id]);
+    if (card.status) {
+        const Mark = STATUS_MARK[card.id] || GiSlowBlob;
+        return <span className="cf-status-mark"><Mark aria-hidden="true" /></span>;
+    }
     if (!noArt) {
         // eslint-disable-next-line @next/next/no-img-element
         return (
@@ -235,8 +251,10 @@ const chromeTint = (rarity) => {
 export default function CardFace({ card, art, dim, live }) {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
     const look = typeLook(card.kind);
-    const hue = art?.color || meta.color;
-    const tint = chromeTint(art?.rarity);
+    // A status card takes no colour from a pet it does not have — it is grey stock and common furniture, so
+    // it cannot be mistaken for something of yours at the far end of a fanned hand.
+    const hue = card.status ? "#6b7280" : (art?.color || meta.color);
+    const tint = card.status ? "common" : chromeTint(art?.rarity);
     return (
         <>
             <span className="cf-stock" style={stockStyle(hue)} />
@@ -368,6 +386,10 @@ export default function CardFace({ card, art, dim, live }) {
                 .cf-stars.is-light .cf-star { fill: #fff4d2; }
                 .cf-stars.is-dark .cf-star { fill: #b9a4ef;
                     filter: drop-shadow(0 0 3px rgba(150,110,255,0.6)) drop-shadow(0 1px 1px rgba(0,0,0,0.85)); }
+
+                /* The glyph in a status card's window: big, flat and colourless. */
+                .cf-status-mark { display: grid; place-items: center; width: 100%; height: 100%;
+                    font-size: 30px; color: #7c8794; }
 
                 .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
                     display: block; }

@@ -689,12 +689,11 @@ export const FOE_SCRIPTS = {
         after: { tackle: [["tackle", 100]] },
     },
     bruiser: {
-        // Acid Slime (M): Corrosive Spit 7 (+1 Slimed), Tackle 10, Lick (Weak 1).
-        // ⚠️ NO STATUS CARDS in this engine, so the Slimed is traded for the Frail their slimes also push —
-        // the point of the move is that it makes your NEXT turn worse, and Frail does that with what we have.
+        // Acid Slime (M): Corrosive Spit 7 (+1 Slimed), Tackle 10, Lick (Weak 1). The Slimed is a real card
+        // in your discard now — see STATUS_CARDS — which is what the move has always been for.
         open: "spit",
         moves: {
-            spit: { key: "spit", label: "Corrosive Spit", damage: 7, frail: 1 },
+            spit: { key: "spit", label: "Corrosive Spit", damage: 7, status: { id: "slimed", n: 1 } },
             tackle: { key: "tackle", label: "Tackle", damage: 10 },
             lick: { key: "lick", label: "Lick", weak: 1 },
         },
@@ -702,18 +701,19 @@ export const FOE_SCRIPTS = {
         limit: { spit: 2, tackle: 2, lick: 1 },
     },
     warden: {
-        // Spike Slime (M): Flame Tackle 8 (+1 Slimed) and Lick (Frail 1). Same trade as above.
+        // Spike Slime (M): Flame Tackle 8 (+1 Slimed) and Lick (Frail 1). Theirs exactly, both halves.
         open: "flame",
         moves: {
-            flame: { key: "flame", label: "Flame Tackle", damage: 8, frail: 1 },
+            flame: { key: "flame", label: "Flame Tackle", damage: 8, status: { id: "slimed", n: 1 } },
             lick: { key: "lick", label: "Lick", frail: 1 },
         },
         after: { flame: [["lick", 30], ["flame", 70]], lick: [["flame", 100]] },
         limit: { flame: 3, lick: 1 },
     },
     hexer: {
-        // Fungi Beast: Bite 6, Grow (+3 Strength). Its spore cloud on death (Vulnerable 2) has no home in an
-        // engine with no death triggers, so it is not pretended at.
+        // Fungi Beast: Bite 6, Grow (+3 Strength), and Spore Cloud on death — Vulnerable 2 on you as it
+        // falls, which is carried on the CREATURE (onDeath in FOES) rather than in its moveset, because it
+        // is not a move: it happens whether or not it was its turn.
         open: "bite",
         moves: { bite: { key: "bite", label: "Bite", damage: 6 }, grow: { key: "grow", label: "Grow", strength: 3 } },
         after: { bite: [["bite", 60], ["grow", 40]], grow: [["bite", 100]] },
@@ -773,24 +773,25 @@ export const FOE_SCRIPTS = {
         limit: { rush: 2 },
     },
     headsman: {
-        // Lagavulin: asleep for three turns behind 8 Block, then Attack 18 and Siphon Soul (-1 Strength).
-        // ⚠️ NO NEGATIVE STRENGTH ON THE HERO in this engine; Siphon Soul is carried as Weak 1, which is the
-        // closest thing we have to "your hits get smaller".
+        // Lagavulin: asleep for three turns behind 8 Block, then Attack 18 and Siphon Soul, which takes
+        // Strength and Dexterity away for the rest of the fight. `strengthDown` is permanent where Weak is a
+        // duration — attackDamage already floors a swing at zero, so a hero at -1 Strength simply hits for
+        // one less with everything, which is theirs.
         open: "sleep",
         moves: {
             sleep: { key: "sleep", label: "Asleep", block: 8 },
             attack: { key: "attack", label: "Attack", damage: 18 },
-            siphon: { key: "siphon", label: "Siphon Soul", weak: 1, frail: 1 },
+            siphon: { key: "siphon", label: "Siphon Soul", strengthDown: 1, frail: 2 },
         },
         after: { sleep: [["sleep", 60], ["attack", 40]], attack: [["attack", 60], ["siphon", 40]], siphon: [["attack", 100]] },
         limit: { sleep: 3, attack: 2, siphon: 1 },
     },
     sentinel: {
-        // Sentry: Bolt (2 Dazed) and Beam 9, strictly alternating. Dazed is a status card, so the Bolt is
-        // carried as Frail 1 — a turn where your deck works worse, which is what Dazed buys them.
+        // Sentry: Bolt (2 Dazed) and Beam 9, strictly alternating. Two Dazed, shuffled into the draw pile,
+        // which is theirs — cards you cannot play and cannot discard, arriving in a hand you have not seen.
         open: "bolt",
         moves: {
-            bolt: { key: "bolt", label: "Bolt", frail: 1 },
+            bolt: { key: "bolt", label: "Bolt", status: { id: "dazed", n: 2, where: "draw" } },
             beam: { key: "beam", label: "Beam", damage: 9 },
         },
         after: { bolt: [["beam", 100]], beam: [["bolt", 100]] },
@@ -818,32 +819,30 @@ export const FOE_SCRIPTS = {
         limit: { bash: 1, whirl: 1, charge: 1 },
     },
     slime_king: {
-        // Slime Boss, 140: Goop Spray (5 Slimed), Preparing, Slam 35, on a strict three-beat cycle, and it
-        // SPLITS at half health. No status cards and no splitting here: the spray is the debuff turn it
-        // really is (Frail 2 + Weak 1) and the split is traded for a Rage — it comes apart into strength
-        // rather than into two bodies, so half health still changes the fight.
+        // Slime Boss, 140: Goop Spray (five Slimed), Preparing, Slam 35, on a strict three-beat cycle — and
+        // it comes apart at half health into two Large Slimes that each keep its current health. Both are
+        // real now: the spray deals five cards into your discard and the split is on the creature (FOES).
         open: "goop",
         moves: {
-            goop: { key: "goop", label: "Goop Spray", frail: 2, weak: 1 },
+            goop: { key: "goop", label: "Goop Spray", status: { id: "slimed", n: 5 } },
             prepare: { key: "prepare", label: "Preparing", block: 10 },
             slam: { key: "slam", label: "Slam", damage: 35 },
-            rage: { key: "rage", label: "Rage", strength: 5, block: 10 },
         },
-        after: { goop: [["prepare", 100]], prepare: [["slam", 100]], slam: [["rage", 35], ["goop", 65]], rage: [["goop", 100]] },
-        limit: { slam: 1, rage: 1 },
+        after: { goop: [["prepare", 100]], prepare: [["slam", 100]], slam: [["goop", 100]] },
+        limit: { slam: 1 },
     },
     hexghost: {
         // Hexaghost, 250: Activate, then Divider (six hits), then a fixed loop of Sear, Tackle 6x2, Inflame
-        // (+2 Strength) and Inferno. The burn cards it deals are traded for Frail, and Divider's damage is
-        // its "hero HP / 12 + 1" formula taken at a full bar: six hits of six.
+        // (+2 Strength) and Inferno. Sear deals a Burn and Inferno shuffles three into the draw pile, both
+        // theirs; Divider is its "hero HP / 12 + 1" formula taken at a full bar — six hits of six.
         open: "activate",
         moves: {
             activate: { key: "activate", label: "Activate", block: 12 },
             divider: { key: "divider", label: "Divider", damage: 6, hits: 6 },
-            sear: { key: "sear", label: "Sear", damage: 6, frail: 1 },
+            sear: { key: "sear", label: "Sear", damage: 6, status: { id: "burn", n: 1 } },
             tackle: { key: "tackle", label: "Tackle", damage: 6, hits: 2 },
             inflame: { key: "inflame", label: "Inflame", strength: 2, block: 12 },
-            inferno: { key: "inferno", label: "Inferno", damage: 3, hits: 6 },
+            inferno: { key: "inferno", label: "Inferno", damage: 3, hits: 6, status: { id: "burn", n: 3, where: "draw" } },
         },
         after: {
             activate: [["divider", 100]],
@@ -871,37 +870,38 @@ export const FOE_SCRIPTS = {
         limit: { peck: 2, swoop: 1 },
     },
     barnacle: {
-        // Shelled Parasite: opens behind 14 Plated Armor, then Double Strike 6x2, Suck 10 (heals itself for
-        // it), and Fell 18 + Frail 2. The plating is a block wall on the opening beat.
-        open: "plate",
+        // Shelled Parasite: 14 Plated Armor — which is ON THE CREATURE now (FOES), so it returns every turn
+        // and wears down a point per blow instead of being a turn it spends guarding — then Double Strike
+        // 6x2, Suck 10 (heals itself for it) and Fell 18 + Frail 2.
+        open: "double",
         moves: {
-            plate: { key: "plate", label: "Plated Armor", block: 14 },
             double: { key: "double", label: "Double Strike", damage: 6, hits: 2 },
             suck: { key: "suck", label: "Suck", damage: 10, heal: 10 },
             fell: { key: "fell", label: "Fell", damage: 18, frail: 2 },
         },
-        after: { plate: [["double", 50], ["suck", 50]], double: [["suck", 40], ["fell", 60]], suck: [["double", 50], ["fell", 50]], fell: [["plate", 40], ["double", 60]] },
+        after: { double: [["suck", 40], ["fell", 60]], suck: [["double", 50], ["fell", 50]], fell: [["double", 60], ["suck", 40]] },
         limit: { fell: 1, suck: 2 },
     },
     tidecaller: {
-        // Mystic: Heal 16, Buff (+2 Strength), Attack 8. Theirs heals and buffs its ALLIES; ours has no way
-        // to reach across the party, so both land on itself — the same problem for the player one body over.
+        // Mystic: Heal 16 and Buff (+2 Strength) ACROSS THE PARTY — theirs, and the reason a Mystic is the
+        // thing you kill first — plus Attack 8.
         open: "heal",
         moves: {
-            heal: { key: "heal", label: "Heal", heal: 16 },
-            buff: { key: "buff", label: "Encourage", strength: 2 },
+            heal: { key: "heal", label: "Heal", heal: 16, allies: true },
+            buff: { key: "buff", label: "Encourage", strength: 2, allies: true },
             attack: { key: "attack", label: "Attack", damage: 8 },
         },
         after: { heal: [["attack", 60], ["buff", 40]], buff: [["attack", 100]], attack: [["heal", 45], ["buff", 25], ["attack", 30]] },
         limit: { heal: 1, buff: 1, attack: 2 },
     },
     centurion: {
-        // Centurion: Slash 12, Fury 6x3, and a defensive beat. Its Protect goes on an ally in theirs.
+        // Centurion: Slash 12, Fury 6x3, and Protect — 15 Block spread over the party, which is what makes
+        // Centurion-and-Mystic a room rather than two creatures standing together.
         open: "slash",
         moves: {
             slash: { key: "slash", label: "Slash", damage: 12 },
             fury: { key: "fury", label: "Fury", damage: 6, hits: 3 },
-            guard: { key: "guard", label: "Protect", block: 15 },
+            guard: { key: "guard", label: "Protect", block: 15, allies: true },
         },
         after: { slash: [["fury", 50], ["guard", 50]], fury: [["guard", 60], ["slash", 40]], guard: [["slash", 60], ["fury", 40]] },
         limit: { guard: 1, fury: 2 },
@@ -919,15 +919,14 @@ export const FOE_SCRIPTS = {
         limit: { zap: 1, hex: 1, drain: 1 },
     },
     sphere: {
-        // Spheric Guardian: twenty health behind forty Block, then Slam 10x2 and Harden. The whole creature
-        // is the armour, which is why its health is a rounding error and its block is not.
-        open: "activate",
+        // Spheric Guardian: twenty health behind forty Block. The 40 is Plated Armor on the creature, so it
+        // is there from the first blow rather than after a turn of set-up, and Harden adds to it.
+        open: "slam",
         moves: {
-            activate: { key: "activate", label: "Activate", block: 40 },
             slam: { key: "slam", label: "Slam", damage: 10, hits: 2 },
             harden: { key: "harden", label: "Harden", block: 15 },
         },
-        after: { activate: [["slam", 100]], slam: [["harden", 60], ["slam", 40]], harden: [["slam", 100]] },
+        after: { slam: [["harden", 60], ["slam", 40]], harden: [["slam", 100]] },
         limit: { slam: 2, harden: 1 },
     },
     snecko: {
@@ -944,19 +943,21 @@ export const FOE_SCRIPTS = {
     },
     // ── ACT TWO ELITES ──
     taskmaster: {
-        // Taskmaster: Scouring Whip 7, which also deals Wounds into your deck. Frail in place of the wounds.
+        // Taskmaster: Scouring Whip 7, and a Wound into your discard with every crack of it — which is the
+        // whole creature: it does almost no damage and ruins your deck while its slavers hit you.
         open: "whip",
-        moves: { whip: { key: "whip", label: "Scouring Whip", damage: 7, frail: 1 } },
+        moves: { whip: { key: "whip", label: "Scouring Whip", damage: 7, status: { id: "wound", n: 1 } } },
         after: { whip: [["whip", 100]] },
     },
     warcaller: {
-        // Gremlin Leader: Rally (summons two gremlins), Encourage (+3 Strength and Block to the gang), Stab
-        // 6x3. No summoning here, so Rally is the buff turn it functionally is when the gang is already out.
+        // Gremlin Leader: Rally SUMMONS two gremlins, Encourage gives the whole gang Strength and Block, and
+        // Stab is 6x3. All three are theirs now — the fight is about whether you can clear the room faster
+        // than it refills.
         open: "stab",
         moves: {
             stab: { key: "stab", label: "Stab", damage: 6, hits: 3 },
-            rally: { key: "rally", label: "Rally", strength: 3, block: 10 },
-            encourage: { key: "encourage", label: "Encourage", strength: 3 },
+            rally: { key: "rally", label: "Rally", summon: ["jackal", "cur"] },
+            encourage: { key: "encourage", label: "Encourage", strength: 3, block: 6, allies: true },
         },
         after: { stab: [["rally", 45], ["encourage", 30], ["stab", 25]], rally: [["stab", 100]], encourage: [["stab", 100]] },
         limit: { stab: 2, rally: 1 },
@@ -1009,16 +1010,18 @@ export const FOE_SCRIPTS = {
         limit: { slash: 2, anger: 1, slap: 1 },
     },
     collector: {
-        // The Collector, 282: Fireball 18, Buff (+3 Strength, 15 Block), Mega Debuff (Weak 3 and Vulnerable
-        // 3), and it summons torch heads — the summoning is the part that does not exist here.
-        open: "fire",
+        // The Collector, 282: Fireball 18, Buff (+3 Strength and Block over the whole room), Mega Debuff
+        // (Weak 3 and Vulnerable 3), and it SUMMONS torch heads — which is the beat that makes it a boss
+        // rather than a big enemy, because the room keeps filling while you are trying to kill it.
+        open: "spawn",
         moves: {
+            spawn: { key: "spawn", label: "Spawn", summon: ["louse", "louse_g"] },
             fire: { key: "fire", label: "Fireball", damage: 18 },
-            buff: { key: "buff", label: "Buff", strength: 3, block: 15 },
+            buff: { key: "buff", label: "Buff", strength: 3, block: 15, allies: true },
             mega: { key: "mega", label: "Mega Debuff", weak: 3, vulnerable: 3 },
         },
-        after: { fire: [["buff", 40], ["mega", 25], ["fire", 35]], buff: [["fire", 100]], mega: [["fire", 100]] },
-        limit: { fire: 2, mega: 1 },
+        after: { spawn: [["fire", 100]], fire: [["buff", 35], ["mega", 20], ["spawn", 15], ["fire", 30]], buff: [["fire", 100]], mega: [["fire", 100]] },
+        limit: { fire: 2, mega: 1, spawn: 1 },
     },
 
     // ══ ACT THREE — THE SPIRE (their Beyond) ═════════════════════════════════════════════════════════════
@@ -1034,28 +1037,32 @@ export const FOE_SCRIPTS = {
         limit: { harden: 1 },
     },
     colossus: {
-        // Orb Walker: Laser 10 with Burns, Claw 15, and it grows by 3 Strength as it goes. Burn is a status
-        // card, so the laser carries Frail instead.
+        // Orb Walker: Laser 10 and two Burns into your discard, Claw 15, and it grows by 3 Strength as it
+        // goes — so the fight gets worse from both ends while your deck fills with cards that hurt you.
         open: "laser",
         moves: {
-            laser: { key: "laser", label: "Laser", damage: 10, frail: 1 },
+            laser: { key: "laser", label: "Laser", damage: 10, status: { id: "burn", n: 2 } },
             claw: { key: "claw", label: "Claw", damage: 15, strength: 3 },
         },
         after: { laser: [["claw", 60], ["laser", 40]], claw: [["laser", 55], ["claw", 45]] },
         limit: { claw: 2, laser: 2 },
     },
     spiker: {
-        // Spiker: Cut 7, and Spike, which is Thorns in theirs — damage back when you hit it. We have no
-        // reactive damage, so the spike is the guard it looks like.
+        // Spiker: Cut 7, and Thorns — 3 damage back for every swing you land on it, which is on the CREATURE
+        // (FOES) rather than in the moveset, because it is true whether or not it is the Spiker's turn. A
+        // three-hit card into a room of these is now a decision instead of free value.
         open: "cut",
         moves: { cut: { key: "cut", label: "Cut", damage: 7 }, spike: { key: "spike", label: "Spike", block: 5, strength: 2 } },
         after: { cut: [["cut", 60], ["spike", 40]], spike: [["cut", 100]] },
         limit: { cut: 2, spike: 1 },
     },
     repulsor: {
-        // Repulsor: Bash 11 and Repulse, which deals Dazed. Frail again in place of the status card.
+        // Repulsor: Bash 11, and Repulse — two Dazed shuffled into your draw pile, theirs exactly.
         open: "bash",
-        moves: { bash: { key: "bash", label: "Bash", damage: 11 }, repulse: { key: "repulse", label: "Repulse", frail: 2 } },
+        moves: {
+            bash: { key: "bash", label: "Bash", damage: 11 },
+            repulse: { key: "repulse", label: "Repulse", status: { id: "dazed", n: 2, where: "draw" } },
+        },
         after: { bash: [["bash", 55], ["repulse", 45]], repulse: [["bash", 100]] },
         limit: { bash: 2, repulse: 1 },
     },
@@ -1085,33 +1092,35 @@ export const FOE_SCRIPTS = {
         limit: { count: 3, time: 1 },
     },
     nemesis: {
-        // Nemesis, 185: Scythe 45, Attack 6x3, and Intangible on alternate turns — a damage floor of 1 that
-        // this engine has no concept of, kept as the heavy guard it plays like.
+        // Nemesis, 185: Scythe 45, Attack 6x3, and INTANGIBLE on alternate turns — every blow that reaches
+        // it while it holds is reduced to one, which is the whole shape of the fight: you cannot out-damage
+        // it, you have to time it.
         open: "triple",
         moves: {
             triple: { key: "triple", label: "Attack", damage: 6, hits: 3 },
             scythe: { key: "scythe", label: "Scythe", damage: 45 },
-            veil: { key: "veil", label: "Veil", block: 25 },
+            veil: { key: "veil", label: "Intangible", intangible: 2 },
         },
         after: { triple: [["veil", 45], ["scythe", 25], ["triple", 30]], veil: [["triple", 60], ["scythe", 40]], scythe: [["veil", 100]] },
         limit: { scythe: 1, veil: 1 },
     },
     reptomancer: {
-        // Reptomancer, 180-190: Snake Strike 13x2, Big Bite 30, and it summons daggers — the summon being
-        // the part with no home here.
+        // Reptomancer, 180-190: Snake Strike 13x2, Big Bite 30, and it SUMMONS daggers — small fast bodies
+        // that make you choose between the caller and the room.
         open: "snake",
         moves: {
             snake: { key: "snake", label: "Snake Strike", damage: 13, hits: 2 },
             bite: { key: "bite", label: "Big Bite", damage: 30 },
-            coil: { key: "coil", label: "Coil", block: 18, strength: 2 },
+            summon: { key: "summon", label: "Summon Daggers", summon: ["jackal", "jackal"] },
         },
-        after: { snake: [["bite", 40], ["coil", 30], ["snake", 30]], bite: [["coil", 55], ["snake", 45]], coil: [["snake", 60], ["bite", 40]] },
-        limit: { snake: 2, bite: 1 },
+        after: { snake: [["bite", 40], ["summon", 30], ["snake", 30]], bite: [["summon", 55], ["snake", 45]], summon: [["snake", 60], ["bite", 40]] },
+        limit: { snake: 2, bite: 1, summon: 1 },
     },
     // ── ACT THREE BOSSES ──
     spire_warden: {
-        // Awakened One, 300 then 320: Slash 20, Soul Strike 6x4, Dark Echo 40, Tackle 20. Its rebirth is a
-        // second health bar, which is a death trigger, which we do not have.
+        // Awakened One, 300 then 320: Slash 20, Soul Strike 6x4, Dark Echo 40, Tackle 20 — and it stands
+        // back up at 320 the first time you kill it, which is carried as a rebirth on the creature (FOES).
+        // A boss you have to kill twice is a different fight from a boss with 620 health.
         open: "echo",
         moves: {
             echo: { key: "echo", label: "Dark Echo", damage: 40 },
@@ -1123,12 +1132,13 @@ export const FOE_SCRIPTS = {
         limit: { echo: 1, slash: 2 },
     },
     time_eater: {
-        // Time Eater, 456: Reverberate 7x3, Head Slam 26 with Draw Reduction, Ripple (20 Block, Weak and
-        // Vulnerable), and Haste, which heals it to half. Draw reduction has no home; the slam keeps Frail.
+        // Time Eater, 456: Reverberate 7x3, Head Slam 26 which eats your draw (two Dazed, theirs reduces
+        // draw by one — the same idea in the currency we have), Ripple (20 Block, Weak and Vulnerable), and
+        // Haste, which heals it.
         open: "rever",
         moves: {
             rever: { key: "rever", label: "Reverberate", damage: 7, hits: 3 },
-            slam: { key: "slam", label: "Head Slam", damage: 26, frail: 2 },
+            slam: { key: "slam", label: "Head Slam", damage: 26, status: { id: "dazed", n: 2, where: "draw" } },
             ripple: { key: "ripple", label: "Ripple", block: 20, weak: 1, vulnerable: 1 },
             haste: { key: "haste", label: "Haste", heal: 40, block: 20 },
         },
@@ -1139,7 +1149,7 @@ export const FOE_SCRIPTS = {
         // Donu, 250: Circle of Power (+3 Strength to both of them) and Beam 10x2.
         open: "circle",
         moves: {
-            circle: { key: "circle", label: "Circle of Power", strength: 3 },
+            circle: { key: "circle", label: "Circle of Power", strength: 3, allies: true },
             beam: { key: "beam", label: "Beam", damage: 10, hits: 2 },
         },
         after: { circle: [["beam", 100]], beam: [["circle", 100]] },
@@ -1148,7 +1158,7 @@ export const FOE_SCRIPTS = {
         // Deca, 250: Square of Protection (16 Block to both, and Plated Armor) and Beam 10x2.
         open: "square",
         moves: {
-            square: { key: "square", label: "Square of Protection", block: 16 },
+            square: { key: "square", label: "Square of Protection", block: 16, allies: true },
             beam: { key: "beam", label: "Beam", damage: 10, hits: 2 },
         },
         after: { square: [["beam", 100]], beam: [["square", 100]] },
@@ -1246,7 +1256,8 @@ export const FOES = {
     jackal:   { id: "jackal",   name: "Jackal",    hp: [10, 14],   script: "jackal" },                   // Spike Slime (S) 10-14
     bruiser:  { id: "bruiser",  name: "Bruiser",   hp: [28, 32],   script: "bruiser" },                  // Acid Slime (M) 28-32
     warden:   { id: "warden",   name: "Warden",    hp: [28, 32],   script: "warden" },                   // Spike Slime (M) 28-32
-    hexer:    { id: "hexer",    name: "Hexer",     hp: [22, 28],   script: "hexer" },                    // Fungi Beast 22-28
+    // Spore Cloud: Vulnerable 2 on you as it falls. A death rattle is the creature's, not the moveset's.
+    hexer:    { id: "hexer",    name: "Hexer",     hp: [22, 28],   script: "hexer", onDeath: { vulnerable: 2 } },  // Fungi Beast 22-28
     ramper:   { id: "ramper",   name: "Ravener",   hp: [48, 54],   script: "ramper" },                   // Cultist 48-54
     mauler:   { id: "mauler",   name: "Mauler",    hp: [40, 44],   script: "mauler" },                   // Jaw Worm 40-44
     leech:    { id: "leech",    name: "Bloodleech", hp: [44, 48],  script: "leech" },                    // Looter 44-48
@@ -1258,16 +1269,18 @@ export const FOES = {
     gorger:   { id: "gorger",   name: "Gorger",    hp: [40, 44],   script: "mauler" },                   // a second Jaw Worm shape
     // ── ACT ONE BOSSES ──
     warlord:  { id: "warlord",  name: "Warlord",   hp: [240, 240], script: "warlord" },                  // The Guardian 240
-    slime_king: { id: "slime_king", name: "The Gorging King", hp: [140, 140], script: "slime_king" },    // Slime Boss 140
+    // It comes apart at half health into two Large Slimes, each keeping its CURRENT health — theirs.
+    slime_king: { id: "slime_king", name: "The Gorging King", hp: [140, 140], script: "slime_king",
+        split: { into: ["bruiser", "warden"] } },                                                         // Slime Boss 140
     hexghost: { id: "hexghost", name: "The Sixfold", hp: [250, 250], script: "hexghost" },               // Hexaghost 250
 
     // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
     drowned:    { id: "drowned",    name: "Drowned",    hp: [25, 31],   script: "drowned" },             // Byrd 25-31
-    barnacle:   { id: "barnacle",   name: "Barnacle",   hp: [68, 72],   script: "barnacle" },            // Shelled Parasite 68-72
+    barnacle:   { id: "barnacle",   name: "Barnacle",   hp: [68, 72],   script: "barnacle", plate: 14 },  // Shelled Parasite 68-72
     tidecaller: { id: "tidecaller", name: "Tidecaller", hp: [48, 56],   script: "tidecaller" },          // Mystic 48-56
     centurion:  { id: "centurion",  name: "Centurion",  hp: [76, 80],   script: "centurion" },           // Centurion 76-80
     chosen:     { id: "chosen",     name: "The Chosen", hp: [95, 99],   script: "chosen" },              // Chosen 95-99
-    sphere:     { id: "sphere",     name: "Sphere",     hp: [20, 20],   script: "sphere" },              // Spheric Guardian 20
+    sphere:     { id: "sphere",     name: "Sphere",     hp: [20, 20],   script: "sphere", plate: 40 },    // Spheric Guardian 20
     snecko:     { id: "snecko",     name: "Snecko",     hp: [114, 120], script: "snecko" },              // Snecko 114-120
     // ── ACT TWO ELITES ──
     taskmaster: { id: "taskmaster", name: "Taskmaster", hp: [54, 60],   script: "taskmaster" },          // Taskmaster 54-60
@@ -1281,7 +1294,7 @@ export const FOES = {
     // ══ ACT THREE — THE SPIRE (their Beyond) ═════════════════════════════════════════════════════════════
     emberling:  { id: "emberling",  name: "Emberling",  hp: [48, 56],   script: "emberling" },           // Darkling 48-56
     colossus:   { id: "colossus",   name: "Colossus",   hp: [90, 96],   script: "colossus" },            // Orb Walker 90-96
-    spiker:     { id: "spiker",     name: "Spiker",     hp: [42, 56],   script: "spiker" },              // Spiker 42-56
+    spiker:     { id: "spiker",     name: "Spiker",     hp: [42, 56],   script: "spiker", thorns: 3 },    // Spiker 42-56
     repulsor:   { id: "repulsor",   name: "Repulsor",   hp: [29, 35],   script: "repulsor" },            // Repulsor 29-35
     writhing:   { id: "writhing",   name: "The Writhing", hp: [160, 160], script: "writhing" },          // Writhing Mass 160
     // ── ACT THREE ELITES ──
@@ -1289,10 +1302,11 @@ export const FOES = {
     nemesis:    { id: "nemesis",    name: "Nemesis",    hp: [185, 185], script: "nemesis" },             // Nemesis 185
     reptomancer:{ id: "reptomancer",name: "The Serpent Caller", hp: [180, 190], script: "reptomancer" }, // Reptomancer 180-190
     // ── ACT THREE BOSSES ──
-    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [300, 320], script: "spire_warden" }, // Awakened One 300/320
+    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [300, 300], script: "spire_warden",
+        onDeath: { rebirth: 320 } },                                                                      // Awakened One 300 then 320
     time_eater: { id: "time_eater", name: "The Hour Eater", hp: [456, 456], script: "time_eater" },      // Time Eater 456
     donu:       { id: "donu",       name: "Donu",       hp: [250, 250], script: "donu" },                // Donu 250
-    deca:       { id: "deca",       name: "Deca",       hp: [250, 250], script: "deca" },                // Deca 250
+    deca:       { id: "deca",       name: "Deca",       hp: [250, 250], script: "deca", plate: 3 },      // Deca 250, Plated Armor 3
 };
 
 /** A creature's health for this fight — its own range, rolled off the room's seed. */
@@ -2016,7 +2030,10 @@ export function playCard(state, uid, targetIndex = 0) {
         // a deck can do more than three things a turn.
         energy: state.energy - card.cost + (card.energy || 0),
         hand: state.hand.filter((c) => c.uid !== uid),
-        discard: [...state.discard, entry],
+        // ── EXHAUST ── gone for the rest of the fight rather than into the discard. A Slimed exists to be
+        // paid off: one energy to be rid of it for good, which is the only reason it is playable at all. It
+        // is the same field their own exhausting cards use, so a real card wanting it later just says so.
+        discard: card.exhaust ? state.discard : [...state.discard, entry],
         // The fight is over when the LAST one is down, not the first.
         over: foes.every((f) => f.hp <= 0) ? "win" : state.over,
     };
@@ -2138,6 +2155,13 @@ export function foeAct(state, i) {
         f = { ...f, strength: (f.strength || 0) + intent.strength };
         events.push({ type: "buff", on: f.id, amount: intent.strength });
     }
+    // ── INTANGIBLE, GRANTED BY A BEAT ───────────────────────────────────────────────────────────────
+    // Nemesis spends alternate turns like this. It is a duration on the creature (ticked down in
+    // startFoeTurn) rather than a flat state, so "it is untouchable for one turn" is what a move can say.
+    if (intent.intangible) {
+        f = { ...f, intangible: (f.intangible || 0) + intent.intangible };
+        events.push({ type: "buff", on: f.id, key: "Intangible", amount: intent.intangible });
+    }
     if (intent.heal) {
         const to = Math.min(f.hpMax || f.hp, (f.hp || 0) + intent.heal);
         events.push({ type: "heal", on: f.id, amount: to - (f.hp || 0) });
@@ -2175,6 +2199,13 @@ export function foeAct(state, i) {
         const { id, n = 1, where = "discard" } = intent.status;
         stateAfterStatus = dealStatus(stateAfterStatus, id, n, where);
         events.push({ type: "status", on: "hero", key: STATUS_CARDS[id]?.name || id, amount: n });
+    }
+    // ── STRENGTH TAKEN AWAY, AND IT DOES NOT TICK BACK ──────────────────────────────────────────────
+    // Siphon Soul. Weak is a duration; this is not — the hero simply hits for less with everything for the
+    // rest of the fight, and attackDamage already floors a swing at zero so a negative total is safe.
+    if (intent.strengthDown) {
+        hero = { ...hero, strength: (hero.strength || 0) - intent.strengthDown };
+        events.push({ type: "debuff", on: "hero", amount: intent.strengthDown, stat: "strength" });
     }
     if (intent.frail) {
         hero = { ...hero, frail: (hero.frail || 0) + intent.frail };
