@@ -7,8 +7,8 @@ import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
-    beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, levelSharpens, levelWeight,
-    nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
+    ASC_MAX, ascRule, beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, levelSharpens,
+    levelWeight, nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -36,10 +36,10 @@ export const CARDS_UNLOCKED = (buyerId) => isOwner(buyerId);
 // seed 4471 and tell me what you think" means two different fights and the whole point of a seed is gone.
 // `encounter` is an authored group from ENCOUNTERS — how many stand there, how much health each has, and
 // which script it plays. It decides the SHAPE of the fight; the Road still supplies the faces.
-export async function getCardFightFixture(buyerId, seed, encounter = null) {
+export async function getCardFightFixture(buyerId, seed, encounter = null, { asc = 0, kind = "fight" } = {}) {
     // The creatures and the health they rolled for THIS fight. buildParty owns both, because the encounter
     // only names which monsters turn up — see the note on FOES.
-    const group = buildParty(encounter, seed);
+    const group = buildParty(encounter, seed, { asc, kind });
     const count = group.length;
     // ── A PARTY, PICKED FROM THE SEED ────────────────────────────────────────────────────────────────
     // Three fighters off the Road rather than one, because "which of them do I hit" is the question a hand of
@@ -73,6 +73,9 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
 
     return {
         seed: seed >>> 0,
+        // The rung the room is being met on, carried to the screen so the fight it builds is the fight the
+        // server priced — see startFight's `asc`/`kind`.
+        asc, kind,
         hero: {
             name: me?.name || "You",
             art: me?.avatar_sprite_url || null,
@@ -138,7 +141,7 @@ export async function getCardFightFixture(buyerId, seed, encounter = null) {
 // The server owns the run because a phone that locks itself mid-fight should not lose it, not because the
 // numbers are worth defending. One row, overwritten.
 
-const newRun = (seed) => ({
+const newRun = (seed, asc = 0) => ({
     seed: seed >>> 0,
     stop: 1,
     // ── THE OVERWORLD ────────────────────────────────────────────────────────────────────────────────
@@ -146,7 +149,7 @@ const newRun = (seed) => ({
     // map that can change under somebody standing on it. `at` is the room being fought/visited right now and
     // null when the player is looking at the map; `trail` is every room already taken, which is the only way
     // the sheet can draw where you have been.
-    map: buildMap(seed >>> 0),
+    map: buildMap(seed >>> 0, { asc }),
     // WHICH ACT THIS IS. A run that has never seen a boss is act 1 and says nothing about acts anywhere;
     // beating one moves this and rebuilds the sheet (nextAct).
     act: 1,
@@ -157,7 +160,14 @@ const newRun = (seed) => ({
     // one file away from HERO_HP — so the day the bar changed, the rules said 80 and every run actually dealt
     // still opened on 70. A copied constant runs a second, wrong game: the simulator measured one hero and
     // the browser handed out another.
-    hp: HERO_HP, hpMax: HERO_HP,
+    // ── AND THE RUNG IT WAS DEALT ON ─────────────────────────────────────────────────────────────────
+    // Stored on the run, because every rule the ladder applies is read off it for the rest of the climb and
+    // a rung the run does not carry is a rung that stops applying the moment anything reloads.
+    asc,
+    // Rung six starts you already hurt. Theirs does the same and it is nastier than it sounds: the whole
+    // act is played on a bar you never had all of.
+    hp: ascRule(asc, 6) ? Math.round(HERO_HP * 0.9) : HERO_HP,
+    hpMax: HERO_HP,
     // ── AND A PURSE TO START WITH ────────────────────────────────────────────────────────────────────
     // ⚠️ THEIRS HANDS YOU 99 GOLD BEFORE THE FIRST ROOM and ours handed you nothing, which quietly killed
     // every early room that asks for money: photographed on a real run, the Bonesetter offered a heal for 45
@@ -175,7 +185,9 @@ const newRun = (seed) => ({
     // clock under the same name left BOTH — the later one won, the top bar subtracted `true` from Date.now()
     // and the run showed as 29,806,893 hours old. One key, one meaning.
     startedAt: Date.now(),
-    deck: [...STARTER_DECK],
+    // Rung eight puts a Wound in the deck before the first room — their Ascender's Bane, and the reason a
+    // ten-card deck is a thing you feel.
+    deck: ascRule(asc, 8) ? [...STARTER_DECK, "wound"] : [...STARTER_DECK],
     offers: null,          // the three on the table after a win, null the rest of the time
     done: null,            // null | "won" | "dead"
     started: true,
@@ -199,8 +211,8 @@ export async function loadRun(buyerId, { create = true } = {}) {
  * payoff for forty-five rooms was a screen you could lose by pressing F5. Beginning again is a thing the
  * player does — the table's seat, or New run on the result screen — and it says so here.
  */
-export async function startRun(buyerId) {
-    const run = newRun(Math.floor(Math.random() * 900000) + 1000);
+export async function startRun(buyerId, asc = 0) {
+    const run = newRun(Math.floor(Math.random() * 900000) + 1000, Math.max(0, Math.min(ASC_MAX, Number(asc) || 0)));
     await saveRun(buyerId, run);
     // A RUN STARTED IS A RUN COUNTED. It is the one counter nothing else can infer: a member who opens the
     // game, walks two rooms and dies has played, and the ladder in UNLOCKS should be able to say so.
@@ -222,8 +234,8 @@ export async function recordRun(buyerId, run, outcome) {
     const ended = { ...run, done: outcome };
     await db.query(
         `INSERT INTO mkt_cards_result
-             (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)`,
+             (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks, asc_level)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12)`,
         [
             buyerId, outcome,
             Math.max(1, Math.min(ACTS, Number(run.act) || 1)),
@@ -232,6 +244,7 @@ export async function recordRun(buyerId, run, outcome) {
             Math.max(0, Number(run.hp) || 0), Math.max(1, Number(run.hpMax) || 1),
             (run.deck || []).length, Number(run.seed) || 0,
             JSON.stringify(run.deck || []), JSON.stringify(run.perks || []),
+            Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0)),
         ]
     ).catch(() => {});
     run.recorded = true;
@@ -248,17 +261,25 @@ export async function recordRun(buyerId, run, outcome) {
  */
 export async function runHistory(buyerId, many = 5) {
     const rows = await db.query(
-        `SELECT outcome, act, stop, score, hp, hp_max, deck_size, ended_at
+        `SELECT outcome, act, stop, score, hp, hp_max, deck_size, asc_level, ended_at
            FROM mkt_cards_result WHERE buyer_id = $1 ORDER BY ended_at DESC LIMIT $2`,
         [buyerId, many]
     ).catch(() => []);
     const recent = rows || [];
     const best = await db.queryOne(
-        `SELECT outcome, act, stop, score FROM mkt_cards_result
+        `SELECT outcome, act, stop, score, asc_level FROM mkt_cards_result
           WHERE buyer_id = $1 ORDER BY score DESC LIMIT 1`,
         [buyerId]
     ).catch(() => null);
-    return { recent, best, runs: recent.length };
+    // ── HOW HIGH THE LADDER IS OPEN ──────────────────────────────────────────────────────────────────
+    // The next rung opens by WINNING on the one below it, which is theirs exactly — you cannot skip up by
+    // dying repeatedly at the top. A member who has never won stands on rung zero with one above them.
+    const climbed = await db.queryOne(
+        `SELECT MAX(asc_level)::int AS top FROM mkt_cards_result WHERE buyer_id = $1 AND outcome = 'won'`,
+        [buyerId]
+    ).catch(() => null);
+    const won = Math.max(-1, Number(climbed?.top ?? -1));
+    return { recent, best, runs: recent.length, open: Math.max(0, Math.min(ASC_MAX, won + 1)) };
 }
 
 export async function saveRun(buyerId, run) {
@@ -570,7 +591,9 @@ export async function runFixture(buyerId, run) {
     // every time the page rendered. Stored once, read for ever after; the pick below is only for a room that
     // predates this (an in-flight run) or a fight with no room around it.
     const encounter = encounterById(room.enc) || pickEncounter(seed, room.row + 1, room.kind, run.recent || [], run.act || 1);
-    const fixture = await getCardFightFixture(buyerId, seed, encounter);
+    const fixture = await getCardFightFixture(buyerId, seed, encounter, {
+        asc: run.asc || 0, kind: room.kind || "fight",
+    });
     return {
         ...fixture,
         stop: { ...stop, of: RUN_LENGTH, row: room.row, kind: room.kind },

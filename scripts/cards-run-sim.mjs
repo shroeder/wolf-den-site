@@ -32,6 +32,10 @@ const RUNS = Number(arg("--runs", 1200));
 const DMGX = Number(arg("--dmgx", 1));
 const POTION_DROP = Number(arg("--potions", 40));   // percentage points, the game's POTION_DROP_BASE
 const HPX = Number(arg("--hpx", 1));
+// ── AND WHICH RUNG OF THE LADDER ─────────────────────────────────────────────────────────────────────────
+// The ladder makes the game itself harder a rung at a time (ASCENSION in cards-kit). A rung that cannot be
+// measured is a rung nobody can price, so the simulator climbs too.
+const ASC = Number(arg("--asc", 0));
 // A third dial, for the question the other two cannot answer: how much damage does a whole act THROW? Walk it
 // on a bar nothing can empty and the total that comes back is the act's price, which is the number a hero's
 // health and healing have to be set against. --herohp 9999 measures; --herohp 80 tests a candidate bar.
@@ -52,9 +56,11 @@ const blockOf = (c) => m.cardById(c.id)?.block || 0;
 // Not optimal and not stupid: covers a swing that would cost more than a Defend is worth, then spends the rest
 // of the bar on the thing closest to dying. A bot that plays perfectly measures the ceiling; this measures the
 // floor a real hand plays on, which is the number a health total should be set against.
-function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) {
+function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null, kind = "fight") {
     let st = m.startFight({
         seed,
+        asc: ASC,
+        kind,
         hero: { hp, hpMax },
         deck,
         perks,
@@ -189,10 +195,10 @@ function runOnce(seed) {
     // of it ever executed here. A boss now pays its trinket and deals the next sheet, exactly as the route
     // does, and the report says how far a run actually got.
     let act = 1;
-    let map = buildMap(seed >>> 0);
-    let hp = HERO_HP;
+    let map = buildMap(seed >>> 0, { asc: ASC });
     let hpMax = HERO_HP;
-    let deck = [...m.STARTER_DECK];   // and STARTER_PERK, paid after every win below
+    let hp = m.ascRule(ASC, 6) ? Math.round(HERO_HP * 0.9) : HERO_HP;
+    let deck = m.ascRule(ASC, 8) ? [...m.STARTER_DECK, "wound"] : [...m.STARTER_DECK];   // and STARTER_PERK, paid after every win below
     // ⚠️ THE SIM HAS TO SPEND THE MONEY, TOO. The first cut walked past every shop and every chest, took no
     // perk off an elite and drank nothing — and then reported that nobody finishes the act. Of course nobody
     // finishes: half the player's power in this game is bought, drunk or burned. A shop's card removal alone
@@ -233,13 +239,13 @@ function runOnce(seed) {
             const hurt = hp / hpMax < (lastFire ? 0.9 : 0.62);
             const best = deck.map((id, i) => ({ id, i, d: m.cardById(id)?.damage || 0 }))
                 .filter((c) => m.canUpgrade(c.id)).sort((a, b) => b.d - a.d)[0];
-            if (hurt || !best) hp = Math.min(hpMax, hp + Math.ceil(hpMax * 0.3) + m.perkSum(perks, "restBonus"));
+            if (hurt || !best) hp = Math.min(hpMax, hp + m.restHeal(hpMax, ASC) + m.perkSum(perks, "restBonus"));
             else deck = deck.map((id, i) => (i === best.i ? m.upgradedId(id) : id));
             continue;
         }
         if (kind === "treasure") {
             embers += 40;
-            if (next() < 0.55 && potions.length < m.beltSize(perks)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+            if (next() < 0.55 && potions.length < m.beltSize(perks, ASC)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
             continue;
         }
         if (kind === "merchant") {
@@ -321,7 +327,7 @@ function runOnce(seed) {
             : m.pickEncounter(encSeed, pick.row + 1, kind, recent, act);
         eventFight = null;
         if (enc?.id) recent = [enc.id, ...recent].slice(0, 2);
-        const party = m.buildParty(enc, encSeed)
+        const party = m.buildParty(enc, encSeed, { asc: ASC, kind })
             .map((f) => (HPX === 1 ? f : { ...f, hp: Math.max(1, Math.round(f.hp * HPX)) }));
         // A tonic before a room you are not walking out of. Crude, and roughly what people do.
         if (hp / hpMax < 0.45 && potions.includes("blood")) {
@@ -329,7 +335,7 @@ function runOnce(seed) {
             hp = Math.min(hpMax, hp + (m.POTIONS.blood?.heal || 12));
         }
         const before = hp;
-        const st = fight(encSeed, party, hp, deck, perks, hpMax, potions);
+        const st = fight(encSeed, party, hp, deck, perks, hpMax, potions, kind);
         const partyHp = party.reduce((n, p) => n + p.hp, 0);
         log.push({
             act, row: pick.row + 1, kind: kind === "event" ? "fight" : kind, enc: enc?.id || "?",
@@ -353,7 +359,7 @@ function runOnce(seed) {
         // so the belt cannot stay empty for an act or overflow for one either.
         if (next() * 100 < luck) {
             luck = Math.max(0, luck - 10);
-            if (potions.length < m.beltSize(perks)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+            if (potions.length < m.beltSize(perks, ASC)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
         } else luck = Math.min(100, luck + 10);
         // An elite pays a perk for the health it just cost — and Ember Heart raises the bar it is measured against.
         if (kind === "elite") {
@@ -381,7 +387,7 @@ function runOnce(seed) {
             }
             act += 1;
             arrived.push({ act, hp, hpMax, deck: deck.length, perks: perks.length, potions: potions.length });
-            map = buildMap(((seed >>> 0) + act * 7919) >>> 0);
+            map = buildMap(((seed >>> 0) + act * 7919) >>> 0, { asc: ASC });
             at = null;
             recent = [];
             continue;

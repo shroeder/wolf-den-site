@@ -838,6 +838,60 @@ export const POTION_IDS = Object.keys(POTIONS);
 export const RUN_LENGTH = 15;
 
 /**
+ * ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────
+ * You now have a number to beat, and until this the game itself never got harder — so the ceiling was fixed
+ * and a second win was the same climb as the first. Theirs answers that with Ascension: a rung is ONE named
+ * rule, the rules stack, and you open the next rung by winning on the one you are on.
+ *
+ * Ten rungs, every one of them theirs, and every one of them REAL — a rung that is only a label on a screen
+ * is worse than no ladder at all. They are ordered the way theirs are: the early ones change the shape of the
+ * map and the size of what is on it, the late ones take things off the player.
+ *
+ * ⚠️ READ THROUGH `ascRule`, NEVER BY INDEXING THIS ARRAY. A run stores the rung it was started on and that
+ * number outlives any edit to this list; a rule looked up by position would silently become a different rule
+ * the day one is inserted.
+ */
+export const ASCENSION = [
+    { n: 1, says: "Elites stalk the map. You will meet more of them." },
+    { n: 2, says: "Everything hits harder." },
+    { n: 3, says: "Elites are tougher." },
+    { n: 4, says: "Bosses are tougher." },
+    { n: 5, says: "A fire gives back less." },
+    { n: 6, says: "You start the climb already hurt." },
+    { n: 7, says: "The ordinary rooms are not ordinary any more." },
+    { n: 8, says: "You start carrying a Wound." },
+    { n: 9, says: "Your belt holds one bottle fewer." },
+    { n: 10, says: "The bosses hit harder too." },
+];
+export const ASC_MAX = ASCENSION.length;
+
+/** Is rung `n` in force on a run at this level? Cumulative, which is the whole idea of a ladder. */
+export const ascRule = (asc, n) => (Math.max(0, Math.min(ASC_MAX, Number(asc) || 0)) >= n);
+
+/** Every rule in force, in words — for the screen that offers the climb and the one that ends it. */
+export const ascRules = (asc) => ASCENSION.filter((r) => ascRule(asc, r.n));
+
+/**
+ * What a creature's health is multiplied by at this rung, by the kind of room it is standing in.
+ * Kept here rather than at the call site so the simulator and the browser cannot disagree about it.
+ */
+export function ascHpScale(asc, kind = "fight") {
+    let k = 1;
+    if (kind === "elite" && ascRule(asc, 3)) k *= 1.25;
+    if (kind === "boss" && ascRule(asc, 4)) k *= 1.25;
+    if (kind !== "elite" && kind !== "boss" && ascRule(asc, 7)) k *= 1.15;
+    return k;
+}
+
+/** What a creature's damage is multiplied by. Rung two is everything; rung ten is bosses on top of it. */
+export function ascDamageScale(asc, kind = "fight") {
+    let k = 1;
+    if (ascRule(asc, 2)) k *= 1.1;
+    if (kind === "boss" && ascRule(asc, 10)) k *= 1.2;
+    return k;
+}
+
+/**
  * ── WHAT A RUN WAS WORTH ─────────────────────────────────────────────────────────────────────────────────
  * Theirs totals a score out of the things a player actually did — floors climbed, elites and bosses killed,
  * how much of the deck they built — and shows it on the screen that ends the run. It is the difference
@@ -856,6 +910,7 @@ export const SCORE = {
     perk: 8,          // trinkets carried out
     card: 3,          // the deck you built
     aliveHp: 1,       // health you walked out on, which is the difference between winning well and barely
+    rung: 0.09,       // and the whole run is worth ~9% more per rung of the ladder it was climbed on
 };
 
 /** The score for a run in whatever state it ended. `acts` is how many were CLEARED, not which one you died in. */
@@ -866,14 +921,17 @@ export function runScore(run = {}) {
     // Rooms across every act: the acts behind you were fifteen apiece, plus how far into this one you got.
     const rooms = (act - 1) * RUN_LENGTH + Math.min(RUN_LENGTH + 1, stop);
     const cleared = won ? ACTS : act - 1;
-    return Math.round(
-        rooms * SCORE.room
+    const raw = rooms * SCORE.room
         + cleared * SCORE.actCleared
         + (won ? SCORE.finished : 0)
         + (run.perks || []).length * SCORE.perk
         + (run.deck || []).length * SCORE.card
-        + (won ? Math.max(0, Number(run.hp) || 0) * SCORE.aliveHp : 0)
-    );
+        + (won ? Math.max(0, Number(run.hp) || 0) * SCORE.aliveHp : 0);
+    // ⚠️ THE RUNG MULTIPLIES, IT DOES NOT ADD. A flat bonus per rung would make the ladder a tax you pay for
+    // points; a multiplier makes the same climb WORTH more the harder it was, which is the only way a score
+    // and a difficulty ladder can share a scoreboard honestly.
+    const asc = Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0));
+    return Math.round(raw * (1 + asc * SCORE.rung));
 }
 
 // ── THE RUN IS THREE ACTS, NOT ONE ───────────────────────────────────────────────────────────────────────
@@ -1960,14 +2018,17 @@ export const ENCOUNTERS = [
  * Each gets its own slice of the seed, so two Curs in one room are not obliged to be identical twins — which
  * is the small thing that stops a pair reading as one enemy drawn twice.
  */
-export function buildParty(encounter, seed) {
+export function buildParty(encounter, seed, { asc = 0, kind = "fight" } = {}) {
     const ids = encounter?.foes?.length ? encounter.foes : ["jackal", "bruiser", "warden"];
+    // ⚠️ THE RUNG SCALES THE BODY, NOT THE TABLE. A creature's health range in FOES is theirs and stays
+    // theirs; what a ladder rung does is meet you with a bigger one of the same creature — see ascHpScale.
+    const hpScale = ascHpScale(asc, kind);
     return ids.map((foeId, i) => {
         const def = FOES[foeId] || FOES.jackal;
         const seeded = (seed >>> 0) + i * 2654435761;
         return {
             foe: def.id, name: def.name, script: def.script,
-            hp: foeHp(def.id, seeded),
+            hp: Math.max(1, Math.round(foeHp(def.id, seeded) * hpScale)),
             curl: foeCurl(def.id, seeded),
             // Everything else that is true of the creature rather than of its turn — see the note in
             // startFight. A creature that loses its armour or its death rattle between the rules and the
@@ -2045,7 +2106,13 @@ export const perkSum = (perks, field) => (perks || [])
  * this game was measured to be short of, so the one that widens the belt is worth having. Read through this
  * anywhere a slot count is needed; POTION_SLOTS stays as the floor.
  */
-export const beltSize = (perks) => POTION_SLOTS + perkSum(perks, "potionSlots");
+export const beltSize = (perks, asc = 0) => POTION_SLOTS + perkSum(perks, "potionSlots")
+    // Rung nine takes a slot off the belt — theirs does the same, and it bites hardest exactly where the
+    // reserve was already thin.
+    - (ascRule(asc, 9) ? 1 : 0);
+
+/** What a campfire gives back. Rung five makes a fire worth less than it was. */
+export const restHeal = (hpMax, asc = 0) => Math.ceil((Number(hpMax) || 0) * (ascRule(asc, 5) ? 0.22 : 0.3));
 
 // ── A CARD, UPGRADED OR NOT ──────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE DECK IS A LIST OF IDS AND IT HAS TO STAY ONE. A run's deck is stored as strings and read by a dozen
@@ -2142,12 +2209,16 @@ export const typeLook = (kind) => TYPE_LOOK[kind] || TYPE_LOOK.skill;
 // adds half again to what the target takes, flooring at each step. The order is not decoration: 6 damage with
 // Weak and Vulnerable is floor(floor(6 x 0.75) x 1.5) = 6, and doing it the other way round gives 7.
 export function attackDamage(base, attacker = {}, defender = {}, mult = 1) {
+    // A rung that makes everything hit harder is a property of the ATTACKER, carried on the creature when the
+    // fight is built (see startFight), so it lands on every blow a creature throws without a single call site
+    // having to remember it.
+    const rung = Number(attacker.dmgScale) || 1;
     // ⚠️ `mult` IS ON THE STRENGTH, NOT ON THE DAMAGE. Heavy Blade reads "Strength affects this card three
     // times", which is a completely different card from one that deals triple damage: it is worth nothing in
     // an opening hand and it is the best card in the deck six turns into a Demon Form. Scaling like this is
     // most of how their decks double their output across an act, and we had none of it.
-    const withStrength = Math.max(0, (Number(base) || 0)
-        + (Number(attacker.strength) || 0) * (Number(mult) || 1));
+    const withStrength = Math.max(0, Math.round(((Number(base) || 0)
+        + (Number(attacker.strength) || 0) * (Number(mult) || 1)) * rung));
     const weakened = (attacker.weak || 0) > 0 ? Math.floor(withStrength * 0.75) : withStrength;
     return (defender.vulnerable || 0) > 0
         ? Math.floor(weakened * (Number(attacker.vulnMult) || 1.5)) : weakened;
@@ -2396,7 +2467,8 @@ function beginTurn(state) {
  * question about where the damage should go. Every rule below reads `foes` — an attack carries the index of
  * what it hit, every living foe acts on its own turn, and the fight is won when the last one is down.
  */
-export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck: deckIds = null, perks = [] } = {}) {
+export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck: deckIds = null, perks = [],
+    asc = 0, kind = "fight" } = {}) {
     // A RUN BRINGS ITS OWN DECK AND ITS OWN HEALTH. Without one this is still the standalone fight it always
     // was — the starter ten at full health — which is what keeps ?seed=N working as a thing you can hand
     // somebody. With one, the cards you have picked and the health you walked out of the last fight on are
@@ -2468,6 +2540,8 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // is true of the thing whether or not it is its turn.
             plate: Math.max(0, Number(f.plate) || 0),
             thorns: Math.max(0, Number(f.thorns) || 0),
+            // Every blow this creature throws is multiplied by its rung — see attackDamage.
+            dmgScale: ascDamageScale(asc, kind),
             onDeath: f.onDeath || null,
             split: f.split || null,
             // ── WHAT IT WILL DO, DECIDED BEFORE YOUR TURN STARTS ─────────────────────────────────

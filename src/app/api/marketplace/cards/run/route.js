@@ -8,8 +8,8 @@ import {
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import {
-    ACTS, BOSS_PERKS, PERKS, beltSize, perkById, perkSum, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById,
-    pickEncounter,
+    ACTS, BOSS_PERKS, PERKS, beltSize, perkById, perkSum, restHeal, RUN_LENGTH, SKIP_EMBERS, canUpgrade,
+    cardById, pickEncounter,
     removalCost, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -154,7 +154,7 @@ export async function POST(request) {
                 // A third of the bar, plus whatever you are carrying that makes a fire worth more (Down
                 // Pillow). Theirs is 30% and the relic that raises it is one of the reasons a rest-heavy
                 // route is a real plan rather than the thing you do when you are losing.
-                run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3)
+                run.hp = Math.min(run.hpMax, run.hp + restHeal(run.hpMax, run.asc)
                     + perkSum(run.perks, "restBonus"));
                 run.at = { ...run.at, rested: true, healed: run.hp - before };
                 await saveRun(buyer.id, run);
@@ -199,7 +199,7 @@ export async function POST(request) {
                 const got = grantForRoom(run, run.at.row, run.at.lane, "treasure");
                 run.embers = (run.embers || 0) + (got.embers || 0);
                 // A full belt is not a lost potion quietly: the chest says what it could not give you.
-                const belted = got.potion && (run.potions || []).length < beltSize(run.perks);
+                const belted = got.potion && (run.potions || []).length < beltSize(run.perks, run.asc);
                 if (belted) run.potions = [...(run.potions || []), got.potion];
                 run.at = {
                     ...run.at,
@@ -229,7 +229,7 @@ export async function POST(request) {
                 if (item.kind === "card") {
                     run.deck = [...(run.deck || []), item.ref];
                 } else if (item.kind === "potion") {
-                    if ((run.potions || []).length >= beltSize(run.perks)) {
+                    if ((run.potions || []).length >= beltSize(run.perks, run.asc)) {
                         return NextResponse.json({ error: "no_potion_slot" }, { status: 400 });
                     }
                     run.potions = [...(run.potions || []), item.ref];
@@ -337,7 +337,7 @@ export async function POST(request) {
                     // re-posted win cannot pay twice.
                     run.embers = (run.embers || 0) + (wonKind === "boss" ? 30 : wonKind === "elite" ? 30 : 15);
                     const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
-                    const room = (run.potions || []).length < beltSize(run.perks);
+                    const room = (run.potions || []).length < beltSize(run.perks, run.asc);
                     if (bottle && room) run.potions = [...(run.potions || []), bottle];
                     run.dropped = bottle ? { key: dropKey, potion: bottle, spilled: !room } : { key: dropKey };
                 }
@@ -471,7 +471,9 @@ export async function POST(request) {
                 // run that happened, and it goes in the history saying how far it actually got.
                 await recordRun(buyer.id, run, "dead");
                 await saveRun(buyer.id, { ...run, done: "dead", recorded: true });
-                return NextResponse.json({ run: await startRun(buyer.id) });
+                // A new run is dealt on the rung asked for, defaulting to the one just finished — climbing
+                // back onto the same step is what anybody does after a loss.
+                return NextResponse.json({ run: await startRun(buyer.id, Number(body?.asc ?? run.asc ?? 0)) });
             }
 
             return NextResponse.json({ error: "bad_action" }, { status: 400 });

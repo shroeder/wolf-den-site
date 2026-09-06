@@ -60,6 +60,11 @@ export default function CardFightClient({ fixture, run = null }) {
     const [fight, setFight] = useState(() => {
         const fresh = startFight({
             seed: fixture.seed,
+            // The rung this room is met on, straight off the fixture — the server already priced the party
+            // with it (buildParty) and the creatures' blows are scaled by it (attackDamage), so a screen that
+            // built the fight without it would show numbers the run does not use.
+            asc: fixture.asc || 0,
+            kind: fixture.kind || "fight",
             hero: fixture.hero,
             foes: fixture.foes,
             // A run brings its own deck; a bare ?seed= fight does not and falls back to the starter ten.

@@ -16,7 +16,7 @@
 //
 // PURE AND SEEDED, like cards-kit: a map is a seed plus these rules, so the same run always draws the same
 // map, and a map can be replayed or handed to somebody without shipping the whole structure around.
-import { RUN_LENGTH, nextRand } from "@/lib/marketplace/cards-kit.js";
+import { RUN_LENGTH, ascRule, nextRand } from "@/lib/marketplace/cards-kit.js";
 
 // One number, defined with the rules rather than here, so the map and the difficulty curve cannot
 // disagree about how tall the act is.
@@ -43,7 +43,14 @@ const NEVER_STACKED = ["elite", "merchant", "rest"];
 const key = (row, lane) => `${row}:${lane}`;
 
 /** Build the whole map for a seed. Returns { rows, nodes, edges, boss }. */
-export function buildMap(seed) {
+export function buildMap(seed, { asc = 0 } = {}) {
+    // ── THE FIRST RUNG OF THE LADDER IS THE MAP ITSELF ───────────────────────────────────────────────
+    // Theirs opens with "Elites are more common", and it is the right thing to open with: it changes where
+    // you are willing to walk before it changes anything you fight. The weights are otherwise theirs.
+    const weights = ascRule(asc, 1)
+        ? WEIGHTS.map(([k, w]) => (k === "elite" ? [k, 13] : k === "fight" ? [k, 48] : [k, w]))
+        : WEIGHTS;
+    const total = weights.reduce((n, [, w]) => n + w, 0);
     let rng = (seed >>> 0) || 1;
     const roll = () => { const [r, next] = nextRand(rng); rng = next; return r; };
 
@@ -114,9 +121,11 @@ export function buildMap(seed) {
 
             // Weighted pick over what is left. A room with everything banned falls back to a fight, which is
             // the one kind with no restrictions on it anywhere.
-            const open = WEIGHTS.filter(([k]) => !banned.has(k));
-            const total = open.reduce((n, [, w]) => n + w, 0) || TOTAL;
-            let r = roll() * total;
+            // `weights` rather than WEIGHTS: the ladder's first rung changes them — see the top of this
+            // function. Reading the module constant here is how a rung becomes a label with nothing behind it.
+            const open = weights.filter(([k]) => !banned.has(k));
+            const openTotal = open.reduce((n, [, w]) => n + w, 0) || total;
+            let r = roll() * openTotal;
             node.kind = "fight";
             for (const [k, w] of open) { r -= w; if (r <= 0) { node.kind = k; break; } }
         }

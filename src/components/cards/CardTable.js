@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import { ACTS, RUN_LENGTH, actName, stopLabel } from "@/lib/marketplace/cards-kit.js";
+import { ACTS, ASC_MAX, RUN_LENGTH, actName, ascRules, stopLabel } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────────
 // The card game had no front room. Every other feature in the Den has one — the mine has a shaft head, the
@@ -28,6 +28,11 @@ export default function CardTable({ run, history = null }) {
     // The push is a server render away (auth, the run row, then a map), so the button has to say it heard you
     // or it reads as dead — the same half-second the map's room buttons cover with `busy`.
     const [going, setGoing] = useState(false);
+    // ── WHICH RUNG YOU ARE CLIMBING ──────────────────────────────────────────────────────────────────
+    // Opens on the highest one you have earned, because that is the one somebody who has been climbing wants
+    // and nobody wants to press the arrow eight times. It can be walked back down: a bad week is allowed.
+    const open = Math.max(0, Math.min(ASC_MAX, Number(history?.open) || 0));
+    const [asc, setAsc] = useState(open);
 
     // A run that ended is not a run you can walk back into: the page behind this one will start a new one the
     // moment you sit. Saying so is the difference between "Sit back down" lying to you and the sharp dealing.
@@ -38,10 +43,12 @@ export default function CardTable({ run, history = null }) {
     // which is also the honest shape: the seat is where you choose to go again.
     const sit = async () => {
         setGoing(true);
+        // A finished run is replaced by a new one AT THE CHOSEN RUNG — which is the only place the ladder is
+        // ever picked, so it has to travel with the request rather than be assumed.
         if (run?.done) {
             await fetch("/api/marketplace/cards/run", {
                 method: "POST", headers: { "content-type": "application/json" },
-                body: JSON.stringify({ action: "restart" }),
+                body: JSON.stringify({ action: "restart", asc }),
             }).catch(() => null);
         }
         router.push("/marketplace/cards");
@@ -94,14 +101,43 @@ export default function CardTable({ run, history = null }) {
                     beat — which is most of why there was no reason to play a second one. The best score sits
                     where you can see it before you sit down, and the last few runs say plainly how each one
                     ended and how far it got. */}
+                {/* ── THE LADDER ───────────────────────────────────────────────────────────────────────
+                    Only shown once a rung is open, which means a first-time player never sees it: the game
+                    has to be beaten once before it offers to be made harder. Theirs works the same way, and
+                    it is the difference between a difficulty setting and something you earned.
+                    The rules in force are listed rather than summarised, because "harder" is not a thing
+                    anybody can plan around and "elites are tougher, and you start hurt" is. */}
+                {open > 0 && !live ? (
+                    <div className="ct-ladder">
+                        <div className="ct-rungs">
+                            <button type="button" className="ct-rung" disabled={asc <= 0}
+                                aria-label="A lower rung" onClick={() => setAsc((n) => Math.max(0, n - 1))}>-</button>
+                            <span className="ct-rung-n">
+                                {asc === 0 ? "No ladder" : `Rung ${asc}`}
+                                <i>of {open} open</i>
+                            </span>
+                            <button type="button" className="ct-rung" disabled={asc >= open}
+                                aria-label="A higher rung" onClick={() => setAsc((n) => Math.min(open, n + 1))}>+</button>
+                        </div>
+                        {asc > 0 ? (
+                            <ul className="ct-rung-rules">
+                                {ascRules(asc).map((r) => <li key={r.n}>{r.says}</li>)}
+                            </ul>
+                        ) : null}
+                    </div>
+                ) : null}
+
                 {history?.best ? (
                     <div className="ct-record">
                         <p className="ct-best">
                             <span>Best</span>
                             <b>{Number(history.best.score).toLocaleString()}</b>
-                            <i>{history.best.outcome === "won"
-                                ? "the whole climb"
-                                : `${actName(history.best.act)}, stop ${history.best.stop}`}</i>
+                            <i>
+                                {history.best.outcome === "won"
+                                    ? "the whole climb"
+                                    : `${actName(history.best.act)}, stop ${history.best.stop}`}
+                                {history.best.asc_level > 0 ? ` · rung ${history.best.asc_level}` : ""}
+                            </i>
                         </p>
                         <ul className="ct-runs">
                             {history.recent.map((r, i) => (
@@ -132,6 +168,22 @@ export default function CardTable({ run, history = null }) {
             <style jsx global>{`
                 /* ── THE RECORD ── quiet furniture on the table, not a scoreboard. The best score is the one
                    figure worth being big; the runs under it are a list you skim. */
+                /* ── THE LADDER ── a stepper and the list of what it does. Deliberately plain: it is a thing
+                   you read once before you commit and never look at again during the run. */
+                .ct-ladder { width: min(340px, 92%); margin: 4px auto 2px; }
+                .ct-rungs { display: flex; align-items: center; justify-content: center; gap: 10px; }
+                .ct-rung { width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+                    border: 1px solid rgba(226,199,143,0.34); background: rgba(20,16,12,0.7);
+                    color: #e8dcc6; font-size: 17px; line-height: 1; }
+                .ct-rung:disabled { opacity: 0.3; cursor: default; }
+                .ct-rung-n { min-width: 118px; text-align: center; font-size: 14px; color: #ffd9a6;
+                    letter-spacing: 0.03em; }
+                .ct-rung-n i { display: block; font-style: normal; font-size: 10.5px; letter-spacing: 0.12em;
+                    text-transform: uppercase; color: #8e8371; }
+                .ct-rung-rules { list-style: none; margin: 6px 0 0; padding: 0; display: flex;
+                    flex-direction: column; gap: 2px; }
+                .ct-rung-rules li { font-size: 11.5px; line-height: 1.35; color: #b3a68f; text-align: center; }
+
                 .ct-record { width: min(340px, 92%); margin: 2px auto 0; }
                 .ct-best { display: flex; align-items: baseline; justify-content: center; gap: 8px;
                     margin: 0 0 6px; font-family: var(--ct-card-font, inherit); }
@@ -154,7 +206,8 @@ export default function CardTable({ run, history = null }) {
                    done with margin-top:auto on the stage instead and the column simply scrolls. */
                 .ct { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-                    padding: 0 10px 18px; background: #0a0b0f; color: #efe3cd; }
+                    /* the Return ribbon is fixed in the bottom-left corner; the column has to end above it */
+                    padding: 0 10px 86px; background: #0a0b0f; color: #efe3cd; }
                 .ct-room { position: fixed; inset: 0; z-index: -1;
                     background: #0a0b0f url(/images/cards/chrome/table-room.png) center/cover no-repeat; }
                 /* The room is painted dim and lit from one lamp; the vignette is what keeps the corners from
