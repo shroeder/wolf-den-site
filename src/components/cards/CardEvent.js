@@ -54,6 +54,7 @@ export default function CardEvent({ run, art = {} }) {
     // A shrine that sharpens a card is doing what a campfire does, so it looks like what a campfire does —
     // see CardForge. Burning a card is a different act and does not borrow the ceremony.
     const [forge, setForge] = useState(null);
+    const [forgeMode, setForgeMode] = useState("sharpen");
     const timers = useRef([]);
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -88,10 +89,11 @@ export default function CardEvent({ run, art = {} }) {
 
     // The same shape the campfire's smith uses: the request goes out as the card starts moving, so the fire
     // is never waiting on the network.
-    const sharpen = useCallback(async (index, card) => {
+    const sharpen = useCallback(async (index, card, mode = "sharpen") => {
         if (busy || forge) return;
         setBusy(true);
         setSaid(null);
+        setForgeMode(mode);
         setForge(card);
         const sent = fetch("/api/marketplace/cards/run", {
             method: "POST", headers: { "content-type": "application/json" },
@@ -197,9 +199,8 @@ export default function CardEvent({ run, art = {} }) {
                                         <button key={`${id}-${i}`} type="button"
                                             className={`cv-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                             aria-label={`${pending.need === "remove" ? "Burn" : "Sharpen"} ${c.name}`}
-                                            onClick={() => (pending.need === "upgrade"
-                                                ? sharpen(pending.choice, id)
-                                                : post({ index: pending.choice, card: id }))}>
+                                            onClick={() => sharpen(pending.choice, id,
+                                                pending.need === "remove" ? "burn" : "sharpen")}>
                                             <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                         </button>
                                     );
@@ -210,7 +211,7 @@ export default function CardEvent({ run, art = {} }) {
                 ) : null}
             </div>
 
-            {forge ? <CardForge card={forge} art={art} /> : null}
+            {forge ? <CardForge card={forge} art={art} mode={forgeMode} /> : null}
 
             <div className="cv-foot">
                 <button type="button" className="cv-leave" disabled={busy || (!done && !pending && false)} onClick={leave}>

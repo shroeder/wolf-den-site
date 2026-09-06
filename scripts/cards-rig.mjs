@@ -91,6 +91,10 @@ if (cmd === "stand") {
     const state = row.state;
     const node = (state.map?.nodes || []).find((n) => n.kind === kind) || { row: 0, lane: 0 };
     state.at = { row: node.row, lane: node.lane, kind, rested: false, opened: null };
+    // A merchant with no shelf is refused by the route (not_in_shop) — the shelf is built on the way IN, and
+    // standing a run in a room by hand skips that. Empty stock is enough for the brazier, which is the half
+    // of the shop worth filming.
+    if (kind === "merchant") state.shop = { stock: [], bought: [], removed: false };
     state.stop = node.row + 1;
     state.trail = [...(state.trail || []), { row: node.row, lane: node.lane }];
     state.done = null;

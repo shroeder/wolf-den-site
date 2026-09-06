@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -86,6 +87,11 @@ export default function CardShop({ run, art = {} }) {
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState(null);
     const [picking, setPicking] = useState(false);
+    // The card currently going into the brazier — see CardForge. Held here rather than derived from the run,
+    // because the server only ever reports a deck that is already one card shorter.
+    const [burning, setBurning] = useState(null);
+    const timers = useRef([]);
+    useEffect(() => () => timers.current.forEach(clearTimeout), []);
     // ⚠️ NOTHING IS BOUGHT BY THE TAP THAT SHOWS IT TO YOU. Luke: "I can't inspect any before buying." The
     // shelf was the whole description — a name, a kind and a number — so what a Whetstone or a Blood Tonic
     // actually DID lived in a `title` attribute, which is a thing a mouse can hover and a phone cannot. And
@@ -117,6 +123,28 @@ export default function CardShop({ run, art = {} }) {
     // HE POINTS AT THE CHEAP ONE. A merchant with a sale on who does not mention it is a merchant with a
     // secret; the discount is the only reason this shelf is worth a second look.
     const onSale = stock.find((s) => s.sale && !bought.includes(s.slot));
+
+    // ── FEEDING THE BRAZIER ──────────────────────────────────────────────────────────────────────────
+    // The one irreversible thing this shop does, and it used to happen in silence. Same ceremony the campfire
+    // uses (CardForge), opposite ending: the card catches and goes up as embers. The request leaves as the
+    // card starts moving, so the fire is not waiting on the network.
+    const burnCard = useCallback(async (id, index) => {
+        if (busy || burning) return;
+        setBusy(true);
+        setSaid(null);
+        setPicking(false);
+        setBurning(id);
+        const sent = fetch("/api/marketplace/cards/run", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "remove", index }),
+        }).then((x) => x.json()).catch(() => null);
+        const [r] = await Promise.all([sent, new Promise((res) => { timers.current.push(setTimeout(res, FORGE_MS)); })]);
+        setBusy(false);
+        setBurning(null);
+        if (r?.error) { setSaid(REFUSAL[r.error] || "The merchant shakes his head."); return; }
+        setLook(null);
+        router.refresh();
+    }, [busy, burning, router]);
 
     const post = useCallback(async (body) => {
         if (busy) return;
@@ -359,6 +387,8 @@ export default function CardShop({ run, art = {} }) {
                 Also real cards. Picking the card to destroy off a list of NAMES is the single worst place in
                 the game to be reading text instead of looking at cards — it is the one irreversible thing
                 the shop does. */}
+            {burning ? <CardForge card={burning} art={art} mode="burn" /> : null}
+
             {picking ? (
                 <div className="cs-pick" role="dialog" aria-label="Choose a card to burn">
                     <p className="cs-pick-head">Feed one to the fire.</p>
@@ -369,7 +399,7 @@ export default function CardShop({ run, art = {} }) {
                             return (
                                 <button key={`${id}-${i}`} type="button" className="cs-buy" disabled={busy}
                                     aria-label={`Burn ${c.name}`}
-                                    onClick={() => post({ action: "remove", index: i })}>
+                                    onClick={() => burnCard(id, i)}>
                                     <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                 </button>
                             );

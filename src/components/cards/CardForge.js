@@ -23,10 +23,21 @@ export const FORGE_MS = 1650;
 export const FORGE_TURN_MS = 620;
 
 /**
+ * ── AND THE OTHER THING A FIRE DOES TO A CARD ────────────────────────────────────────────────────────────
+ * Removal is the strongest purchase in their game and ours had it happening in silence: you fed a card to the
+ * merchant's brazier and the modal simply closed. It is the ONE irreversible thing the shop does — the deck
+ * you walk out with is smaller for the rest of the run — and an irreversible act with no moment attached
+ * reads as a misclick.
+ *
+ * Same rise, same size, opposite ending: the card catches from the bottom, chars, and goes up as embers. It
+ * deliberately does NOT flash white — a flash is the language of a card becoming better, and these two must
+ * never be mistaken for one another at a glance.
+ *
  * `card` is the id going in; the upgraded id is derived, so a caller cannot hand this two unrelated faces.
  * `art` is the same pet-art map every other card render is given.
  */
-export default function CardForge({ card, art = {} }) {
+export default function CardForge({ card, art = {}, mode = "sharpen" }) {
+    const burning = mode === "burn";
     const [turned, setTurned] = useState(false);
     const timer = useRef(null);
     useEffect(() => {
@@ -40,19 +51,23 @@ export default function CardForge({ card, art = {} }) {
     if (!base) return null;
 
     return (
-        <div className="frg" role="status" aria-live="polite">
+        <div className={`frg${burning ? " is-burn" : ""}`} role="status" aria-live="polite">
             <span className="frg-glow" aria-hidden="true" />
-            <span className={`frg-card${turned ? " is-turned" : ""}`}>
+            <span className={`frg-card${turned ? (burning ? " is-burning" : " is-turned") : ""}`}>
                 <span className="cf-card">
-                    <CardFace card={turned ? sharp : base} art={art[base.pet]} />
+                    {/* A burning card never changes face — it is the card you chose, right up until it is
+                        not there. Swapping it for anything would be the game editing your decision. */}
+                    <CardFace card={!burning && turned ? sharp : base} art={art[base.pet]} />
                 </span>
             </span>
             {/* Six embers off the coals, staggered so they do not read as one puff. */}
             <span className="frg-sparks" aria-hidden="true">
                 {[0, 1, 2, 3, 4, 5].map((n) => <i key={n} style={{ "--n": n }} />)}
             </span>
-            <span className={`frg-say${turned ? " is-turned" : ""}`}>
-                {turned ? "Sharper." : "Into the coals…"}
+            <span className={`frg-say${turned ? (burning ? " is-ash" : " is-turned") : ""}`}>
+                {burning
+                    ? (turned ? "Gone." : "Into the fire…")
+                    : (turned ? "Sharper." : "Into the coals…")}
             </span>
 
             <style jsx global>{`
@@ -115,6 +130,31 @@ export default function CardForge({ card, art = {} }) {
                     font-size: 15px; letter-spacing: 0.04em; color: #ffd9a2;
                     text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
                 .frg-say.is-turned { color: #9be08a; }
+                .frg-say.is-ash { color: #b9a08a; }
+
+                /* ── THE BURN ──────────────────────────────────────────────────────────────────────────
+                   Deeper and redder than the smith's heat, and it never blows out to white: a white flash
+                   means a card got better, and the two acts must not be confusable in a glance. */
+                .frg.is-burn .frg-glow { background: radial-gradient(circle, rgba(255,150,60,0.75),
+                    rgba(220,60,10,0.45) 40%, rgba(120,20,0,0) 72%); }
+                .frg-card.is-burning { animation: frg-rise ${FORGE_MS}ms cubic-bezier(.2,.9,.25,1) both,
+                    frg-ash 1s cubic-bezier(.4,0,.7,1) both; }
+                /* Chars from the bottom, lifts, and goes. The mask is what makes it burn AWAY rather than
+                   simply fade: the transparent edge climbs the card as the sweep moves. */
+                @keyframes frg-ash {
+                    0% { filter: none; -webkit-mask-image: linear-gradient(to top, #000 0%, #000 100%);
+                        mask-image: linear-gradient(to top, #000 0%, #000 100%); opacity: 1; }
+                    25% { filter: brightness(1.25) sepia(0.35) drop-shadow(0 -6px 14px rgba(255,120,30,0.85)); }
+                    60% { filter: brightness(0.6) sepia(0.8) drop-shadow(0 -10px 18px rgba(255,90,20,0.7));
+                        -webkit-mask-image: linear-gradient(to top, transparent 45%, #000 62%);
+                        mask-image: linear-gradient(to top, transparent 45%, #000 62%); }
+                    100% { filter: brightness(0.25) sepia(1); opacity: 0;
+                        -webkit-mask-image: linear-gradient(to top, transparent 96%, #000 100%);
+                        mask-image: linear-gradient(to top, transparent 96%, #000 100%); }
+                }
+                /* More of them, and they carry on after the card has gone. */
+                .frg.is-burn .frg-sparks i { background: #ff9c4a; animation-duration: 1.9s;
+                    animation-delay: calc(0.5s + var(--n) * 0.09s); }
 
                 /* The card is drawn at its usual size and scaled, so this only has to exist because the two
                    screens that host it namespace their own .cf-card rules. */
