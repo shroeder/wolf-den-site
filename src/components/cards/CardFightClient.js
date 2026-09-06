@@ -1877,7 +1877,13 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-trinkets { position: absolute; top: calc(84px + env(safe-area-inset-top)); left: 50%;
                     transform: translateX(-50%); z-index: 3;
                     display: flex; justify-content: center; gap: 5px; }
-                .cf-trinket { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0;
+                /* ⚠️ THE PICTURE IS 22px AND THE TARGET MUST NOT BE. A trinket is tapped to read what it
+                   does, and a 22x22 target is a miss on a phone — measured by the hit audit, which is the
+                   only thing that looks at a control's SIZE rather than its appearance. The padding grows
+                   the box to 38px without moving the art, and the negative margin keeps the strip's spacing
+                   exactly where it was so nothing on screen shifts. */
+                .cf-trinket { padding: 8px; margin: -8px; border: 0; background: none; cursor: pointer;
+                    line-height: 0;
                     border-radius: 50%; }
                 .cf-trinket-art { width: 22px; height: 22px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }

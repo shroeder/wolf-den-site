@@ -91,6 +91,13 @@ if (cmd === "stand") {
     const state = row.state;
     const node = (state.map?.nodes || []).find((n) => n.kind === kind) || { row: 0, lane: 0 };
     state.at = { row: node.row, lane: node.lane, kind, rested: false, opened: null };
+    // ⚠️ AND EVERYTHING THE LAST ROOM LEFT BEHIND. Standing a run somewhere without clearing these hands the
+    // screen a reward it never won: a `reward` call earlier in a session left gotPerk set, and the trinket
+    // panel then sat over a plain fight — which read as the game showing a pickup at random.
+    state.offers = null;
+    state.bossOffers = null;
+    state.gotPerk = null;
+    state.dropped = null;
     // ⚠️ A SHELF WITH NOTHING ON IT IS A LIE. The route refuses a merchant with no shop object at all
     // (not_in_shop — the shelf is built on the way IN, which standing a run by hand skips), and the first
     // version of this stood one up with EMPTY stock. Photographed on a wide screen that read as a broken

@@ -40,8 +40,7 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
     if (!face && !perk) return null;
 
     return (
-        <div className={`got${isCard ? " is-card" : ""}`} role="dialog" aria-live="polite"
-            onClick={isCard ? undefined : () => onDone?.()}>
+        <div className={`got${isCard ? " is-card" : ""}`} role="dialog" aria-live="polite" aria-modal="true">
             <span className="got-glow" aria-hidden="true" />
 
             {face ? (
@@ -53,7 +52,14 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
                     <Sprite className="got-item" src={`/images/cards/items/${perk.id}.png`} />
                     <span className="got-name">{perk.name}</span>
                     <p className="got-text">{perk.text}</p>
-                    <span className="got-go">Tap to go on</span>
+                    {/* ⚠️ A REAL BUTTON, NOT A DIV THAT LISTENS. The whole panel used to take the click,
+                        which reads fine with a thumb and is nothing at all with a keyboard — and a hit-test
+                        audit walking the game's controls could not see this screen had any. It covers the
+                        panel so tapping anywhere still works, and it is focusable and labelled. */}
+                    <button type="button" className="got-go" onClick={() => onDone?.()}
+                        aria-label={`${perk.name}. ${perk.text} Tap to go on.`}>
+                        Tap to go on
+                    </button>
                 </>
             )}
 
@@ -90,9 +96,15 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
                 .got-text { position: relative; margin: 0; max-width: 300px; text-align: center;
                     font-family: var(--cf-card-font); font-size: 13.5px; line-height: 1.45; color: #cdbfa6;
                     animation: got-fade 0.5s 0.24s ease-out both; }
-                .got-go { position: relative; margin-top: 10px; font-family: var(--cf-card-font);
-                    font-size: 12px; letter-spacing: 0.08em;
+                /* It IS the dismiss: the label sits where it always did and the control stretches over the
+                   whole panel behind it, so a tap anywhere still works and a keyboard has something to land
+                   on. z-index below the art so the object stays the thing you are looking at. */
+                .got-go { position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end;
+                    justify-content: center; padding-bottom: calc(50% - 118px);
+                    border: 0; background: none; cursor: pointer;
+                    font-family: var(--cf-card-font); font-size: 12px; letter-spacing: 0.08em;
                     text-transform: uppercase; color: #8e8371; animation: got-fade 0.5s 0.6s ease-out both; }
+                .got-go:focus-visible { outline: 2px solid rgba(255,214,150,0.8); outline-offset: -6px; }
                 @keyframes got-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
                 /* THE CARD YOU TOOK, lifted and then sent down into the deck. Same scale the forge uses, so
