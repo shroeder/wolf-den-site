@@ -310,6 +310,12 @@ export async function POST(request) {
                     // Heart paying its +8 from an elite and not from the shop.
                     if (got.perk) takePerk(run, got.perk);
                     if (got.embers) run.embers = (run.embers || 0) + got.embers;
+                    // ── AND THE SCREEN IS TOLD WHICH ONE ─────────────────────────────────────────
+                    // It used to appear in the strip along the top and nowhere else — a strip nobody is
+                    // looking at, because the same request also deals three cards to choose between. A
+                    // trinket is carried for the rest of the run and has to be READ once; see CardGot.
+                    // Cleared when the reward is taken, like `dropped`.
+                    if (got.perk) run.gotPerk = got.perk;
                 }
                 // ── AND THE BOTTLE THE FIGHT PAID ────────────────────────────────────────────────
                 // See potionDrop: two combats in five, theirs, and the reserve a hero needs to arrive at an
@@ -376,6 +382,7 @@ export async function POST(request) {
                 run.deck = [...run.deck, id];
                 run.offers = null;
                 run.dropped = null;         // the reward screen is done; so is the line about the bottle
+                run.gotPerk = null;
                 run.fight = null;           // the fight it came from is finished with
                 run.at = null;              // back to the sheet to choose where next
                 await saveRun(buyer.id, run);
@@ -390,6 +397,7 @@ export async function POST(request) {
                 run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
                 run.dropped = null;
+                run.gotPerk = null;
                 run.fight = null;
                 run.at = null;
                 await saveRun(buyer.id, run);

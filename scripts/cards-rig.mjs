@@ -104,6 +104,26 @@ if (cmd === "stand") {
     console.log(`standing at a ${kind}, row ${node.row}, deck of ${state.deck.length}, hp ${state.hp}/${state.hpMax}`);
 }
 
+// Stand the run on a REWARD screen without winning a fight for it. CardFightClient synthesises a won fight
+// whenever the run carries offers (see its note on why the row is the authority), so this is all it needs.
+// e.g. node scripts/cards-rig.mjs reward whetstone
+if (cmd === "reward") {
+    const perk = process.argv[3] || null;
+    const row = (await sql`SELECT state FROM mkt_cards_run WHERE buyer_id = ${owner.id}::uuid`)[0];
+    if (!row) throw new Error("no run — load the page once first");
+    const state = row.state;
+    const node = (state.map?.nodes || []).find((n) => n.kind === "fight") || { row: 0, lane: 0 };
+    state.at = { row: node.row, lane: node.lane, kind: perk ? "elite" : "fight", enc: null };
+    state.stop = node.row + 1;
+    state.fight = null;
+    state.done = null;
+    state.offers = ["swipe", "scuttle", "sting"];
+    state.gotPerk = perk;
+    await sql.query(`UPDATE mkt_cards_run SET state = $1::jsonb WHERE buyer_id = $2`,
+        [JSON.stringify(state), owner.id]);
+    console.log(`reward screen: 3 cards${perk ? ` and a ${perk}` : ""}`);
+}
+
 if (cmd === "restore") {
     if (!existsSync(BAK)) throw new Error("no backup file");
     const { run, prog } = JSON.parse(readFileSync(BAK, "utf8"));

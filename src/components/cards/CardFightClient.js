@@ -19,6 +19,7 @@ import {
 // NOT. What is left here is the BOX: how big a card is, the moulding around it, and the four states only a
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
 // the floating number and the screen jolt are all timed off this one value, because the whole point of the
@@ -105,6 +106,11 @@ export default function CardFightClient({ fixture, run = null }) {
     // thing that crosses between them is `hp` at the moment a fight ends.
     const [runState, setRunState] = useState(run);
     const [busy, setBusy] = useState(false);
+    // The card being taken off the reward screen, and the trinket an elite just handed over — both are
+    // held here rather than read off the run, because the server reports a deck and a strip that are
+    // ALREADY changed and the whole point of both moments is the half-second before that is true.
+    const [took, setTook] = useState(null);
+    const [seenPerk, setSeenPerk] = useState(null);
     const reported = useRef(null);
 
     const post = useCallback(async (action, extra = {}) => {
@@ -616,8 +622,18 @@ export default function CardFightClient({ fixture, run = null }) {
 
     // A pick (or a deliberate skip) advances the ladder, and the next stop is a fresh server render — the
     // fixture for stop N+1 is built there, so the screen asks for it rather than trying to derive it.
+    // ── TAKING A CARD IS A MOMENT, TOO ───────────────────────────────────────────────────────────────
+    // It used to vanish: you tapped one of three and the screen moved on with no confirmation that the one
+    // you tapped was the one you got. It lifts and settles into the deck now — see CardGot — and the request
+    // goes out as it starts moving, so nothing is waiting on the network.
     const takeCard = async (id) => {
-        const next = await post(id ? "pick" : "skip", id ? { id } : {});
+        if (id) setTook(id);
+        const sent = post(id ? "pick" : "skip", id ? { id } : {});
+        const [next] = await Promise.all([
+            sent,
+            id ? new Promise((r) => setTimeout(r, GOT_CARD_MS)) : Promise.resolve(),
+        ]);
+        setTook(null);
         if (next) router.refresh();
     };
     const startNewRun = async () => { await post("restart"); router.refresh(); };
@@ -1203,6 +1219,16 @@ export default function CardFightClient({ fixture, run = null }) {
                         going." So a boss win deals three boss trinkets instead of three cards, and taking one
                         opens the next act. This sits FIRST because a boss win sets bossOffers and never
                         offers cards, and the two must not both be able to match. */}
+                    {/* ── WHAT THE ELITE HANDED OVER ───────────────────────────────────────────────
+                        Held up before the cards are dealt, because a trinket is carried for the rest of the
+                        run and the three cards under it are competing for the same pair of eyes. Waits for a
+                        tap: a thing chosen FOR you has to be read before it can be dismissed. */}
+                    {runState?.gotPerk && seenPerk !== runState.gotPerk ? (
+                        <CardGot trinket={runState.gotPerk} onDone={() => setSeenPerk(runState.gotPerk)} />
+                    ) : null}
+                    {/* And the card you just took, on its way into the deck. */}
+                    {took ? <CardGot card={took} art={fixture.petArt} /> : null}
+
                     {runState && fight.over === "win" && runState.bossOffers?.length ? (
                         <div className="cf-choose">
                             <div className="cf-title"><span>The boss is down</span></div>
