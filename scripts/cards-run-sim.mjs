@@ -170,11 +170,26 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) 
 const ONLY = (() => { const i = process.argv.indexOf("--cards"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
 const POOL_BY_TIER = [1, 2, 3].map((t) => Object.values(m.POOL || {})
     .filter((c) => (c.tier || 1) === t && (!ONLY || ONLY.has(c.id))).map((c) => c.id));
-const offerTier = (row) => (row < 5 ? 0 : row < 10 ? 1 : 2);
+// ⚠️ THE REWARD TIER IS THE GAME'S, NOT A GUESS AT IT. This was `row < 5 ? 0 : row < 10 ? 1 : 2` — a
+// row-only ladder that ignored the ACT entirely, so a deck walking into the Deep was offered the same
+// tier-one commons it saw on the first floor of the Sand, while the real game opens a rung early per act
+// (roomFight/tierUp) precisely because a deck that has beaten a boss should see the cards that beat the next
+// one. And the game offers everything AT OR BELOW that tier, where this took the tier exactly.
+const offersAt = (row, kind, act) => {
+    const max = m.stopAt(row + 1, kind, act).offer;
+    return Object.values(m.POOL || {})
+        .filter((c) => (c.tier || 1) <= max && (!ONLY || ONLY.has(c.id))).map((c) => c.id);
+};
 const encSeedFor = (seed, at) => ((seed >>> 0) + (at.row * 31 + at.lane) * 104729) >>> 0;
 
 function runOnce(seed) {
-    const map = buildMap(seed >>> 0);
+    // ⚠️ A RUN IS THREE ACTS AND THIS ONLY EVER PLAYED THE FIRST. "Runs finished" meant "reached the act-one
+    // boss", which is a perfectly good number to tune act one against and tells you NOTHING about the other
+    // two — both of which have a full bestiary, their own encounter pools and their own written rooms, none
+    // of it ever executed here. A boss now pays its trinket and deals the next sheet, exactly as the route
+    // does, and the report says how far a run actually got.
+    let act = 1;
+    let map = buildMap(seed >>> 0);
     let hp = HERO_HP;
     let hpMax = HERO_HP;
     let deck = [...m.STARTER_DECK];   // and STARTER_PERK, paid after every win below
@@ -195,9 +210,9 @@ function runOnce(seed) {
     let roll = seed >>> 0;
     const next = () => { const [r, n] = m.nextRand(roll); roll = n; return r; };
     const log = [];
-    for (let step = 0; step < 40; step += 1) {
+    for (let step = 0; step < 40 * m.ACTS; step += 1) {
         const open = reachable(map, at);
-        if (!open.length) return { won: true, row: at?.row ?? 0, hp, log, deck: deck.length };
+        if (!open.length) return { won: true, act, row: at?.row ?? 0, hp, log, deck: deck.length };
         // Hurt? take the fire. Otherwise anything — the shape of the path is the map's business, not the
         // health total's, and averaging over a thousand maps washes the choice out.
         const pick = (hp / hpMax < 0.55 && open.find((n) => n.kind === "rest"))
@@ -234,7 +249,7 @@ function runOnce(seed) {
             if (embers >= cost && chaff > -1 && deck.length > 6) {
                 deck = deck.filter((_, i) => i !== chaff); embers -= cost; removals += 1;
             }
-            const stock = m.buildShop((seed + pick.row) >>> 0, { cardIds: (POOL_BY_TIER[offerTier(pick.row)] || []).slice(0, 3) });
+            const stock = m.buildShop((seed + pick.row * act) >>> 0, { cardIds: offersAt(pick.row, "fight", act).slice(0, 3) });
             const buy = stock.filter((x) => x.kind === "card" && x.price <= embers).sort((a, b) => a.price - b.price)[0];
             if (buy) { deck = [...deck, buy.ref]; embers -= buy.price; }
             continue;
@@ -244,7 +259,7 @@ function runOnce(seed) {
         // it plays the rules the browser plays, and an event table scored by a second implementation would
         // measure a game nobody can play. The run object is assembled to the shape the server keeps.
         if (kind === "event") {
-            const ev = pickEvent(encSeedFor(seed, pick), 1, seenEvents);
+            const ev = pickEvent(encSeedFor(seed, pick), act, seenEvents);
             seenEvents.push(ev.id);
             const box = {
                 seed, hp, hpMax, embers, deck, perks, potions,
@@ -292,7 +307,7 @@ function runOnce(seed) {
             }
             hp = box.hp; hpMax = box.hpMax; embers = box.embers || 0;
             deck = box.deck; perks = box.perks; potions = box.potions || [];
-            if (hp <= 0) return { won: false, row: pick.row + 1, hp: 0, log, deck: deck.length };
+            if (hp <= 0) return { won: false, act, row: pick.row + 1, hp: 0, log, deck: deck.length };
             // A room that woke something hands itself to the fight below, exactly as the route does.
             if (!out.fight) continue;
             eventFight = box.at.enc;
@@ -301,7 +316,7 @@ function runOnce(seed) {
         const encSeed = encSeedFor(seed, pick);
         const enc = eventFight
             ? (m.encounterById(eventFight) || m.pickEncounter(encSeed, pick.row + 1, "fight", recent))
-            : m.pickEncounter(encSeed, pick.row + 1, kind, recent);
+            : m.pickEncounter(encSeed, pick.row + 1, kind, recent, act);
         eventFight = null;
         if (enc?.id) recent = [enc.id, ...recent].slice(0, 2);
         const party = m.buildParty(enc, encSeed)
@@ -315,7 +330,7 @@ function runOnce(seed) {
         const st = fight(encSeed, party, hp, deck, perks, hpMax, potions);
         const partyHp = party.reduce((n, p) => n + p.hp, 0);
         log.push({
-            row: pick.row + 1, kind: kind === "event" ? "fight" : kind, enc: enc?.id || "?",
+            act, row: pick.row + 1, kind: kind === "event" ? "fight" : kind, enc: enc?.id || "?",
             partyHp,
             turns: st.turn, lost: before - Math.max(0, st.hero.hp), dead: st.over === "lose",
             // What the deck actually PUT OUT, per turn: the party's health divided by how long it took to
@@ -323,7 +338,7 @@ function runOnce(seed) {
             dpt: st.turn ? partyHp / st.turn : 0,
             deck: deck.length,
         });
-        if (st.over === "lose") return { won: false, row: pick.row + 1, hp: 0, log, deck: deck.length };
+        if (st.over === "lose") return { won: false, act, row: pick.row + 1, hp: 0, log, deck: deck.length };
         // The starting relic pays here, exactly where the route pays it: after the win, before the reward.
         const spent = st.hero.hp < hpMax / 2;
         hp = Math.min(hpMax, st.hero.hp + perks.reduce((n, id) => n
@@ -348,14 +363,33 @@ function runOnce(seed) {
                 if (bump) { hpMax += bump; hp += bump; }
             }
         } else embers += 0;
-        if (kind === "boss") return { won: true, row: pick.row + 1, hp, log, deck: deck.length };
+        if (kind === "boss") {
+            if (act >= m.ACTS) return { won: true, act, row: pick.row + 1, hp, log, deck: deck.length };
+            // The boss trinket, then the next act's sheet. Their boss relics are the strongest objects in the
+            // game and taking one is the whole reward for the act — a simulator that walked past it would
+            // measure act two on act one's power.
+            const open = m.BOSS_PERK_IDS.filter((id) => !perks.includes(id));
+            if (open.length) {
+                const got = open[Math.floor(next() * open.length)];
+                perks = [...perks, got];
+                const k = m.BOSS_PERKS[got] || {};
+                if (k.maxHp) { hpMax += k.maxHp; hp += k.maxHp; }
+                if (k.maxHpDown) { hpMax = Math.max(10, hpMax - k.maxHpDown); hp = Math.min(hp, hpMax); }
+                if (k.embers) embers += k.embers;
+            }
+            act += 1;
+            map = buildMap(((seed >>> 0) + act * 7919) >>> 0);
+            at = null;
+            recent = [];
+            continue;
+        }
         embers += 15;
         // ── THREE ON THE TABLE, AND YOU TAKE THE BEST ONE ───────────────────────────────────────────
         // This took a RANDOM card of the tier, which is not what anybody does and badly understates how fast a
         // deck grows: the reward screen offers three and the whole skill of it is picking. Scored the way a
         // player scores at a glance — what it does, per point of energy it costs — with block worth a little
         // less than damage because a turn spent not dying is a turn the fight got longer.
-        const tier = POOL_BY_TIER[offerTier(pick.row)] || POOL_BY_TIER[0];
+        const tier = offersAt(pick.row, kind, act);
         if (tier.length) {
             const offer = [0, 1, 2].map(() => tier[Math.floor(next() * tier.length)]);
             // Scored the way a player scores at a glance: what it does per point of energy, with the cards
@@ -377,7 +411,7 @@ function runOnce(seed) {
             deck = [...deck, offer.slice().sort((a, b) => worth(b) - worth(a))[0]];
         }
     }
-    return { won: false, row: at?.row ?? 0, hp, log, deck: deck.length };
+    return { won: false, act, row: at?.row ?? 0, hp, log, deck: deck.length };
 }
 
 const runs = Array.from({ length: RUNS }, (_, i) => runOnce((i + 1) * 2654435761 >>> 0));
@@ -412,32 +446,21 @@ for (const kind of ["elite", "boss"]) {
 }
 const won = runs.filter((r) => r.won).length;
 console.log(`\n  runs finished: ${won}/${RUNS} (${((won / RUNS) * 100).toFixed(0)}%)`
-    + `  ·  average death at row ${avg(runs.filter((r) => !r.won), (r) => r.row).toFixed(1)}`);
-const byEnc = {};
-for (const f of fights) (byEnc[f.enc] ||= []).push(f);
-console.log("\n  by encounter        party hp   turns   hp lost   met");
-for (const [id, g] of Object.entries(byEnc).sort((a, b) => avg(b[1], (f) => f.turns) - avg(a[1], (f) => f.turns))) {
-    console.log(`  ${id.padEnd(16)}  ${avg(g, (f) => f.partyHp).toFixed(0).padStart(8)}   ${avg(g, (f) => f.turns).toFixed(1).padStart(5)}`
-        + `   ${avg(g, (f) => f.lost).toFixed(1).padStart(7)}   ${String(g.length).padStart(5)}`);
-}
+    + `  ·  average death: act ${avg(runs.filter((r) => !r.won), (r) => r.act).toFixed(1)}`
+    + ` row ${avg(runs.filter((r) => !r.won), (r) => r.row).toFixed(1)}`);
 
-// ── AND WHAT WE ARE AIMING AT ────────────────────────────────────────────────────────────────────────────────
-// Their act 1 at ascension 0, off the wiki, for the fights a starter deck actually meets. The column that
-// matters is the last one: an opening fight there is over in two or three turns.
-if (process.argv.includes("--spire")) {
-    console.log(`
-  SLAY THE SPIRE, ACT 1 (ascension 0)          total hp   ~turns
-    2 Louses                                     20-30      2-3
-    Small Slimes (acid S + spike S)              20-26      2-3
-    Jaw Worm                                     40-44      3-4
-    Cultist                                      48-54      3-4
-    Blue Slaver / Red Slaver                     46-50      3-4
-    2 Fungi Beasts                               44-56      3-4
-    Looter                                       44-48      3-4
-    Gremlin Gang (5)                             60-70      4-5
-    ELITE  Gremlin Nob                           82-86      5-6
-    ELITE  3 Sentries                           114-126     5-6
-    ELITE  Lagavulin                            109-111     5-7
-    BOSS   Guardian / Hexaghost / Slime Boss    140-250     8-12
-  Their hero opens on 80 hp with a ten-card deck that deals about 13 a turn — the same shape as ours.`);
+// ── HOW FAR A RUN ACTUALLY GETS ──────────────────────────────────────────────────────────────────────────
+// One number for "finished" hides the shape of a three-act run entirely: an act nobody reaches and an act
+// nobody survives look identical from the top.
+console.log(`\n  how far runs get`);
+for (let a = 1; a <= m.ACTS; a += 1) {
+    const reached = runs.filter((r) => r.act >= a).length;
+    const cleared = runs.filter((r) => r.act > a || (r.act === a && r.won)).length;
+    const rooms = fights.filter((f) => f.act === a);
+    console.log(`  ${m.actName(a).padEnd(11)} reached ${String(reached).padStart(4)}`
+        + `   cleared ${String(cleared).padStart(4)}`
+        + ` (${reached ? ((cleared / reached) * 100).toFixed(0).padStart(3) : "  -"}% of arrivals)`
+        + `   fights ${String(rooms.length).padStart(5)}`
+        + `   hp lost ${avg(rooms, (f) => f.lost).toFixed(1).padStart(5)}`
+        + `   turns ${avg(rooms, (f) => f.turns).toFixed(1)}`);
 }

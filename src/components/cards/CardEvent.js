@@ -15,8 +15,8 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import {
-    GiAnvil, GiBrokenBone, GiCrackedGlass, GiDeathSkull, GiEgyptianBird, GiEyeOfHorus, GiFishCorpse,
-    GiFlame, GiMushroomGills, GiSnakeTongue, GiStoneBlock, GiStoneSphere,
+    GiAnvil, GiBrokenBone, GiCrackedGlass, GiDeathSkull, GiEgyptianBird, GiEyeOfHorus, GiFangs,
+    GiFishCorpse, GiFlame, GiMushroomGills, GiSnakeTongue, GiStoneBlock, GiStoneSphere,
 } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
@@ -43,6 +43,7 @@ const MARK = {
     ooze: GiCrackedGlass,
     wall: GiStoneBlock,
     eye: GiEyeOfHorus,
+    fang: GiFangs,
 };
 
 export default function CardEvent({ run, art = {} }) {

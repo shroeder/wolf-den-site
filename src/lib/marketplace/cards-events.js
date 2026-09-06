@@ -190,6 +190,82 @@ export const EVENTS = [
         ],
     },
 
+    // ── ACT TWO ── theirs: the City's rooms trade in the BAR and in the deck rather than in small change,
+    // because by act two a health total is a resource you spend rather than one you protect.
+    {
+        id: "vampires", act: 2, name: "The Pale Company", icon: "fang",
+        say: "They are very polite about it. They have clearly had this conversation before, many times.",
+        choices: [
+            { label: "Let them", detail: "Lose 8 max health. Take a card that drinks.", effect: { maxHp: -8, card: "reaper" } },
+            { label: "Keep your blood", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "tollgate", act: 2, name: "The Toll", icon: "goo",
+        say: "Something has strung a chain across the passage and is waiting behind it, patiently, for payment.",
+        choices: [
+            { label: "Pay the toll", detail: "Pay 140 embers. It lets you by, and gives you a bottle for the trouble.", cost: 140, effect: { potion: 1 } },
+            { label: "Refuse", detail: "A fight.", effect: { fight: "d_thieves" } },
+        ],
+    },
+    {
+        id: "sunken_library", act: 2, name: "The Sunken Library", icon: "wall",
+        say: "Most of it has been ruined by the water. Three or four of the pages are still worth the swim.",
+        choices: [
+            { label: "Read one properly", detail: "Sharpen a card.", effect: { upgrade: 1 } },
+            { label: "Tear one out", detail: "Burn a card. +40 embers.", effect: { remove: 1, embers: 40 } },
+            { label: "Take what floats", detail: "A potion and 60 embers.", effect: { potion: 1, embers: 60 } },
+        ],
+    },
+    {
+        id: "knowing_skull", act: 2, name: "The Knowing Skull", icon: "corpse",
+        say: "It answers questions. It charges for them in the only currency it can actually carry away.",
+        choices: [
+            { label: "Ask for money", detail: "Lose 8 health. +120 embers.", again: true, effect: { hp: -8, embers: 120 } },
+            { label: "Ask for a bottle", detail: "Lose 8 health. A potion.", again: true, effect: { hp: -8, potion: 1 } },
+            { label: "Ask for its charm", detail: "Lose 12 health. A trinket.", again: true, effect: { hp: -12, perk: 1 } },
+            { label: "Stop asking", detail: "Walk on.", effect: {} },
+        ],
+    },
+
+    // ── ACT THREE ── theirs deal in whole runs: a bar, a boss, a deck rebuilt.
+    {
+        id: "long_fall", act: 3, name: "The Long Fall", icon: "goo",
+        say: "The stair simply stops. There is a long way down and something at the bottom of it that glitters.",
+        choices: [
+            { label: "Climb down for it", detail: "Lose a quarter of your health. Take a trinket.", effect: { hpPct: -0.25, perk: 1 } },
+            { label: "Jump", detail: "Lose a third of your health. Two trinkets' worth: a trinket and 200 embers.", effect: { hpPct: -0.34, perk: 1, embers: 200 } },
+            { label: "Find another way round", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "moai", act: 3, name: "The Stone Head", icon: "shrine",
+        say: "It is far too large to have been carried up here, and there is no sign it was ever carved in place.",
+        choices: [
+            { label: "Rest in its shadow", detail: "Heal fully. Lose 10 max health.", effect: { hpPct: 1, maxHp: -10 } },
+            { label: "Put your hand in its mouth", detail: "Sharpen 2 cards. Lose a fifth of your health.", effect: { upgrade: 2, hpPct: -0.2 } },
+            { label: "Leave it alone", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "winding_halls", act: 3, name: "The Winding Halls", icon: "wall",
+        say: "You have been here before. You are fairly sure you have been here before.",
+        choices: [
+            { label: "Take the long way", detail: "Heal a third.", effect: { hpPct: 0.34 } },
+            { label: "Take the short way", detail: "Lose 18 health. +2 max health and a Wound in your deck.", effect: { hp: -18, maxHp: 2, card: "wound" } },
+            { label: "Stop and think", detail: "Burn a card.", effect: { remove: 1 } },
+        ],
+    },
+    {
+        id: "mind_bloom", act: 3, name: "The Bloom", icon: "eye",
+        say: "It shows you the thing you came up here to do, and offers to let you skip to the end of it.",
+        choices: [
+            { label: "Take the fight now", detail: "An elite. A trinket if you win.", effect: { fight: "the_headsman", perk: 1 } },
+            { label: "Take the easy road", detail: "300 embers, and a Wound in your deck.", effect: { embers: 300, card: "wound" } },
+            { label: "Refuse it", detail: "Heal a quarter.", effect: { hpPct: 0.25 } },
+        ],
+    },
+
     // ── THE WATCHER ── act three ─────────────────────────────────────────────────────────────────────────
     {
         id: "spire_watcher", act: 3, name: "The Watcher", icon: "eye",
@@ -269,8 +345,12 @@ export function applyEventChoice(run, ev, index, card = null) {
     const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
 
     if (eff.maxHp) {
-        run.hpMax += eff.maxHp; run.hp += eff.maxHp;
-        said.push(`+${eff.maxHp} max health.`);
+        // ⚠️ IT GOES BOTH WAYS. Their act-two and act-three rooms buy things with the BAR — the Vampires take
+        // six of it for a card that drinks — so this has to clamp and it has to say "lost" rather than print
+        // "+-6 max health", which is what a one-directional line does the first time a room asks for some.
+        run.hpMax = Math.max(10, run.hpMax + eff.maxHp);
+        run.hp = Math.max(1, Math.min(run.hpMax, run.hp + eff.maxHp));
+        said.push(eff.maxHp > 0 ? `+${eff.maxHp} max health.` : `Lost ${-eff.maxHp} max health.`);
     }
     if (eff.hpPct || eff.hp) {
         const by = (eff.hp || 0) + Math.round((eff.hpPct || 0) * run.hpMax);
