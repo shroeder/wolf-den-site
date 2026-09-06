@@ -9,7 +9,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    ACTS, DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
@@ -82,6 +82,12 @@ export default function CardFightClient({ fixture, run = null }) {
         // back up at full health with its reward still pending — the card-reward hole again, on the one fight
         // in the act you would least like to be asked to do twice.
         if (run?.offers?.length || run?.bossOffers?.length) return { ...fresh, over: "win" };
+        // ── ⚠️ AND A RUN THAT IS OVER IS OVER ────────────────────────────────────────────────────────
+        // Same argument, one step further along: the run row says the climb is finished, so the screen must
+        // not build a room. Without this a won run reloaded straight into the act-three boss at full health —
+        // the game asking you to kill the Time Eater again, having already told the table you beat it. The
+        // result screen reads `over` and `runState.done`, so handing it the ending is all this needs to do.
+        if (run?.done) return { ...fresh, over: run.done === "won" ? "win" : "lose", gaveUp: false };
         // ── AND A FIGHT LEFT HALF-FOUGHT IS PICKED BACK UP ───────────────────────────────────────────
         // The run holds the engine state at the end of every turn (see "save" in the run route), so a phone
         // that locked itself in a pocket comes back to the same turn, the same hand and the same wounded
@@ -127,7 +133,11 @@ export default function CardFightClient({ fixture, run = null }) {
 
     // A resumed reward has ALREADY been reported — see the note in the initialiser. Without this the effect
     // below sees `over: "win"` on the first render and posts the win a second time.
-    if (reported.current === null && (run?.offers?.length || run?.bossOffers?.length)) reported.current = "win";
+    // ⚠️ AND A FINISHED RUN HAS ALREADY REPORTED ITSELF. Without `run.done` here the result screen posts the
+    // win again the moment it mounts, and that post used to deal a whole new run out from under it.
+    if (reported.current === null && (run?.offers?.length || run?.bossOffers?.length || run?.done)) {
+        reported.current = "win";
+    }
 
     // ── TELLING THE SERVER HOW IT ENDED, EXACTLY ONCE ────────────────────────────────────────────────
     // `reported` guards the double-fire: the effect re-runs on every state change after the fight is over,
@@ -1311,7 +1321,10 @@ export default function CardFightClient({ fixture, run = null }) {
                             </div>
                             <p className="cf-note">
                                 {runState?.done === "won"
-                                    ? `All ${RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
+                                    // WARNING: A RUN IS THREE ACTS. This said "All 15 stops", which is one
+                                    // act's worth and was written when the game was one act long — the line
+                                    // that pays off the whole climb was understating it by two thirds.
+                                    ? `All three acts, ${ACTS * RUN_LENGTH} stops, and you walked out on ${fight.hero.hp} of ${fight.hero.hpMax}.`
                                     : runState?.done === "dead"
                                         ? `You made it to ${stopLabel(runState.stop, { capital: false, act: runState.act })}.`
                                         : fight.over === "win"

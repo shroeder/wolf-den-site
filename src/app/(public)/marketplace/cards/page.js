@@ -46,6 +46,15 @@ export default async function CardsPage({ searchParams }) {
         return <CardFightClient fixture={fixture} />;
     }
 
+    // ── ⚠️ A FINISHED RUN IS NOT RUBBISH TO BE SWEPT UP ──────────────────────────────────────────────────
+    // This asked for a run with `create: true`, and loadRun answers that by DEALING A NEW ONE the moment it
+    // sees a finished one — so beating the last boss of the third act and then reloading (or letting anything
+    // call router.refresh) replaced the victory screen with a fresh act-one map. Forty-five rooms, and the
+    // payoff was a screen you could lose by pressing F5. Tested by winning one: the ending was gone.
+    //
+    // A stored run is returned whatever state it is in; a new one is dealt only when there is no run at all.
+    // Starting the next climb is a thing the player DOES (the table's seat, or New run on the result screen),
+    // both of which post `restart` — see CardTable.
     const run = await loadRun(buyer.id, { create: true });
 
     // ── THE MAP IS THE DEFAULT SCREEN ────────────────────────────────────────────────────────────────────

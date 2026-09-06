@@ -183,12 +183,23 @@ const newRun = (seed) => ({
 
 export async function loadRun(buyerId, { create = true } = {}) {
     const row = await db.queryOne(`SELECT state FROM mkt_cards_run WHERE buyer_id = $1`, [buyerId]).catch(() => null);
-    if (row?.state && !row.state.done) return row.state;
-    if (row?.state?.done && !create) return row.state;
+    // A STORED RUN COMES BACK WHATEVER STATE IT IS IN. A finished one is not rubbish to be swept up — it is
+    // the ending, and the screen that shows it has to be able to load twice. See startRun.
+    if (row?.state) return row.state;
     if (!create) return null;
-    // ⚠️ Math.random is fine HERE and nowhere inside the rules. The seed is the one thing a run is allowed to
-    // pull out of the air; everything downstream of it is threaded (see nextRand), which is what lets a run be
-    // replayed from its seed alone.
+    return startRun(buyerId);
+}
+
+/**
+ * Deal a new run, on purpose.
+ *
+ * ⚠️ STARTING A RUN USED TO BE A SIDE EFFECT OF LOADING ONE — loadRun with `create` quietly threw away a
+ * finished run and dealt a fresh one, which meant every reader of a run was also a writer. Beating the last
+ * boss of the third act and then letting ANYTHING re-render replaced the ending with a new act-one map: the
+ * payoff for forty-five rooms was a screen you could lose by pressing F5. Beginning again is a thing the
+ * player does — the table's seat, or New run on the result screen — and it says so here.
+ */
+export async function startRun(buyerId) {
     const run = newRun(Math.floor(Math.random() * 900000) + 1000);
     await saveRun(buyerId, run);
     // A RUN STARTED IS A RUN COUNTED. It is the one counter nothing else can infer: a member who opens the

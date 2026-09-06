@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
     CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
-    saveRun, shopStock, takePerk,
+    saveRun, shopStock, startRun, takePerk,
 } from "@/lib/marketplace/cards.js";
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
@@ -462,9 +462,9 @@ export async function POST(request) {
             }
 
             if (action === "restart") {
+                // Explicit, because loading no longer deals one — see startRun.
                 await saveRun(buyer.id, { ...run, done: "dead" });
-                const fresh = await loadRun(buyer.id, { create: true });
-                return NextResponse.json({ run: fresh });
+                return NextResponse.json({ run: await startRun(buyer.id) });
             }
 
             return NextResponse.json({ error: "bad_action" }, { status: 400 });

@@ -32,7 +32,20 @@ export default function CardTable({ run }) {
     // A run that ended is not a run you can walk back into: the page behind this one will start a new one the
     // moment you sit. Saying so is the difference between "Sit back down" lying to you and the sharp dealing.
     const live = Boolean(run && !run.done);
-    const sit = () => { setGoing(true); router.push("/marketplace/cards"); };
+    // ── SITTING DOWN AFTER A FINISHED RUN DEALS A NEW ONE ────────────────────────────────────────────
+    // The page used to do this by accident, because loading a run quietly replaced a finished one. Now that
+    // the ending survives a reload (see the note in the page), starting again has to be an actual request —
+    // which is also the honest shape: the seat is where you choose to go again.
+    const sit = async () => {
+        setGoing(true);
+        if (run?.done) {
+            await fetch("/api/marketplace/cards/run", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "restart" }),
+            }).catch(() => null);
+        }
+        router.push("/marketplace/cards");
+    };
 
     return (
         <div className={`ct ${panelFont.className}`}>
