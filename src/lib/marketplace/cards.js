@@ -8,7 +8,7 @@ import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
     beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, levelSharpens, levelWeight,
-    nextRand, perkSum, pickEncounter, stopAt, unlockedCards,
+    nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -206,6 +206,59 @@ export async function startRun(buyerId) {
     // game, walks two rooms and dies has played, and the ladder in UNLOCKS should be able to say so.
     await bumpCardProgress(buyerId, "runs");
     return run;
+}
+
+/**
+ * ── WRITING THE RUN DOWN ─────────────────────────────────────────────────────────────────────────────────
+ * One row per ENDED run — see migration 433. Written once, when it ends, and never touched again: the live
+ * run is rewritten on every tap and is no place to keep a record.
+ *
+ * ⚠️ ONCE, AND NOT TWICE. A run can reach its ending by more than one path — the last boss falling, the hero
+ * dying, the player giving up — and two of those can be posted again by a client that reloads. `recorded` is
+ * stamped on the run itself, so the second attempt is a no-op rather than a second row in the history.
+ */
+export async function recordRun(buyerId, run, outcome) {
+    if (!run || run.recorded) return run;
+    const ended = { ...run, done: outcome };
+    await db.query(
+        `INSERT INTO mkt_cards_result
+             (buyer_id, outcome, act, stop, score, hp, hp_max, deck_size, seed, deck, perks)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)`,
+        [
+            buyerId, outcome,
+            Math.max(1, Math.min(ACTS, Number(run.act) || 1)),
+            Math.max(0, Number(run.stop) || 0),
+            runScore(ended),
+            Math.max(0, Number(run.hp) || 0), Math.max(1, Number(run.hpMax) || 1),
+            (run.deck || []).length, Number(run.seed) || 0,
+            JSON.stringify(run.deck || []), JSON.stringify(run.perks || []),
+        ]
+    ).catch(() => {});
+    run.recorded = true;
+    return run;
+}
+
+/**
+ * The last few runs and the best one, for the table.
+ *
+ * ⚠️ ONE ROUND TRIP, NOT TWO. "my recent runs" and "my best run" are one question asked two ways and this
+ * screen is opened constantly — see the note in CLAUDE.md on why a second convenient query is how this repo
+ * has billed a fortune before. The best row is picked out of the same result set the list came from when it
+ * is in there, and only a member with more than `many` runs pays for the second look.
+ */
+export async function runHistory(buyerId, many = 5) {
+    const rows = await db.query(
+        `SELECT outcome, act, stop, score, hp, hp_max, deck_size, ended_at
+           FROM mkt_cards_result WHERE buyer_id = $1 ORDER BY ended_at DESC LIMIT $2`,
+        [buyerId, many]
+    ).catch(() => []);
+    const recent = rows || [];
+    const best = await db.queryOne(
+        `SELECT outcome, act, stop, score FROM mkt_cards_result
+          WHERE buyer_id = $1 ORDER BY score DESC LIMIT 1`,
+        [buyerId]
+    ).catch(() => null);
+    return { recent, best, runs: recent.length };
 }
 
 export async function saveRun(buyerId, run) {

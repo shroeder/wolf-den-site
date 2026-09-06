@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
     CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
-    saveRun, shopStock, startRun, takePerk,
+    recordRun, saveRun, shopStock, startRun, takePerk,
 } from "@/lib/marketplace/cards.js";
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
@@ -361,6 +361,10 @@ export async function POST(request) {
                     if ((run.act || 1) >= ACTS) {
                         run.done = "won";
                         run.bossOffers = null;
+                        // ── AND IT GOES IN THE LEDGER ────────────────────────────────────────
+                        // The one moment a climb is finished. See recordRun: written once, here, and the
+                        // stamp it leaves means a reloaded result screen cannot write a second row.
+                        await recordRun(buyer.id, run, "won");
                     } else {
                         run.bossOffers = bossOffers(run);
                     }
@@ -457,13 +461,16 @@ export async function POST(request) {
             if (action === "dead") {
                 run.done = "dead";
                 run.fight = null;              // the room is over; nothing to come back to
+                await recordRun(buyer.id, run, "dead");
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
             }
 
             if (action === "restart") {
-                // Explicit, because loading no longer deals one — see startRun.
-                await saveRun(buyer.id, { ...run, done: "dead" });
+                // Explicit, because loading no longer deals one — see startRun. A run given up is still a
+                // run that happened, and it goes in the history saying how far it actually got.
+                await recordRun(buyer.id, run, "dead");
+                await saveRun(buyer.id, { ...run, done: "dead", recorded: true });
                 return NextResponse.json({ run: await startRun(buyer.id) });
             }
 

@@ -837,6 +837,45 @@ export const POTION_IDS = Object.keys(POTIONS);
 
 export const RUN_LENGTH = 15;
 
+/**
+ * ── WHAT A RUN WAS WORTH ─────────────────────────────────────────────────────────────────────────────────
+ * Theirs totals a score out of the things a player actually did — floors climbed, elites and bosses killed,
+ * how much of the deck they built — and shows it on the screen that ends the run. It is the difference
+ * between "you won" and "you won, and here is the number to beat".
+ *
+ * Kept in the RULES rather than in the ledger that stores it, because the screen has to be able to show the
+ * same figure the row will hold. A score computed twice in two places is a score nobody trusts.
+ *
+ * Weighted the way the run is actually shaped: rooms are the body of it, an act cleared is the real
+ * milestone, and finishing all three is worth more than the sum of its parts because almost nobody does.
+ */
+export const SCORE = {
+    room: 5,          // every room walked into, including the ones that were not fights
+    actCleared: 60,   // a boss down and the next sheet dealt
+    finished: 250,    // all three, which is the whole game
+    perk: 8,          // trinkets carried out
+    card: 3,          // the deck you built
+    aliveHp: 1,       // health you walked out on, which is the difference between winning well and barely
+};
+
+/** The score for a run in whatever state it ended. `acts` is how many were CLEARED, not which one you died in. */
+export function runScore(run = {}) {
+    const act = Math.max(1, Math.min(ACTS, Number(run.act) || 1));
+    const stop = Math.max(0, Number(run.stop) || 0);
+    const won = run.done === "won";
+    // Rooms across every act: the acts behind you were fifteen apiece, plus how far into this one you got.
+    const rooms = (act - 1) * RUN_LENGTH + Math.min(RUN_LENGTH + 1, stop);
+    const cleared = won ? ACTS : act - 1;
+    return Math.round(
+        rooms * SCORE.room
+        + cleared * SCORE.actCleared
+        + (won ? SCORE.finished : 0)
+        + (run.perks || []).length * SCORE.perk
+        + (run.deck || []).length * SCORE.card
+        + (won ? Math.max(0, Number(run.hp) || 0) * SCORE.aliveHp : 0)
+    );
+}
+
 // ── THE RUN IS THREE ACTS, NOT ONE ───────────────────────────────────────────────────────────────────────
 // Luke, having just killed the boss: "the run isn't supposed to end when you beat the boss. Look at how Slay
 // the Spire does it — when you beat the boss of the first one you get a really powerful enhancement that you

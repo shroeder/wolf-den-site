@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import CardTable from "@/components/cards/CardTable";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { CARDS_UNLOCKED, loadRun } from "@/lib/marketplace/cards.js";
+import { CARDS_UNLOCKED, loadRun, runHistory } from "@/lib/marketplace/cards.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -23,6 +23,10 @@ export default async function CardTablePage() {
     // Owner-gated while it is a prototype, on the same terms and with the same bounce as the game itself.
     if (!CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
 
-    const run = await loadRun(buyer.id, { create: false });
-    return <CardTable run={run} />;
+    // Both in one go: neither waits on the other, and the table is a screen people open often.
+    const [run, history] = await Promise.all([
+        loadRun(buyer.id, { create: false }),
+        runHistory(buyer.id),
+    ]);
+    return <CardTable run={run} history={history} />;
 }

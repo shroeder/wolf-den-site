@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
-import { RUN_LENGTH, stopLabel } from "@/lib/marketplace/cards-kit.js";
+import { ACTS, RUN_LENGTH, actName, stopLabel } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE TABLE YOU SIT DOWN AT ────────────────────────────────────────────────────────────────────────────
 // The card game had no front room. Every other feature in the Den has one — the mine has a shaft head, the
@@ -23,7 +23,7 @@ import { RUN_LENGTH, stopLabel } from "@/lib/marketplace/cards-kit.js";
 // a press you meant.
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
-export default function CardTable({ run }) {
+export default function CardTable({ run, history = null }) {
     const router = useRouter();
     // The push is a server render away (auth, the run row, then a map), so the button has to say it heard you
     // or it reads as dead — the same half-second the map's room buttons cover with `busy`.
@@ -59,7 +59,7 @@ export default function CardTable({ run }) {
                             ? "You walked out of the last one. Sit down and we'll go again."
                             : run?.done === "dead"
                                 ? "That one went badly. Cut the deck, start over."
-                                : `One run, ${RUN_LENGTH} rooms. You in?`}
+                                : `One run, three acts, ${ACTS * RUN_LENGTH} rooms. You in?`}
                 </p>
 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -89,6 +89,34 @@ export default function CardTable({ run }) {
                     The collection is the thing you can look at when you do NOT want to start a run, which is
                     exactly what a front room is for. Quiet, under the button: the sharp is asking you to sit,
                     not to browse. */}
+                {/* ── WHAT YOU HAVE DONE BEFORE ────────────────────────────────────────────────────────
+                    A finished run used to leave one sentence and nothing else, so there was never a number to
+                    beat — which is most of why there was no reason to play a second one. The best score sits
+                    where you can see it before you sit down, and the last few runs say plainly how each one
+                    ended and how far it got. */}
+                {history?.best ? (
+                    <div className="ct-record">
+                        <p className="ct-best">
+                            <span>Best</span>
+                            <b>{Number(history.best.score).toLocaleString()}</b>
+                            <i>{history.best.outcome === "won"
+                                ? "the whole climb"
+                                : `${actName(history.best.act)}, stop ${history.best.stop}`}</i>
+                        </p>
+                        <ul className="ct-runs">
+                            {history.recent.map((r, i) => (
+                                <li key={i} className={r.outcome === "won" ? "is-won" : ""}>
+                                    <span>{r.outcome === "won" ? "Won" : "Died"}</span>
+                                    <i>{r.outcome === "won"
+                                        ? "all three acts"
+                                        : `${actName(r.act)}, stop ${r.stop}`}</i>
+                                    <b>{Number(r.score).toLocaleString()}</b>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
+
                 <button type="button" className="ct-see" onClick={() => router.push("/marketplace/cards/collection")}>
                     See every card
                 </button>
@@ -102,8 +130,30 @@ export default function CardTable({ run }) {
             {/* Global for the same reason the shop's and the rooms' are: every selector is under `.ct`, which
                 is this screen and nothing else on the site. */}
             <style jsx global>{`
-                .ct { position: fixed; inset: 0; z-index: 4000; overflow: hidden;
-                    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+                /* ── THE RECORD ── quiet furniture on the table, not a scoreboard. The best score is the one
+                   figure worth being big; the runs under it are a list you skim. */
+                .ct-record { width: min(340px, 92%); margin: 2px auto 0; }
+                .ct-best { display: flex; align-items: baseline; justify-content: center; gap: 8px;
+                    margin: 0 0 6px; font-family: var(--ct-card-font, inherit); }
+                .ct-best span { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8e8371; }
+                .ct-best b { font-size: 25px; color: #ffd9a6; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+                .ct-best i { font-size: 12px; font-style: normal; color: #b3a68f; }
+                .ct-runs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+                .ct-runs li { display: flex; align-items: baseline; gap: 8px; padding: 3px 8px;
+                    border-radius: 7px; background: rgba(18,16,20,0.5); font-size: 12px; color: #b3a68f; }
+                .ct-runs li span { min-width: 34px; color: #9a8e7c; }
+                .ct-runs li.is-won span { color: #9be08a; }
+                .ct-runs li i { flex: 1; font-style: normal; }
+                .ct-runs li b { color: #e8dcc6; font-variant-numeric: tabular-nums; }
+
+                /* ⚠️ BOTTOM-ANCHORED WITHOUT THROWING THE TOP AWAY. This was overflow:hidden with
+                   justify-content:flex-end, which clips anything too tall off the TOP and gives you no way to
+                   reach it — and the moment the run record was added under the dealer, his greeting went off
+                   the screen. Photographed: the page opened on the top of his ears.
+                   flex-end also cannot be scrolled back into in most browsers, which is why the anchoring is
+                   done with margin-top:auto on the stage instead and the column simply scrolls. */
+                .ct { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
+                    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
                     padding: 0 10px 18px; background: #0a0b0f; color: #efe3cd; }
                 .ct-room { position: fixed; inset: 0; z-index: -1;
                     background: #0a0b0f url(/images/cards/chrome/table-room.png) center/cover no-repeat; }
@@ -112,7 +162,7 @@ export default function CardTable({ run }) {
                 .ct-room::after { content: ""; position: absolute; inset: 0;
                     background: radial-gradient(ellipse at 50% 42%, rgba(10,11,15,0.05), rgba(6,7,10,0.88) 78%); }
 
-                .ct-stage { flex: 1; width: min(680px, 100%);
+                .ct-stage { margin-top: auto; width: min(680px, 100%);
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
                     gap: 10px; padding-bottom: 6px; }
 
