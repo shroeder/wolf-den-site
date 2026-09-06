@@ -727,7 +727,13 @@ export const FOE_SCRIPTS = {
         open: "ritual",
         moves: {
             ritual: { key: "ritual", label: "Incantation", strength: 3 },
-            strike: { key: "strike", label: "Dark Strike", damage: 6, strength: 3 },
+            // ⚠️ THE STRENGTH IS ON THE INCANTATION, NOT ON THE STRIKE. Theirs rituals ONCE on its opening
+            // beat and then hits for a flat 6+3 forever; ours carried the +3 on Dark Strike as well, with no
+            // limit, so a Cultist grew by three every single turn — 9, 12, 15, 18 — and it is in three of the
+            // rooms act one draws most. That one field is why no dial on health or damage could make the act
+            // survivable: every extra turn a fight lasted made the thing hitting you bigger, so blocking was
+            // punished and racing was punished, and 600 simulated runs finished 2% of the time.
+            strike: { key: "strike", label: "Dark Strike", damage: 6 },
         },
         after: { ritual: [["strike", 100]], strike: [["strike", 100]] },
     },
@@ -1126,7 +1132,9 @@ export const FOE_SCRIPTS = {
             echo: { key: "echo", label: "Dark Echo", damage: 40 },
             slash: { key: "slash", label: "Slash", damage: 20 },
             soul: { key: "soul", label: "Soul Strike", damage: 6, hits: 4 },
-            tackle: { key: "tackle", label: "Tackle", damage: 20, strength: 2 },
+            // Same defect as the Cultist's, on the act-three boss: an unlimited +2 on a beat it can repeat.
+            // Theirs gains Strength from Curiosity — when YOU play a Power — never simply for swinging.
+            tackle: { key: "tackle", label: "Tackle", damage: 20 },
         },
         after: { echo: [["slash", 50], ["soul", 50]], slash: [["soul", 45], ["tackle", 55]], soul: [["slash", 50], ["tackle", 50]], tackle: [["soul", 60], ["slash", 40]] },
         limit: { echo: 1, slash: 2 },
@@ -1361,11 +1369,13 @@ export const ENCOUNTERS = [
     { id: "thugs", name: "Exordium Thugs", pool: "hard", weight: 3, foes: ["ramper", "leech"] },
     { id: "wildlife", name: "Exordium Wildlife", pool: "hard", weight: 3, foes: ["mauler", "hexer"] },
     // Their act 1 has no third band; ours has fifteen rows where theirs has sixteen floors, so the deep band
-    // is the strong pool with the heavier halves of it — the same rooms, weighted toward the ones that hurt.
-    { id: "deep_slimes", name: "Slime Pair", pool: "deep", weight: 3, foes: ["bruiser", "warden"] },
-    { id: "deep_wildlife", name: "The Wildlife", pool: "deep", weight: 3, foes: ["mauler", "hexer", "louse"] },
-    { id: "deep_thugs", name: "The Thugs", pool: "deep", weight: 3, foes: ["ramper", "leech", "louse_g"] },
-    { id: "deep_worms", name: "Jaw Worms", pool: "deep", weight: 2, foes: ["mauler", "gorger"] },
+    // is the heavy half of the same pool. Their ceiling for an act-one room is the Exordium Thugs at about
+    // ninety health across two bodies, and The Thugs carried a third — 111 — which is why it was the single
+    // most expensive room in the act at 55 health a visit. It is two bodies now, theirs.
+    { id: "deep_slimes", name: "Slime Pair", pool: "hard", weight: 2, foes: ["bruiser", "warden"] },
+    { id: "deep_wildlife", name: "The Wildlife", pool: "hard", weight: 2, foes: ["mauler", "hexer", "louse"] },
+    { id: "deep_thugs", name: "The Thugs", pool: "hard", weight: 2, foes: ["ramper", "leech"] },
+    { id: "deep_worms", name: "Jaw Worms", pool: "hard", weight: 2, foes: ["mauler", "gorger"] },
 
     // ── ACT ONE ELITES ── theirs, all three.
     { id: "the_champion", name: "The Gremlin Nob", pool: "elite", weight: 3, foes: ["champion"] },
@@ -1393,10 +1403,10 @@ export const ENCOUNTERS = [
     { id: "d_three_cultists", name: "Three Cultists", pool: "2:hard", weight: 3, foes: ["ramper", "ramper", "ramper"] },
     { id: "d_parasite_fungi", name: "Parasite and Fungi", pool: "2:hard", weight: 3, foes: ["barnacle", "hexer"] },
 
-    { id: "d_deep_court", name: "The Tide Court", pool: "2:deep", weight: 3, foes: ["centurion", "tidecaller", "drowned"] },
-    { id: "d_deep_shell", name: "The Shellbacks", pool: "2:deep", weight: 3, foes: ["barnacle", "sphere"] },
-    { id: "d_deep_chosen", name: "The Chosen Pair", pool: "2:deep", weight: 3, foes: ["chosen", "chosen"] },
-    { id: "d_deep_snecko", name: "Snecko and Byrds", pool: "2:deep", weight: 2, foes: ["snecko", "drowned"] },
+    { id: "d_deep_court", name: "The Tide Court", pool: "2:hard", weight: 3, foes: ["centurion", "tidecaller", "drowned"] },
+    { id: "d_deep_shell", name: "The Shellbacks", pool: "2:hard", weight: 3, foes: ["barnacle", "sphere"] },
+    { id: "d_deep_chosen", name: "The Chosen Pair", pool: "2:hard", weight: 3, foes: ["chosen", "chosen"] },
+    { id: "d_deep_snecko", name: "Snecko and Byrds", pool: "2:hard", weight: 2, foes: ["snecko", "drowned"] },
 
     { id: "d_elite_leader", name: "The Warcaller", pool: "2:elite", weight: 3, foes: ["gremlin_lead"] },
     { id: "d_elite_task", name: "The Taskmaster", pool: "2:elite", weight: 3, foes: ["taskmaster", "leech", "leech"] },
@@ -1417,9 +1427,9 @@ export const ENCOUNTERS = [
     { id: "s_sphere_shapes", name: "Sphere and Shapes", pool: "3:hard", weight: 3, foes: ["sphere", "spiker", "repulsor"] },
     { id: "s_orb_darkling", name: "Orb Walker and Darklings", pool: "3:hard", weight: 3, foes: ["colossus", "emberling", "emberling"] },
 
-    { id: "s_deep_summit", name: "The Summit", pool: "3:deep", weight: 3, foes: ["colossus", "colossus"] },
-    { id: "s_deep_mass", name: "Mass and Shapes", pool: "3:deep", weight: 3, foes: ["writhing", "spiker"] },
-    { id: "s_deep_dark", name: "The Darkling Nest", pool: "3:deep", weight: 3, foes: ["emberling", "emberling", "colossus"] },
+    { id: "s_deep_summit", name: "The Summit", pool: "3:hard", weight: 3, foes: ["colossus", "colossus"] },
+    { id: "s_deep_mass", name: "Mass and Shapes", pool: "3:hard", weight: 3, foes: ["writhing", "spiker"] },
+    { id: "s_deep_dark", name: "The Darkling Nest", pool: "3:hard", weight: 3, foes: ["emberling", "emberling", "colossus"] },
 
     { id: "s_elite_giant", name: "The Giant", pool: "3:elite", weight: 3, foes: ["giant_head"] },
     { id: "s_elite_nemesis", name: "Nemesis", pool: "3:elite", weight: 3, foes: ["nemesis"] },
@@ -1468,7 +1478,13 @@ export const encounterById = (id) => ENCOUNTERS.find((e) => e.id === id) || null
  * one's, so a half-written bestiary is a duller run rather than a crash.
  */
 export function poolFor(n, kind = "fight", act = 1) {
-    const band = kind === "boss" ? "boss" : kind === "elite" ? "elite" : n <= 3 ? "easy" : n <= 9 ? "hard" : "deep";
+    // ⚠️ TWO COMBAT POOLS PER ACT, NOT THREE. Theirs is easy for the first three rooms and hard for every
+    // room after it, all the way to the boss — the act does NOT keep escalating. We had a third "deep" band
+    // over rows 10-15 averaging 86 party health, and a simulator over 600 runs put 40% of its deaths in it
+    // against 17% in the band below: the six rooms before a 240-health boss were costing 29 health each, so
+    // runs arrived at the door on a third of a bar or did not arrive. The deep rooms are still here — they
+    // were folded into `hard`, which is exactly how theirs holds both a lone Looter and the Exordium Thugs.
+    const band = kind === "boss" ? "boss" : kind === "elite" ? "elite" : n <= 3 ? "easy" : "hard";
     const a = Math.max(1, Math.floor(Number(act) || 1));
     if (a <= 1) return band;
     const named = `${a}:${band}`;

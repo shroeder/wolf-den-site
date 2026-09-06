@@ -1230,6 +1230,21 @@ export default function CardFightClient({ fixture, run = null }) {
                                 where it belongs, not on the prop. Ours said "Stop 1 of 8 — take one", which put
                                 bookkeeping on a piece of cloth and made the instruction the smaller half of it. */}
                             <div className="cf-title"><span>Choose a card</span></div>
+                            {/* THE BOTTLE THE FIGHT PAID, said on the reward screen rather than appearing
+                                silently in the belt. Two combats in five drop one — see potionDrop — and a
+                                drop nobody notices is a resource nobody plans around. A full belt says so
+                                too, because "you were owed one and had nowhere to put it" is information a
+                                player uses on the very next chest. */}
+                            {runState.dropped?.potion ? (
+                                <div className={`cf-drop${runState.dropped.spilled ? " is-spilled" : ""}`}>
+                                    <Sprite src={`/images/cards/potions/${runState.dropped.potion}.png`} className="cf-drop-art" />
+                                    <span>
+                                        {runState.dropped.spilled
+                                            ? `${POTIONS[runState.dropped.potion]?.name} — no belt slot free`
+                                            : POTIONS[runState.dropped.potion]?.name}
+                                    </span>
+                                </div>
+                            ) : null}
                             <div className="cf-offers">
                                 {runState.offers.map((id) => {
                                     const c = cardById(id);
@@ -2080,6 +2095,15 @@ export default function CardFightClient({ fixture, run = null }) {
                         justify-items: center; text-align: center; gap: 6px; padding: 14px; }
                     .cf-bossperk-art { grid-row: auto; width: 56px; height: 56px; }
                 }
+
+                /* The line under the banner that names the bottle a fight paid. Quiet — it is a note, not a
+                   second decision — and it goes amber when the belt was full, because that is the half of it
+                   a player has to act on. */
+                .cf-drop { display: inline-flex; align-items: center; gap: 7px; margin: -2px auto 2px;
+                    padding: 4px 11px 4px 5px; border-radius: 999px; font-size: 12.5px; letter-spacing: .01em;
+                    color: #e8dcc6; background: rgba(20, 16, 12, .62); border: 1px solid rgba(226, 199, 143, .3); }
+                .cf-drop.is-spilled { color: #f0c98a; border-color: rgba(240, 201, 138, .45); }
+                .cf-drop-art { width: 20px; height: 20px; object-fit: contain; display: block; }
 
                 .cf-offers { display: flex; gap: 10px; justify-content: center; flex-wrap: nowrap; }
                 /* ── BIGGER, NOT DIFFERENT ────────────────────────────────────────────────────────────

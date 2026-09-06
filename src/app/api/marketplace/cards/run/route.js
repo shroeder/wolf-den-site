@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import {
-    CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, saveRun,
-    shopStock, takePerk,
+    CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
+    saveRun, shopStock, takePerk,
 } from "@/lib/marketplace/cards.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import {
@@ -274,6 +274,17 @@ export async function POST(request) {
                     if (got.perk) takePerk(run, got.perk);
                     if (got.embers) run.embers = (run.embers || 0) + got.embers;
                 }
+                // ── AND THE BOTTLE THE FIGHT PAID ────────────────────────────────────────────────
+                // See potionDrop: two combats in five, theirs, and the reserve a hero needs to arrive at an
+                // elite with. Keyed to the room so a re-posted win cannot pay twice, and a full belt is said
+                // out loud rather than swallowed — the chest already works this way.
+                const dropKey = `${run.at?.row ?? 0}:${run.at?.lane ?? 0}`;
+                if (run.dropped?.key !== dropKey) {
+                    const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
+                    const room = (run.potions || []).length < POTION_SLOTS;
+                    if (bottle && room) run.potions = [...(run.potions || []), bottle];
+                    run.dropped = bottle ? { key: dropKey, potion: bottle, spilled: !room } : { key: dropKey };
+                }
                 const wasBoss = run.at?.kind === "boss" || run.stop > RUN_LENGTH;
                 // WON IS WON, and an elite or a boss is also its own line in the ledger — those are the two
                 // counts the harder unlocks are keyed to, and they are the two a player remembers doing.
@@ -309,6 +320,7 @@ export async function POST(request) {
             // the crown" and "act two is dealt". Legal only against the three actually on the table, which is
             // also what makes a replayed request harmless — once they are cleared there is nothing to take.
             if (action === "bosspick") {
+                run.dropped = null;
                 const id = String(body?.id || "");
                 if (!run.bossOffers?.includes(id) || !BOSS_PERKS[id]) {
                     return NextResponse.json({ error: "no_such_boss_perk" }, { status: 400 });
@@ -326,6 +338,7 @@ export async function POST(request) {
                 if (!run.offers?.includes(id)) return NextResponse.json({ error: "no_such_offer" }, { status: 400 });
                 run.deck = [...run.deck, id];
                 run.offers = null;
+                run.dropped = null;         // the reward screen is done; so is the line about the bottle
                 run.fight = null;           // the fight it came from is finished with
                 run.at = null;              // back to the sheet to choose where next
                 await saveRun(buyer.id, run);
@@ -339,6 +352,7 @@ export async function POST(request) {
                 // deck and the means to fix it later".
                 run.embers = (run.embers || 0) + SKIP_EMBERS;
                 run.offers = null;
+                run.dropped = null;
                 run.fight = null;
                 run.at = null;
                 await saveRun(buyer.id, run);

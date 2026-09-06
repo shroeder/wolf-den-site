@@ -29,8 +29,12 @@ const RUNS = Number(arg("--runs", 1200));
 // measured before one of them is written into the tables. Nothing here changes the game; it changes the copy
 // of the game this simulator is playing.
 const DMGX = Number(arg("--dmgx", 1));
-const POTION_DROP = Number(arg("--potions", 0));
+const POTION_DROP = Number(arg("--potions", 40));   // percentage points, the game's POTION_DROP_BASE
 const HPX = Number(arg("--hpx", 1));
+// A third dial, for the question the other two cannot answer: how much damage does a whole act THROW? Walk it
+// on a bar nothing can empty and the total that comes back is the act's price, which is the number a hero's
+// health and healing have to be set against. --herohp 9999 measures; --herohp 80 tests a candidate bar.
+const HERO_HP = Number(arg("--herohp", 0)) || m.HERO_HP;
 const scriptOf = (name) => {
     const src = m.FOE_SCRIPTS[name] || m.FOE_SCRIPTS.cur;
     if (DMGX === 1) return src;
@@ -47,7 +51,7 @@ const blockOf = (c) => m.cardById(c.id)?.block || 0;
 // Not optimal and not stupid: covers a swing that would cost more than a Defend is worth, then spends the rest
 // of the bar on the thing closest to dying. A bot that plays perfectly measures the ceiling; this measures the
 // floor a real hand plays on, which is the number a health total should be set against.
-function fight(seed, party, hp, deck, perks = [], hpMax = m.HERO_HP) {
+function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) {
     let st = m.startFight({
         seed,
         hero: { hp, hpMax },
@@ -58,6 +62,24 @@ function fight(seed, party, hp, deck, perks = [], hpMax = m.HERO_HP) {
     let guard = 0;
     while (!st.over && guard < 600) {
         guard += 1;
+        // ── AND A PLAYER DRINKS ──────────────────────────────────────────────────────────────────────────
+        // A belt that is never opened is a resource the measurement does not have, and the whole reason
+        // potions exist in their game is the room you should not have survived. Two rules, which is roughly
+        // what anybody does: if this swing kills you, drink the thing that stops it; if you are past the
+        // point where the fight is going well, drink the thing that ends it sooner.
+        if (belt && belt.length) {
+            const incomingNow = m.incomingTotal(st);
+            const save = incomingNow >= st.hero.hp + st.hero.block
+                ? (belt.includes("bark") ? "bark" : belt.includes("blood") ? "blood" : null) : null;
+            const push = !save && guard > 6 && st.hero.hp / hpMax < 0.6
+                ? (belt.includes("fury") ? "fury" : belt.includes("spark") ? "spark" : null) : null;
+            const sip = save || push;
+            if (sip) {
+                belt.splice(belt.indexOf(sip), 1);
+                st = m.drinkPotion(st, sip);
+                continue;
+            }
+        }
         // ⚠️ THE WHOLE PARTY, NOT THE FIRST ONE. `intentDamage(state, i)` is ONE creature's swing and defaults
         // to index 0; `incomingTotal` is the room. Blocking against a third of what is coming and eating the
         // rest is exactly how this simulator concluded the act was unsurvivable — and it is the same mistake
@@ -75,13 +97,23 @@ function fight(seed, party, hp, deck, perks = [], hpMax = m.HERO_HP) {
             st = m.playCard(st, lethal.uid, t.i).state;
             continue;
         }
-        // ── COVER THE WHOLE SWING, NOT A THIRD OF IT ─────────────────────────────────────────────────────
-        // The first cut played ONE block card against whatever was coming and then went back to attacking, so
-        // against a twenty-point turn it took fifteen on the chin every time and the act read as unsurvivable.
-        // Nobody plays like that. A competent hand keeps laying block until the incoming is covered or the
-        // cards run out, and only then spends what is left on damage — which is the single biggest difference
-        // between a player who finishes an act and one who does not.
-        if (incoming >= 5 && st.hero.block < incoming) {
+        // ── BLOCK WHAT MATTERS, RACE THE REST ────────────────────────────────────────────────────────────
+        // ⚠️ THIS POLICY HAS BEEN WRONG IN BOTH DIRECTIONS AND THE SECOND WAY WAS THE EXPENSIVE ONE. First it
+        // laid ONE block card against a twenty-point turn and ate fifteen; corrected, it laid block until every
+        // point of the swing was covered — and that reads as careful play but it is the losing line, because
+        // covering fourteen incoming with five-point Blocks costs the entire energy bar and the fight never
+        // ends. Five turns of full cover leaks more health than three turns of racing, which is why turtling
+        // put 98% of these runs in the ground and why no dial on the monsters could pull them out: the hand was
+        // never going to kill anything.
+        //
+        // What a competent player actually does is spend block only when the swing is big enough to be worth a
+        // card, or when they are hurt enough that chip damage is the thing that kills them — and otherwise
+        // takes the hit and removes a body, because a dead creature never swings again. One card at a time,
+        // re-reading the board after each, so it stops the moment the swing stops being frightening.
+        const bare = Math.max(0, incoming - st.hero.block);
+        const hurt = st.hero.hp / (st.hero.hpMax || m.HERO_HP) < 0.5;
+        const worthACard = bare >= st.hero.hp ? 1 : hurt ? 6 : 11;
+        if (bare >= worthACard) {
             const blocker = playable.find((c) => blockOf(c));
             if (blocker) { st = m.playCard(st, blocker.uid).state; continue; }
         }
@@ -110,8 +142,8 @@ const offerTier = (row) => (row < 5 ? 0 : row < 10 ? 1 : 2);
 
 function runOnce(seed) {
     const map = buildMap(seed >>> 0);
-    let hp = m.HERO_HP;
-    let hpMax = m.HERO_HP;
+    let hp = HERO_HP;
+    let hpMax = HERO_HP;
     let deck = [...m.STARTER_DECK];   // and STARTER_PERK, paid after every win below
     // ⚠️ THE SIM HAS TO SPEND THE MONEY, TOO. The first cut walked past every shop and every chest, took no
     // perk off an elite and drank nothing — and then reported that nobody finishes the act. Of course nobody
@@ -120,6 +152,7 @@ function runOnce(seed) {
     // building taken out.
     let perks = [m.STARTER_PERK];
     let potions = [];
+    let luck = POTION_DROP;
     let embers = 0;
     let removals = 0;
     let at = null;
@@ -132,7 +165,7 @@ function runOnce(seed) {
         if (!open.length) return { won: true, row: at?.row ?? 0, hp, log, deck: deck.length };
         // Hurt? take the fire. Otherwise anything — the shape of the path is the map's business, not the
         // health total's, and averaging over a thousand maps washes the choice out.
-        const pick = (hp / m.HERO_HP < 0.55 && open.find((n) => n.kind === "rest"))
+        const pick = (hp / hpMax < 0.55 && open.find((n) => n.kind === "rest"))
             || open[Math.floor(next() * open.length)];
         at = pick;
         const kind = pick.kind === "unknown" ? resolveUnknown(seed, pick.row) : pick.kind;
@@ -178,7 +211,7 @@ function runOnce(seed) {
             hp = Math.min(hpMax, hp + (m.POTIONS.blood?.heal || 12));
         }
         const before = hp;
-        const st = fight(encSeed, party, hp, deck, perks, hpMax);
+        const st = fight(encSeed, party, hp, deck, perks, hpMax, potions);
         const partyHp = party.reduce((n, p) => n + p.hp, 0);
         log.push({
             row: pick.row + 1, kind, enc: enc?.id || "?",
@@ -196,9 +229,12 @@ function runOnce(seed) {
         // Theirs drops a potion off roughly two combats in five, and three slots of them is a real second
         // resource: the thing that gets you through the room you should not have survived. Ours came only
         // out of chests, which is about one a run. POTION_DROP is the dial being tested here.
-        if (next() < POTION_DROP && potions.length < m.POTION_SLOTS) {
-            potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
-        }
+        // Self-correcting, the way the run row does it: kinder after a dry fight, meaner after a paid one,
+        // so the belt cannot stay empty for an act or overflow for one either.
+        if (next() * 100 < luck) {
+            luck = Math.max(0, luck - 10);
+            if (potions.length < m.POTION_SLOTS) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+        } else luck = Math.min(100, luck + 10);
         // An elite pays a perk for the health it just cost — and Ember Heart raises the bar it is measured against.
         if (kind === "elite") {
             const open = m.PERK_IDS.filter((id) => !perks.includes(id));
