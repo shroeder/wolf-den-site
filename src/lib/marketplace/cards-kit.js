@@ -1037,8 +1037,31 @@ export function tierOdds(maxTier = 1) {
     return [0.35, 0.42, 0.23];
 }
 
+/**
+ * ── WHAT A PET'S LEVEL BUYS ON A REWARD SCREEN ───────────────────────────────────────────────────────────
+ * Luke asked how levelling a pet should touch its card. The answer is that it changes how the card ARRIVES
+ * and never what it does: a level-five Bear hits for exactly what a level-one Bear hits for.
+ *
+ * ⚠️ THE NUMBERS STAY FIXED ON PURPOSE. The moment a card's damage depends on how long somebody has owned an
+ * animal, no fight can be balanced, no run can be handed to another member, and the collection quietly stops
+ * being the flavour of a deck and becomes its power curve. It is also unmeasurable — the simulator would be
+ * playing one game and the browser another, which is the exact fault that made every number it printed for a
+ * week meaningless (see the note on ownership in cards-run-sim).
+ *
+ * So a level does two legible things. It makes the card TURN UP more — your best animals appear in your runs
+ * — and at the top it makes the card turn up SHARPENED, which is a known quantity the balance already
+ * accounts for (their Molten Egg does exactly this) rather than a new number nobody can price.
+ */
+export const levelWeight = (level = 1, enshrined = false) => (enshrined ? 3 : [1, 1, 1.25, 1.6, 2, 2.5][Math.max(1, Math.min(5, level))]);
+
+/** Does a card off this pet arrive already sharpened? The top of the ladder, and the stone above it. */
+export const levelSharpens = (level = 1, enshrined = false, roll = 1) => {
+    if (enshrined || level >= 5) return true;
+    return level >= 4 && roll < 0.5;
+};
+
 /** Draw one card id from `pool`, weighted the way a reward screen should be. Returns [id, nextRng]. */
-export function drawOffer(pool, maxTier, rng) {
+export function drawOffer(pool, maxTier, rng, weightOf = null) {
     const odds = tierOdds(maxTier);
     const byTier = [1, 2, 3].map((t, i) => (odds[i] > 0 ? pool.filter((c) => (c.tier || 1) === t) : []));
     // A tier with nothing left in it hands its share to the others rather than returning nothing — a member
@@ -1052,7 +1075,14 @@ export function drawOffer(pool, maxTier, rng) {
     if (pick < 0) pick = live.findLastIndex((w) => w > 0);
     const list = byTier[pick];
     const [r2, next2] = nextRand(next);
-    return [list[Math.floor(r2 * list.length)], next2];
+    // Inside the tier, a pet you have levelled is likelier to be the one dealt — see levelWeight. Without a
+    // weigher this is the flat draw it always was.
+    if (!weightOf) return [list[Math.floor(r2 * list.length)], next2];
+    const weights = list.map((c) => Math.max(0.0001, weightOf(c)));
+    const sum = weights.reduce((n, w) => n + w, 0);
+    let want = r2 * sum;
+    const at = weights.findIndex((w) => { want -= w; return want <= 0; });
+    return [list[at < 0 ? list.length - 1 : at], next2];
 }
 
 // ── THE TEN CARDS EVERY RUN OPENS WITH ───────────────────────────────────────────────────────────────────

@@ -7,8 +7,8 @@ import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
-    beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, nextRand, perkSum, pickEncounter,
-    stopAt, unlockedCards,
+    beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, levelSharpens, levelWeight,
+    nextRand, perkSum, pickEncounter, stopAt, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -279,16 +279,57 @@ export async function bumpCardProgress(buyerId, field, { bestStop = 0 } = {}) {
     ).catch(() => {});
 }
 
+/**
+ * ── WHAT YOU OWN, AND HOW FAR YOU HAVE TAKEN IT ──────────────────────────────────────────────────────────
+ * Luke: "have you decided how we should incorporate pet upgrade levels impact on the cards?" — and the answer
+ * this returns the data for is: a level changes how a card ARRIVES, never what it does. See cardOffers.
+ *
+ * ⚠️ ONE QUERY, NOT THREE. Ownership, experience and the enshrinement stone in a single round trip, because
+ * this runs on every won fight and the shop shelf — and reaching for the convenient existing function three
+ * times is exactly the pattern that has billed a fortune here before (see the CLAUDE.md note on Active CPU).
+ * It replaces ownedPetIds on this path rather than joining it, so the count is unchanged.
+ *
+ * ⚠️ ::text ON BOTH SIDES OF EVERY JOIN. mkt_pet_level.buyer_id is UUID and mkt_pet_enshrined.buyer_id is
+ * TEXT; joining them raw is "operator does not exist: uuid = text", which db.query swallows into an empty
+ * array — and an empty array here is not an error anybody sees, it is every pet quietly reading as level 1.
+ * That exact trap already cost this feature its whole level-art feature once.
+ */
+export async function ownedPetLevels(buyerId) {
+    const rows = await db.query(
+        `SELECT u.ref AS pet_id, COALESCE(l.xp, 0) AS xp, e.stone
+           FROM mkt_cosmetic_unlock u
+           LEFT JOIN mkt_pet_level l
+                  ON l.buyer_id::text = u.buyer_id::text AND l.pet_id = u.ref
+           LEFT JOIN mkt_pet_enshrined e
+                  ON e.buyer_id::text = u.buyer_id::text AND e.pet_id = u.ref
+          WHERE u.buyer_id = $1 AND u.category = 'pet'`,
+        [buyerId]
+    ).catch(() => []);
+    const out = new Map();
+    for (const r of rows || []) {
+        const rarity = collectibleById(r.pet_id)?.rarity || "common";
+        out.set(r.pet_id, {
+            level: petLevelForXp(r.xp, rarity),
+            enshrined: Boolean(r.stone),
+        });
+    }
+    return out;
+}
+
 export async function eligibleCards(buyerId, run) {
-    const [have, progress] = await Promise.all([ownedPetIds(buyerId), cardProgress(buyerId)]);
+    const [levels, progress] = await Promise.all([ownedPetLevels(buyerId), cardProgress(buyerId)]);
+    const have = new Set(levels.keys());
     const earned = unlockedCards(progress);
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind, run.act || 1).offer;
     // A CARD YOU EARNED BY PLAYING IGNORES THE PET GATE. That is the entire point of it — see the note above
     // UNLOCKS — but it still obeys DEPTH, because tier is about what a fight at this stop should be handing
     // you and has nothing to do with how you came by the card.
-    return [...Object.values(POOL), ...Object.values(UNLOCKS)]
+    const cards = [...Object.values(POOL), ...Object.values(UNLOCKS)]
         .filter((c) => c.tier <= maxTier)
         .filter((c) => earned.has(c.id) || have.has(c.pet) || BASIC_UNLOCKS.includes(c.id));
+    // The levels ride back with the cards because the reward screen needs both and the query has already
+    // been paid for — see cardOffers.
+    return { cards, levels };
 }
 
 // ── THE CARD IS YOUR PET, AT THE LEVEL YOU HAVE IT AT ────────────────────────────────────────────────────
@@ -392,7 +433,7 @@ export async function petArtFor(buyerId, cardIds = []) {
 }
 
 export async function cardOffers(buyerId, run) {
-    const eligible = await eligibleCards(buyerId, run);
+    const { cards: eligible, levels } = await eligibleCards(buyerId, run);
 
     // Threaded off the run's own seed and its stop, so the same run re-offers the same three cards if the
     // page is reloaded before a pick is made — reloading is not a reroll.
@@ -406,20 +447,41 @@ export async function cardOffers(buyerId, run) {
     const many = 3 + perkSum(run.perks, "offerPlus");
     // Weighted by tier rather than drawn flat — see tierOdds. The room's own `offer` is the ceiling.
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind, run.act || 1).offer;
+    // ── AND A PET YOU HAVE LEVELLED TURNS UP MORE ────────────────────────────────────────────────────
+    // The first of the two things a level buys. A card whose pet is level five is two and a half times as
+    // likely to be the one dealt as a level-one; an enshrined one, three. Nothing about the card changes —
+    // see the note on levelWeight for why that is the whole design and not a compromise.
+    const weigh = (c) => {
+        const at = levels.get(c.pet);
+        return at ? levelWeight(at.level, at.enshrined) : 1;
+    };
     while (out.length < many && pool.length) {
-        const [card, next] = drawOffer(pool, maxTier, roll);
+        const [card, next] = drawOffer(pool, maxTier, roll, weigh);
         roll = next;
         if (!card) break;
         pool.splice(pool.indexOf(card), 1);
         out.push(card.id);
     }
     // ── AND WHETHER THEY ARRIVE SHARPENED ────────────────────────────────────────────────────────────
+    // Two ways a card can land already upgraded, and they are the same mechanic wearing two hats.
+    //
     // A Molten Egg upgrades every ATTACK it is offered — not the skills, not the powers, which is what keeps
     // it from being simply "all your rewards are better" and makes it a relic that shapes what you take.
-    if (perkSum(run.perks, "eggUpgrades")) {
-        return out.map((id) => (cardById(id)?.kind === "attack" && canUpgrade(id) ? upgradedId(id) : id));
-    }
-    return out;
+    //
+    // A LEVEL FIVE PET ALWAYS DOES, and a level four half the time — the second thing a level buys. An
+    // upgraded card is a quantity the balance already accounts for (it is what a campfire hands out), which
+    // is precisely why this is the safe way to let a collection matter: it moves a card up a rung everyone
+    // can already reach rather than inventing a number nobody can price.
+    const egg = perkSum(run.perks, "eggUpgrades");
+    return out.map((id) => {
+        const card = cardById(id);
+        if (!card || !canUpgrade(id)) return id;
+        const at = levels.get(card.pet);
+        const [r, next] = nextRand(roll);
+        roll = next;
+        const sharp = (at && levelSharpens(at.level, at.enshrined, r)) || (egg && card.kind === "attack");
+        return sharp ? upgradedId(id) : id;
+    });
 }
 
 /**
@@ -524,14 +586,19 @@ export function potionDrop(run, row, lane) {
  * is which pets they own.
  */
 export async function shopStock(buyerId, run, seed) {
-    const eligible = await eligibleCards(buyerId, run);
+    const { cards: eligible, levels } = await eligibleCards(buyerId, run);
     let roll = (seed >>> 0) + 104729;
     const pool = [...eligible];
     const cardIds = [];
+    // The shelf reads a level the same way the reward screen does — see levelWeight. A member who has
+    // levelled a Bear should meet the Bear, wherever cards are handed out.
+    const weigh = (c) => { const at = levels.get(c.pet); return at ? levelWeight(at.level, at.enshrined) : 1; };
     while (cardIds.length < SHOP.cards && pool.length) {
-        const [r, next] = nextRand(roll);
+        const [card, next] = drawOffer(pool, 3, roll, weigh);
         roll = next;
-        cardIds.push(pool.splice(Math.floor(r * pool.length), 1)[0].id);
+        if (!card) break;
+        pool.splice(pool.indexOf(card), 1);
+        cardIds.push(card.id);
     }
     // Nothing already carried: a shop offering a perk you hold or a potion slot you cannot fill is a slot
     // that wastes the visit.
