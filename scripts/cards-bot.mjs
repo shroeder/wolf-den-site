@@ -135,10 +135,16 @@ const readScreen = async () => js(`(() => {
     const over = has('.cf-choose');
     const title = t('.cf-title span');
     return {
-        screen: has('.cs') ? 'shop' : has('.cr') ? 'room' : has('.cm') ? 'map' : has('.cf-field') ? 'fight' : 'unknown',
+        screen: has('.cs') ? 'shop' : has('.cv') ? 'event' : has('.cr') ? 'room' : has('.cm') ? 'map' : has('.cf-field') ? 'fight' : 'unknown',
+        eventName: t('.cv-name'),
+        eventChoices: [...document.querySelectorAll('.cv-do')].map((b) => ({
+            label: b.querySelector('b')?.textContent?.trim() || null, off: b.disabled,
+        })),
+        eventPicking: has('.cv-pick'),
+        eventDone: has('.cv-got'),
         over, title,
-        hp: t('.cm-hp') || t('.cr-hp') || t('.cs-hp') || (document.querySelectorAll('.cfb-hp')[0]?.textContent?.trim() ?? null),
-        embers: t('.cm-em') || t('.cr-em') || t('.cs-em') || t('.cf-embers'),
+        hp: t('.cm-hp') || t('.cr-hp') || t('.cs-hp') || t('.cv-hp') || (document.querySelectorAll('.cfb-hp')[0]?.textContent?.trim() ?? null),
+        embers: t('.cm-em') || t('.cr-em') || t('.cs-em') || t('.cv-em') || t('.cf-embers'),
         turn: t('.cf-turn'),
         energy: t('.cf-energy-n'),
         offers: document.querySelectorAll('.cf-offer').length,
@@ -228,6 +234,36 @@ while (runs < RUNS && steps < MAX_STEPS) {
         note(`  map ${st.hp} ${st.embers || ""} → ${pick.label}`);
         await tap(".cm-node", pick.i);
         await sleep(2600);
+        continue;
+    }
+
+    // ── A ROOM WITH WRITING IN IT ────────────────────────────────────────────────────────────────────────
+    // ⚠️ THE BOT SAT ON ONE FOR 339 STEPS. Events landed and nothing here knew the screen, so `unknown` came
+    // back over and over and the run never moved — which is the whole argument for this bot existing: the
+    // simulator had been happily playing events for an hour and could not have told me the interface was a
+    // dead end. Takes the first choice it can afford (the disabled ones say so on the plate), answers the
+    // picker if the choice asks which card, then leaves.
+    if (st.screen === "event") {
+        if (st.eventPicking) {
+            note("  event: choosing a card");
+            await tap(".cv-card:not(.is-done)");
+            await sleep(1800);
+            await shot("event-done");
+            await tap(".cv-leave");
+            await sleep(2400);
+            continue;
+        }
+        if (!st.eventDone) {
+            const take = st.eventChoices.findIndex((c) => !c.off);
+            note(`  event: ${st.eventName} → ${st.eventChoices[take]?.label || "(nothing available)"}`);
+            if (take > -1) {
+                await tap(".cv-do", take);
+                await sleep(1900);
+                await shot("event-done");
+            }
+        }
+        await tap(".cv-leave");
+        await sleep(2400);
         continue;
     }
 

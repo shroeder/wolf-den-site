@@ -30,6 +30,12 @@ export const QUIET_SEEN = [
 // Overlays with no marker to seed — they are server-driven, so the only way to be rid of them is a stylesheet.
 // The happy-hour card has no class at all and is matched through the dialog it wraps.
 export const QUIET_HIDE = [
+    // ── THE DEV SERVER'S OWN BADGE ───────────────────────────────────────────────────────────────────
+    // Next puts a round dark button with its N logo in the bottom-left corner of every page in dev, and it
+    // is drawn OVER everything — it sat on top of the card game's "Move on" ribbon and ate the M, which
+    // reads in a screenshot exactly like a site element covering the way out of a room. Nothing in
+    // production has it; hiding it here stops the rig reporting a bug that does not exist.
+    "nextjs-portal", "[data-nextjs-toast]", "#__next-build-watcher",
     ".checkin-overlay",
     // ── THE BADGE POP ────────────────────────────────────────────────────────────────────────────────
     // It is marked seen on DISMISS and server-side, deliberately — a tab closed mid-read should hand the

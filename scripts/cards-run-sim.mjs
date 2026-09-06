@@ -165,7 +165,7 @@ function runOnce(seed) {
     let perks = [m.STARTER_PERK];
     let potions = [];
     let luck = POTION_DROP;
-    let embers = 0;
+    let embers = 60;   // the purse a run is dealt — see newRun in cards.js
     let removals = 0;
     let at = null;
     let recent = [];
@@ -243,8 +243,23 @@ function runOnce(seed) {
                     + (e.fight ? -14 : 0) + (e.wake || 0) * -16 + Math.min(0, cost) * 1.15
                     - (c.cost || 0) * 0.1;
             };
-            const best = ev.choices.map((c, i) => ({ c, i })).sort((a, b) => worth(b.c) - worth(a.c))[0];
+            // A room that can be searched again gets searched again, while it is worth it and while there is
+            // health to pay for it — which is the decision Dead Adventurer and the Scrap Ooze are made of.
+            const taken = new Set();
+            let best = ev.choices.map((c, i) => ({ c, i })).filter((x) => !taken.has(x.i))
+                .sort((a, b) => worth(b.c) - worth(a.c))[0];
             let out = applyEventChoice(box, ev, best.i, null);
+            let guard = 0;
+            while (out.more && guard++ < 4) {
+                taken.add(best.i);
+                hp = box.hp; hpMax = box.hpMax; embers = box.embers || 0;
+                const next = ev.choices.map((c, i) => ({ c, i }))
+                    .filter((x) => !taken.has(x.i) && !(box.at.used || []).includes(x.i))
+                    .sort((a, b) => worth(b.c) - worth(a.c))[0];
+                if (!next || worth(next.c) <= 0) break;
+                best = next;
+                out = applyEventChoice(box, ev, best.i, null);
+            }
             if (out.pending) {
                 // Which card: the worst one you own to burn, the biggest hitter to sharpen.
                 const card = out.pending === "remove"

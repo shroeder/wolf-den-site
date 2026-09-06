@@ -55,6 +55,10 @@ export default function CardEvent({ run, art = {} }) {
     const Mark = MARK[ev?.icon] || GiStoneBlock;
     const pending = at.pending || null;
     const done = Boolean(at.spent);
+    // A room you can stay in remembers which plates you have already pressed — see the note on `again` in
+    // the resolver. They stay on screen, greyed, because "you already took that one" is the information the
+    // next decision is made against.
+    const used = at.used || [];
     const deck = run.deck || [];
 
     const post = useCallback(async (extra) => {
@@ -115,7 +119,7 @@ export default function CardEvent({ run, art = {} }) {
 
                 {/* ── WHAT IT DID ── in the room, in words, before you are allowed to leave it. The chest
                     taught this lesson once already: a payout you cannot see is not a payout. */}
-                {done ? (
+                {done || used.length ? (
                     <div className="cv-got">
                         {(at.said || []).map((line, i) => <span key={i} className="cv-gain">{line}</span>)}
                         {!(at.said || []).length ? <span className="cv-gain is-quiet">You leave it alone.</span> : null}
@@ -131,14 +135,16 @@ export default function CardEvent({ run, art = {} }) {
                     <div className="cv-choices">
                         {ev.choices.map((c, i) => {
                             const tooPoor = Boolean(c.cost) && (run.embers || 0) < c.cost;
+                            const spent = used.includes(i);
                             return (
-                                <button key={i} type="button" className="cv-do" disabled={busy || tooPoor}
+                                <button key={i} type="button" className={`cv-do${spent ? " is-spent" : ""}`}
+                                    disabled={busy || tooPoor || spent}
                                     onClick={() => post({ index: i })}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img className="cv-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                                     <span className="cv-do-text">
                                         <b>{c.label}</b>
-                                        <i>{tooPoor ? `${c.detail} — you cannot afford it` : c.detail}</i>
+                                        <i>{spent ? "Already searched." : tooPoor ? `${c.detail} — you cannot afford it` : c.detail}</i>
                                     </span>
                                 </button>
                             );
@@ -226,6 +232,7 @@ export default function CardEvent({ run, art = {} }) {
                 .cv-do { position: relative; display: block; width: 100%; padding: 0; border: 0;
                     background: none; cursor: pointer; }
                 .cv-do:disabled { cursor: default; opacity: 0.5; }
+                .cv-do.is-spent { opacity: 0.34; }
                 .cv-plate { display: block; width: 100%; height: 100%; position: absolute; inset: 0;
                     object-fit: fill; pointer-events: none; }
                 .cv-do-text { position: relative; display: flex; flex-direction: column; gap: 2px;

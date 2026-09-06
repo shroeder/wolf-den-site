@@ -6,7 +6,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
-    POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
+    HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
     beltSize, buildShop, canUpgrade, cardById, encounterById, nextRand, pickEncounter, stopAt,
     unlockedCards,
     upgradedId,
@@ -153,8 +153,18 @@ const newRun = (seed) => ({
     bossOffers: null,   // the three boss trinkets on the table, between the boss dying and the next act
     at: null,
     trail: [],
-    hp: 70, hpMax: 70,
-    embers: 0,             // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
+    // ⚠️ NOT A NUMBER TYPED HERE. This was `hp: 70, hpMax: 70` — a second copy of the hero's health living
+    // one file away from HERO_HP — so the day the bar changed, the rules said 80 and every run actually dealt
+    // still opened on 70. A copied constant runs a second, wrong game: the simulator measured one hero and
+    // the browser handed out another.
+    hp: HERO_HP, hpMax: HERO_HP,
+    // ── AND A PURSE TO START WITH ────────────────────────────────────────────────────────────────────
+    // ⚠️ THEIRS HANDS YOU 99 GOLD BEFORE THE FIRST ROOM and ours handed you nothing, which quietly killed
+    // every early room that asks for money: photographed on a real run, the Bonesetter offered a heal for 45
+    // and a card burned for 75 and BOTH were greyed out, so a written room with three choices in it was a
+    // room with one. Their whole opening — a shop on floor 4 you can actually buy from, a Cleric you can pay
+    // — depends on the purse existing. Priced at the same 60% our shelf is priced at against theirs.
+    embers: 60,            // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
     // ⚠️ YOU START HOLDING ONE. Theirs does — every character opens with a relic and the Ironclad's heals 6
     // after every win. See STARTER_PERK: it is what makes an act survivable without making a fight easy.
     perks: [STARTER_PERK],

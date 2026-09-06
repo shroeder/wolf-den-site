@@ -66,9 +66,9 @@ export const EVENTS = [
         id: "fallen", act: 1, name: "The Fallen Runner", icon: "corpse",
         say: "He got further than most. Whatever stopped him is still close enough to smell.",
         choices: [
-            { label: "Search his pack", detail: "60 embers. Something is listening.", effect: { embers: 60, wake: 0.25 } },
-            { label: "Search his belt", detail: "A potion. Something is closer.", effect: { potion: 1, wake: 0.55 } },
-            { label: "Take his charm", detail: "A trinket. It has found you.", effect: { perk: 1, wake: 1 } },
+            { label: "Search his pack", detail: "60 embers. Something is listening.", again: true, effect: { embers: 60, wake: 0.25 } },
+            { label: "Search his belt", detail: "A potion. Something is closer.", again: true, effect: { potion: 1, wake: 0.55 } },
+            { label: "Take his charm", detail: "A trinket. It has found you.", again: true, effect: { perk: 1, wake: 1 } },
             { label: "Leave him be", detail: "Walk on.", effect: {} },
         ],
     },
@@ -159,9 +159,9 @@ export const EVENTS = [
         id: "ooze", act: 0, name: "The Scrap Ooze", icon: "ooze",
         say: "There is metal in it. Some of the metal is moving on its own.",
         choices: [
-            { label: "Reach in", detail: "Lose 4 health. It might hold a trinket.", effect: { hp: -4, maybePerk: 0.3 } },
-            { label: "Reach in again", detail: "Lose 4 health. Likelier now.", effect: { hp: -4, maybePerk: 0.55 } },
-            { label: "Once more", detail: "Lose 4 health. It is nearly certain.", effect: { hp: -4, maybePerk: 0.85 } },
+            { label: "Reach in", detail: "Lose 4 health. It might hold a trinket.", again: true, effect: { hp: -4, maybePerk: 0.3 } },
+            { label: "Reach in again", detail: "Lose 4 health. Likelier now.", again: true, effect: { hp: -4, maybePerk: 0.55 } },
+            { label: "Once more", detail: "Lose 4 health. It is nearly certain.", again: true, effect: { hp: -4, maybePerk: 0.85 } },
             { label: "Wipe your hand and go", detail: "Walk on.", effect: {} },
         ],
     },
@@ -334,6 +334,18 @@ export function applyEventChoice(run, ev, index, card = null) {
         return { said, fight: true };
     }
 
-    run.at = { ...run.at, pending: null, said, spent: true };
-    return { said };
+    // ── THE ROOMS YOU CAN STAY IN ────────────────────────────────────────────────────────────────────
+    // ⚠️ AN ESCALATING ROOM THAT CLOSES AFTER ONE CHOICE IS NOT AN ESCALATING ROOM. Dead Adventurer and the
+    // Scrap Ooze are their two best events and both are built on the SAME choice offered again, worth more
+    // and likelier to end badly each time — the whole thing is the third search, the one you make against
+    // your own judgement. Photographed on a real run, ours paid 60 embers and then had nothing left but
+    // "Move on", which is a room with one door and a paragraph.
+    //
+    // A choice marked `again` keeps the room open and remembers itself in `used`, so the plate greys out and
+    // the ones under it stay live. The room ends when a choice without `again` is taken, when the thing in
+    // it wakes, or when the player walks away — which is theirs exactly.
+    const used = [...(run.at?.used || []), index];
+    const more = choice.again && used.length < ev.choices.length - 1;
+    run.at = { ...run.at, pending: null, used, spent: !more, said: [...(more ? (run.at?.said || []) : []), ...said] };
+    return { said, more };
 }
