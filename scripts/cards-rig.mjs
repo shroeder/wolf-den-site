@@ -82,6 +82,24 @@ if (cmd === "event") {
     console.log("seed", state.seed, "| act", state.act || 1);
 }
 
+// Stand the run in a room, without playing to it — for filming a screen rather than reaching one.
+// e.g. node scripts/cards-rig.mjs stand rest
+if (cmd === "stand") {
+    const kind = process.argv[3] || "rest";
+    const row = (await sql`SELECT state FROM mkt_cards_run WHERE buyer_id = ${owner.id}::uuid`)[0];
+    if (!row) throw new Error("no run — load the page once first");
+    const state = row.state;
+    const node = (state.map?.nodes || []).find((n) => n.kind === kind) || { row: 0, lane: 0 };
+    state.at = { row: node.row, lane: node.lane, kind, rested: false, opened: null };
+    state.stop = node.row + 1;
+    state.trail = [...(state.trail || []), { row: node.row, lane: node.lane }];
+    state.done = null;
+    state.hp = Math.max(1, Math.round(state.hpMax * 0.6));
+    await sql.query(`UPDATE mkt_cards_run SET state = $1::jsonb WHERE buyer_id = $2`,
+        [JSON.stringify(state), owner.id]);
+    console.log(`standing at a ${kind}, row ${node.row}, deck of ${state.deck.length}, hp ${state.hp}/${state.hpMax}`);
+}
+
 if (cmd === "restore") {
     if (!existsSync(BAK)) throw new Error("no backup file");
     const { run, prog } = JSON.parse(readFileSync(BAK, "utf8"));

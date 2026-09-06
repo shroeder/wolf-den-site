@@ -7,7 +7,7 @@ import {
     GiSlowBlob, GiSmallFire, GiThunderStruck,
 } from "react-icons/gi";
 
-import { KEYWORDS, typeLook, upgradedFields } from "@/lib/marketplace/cards-kit.js";
+import { KEYWORDS, baseIdOf, typeLook, upgradedFields } from "@/lib/marketplace/cards-kit.js";
 import { RARITY_META } from "@/lib/marketplace/rarity.js";
 
 // ── ONE CARD, DRAWN THE SAME WHEREVER IT IS ──────────────────────────────────────────────────────────────────
@@ -192,11 +192,16 @@ const CardArt = ({ card, pet }) => {
         return <span className="cf-status-mark"><Mark aria-hidden="true" /></span>;
     }
     if (!noArt) {
+        // WARNING: THE BASE ID, NOT THE CARD ID. A handful of cards have a painted illustration of their own
+        // (bite, hop, pounce, purr) and an upgraded copy travels as "bite+" — for which there is no file, so
+        // the image 404d and fell back to the pet sprite. Filmed at a campfire: you tapped a Bite showing its
+        // painted wolf and got back a Bite+ wearing a completely different animal, which reads as the smith
+        // having swapped your card. The suffix is a rules concept; the picture belongs to the card underneath.
         // eslint-disable-next-line @next/next/no-img-element
         return (
             <img
                 ref={img}
-                className="cf-art-full" src={`/images/cards/${card.id}.webp`} alt="" draggable="false"
+                className="cf-art-full" src={`/images/cards/${baseIdOf(card.id)}.webp`} alt="" draggable="false"
                 onError={() => setNoArt(true)}
             />
         );

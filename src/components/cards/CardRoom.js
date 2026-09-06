@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
@@ -56,6 +57,13 @@ export default function CardRoom({ run, art = {} }) {
     // The fire asks a question now (see the note by the buttons) and the answer is a card, so the
     // picker is the same shape the brazier in the shop already uses.
     const [picking, setPicking] = useState(false);
+    // ── THE CARD THAT IS IN THE FIRE RIGHT NOW ───────────────────────────────────────────────────────
+    // `from` is the card you chose and `to` is what it becomes; `turned` flips at the flash, which is the
+    // frame the face swaps on. Held on the client because the SERVER only ever reports the finished card —
+    // and the whole point of this screen is the half-second where it is neither.
+    const [forge, setForge] = useState(null);
+    const timers = useRef([]);
+    useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
     const at = run.at || {};
     const room = ROOM[at.kind] || ROOM.rest;
@@ -89,6 +97,32 @@ export default function CardRoom({ run, art = {} }) {
         setPicking(false);
         router.refresh();
     }, [busy, router]);
+
+    // ── HOLDING IT IN THE COALS ──────────────────────────────────────────────────────────────────────
+    // Theirs flies the chosen card to the middle of the screen, blows a white-gold flash through it and lets
+    // you WATCH it become the upgraded card — the "+" arrives, the numbers go green — and it is a ceremony
+    // on purpose, because a smith is the thing you gave up a heal for. Ours tapped a card, closed a modal
+    // with no feedback at all, and then showed a DIFFERENT, already-upgraded card at 130px near the floor.
+    // The information was right and the moment was missing, and worse: nothing tied the card you picked to
+    // the card you got.
+    //
+    // The request goes out at the same instant the card starts moving, so the fire is not waiting on the
+    // network — by the time the animation lands the server has long since answered.
+    const forgeCard = useCallback(async (id, index) => {
+        if (busy || forge) return;
+        setBusy(true);
+        setSaid(null);
+        setPicking(false);
+        setForge(id);
+        const sent = fetch("/api/marketplace/cards/run", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "smith", index }),
+        }).catch(() => null);
+        await Promise.all([sent, new Promise((r) => { timers.current.push(setTimeout(r, FORGE_MS)); })]);
+        setBusy(false);
+        setForge(null);
+        router.refresh();
+    }, [busy, forge, router]);
 
     return (
         <div className={`cr ${panelFont.className}`} style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
@@ -239,7 +273,7 @@ export default function CardRoom({ run, art = {} }) {
                                     <button key={`${id}-${i}`} type="button"
                                         className={`cr-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                         aria-label={can ? `Sharpen ${c.name}` : `${c.name}, already sharpened`}
-                                        onClick={() => post("smith", { index: i })}>
+                                        onClick={() => forgeCard(id, i)}>
                                         <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                     </button>
                                 );
@@ -249,6 +283,8 @@ export default function CardRoom({ run, art = {} }) {
                     </div>
                 ) : null}
             </div>
+
+            {forge ? <CardForge card={forge} art={art} /> : null}
 
             {/* The map's ribbon, so leaving looks the same wherever you are leaving from. */}
             <div className="cr-foot">

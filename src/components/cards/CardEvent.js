@@ -11,7 +11,7 @@
 // Built on the campfire's own screen (CardRoom): the same alcove behind it, the same sticky bar of health,
 // embers and belt, the same ribbon out. A room that invented its own furniture would read as a different
 // game, and the whole point of a question mark is that you did not know which room you were walking into.
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import {
@@ -20,6 +20,7 @@ import {
 } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { cardById, canUpgrade, POTIONS } from "@/lib/marketplace/cards-kit.js";
 import { eventById } from "@/lib/marketplace/cards-events.js";
 
@@ -50,6 +51,11 @@ export default function CardEvent({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState(null);
+    // A shrine that sharpens a card is doing what a campfire does, so it looks like what a campfire does —
+    // see CardForge. Burning a card is a different act and does not borrow the ceremony.
+    const [forge, setForge] = useState(null);
+    const timers = useRef([]);
+    useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
     const at = run.at || {};
     const ev = eventById(at.event);
@@ -79,6 +85,23 @@ export default function CardEvent({ run, art = {} }) {
         if (r?.error && r.error !== "already_chosen") { setSaid("Nothing comes of it."); return; }
         router.refresh();
     }, [busy, router]);
+
+    // The same shape the campfire's smith uses: the request goes out as the card starts moving, so the fire
+    // is never waiting on the network.
+    const sharpen = useCallback(async (index, card) => {
+        if (busy || forge) return;
+        setBusy(true);
+        setSaid(null);
+        setForge(card);
+        const sent = fetch("/api/marketplace/cards/run", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "choose", index, card }),
+        }).catch(() => null);
+        await Promise.all([sent, new Promise((r) => { timers.current.push(setTimeout(r, FORGE_MS)); })]);
+        setBusy(false);
+        setForge(null);
+        router.refresh();
+    }, [busy, forge, router]);
 
     const leave = useCallback(async () => {
         if (busy) return;
@@ -174,7 +197,9 @@ export default function CardEvent({ run, art = {} }) {
                                         <button key={`${id}-${i}`} type="button"
                                             className={`cv-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                             aria-label={`${pending.need === "remove" ? "Burn" : "Sharpen"} ${c.name}`}
-                                            onClick={() => post({ index: pending.choice, card: id })}>
+                                            onClick={() => (pending.need === "upgrade"
+                                                ? sharpen(pending.choice, id)
+                                                : post({ index: pending.choice, card: id }))}>
                                             <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                         </button>
                                     );
@@ -184,6 +209,8 @@ export default function CardEvent({ run, art = {} }) {
                     </div>
                 ) : null}
             </div>
+
+            {forge ? <CardForge card={forge} art={art} /> : null}
 
             <div className="cv-foot">
                 <button type="button" className="cv-leave" disabled={busy || (!done && !pending && false)} onClick={leave}>
