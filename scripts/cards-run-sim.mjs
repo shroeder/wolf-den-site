@@ -96,6 +96,19 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) 
         // against — blocking a third of what is coming and eating the rest is how this simulator once
         // concluded the act was unsurvivable.
         const incoming = m.incomingTotal(st);
+        // ── LAY THE POWER DOWN FIRST, WHILE THERE ARE TURNS LEFT TO SPEND IT ─────────────────────────────
+        // ⚠️ A POWER HAS NO DAMAGE AND NO BLOCK, so a policy that sorts by those two numbers plays Demon Form
+        // last — after the attacks, on the turn it stops being worth anything — or never plays it at all.
+        // Their value is entirely in the turns that come AFTER, which is why they are the cards that win long
+        // fights, and a simulator that cannot see that would have reported the whole scaling pool as useless.
+        const partyLeft = st.foes.reduce((n, f) => n + Math.max(0, f.hp), 0);
+        const power = st.hand.filter((c) => m.canPlay(st, c.uid)).find((c) => {
+            const k = m.cardById(c.id) || {};
+            return (k.strengthEach || k.blockEach || k.energyEach || k.blockKeeps)
+                && st.turn <= 4 && partyLeft > 45;
+        });
+        if (power) { st = m.playCard(st, power.uid).state; continue; }
+
         // ── KILL IT IF IT CAN BE KILLED ──────────────────────────────────────────────────────────────────
         // The best play in this game is almost always removing a body: it takes a whole creature's damage off
         // every remaining turn at once. A policy that does not look for lethal is measuring a worse player
@@ -148,7 +161,15 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) 
 
 // Every card the reward screen could offer, by tier — the sim takes one after every win, which is what a run
 // actually does. It takes the best damage card it is shown, which is what most people do.
-const POOL_BY_TIER = [1, 2, 3].map((t) => Object.values(m.POOL || {}).filter((c) => (c.tier || 1) === t).map((c) => c.id));
+// ── ⚠️ THE POOL A REAL PLAYER SEES IS NOT THE POOL ─────────────────────────────────────────────────────────
+// A card is offered only if you OWN ITS PET (see eligibleCards) — that is the whole identity of this deck, and
+// it means the pool in cards-kit is a ceiling rather than a hand. Measured against the owner's real
+// collection: 20 of 52, and five of sixteen at tier three. Every number this simulator printed before this
+// dial existed was for a player who owns every animal in the Den.
+//   --cards a,b,c   restrict the offer pool to these ids (what one member can actually be dealt)
+const ONLY = (() => { const i = process.argv.indexOf("--cards"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
+const POOL_BY_TIER = [1, 2, 3].map((t) => Object.values(m.POOL || {})
+    .filter((c) => (c.tier || 1) === t && (!ONLY || ONLY.has(c.id))).map((c) => c.id));
 const offerTier = (row) => (row < 5 ? 0 : row < 10 ? 1 : 2);
 const encSeedFor = (seed, at) => ((seed >>> 0) + (at.row * 31 + at.lane) * 104729) >>> 0;
 
@@ -337,12 +358,20 @@ function runOnce(seed) {
         const tier = POOL_BY_TIER[offerTier(pick.row)] || POOL_BY_TIER[0];
         if (tier.length) {
             const offer = [0, 1, 2].map(() => tier[Math.floor(next() * tier.length)]);
+            // Scored the way a player scores at a glance: what it does per point of energy, with the cards
+            // whose value is in LATER turns counted for what they compound into rather than for the nothing
+            // they do the turn they are played.
             const worth = (id) => {
                 const c = m.cardById(id) || {};
                 const hits = c.hits || 1;
                 const raw = (c.damage || 0) * hits * (c.all ? 1.6 : 1) + (c.block || 0) * 0.8
                     + (c.heal || 0) * 0.7 + (c.strength || 0) * 6 + (c.draw || 0) * 4 + (c.energy || 0) * 5
-                    + (c.vulnerable || 0) * 2 + (c.weak || 0) * 2;
+                    + (c.vulnerable || 0) * 2 + (c.weak || 0) * 2
+                    // A fight runs four turns or so; a power is worth roughly that many payouts.
+                    + (c.strengthEach || 0) * 22 + (c.blockEach || 0) * 7 + (c.energyEach || 0) * 18
+                    + (c.blockKeeps ? 16 : 0) + (c.strengthMult ? 7 : 0) + (c.damageFromBlock ? 9 : 0)
+                    + (c.blockDouble ? 8 : 0) + (c.strengthDouble ? 10 : 0) + (c.thorns || 0) * 2
+                    + (c.foeStrength || 0) * 5 - (c.selfHp || 0) * 1.2;
                 return raw / Math.max(1, c.cost || 1);
             };
             deck = [...deck, offer.slice().sort((a, b) => worth(b) - worth(a))[0]];

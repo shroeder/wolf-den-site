@@ -114,6 +114,31 @@ const PERK_ART = {
         + "to hold bottles, the leather darkened where the loops sit.",
     grindstone: "A small round hand grindstone of grey rough grit on a short iron spindle with a wooden "
         + "crank handle, bright metal filings caught in its rim.",
+
+    // ── AND THE TEN THAT CAME WITH THE SCALING CARDS ── same rule: a kept object somebody carried.
+    anchor: "A small rust-pitted iron boat anchor with one bent fluke, a short length of frayed rope still "
+        + "knotted through its ring.",
+    mango: "A single ripe mango, its skin blushing red into gold, one slice cut away to show the deep orange "
+        + "flesh and the pale flat stone inside.",
+    smooth_stone: "A flat oval river stone of pale grey, worn perfectly smooth and slightly dished on one "
+        + "face, with a single darker band running across it.",
+    red_mask: "A carved wooden face mask painted dull red, with narrow slit eyes and a grim flat mouth, its "
+        + "paint chipped at the brow and a leather tie hanging from one side.",
+    paper_frog: "A small folded paper frog of creased crimson paper, sharply origami-angled, sitting squat "
+        + "with its folded hind legs tensed to jump.",
+    magic_flower: "A single pale blue flower with six long petals on a slender green stem, faintly glowing at "
+        + "its golden centre, one leaf curling from the stalk.",
+    // Came back once on a pale rectangular panel instead of on nothing — the fan's own paper leaf is a flat
+    // light shape and the model kept reading it as a card to draw ON. Says "no backing" out loud now.
+    toy_fan: "A small folding hand fan opened into a fan shape, its leaf deep teal painted with a curling "
+        + "wave, ribs of dark split bamboo and a red cord tassel swinging from the pivot. Nothing behind it "
+        + "at all: no panel, no card, no paper backing, no rectangle.",
+    lizard_tail: "A severed lizard's tail of green-brown scales, tapering and slightly curled, the cut end "
+        + "clean and already beading with a bright regrowing bud.",
+    question_card: "A single face-down playing card of dark blue with a worn gilt border, a large pale "
+        + "question mark stamped at its centre, one corner softly bent.",
+    molten_egg: "A large dark stone egg cracked in a web of fissures with hot orange light glowing out of "
+        + "them, resting in a small nest of blackened wire.",
 };
 
 const JOBS = [

@@ -7,7 +7,7 @@ import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
-    beltSize, buildShop, canUpgrade, cardById, encounterById, nextRand, pickEncounter, stopAt,
+    beltSize, buildShop, canUpgrade, cardById, encounterById, nextRand, perkSum, pickEncounter, stopAt,
     unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
@@ -399,10 +399,21 @@ export async function cardOffers(buyerId, run) {
     let roll = (run.seed >>> 0) + run.stop * 7919;
     const pool = [...eligible];
     const out = [];
-    while (out.length < 3 && pool.length) {
+    // ── HOW MANY ARE ON THE TABLE ────────────────────────────────────────────────────────────────────
+    // Three, and a Question Card makes it four — theirs, and it is one of the strongest commons in their
+    // game precisely because a reward screen is the only place a deck is chosen. Read through perkSum so a
+    // second trinket of the same shape needs no code.
+    const many = 3 + perkSum(run.perks, "offerPlus");
+    while (out.length < many && pool.length) {
         const [r, next] = nextRand(roll);
         roll = next;
         out.push(pool.splice(Math.floor(r * pool.length), 1)[0].id);
+    }
+    // ── AND WHETHER THEY ARRIVE SHARPENED ────────────────────────────────────────────────────────────
+    // A Molten Egg upgrades every ATTACK it is offered — not the skills, not the powers, which is what keeps
+    // it from being simply "all your rewards are better" and makes it a relic that shapes what you take.
+    if (perkSum(run.perks, "eggUpgrades")) {
+        return out.map((id) => (cardById(id)?.kind === "attack" && canUpgrade(id) ? upgradedId(id) : id));
     }
     return out;
 }

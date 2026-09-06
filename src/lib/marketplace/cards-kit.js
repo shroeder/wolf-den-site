@@ -319,6 +319,79 @@ export const POOL = {
     trance: { id: "trance", pet: "parrot", name: "Battle Trance", cost: 0, kind: "skill", target: "self", tier: 3,
         draw: 3, exhaust: true, text: "Draw 3 cards. Exhaust.",
         upgrade: { draw: 4 } },
+
+    // ── AND FIFTEEN THAT SCALE, WHICH IS THE HALF THAT WAS ACTUALLY MISSING ──────────────────────────
+    // ⚠️ THE PET IS NOT DECORATION, IT IS WHETHER THE CARD EXISTS FOR YOU. A card is only ever offered to
+    // somebody who OWNS ITS PET (see eligibleCards) — that is the whole identity of this deck and the reason
+    // its art bill is zero — so putting the best cards on the rarest animals quietly builds a game where the
+    // ceiling belongs to whoever has been collecting longest. Measured against the owner's own collection:
+    // 20 of 52 pool cards reachable, and not ONE of the scaling cards below.
+    //
+    // So the cards that decide whether a deck can grow — Demon Form, Metallicize, Barricade, Heavy Blade,
+    // Limit Break, Berserk, Entrench — sit on the animals the Den actually owns (hen, sloth, bee, ladybug,
+    // corsair parrot, ember whelp, anvil golem, tunnel worm: 20 to 31 members each, of 55). Rare pets carry
+    // flavour and reach, never the difference between a deck that scales and one that cannot.
+    // ⚠️ EVERY CARD IN THIS POOL WAS A FLAT NUMBER. Adding more of them does not fix a deck that stops
+    // getting stronger: a simulator that reached the act-one boss in 77% of runs still lost 60% of them
+    // there, dealing 20 damage a turn against the 30 theirs deals, and an eleven-turn boss collects three
+    // extra rounds of damage a shorter one never sees.
+    //
+    // What closes that is not bigger numbers, it is their POWERS and their MULTIPLIERS: cards that do
+    // nothing the turn you play them and win the fights that go long. Demon Form, Metallicize, Barricade,
+    // Heavy Blade reading Strength three times, Body Slam swinging your own guard, Limit Break doubling what
+    // you have already built. That is how their deck doubles its output across an act and ours did not.
+
+    // ── TIER 1 ──
+    clothesline: { id: "clothesline", pet: "minotaur", name: "Clothesline", cost: 2, kind: "attack", target: "foe", tier: 1,
+        damage: 12, weak: 2, text: "Deal {damage} damage. Apply {weak} Weak.",
+        upgrade: { damage: 14, weak: 3 } },
+    bodyslam: { id: "bodyslam", pet: "golden_goose", name: "Body Slam", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damageFromBlock: true, damage: 0, text: "Deal damage equal to your Block.",
+        upgrade: { cost: 0 } },
+    dagger: { id: "dagger", pet: "chain_shrike", name: "Dagger Throw", cost: 0, kind: "attack", target: "foe", tier: 1,
+        damage: 3, weak: 1, text: "Deal {damage} damage. Apply {weak} Weak.",
+        upgrade: { damage: 5 } },
+    bloodletting: { id: "bloodletting", pet: "anglerfish", name: "Bloodletting", cost: 0, kind: "skill", target: "self", tier: 1,
+        selfHp: 3, energy: 2, exhaust: true, text: "Lose 3 health. Gain 2 energy. Exhaust.",
+        upgrade: { energy: 3 } },
+
+    // ── TIER 2 ──
+    metallicize: { id: "metallicize", pet: "anvil_golem", name: "Metallicize", cost: 1, kind: "power", target: "self", tier: 2,
+        blockEach: 3, text: "Gain 3 Block at the end of every turn.",
+        upgrade: { blockEach: 4 } },
+    heavyblade: { id: "heavyblade", pet: "marlin", name: "Heavy Blade", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 14, strengthMult: 3, text: "Deal {damage} damage. Strength counts three times.",
+        upgrade: { strengthMult: 5 } },
+    disarm: { id: "disarm", pet: "bee", name: "Disarm", cost: 1, kind: "skill", target: "foe", tier: 2,
+        foeStrength: 2, exhaust: true, text: "The enemy loses 2 Strength for good. Exhaust.",
+        upgrade: { foeStrength: 3 } },
+    flamebarrier: { id: "flamebarrier", pet: "cinder_hound", name: "Flame Barrier", cost: 2, kind: "skill", target: "self", tier: 2,
+        block: 12, thorns: 4, text: "Gain {block} Block. Deal 4 damage back to anything that hits you.",
+        upgrade: { block: 16, thorns: 6 } },
+    entrench: { id: "entrench", pet: "ladybug", name: "Entrench", cost: 2, kind: "skill", target: "self", tier: 2,
+        blockDouble: true, text: "Double your Block.",
+        upgrade: { cost: 1 } },
+    ghostarmor: { id: "ghostarmor", pet: "scarecrow_crow", name: "Ghostly Armour", cost: 1, kind: "skill", target: "self", tier: 2,
+        block: 10, text: "Gain {block} Block.",
+        upgrade: { block: 13 } },
+
+    // ── TIER 3 ──
+    demonform: { id: "demonform", pet: "ember_whelp", name: "Demon Form", cost: 3, kind: "power", target: "self", tier: 3,
+        strengthEach: 2, text: "Gain 2 Strength at the start of every turn.",
+        upgrade: { strengthEach: 3 } },
+    barricade: { id: "barricade", pet: "tunnel_worm", name: "Barricade", cost: 3, kind: "power", target: "self", tier: 3,
+        blockKeeps: true, text: "Your Block is no longer lost at the start of your turn.",
+        upgrade: { cost: 2 } },
+    limitbreak: { id: "limitbreak", pet: "molten_salamander", name: "Limit Break", cost: 1, kind: "skill", target: "self", tier: 3,
+        strengthDouble: true, exhaust: true, text: "Double your Strength. Exhaust.",
+        upgrade: { exhaust: false } },
+    offering: { id: "offering", pet: "imp", name: "Offering", cost: 0, kind: "skill", target: "self", tier: 3,
+        selfHp: 6, energy: 2, draw: 3, exhaust: true,
+        text: "Lose 6 health. Gain 2 energy and draw 3 cards. Exhaust.",
+        upgrade: { draw: 5 } },
+    berserk: { id: "berserk", pet: "corsair_parrot", name: "Berserk", cost: 2, kind: "power", target: "self", tier: 3,
+        energyEach: 1, selfHp: 6, text: "Lose 6 health. Gain 1 energy every turn.",
+        upgrade: { selfHp: 3 } },
 };
 
 // The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
@@ -505,6 +578,31 @@ export const PERKS = {
         text: "Two more potion slots." },
     grindstone: { id: "grindstone", name: "Grindstone", icon: "sword", strength: 1, block: 4,
         text: "Start every fight with 1 Strength and 4 Block." },
+
+    // ── AND TEN MORE ── theirs, on the hooks the scaling cards brought with them.
+    anchor: { id: "anchor", name: "Anchor", icon: "shield", block: 10,
+        text: "Start every fight with 10 Block." },
+    mango: { id: "mango", name: "Mango", icon: "heart", maxHp: 14,
+        text: "+14 max health, and healed for it now." },
+    smooth_stone: { id: "smooth_stone", name: "Smooth Stone", icon: "shield", blockEach: 2,
+        text: "Gain 2 Block at the end of every turn." },
+    red_mask: { id: "red_mask", name: "Red Mask", icon: "paw", weakAll: 1,
+        text: "Every enemy starts each fight Weak." },
+    paper_frog: { id: "paper_frog", name: "Paper Frog", icon: "paw", vulnBonus: 0.25,
+        text: "Vulnerable enemies take 75% more damage instead of 50%." },
+    magic_flower: { id: "magic_flower", name: "Magic Flower", icon: "heart", healBonus: 0.5,
+        text: "Everything that heals you heals half again as much." },
+    toy_fan: { id: "toy_fan", name: "Toy Fan", icon: "ration", healPerPotion: 4,
+        text: "Heal 4 whenever you drink a potion." },
+    // ⚠️ ONE PER FIGHT, not one per run — `tailUsed` is on the fight's hero, which is the state that is
+    // thrown away when the room ends. Theirs is once per RUN and the difference is enormous; ours is the
+    // smaller, honest version of the same idea rather than a relic pretending to be their best one.
+    lizard_tail: { id: "lizard_tail", name: "Lizard Tail", icon: "paw", revive: 1,
+        text: "The first blow that would kill you in a fight leaves you on half health instead." },
+    question_card: { id: "question_card", name: "Question Card", icon: "paw", offerPlus: 1,
+        text: "One extra card to choose from after every fight." },
+    molten_egg: { id: "molten_egg", name: "Molten Egg", icon: "ember", eggUpgrades: 1,
+        text: "Attacks you are offered after a fight arrive already sharpened." },
 };
 // ── THE ONE YOU START WITH ───────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY SPIRE CHARACTER OPENS THE GAME HOLDING A RELIC, and the Ironclad's is Burning Blood: heal 6 after
@@ -1754,10 +1852,16 @@ export const typeLook = (kind) => TYPE_LOOK[kind] || TYPE_LOOK.skill;
 // Strength is added to the printed number FIRST, then Weak takes a quarter off the attacker, then Vulnerable
 // adds half again to what the target takes, flooring at each step. The order is not decoration: 6 damage with
 // Weak and Vulnerable is floor(floor(6 x 0.75) x 1.5) = 6, and doing it the other way round gives 7.
-export function attackDamage(base, attacker = {}, defender = {}) {
-    const withStrength = Math.max(0, (Number(base) || 0) + (Number(attacker.strength) || 0));
+export function attackDamage(base, attacker = {}, defender = {}, mult = 1) {
+    // ⚠️ `mult` IS ON THE STRENGTH, NOT ON THE DAMAGE. Heavy Blade reads "Strength affects this card three
+    // times", which is a completely different card from one that deals triple damage: it is worth nothing in
+    // an opening hand and it is the best card in the deck six turns into a Demon Form. Scaling like this is
+    // most of how their decks double their output across an act, and we had none of it.
+    const withStrength = Math.max(0, (Number(base) || 0)
+        + (Number(attacker.strength) || 0) * (Number(mult) || 1));
     const weakened = (attacker.weak || 0) > 0 ? Math.floor(withStrength * 0.75) : withStrength;
-    return (defender.vulnerable || 0) > 0 ? Math.floor(weakened * 1.5) : weakened;
+    return (defender.vulnerable || 0) > 0
+        ? Math.floor(weakened * (Number(attacker.vulnMult) || 1.5)) : weakened;
 }
 
 /**
@@ -1870,6 +1974,19 @@ function reap(foes, hero) {
     return { foes: out, hero: touched, events };
 }
 
+/**
+ * ── AND ONE CHANCE TO NOT BE DEAD ────────────────────────────────────────────────────────────────────────
+ * Their Lizard Tail catches you once a run at half your health, and it is the relic people remember owning.
+ * It lives here rather than in each of the four places a fight can end, because "is the hero actually down"
+ * has to answer the same way whether the blow came from a creature, from a Burn ticking, or from a card that
+ * costs blood — and three of those four places would otherwise have to remember to ask.
+ */
+function stillStanding(hero, perks) {
+    if (hero.hp > 0 || hero.tailUsed) return hero;
+    if (!perkSum(perks, "revive")) return hero;
+    return { ...hero, hp: Math.max(1, Math.floor(hero.hpMax / 2)), tailUsed: true };
+}
+
 /** Block eats damage first, and only what is left reaches HP. */
 function land(unit, amount) {
     const absorbed = Math.min(unit.block || 0, amount);
@@ -1957,14 +2074,20 @@ function beginTurn(state) {
         ...state,
         turn: state.turn + 1,
         // `energy` is a first-turn gift (Old Lantern); `energyEach` is a boss trinket and pays EVERY turn.
-        energy: state.energyMax + perkSum(state.perks, "energyEach")
+        energy: state.energyMax + perkSum(state.perks, "energyEach") + (state.hero.energyEach || 0)
             + (first ? perkSum(state.perks, "energy") : 0),
         // A Horn Cleat pays on the SECOND turn — theirs exactly, and the reason it is a good trinket rather
         // than a strange one: turn one you are setting up, turn two is when the first real swing lands.
         hero: {
             ...state.hero,
-            block: (first ? state.hero.block : 0)
+            // ⚠️ BARRICADE KEEPS IT. Block is wiped at the top of every turn — that rule is most of what
+            // makes a fight a fight — and exactly one card in their game turns it off. It reads here rather
+            // than as a branch further down because "does my guard survive the turn" is a property of the
+            // turn opening, not of the card that said so.
+            block: (first || state.hero.blockKeeps ? state.hero.block : 0)
                 + (state.turn === 1 ? perkSum(state.perks, "blockTurn2") : 0),
+            // Demon Form, and the trinket that does the same thing quietly.
+            strength: (state.hero.strength || 0) + (first ? 0 : (state.hero.strengthEach || 0)),
         },
     };
     return drawCards(opened, DRAW_PER_TURN + (first ? perkSum(state.perks, "draw") : 0));
@@ -2017,6 +2140,12 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // Damage back to anything that swings at you — Bronze Scales, straight. The creatures have had
             // this since the Spikers arrived; it is the same field on the other side of the board.
             thorns: perkSum(perks, "thorns"),
+            // A Paper Frog: Vulnerable takes 75% more off instead of 50%. Carried on the HERO rather than
+            // read from the perks inside attackDamage, because that function is handed two fighters and
+            // nothing else — which is what lets the creatures use it against you unchanged.
+            vulnMult: 1.5 + (perkSum(perks, "vulnBonus") || 0),
+            // A Magic Flower: everything that heals you heals more.
+            healMult: 1 + (perkSum(perks, "healBonus") || 0),
             vulnerable: 0, weak: 0,
         },
         foes: party.map((f, i) => ({
@@ -2036,7 +2165,9 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // of phase — a jackal that nips, a bruiser that spends a turn bracing, and one that builds to a
             // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
             // length and in shape.
-            block: 0, strength: 0, weak: 0, beat: 0, intangible: 0,
+            block: 0, strength: 0, beat: 0, intangible: 0,
+            // A Red Mask, the defensive twin of the Bag of Marbles two lines down.
+            weak: perkSum(perks, "weakAll"),
             // A Bag of Marbles marks the whole room the moment the fight opens — theirs, and the reason it
             // is a good common: it is worth the most in exactly the rooms with the most bodies in them.
             vulnerable: perkSum(perks, "vulnerableAll"),
@@ -2126,7 +2257,10 @@ export function playCard(state, uid, targetIndex = 0) {
     // SINGLE HITS rather than one big number, because that is what makes them different from a card with a
     // bigger figure on it: each swing is rolled against that foe's own Block and its own Vulnerable, so three
     // hits of 4 chew through 6 Block where one hit of 12 does not, and a party of three is what `all` is for.
-    if (card.damage) {
+    // ⚠️ `card.damage` ALONE IS NOT THE TEST. Body Slam's printed damage is zero — the number comes off the
+    // Block you are holding — so a truthiness check on the field skipped the whole branch and the card did
+    // nothing at all.
+    if (card.damage || card.damageFromBlock) {
         const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
         for (let swing = 0; swing < (card.hits || 1); swing += 1) {
             for (const i of targets) {
@@ -2134,7 +2268,9 @@ export function playCard(state, uid, targetIndex = 0) {
                 // ── INTANGIBLE ── everything that reaches it is one. Nemesis spends alternate turns like
                 // this and it is the reason you cannot simply out-damage it: a 32-damage Crush and a Peck
                 // are the same card while it holds.
-                const raw = attackDamage(card.damage, hero, foes[i]);
+                // Body Slam swings your own guard: the number on the card IS the Block you are holding.
+                const base = card.damageFromBlock ? (hero.block || 0) : card.damage;
+                const raw = attackDamage(base, hero, foes[i], card.strengthMult || 1);
                 const dealt = (foes[i].intangible || 0) > 0 ? Math.min(1, raw) : raw;
                 hitFoe(i, (f) => land(f, dealt));
                 events.push({ type: "damage", on: foes[i].id, amount: dealt });
@@ -2157,7 +2293,7 @@ export function playCard(state, uid, targetIndex = 0) {
     // maximum — a heal is not a way to grow.
     if (card.heal) {
         const before = hero.hp;
-        hero = { ...hero, hp: Math.min(hero.hpMax, hero.hp + card.heal) };
+        hero = { ...hero, hp: Math.min(hero.hpMax, hero.hp + Math.round(card.heal * (hero.healMult || 1))) };
         events.push({ type: "heal", on: "hero", amount: hero.hp - before });
     }
     if (card.vulnerable) {
@@ -2184,6 +2320,61 @@ export function playCard(state, uid, targetIndex = 0) {
         hero = { ...hero, strength: (hero.strength || 0) + card.strength };
         events.push({ type: "buff", on: "hero", key: "Strength", amount: card.strength });
     }
+    // ── AND THE REST OF WHAT A CARD CAN BE ───────────────────────────────────────────────────────────
+    // Every one of these is a shape their deck has and ours did not, which is why ours stopped getting
+    // stronger halfway up the act: a pool of flat numbers cannot scale, however big the numbers are.
+    //
+    // POWERS THAT TICK. Demon Form is +2 Strength EVERY turn and Metallicize is Block every turn — they do
+    // nothing the turn you play them and they win the fights that go long, which is exactly the fight we
+    // were losing (an act-one boss ran eleven turns and cost 60 health).
+    if (card.strengthEach) {
+        hero = { ...hero, strengthEach: (hero.strengthEach || 0) + card.strengthEach };
+        events.push({ type: "buff", on: "hero", key: "Demon Form", amount: card.strengthEach });
+    }
+    if (card.blockEach) {
+        hero = { ...hero, blockEach: (hero.blockEach || 0) + card.blockEach };
+        events.push({ type: "buff", on: "hero", key: "Metallicize", amount: card.blockEach });
+    }
+    if (card.energyEach) {
+        hero = { ...hero, energyEach: (hero.energyEach || 0) + card.energyEach };
+        events.push({ type: "buff", on: "hero", key: "Berserk", amount: card.energyEach });
+    }
+    // THORNS FOR THE FIGHT. Flame Barrier — the creatures have had this since the Spikers arrived.
+    if (card.thorns) {
+        hero = { ...hero, thorns: (hero.thorns || 0) + card.thorns };
+        events.push({ type: "buff", on: "hero", key: "Thorns", amount: card.thorns });
+    }
+    // Barricade, read at the top of every turn — see beginTurn.
+    if (card.blockKeeps) {
+        hero = { ...hero, blockKeeps: true };
+        events.push({ type: "buff", on: "hero", key: "Barricade", amount: 1 });
+    }
+    // THE DOUBLINGS. Entrench and Limit Break: worth nothing on their own and enormous on top of a turn you
+    // already spent, which is the whole reason to hold one.
+    if (card.blockDouble) {
+        const gained = hero.block || 0;
+        hero = { ...hero, block: gained * 2 };
+        events.push({ type: "block", on: "hero", amount: gained });
+    }
+    if (card.strengthDouble) {
+        const gained = hero.strength || 0;
+        hero = { ...hero, strength: gained * 2 };
+        events.push({ type: "buff", on: "hero", key: "Strength", amount: gained });
+    }
+    // A CARD THAT TAKES YOUR OWN BLOOD. Bloodletting and Offering pay in health for energy and cards, and it
+    // is real damage: it goes through nothing, it can kill you, and that is the point of the trade.
+    if (card.selfHp) {
+        hero = { ...hero, hp: Math.max(0, hero.hp - card.selfHp) };
+        events.push({ type: "damage", on: "hero", amount: card.selfHp, self: true });
+    }
+    // AND ONE THAT TAKES THEIRS. Disarm removes Strength from the thing in front of you, for good.
+    if (card.foeStrength) {
+        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
+        for (const i of targets) {
+            hitFoe(i, (f) => ({ ...f, strength: (f.strength || 0) - card.foeStrength }));
+            events.push({ type: "debuff", on: foes[i].id, key: "Strength", amount: card.foeStrength });
+        }
+    }
 
     // Anything that just died or came apart, before the state is handed back.
     const reaped = reap(foes, hero);
@@ -2203,7 +2394,8 @@ export function playCard(state, uid, targetIndex = 0) {
         // is the same field their own exhausting cards use, so a real card wanting it later just says so.
         discard: card.exhaust ? state.discard : [...state.discard, entry],
         // The fight is over when the LAST one is down, not the first.
-        over: foes.every((f) => f.hp <= 0) ? "win" : state.over,
+        over: (hero = stillStanding(hero, state.perks)).hp <= 0
+            ? "lose" : foes.every((f) => f.hp <= 0) ? "win" : state.over,
     };
     // Drawn AFTER the card has left the hand and reached the discard, so a card that draws cannot draw itself
     // back, and so a draw that exhausts the pile reshuffles a discard this card is already part of.
@@ -2233,11 +2425,19 @@ export function drinkPotion(state, potionId) {
     let next = { ...state, hero: { ...state.hero } };
     if (potion.block) next.hero.block = (next.hero.block || 0) + potion.block;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
-    if (potion.heal) next.hero.hp = Math.min(next.hero.hpMax, next.hero.hp + potion.heal);
+    // A Toy Fan pays for the act of drinking, whatever was in the bottle — theirs exactly, and it is what
+    // makes a belt of situational potions worth carrying at all.
+    const fan = perkSum(state.perks, "healPerPotion");
+    const mult = next.hero.healMult || 1;
+    if (potion.heal || fan) {
+        next.hero.hp = Math.min(next.hero.hpMax,
+            next.hero.hp + Math.round(((potion.heal || 0) + fan) * mult));
+    }
     // A share of the bar rather than a flat number — theirs prices its healing this way, and it is the only
     // version that is still worth drinking in act three.
     if (potion.healPct) {
-        next.hero.hp = Math.min(next.hero.hpMax, next.hero.hp + Math.round(next.hero.hpMax * potion.healPct));
+        next.hero.hp = Math.min(next.hero.hpMax,
+            next.hero.hp + Math.round(next.hero.hpMax * potion.healPct * mult));
     }
     // ── THE BOTTLES THAT REACH THE OTHER SIDE OF THE BOARD ───────────────────────────────────────────
     // Every one of these hits the WHOLE room rather than asking for a target: a potion that needs a target
@@ -2482,7 +2682,8 @@ export function foeAct(state, i) {
     events.push(...reaped.events);
 
     return {
-        state: { ...stateAfterStatus, hero, foes, rng, over: hero.hp <= 0 ? "lose" : state.over },
+        state: { ...stateAfterStatus, hero: (hero = stillStanding(hero, state.perks)), foes, rng,
+            over: hero.hp <= 0 ? "lose" : state.over },
         events,
         acted: true,
         // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
@@ -2512,7 +2713,7 @@ export function finishFoeTurn(state) {
     const kept = state.hand.filter((entry) => !ALL_CARDS[entry.id]?.ethereal);
     const spent = {
         ...state, hero,
-        over: hero.hp <= 0 ? "lose" : state.over,
+        over: (hero = stillStanding(hero, state.perks)).hp <= 0 ? "lose" : state.over,
         discard: [...state.discard, ...kept], hand: [],
     };
     if (spent.over === "lose") return { state: spent, events: [{ type: "over", result: "lose" }] };
@@ -2529,8 +2730,17 @@ export function finishFoeTurn(state) {
  */
 export function endTurn(state) {
     if (!state || state.over) return { state, events: [] };
-    let cur = startFoeTurn(state).state;
-    const events = [];
+    // ── METALLICIZE PAYS ON THE WAY OUT ──────────────────────────────────────────────────────────────
+    // ⚠️ AT THE END OF YOUR TURN, NOT THE START OF IT, and the difference is the whole card: block gained
+    // here stands through the swing that is about to land, where block gained at the top of a turn would be
+    // wiped before anything ever hit it. Theirs works exactly this way, and the trinket that does the same
+    // thing (Oddly Smooth Stone) reads the same field.
+    const steady = (state.hero.blockEach || 0) + perkSum(state.perks, "blockEach");
+    const opened = steady > 0
+        ? { ...state, hero: { ...state.hero, block: (state.hero.block || 0) + blockGain(steady, state.hero) } }
+        : state;
+    let cur = startFoeTurn(opened).state;
+    const events = steady > 0 ? [{ type: "block", on: "hero", amount: steady }] : [];
     for (let i = 0; i < cur.foes.length; i += 1) {
         const step = foeAct(cur, i);
         cur = step.state;
