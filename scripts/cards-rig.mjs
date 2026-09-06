@@ -87,23 +87,31 @@ if (cmd === "restore") {
     const { run, prog } = JSON.parse(readFileSync(BAK, "utf8"));
     await sql`DELETE FROM mkt_cards_run WHERE buyer_id = ${owner.id}::uuid`;
     if (run) {
-        await sql`INSERT INTO mkt_cards_run (buyer_id, state, created_at, updated_at)
-                  VALUES (${owner.id}::uuid, ${JSON.stringify(run.state)}::jsonb, ${run.created_at}, ${run.updated_at})`;
+        // WARNING: NAME ONLY COLUMNS THIS TABLE HAS. This insert listed created_at, which mkt_cards_run does
+        // not have — so restore DELETED the owner's row and then threw, every single time, and the failure
+        // was at the bottom of a stack trace nobody was reading because the command had always "worked".
+        // The backup is written from SELECT *, so the columns are whatever the row actually had.
+        const cols = Object.keys(run).filter((k) => k !== "buyer_id" && k !== "state");
+        const names = ["buyer_id", "state", ...cols].join(", ");
+        const marks = ["$1::uuid", "$2::jsonb", ...cols.map((_, i) => `$${i + 3}`)].join(", ");
+        await sql.query(`INSERT INTO mkt_cards_run (${names}) VALUES (${marks})`,
+            [owner.id, JSON.stringify(run.state), ...cols.map((k) => run[k])]);
     }
     if (prog) {
         await sql`DELETE FROM mkt_cards_progress WHERE buyer_id = ${owner.id}::uuid`;
         const cols = Object.keys(prog).filter((k) => k !== "buyer_id");
         // Counters are plain integers plus a couple of timestamps; put every one back exactly as found.
         for (const c of cols) {
-            await sql(`UPDATE mkt_cards_progress SET ${c} = $1 WHERE buyer_id = $2`, [prog[c], owner.id])
-                .catch(() => {});
+            // WARNING: sql.query, NOT sql(). The neon client only accepts a tagged template unless you call
+            // .query — and this was wrapped in a .catch that ate the resulting error, so the counter restore
+            // has never once run. A rig that reports success while putting nothing back is worse than no rig.
+            await sql.query(`UPDATE mkt_cards_progress SET ${c} = $1 WHERE buyer_id = $2`, [prog[c], owner.id]);
         }
         const has = (await sql`SELECT 1 FROM mkt_cards_progress WHERE buyer_id = ${owner.id}::uuid`)[0];
         if (!has) {
             await sql`INSERT INTO mkt_cards_progress (buyer_id) VALUES (${owner.id}::uuid)`;
             for (const c of cols) {
-                await sql(`UPDATE mkt_cards_progress SET ${c} = $1 WHERE buyer_id = $2`, [prog[c], owner.id])
-                    .catch(() => {});
+                await sql.query(`UPDATE mkt_cards_progress SET ${c} = $1 WHERE buyer_id = $2`, [prog[c], owner.id]);
             }
         }
     }
@@ -111,5 +119,10 @@ if (cmd === "restore") {
               WHERE buyer_id = ${owner.id}::uuid AND device_label = 'rig' AND revoked_at IS NULL`;
     // The backup is consumed, so the next `save` is allowed to take a fresh one.
     unlinkSync(BAK);
-    console.log("run restored, rig sessions revoked, backup cleared");
+    // AND IT SAYS WHAT IT PUT BACK. A restore that reports success without reading the row is how a
+    // silently-failing insert survived a whole session.
+    const back = (await sql`SELECT state FROM mkt_cards_run WHERE buyer_id = ${owner.id}::uuid`)[0];
+    if (run && !back) throw new Error("RESTORE FAILED: the run row is not there. The backup is still on disk.");
+    console.log("run restored:", back ? `done=${back.state?.done} stop=${back.state?.stop} deck=${back.state?.deck?.length}` : "(there was no run to restore)");
+    console.log("rig sessions revoked, backup cleared");
 }
