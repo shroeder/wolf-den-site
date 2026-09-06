@@ -177,8 +177,8 @@ const POOL_BY_TIER = [1, 2, 3].map((t) => Object.values(m.POOL || {})
 // one. And the game offers everything AT OR BELOW that tier, where this took the tier exactly.
 const offersAt = (row, kind, act) => {
     const max = m.stopAt(row + 1, kind, act).offer;
-    return Object.values(m.POOL || {})
-        .filter((c) => (c.tier || 1) <= max && (!ONLY || ONLY.has(c.id))).map((c) => c.id);
+    const pool = Object.values(m.POOL || {}).filter((c) => (c.tier || 1) <= max && (!ONLY || ONLY.has(c.id)));
+    return { pool, max };
 };
 const encSeedFor = (seed, at) => ((seed >>> 0) + (at.row * 31 + at.lane) * 104729) >>> 0;
 
@@ -249,7 +249,8 @@ function runOnce(seed) {
             if (embers >= cost && chaff > -1 && deck.length > 6) {
                 deck = deck.filter((_, i) => i !== chaff); embers -= cost; removals += 1;
             }
-            const stock = m.buildShop((seed + pick.row * act) >>> 0, { cardIds: offersAt(pick.row, "fight", act).slice(0, 3) });
+            const stock = m.buildShop((seed + pick.row * act) >>> 0,
+                { cardIds: offersAt(pick.row, "fight", act).pool.slice(0, 3).map((c) => c.id) });
             const buy = stock.filter((x) => x.kind === "card" && x.price <= embers).sort((a, b) => a.price - b.price)[0];
             if (buy) { deck = [...deck, buy.ref]; embers -= buy.price; }
             continue;
@@ -389,9 +390,16 @@ function runOnce(seed) {
         // deck grows: the reward screen offers three and the whole skill of it is picking. Scored the way a
         // player scores at a glance — what it does, per point of energy it costs — with block worth a little
         // less than damage because a turn spent not dying is a turn the fight got longer.
-        const tier = offersAt(pick.row, kind, act);
-        if (tier.length) {
-            const offer = [0, 1, 2].map(() => tier[Math.floor(next() * tier.length)]);
+        const { pool: offerPool, max: offerMax } = offersAt(pick.row, kind, act);
+        if (offerPool.length) {
+            // Drawn through the game's OWN weighting (drawOffer), not flat — see tierOdds. A simulator that
+            // deals rewards differently from the browser is measuring a different game, and this one was.
+            const offer = [];
+            for (let n = 0; n < 3; n += 1) {
+                const [card, nx] = m.drawOffer(offerPool, offerMax, roll);
+                roll = nx;
+                if (card) offer.push(card.id);
+            }
             // Scored the way a player scores at a glance: what it does per point of energy, with the cards
             // whose value is in LATER turns counted for what they compound into rather than for the nothing
             // they do the turn they are played.

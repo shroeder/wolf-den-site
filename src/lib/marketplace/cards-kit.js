@@ -835,6 +835,42 @@ export function roomFight(row, kind = "fight", act = 1) {
 // Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
 export const stopAt = (n, kind = "fight", act = 1) => ({ n, kind, act, ...roomFight(n, kind, act) });
 
+/**
+ * ── HOW LIKELY EACH TIER IS ON A REWARD SCREEN ───────────────────────────────────────────────────────────
+ * ⚠️ THE DRAW WAS UNIFORM OVER EVERYTHING AT OR BELOW THE ROOM'S TIER, which sounds generous and is not: it
+ * means a reward on the fifteenth floor is exactly as likely to be a Peck (3 damage, and a deliberately weak
+ * card) as it is to be a Crush. Measured, that dilution alone was worth ten points of act-one completion.
+ *
+ * Theirs draws on RARITY instead — about 60% common, 37% uncommon, 3% rare in act one, shifting toward the
+ * good end as the run goes on — so a late reward is still usually a common but the ceiling is genuinely
+ * reachable. These are the same odds expressed against our three tiers, and they live here rather than in
+ * cardOffers because the simulator has to draw the same way the browser does or it is measuring a different
+ * game (which it was: a row-only tier ladder that ignored the act entirely).
+ */
+export function tierOdds(maxTier = 1) {
+    if (maxTier <= 1) return [1, 0, 0];
+    if (maxTier === 2) return [0.6, 0.4, 0];
+    return [0.35, 0.42, 0.23];
+}
+
+/** Draw one card id from `pool`, weighted the way a reward screen should be. Returns [id, nextRng]. */
+export function drawOffer(pool, maxTier, rng) {
+    const odds = tierOdds(maxTier);
+    const byTier = [1, 2, 3].map((t, i) => (odds[i] > 0 ? pool.filter((c) => (c.tier || 1) === t) : []));
+    // A tier with nothing left in it hands its share to the others rather than returning nothing — a member
+    // who owns two animals must still be dealt three cards.
+    const live = byTier.map((list, i) => (list.length ? odds[i] : 0));
+    const total = live.reduce((n, x) => n + x, 0);
+    const [r, next] = nextRand(rng >>> 0);
+    if (!total) return [null, next];
+    let roll = r * total;
+    let pick = live.findIndex((w) => { roll -= w; return roll <= 0; });
+    if (pick < 0) pick = live.findLastIndex((w) => w > 0);
+    const list = byTier[pick];
+    const [r2, next2] = nextRand(next);
+    return [list[Math.floor(r2 * list.length)], next2];
+}
+
 // ── THE TEN CARDS EVERY RUN OPENS WITH ───────────────────────────────────────────────────────────────────
 // ⚠️ THIS WAS WEAKER THAN ANY OF THEIR STARTING DECKS AND IT SET THE PRICE OF THE WHOLE ACT. Theirs is five
 // Strikes, FOUR Defends and one card that does something — and ours was five Bites, THREE Hops, a Pounce and
