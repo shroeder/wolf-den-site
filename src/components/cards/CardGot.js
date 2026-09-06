@@ -85,10 +85,13 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
                 .got-name { position: relative; font-family: var(--cf-card-font); font-size: 19px;
                     letter-spacing: 0.04em; color: #ffe0ab; text-shadow: 0 2px 6px rgba(0,0,0,0.9);
                     animation: got-fade 0.5s 0.16s ease-out both; }
+                /* Same face as the name above it — see the note on cf-bossperk. A trinket held up with its
+                   title in one font and its effect in another reads as two things stuck together. */
                 .got-text { position: relative; margin: 0; max-width: 300px; text-align: center;
-                    font-size: 13.5px; line-height: 1.45; color: #cdbfa6;
+                    font-family: var(--cf-card-font); font-size: 13.5px; line-height: 1.45; color: #cdbfa6;
                     animation: got-fade 0.5s 0.24s ease-out both; }
-                .got-go { position: relative; margin-top: 10px; font-size: 12px; letter-spacing: 0.08em;
+                .got-go { position: relative; margin-top: 10px; font-family: var(--cf-card-font);
+                    font-size: 12px; letter-spacing: 0.08em;
                     text-transform: uppercase; color: #8e8371; animation: got-fade 0.5s 0.6s ease-out both; }
                 @keyframes got-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 

@@ -2071,7 +2071,13 @@ export default function CardFightClient({ fixture, run = null }) {
                     color: #ff9a4d; font-weight: 800; font-variant-numeric: tabular-nums; }
                 .cf-pill-em { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px;
                     color: #ff9a4d; font-weight: 800; }
-                .cf-note { margin: 0; max-width: 32ch; font-size: 13px; color: #b9c3d0; text-align: center; }
+                /* ⚠️ THE GAME'S TYPEFACE, SAID RATHER THAN INHERITED. Photographed on the boss-reward
+                   screen: the banner above it was in the card font and this line — "Take one, and the next
+                   act opens." — was in the SITE's sans, sitting between two things that were not. The same
+                   fault the written rooms had. The site styles p, b and i, so every one of these has to
+                   name the face. */
+                .cf-note { margin: 0; max-width: 32ch; font-family: var(--cf-card-font); font-size: 13px;
+                    color: #b9c3d0; text-align: center; }
 
                 /* ── A PILL, NOT A PLATE ─────────────────────────────────────────────────────────────────
                    Spire's Skip is a small flat capsule with a bright outline — no metal, no rivets, no
@@ -2114,7 +2120,10 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-bossperk-art { grid-row: 1 / 3; width: 46px; height: 46px; object-fit: contain;
                     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.7)); }
                 .cf-bossperk b { font-family: var(--cf-card-font); font-size: 15px; color: #ffd9a6; }
-                .cf-bossperk i { font-style: normal; font-size: 12.5px; line-height: 1.35; color: #d3d9e2; }
+                /* The NAME above it already said the card font and this did not, so a trinket's title and
+                   its own description were in two different faces on one tile. */
+                .cf-bossperk i { font-family: var(--cf-card-font); font-style: normal; font-size: 12.5px;
+                    line-height: 1.35; color: #d3d9e2; }
                 @media (min-width: 760px) {
                     .cf-bossoffers { grid-template-columns: repeat(3, 1fr); width: min(760px, 94vw); }
                     .cf-bossperk { grid-template-columns: 1fr; grid-template-rows: auto auto auto;
