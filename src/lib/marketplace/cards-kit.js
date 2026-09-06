@@ -20,7 +20,13 @@
 // ── THE DIALS ────────────────────────────────────────────────────────────────────────────────────────────
 // Straight off Spire, deliberately. These numbers have had a decade of play behind them and we have had none,
 // so the slice copies them exactly and earns the right to disagree later.
-export const HERO_HP = 70;
+// ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ EIGHTY, BECAUSE THIS HERO IS THE IRONCLAD IN EVERY OTHER RESPECT. It opens holding their Burning Blood
+// (see STARTER_PERK), it carries their starting deck (see STARTER_DECK) and it walks their act against their
+// monsters at their health — and it was doing all of that on the SILENT's health total, which is the bar of a
+// character built around never being hit. Seventy against a Guardian that deals 54 over nine turns is not a
+// fight anybody wins reliably, and 70% of the runs that reached an act-one boss died at it.
+export const HERO_HP = 80;
 export const ENERGY_PER_TURN = 3;
 export const DRAW_PER_TURN = 5;
 // A hand this size cannot be drawn past. Anything over the cap is discarded as it is drawn rather than held,
@@ -161,8 +167,9 @@ export const CARDS = {
 //   Ascend           2    Inflame + Defend                +3 Strength and 5 Block
 //   Phoenix Fire     2    Reaper-ish                      heal 14 + 2 Strength, the mythic's card
 //
-// THE STARTER DECK IS THEIRS TOO: five Bites, three Hops, a Purr and a Pounce — Spire deals five Strikes,
-// four Defends and a Bash. One Defend is a Purr here, which is the only deliberate difference in the ten.
+// THE STARTER DECK IS THEIRS TOO, to the card: five Bites, four Hops and a Pounce against their five Strikes,
+// four Defends and a Bash. It used to trade a Hop for a Purr — see the note on STARTER_DECK for what that one
+// card was costing.
 //
 // The eight cards playing earns you are priced the same way and carry their reference in their own comments
 // (see UNLOCKS below).
@@ -248,6 +255,70 @@ export const POOL = {
     phoenixfire: { id: "phoenixfire", pet: "radiant_phoenix", name: "Phoenix Fire", cost: 2, kind: "skill", target: "self", tier: 3,
         heal: 14, strength: 2, text: "Heal {heal}. Gain {strength} Strength.",
         upgrade: { heal: 18, strength: 3 } },
+
+    // ── AND FIFTEEN MORE, BECAUSE A TIER OF SEVEN IS NOT A CHOICE ────────────────────────────────────
+    // ⚠️ TIER THREE HELD SEVEN CARDS AND ONLY THREE OF THEM HIT ANYTHING. A reward screen deals three off the
+    // tier, so from row ten on, a player was being offered the same handful over and over and better than
+    // half of it was not damage — which is exactly what the simulator measured at the far end of the act: a
+    // deck putting out 20 a turn against an act-one boss where theirs puts out thirty, so the fight ran ten
+    // turns and cost 59 health. A deck that does not scale is not a difficulty problem, it is an empty
+    // cupboard, and no monster number can be tuned to fix it.
+    //
+    // Every one of these is one of the Ironclad's, priced to theirs. New pets throughout — the art already
+    // exists for all of them, so this is fifteen cards and no new sprites.
+
+    // ── TIER 1 ── the shape of the deck.
+    gore: { id: "gore", pet: "tiger_cub", name: "Gore", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 5, hits: 2, text: "Deal {damage} damage twice.",
+        upgrade: { damage: 7 } },
+    rummage: { id: "rummage", pet: "monkey", name: "Rummage", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 9, draw: 1, text: "Deal {damage} damage. Draw 1 card.",
+        upgrade: { damage: 10, draw: 2 } },
+    thunderclap: { id: "thunderclap", pet: "stormcrow", name: "Thunderclap", cost: 1, kind: "attack", target: "foe", tier: 1,
+        damage: 4, all: true, vulnerable: 1, text: "Deal {damage} damage to ALL enemies. Apply {vulnerable} Vulnerable.",
+        upgrade: { damage: 7 } },
+    shrug: { id: "shrug", pet: "sloth", name: "Shrug It Off", cost: 1, kind: "skill", target: "self", tier: 1,
+        block: 8, draw: 1, text: "Gain {block} Block. Draw 1 card.",
+        upgrade: { block: 11 } },
+
+    // ── TIER 2 ── where a run stops being its starting deck.
+    gutpunch: { id: "gutpunch", pet: "croc", name: "Gut Punch", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 13, weak: 1, vulnerable: 1, text: "Deal {damage} damage. Apply {weak} Weak and {vulnerable} Vulnerable.",
+        upgrade: { damage: 16 } },
+    rend: { id: "rend", pet: "wyvern", name: "Rend", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 20, exhaust: true, text: "Deal {damage} damage. Exhaust.",
+        upgrade: { damage: 26 } },
+    pummel: { id: "pummel", pet: "pit_beetle", name: "Pummel", cost: 1, kind: "attack", target: "foe", tier: 2,
+        damage: 2, hits: 4, exhaust: true, text: "Deal {damage} damage four times. Exhaust.",
+        upgrade: { damage: 3 } },
+    regroup: { id: "regroup", pet: "beaver", name: "Regroup", cost: 1, kind: "skill", target: "self", tier: 2,
+        block: 12, exhaust: true, text: "Gain {block} Block. Exhaust.",
+        upgrade: { block: 16 } },
+    shockwave: { id: "shockwave", pet: "sea_wyrm", name: "Shockwave", cost: 2, kind: "skill", target: "foe", tier: 2,
+        all: true, weak: 2, vulnerable: 2, exhaust: true,
+        text: "Apply {weak} Weak and {vulnerable} Vulnerable to ALL enemies. Exhaust.",
+        upgrade: { weak: 3, vulnerable: 3 } },
+    dropkick: { id: "dropkick", pet: "centaur", name: "Dropkick", cost: 2, kind: "attack", target: "foe", tier: 2,
+        damage: 12, energy: 1, draw: 1, text: "Deal {damage} damage. Gain 1 energy and draw 1 card.",
+        upgrade: { damage: 15 } },
+
+    // ── TIER 3 ── the ceiling, and there has to be one worth reaching.
+    immolate: { id: "immolate", pet: "molten_phoenix", name: "Immolate", cost: 2, kind: "attack", target: "foe", tier: 3,
+        damage: 21, all: true, text: "Deal {damage} damage to ALL enemies.",
+        upgrade: { damage: 28 } },
+    reaper: { id: "reaper", pet: "elder_dragon", name: "Reaper", cost: 2, kind: "attack", target: "foe", tier: 3,
+        damage: 12, all: true, heal: 8, exhaust: true,
+        text: "Deal {damage} damage to ALL enemies. Heal {heal}. Exhaust.",
+        upgrade: { damage: 15, heal: 11 } },
+    impervious: { id: "impervious", pet: "ironback", name: "Impervious", cost: 2, kind: "skill", target: "self", tier: 3,
+        block: 30, exhaust: true, text: "Gain {block} Block. Exhaust.",
+        upgrade: { block: 40 } },
+    seeingred: { id: "seeingred", pet: "spirit_fox", name: "Seeing Red", cost: 1, kind: "skill", target: "self", tier: 3,
+        energy: 2, exhaust: true, text: "Gain 2 energy. Exhaust.",
+        upgrade: { cost: 0 } },
+    trance: { id: "trance", pet: "parrot", name: "Battle Trance", cost: 0, kind: "skill", target: "self", tier: 3,
+        draw: 3, exhaust: true, text: "Draw 3 cards. Exhaust.",
+        upgrade: { draw: 4 } },
 };
 
 // The floor. Offered to everybody regardless of what they own, so a member with five pets still gets a real
@@ -404,6 +475,36 @@ export const PERKS = {
     // Theirs: Burning Blood. The relic the Ironclad opens every single run holding — see STARTER_PERK below.
     warm_blood: { id: "warm_blood", name: "Warm Blood", icon: "heart", healAfter: 6,
         text: "Heal 6 after every fight you win." },
+
+    // ── AND TEN MORE, BECAUSE SIX IS NOT A POOL ──────────────────────────────────────────────────────
+    // ⚠️ A RUN COULD HOLD SIX TRINKETS AND THAT WAS THE CEILING ON THE WHOLE POWER CURVE. Theirs has about
+    // a hundred and eighty; a run of theirs is carrying eight or ten by act three, and the difference
+    // between a floor-one deck and a floor-sixteen deck is mostly what is hanging off it. The simulator put
+    // it in numbers: with the monsters priced exactly to theirs, more than half of all runs reached the act
+    // one boss and 72% of them died at it, dealing 23 damage a turn where theirs deals thirty.
+    //
+    // Every one of these is one of their commons, ported to a field the engine already reads or to one of
+    // the four hooks added for them (thorns, strengthLow, blockTurn2, potionSlots).
+    travel_pack: { id: "travel_pack", name: "Travelling Pack", icon: "paw", draw: 2,
+        text: "Draw two extra cards on your first turn." },
+    bronze_scales: { id: "bronze_scales", name: "Bronze Scales", icon: "shield", thorns: 3,
+        text: "Deal 3 damage back to anything that hits you." },
+    marble_bag: { id: "marble_bag", name: "Bag of Marbles", icon: "paw", vulnerableAll: 1,
+        text: "Every enemy starts each fight Vulnerable." },
+    horn_cleat: { id: "horn_cleat", name: "Horn Cleat", icon: "shield", blockTurn2: 14,
+        text: "Gain 14 Block on the second turn of every fight." },
+    river_pearl: { id: "river_pearl", name: "River Pearl", icon: "heart", maxHp: 12,
+        text: "+12 max health, and healed for it now." },
+    red_fang: { id: "red_fang", name: "Red Fang", icon: "sword", strengthLow: 3,
+        text: "Start a fight below half health with 3 Strength." },
+    down_pillow: { id: "down_pillow", name: "Down Pillow", icon: "heart", restBonus: 15,
+        text: "A campfire heals 15 more." },
+    bone_broth: { id: "bone_broth", name: "Bone Broth", icon: "ration", healAfterLow: 12,
+        text: "Heal 12 after a fight you win below half health." },
+    wide_belt: { id: "wide_belt", name: "Wide Belt", icon: "ration", potionSlots: 2,
+        text: "Two more potion slots." },
+    grindstone: { id: "grindstone", name: "Grindstone", icon: "sword", strength: 1, block: 4,
+        text: "Start every fight with 1 Strength and 4 Block." },
 };
 // ── THE ONE YOU START WITH ───────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY SPIRE CHARACTER OPENS THE GAME HOLDING A RELIC, and the Ironclad's is Burning Blood: heal 6 after
@@ -432,6 +533,23 @@ export const POTIONS = {
     bark: { id: "bark", name: "Barkskin", icon: "shield", block: 12, text: "Gain 12 Block." },
     fury: { id: "fury", name: "Bottled Fury", icon: "sword", strength: 2, text: "Gain 2 Strength." },
     spark: { id: "spark", name: "Spark", icon: "energy", energy: 2, text: "Gain 2 energy." },
+
+    // ── AND THE REST OF THE SHELF ────────────────────────────────────────────────────────────────────
+    // Five bottles is not a resource, it is a coin flip between two of them. Theirs has about forty, and the
+    // reason the belt is worth a slot in their top bar is that a bottle can answer a ROOM — the swing you
+    // cannot block, the elite you cannot out-damage — rather than just topping you up.
+    fire: { id: "fire", name: "Fire Flask", icon: "sword", damageAll: 10,
+        text: "Deal 10 damage to ALL enemies." },
+    fear: { id: "fear", name: "Fear Draught", icon: "draw", vulnerableAll: 2,
+        text: "Apply 2 Vulnerable to ALL enemies." },
+    sap: { id: "sap", name: "Sapping Brew", icon: "draw", weakAll: 2,
+        text: "Apply 2 Weak to ALL enemies." },
+    salve: { id: "salve", name: "Field Salve", icon: "heal", healPct: 0.25,
+        text: "Heal a quarter of your health." },
+    ironskin: { id: "ironskin", name: "Ironskin", icon: "shield", block: 22,
+        text: "Gain 22 Block." },
+    insight: { id: "insight", name: "Insight", icon: "draw", draw: 3, energy: 1,
+        text: "Draw 3 cards and gain 1 energy." },
 };
 export const POTION_IDS = Object.keys(POTIONS);
 
@@ -619,10 +737,19 @@ export function roomFight(row, kind = "fight", act = 1) {
 // Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
 export const stopAt = (n, kind = "fight", act = 1) => ({ n, kind, act, ...roomFight(n, kind, act) });
 
+// ── THE TEN CARDS EVERY RUN OPENS WITH ───────────────────────────────────────────────────────────────────
+// ⚠️ THIS WAS WEAKER THAN ANY OF THEIR STARTING DECKS AND IT SET THE PRICE OF THE WHOLE ACT. Theirs is five
+// Strikes, FOUR Defends and one card that does something — and ours was five Bites, THREE Hops, a Pounce and
+// a Purr, which heals five for a whole energy. No Spire character is given a healing card, and the reason is
+// exactly what the simulator measured: a card that neither kills the thing in front of you nor stops it from
+// hitting you is a blank turn, and a blank turn in a room of two is fifteen health. Ours was one Defend short
+// AND carrying the blank.
+//
+// It is the Ironclad's deck now, to the card. Purr is still in the game — it is a Bear, and it is a fine
+// find at a merchant — it just is not something a run is handed before it has met anything.
 export const STARTER_DECK = [
     "bite", "bite", "bite", "bite", "bite",
-    "hop", "hop", "hop",
-    "purr",
+    "hop", "hop", "hop", "hop",
     "pounce",
 ];
 
@@ -1524,6 +1651,15 @@ export function pickEncounter(seed, n, kind = "fight", recent = [], act = 1) {
 export const perkSum = (perks, field) => (perks || [])
     .reduce((n, id) => n + (Number(ALL_PERKS[id]?.[field]) || 0), 0);
 
+/**
+ * The belt is three slots plus whatever you are carrying that widens it.
+ *
+ * A constant everywhere it was read, which meant a trinket could not touch it — and potions are the reserve
+ * this game was measured to be short of, so the one that widens the belt is worth having. Read through this
+ * anywhere a slot count is needed; POTION_SLOTS stays as the floor.
+ */
+export const beltSize = (perks) => POTION_SLOTS + perkSum(perks, "potionSlots");
+
 // ── A CARD, UPGRADED OR NOT ──────────────────────────────────────────────────────────────────────────────
 // ⚠️ THE DECK IS A LIST OF IDS AND IT HAS TO STAY ONE. A run's deck is stored as strings and read by a dozen
 // places — the shop's burn picker, the reward screen, the pet art fetch, the engine's own shuffle — so an
@@ -1823,7 +1959,13 @@ function beginTurn(state) {
         // `energy` is a first-turn gift (Old Lantern); `energyEach` is a boss trinket and pays EVERY turn.
         energy: state.energyMax + perkSum(state.perks, "energyEach")
             + (first ? perkSum(state.perks, "energy") : 0),
-        hero: { ...state.hero, block: first ? state.hero.block : 0 },
+        // A Horn Cleat pays on the SECOND turn — theirs exactly, and the reason it is a good trinket rather
+        // than a strange one: turn one you are setting up, turn two is when the first real swing lands.
+        hero: {
+            ...state.hero,
+            block: (first ? state.hero.block : 0)
+                + (state.turn === 1 ? perkSum(state.perks, "blockTurn2") : 0),
+        },
     };
     return drawCards(opened, DRAW_PER_TURN + (first ? perkSum(state.perks, "draw") : 0));
 }
@@ -1867,7 +2009,14 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // somewhere in the turn loop — the engine stays a function of its state, and a new perk of this
             // shape is a line in PERKS rather than a line in here.
             block: perkSum(perks, "block"),
-            strength: perkSum(perks, "strength"),
+            // ⚠️ `strengthLow` IS READ AGAINST THE BAR THE FIGHT STARTS ON, not against the bar as it falls.
+            // Theirs works the same way — Red Skull checks when the fight begins — and it has to, or a hero
+            // would grow mid-fight every time a blow landed and the number over a card would be a lie.
+            strength: perkSum(perks, "strength")
+                + ((hero.hp || HERO_HP) / (hero.hpMax || HERO_HP) < 0.5 ? perkSum(perks, "strengthLow") : 0),
+            // Damage back to anything that swings at you — Bronze Scales, straight. The creatures have had
+            // this since the Spikers arrived; it is the same field on the other side of the board.
+            thorns: perkSum(perks, "thorns"),
             vulnerable: 0, weak: 0,
         },
         foes: party.map((f, i) => ({
@@ -1887,7 +2036,10 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // of phase — a jackal that nips, a bruiser that spends a turn bracing, and one that builds to a
             // heave. Turn one is 17 now, and the heavy beats arrive apart because the scripts differ in
             // length and in shape.
-            block: 0, strength: 0, vulnerable: 0, weak: 0, beat: 0, intangible: 0,
+            block: 0, strength: 0, weak: 0, beat: 0, intangible: 0,
+            // A Bag of Marbles marks the whole room the moment the fight opens — theirs, and the reason it
+            // is a good common: it is worth the most in exactly the rooms with the most bodies in them.
+            vulnerable: perkSum(perks, "vulnerableAll"),
             // Spent by the first blow that reaches it — see `land`. Zero on everything that does not curl.
             curl: Math.max(0, Number(f.curl) || 0),
             // ── AND THE REST OF WHAT A CREATURE IS ──────────────────────────────────────────────
@@ -2082,6 +2234,27 @@ export function drinkPotion(state, potionId) {
     if (potion.block) next.hero.block = (next.hero.block || 0) + potion.block;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
     if (potion.heal) next.hero.hp = Math.min(next.hero.hpMax, next.hero.hp + potion.heal);
+    // A share of the bar rather than a flat number — theirs prices its healing this way, and it is the only
+    // version that is still worth drinking in act three.
+    if (potion.healPct) {
+        next.hero.hp = Math.min(next.hero.hpMax, next.hero.hp + Math.round(next.hero.hpMax * potion.healPct));
+    }
+    // ── THE BOTTLES THAT REACH THE OTHER SIDE OF THE BOARD ───────────────────────────────────────────
+    // Every one of these hits the WHOLE room rather than asking for a target: a potion that needs a target
+    // needs a targeting mode on a screen where the only tap that matters is playing a card, and theirs are
+    // strongest in the rooms with the most bodies in them anyway.
+    if (potion.damageAll || potion.vulnerableAll || potion.weakAll) {
+        next.foes = next.foes.map((f) => {
+            if (f.hp <= 0) return f;
+            let out = f;
+            if (potion.vulnerableAll) out = { ...out, vulnerable: (out.vulnerable || 0) + potion.vulnerableAll };
+            if (potion.weakAll) out = { ...out, weak: (out.weak || 0) + potion.weakAll };
+            if (potion.damageAll) out = land(out, attackDamage(potion.damageAll, next.hero, out));
+            return out;
+        });
+        const reaped = reap(next.foes, next.hero);
+        next = { ...next, foes: reaped.foes, hero: reaped.hero };
+    }
     if (potion.energy) next.energy = (next.energy || 0) + potion.energy;
     if (potion.draw) next = drawCards(next, potion.draw);
     return next;
@@ -2205,6 +2378,14 @@ export function foeAct(state, i) {
             dealt += blow;
         }
         events.push({ type: "damage", on: "hero", amount: dealt, hits: swings });
+        // ── AND WHAT SWINGING AT YOU COSTS ──────────────────────────────────────────────────────────
+        // Bronze Scales: the creature takes it once per swing, which is why a multi-hit attacker is the
+        // worst thing to own thorns against — the same rule the Spikers already play by, mirrored.
+        if (hero.thorns > 0) {
+            let back = 0;
+            for (let h = 0; h < swings; h += 1) { f = land(f, hero.thorns); back += hero.thorns; }
+            events.push({ type: "damage", on: f.id, amount: back, thorns: true });
+        }
     }
     // Applied AFTER the blow, so the Vulnerable a beat inflicts does not also multiply that same beat — the
     // card side already works this way and a foe that broke the rule would be reading its own buff twice.

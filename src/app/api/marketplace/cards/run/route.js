@@ -5,9 +5,11 @@ import {
     CARDS_UNLOCKED, bossOffers, bumpCardProgress, cardOffers, grantForRoom, loadRun, nextAct, potionDrop,
     saveRun, shopStock, takePerk,
 } from "@/lib/marketplace/cards.js";
+import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import {
-    ACTS, BOSS_PERKS, PERKS, perkById, POTION_SLOTS, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter,
+    ACTS, BOSS_PERKS, PERKS, beltSize, perkById, perkSum, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById,
+    pickEncounter,
     removalCost, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -100,6 +102,15 @@ export async function POST(request) {
                 // is most of why the sheet feels like fights with gaps in it — and it is why the campfires
                 // read as missing even at their full Spire weight. They open screens now; `at` survives them
                 // exactly as the merchant's does, and `leave` is what clears it.
+                // ── AND THE ROOMS THAT ARE WRITING ──────────────────────────────────────────────
+                // Same rule as the merchant's shelf and the reward's three cards: rolled once, on the way in,
+                // and stored — so a reload stands you in the same room reading the same page rather than
+                // re-rolling the act underneath you. `seen` is the run's memory of which ones it has shown.
+                if (kind === "event") {
+                    const ev = pickEvent(encSeed, run.act || 1, run.seenEvents || []);
+                    run.at.event = ev.id;
+                    run.seenEvents = [...(run.seenEvents || []), ev.id];
+                }
                 if (kind === "rest") run.at.rested = false;
                 if (kind === "treasure") run.at.opened = null;
                 // ── THE MERCHANT KEEPS YOU ──────────────────────────────────────────────────────
@@ -115,6 +126,22 @@ export async function POST(request) {
                 return NextResponse.json({ run });
             }
 
+            // ── A CHOICE IN A QUESTION-MARK ROOM ────────────────────────────────────────────────────
+            // Two shapes, one action: a choice that needs a card comes back `pending` and arrives again
+            // carrying one. `spent` is what stops a refresh from taking the pearl twice — the same guard the
+            // campfire's `rested` and the chest's `opened` already use.
+            if (action === "choose") {
+                if (run.at?.kind !== "event") return NextResponse.json({ error: "not_at_event" }, { status: 400 });
+                if (run.at.spent) return NextResponse.json({ error: "already_chosen" }, { status: 400 });
+                const ev = eventById(run.at.event);
+                if (!ev) return NextResponse.json({ error: "no_such_event" }, { status: 400 });
+                const index = Number(body?.index);
+                const out = applyEventChoice(run, ev, index, body?.card ? String(body.card) : null);
+                if (out.error) return NextResponse.json({ error: out.error }, { status: 400 });
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
             // ── THE CAMPFIRE ────────────────────────────────────────────────────────────────────────
             // Once, and it has to be asked for. The heal is unchanged — 30% of max, which is what it paid
             // when it happened TO you on the way past — but sitting down is now a thing you do, and a thing
@@ -124,7 +151,11 @@ export async function POST(request) {
                 if (run.at?.kind !== "rest") return NextResponse.json({ error: "not_at_fire" }, { status: 400 });
                 if (run.at.rested) return NextResponse.json({ error: "already_rested" }, { status: 400 });
                 const before = run.hp;
-                run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3));
+                // A third of the bar, plus whatever you are carrying that makes a fire worth more (Down
+                // Pillow). Theirs is 30% and the relic that raises it is one of the reasons a rest-heavy
+                // route is a real plan rather than the thing you do when you are losing.
+                run.hp = Math.min(run.hpMax, run.hp + Math.ceil(run.hpMax * 0.3)
+                    + perkSum(run.perks, "restBonus"));
                 run.at = { ...run.at, rested: true, healed: run.hp - before };
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });
@@ -168,7 +199,7 @@ export async function POST(request) {
                 const got = grantForRoom(run, run.at.row, run.at.lane, "treasure");
                 run.embers = (run.embers || 0) + (got.embers || 0);
                 // A full belt is not a lost potion quietly: the chest says what it could not give you.
-                const belted = got.potion && (run.potions || []).length < POTION_SLOTS;
+                const belted = got.potion && (run.potions || []).length < beltSize(run.perks);
                 if (belted) run.potions = [...(run.potions || []), got.potion];
                 run.at = {
                     ...run.at,
@@ -198,7 +229,7 @@ export async function POST(request) {
                 if (item.kind === "card") {
                     run.deck = [...(run.deck || []), item.ref];
                 } else if (item.kind === "potion") {
-                    if ((run.potions || []).length >= POTION_SLOTS) {
+                    if ((run.potions || []).length >= beltSize(run.perks)) {
                         return NextResponse.json({ error: "no_potion_slot" }, { status: 400 });
                     }
                     run.potions = [...(run.potions || []), item.ref];
@@ -264,7 +295,13 @@ export async function POST(request) {
                 run.fight = null;           // won: there is no fight to come back to, only a reward
                 // Iron Ration pays here — after a win, before the reward, so the number on the card is the
                 // number you keep.
-                const ration = (run.perks || []).reduce((n, id) => n + (perkById(id)?.healAfter || 0), 0);
+                // Warm Blood pays after every win; Bone Broth pays only when the win nearly cost you the
+                // run — read against the health the FIGHT ended on, before the ration heals it, or a hero on
+                // 20 would be judged as a hero on 32 and the trinket would never fire.
+                const spent = run.hp < run.hpMax / 2;
+                const ration = (run.perks || []).reduce((n, id) => n
+                    + (perkById(id)?.healAfter || 0)
+                    + (spent ? (perkById(id)?.healAfterLow || 0) : 0), 0);
                 if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
                 // An elite hands over a perk for the health it just cost you.
                 if (run.at?.kind === "elite") {
@@ -281,7 +318,7 @@ export async function POST(request) {
                 const dropKey = `${run.at?.row ?? 0}:${run.at?.lane ?? 0}`;
                 if (run.dropped?.key !== dropKey) {
                     const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
-                    const room = (run.potions || []).length < POTION_SLOTS;
+                    const room = (run.potions || []).length < beltSize(run.perks);
                     if (bottle && room) run.potions = [...(run.potions || []), bottle];
                     run.dropped = bottle ? { key: dropKey, potion: bottle, spilled: !room } : { key: dropKey };
                 }

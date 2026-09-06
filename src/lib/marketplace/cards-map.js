@@ -158,16 +158,16 @@ export function buildMap(seed) {
  * mix about 64% fight and 12% rest, which is a harder, more repetitive act than theirs and exactly what a
  * campfire shortage feels like.
  *
- * THE HONEST FIX IS EVENTS, and we do not have them: theirs resolves a "?" to an EVENT about six times in
- * seven — a written room with a choice in it — and a fight barely one time in ten. Until those are authored,
- * a question mark leans the way theirs does, toward the things that are NOT another fight, and the campfire
- * is in the mix because a fire you did not expect is the closest thing we have to a good event.
+ * THE EVENTS EXIST NOW (cards-events.js), so this is theirs: a question mark is a written room with a choice
+ * in it about seven times in ten, a chest or a shelf now and then, and another fight barely one time in ten.
+ * The campfire has come OUT of the mix — theirs never hides a rest behind a mark, it puts them on the sheet
+ * where you can route toward them, and a fire is only a good surprise while there is nothing better to find.
  */
 export function resolveUnknown(seed, row) {
     const [r] = nextRand(((seed >>> 0) + row * 7919) >>> 0);
-    if (r < 0.30) return "treasure";
-    if (r < 0.55) return "rest";
-    if (r < 0.80) return "merchant";
+    if (r < 0.70) return "event";
+    if (r < 0.82) return "treasure";
+    if (r < 0.92) return "merchant";
     return "fight";
 }
 

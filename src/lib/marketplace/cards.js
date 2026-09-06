@@ -6,8 +6,10 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
-    POTION_IDS, POTION_SLOTS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty, buildShop,
-    cardById, encounterById, nextRand, pickEncounter, stopAt, unlockedCards,
+    POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
+    beltSize, buildShop, canUpgrade, cardById, encounterById, nextRand, pickEncounter, stopAt,
+    unlockedCards,
+    upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -450,7 +452,7 @@ export function grantForRoom(run, row, lane, kind) {
         // A chest is embers and, half the time, a potion — a potion being the thing you can carry OUT of the
         // room, which is what a chest should feel like.
         const out = { embers: 40 };
-        if (next() < 0.55 && (run.potions || []).length < POTION_SLOTS) {
+        if (next() < 0.55 && (run.potions || []).length < beltSize(run.perks)) {
             out.potion = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
         }
         return out;

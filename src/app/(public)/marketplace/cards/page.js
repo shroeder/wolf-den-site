@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import CardEvent from "@/components/cards/CardEvent";
 import CardFightClient from "@/components/cards/CardFightClient";
 import CardMap from "@/components/cards/CardMap";
 import CardRoom from "@/components/cards/CardRoom";
@@ -72,6 +73,14 @@ export default async function CardsPage({ searchParams }) {
     // THE SHOP DRAWS ITS STOCK AS CARDS, so it needs the same pet art the fight uses — the portrait in the
     // window, the rarity that colours the banner and the pet's colour for the stock. Fetched for the three
     // cards on the shelf and nothing else (petArtFor), because a shelf is not a fight.
+    // ── THE QUESTION-MARK ROOM ──────────────────────────────────────────────────────────────────────
+    // Needs the same pet art the campfire does, because both of them can put your own deck on screen: the
+    // Old Wall and the Bonesetter ask WHICH card, and a picker that draws names instead of cards is the
+    // fault the fire's picker was rebuilt to fix.
+    if (run.at?.kind === "event") {
+        return <CardEvent run={run} art={await petArtFor(buyer.id, run.deck || [])} />;
+    }
+
     if (run.at?.kind === "merchant") {
         const art = await petArtFor(buyer.id, (run.shop?.stock || []).filter((s) => s.kind === "card").map((s) => s.ref)
             .concat(run.deck || []));

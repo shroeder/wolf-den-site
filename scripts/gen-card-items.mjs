@@ -41,6 +41,20 @@ const POTION_ART = {
         + "throws sparks against the glass, its neck bound in a strip of red leather.",
     spark: "A small round jar of clear glass sealed with a brass cap, with a bright crackling arc of yellow "
         + "white lightning caught and turning inside it, lighting the glass from within.",
+    // ── THE SIX THAT ANSWER A ROOM ── see the note in POTIONS. Shape first: a flask you throw is not the
+    // same silhouette as a flask you drink, and at 34px the silhouette is all there is.
+    fire: "A round glass grenade-flask with a heavy sealed neck and a short fuse of waxed cord, filled with "
+        + "churning orange fire that presses against the glass, bright and about to go.",
+    fear: "A tall crooked black glass phial with a bone stopper, filled with roiling violet smoke that has "
+        + "shapes moving in it, the glass fogged from the inside.",
+    sap: "A wide-bellied jar of cloudy grey-green sap, thick and slow, its cork sunk deep and a dull weight "
+        + "to it, a dead leaf stuck to the glass.",
+    salve: "A shallow round tin pot with its lid off beside it, packed with pale green ointment, a smear of "
+        + "it on the rim and a clean linen strip folded under.",
+    ironskin: "A squat iron-banded bottle of dull grey liquid with a hammered metal collar and a heavy stone "
+        + "stopper, the glass thick and smoked.",
+    insight: "A small clear glass sphere on a short brass neck, filled with pale gold light that gathers into "
+        + "a single bright point at its centre.",
 };
 
 // ── THE TRINKETS ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -78,6 +92,28 @@ const PERK_ART = {
         + "half-out of the mouth, the leather worn pale at the seams.",
     old_wolf: "An old grey wolf skull with one cracked fang, bound at the brow with a strip of red cloth and "
         + "a single brass ring, dignified rather than grisly.",
+
+    // ── THE TEN THAT MADE IT A POOL ── every one a carried, worn thing rather than an icon of its effect.
+    travel_pack: "A small canvas rucksack with worn leather straps and a rolled blanket lashed under the "
+        + "flap, its buckles tarnished and one strap mended with a knot.",
+    bronze_scales: "A palm-sized patch of overlapping bronze scale armour, each scale rivetted to dark "
+        + "leather backing, the edges of the scales bright where they have been chipped.",
+    marble_bag: "A small drawstring pouch of dark blue cloth spilling three glass marbles onto nothing, the "
+        + "marbles catching the light with coloured twists inside them.",
+    horn_cleat: "A cleat of pale polished horn bound to a short length of tarred rope, the horn yellowed with "
+        + "age and the rope frayed at its cut end.",
+    river_pearl: "A single large irregular freshwater pearl, faintly pink and imperfectly round, resting in "
+        + "the cracked half of a river mussel shell.",
+    red_fang: "A single long curved fang, ivory going to brown at the root, its point stained dark red, "
+        + "bound near the root with a whipping of red thread.",
+    down_pillow: "A small plump travel pillow of faded blue-striped ticking, its corners soft and grubby, one "
+        + "seam split with a wisp of white down escaping.",
+    bone_broth: "A dented tin camp cup of steaming pale broth with a cracked knuckle bone standing in it, the "
+        + "handle wrapped in a strip of cloth.",
+    wide_belt: "A broad worn leather belt with a heavy brass buckle, four small stitched loops along it sized "
+        + "to hold bottles, the leather darkened where the loops sit.",
+    grindstone: "A small round hand grindstone of grey rough grit on a short iron spindle with a wooden "
+        + "crank handle, bright metal filings caught in its rim.",
 };
 
 const JOBS = [

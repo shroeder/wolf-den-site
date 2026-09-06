@@ -6,7 +6,7 @@ import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
-import { POTIONS, POTION_SLOTS, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
+import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -112,7 +112,7 @@ export default function CardShop({ run, art = {} }) {
     const shownCard = shown?.kind === "card" ? cardById(shown.ref) : null;
     const shownGone = shown ? bought.includes(shown.slot) : false;
     const shortBy = shown ? shown.price - embers : 0;
-    const beltFull = shown?.kind === "potion" && potions.length >= POTION_SLOTS;
+    const beltFull = shown?.kind === "potion" && potions.length >= beltSize(run.perks);
 
     // HE POINTS AT THE CHEAP ONE. A merchant with a sale on who does not mention it is a merchant with a
     // secret; the discount is the only reason this shelf is worth a second look.

@@ -20,6 +20,7 @@
 //   ...--spire            print Slay the Spire's act 1 numbers beside ours
 import * as m from "../src/lib/marketplace/cards-kit.js";
 import { buildMap, reachable, resolveUnknown } from "../src/lib/marketplace/cards-map.js";
+import { applyEventChoice, pickEvent } from "../src/lib/marketplace/cards-events.js";
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const RUNS = Number(arg("--runs", 1200));
@@ -68,22 +69,32 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) 
         // what anybody does: if this swing kills you, drink the thing that stops it; if you are past the
         // point where the fight is going well, drink the thing that ends it sooner.
         if (belt && belt.length) {
+            // ⚠️ READ THE BOTTLE, NOT ITS NAME. This knew four potion ids by heart, and the day the shelf grew
+            // from five bottles to eleven the belt filled with things it had never heard of and would not
+            // drink — which read as the GAME getting harder (16% of runs finished, then 8%) when all that had
+            // happened was that the measuring instrument stopped opening two thirds of its own supplies.
             const incomingNow = m.incomingTotal(st);
-            const save = incomingNow >= st.hero.hp + st.hero.block
-                ? (belt.includes("bark") ? "bark" : belt.includes("blood") ? "blood" : null) : null;
-            const push = !save && guard > 6 && st.hero.hp / hpMax < 0.6
-                ? (belt.includes("fury") ? "fury" : belt.includes("spark") ? "spark" : null) : null;
-            const sip = save || push;
-            if (sip) {
-                belt.splice(belt.indexOf(sip), 1);
-                st = m.drinkPotion(st, sip);
+            const dying = incomingNow >= st.hero.hp + st.hero.block;
+            const worth = (id) => {
+                const p = m.POTIONS[id] || {};
+                const saves = (p.block || 0) + (p.heal || 0) + Math.round((p.healPct || 0) * (st.hero.hpMax || 70));
+                const pushes = (p.damageAll || 0) * Math.max(1, st.foes.filter((f) => f.hp > 0).length)
+                    + (p.strength || 0) * 6 + (p.energy || 0) * 5 + (p.draw || 0) * 4
+                    + (p.vulnerableAll || 0) * 5 + (p.weakAll || 0) * 4;
+                return dying ? saves * 2 + pushes * 0.3 : pushes;
+            };
+            const best = belt.slice().sort((a, b) => worth(b) - worth(a))[0];
+            // Drink to survive, or drink because the fight has stopped going anywhere.
+            if (best && worth(best) > 0 && (dying || (guard > 6 && st.hero.hp / hpMax < 0.6))) {
+                belt.splice(belt.indexOf(best), 1);
+                st = m.drinkPotion(st, best);
                 continue;
             }
         }
-        // ⚠️ THE WHOLE PARTY, NOT THE FIRST ONE. `intentDamage(state, i)` is ONE creature's swing and defaults
-        // to index 0; `incomingTotal` is the room. Blocking against a third of what is coming and eating the
-        // rest is exactly how this simulator concluded the act was unsurvivable — and it is the same mistake
-        // a player makes when they read the board wrong, which is precisely why the number in cards-kit exists.
+        // ⚠️ THE WHOLE PARTY, NOT THE FIRST ONE. `intentDamage(state, i)` is ONE creature's swing and
+        // defaults to index 0; `incomingTotal` is the room, which is the only figure a turn can be planned
+        // against — blocking a third of what is coming and eating the rest is how this simulator once
+        // concluded the act was unsurvivable.
         const incoming = m.incomingTotal(st);
         // ── KILL IT IF IT CAN BE KILLED ──────────────────────────────────────────────────────────────────
         // The best play in this game is almost always removing a body: it takes a whole creature's damage off
@@ -139,6 +150,7 @@ function fight(seed, party, hp, deck, perks = [], hpMax = HERO_HP, belt = null) 
 // actually does. It takes the best damage card it is shown, which is what most people do.
 const POOL_BY_TIER = [1, 2, 3].map((t) => Object.values(m.POOL || {}).filter((c) => (c.tier || 1) === t).map((c) => c.id));
 const offerTier = (row) => (row < 5 ? 0 : row < 10 ? 1 : 2);
+const encSeedFor = (seed, at) => ((seed >>> 0) + (at.row * 31 + at.lane) * 104729) >>> 0;
 
 function runOnce(seed) {
     const map = buildMap(seed >>> 0);
@@ -157,6 +169,8 @@ function runOnce(seed) {
     let removals = 0;
     let at = null;
     let recent = [];
+    const seenEvents = [];
+    let eventFight = null;
     let roll = seed >>> 0;
     const next = () => { const [r, n] = m.nextRand(roll); roll = n; return r; };
     const log = [];
@@ -174,16 +188,21 @@ function runOnce(seed) {
             // Theirs is one or the other and so is ours. Hurt enough that the next room could end the run?
             // Sit down. Otherwise put the biggest card you own in the coals, because a deck that improves is
             // the only thing that keeps up with an act that gets harder.
-            const hurt = hp / hpMax < 0.62;
+            // ⚠️ THE LAST FIRE IS ALWAYS A REST, and this simulator was smithing at it. Their floor 15 is a
+            // campfire and floor 16 is the boss, which is not a coincidence — it is the game handing you a
+            // full bar for the fight that is about to take half of it. A policy that sharpens there walks
+            // into a 209-health boss on 43 health, and 74% of the runs that reached one died at it.
+            const lastFire = pick.row >= m.RUN_LENGTH - 1;
+            const hurt = hp / hpMax < (lastFire ? 0.9 : 0.62);
             const best = deck.map((id, i) => ({ id, i, d: m.cardById(id)?.damage || 0 }))
                 .filter((c) => m.canUpgrade(c.id)).sort((a, b) => b.d - a.d)[0];
-            if (hurt || !best) hp = Math.min(hpMax, hp + Math.ceil(hpMax * 0.3));
+            if (hurt || !best) hp = Math.min(hpMax, hp + Math.ceil(hpMax * 0.3) + m.perkSum(perks, "restBonus"));
             else deck = deck.map((id, i) => (i === best.i ? m.upgradedId(id) : id));
             continue;
         }
         if (kind === "treasure") {
             embers += 40;
-            if (next() < 0.55 && potions.length < m.POTION_SLOTS) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+            if (next() < 0.55 && potions.length < m.beltSize(perks)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
             continue;
         }
         if (kind === "merchant") {
@@ -199,9 +218,55 @@ function runOnce(seed) {
             if (buy) { deck = [...deck, buy.ref]; embers -= buy.price; }
             continue;
         }
-        if (kind !== "fight" && kind !== "elite" && kind !== "boss") continue;
-        const encSeed = (seed >>> 0) + (pick.row * 31 + pick.lane) * 104729;
-        const enc = m.pickEncounter(encSeed, pick.row + 1, kind, recent);
+        // ── A ROOM WITH WRITING IN IT ────────────────────────────────────────────────────────────
+        // Run through the GAME'S OWN resolver, not a copy of it — the whole value of this simulator is that
+        // it plays the rules the browser plays, and an event table scored by a second implementation would
+        // measure a game nobody can play. The run object is assembled to the shape the server keeps.
+        if (kind === "event") {
+            const ev = pickEvent(encSeedFor(seed, pick), 1, seenEvents);
+            seenEvents.push(ev.id);
+            const box = {
+                seed, hp, hpMax, embers, deck, perks, potions,
+                at: { row: pick.row, lane: pick.lane, kind: "event", event: ev.id },
+            };
+            // What a player takes: the best thing they can afford that will not kill them. Healing is worth
+            // its face, a trinket is worth about a good card, and a choice that costs health it cannot spare
+            // is off the table — which is exactly how a person reads these rooms.
+            const worth = (c) => {
+                const e = c.effect || {};
+                const cost = (e.hp || 0) + Math.round((e.hpPct || 0) * hpMax);
+                if (c.cost && embers < c.cost) return -1;
+                if (hp + Math.min(0, cost) < 12) return -1;
+                return (e.maxHp || 0) * 1.6 + Math.max(0, cost) * 1.0 + (e.embers || 0) * 0.14
+                    + (e.perk || 0) * 26 + (e.maybePerk || 0) * 22 + (e.potion || 0) * 12
+                    + (e.upgrade || 0) * 15 + (e.remove || 0) * 14 + (e.card ? -16 : 0)
+                    + (e.fight ? -14 : 0) + (e.wake || 0) * -16 + Math.min(0, cost) * 1.15
+                    - (c.cost || 0) * 0.1;
+            };
+            const best = ev.choices.map((c, i) => ({ c, i })).sort((a, b) => worth(b.c) - worth(a.c))[0];
+            let out = applyEventChoice(box, ev, best.i, null);
+            if (out.pending) {
+                // Which card: the worst one you own to burn, the biggest hitter to sharpen.
+                const card = out.pending === "remove"
+                    ? (box.deck.find((id) => m.cardById(id)?.status) || box.deck.find((id) => id === "purr")
+                        || box.deck.filter((id) => id === "bite").pop() || box.deck[0])
+                    : box.deck.filter((id) => m.canUpgrade(id))
+                        .sort((a, b) => (m.cardById(b)?.damage || 0) - (m.cardById(a)?.damage || 0))[0];
+                if (card) out = applyEventChoice(box, ev, best.i, card);
+            }
+            hp = box.hp; hpMax = box.hpMax; embers = box.embers || 0;
+            deck = box.deck; perks = box.perks; potions = box.potions || [];
+            if (hp <= 0) return { won: false, row: pick.row + 1, hp: 0, log, deck: deck.length };
+            // A room that woke something hands itself to the fight below, exactly as the route does.
+            if (!out.fight) continue;
+            eventFight = box.at.enc;
+        }
+        if (kind !== "fight" && kind !== "elite" && kind !== "boss" && !eventFight) continue;
+        const encSeed = encSeedFor(seed, pick);
+        const enc = eventFight
+            ? (m.encounterById(eventFight) || m.pickEncounter(encSeed, pick.row + 1, "fight", recent))
+            : m.pickEncounter(encSeed, pick.row + 1, kind, recent);
+        eventFight = null;
         if (enc?.id) recent = [enc.id, ...recent].slice(0, 2);
         const party = m.buildParty(enc, encSeed)
             .map((f) => (HPX === 1 ? f : { ...f, hp: Math.max(1, Math.round(f.hp * HPX)) }));
@@ -214,7 +279,7 @@ function runOnce(seed) {
         const st = fight(encSeed, party, hp, deck, perks, hpMax, potions);
         const partyHp = party.reduce((n, p) => n + p.hp, 0);
         log.push({
-            row: pick.row + 1, kind, enc: enc?.id || "?",
+            row: pick.row + 1, kind: kind === "event" ? "fight" : kind, enc: enc?.id || "?",
             partyHp,
             turns: st.turn, lost: before - Math.max(0, st.hero.hp), dead: st.over === "lose",
             // What the deck actually PUT OUT, per turn: the party's health divided by how long it took to
@@ -224,7 +289,9 @@ function runOnce(seed) {
         });
         if (st.over === "lose") return { won: false, row: pick.row + 1, hp: 0, log, deck: deck.length };
         // The starting relic pays here, exactly where the route pays it: after the win, before the reward.
-        hp = Math.min(hpMax, st.hero.hp + perks.reduce((n, id) => n + (m.PERKS[id]?.healAfter || 0), 0));
+        const spent = st.hero.hp < hpMax / 2;
+        hp = Math.min(hpMax, st.hero.hp + perks.reduce((n, id) => n
+            + (m.PERKS[id]?.healAfter || 0) + (spent ? (m.PERKS[id]?.healAfterLow || 0) : 0), 0));
         // ── A WON FIGHT SOMETIMES HANDS YOU A BOTTLE ─────────────────────────────────────────────────
         // Theirs drops a potion off roughly two combats in five, and three slots of them is a real second
         // resource: the thing that gets you through the room you should not have survived. Ours came only
@@ -233,7 +300,7 @@ function runOnce(seed) {
         // so the belt cannot stay empty for an act or overflow for one either.
         if (next() * 100 < luck) {
             luck = Math.max(0, luck - 10);
-            if (potions.length < m.POTION_SLOTS) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+            if (potions.length < m.beltSize(perks)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
         } else luck = Math.min(100, luck + 10);
         // An elite pays a perk for the health it just cost — and Ember Heart raises the bar it is measured against.
         if (kind === "elite") {
