@@ -293,9 +293,28 @@ export default function CardEvent({ run, art = {} }) {
                     letter-spacing: 0.04em; }
                 .cv-pick-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
                     gap: 8px; }
+                /* ⚠️ A CARD MUST BE GIVEN ITS SIZE, and this screen never gave it one. CardFace draws itself
+                   out of ABSOLUTELY POSITIONED layers — the stock, the rim, the banner — so a .cf-card with
+                   no width or height is a zero-size box whose pieces escape it and spread over whatever is
+                   beside them. Every other screen in the game sizes it (.cr .cf-card, .cs .cf-card, and the
+                   fight's own), and this one was written without it.
+                   It LOOKED right, which is why it survived a screenshot: the cards drew in the right places.
+                   What broke was the hit test. Measured in the browser, the point at the centre of a card's
+                   own button belonged to the NEIGHBOURING card's stock layer, not to the button — so every tap
+                   landed on a sibling and the picker could not be used at all. The bot sat in it for a
+                   hundred and thirty steps saying "choosing a card" and never chose one. */
+                .cv .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                    display: flex; flex-direction: column; align-items: center;
+                    background: none; border: 0; border-radius: 9px;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
+                /* The painted moulding, laid over the clipped picture — the same overlay every other screen
+                   that draws a card puts on it. Sizing the box without this gives a card with no frame and
+                   its pieces sitting where the flex column did not put them. */
+                .cv .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                    pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
+                    background-repeat: no-repeat; background-size: 100% 100%; }
                 .cv-card { padding: 0; border: 0; background: none; cursor: pointer; }
                 .cv-card.is-done { opacity: 0.35; cursor: default; }
-                .cv-card .cf-card { width: 100%; }
 
                 .cv-foot { display: flex; justify-content: center; padding-top: 6px; }
                 .cv-leave { padding: 8px 22px; border-radius: 999px; font-family: var(--cf-card-font);

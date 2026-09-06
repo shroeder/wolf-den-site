@@ -91,10 +91,23 @@ if (cmd === "stand") {
     const state = row.state;
     const node = (state.map?.nodes || []).find((n) => n.kind === kind) || { row: 0, lane: 0 };
     state.at = { row: node.row, lane: node.lane, kind, rested: false, opened: null };
-    // A merchant with no shelf is refused by the route (not_in_shop) — the shelf is built on the way IN, and
-    // standing a run in a room by hand skips that. Empty stock is enough for the brazier, which is the half
-    // of the shop worth filming.
-    if (kind === "merchant") state.shop = { stock: [], bought: [], removed: false };
+    // ⚠️ A SHELF WITH NOTHING ON IT IS A LIE. The route refuses a merchant with no shop object at all
+    // (not_in_shop — the shelf is built on the way IN, which standing a run by hand skips), and the first
+    // version of this stood one up with EMPTY stock. Photographed on a wide screen that read as a broken
+    // two-column layout: a merchant alone on the left and bare planks stretching away to the right. The
+    // stall was fine; the rig was handing it nothing to hold. buildShop is pure, so it can be called here.
+    if (kind === "merchant") {
+        const kit = await import("../src/lib/marketplace/cards-kit.js");
+        const pool = Object.values(kit.POOL).filter((c) => c.tier <= 2).slice(0, 24);
+        const cardIds = [pool[3]?.id, pool[9]?.id, pool[15]?.id].filter(Boolean);
+        const held = new Set(state.perks || []);
+        state.shop = {
+            stock: kit.buildShop((state.seed >>> 0) + node.row, {
+                cardIds, perkIds: kit.PERK_IDS.filter((id) => !held.has(id)),
+            }),
+            bought: [], removed: false,
+        };
+    }
     state.stop = node.row + 1;
     state.trail = [...(state.trail || []), { row: node.row, lane: node.lane }];
     state.done = null;
