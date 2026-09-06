@@ -244,14 +244,23 @@ export default function CardEvent({ run, art = {} }) {
                    without fourteen paintings existing. */
                 .cv-mark { display: grid; place-items: center; font-size: 70px; color: #e0b878;
                     filter: drop-shadow(0 0 26px rgba(255,170,70,0.32)) drop-shadow(0 8px 14px rgba(0,0,0,0.8)); }
-                .cv-name { margin: 2px 0 0; font-size: 21px; letter-spacing: 0.05em; font-weight: 700;
+                /* ── THE ROOM'S OWN TYPEFACE ───────────────────────────────────────────────────────────
+                   ⚠️ THIS SCREEN DECLARED NO FONT AT ALL and every other one in the game does, so a written
+                   room was the single place in the card game rendering in the SITE's sans while the campfire
+                   two rooms earlier, the merchant's shelf and this room's own prose were all in the card
+                   font. Photographed side by side it reads as a different game's screen — and it is the one
+                   screen whose entire job is to be read. The site also styles h1 and button, so these have
+                   to say it rather than inherit it. */
+                .cv-name { margin: 2px 0 0; font-family: var(--cf-card-font); font-size: 21px;
+                    letter-spacing: 0.05em; font-weight: 700;
                     color: #f3e6cd; text-shadow: 0 2px 6px rgba(0,0,0,0.9); text-align: center; }
                 .cv-say { margin: 0; max-width: 340px; text-align: center; font-size: 13.5px; line-height: 1.5;
                     color: #c3b49c; font-style: italic; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cv-warn { margin: 0; font-size: 12.5px; color: #f0c98a; }
 
                 .cv-got { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 2px; }
-                .cv-gain { font-size: 13px; color: #ffd79a; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+                .cv-gain { font-family: var(--cf-card-font); font-size: 13px; color: #ffd79a;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cv-gain.is-quiet { color: #9d9282; font-style: italic; }
 
                 /* ── THE PLATES ── full width and stacked, because they are sentences rather than buttons and
@@ -268,8 +277,10 @@ export default function CardEvent({ run, art = {} }) {
                     padding: 11px 16px; text-align: left; }
                 /* ⚠️ NOT INHERITED. The site sets a link colour on anything that looks like a control, which
                    has quietly turned button text blue on this game's screens before. */
-                .cv-do-text b { font-size: 14.5px; color: #f7ecd6; letter-spacing: 0.03em; }
-                .cv-do-text i { font-size: 12px; color: #cbbb9f; font-style: normal; }
+                .cv-do-text b { font-family: var(--cf-card-font); font-size: 14.5px; color: #f7ecd6;
+                    letter-spacing: 0.03em; }
+                .cv-do-text i { font-family: var(--cf-card-font); font-size: 12px; color: #cbbb9f;
+                    font-style: normal; }
                 .cv-do:not(:disabled):active .cv-do-text { transform: translateY(1px); }
 
                 .cv-pick-over { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
@@ -278,7 +289,8 @@ export default function CardEvent({ run, art = {} }) {
                     background: #14161d; border: 1px solid rgba(226,199,143,0.28); border-radius: 12px;
                     padding: 10px; }
                 .cv-pick-bar { position: sticky; top: -10px; background: #14161d; padding: 2px 2px 8px; }
-                .cv-pick-head { margin: 0; font-size: 13px; color: #e8dcc6; letter-spacing: 0.04em; }
+                .cv-pick-head { margin: 0; font-family: var(--cf-card-font); font-size: 13px; color: #e8dcc6;
+                    letter-spacing: 0.04em; }
                 .cv-pick-deck { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
                     gap: 8px; }
                 .cv-card { padding: 0; border: 0; background: none; cursor: pointer; }
@@ -286,7 +298,8 @@ export default function CardEvent({ run, art = {} }) {
                 .cv-card .cf-card { width: 100%; }
 
                 .cv-foot { display: flex; justify-content: center; padding-top: 6px; }
-                .cv-leave { padding: 8px 22px; border-radius: 999px; font-size: 13px; letter-spacing: 0.05em;
+                .cv-leave { padding: 8px 22px; border-radius: 999px; font-family: var(--cf-card-font);
+                    font-size: 13px; letter-spacing: 0.05em;
                     color: #e8dcc6; background: rgba(20,16,12,0.72);
                     border: 1px solid rgba(226,199,143,0.3); cursor: pointer; }
                 .cv-leave:disabled { opacity: 0.45; cursor: default; }

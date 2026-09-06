@@ -473,10 +473,16 @@ export default function CardShop({ run, art = {} }) {
                    screen. */
                 .cs-keeper { width: 118px; max-width: 32vw; height: auto; object-fit: contain;
                     filter: drop-shadow(0 8px 14px rgba(0,0,0,0.7)); }
-                /* ── WHAT HE SAYS ── one line, always present so the layout does not jump when he answers,
-                   and lit when it is an answer rather than a greeting. */
-                .cs-say { margin: 1px 0 0; max-width: 300px; text-align: center; font-size: 12px;
-                    line-height: 1.35; color: #c3b49c; font-style: italic;
+                /* ── WHAT HE SAYS ── always present so the layout does not jump when he answers, and lit
+                   when it is an answer rather than a greeting.
+                   ⚠️ IT WAS BUILT FOR ONE LINE AND IT IS NOT ALWAYS ONE LINE. His sale greeting names the
+                   item — "The Bottled Fury's marked down today. The fire's extra." — which wraps at 300px,
+                   and the shelf below is z-index 2, so the second line was painted OVER by the card row.
+                   Photographed on a real visit: "THE FIRE'S EXTRA" ran underneath Shrug It Off's banner.
+                   The room reserves two lines' height now whatever he happens to say, which keeps the
+                   no-jump property that made it one line in the first place. */
+                .cs-say { margin: 1px 0 0; max-width: 330px; min-height: 2.7em; text-align: center;
+                    font-size: 12px; line-height: 1.35; color: #c3b49c; font-style: italic;
                     text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cs-say.is-live { color: #ffcf9a; font-style: normal; }
 

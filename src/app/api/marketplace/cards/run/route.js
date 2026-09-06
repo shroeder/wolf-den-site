@@ -303,6 +303,7 @@ export async function POST(request) {
                     + (perkById(id)?.healAfter || 0)
                     + (spent ? (perkById(id)?.healAfterLow || 0) : 0), 0);
                 if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
+                const wonKind = run.at?.kind || "fight";
                 // An elite hands over a perk for the health it just cost you.
                 if (run.at?.kind === "elite") {
                     const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
@@ -323,6 +324,18 @@ export async function POST(request) {
                 // out loud rather than swallowed — the chest already works this way.
                 const dropKey = `${run.at?.row ?? 0}:${run.at?.lane ?? 0}`;
                 if (run.dropped?.key !== dropKey) {
+                    // ── ⚠️ AND THE MONEY, WHICH A WON FIGHT HAS NEVER PAID ───────────────────────
+                    // Found by playing it: five fights won and the purse never moved off sixty. Embers came
+                    // from chests, from skipping a card and from an elite that had nothing left to give —
+                    // and from nothing else. Every combat in their game pays gold, and it is what makes the
+                    // merchant a room you can use rather than scenery: card removal is the strongest
+                    // purchase in Spire and ours was priced at 55 against an income of almost zero.
+                    //
+                    // Worse, the SIMULATOR has been paying 15 a win all along, so every number it has
+                    // printed about shops, burns and the Bonesetter was for a player with money the browser
+                    // never gave them. Paid inside the same once-per-room guard the bottle uses, so a
+                    // re-posted win cannot pay twice.
+                    run.embers = (run.embers || 0) + (wonKind === "boss" ? 30 : wonKind === "elite" ? 30 : 15);
                     const bottle = potionDrop(run, run.at?.row ?? 0, run.at?.lane ?? 0);
                     const room = (run.potions || []).length < beltSize(run.perks);
                     if (bottle && room) run.potions = [...(run.potions || []), bottle];
