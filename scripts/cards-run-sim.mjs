@@ -206,13 +206,14 @@ function runOnce(seed) {
     let at = null;
     let recent = [];
     const seenEvents = [];
+    const arrived = [];
     let eventFight = null;
     let roll = seed >>> 0;
     const next = () => { const [r, n] = m.nextRand(roll); roll = n; return r; };
     const log = [];
     for (let step = 0; step < 40 * m.ACTS; step += 1) {
         const open = reachable(map, at);
-        if (!open.length) return { won: true, act, row: at?.row ?? 0, hp, log, deck: deck.length };
+        if (!open.length) return { won: true, act, arrived, row: at?.row ?? 0, hp, log, deck: deck.length };
         // Hurt? take the fire. Otherwise anything — the shape of the path is the map's business, not the
         // health total's, and averaging over a thousand maps washes the choice out.
         const pick = (hp / hpMax < 0.55 && open.find((n) => n.kind === "rest"))
@@ -308,7 +309,7 @@ function runOnce(seed) {
             }
             hp = box.hp; hpMax = box.hpMax; embers = box.embers || 0;
             deck = box.deck; perks = box.perks; potions = box.potions || [];
-            if (hp <= 0) return { won: false, act, row: pick.row + 1, hp: 0, log, deck: deck.length };
+            if (hp <= 0) return { won: false, act, arrived, row: pick.row + 1, hp: 0, log, deck: deck.length };
             // A room that woke something hands itself to the fight below, exactly as the route does.
             if (!out.fight) continue;
             eventFight = box.at.enc;
@@ -339,7 +340,7 @@ function runOnce(seed) {
             dpt: st.turn ? partyHp / st.turn : 0,
             deck: deck.length,
         });
-        if (st.over === "lose") return { won: false, act, row: pick.row + 1, hp: 0, log, deck: deck.length };
+        if (st.over === "lose") return { won: false, act, arrived, row: pick.row + 1, hp: 0, log, deck: deck.length };
         // The starting relic pays here, exactly where the route pays it: after the win, before the reward.
         const spent = st.hero.hp < hpMax / 2;
         hp = Math.min(hpMax, st.hero.hp + perks.reduce((n, id) => n
@@ -365,7 +366,7 @@ function runOnce(seed) {
             }
         } else embers += 0;
         if (kind === "boss") {
-            if (act >= m.ACTS) return { won: true, act, row: pick.row + 1, hp, log, deck: deck.length };
+            if (act >= m.ACTS) return { won: true, act, arrived, row: pick.row + 1, hp, log, deck: deck.length };
             // The boss trinket, then the next act's sheet. Their boss relics are the strongest objects in the
             // game and taking one is the whole reward for the act — a simulator that walked past it would
             // measure act two on act one's power.
@@ -379,6 +380,7 @@ function runOnce(seed) {
                 if (k.embers) embers += k.embers;
             }
             act += 1;
+            arrived.push({ act, hp, hpMax, deck: deck.length, perks: perks.length, potions: potions.length });
             map = buildMap(((seed >>> 0) + act * 7919) >>> 0);
             at = null;
             recent = [];
@@ -403,23 +405,41 @@ function runOnce(seed) {
             // Scored the way a player scores at a glance: what it does per point of energy, with the cards
             // whose value is in LATER turns counted for what they compound into rather than for the nothing
             // they do the turn they are played.
+            // ⚠️ A DECK IS NOT A PILE OF THE BEST CARDS, and scoring each offer on its own merits builds one.
+            // This valued a drawn card at four points, so a one-energy "3 Block, draw 2" outscored a
+            // nine-damage Swipe — and over 250 runs the three most-taken cards in the game were cantrips,
+            // 36% of every pick. The decks that came out could not kill anything: damage per turn sat flat at
+            // 13.5 from the first room to the act-one boss, which took 12.6 turns and 55 of an 85 health bar,
+            // and runs walked into the Deep on 41% of the bar. That reads exactly like a game whose cards do
+            // not scale, and it was a simulator that could not build a deck.
+            //
+            // Draw is worth what you can DO with what you draw — three energy is three cards a turn no matter
+            // how many are in your hand — and an offer is worth more when the deck is short of what it does.
+            const attacks = deck.filter((x) => (m.cardById(x)?.damage || 0) > 0).length;
+            const guards = deck.filter((x) => (m.cardById(x)?.block || 0) > 0).length;
+            const wantAttack = attacks / Math.max(1, deck.length) < 0.45;
+            const wantGuard = guards / Math.max(1, deck.length) < 0.22;
             const worth = (id) => {
                 const c = m.cardById(id) || {};
                 const hits = c.hits || 1;
-                const raw = (c.damage || 0) * hits * (c.all ? 1.6 : 1) + (c.block || 0) * 0.8
-                    + (c.heal || 0) * 0.7 + (c.strength || 0) * 6 + (c.draw || 0) * 4 + (c.energy || 0) * 5
+                const need = ((c.damage ? (wantAttack ? 1.65 : 1) : 1) * (c.block && !c.damage ? (wantGuard ? 1.4 : 0.75) : 1));
+                const raw = need * ((c.damage || 0) * hits * (c.all ? 1.6 : 1) + (c.block || 0) * 0.8
+                    + (c.heal || 0) * 0.7 + (c.strength || 0) * 6 + (c.draw || 0) * 2.2 + (c.energy || 0) * 5
                     + (c.vulnerable || 0) * 2 + (c.weak || 0) * 2
                     // A fight runs four turns or so; a power is worth roughly that many payouts.
                     + (c.strengthEach || 0) * 22 + (c.blockEach || 0) * 7 + (c.energyEach || 0) * 18
                     + (c.blockKeeps ? 16 : 0) + (c.strengthMult ? 7 : 0) + (c.damageFromBlock ? 9 : 0)
                     + (c.blockDouble ? 8 : 0) + (c.strengthDouble ? 10 : 0) + (c.thorns || 0) * 2
-                    + (c.foeStrength || 0) * 5 - (c.selfHp || 0) * 1.2;
+                    + (c.foeStrength || 0) * 5 - (c.selfHp || 0) * 1.2);
                 return raw / Math.max(1, c.cost || 1);
             };
-            deck = [...deck, offer.slice().sort((a, b) => worth(b) - worth(a))[0]];
+            const takeIt = offer.slice().sort((a, b) => worth(b) - worth(a))[0];
+            globalThis.__taken = globalThis.__taken || {};
+            globalThis.__taken[takeIt] = (globalThis.__taken[takeIt] || 0) + 1;
+            deck = [...deck, takeIt];
         }
     }
-    return { won: false, act, row: at?.row ?? 0, hp, log, deck: deck.length };
+    return { won: false, act, arrived, row: at?.row ?? 0, hp, log, deck: deck.length };
 }
 
 const runs = Array.from({ length: RUNS }, (_, i) => runOnce((i + 1) * 2654435761 >>> 0));
@@ -460,6 +480,17 @@ console.log(`\n  runs finished: ${won}/${RUNS} (${((won / RUNS) * 100).toFixed(0
 // ── HOW FAR A RUN ACTUALLY GETS ──────────────────────────────────────────────────────────────────────────
 // One number for "finished" hides the shape of a three-act run entirely: an act nobody reaches and an act
 // nobody survives look identical from the top.
+// WHAT THE PLAYER ACTUALLY TAKES. A pool of a hundred cards is worth nothing if the scoring only ever reaches
+// for the same handful, and a deck that stops getting stronger is usually a deck full of the cheap ones.
+const taken = Object.entries(globalThis.__taken || {}).sort((a, b) => b[1] - a[1]);
+const totalTaken = taken.reduce((n, [, c]) => n + c, 0);
+console.log(`\n  most-taken cards (of ${totalTaken} picks, ${taken.length} distinct)`);
+console.log("   " + taken.slice(0, 14).map(([id, n]) => {
+    const c = m.cardById(id) || {};
+    const what = c.damage ? `${c.damage}d` : c.block ? `${c.block}b` : "util";
+    return `${id} ${Math.round((n / totalTaken) * 100)}% ${what}`;
+}).join("  ·  "));
+
 console.log(`\n  how far runs get`);
 for (let a = 1; a <= m.ACTS; a += 1) {
     const reached = runs.filter((r) => r.act >= a).length;
@@ -471,4 +502,14 @@ for (let a = 1; a <= m.ACTS; a += 1) {
         + `   fights ${String(rooms.length).padStart(5)}`
         + `   hp lost ${avg(rooms, (f) => f.lost).toFixed(1).padStart(5)}`
         + `   turns ${avg(rooms, (f) => f.turns).toFixed(1)}`);
+    // WHAT A RUN WALKS IN ON. An act nobody survives and an act nobody arrives at in any shape to survive
+    // look identical from the top, and the fix for them is not the same fix.
+    const came = runs.flatMap((r) => r.arrived || []).filter((x) => x.act === a);
+    if (came.length) {
+        console.log(`              arrived on ${avg(came, (x) => x.hp).toFixed(0)}/${avg(came, (x) => x.hpMax).toFixed(0)} health`
+            + ` (${((avg(came, (x) => x.hp) / avg(came, (x) => x.hpMax)) * 100).toFixed(0)}% of the bar)`
+            + `   deck ${avg(came, (x) => x.deck).toFixed(1)}`
+            + `   trinkets ${avg(came, (x) => x.perks).toFixed(1)}`
+            + `   potions ${avg(came, (x) => x.potions).toFixed(1)}`);
+    }
 }
