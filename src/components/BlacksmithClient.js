@@ -630,6 +630,26 @@ export default function BlacksmithClient({ initial }) {
                                             : scroll ? <>Enhance the piece &mdash; spend a 📜 Power Scroll</>
                                                 : <>Need {need} {part?.name || "parts"} to enhance</>}
                                     </button>
+                                    {/* ── OR SPEND THE SCROLL ON PURPOSE ───────────────────────────────────
+                                        From the bug channel: "my power scrolls aren't working... when I pick
+                                        enhance and my gear it's still using parts."
+                                        Working as built, and built wrong. A Power Scroll was only ever
+                                        reachable as a FALLBACK — the button above hands it over when you
+                                        cannot afford the parts and never otherwise — so somebody holding
+                                        eight of them and a full parts bin had no way to spend one, and read
+                                        that as the scroll being broken. It is a free enhance; whether to save
+                                        the parts is the holder's call, not the forge's.
+                                        Only offered when parts WOULD have been spent: when you are short, the
+                                        button above is already the scroll and a second one would be the same
+                                        press twice. */}
+                                    {rerolling.affordable && powerScrolls > 0 ? (
+                                        <button type="button" className="forge-scroll-alt" disabled={Boolean(busy)}
+                                            onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: true }); }}>
+                                            Or spend a 📜 Power Scroll &mdash; keep the {part?.name || "parts"}
+                                            <i>{powerScrolls} in reserve</i>
+                                        </button>
+                                    ) : null}
+
                                     {/* ── SAID BEFORE THE PARTS GO IN ──────────────────────────────────────
                                         The forge has always known when a piece is finished — `allMaxed`
                                         comes back on the RESULT and the modal prints "Stats maxed". By then
@@ -1471,6 +1491,16 @@ export const FORGE_CSS = `
 .forge-secondary b { color: #ffd08a; }
 .forge-secondary:hover:not(:disabled) { background: rgba(255,175,75,0.12); }
 .forge-secondary:disabled { opacity: 0.5; cursor: default; }
+/* The scroll as a CHOICE, deliberately quieter than the parts button above it: spending parts is the
+   ordinary way to enhance and the scroll is the thing you are saving for later. Colour set outright —
+   a button inside prose inherits the site's link colour otherwise. */
+.forge-scroll-alt { display: block; width: 100%; margin-top: 6px; padding: 8px 10px; border-radius: 10px;
+    cursor: pointer; font-size: 11.5px; font-weight: 700; color: #cbbfa8; text-align: center;
+    background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,175,75,0.3); }
+.forge-scroll-alt i { display: block; margin-top: 2px; font-style: normal; font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #8d8270; }
+.forge-scroll-alt:hover:not(:disabled) { background: rgba(255,175,75,0.09); color: #ffe2b6; }
+.forge-scroll-alt:disabled { opacity: 0.5; cursor: default; }
 .forge-cardwrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .forge-cardwrap > .forge-card { flex: 1 1 auto; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 9px 11px; border-radius: 14px; cursor: pointer; text-align: center;

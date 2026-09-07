@@ -1264,6 +1264,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // How many pages of opponents are on screen. Reset whenever the roster changes underneath, so beating
     // somebody does not leave you looking at a page that no longer exists.
     const [fightPage, setFightPage] = useState(1);
+    // ── AND A WAY TO FIND ONE PERSON ─────────────────────────────────────────────────────────────────
+    // See the note over the search box itself. Lives beside fightPage because the two answer the same
+    // question — "how do I get to somebody who is not on the first eight rows".
+    const [fightFind, setFightFind] = useState("");
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     // How much of the log has already been turned into floating numbers. Without this the screen only ever
@@ -3859,11 +3863,37 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         {" "}inside your last {st.hiddenRecent.within} bouts. They come back once you have fought somebody else.
                     </p>
                 ) : null}
+                {/* ── AND A WAY TO FIND ONE PERSON ────────────────────────────────────────────────────
+                    From the bug channel: "I'm missing people from the available fight list for Arena that I
+                    know I haven't fought (Eric/Gray/Kai) I even opened the WHOLE list", and the next day
+                    "Now so is MamaG, Kimchi, and Hoffbob."
+                    Nothing was hiding them, and the note above was not the answer either — every one of
+                    those six was on her board. Measured against her actual standing: of seventy-one
+                    opponents, Eric was position SEVENTY-ONE, Hoffbob sixty-sixth, Kaishiern sixtieth. That
+                    is the ring working as designed — it offers the people nearest you in standing, so the
+                    top of the Den is by definition the far edge of it — and "eight presses of Load more"
+                    is indistinguishable from "gone" to the person doing the pressing.
+                    Widening the ring is the wrong fix; it would undo the thing the ring is for. What was
+                    missing is the other way of asking: not "who is near me" but "where is Eric". Filters
+                    the whole list, not the loaded page, so a name always resolves however deep it sits. */}
+                {(FIGHT_OPTIONS(st).length > FIGHT_PAGE) ? (
+                    <div className="ar-namefind">
+                        <input type="text" value={fightFind} onChange={(e) => setFightFind(e.target.value)}
+                            placeholder="Find a name" aria-label="Find an opponent by name" />
+                        {fightFind ? (
+                            <button type="button" className="ar-namefind-x" aria-label="Clear"
+                                onClick={() => { Sfx.ui(); setFightFind(""); }}>Clear</button>
+                        ) : null}
+                    </div>
+                ) : null}
                 {/* Hardest first, because the interesting fight should be the one you see. Members and
                     Gauntlet tiers in ONE list: they resolve to the same thing server-side, and splitting
                     them on screen would be asking somebody to compare two ladders to answer one question. */}
                 {(() => {
-                    const all = FIGHT_OPTIONS(st);
+                    // A search answers over EVERYTHING, so it ignores the ring and the page both — the
+                    // whole complaint was that the person you want is past the end of the page.
+                    const find = fightFind.trim().toLowerCase();
+                    const all = FIGHT_OPTIONS(st).filter((o) => !find || String(o.name || "").toLowerCase().includes(find));
                     // ── CHOSEN BY NEARNESS, SHOWN BY RATING ──────────────────────────────────────
                     // Luke: "amongst this list provided it should be sorted by VP highest on top."
                     //
@@ -3876,7 +3906,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     // So the SELECTION still goes by nearness and only the ORDER ON SCREEN changes: take the
                     // ring, then read it strongest-first. Kaishiern at 1,985 now leads the card he is on
                     // rather than sitting fourth between two people rated below him.
-                    const opts = all.slice(0, fightPage * FIGHT_PAGE)
+                    const opts = (find ? all : all.slice(0, fightPage * FIGHT_PAGE))
                         .slice()
                         .sort((x, y) => (Number(y.vp) || 0) - (Number(x.vp) || 0));
                     // The biggest purse on the board, so one row can be flagged as the one worth taking.
@@ -3960,12 +3990,23 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         );
                     });
                 })()}
+                {/* An empty result has to say so. A search that silently shows nothing is the same
+                    disappearance this box was added to fix. */}
+                {fightFind.trim() && !FIGHT_OPTIONS(st).some((o) => String(o.name || "").toLowerCase().includes(fightFind.trim().toLowerCase())) ? (
+                    <p className="ar-pick-note is-quiet">
+                        Nobody on your list matches &ldquo;{fightFind.trim()}&rdquo;. They may be one of the
+                        members hidden for a few bouts after you have fought them.
+                    </p>
+                ) : null}
                 {/* ── AND THE REST OF THE BOARD ───────────────────────────────────────────────────────
                     Luke: "the list you should be able to load more to see more, otherwise you're stuck
                     fighting the top 10 people." Sorted hardest-first, a fixed page meant the strongest
                     handful were the only fights that existed and anybody wanting an easier one had no
                     route to it. */}
                 {(() => {
+                    // While a name is being searched the list is already showing every match, so there is
+                    // nothing left to load and the button would be lying about the ring.
+                    if (fightFind.trim()) return null;
                     const total = FIGHT_OPTIONS(st).length;
                     const seen = Math.min(total, fightPage * FIGHT_PAGE);
                     if (seen >= total) return null;
@@ -5956,6 +5997,21 @@ function Styles() {
                 padding: 0 2px 2px; }
             .ar-pick-head b { font-family: var(--font-display); font-size: 1.02rem; color: #ffe9b8; }
             .ar-pick-head em { font-style: normal; font-size: 11px; color: #98a0aa; }
+            /* ── FIND ONE PERSON ── a quiet row above the fight list. Deliberately not styled like the
+               big "Find a fight" button below it (.ar-find): that one commits you to a bout, this one only
+               narrows a list, and two things that look alike there would be a nasty mis-tap. */
+            .ar-namefind { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+            .ar-namefind input { flex: 1 1 auto; min-width: 0; padding: 7px 10px; border-radius: 9px;
+                font-size: 12.5px; color: #e8dcc6; background: rgba(255,255,255,0.04);
+                border: 1px solid rgba(255,255,255,0.12); }
+            .ar-namefind input::placeholder { color: #79818d; }
+            .ar-namefind input:focus { outline: none; border-color: rgba(255,179,92,0.5);
+                background: rgba(255,255,255,0.06); }
+            /* Colour set outright — the site's link rules reach buttons that sit inside prose. */
+            .ar-namefind-x { flex: 0 0 auto; padding: 7px 10px; border-radius: 9px; cursor: pointer;
+                font-size: 11.5px; color: #cbd2da; background: rgba(255,255,255,0.05);
+                border: 1px solid rgba(255,255,255,0.12); }
+            .ar-namefind-x:hover { color: #fff; background: rgba(255,255,255,0.1); }
             .ar-pick-note { margin: 0 0 2px; font-size: 11px; color: #ffb35c; }
             /* The amber above is a WARNING — "your opponent is still standing". A list explaining its own
                shape is not one, so it takes the page's quiet grey and a line height it can wrap on. */

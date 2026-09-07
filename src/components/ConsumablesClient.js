@@ -79,9 +79,13 @@ export default function ConsumablesClient() {
         // FORGE SCROLLS ARE SPENT AT THE FORGE, not from the stash. They carry `target: "forge"`, which fell
         // into the charged-gear picker below — and that picker filters for recharge/cooldown targets, so a
         // forge target matched nothing and the scroll opened an EMPTY dialog. The server has always answered
-        // "use_at_forge"; there was simply no route to the forge. Send them there, on the Attune tab, which is
-        // the interface this scroll wants: every piece you own, pick one, pick an element.
-        if (item.target === "forge") { window.location.href = "/marketplace/blacksmith?tab=attune"; return; }
+        // "use_at_forge"; there was simply no route to the forge.
+        //
+        // WHICH BENCH is consumableHref's to answer, not this line's. It used to say `?tab=attune` outright,
+        // which is right for the Enchantment Scroll and wrong for the Power Scroll — and a member spent a
+        // morning bouncing off the affinity bench holding a scroll it cannot spend.
+        const href = item.href || null;
+        if (href) { window.location.href = href; return; }
         if (item.target) { setPicking(item); return; } // needs a charged-gear target
         post({ id: item.id, action: "use" }, `use:${item.id}`);
     }

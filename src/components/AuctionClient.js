@@ -7,9 +7,25 @@ import ItemArt from "@/components/ItemArt";
 import CoinCta from "@/components/CoinCta";
 import { GiOpenBook } from "react-icons/gi";
 import Coin from "@/components/Coin";
+import { EQUIP_SLOTS } from "@/lib/marketplace/items.js";
 
 const RARITY_TXT = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
-const SLOTS = [["", "All slots"], ["main_hand", "Weapon"], ["off_hand", "Off-hand"], ["head", "Head"], ["chest", "Chest"], ["legs", "Legs"], ["feet", "Feet"], ["hands", "Hands"], ["ring", "Ring"], ["amulet", "Amulet"], ["cloak", "Cloak"]];
+// ── THE SLOT FILTER IS THE GAME'S OWN SLOT LIST, NOT A COPY OF IT ──────────────────────────────
+// From the bug channel: "the slot filter doesnt work for many of the slots. For example, even though there
+// are multiple boots listings, when you sort by feet it shows none."
+//
+// True, and the cause was that this list was hand-written NEXT TO the game instead of taken FROM it. It
+// offered Head, Feet, Legs, Hands and Cloak. Gear in this game is worn on helmet, boots and back; there is
+// no such slot as legs or hands, and belt — which is a slot — had no option at all. getAuctionListings
+// compares the chosen value straight against the item's own slot, so only the five names that happened to
+// coincide (main_hand, off_hand, chest, amulet, ring) ever matched a row, and two of the options on offer
+// could not have returned one if the whole house were listed.
+//
+// Derived now, so a slot added to the game turns up here with it, and the labels are the same words the
+// equipment screen uses — "Boots", not "Feet". Deduped by what a slot ACCEPTS: two ring slots, one ring.
+const SLOTS = [["", "All slots"], ...EQUIP_SLOTS
+    .filter((s, i, all) => all.findIndex((o) => o.accepts === s.accepts) === i)
+    .map((s) => [s.accepts, s.label])];
 const RARITIES = [["", "All rarities"], ["common", "Common"], ["rare", "Rare"], ["epic", "Epic"], ["legendary", "Legendary"], ["mythic", "Mythic"]];
 const SORTS = [["new", "Newest"], ["old", "Oldest"], ["price_asc", "Price ↑"], ["price_desc", "Price ↓"]];
 const TABS = [{ k: "browse", ic: "🔍", label: "Browse" }, { k: "sell", ic: "🏷️", label: "Sell" }, { k: "mine", ic: "📜", label: "Listings" }];

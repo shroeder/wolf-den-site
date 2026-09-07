@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL_LINES } from "@/lib/marketplace/casino-slot5.js";
-import { MIN_BET, MAX_BET } from "@/lib/marketplace/casino.js";
+import { MIN_BET, MAX_BET, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -233,6 +233,21 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
     if (r.locked) features.push("locked");
     if (r.winAgain) features.push("winagain"); // the row emptying, not r.fired - that field is the CLIENT shape
     if (r.locked?.spins?.some((sp) => sp.retrigger)) features.push("retrigger");
+    // ── AND IT COUNTS ON THE CARDS ───────────────────────────────────────────────────────────────────────
+    // From the bug channel: "Just played a few games in the casino and the daily floor bounties did not
+    // count any of it. I played on four machines winning multiple times and it didn't count the plays or
+    // the wins for the daily bounty."
+    //
+    // He was right, and the floor's own note called it: tickCasinoQuests says it exists as one function for
+    // all the machines "so the fourth one somebody adds cannot quietly fail to tick a card" — and then the
+    // five-reel was added and did precisely that. It ends a spin with trackActivity, which feeds the report,
+    // and stops there. trackActivity is TELEMETRY; the pump that moves "Play 5 times on the floor" and "Win
+    // on any machine" is this call, and this was the one machine on the floor that never made it. Thirty-six
+    // spins the night he reported it, and cas_play5 never left 0/5.
+    //
+    // Above the telemetry rather than below, so the thing a member can SEE happens first if the request is
+    // cut short.
+    await tickCasinoQuests(buyerId, "slot5", won);
     await trackActivity(buyerId, "casino_play", {
         game: "slot5", machine: m.id, bet: stake,
         wonChips: won, multiple: Number((r.total / stake).toFixed(3)),

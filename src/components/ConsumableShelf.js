@@ -179,11 +179,11 @@ export default function ConsumableShelf({ feature, title = "In your pack", onUse
                             </span>
             {/* A consumable with a `target` needs you to pick WHAT it lands on, and that picker lives on
                                 another screen — so this sends you there rather than offering a tap that cannot
-                                finish. Same two destinations the store's own stash uses (see ConsumablesClient):
-                                a forge scroll wants the Attune tab, a charged-gear relic wants the stash's
-                                picker. */}
+                                finish. WHICH bench at the forge is consumableHref's answer: the Power Scroll
+                                is spent on Enhance and the Enchantment Scroll on Attune, and this line used to
+                                send both to Attune. */}
                             {c.target === "forge" ? (
-                                <a className="cshelf-go" href="/marketplace/blacksmith?tab=attune">Forge ›</a>
+                                <a className="cshelf-go" href={c.href || "/marketplace/blacksmith"}>Forge ›</a>
                             ) : c.target ? (
                                 <a className="cshelf-go" href="/marketplace/store">Pick ›</a>
                             ) : (

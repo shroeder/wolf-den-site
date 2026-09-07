@@ -291,6 +291,27 @@ const FEATURE_BY_EFFECT = {
     delve_reset: "delve",
 };
 
+// ── AND WHICH BENCH, ONCE YOU GET THERE ──────────────────────────────────────────────────────────────────
+// From the bug channel: "My power scrolls aren't working. When I click to use one it takes me to the affinity
+// one not the enhance tab."
+//
+// Two callers sent EVERY forge-targeted consumable to `?tab=attune`, hard-coded. That tab was chosen for the
+// Enchantment Scroll, which genuinely wants it — pick a piece, pick an element. The Power Scroll shares the
+// same `target: "forge"` and got swept along to a bench that cannot spend it. Her forge log shows the
+// consequence exactly: three opens in one minute and no enhance between them.
+//
+// The bench comes from the effect the scroll HAS, for the same reason the screen does, and it lives here so
+// the two callers ask rather than each remember.
+const BENCH_BY_EFFECT = { forge_enhance: "enhance", forge_enchant: "attune" };
+
+/** Where using this consumable should land you: a path, or null if it is used from the stash itself. */
+export function consumableHref(id) {
+    const feature = featureOf(id);
+    if (feature !== "forge") return null;   // only the forge has benches to land on
+    const bench = BENCH_BY_EFFECT[CONSUMABLES[id]?.effect?.type || ""];
+    return `/marketplace/blacksmith${bench ? `?tab=${bench}` : ""}`;
+}
+
 /** Which feature screen this consumable belongs on, or null for one that belongs to no screen in particular. */
 export function featureOf(id) {
     const t = CONSUMABLES[id]?.effect?.type || "";
@@ -322,7 +343,7 @@ export async function featureConsumables(buyerId, feature) {
                 // Whether the shelf may offer "Use all". Decided here, from the same allow-list the POST
                 // enforces, so the button and the door can never disagree about what is bulk-usable.
                 count: Number(r.count) || 0, target: c.target || null, bulk: canBulkUse(r.consumable_id),
-                    stackNote: stackNote(r.consumable_id) };
+                    href: consumableHref(r.consumable_id), stackNote: stackNote(r.consumable_id) };
         })
         // Cheapest-feeling first is wrong here; what you want at a glance is the thing you have most of, then
         // by name so the shelf does not reshuffle itself between visits.
@@ -398,7 +419,10 @@ export async function listConsumables(buyerId) {
             // `bulk` is the same question for everything that ISN'T pet food, answered by the one allow-list
             // the POST enforces — so the button and the door cannot disagree.
             target: c.target || null, feedable: c.effect?.type === "pet_xp", bulk: canBulkUse(r.consumable_id),
-            stackNote: stackNote(r.consumable_id) };
+            // Where tapping it sends you, decided HERE — the screens that render this row are client
+            // components and this module is server-only, so the rule travels as a field rather than as an
+            // import. See consumableHref: two forge scrolls, two different benches.
+            href: consumableHref(r.consumable_id), stackNote: stackNote(r.consumable_id) };
     }).filter(Boolean);
     // The member's charged gear, for the recharge / cooldown-reset target pickers.
     const now = Date.now();
