@@ -332,7 +332,7 @@ export default function CardEvent({ run, art = {} }) {
                    own button belonged to the NEIGHBOURING card's stock layer, not to the button — so every tap
                    landed on a sibling and the picker could not be used at all. The bot sat in it for a
                    hundred and thirty steps saying "choosing a card" and never chose one. */
-                .cv .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cv .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }

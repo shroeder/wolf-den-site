@@ -158,7 +158,7 @@ export default function CardForge({ card, art = {}, mode = "sharpen" }) {
 
                 /* The card is drawn at its usual size and scaled, so this only has to exist because the two
                    screens that host it namespace their own .cf-card rules. */
-                .frg .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px; }
+                .frg .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px; }
 
                 @media (min-width: 720px) { .frg-sparks { width: 260px; height: 320px; } }
             `}</style>

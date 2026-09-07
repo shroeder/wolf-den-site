@@ -213,7 +213,11 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                 /* LOCKED IS COLD AND STILL LEGIBLE. A card you cannot have is greyed rather than hidden — the
                    point of the cabinet is the empty slots. */
                 .cc-lock.is-junk { color: #8e8371; font-style: italic; }
-                .cc-slot.is-locked .cf-card { filter: grayscale(0.85) brightness(0.5)
+                /* COLD, BUT YOU CAN STILL READ IT. At brightness 0.5 a locked card was a dark rectangle
+                   with a name over it — and the reason to browse the locked half of the cabinet is to see
+                   what a card DOES before you go and earn the pet. Greyed is the signal; unreadable is a
+                   different thing that happened to look like the signal. */
+                .cc-slot.is-locked .cf-card { filter: grayscale(0.85) brightness(0.66)
                     drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
                 .cc-lock { max-width: 96px; font-size: 10px; line-height: 1.2; letter-spacing: 0.04em;
                     color: #9d8f79; }
@@ -232,15 +236,20 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                 .cc-item em { display: block; margin-top: 3px; font-style: normal; font-size: 11px;
                     letter-spacing: 0.03em; color: #8e8069; }
 
-                .cc .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cc .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
                 .cc .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
-                /* Held up: the same face at a size the sentence on it can be read at. */
-                .cc .cf-card.is-big { width: 168px; height: 242px; }
+                /* Held up: the same face at a size the sentence on it can be read at — which it now is.
+                   Setting the width and height alone did nothing to the CARD, only to its box: every
+                   measurement inside the face was an absolute pixel tuned against 96x138, so this drew a
+                   61px window and 10.5px text inside a box three quarters larger and the result was a
+                   slit of animal over an empty slab. The face reads these two numbers now (see the note
+                   at the top of CardFace's stylesheet) and everything on it is a fraction of them. */
+                .cc .cf-card.is-big { --cf-w: 168px; --cf-h: 242px; }
 
                 .cc-over { position: fixed; inset: 0; z-index: 4100; display: grid; place-items: center;
                     padding: 16px; background: rgba(4,5,8,0.88); }

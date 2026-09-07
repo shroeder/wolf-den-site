@@ -114,7 +114,23 @@ const textSize = (card, live) => {
         const now = live && live[f] != null ? live[f] : card[f];
         return String(now ?? "");
     });
-    if (filled.length > 58) return " is-tiny";
+    // FOUR STEPS, NOT THREE. The Doorward's sentence ("The first blow that would kill you in a fight
+    // leaves you on half health instead") is eighty characters and was overflowing its box by six pixels
+    // at the smallest size there was — the last line simply cut off by the bottom rail. Nine cards sit
+    // past the tiny threshold and only one past this one, which is what a step for an outlier should look
+    // like: it catches the outlier and leaves every other card alone.
+    // ── THE STEPS ARE MEASURED, NOT GUESSED ─────────────────────────────────────────────────────────
+    // Every one of the 119 cards in the cabinet was rendered and its line box compared against its band.
+    // The boundaries below are where that measurement actually falls: 40 characters is the last that fits
+    // at full size, 57 the last at small, 70 the last at tiny. The old small/tiny boundary sat at 58 — one
+    // character too generous — and The Doorward ("Deal 6 damage to ALL enemies. Apply 2 Vulnerable.
+    // Exhaust.", fifty-eight of them) wrapped to a fifth line and lost it under the bottom rail.
+    //
+    // A character count is a proxy for a LINE count and not a very good one, so these have to be re-measured
+    // whenever the band or the face changes rather than reasoned about. is-micro catches nothing in the
+    // cabinet today; it is headroom for a card written longer than any that exists.
+    if (filled.length > 72) return " is-micro";
+    if (filled.length > 57) return " is-tiny";
     if (filled.length > 40) return " is-small";
     return "";
 };
@@ -337,7 +353,14 @@ export default function CardFace({ card, art, dim, live }) {
 
                 Stepped rather than fluid, because two sizes at a glance read as a design and a continuous
                 scale reads as a bug: the cabinet would show twenty-six cards in twenty-six type sizes. */}
-            <span className={`cf-text${textSize(card, live)}`}>{withNumbers(card, live)}</span>
+            <span className={`cf-text${textSize(card, live)}`}>
+                {/* The sentence is wrapped rather than laid straight into the box, and the wrapper is what
+                    makes it sit in the MIDDLE of the band instead of hanging from the top of it. The box
+                    cannot centre it directly: withNumbers returns a run of inline spans, and any flex or
+                    grid on their parent would take each one as an item and stack the sentence into a
+                    column of fragments. One block wrapper keeps them a paragraph. */}
+                <i className="cf-line">{withNumbers(card, live)}</i>
+            </span>
 
             {/* ⚠️ GLOBAL, FOR THE SAME REASON THE FIGHT'S BLOCK IS. styled-jsx scopes a rule to the
                 elements THIS component renders — and the picture in the window is rendered by <CardArt> and
@@ -345,15 +368,35 @@ export default function CardFace({ card, art, dim, live }) {
                 would come out at its natural size. Everything below is under the `.cf-` prefix, which is the
                 card game and nothing else on the site. */}
             <style jsx global>{`
-                .cf-stock { position: absolute; inset: 4px; z-index: 0; border-radius: 6px; }
+                /* ── EVERY MEASUREMENT ON THIS CARD IS A FRACTION OF THE CARD ────────────────────────────
+                   These used to be absolute pixels — a 53px window, 10.5px text, a 34x15 plate — all of
+                   them sized by hand against a 96x138 box. That box is declared in NINE screens, and one
+                   of them is not 96x138: the cabinet holds a card up at 168x242 so its sentence can be
+                   read. It could not be. The box grew by three quarters and the window, the type and the
+                   plate did not move at all, so the one card in the game you tap in order to LOOK at it
+                   came out as a letterbox slit of animal over an empty grey slab — the worst-drawn card
+                   in the game, on the screen whose whole job is admiring it.
+                   Two custom properties, and every rule below is a fraction of one of them. A screen that
+                   wants a different size sets the numbers; nothing in here has to know. */
+                /* Declared here AND defaulted at every use site below. A calc() over an undefined custom
+                   property is an invalid value, not a zero — the whole declaration is dropped — so one
+                   caller that renders a face without the .cf-card class on its wrapper would not get a
+                   slightly wrong card, it would get an unstyled column of spans. Eighteen call sites draw
+                   one of these; the fallback means the nineteenth cannot break it. */
+                .cf-card { --cf-w: 96px; --cf-h: 138px; }
+                .cf-stock { position: absolute; inset: calc(var(--cf-w, 96px) * 0.042); z-index: 0;
+                    border-radius: calc(var(--cf-w, 96px) * 0.063); }
                 /* A DIAMOND HUNG OFF THE CORNER, in dark stone with a white numeral — theirs, and it reads
                    better than the amber disc did against a lit card. Rotated square, so the glyph inside is
                    counter-rotated. */
-                .cf-cost { position: absolute; top: -8px; left: -8px; width: 22px; height: 22px; z-index: 4;
-                    display: grid; place-items: center; transform: rotate(45deg); border-radius: 4px;
+                .cf-cost { position: absolute; top: calc(var(--cf-w, 96px) * -0.083); left: calc(var(--cf-w, 96px) * -0.083);
+                    width: calc(var(--cf-w, 96px) * 0.229); height: calc(var(--cf-w, 96px) * 0.229); z-index: 4;
+                    display: grid; place-items: center; transform: rotate(45deg);
+                    border-radius: calc(var(--cf-w, 96px) * 0.042);
                     background: linear-gradient(145deg, #6b7280, #2c313a); border: 1px solid #10131a;
                     box-shadow: 0 2px 5px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.28); }
-                .cf-cost i { transform: rotate(-45deg); font-style: normal; font-size: 12px; font-weight: 800;
+                .cf-cost i { transform: rotate(-45deg); font-style: normal; font-weight: 800;
+                    font-size: calc(var(--cf-w, 96px) * 0.125);
                     color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
                 .cf-cost.is-dim { background: linear-gradient(145deg, #3a3f47, #23272e); }
                 .cf-cost.is-dim i { color: #96a0ae; }
@@ -361,11 +404,15 @@ export default function CardFace({ card, art, dim, live }) {
                    clip-path was faking — and faking badly: its clipped underside was letting the card art show
                    through beneath the name, which read as the sprite covering the banner.
                    Set in the card face, not the UI face — see the note on CARD_FONT at the top. */
-                .cf-banner { font-family: var(--cf-card-font); font-weight: 700; font-size: 10.5px;
-                    position: relative; z-index: 3; width: calc(100% + 14px);
-                    margin: 4px -7px -6px; padding: 3px 9px 6px;
+                /* One font-size, not two. This carried 10.5px and then 9px four lines later, so the first
+                   was dead the day it was written and every later reader had to find that out. */
+                .cf-banner { font-family: var(--cf-card-font);
+                    position: relative; z-index: 3; width: calc(100% + var(--cf-w, 96px) * 0.146);
+                    margin: calc(var(--cf-w, 96px) * 0.042) calc(var(--cf-w, 96px) * -0.073) calc(var(--cf-w, 96px) * -0.063);
+                    padding: calc(var(--cf-w, 96px) * 0.031) calc(var(--cf-w, 96px) * 0.094) calc(var(--cf-w, 96px) * 0.063);
                     background-repeat: no-repeat; background-size: 100% 100%;
-                    font-size: 9px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.1;
+                    font-size: calc(var(--cf-w, 96px) * 0.094); font-weight: 800; letter-spacing: 0.01em;
+                    line-height: 1.1;
                     text-align: center; color: #1b1e24; text-shadow: 0 1px 0 rgba(255,255,255,0.35);
                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
@@ -382,9 +429,9 @@ export default function CardFace({ card, art, dim, live }) {
                    Small and gold on the card stock, sitting inside the moulding's bottom rail. Drawn as SVG
                    rather than set as a character: a star glyph is a different shape in every font and a
                    different WIDTH on every phone, and six of them have to fit inside 96px on every one. */
-                .cf-stars { position: absolute; left: 0; right: 0; bottom: 4px; z-index: 4;
-                    display: flex; justify-content: center; gap: 1.5px; pointer-events: none; }
-                .cf-star { width: 8px; height: 8px; fill: #ffcb5e;
+                .cf-stars { position: absolute; left: 0; right: 0; bottom: calc(var(--cf-w, 96px) * 0.042); z-index: 4;
+                    display: flex; justify-content: center; gap: calc(var(--cf-w, 96px) * 0.016); pointer-events: none; }
+                .cf-star { width: calc(var(--cf-w, 96px) * 0.083); height: calc(var(--cf-w, 96px) * 0.083); fill: #ffcb5e;
                     filter: drop-shadow(0 1px 1px rgba(0,0,0,0.85)); }
                 /* THE SIXTH RUNG IS NOT A NUMBER AND NOT A STAR EITHER, IT IS A STONE. An enshrined pet wears
                    the form the stone gave it in the window; down here the stars take the stone's colour. */
@@ -394,12 +441,22 @@ export default function CardFace({ card, art, dim, live }) {
 
                 /* The glyph in a status card's window: big, flat and colourless. */
                 .cf-status-mark { display: grid; place-items: center; width: 100%; height: 100%;
-                    font-size: 30px; color: #7c8794; }
+                    font-size: calc(var(--cf-w, 96px) * 0.313); color: #7c8794; }
 
-                .cf-art { position: relative; width: calc(100% - 16px); height: 53px; margin: 0 8px;
-                    display: block; }
-                .cf-art-in { position: absolute; inset: 3px; display: grid; place-items: center;
-                    border-radius: 4px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
+                /* ── THE WINDOW GETS THE CARD ──────────────────────────────────────────────────────────
+                   It was 53px of a 138px card, and the picture inside it 68x44 — twenty-two percent of the
+                   card's area for the thing the card IS. Every card in this game is a pet; the pet was a
+                   letterbox strip under the name, and the remaining half of the card was flat coloured
+                   stock with three words floating in it. Spire gives its art a little under half the card
+                   and it is most of why their deck reads as a deck of paintings.
+                   The eight pixels this needs come from the plate below, which used to cost eight pixels
+                   of flow hovering between two zones and now sits ON the window's bottom rail where a
+                   type mark belongs — so the sentence keeps very nearly the room it had. */
+                .cf-art { position: relative; width: calc(100% - var(--cf-w, 96px) * 0.167);
+                    height: calc(var(--cf-h, 138px) * 0.442); margin: 0 calc(var(--cf-w, 96px) * 0.083); display: block; }
+                .cf-art-in { position: absolute; inset: calc(var(--cf-w, 96px) * 0.031); display: grid;
+                    place-items: center; border-radius: calc(var(--cf-w, 96px) * 0.042); overflow: hidden;
+                    box-shadow: inset 0 0 calc(var(--cf-w, 96px) * 0.104) rgba(0,0,0,0.6); }
                 .cf-rim { position: absolute; inset: 0; z-index: 2; pointer-events: none;
                     background-repeat: no-repeat; background-size: 100% 100%;
                     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
@@ -409,19 +466,32 @@ export default function CardFace({ card, art, dim, live }) {
                    lets the picture sit outside the shield's shoulders — a sliver of sky above the fox, which
                    at a glance looks like the art is leaking out of its frame. The metal has to be the last
                    thing on every edge. */
-                .cf-art.is-attack .cf-art-in { inset: 5px 6px 4px;
+                .cf-art.is-attack .cf-art-in {
+                    inset: calc(var(--cf-w, 96px) * 0.052) calc(var(--cf-w, 96px) * 0.063) calc(var(--cf-w, 96px) * 0.042);
                     clip-path: polygon(2% 0, 98% 0, 98% 58%, 50% 100%, 2% 58%); }
-                .cf-art.is-skill .cf-art-in { border-radius: 9px; }
-                .cf-art-img { max-width: 96%; max-height: 40px; object-fit: contain;
+                .cf-art.is-skill .cf-art-in { border-radius: calc(var(--cf-w, 96px) * 0.094); }
+                /* Was a 40px ceiling against a 53px window — three quarters of it. Kept as the same
+                   three quarters rather than a number, so a fallback portrait fills the same share of a
+                   window whatever size the card is drawn at. */
+                .cf-art-img { max-width: 96%; max-height: 76%; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
                 /* Full-bleed art fills its window; the fallback portrait is CONTAINED, because a pet sprite
                    cropped to a letterbox loses its head. Two jobs, two fits. */
                 .cf-art-full { width: 100%; height: 100%; object-fit: cover; display: block; }
                 /* Sitting ON the art window's bottom border, in the rarity colour with dark text. */
-                .cf-type { position: relative; z-index: 3; margin-top: -7px; width: 34px; height: 15px;
+                /* ── THE PLATE SITS ON THE RAIL ────────────────────────────────────────────────────────
+                   Pulled up by four fifths of its own height so it straddles the window's bottom edge and
+                   costs the column almost nothing. It used to float in the gap between the picture and the
+                   sentence, belonging to neither and spending eight pixels to do it.
+                   And the emblem is bigger and embossed. A dark glyph at 10px on a mid-grey plate is a
+                   smudge at the size a card is actually played at — legible in a screenshot blown up
+                   four times and not on a phone, which is the wrong way round. */
+                .cf-type { position: relative; z-index: 3; margin-top: calc(var(--cf-h, 138px) * -0.087);
+                    width: calc(var(--cf-w, 96px) * 0.354); height: calc(var(--cf-h, 138px) * 0.109);
                     display: grid; place-items: center; background-repeat: no-repeat; background-size: 100% 100%;
-                    color: #1b1f27; font-size: 10px; line-height: 1;
+                    color: #171b22; font-size: calc(var(--cf-h, 138px) * 0.080); line-height: 1;
                     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+                .cf-type svg { filter: drop-shadow(0 1px 0 rgba(255,255,255,0.34)); }
                 /* POSITIONED, or the stock eats it. The card's colour is an absolutely-positioned layer at
                    z-index 0, and a STATIC element paints below every positioned sibling no matter what order
                    they are in the markup — so the sentence went under the slab the moment the stock arrived,
@@ -434,13 +504,18 @@ export default function CardFace({ card, art, dim, live }) {
                    which looks like a rendering fault rather than a wide word. The rails are ~11px at this
                    size; the sentence stops before them and wraps instead. */
                 .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
-                    padding: 4px 12px 0; font-size: 10.5px; line-height: 1.16; text-align: center; color: #eef2f8;
+                    display: flex; align-items: center; justify-content: center;
+                    padding: calc(var(--cf-w, 96px) * 0.042) calc(var(--cf-w, 96px) * 0.125) 0;
+                    font-size: calc(var(--cf-w, 96px) * 0.109); line-height: 1.16; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
+                .cf-line { display: block; width: 100%; font-style: normal; }
                 /* THE SIDE PADDING DOES NOT SHRINK WITH THE TYPE. It is there to clear the moulding's rails,
                    which are the same width whatever size the sentence is set at — buying two characters a
                    line back by moving the text under the metal is trading one clipped word for another. */
-                .cf-text.is-small { font-size: 9.5px; line-height: 1.12; }
-                .cf-text.is-tiny { font-size: 8.6px; line-height: 1.1; }
+                .cf-text.is-small { font-size: calc(var(--cf-w, 96px) * 0.099); line-height: 1.12; }
+                .cf-text.is-tiny { font-size: calc(var(--cf-w, 96px) * 0.090); line-height: 1.1; }
+                /* The outlier step — see textSize. One card in the game reaches it. */
+                .cf-text.is-micro { font-size: calc(var(--cf-w, 96px) * 0.081); line-height: 1.06; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
                 /* An unmodified number is just text. One the fight has moved is called out — green up, red

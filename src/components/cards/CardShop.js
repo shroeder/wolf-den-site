@@ -509,7 +509,7 @@ export default function CardShop({ run, art = {} }) {
                 /* ── THE CARD BOX ── everything inside it is CardFace's. See the note there: the face is one
                    component and the box belongs to the screen, because the fight's fans out and is dragged
                    and this one stands on a plank. */
-                .cs .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cs .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6));

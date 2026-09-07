@@ -1853,7 +1853,7 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* The box paints NOTHING — no background, no border. The drawn moulding is the card's outside
                    edge, and anything the box painted would show past it wherever the two silhouettes disagree,
                    which is exactly what put a green line down the side of the frog. */
-                .cf-card { position: relative; flex: 0 0 auto; width: 96px; height: 138px; padding: 0 0 8px;
+                .cf-card { position: relative; flex: 0 0 auto; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center; touch-action: none;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55));
@@ -2025,7 +2025,7 @@ export default function CardFightClient({ fixture, run = null }) {
                    continuously now, so there is nothing to summon. */
                 .cf-read { position: fixed; inset: 0; z-index: 5100; display: grid; place-items: center;
                     background: rgba(6,7,10,0.72); pointer-events: none; }
-                .cf-read-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cf-read-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     transform: scale(2.1); animation: cfRead 140ms ease-out; }
                 .cf-read-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
@@ -2046,14 +2046,14 @@ export default function CardFightClient({ fixture, run = null }) {
                    card getting out of the way on its path to the discard. */
                 .cf-played { position: fixed; left: 0; right: 0; bottom: 22%; z-index: 4950;
                     display: grid; place-items: center; pointer-events: none; }
-                .cf-played-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cf-played-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     animation: cfPerform 340ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
 
                 /* Parked: smaller and lower, because while it is aiming it is a label for what is being
                    thrown rather than the thing you are looking at. */
                 .cf-drag.is-parked { transform: translate(-50%, -104%) scale(0.72) rotate(0deg); opacity: 0.94; }
-                .cf-drag { position: fixed; z-index: 5000; width: 96px; height: 138px; padding: 0 0 8px;
+                .cf-drag { position: fixed; z-index: 5000; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center; pointer-events: none;
                     background: none;
                     /* HELD ABOVE THE POINTER, not on it. Centred on the thumb, the card covered the foe

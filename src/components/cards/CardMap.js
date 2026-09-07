@@ -503,7 +503,7 @@ export default function CardMap({ run, art = {} }) {
                     min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;
                     display: grid; place-items: center; background: rgba(10,12,16,0.92);
                     border: 1px solid rgba(201,162,83,0.6); color: #ffd08a; font-size: 11px; font-weight: 800; }
-                .cm .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px;
+                .cm .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }

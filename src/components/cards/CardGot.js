@@ -112,7 +112,7 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
                 .got-card { position: relative; display: block; transform-origin: center center;
                     animation: got-card-in 0.42s cubic-bezier(.2,.9,.25,1) both; }
                 .got-card.is-going { animation: got-card-out 0.34s ease-in both; }
-                .got .cf-card { position: relative; width: 96px; height: 138px; padding: 0 0 8px; }
+                .got .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px; }
                 @keyframes got-card-in {
                     0% { transform: scale(1.2) translateY(30px); opacity: 0; }
                     70% { transform: scale(2.3) translateY(0); opacity: 1; }
