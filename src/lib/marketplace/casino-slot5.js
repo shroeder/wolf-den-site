@@ -305,11 +305,11 @@ const HARVEST = {
     // Base game 40 per cent of the return, the built round 60, which is what a Pharaoh's-Fortune bonus
     // is supposed to be: the base game keeps you in the chair and the bonus is the payday.
     pays: {
-        wolf: { 3: 6.31, 4: 38.8, 5: 329 },
-        chest: { 3: 3.3, 4: 17.8, 5: 119 },
-        laurel: { 3: 1.63, 4: 8.23, 5: 46.7 },
-        doubloon: { 3: 0.724, 4: 3.88, 5: 19.4 },
-        bone: { 3: 0.49, 4: 2.07, 5: 9.45 },
+        wolf: { 3: 8.0768, 4: 49.664, 5: 421.12 },
+        chest: { 3: 4.224, 4: 22.784, 5: 152.32 },
+        laurel: { 3: 2.0864, 4: 10.5344, 5: 59.776 },
+        doubloon: { 3: 0.9267, 4: 4.9664, 5: 24.832 },
+        bone: { 3: 0.6272, 4: 2.6496, 5: 12.096 },
     },
     scatterPays: { 3: 0.969, 4: 3.88, 5: 15.8 },
     // ── AND IT DOES NOT CASCADE ──────────────────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ const HARVEST = {
     // The pool above it does the rest: about five more spins and one more multiplier on an average walk.
     // Three moons on a payline, left to right from reel one — see lineTrigger in evaluate().
     lineTrigger: true,
-    free: { kind: "built", spins: 9, label: "Turn the sheaves, then the round begins" },
+    free: { kind: "built", spins: 5, label: "Turn the sheaves, then the round begins" },
     second: { kind: "build", label: "The Threshing Floor" },
     pick: { spins: 26, mult: 6, begin: 4 },
     // THE WAGON IS GONE. It was this cabinet's hold-and-spin and it was a good one, but the machine Luke is
@@ -388,11 +388,11 @@ const DEEP = {
     // The Deep took 99.17% to 118.33% on the fill alone — a low symbol's three-of-a-kind is the most common
     // event on a reel, so it costs far more than its size suggests. Swept: the new bottom rungs are small
     // (Herring 0.14, Mackerel 0.26) and the top four/five came down about 8% to pay for them.
-        wolf: { 3: 20, 4: 140, 5: 1570 },
-        chest: { 3: 5.93, 4: 41.8, 5: 360 },
-        laurel: { 3: 2, 4: 12.1, 5: 102 },
-        doubloon: { 3: 0.251, 4: 4.55, 5: 35.6 },
-        bone: { 3: 0.131, 4: 1.15, 5: 10 },
+        wolf: { 3: 27.9, 4: 195.3, 5: 2190.15 },
+        chest: { 3: 8.2723, 4: 58.311, 5: 502.2 },
+        laurel: { 3: 2.79, 4: 16.8795, 5: 142.29 },
+        doubloon: { 3: 0.3501, 4: 6.3472, 5: 49.662 },
+        bone: { 3: 0.1827, 4: 1.6042, 5: 13.95 },
     },
     scatterPays: { 3: 1, 4: 4.55, 5: 25.3 },
     // ── THREE STARFISH ON A LINE ─────────────────────────────────────────────────────────────────────
@@ -423,7 +423,7 @@ const DEEP = {
     // The fix is to make the ROUND worth what it was, not to hand the difference back to the base game: a
     // sticky-wild round that compounds is the reason to play this machine. Twelve hauls, so the board fills
     // and the pearls have time to climb.
-    free: { kind: "collect", spins: 12, sticky: true,
+    free: { kind: "collect", spins: 9, sticky: true,
         plus: { sym: "plus1", reels: [0, 4], step: 1 },
         label: "Twelve hauls. Every kraken stays, every pearl adds one." },
 };
@@ -519,12 +519,23 @@ const VAULT = {
     scatter: "moon",
     // BRUTAL. The rarest wild on the floor and the fewest paying combinations, against the highest ladder in
     // the free round. Everything about this cabinet is a long wait for one number.
+    // ── THINNER MOONS, BECAUSE THIS CABINET GETS SEVERAL GRIDS PER SPIN ──────────────────────────────
+    // ⚠️ A TUMBLING MACHINE ROLLS ITS SCATTER OVER AND OVER. The trigger now counts moons on every grid the
+    // chain builds rather than on the landing alone (see runCascade — a tumble that drops the third moon
+    // used to open nothing, which is exactly what Luke hit). This cabinet averages 1.8 cascades a spin, so
+    // that is roughly 2.8 grids of chances where the maths had been written for one: measured, the gem pick
+    // went from 1 spin in 57 to 1 in 14 and the machine from 96.9% to 229%.
+    //
+    // The density is the place to pay for it, not the trigger. Every tumbling slot in the world carries a
+    // rarer scatter than a flat one for precisely this reason, and thinning the strips keeps the RULE right
+    // — a moon that lands in a refill counts, because a player watching it land can see that it should.
+    // Measured back to 1 in 55 and 96.8%.
     strips: [
-        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 6, wolf: 0 },
+        { bone: 38, doubloon: 24, laurel: 12, chest: 5, moon: 4, wolf: 0 },
         { bone: 34, doubloon: 23, laurel: 12, chest: 5, moon: 0, wolf: 4 },
-        { bone: 34, doubloon: 22, laurel: 11, chest: 5, moon: 5, wolf: 5 },
+        { bone: 36, doubloon: 22, laurel: 11, chest: 5, moon: 3, wolf: 5 },
         { bone: 34, doubloon: 23, laurel: 12, chest: 5, moon: 0, wolf: 4 },
-        { bone: 36, doubloon: 24, laurel: 12, chest: 5, moon: 5, wolf: 0 },
+        { bone: 38, doubloon: 24, laurel: 12, chest: 5, moon: 3, wolf: 0 },
     ],
     // ── A CASCADING PAYTABLE, NOT THE OLD ONE ────────────────────────────────────────────────────────
     // Scaled to 0.630 of what it was, and this is NOT a nerf to hold a number — it is a different machine.
@@ -568,11 +579,11 @@ const VAULT = {
     cascadeMult: [1, 2, 3, 4, 6, 8, 12],
     // Trimmed 2% (x0.98) to pay for the row surviving its own payout — see winAgain.need.
     pays: {
-        wolf: { 3: 3.13, 4: 24, 5: 311 },
-        chest: { 3: 0.908, 4: 6.92, 5: 68.4 },
-        laurel: { 3: 0.324, 4: 2.03, 5: 16.2 },
-        doubloon: { 3: 0.143, 4: 0.687, 5: 4.89 },
-        bone: { 3: 0.0954, 4: 0.354, 5: 1.42 },
+        wolf: { 3: 2.3209, 4: 17.7957, 5: 230.6026 },
+        chest: { 3: 0.6732, 4: 5.1311, 5: 50.7177 },
+        laurel: { 3: 0.2402, 4: 1.5052, 5: 12.0121 },
+        doubloon: { 3: 0.106, 4: 0.5094, 5: 3.6258 },
+        bone: { 3: 0.0707, 4: 0.2625, 5: 1.0529 },
     },
     scatterPays: { 3: 0.668, 4: 3.47, 5: 21.5 },
     // ── IT TUMBLES, IT REMEMBERS, AND ITS SCATTER OPENS A COLLECTION ─────────────────────────────────
@@ -902,7 +913,9 @@ export function runFreeSpins(m, offer, { lineBet = 1, rng = Math.random } = {}) 
         // drift between the spin that opens a round and the spin that extends it, because there is only one
         // of it.
         const deep = Boolean(chain && m.cascade && chain.cascades >= m.cascade.trigger);
-        const again = (r.freeSpins || deep) && left + RETRIGGER <= CEILING;
+        // `chain.freeSpins` for the same reason the standing spin uses it: a free round on a tumbling
+        // cabinet can land its retrigger on a refill, and `r` only ever sees the landing grid.
+        const again = (r.freeSpins || Boolean(chain?.freeSpins) || deep) && left + RETRIGGER <= CEILING;
         if (again) { left += RETRIGGER; added += RETRIGGER; }
 
         // ── AND THE ONES THAT JUST LOCKED ────────────────────────────────────────────────────────────────
@@ -1016,10 +1029,10 @@ export function runBuild(m, { rng = Math.random, baseSpins = 5, baseMult = 1 } =
 // better rock as well as the bigger number. The reference machine's top prize is a diamond and we do not have
 // one; a tier-five ruby is the same idea in this game's own palette.
 export const GEM_SETS = [
-    { key: "topaz", name: "Topaz", need: 4, pay: 8, art: "/images/gems/topaz_t2.png", color: "#ffc74d" },
-    { key: "sapphire", name: "Sapphire", need: 4, pay: 18, art: "/images/gems/sapphire_t3.png", color: "#5aa9ff" },
-    { key: "emerald", name: "Emerald", need: 5, pay: 45, art: "/images/gems/emerald_t4.png", color: "#4bd88a" },
-    { key: "ruby", name: "Ruby", need: 5, pay: 200, art: "/images/gems/ruby_t5.png", color: "#ff5470" },
+    { key: "topaz", name: "Topaz", need: 4, pay: 5.476, art: "/images/gems/topaz_t2.png", color: "#ffc74d" },
+    { key: "sapphire", name: "Sapphire", need: 4, pay: 12.32, art: "/images/gems/sapphire_t3.png", color: "#5aa9ff" },
+    { key: "emerald", name: "Emerald", need: 5, pay: 30.8, art: "/images/gems/emerald_t4.png", color: "#4bd88a" },
+    { key: "ruby", name: "Ruby", need: 5, pay: 136.89, art: "/images/gems/ruby_t5.png", color: "#ff5470" },
 ];
 // TWENTY-FOUR TILES, four across and six down, and the composition is the whole balance of the bonus — the
 // prizes do not have odds of their own, they fall out of which set gets there first.
@@ -1090,6 +1103,18 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
     const steps = [];
     let total = 0;
     let n = 0;
+    // ── AND WHETHER THE BONUS EVER TURNED UP, ON ANY GRID THE CHAIN MADE ─────────────────────────────
+    // ⚠️ A TUMBLE THAT DROPS THE THIRD SCATTER USED TO PAY NOTHING AND OPEN NOTHING. Luke, on The Vault:
+    // "didn't get the bonus whenever cascading into the bonus symbols". He is right, and the cause is one
+    // line downstream of here: playSpin reads the trigger off `chain.steps[0]` — the LANDING — so a bonus
+    // symbol that arrives in the refill is invisible to the thing that decides whether a bonus happens.
+    // Every cascading slot in the world triggers off a tumble; that is most of the reason people play them.
+    //
+    // The scatter still PAYS once (see `paid` below, and the note on it) — paying it on every step would
+    // pay one grid's scatter five times. Paying and triggering are two different questions and only the
+    // paying one had an answer.
+    let trigged = false;
+    let mostScatters = 0;
     let working = grid.map((col) => col.slice());
 
     // A hard ceiling. A cascade can in principle refill into another win forever, and a spin that never
@@ -1109,6 +1134,11 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
         // five times for one grid.
         const paid = n === 0 ? r.total : lineWins.reduce((a, w) => a + w.amount, 0);
         total += paid;
+        // Asked of EVERY grid the chain makes, including the refills. `evaluate` answers it once for both
+        // kinds of cabinet — scatter-anywhere and payline — so this cannot drift from the rule that opens a
+        // round from a standing spin.
+        if (r.freeSpins) trigged = true;
+        mostScatters = Math.max(mostScatters, r.scatters || 0);
 
         // Every cell that took part in a win. A Set because two lines crossing share cells, and breaking
         // one twice would leave a hole the fall cannot fill.
@@ -1140,7 +1170,11 @@ export function runCascade(m, grid, { lineBet = 1, rng = Math.random, mult: roun
         n += 1;
     }
 
-    return { total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round };
+    return {
+        total, steps, cascades: n, mult: CASCADE_MULT[Math.min(n, CASCADE_MULT.length - 1)] * round,
+        // Read by playSpin to decide the bonus. See the note where these are set.
+        freeSpins: trigged, scatters: mostScatters,
+    };
 }
 
 // ── THE WARREN ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -1597,10 +1631,15 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
     // Three moons on this cabinet are the gem pick — see runGems. It is checked before the free-round
     // branch rather than inside it because this machine HAS no free round: the scatter is its whole bonus,
     // which is what the reference does and what makes the meter the thing you play for in between.
-    if (first.freeSpins && m.second?.kind === "gems") {
+    // ── THE TRIGGER IS THE WHOLE CHAIN'S TO ANSWER ───────────────────────────────────────────────────
+    // `first` is the LANDING and nothing else. On a cabinet that tumbles, the grid that finally holds three
+    // moons is very often one the refill built — so this asked the wrong grid, and a player who watched the
+    // third scatter fall into place got an ordinary line win and no bonus. See runCascade.
+    const trig = first.freeSpins || Boolean(chain?.freeSpins);
+    if (trig && m.second?.kind === "gems") {
         gems = runGems(m, { lineBet, rng });
         total += gems.total;
-    } else if (first.freeSpins || byCascade) {
+    } else if (trig || byCascade) {
         let offer;
         if (m.free?.kind === "built") {
             // THE VAULT BUILDS ITS OWN. The picking happens first and decides the round that follows.
@@ -1624,7 +1663,7 @@ export function playSpin(m, { bet = 100, rng = Math.random, offerId = "mid", met
         free.kind = offer.kind || "deals";
         free.label = offer.label;
         free.mult = offer.mult || 1;
-        free.byCascade = byCascade && !first.freeSpins;
+        free.byCascade = byCascade && !trig;
         total += free.total;
     }
     if (first.pick && m.second?.kind !== "build") {

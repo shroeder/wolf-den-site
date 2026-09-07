@@ -58,6 +58,9 @@ const FREE_STOP_AT = [0, 230, 460, 690, 920];
 const FREE_SETTLE_MS = 300;
 const FREE_LINE_MS = 470;
 const FREE_HOLD_MS = 420;   // how long a finished free spin sits before the next one goes
+// The least daylight between two reels coming to rest. Below about a tenth of a second the eye reads them as
+// landing together, which is the thing the stagger exists to avoid. See the note in playGrid.
+const MIN_REST_GAP = 110;
 // Below this a win is not celebrated — see CELEBRATE_AT in casino-slot5-play.js. Seven wins in ten on a
 // twenty-line machine pay back less than the stake; that is what twenty lines buys, and a machine that
 // throws a fanfare at every one of them is doing the exact thing this rework existed to stop.
@@ -563,6 +566,21 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
         // successive hold is longer than the last, because a second hold the same length as the first reads
         // as the machine repeating itself instead of as the tension climbing.
         const tease = teaseFor(g);
+        // ── AND THEY COME TO REST IN ORDER ───────────────────────────────────────────────────────────────
+        // ⚠️ REEL FIVE USED TO STOP BEFORE REEL FOUR. Luke: "on all machines, the free spins 4th reel
+        // finished before the third."
+        //
+        // The reels START braking in order — that ladder is FREE_STOP_AT and it is fine. What is not fine is
+        // that the brake's LENGTH is measured per reel (see measureBrake) and comes back anywhere between
+        // 220ms and 900ms depending where the looping strip happened to be caught. The free round starts its
+        // reels only 230ms apart, so any reel whose brake runs 230ms shorter than the one before it comes to
+        // rest FIRST. Left to itself that happens constantly, and it is the one part of a spin a player is
+        // actually watching — the reels resolving left to right is the whole grammar of a slot.
+        //
+        // So a reel may brake for longer than it measured, never shorter: `restLadder` remembers when the
+        // previous one is due to rest and this one is held open until after it. Lengthening is free (the
+        // settle is a CSS duration we hand over) and it reads as a heavier reel rather than as a delay.
+        const restLadder = { at: -Infinity };
         const landsAt = [];
         let extra = 0;
         let held = 0;
@@ -599,7 +617,16 @@ export default function Slot5({ machineId = "slot", lines, onSpin, onSettled, ch
                 // MEASURED FIRST. This runs before React re-renders, so the strip is still mid-run and the
                 // transform is the live one — read it after the class flips and it is already the settle's.
                 const b = measureBrake(k);
-                if (b) setBrake((prev) => ({ ...prev, [k]: b }));
+                // Held open until after the reel to its left has actually stopped. MIN_REST_GAP rather than
+                // zero because two reels resting on the same frame reads as one wide reel stopping.
+                if (b) {
+                    const earliest = restLadder.at + MIN_REST_GAP;
+                    if (at + b.ms < earliest) b.ms = Math.round(earliest - at);
+                    restLadder.at = at + b.ms;
+                    setBrake((prev) => ({ ...prev, [k]: b }));
+                } else {
+                    restLadder.at = Math.max(restLadder.at + MIN_REST_GAP, at + settle);
+                }
                 // ── AND THE PAYOUT WAITS FOR THE LAST REEL, NOT FOR A CONSTANT ───────────────────────
                 // The brake's LENGTH is derived now (see measureBrake), so it runs anywhere from 240ms to
                 // 900ms depending on where the loop was caught. The lines used to be drawn at a fixed
