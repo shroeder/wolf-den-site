@@ -198,6 +198,8 @@ export const REWARDS = {
     // Store credit (fixed amounts)
     store_credit_5: "$5 store credit",
     store_credit_10: "$10 store credit",
+    store_credit_15: "$15 store credit",
+    store_credit_25: "$25 store credit",
     store_credit_30: "$30 store credit",
     // Discounts — CAPPED so a big purchase can't blow the perk open
     // Trade & BOGO — CAPPED
@@ -205,6 +207,9 @@ export const REWARDS = {
     // Non-monetary prestige perks (zero cost — great to earn)
     // ELITE rewards — reserved for Ascendant/Eternal gear. Gated behind the rarest drops in the game and
     // long (up to 1-year) cooldowns, so they can be genuinely big while still value-capped.
+    //
+    // ⚠️ $100 IS NO LONGER ATTACHED TO ANY ITEM, and the key stays only because two claims were already
+    // redeemed against it and the claim rows name their reward by this string. See the Ascendant Crown.
     store_credit_100: "$100 store credit",
 };
 
@@ -589,8 +594,18 @@ export const ITEMS = [
     // from Ascendant/Eternal loot chests, awarded for elite boss performance or by the owner). Each is a
     // top-end stat block AND a signature AND a charged REAL-WORLD reward with a long cooldown. =====
     // -- Ascendant --
-    { id: "ascendant_crown", name: "Ascendant Crown", slot: "helmet", rarity: "ascendant", icon: "GiCrenelCrown", flavor: "Worn by those who rose past legend.", stats: { might: 20, crit_chance: 15, crit_power: 20 }, reqLevel: 80, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "store_credit_100", chargeRewardLabel: REWARDS.store_credit_100, sort: 900 },
-    { id: "ascendant_blade", name: "Ascendant Blade", slot: "main_hand", rarity: "ascendant", icon: "GiEnergySword", flavor: "It hums with a light that shouldn't exist.", stats: { might: 35, crit_power: 20 }, reqLevel: 82, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "store_credit_30", chargeRewardLabel: REWARDS.store_credit_30, sort: 901 },
+    // ── THE TWO PIECES THAT COST REAL MONEY ──────────────────────────────────────────────────────────
+    // These are the only chest-obtainable items in the game that redeem against the till, and until now the
+    // Crown was $100 twice and the Blade $30 twice — $260 of shop credit hanging off two drops. That was
+    // priced when the top of the ladder was unreachable: 87 of the 124 ascendant-and-above items had never
+    // been owned by anyone, and celestial and primordial had never been seen at all.
+    //
+    // The chest work in this same change makes them reachable, which multiplies how many of these get out
+    // — so the per-item value comes down to match. Luke: "change the high tier items to only be less store
+    // credit." $25 and $15 are still real prizes for the rarest gear in the game, and the exposure is now
+    // bounded by something other than nobody ever finding them.
+    { id: "ascendant_crown", name: "Ascendant Crown", slot: "helmet", rarity: "ascendant", icon: "GiCrenelCrown", flavor: "Worn by those who rose past legend.", stats: { might: 20, crit_chance: 15, crit_power: 20 }, reqLevel: 80, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "store_credit_25", chargeRewardLabel: REWARDS.store_credit_25, sort: 900 },
+    { id: "ascendant_blade", name: "Ascendant Blade", slot: "main_hand", rarity: "ascendant", icon: "GiEnergySword", flavor: "It hums with a light that shouldn't exist.", stats: { might: 35, crit_power: 20 }, reqLevel: 82, source: "elite", charged: true, charges: 2, cooldownDays: 180, chargeReward: "store_credit_15", chargeRewardLabel: REWARDS.store_credit_15, sort: 901 },
     { id: "ascendant_aegis", name: "Ascendant Aegis", slot: "off_hand", rarity: "ascendant", icon: "GiCheckedShield", flavor: "Nothing has ever broken it.", stats: { ferocity: 35, fortune: 20 }, reqLevel: 84, source: "elite", sort: 902 },
     // -- Eternal (the pinnacle — 1-year cooldowns) --
     { id: "eternal_wolf_crown", name: "Eternal Wolf Crown", slot: "helmet", rarity: "eternal", icon: "GiWolfHead", flavor: "The Den remembers only a handful who wore it.", stats: { might: 25, crit_chance: 20, crit_power: 30 }, reqLevel: 95, source: "elite", sort: 910 },

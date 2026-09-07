@@ -24,15 +24,22 @@ import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 // CUT HARD. A recipe should be a thing you remember, not something that turns up every few chests. Roughly a
 // third of the first pass, and the low tiers cut most — a wooden chest coughing one up 3% of the time made the
 // commonest chest in the game a reliable recipe source.
-const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, ascendant: 0.060, eternal: 0.075 };
+// ⚠️ EVERY TIER, INCLUDING THE TWO NOBODY HAS OPENED YET. These three tables stopped at `eternal` while
+// CHEST_ORDER and CHEST_ART_TIERS run on through celestial and primordial, so those two chests read
+// `undefined` for their odds — which is not zero, it is NaN through the comparison and a silent nothing.
+// It has never mattered because nobody has ever opened one. It would have mattered the first time.
+const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, ascendant: 0.060, eternal: 0.075,
+    celestial: 0.090, primordial: 0.110 };
 // ── AND A HANDFUL OF SEEDS, AS ONE OF THE THINGS A CHEST CONTAINS ────────────────────────────────────────────
 // Sits in the same chain as the recipe and the gem: the chest either gives you seeds or it doesn't, drawn
 // like every other outcome. It is deliberately commoner than either — seeds are a supply, not a find — and
 // banded by tier, so a wooden chest cannot hold a Star Fruit however many you open.
 //
 // The old seed table listed all three chest tiers with tuned odds and nothing ever called them.
-const SEED_CHANCE = { wooden: 0.10, iron: 0.13, gold: 0.16, mythic: 0.18, ascendant: 0.20, eternal: 0.22 };
-const SEED_COUNT = { wooden: 2, iron: 2, gold: 3, mythic: 3, ascendant: 4, eternal: 4 };
+const SEED_CHANCE = { wooden: 0.10, iron: 0.13, gold: 0.16, mythic: 0.18, ascendant: 0.20, eternal: 0.22,
+    celestial: 0.24, primordial: 0.26 };
+const SEED_COUNT = { wooden: 2, iron: 2, gold: 3, mythic: 3, ascendant: 4, eternal: 4,
+    celestial: 5, primordial: 5 };
 
 // How often a chest gives a GEM instead of its ordinary contents. Deliberately in the same order of
 // magnitude as the recipe chance above — a gem should feel like a find, and gear is still what a chest is
@@ -59,8 +66,16 @@ export const CHEST_TIERS = {
     // Top tiers span 5 rarities each, with the curve ANCHORED to the low end — most drops are the ordinary
     // gear in range and the top rarities are a rare thrill. Higher chests just nudge more weight upward.
     mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { rare: 10, epic: 42, legendary: 34, mythic: 14 } },
-    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 34, legendary: 36, mythic: 22, ascendant: 7, eternal: 1 } },
-    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 30, legendary: 34, mythic: 24, ascendant: 9, eternal: 3 } },
+    // ── A TOP CHEST HAS TO PAY TOP GEAR ─────────────────────────────────────────────────────────────
+    // ⚠️ AN ASCENDANT CHEST PAID AN ASCENDANT ITEM 7% OF THE TIME. Measured against production: 22 of
+    // them have been opened in the Den's history and they produced THREE distinct ascendant pieces
+    // between them. The rarest object a member can be handed mostly gave them an epic they already had.
+    //
+    // The chest is the reward for the tier, so the tier is what it leads with. The remainder keeps its
+    // shape — the weight comes off the epic end, which is the part that was already redundant by the
+    // time anybody held one of these. Still sums to exactly 100, so these read as percentages.
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 20, legendary: 33, mythic: 25, ascendant: 20, eternal: 2 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 16, legendary: 30, mythic: 26, ascendant: 20, eternal: 8 } },
     // ── THE TWO RAREST CHESTS ARE THE ONLY ROUTE TO THE TWO RAREST TIERS ─────────────────────────────────
     // 55 items — every celestial and every primordial piece — could not be obtained by anything at all: no
     // chest's table listed those rarities, so the top of the ladder was decoration. These are the numbers Luke
@@ -74,10 +89,16 @@ export const CHEST_TIERS = {
     // only thing that has changed about these chests is that a sliver came off the ordinary end to pay for the
     // new tail. Deliberately tiny: with a primordial chest itself meant to be a once-a-year object, a 1% tail
     // on it is the rarest thing in the game by an order of magnitude, and that is the intent.
+    // ⚠️ AND THE TAIL HAS TO BE BIG ENOUGH TO EVER ARRIVE. With the chest supply fixed above, a celestial
+    // CHEST now lands about every two months and a primordial one about once a year — which is the cadence
+    // the note above always claimed. But a 4% celestial tail inside it still put the first celestial ITEM
+    // three years out and the first primordial fifteen, which is the same disease one level down: the door
+    // opens and there is nothing behind it. These two chests are the only route to those two rarities, so
+    // they lead with them.
     celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff",
-        weights: { epic: 23.4, legendary: 31.3, mythic: 27.4, ascendant: 11.7, eternal: 3.9, celestial: 2, primordial: 0.3 } },
+        weights: { epic: 9, legendary: 24, mythic: 26, ascendant: 20, eternal: 9, celestial: 10, primordial: 2 } },
     primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0",
-        weights: { epic: 16.7, legendary: 27.9, mythic: 27.9, ascendant: 14.9, eternal: 5.6, celestial: 6, primordial: 1 } },
+        weights: { epic: 5, legendary: 14, mythic: 20, ascendant: 20, eternal: 15, celestial: 18, primordial: 8 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -119,12 +140,37 @@ function tierForLevel(level) {
 // rarest-first and stops at the first hit, so you get at most one elite chest per milestone and the tiers get
 // exponentially harder to see — the last three especially. This is how Ascendant→Primordial chests are earned
 // purely through play. The odds below are per ROLL; see syncLevelChests for how often a roll happens.
+// ⚠️ THESE ODDS WERE WRITTEN FOR A BIGGER GAME THAN THIS ONE. The roll only happens on a milestone
+// level-up, and the whole Den produces 0.94 of those a DAY — 51 in its first 54 days. Chained through
+// the chest table above, that put the first celestial ITEM 88 years away and the first primordial 571.
+// The file already said what was intended ("a primordial chest itself meant to be a once-a-year
+// object"); the arithmetic missed it by twenty to five hundred times.
+//
+// Roughly quadrupled, and the second faucet below (see rollEliteChest, called on every tenth delve
+// clear) roughly quadruples the rolls again. Luke: "high tier chests are maybe too rare. but I still
+// want them rare." So a primordial chest lands about once a year across the entire Den and the item
+// inside it is rarer still — which is the promise the comment made and the numbers now keep.
 const ELITE_CHEST_LOTTERY = [
-    { tier: "primordial", chance: 0.00015 }, // ~1 in 6,700 level-ups
-    { tier: "celestial", chance: 0.0012 }, //  ~1 in 830
-    { tier: "eternal", chance: 0.006 }, //     ~1 in 165
-    { tier: "ascendant", chance: 0.025 }, //   ~1 in 40
+    { tier: "primordial", chance: 0.0005 }, //  ~1 in 2,000 rolls
+    { tier: "celestial", chance: 0.004 }, //    ~1 in 250
+    { tier: "eternal", chance: 0.010 }, //      ~1 in 100
+    { tier: "ascendant", chance: 0.030 }, //    ~1 in 33
 ];
+
+/**
+ * ── ONE ROLL OF THE ELITE LOTTERY ────────────────────────────────────────────────────────────────────
+ * Ordered rarest-first and stops at the first hit, so a roll yields at most one chest. Returns the tier
+ * or null.
+ *
+ * Exported because there are two faucets now and there must not be two copies of the odds. The milestone
+ * level-up has always had one; the second is a delve clear, which is the hardest repeatable thing in the
+ * game and was paying wooden, iron and gold chests exclusively — 2,455 of them and never once anything
+ * above gold.
+ */
+export function eliteRoll(fortune = 0) {
+    for (const e of ELITE_CHEST_LOTTERY) if (Math.random() < luckyChance(e.chance, fortune)) return e.tier;
+    return null;
+}
 
 function rollRarity(weights) {
     const total = Object.values(weights).reduce((s, w) => s + w, 0);
@@ -203,7 +249,8 @@ export async function syncLevelChests(buyerId) {
         // hat, and the reason three Ascendants are already out. Odds per roll are untouched; only the number
         // of rolls changes, so an elite chest stays a real thing that happens, just at the promised cadence.
         if (L >= 20) {
-            for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < luckyChance(e.chance, fortune)) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
+            const won = eliteRoll(fortune);
+            if (won) tally[won] = (tally[won] || 0) + 1;
         }
     }
     // A run of levels that crossed no milestone grants nothing — don't write an empty grant row.

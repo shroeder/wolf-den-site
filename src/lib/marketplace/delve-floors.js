@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { addChests, eliteRoll } from "@/lib/marketplace/chests.js";
+import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
@@ -503,10 +504,29 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
                 deepest_floor = GREATEST(deepest_floor, $6),
                 updated_at = NOW()
           WHERE buyer_id = $1
-          RETURNING floors_cleared, bosses_felled`,
+          RETURNING floors_cleared, bosses_felled, runs_cleared`,
         [buyerId, JSON.stringify({ ...run, over: true, died, cleared, fled, foe: null, awaiting: null }),
             cleared ? 1 : 0, died ? 1 : 0, floorsDone, run.floor]
     ).catch(() => null);
+
+    // ── AND EVERY TENTH CLEAR ROLLS FOR AN ELITE CHEST ───────────────────────────────────────────────────
+    // ⚠️ THE HARDEST REPEATABLE THING IN THE GAME PAID THE LOWEST CHESTS. Measured over the Den's whole
+    // history: the delve has handed out 2,455 chests and not one of them was above gold, while the ONLY
+    // route to an Ascendant-or-better chest was a milestone level-up — which the entire Den produces 0.94 of
+    // a day. That is why 87 of the 124 top-tier items have never been owned by anybody, and why celestial
+    // and primordial had never been seen at all.
+    //
+    // EVERY TENTH CLEAR, deliberately, and it is the same shape as the level track's every-tenth-level: a
+    // milestone you can feel coming rather than a coin flip on every run. It has to be gated — clears run
+    // about thirty a DAY across the Den, so a roll on each one would be thirty-two times the level-up faucet
+    // and the top of the ladder would stop being rare, which is the one thing it must stay.
+    //
+    // Fortune applies here exactly as it does on the level track, because eliteRoll is the same roll.
+    if (cleared && stats?.runs_cleared && Number(stats.runs_cleared) % 10 === 0) {
+        const luck = await fortuneFor(buyerId).catch(() => 0);
+        const won = eliteRoll(luck);
+        if (won) await addChests(buyerId, { [won]: 1 }, { source: "delve_milestone", meta: { clears: Number(stats.runs_cleared) } }).catch(() => {});
+    }
 
     // ── ASCENSION POWERS ON THE WAY OUT ──────────────────────────────────────────────────────────────────
     // The Delver's Rope gives the day back when a run ends BADLY. The day is claimed at the door (see
