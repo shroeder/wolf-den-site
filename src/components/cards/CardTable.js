@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import CardFoot from "@/components/cards/CardFoot";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
@@ -159,9 +160,7 @@ export default function CardTable({ run, history = null }) {
             </div>
 
             {/* The same ribbon the map and the rooms leave on, and from here it does what it says. */}
-            <button type="button" className="ct-return" onClick={() => router.push("/marketplace/town")}>
-                Return
-            </button>
+            <CardFoot label="Return" onClick={() => router.push("/marketplace/town")} />
 
             {/* Global for the same reason the shop's and the rooms' are: every selector is under `.ct`, which
                 is this screen and nothing else on the site. */}
@@ -207,7 +206,6 @@ export default function CardTable({ run, history = null }) {
                 .ct { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
                     /* the Return ribbon is fixed in the bottom-left corner; the column has to end above it */
-                    padding: 0 10px 86px; background: #0a0b0f; color: #efe3cd; }
                 .ct-room { position: fixed; inset: 0; z-index: -1;
                     background: #0a0b0f url(/images/cards/chrome/table-room.png) center/cover no-repeat; }
                 /* The room is painted dim and lit from one lamp; the vignette is what keeps the corners from
@@ -256,14 +254,6 @@ export default function CardTable({ run, history = null }) {
                    trap: at 375 the ribbon runs 0-158 and a centred 210px button runs 82-292, so Return sat on
                    top of Sit back down. On a wide screen the column is far to the right of it; on a narrow one
                    the stage is given the ribbon's whole band as padding below. */
-                .ct-return { position: absolute; left: 0; bottom: 18px; width: 158px; height: 52px;
-                    padding: 0 34px 0 10px; border: 0; cursor: pointer; background-color: transparent;
-                    background-image: url(/images/cards/chrome/return-ribbon.png);
-                    background-size: 100% 100%; background-repeat: no-repeat;
-                    font-family: inherit; font-weight: 700; font-size: 15px; color: #ffe6a6;
-                    text-shadow: 0 2px 3px rgba(0,0,0,0.7); text-align: center;
-                    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
-                .ct-return:hover { filter: brightness(1.1); }
 
                 @media (max-width: 560px) { .ct-stage { padding-bottom: 74px; } }
                 @media (min-width: 760px) {
@@ -279,7 +269,6 @@ export default function CardTable({ run, history = null }) {
                     .ct-stage { gap: 6px; }
                     .ct-do { height: 44px; width: 190px; }
                     .ct-do-label { font-size: 13.5px; }
-                    .ct-return { width: 132px; height: 46px; bottom: 12px; font-size: 13.5px; }
                 }
             `}</style>
         </div>

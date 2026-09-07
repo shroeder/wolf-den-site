@@ -6,6 +6,7 @@ import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
@@ -411,9 +412,7 @@ export default function CardShop({ run, art = {} }) {
             {/* The same ribbon the map leaves by, hung off the stall rather than off the window: aligned to
                 the screen edge it ended up a long way from everything else on a wide monitor. */}
             <div className="cs-foot">
-                <button type="button" className="cs-leave" disabled={busy} onClick={() => post({ action: "leave" })}>
-                    Move on
-                </button>
+                
             </div>
 
             {/* ── GLOBAL, AND IT HAS TO BE ────────────────────────────────────────────────────────────────
@@ -421,10 +420,12 @@ export default function CardShop({ run, art = {} }) {
                 <CardFace> one level down — so a scoped `.cf-card` here would style the box and nothing inside
                 it. Same trap, and the same answer, as the fight screen. Every selector is under `.cs` or the
                 card game's own `.cf-` prefix. */}
+            <CardFoot label="Move on" busy={busy} onClick={() => post({ action: "leave" })} />
+
             <style jsx global>{`
                 .cs { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center; gap: 10px;
-                    padding: 0 10px 18px; background: #0a0b0f; color: #efe3cd; }
+                    /* ends above the foot band — see CardFoot */
                 /* THE ROOM IS BEHIND EVERYTHING AND FIXED, so scrolling the wares does not scroll the wall.
                    cover and not 100% 100%: it is a painting of a place, and stretching a place to a phone's
                    aspect bends the stonework. */
@@ -673,12 +674,6 @@ export default function CardShop({ run, art = {} }) {
                 .cs-pick .cs-buy { padding-bottom: 0; }
 
                 /* The map's ribbon, so leaving looks the same wherever you are leaving from. */
-                .cs-leave { width: 132px; height: 46px; padding: 0 0 3px 8px;
-                    border: 0; background: transparent url(/images/cards/chrome/return-ribbon.png) center/100% 100% no-repeat;
-                    color: #ffe6d2; font: inherit; font-size: 14px; letter-spacing: 0.04em; cursor: pointer;
-                    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-                    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
-                .cs-leave:disabled { opacity: 0.5; cursor: default; }
 
                 /* ── AND ON A WIDE SCREEN HE STANDS BESIDE HIS GOODS ─────────────────────────────────────
                    Not "the same column, centred". A stall is a person on one side and the wares on the

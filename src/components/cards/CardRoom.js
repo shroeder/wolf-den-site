@@ -6,6 +6,7 @@ import { Cinzel } from "next/font/google";
 import { GiFlame } from "react-icons/gi";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
@@ -287,18 +288,14 @@ export default function CardRoom({ run, art = {} }) {
             {forge ? <CardForge card={forge} art={art} /> : null}
 
             {/* The map's ribbon, so leaving looks the same wherever you are leaving from. */}
-            <div className="cr-foot">
-                <button type="button" className="cr-leave" disabled={busy} onClick={() => post("leave")}>
-                    Move on
-                </button>
-            </div>
+            <CardFoot label="Move on" busy={busy} onClick={() => post("leave")} />
 
             {/* Global for the same reason the shop's is: every selector is under `.cr`, which is this screen
                 and nothing else on the site. */}
             <style jsx global>{`
                 .cr { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;
-                    padding: 0 10px 18px; background: #0a0b0f; color: #efe3cd; }
+                    padding: 0 10px 76px; background: #0a0b0f; color: #efe3cd; }
                 /* ⚠️ THE SAME LANTERN THE MERCHANT WAS STANDING IN. This is the shop's alcove and it has one
                    hanging lamp at dead centre; on a phone a cover-sized background shows the art's whole
                    height and only its middle third, so the lamp sits directly behind whatever object this
@@ -400,11 +397,6 @@ export default function CardRoom({ run, art = {} }) {
                     background-repeat: no-repeat; background-size: 100% 100%; }
 
                 .cr-foot { width: min(680px, 100%); display: flex; padding-bottom: 4px; }
-                .cr-leave { width: 132px; height: 46px; padding: 0 0 3px 8px; border: 0;
-                    background: transparent url(/images/cards/chrome/return-ribbon.png) center/100% 100% no-repeat;
-                    color: #ffe6d2; font: inherit; font-size: 14px; letter-spacing: 0.04em; cursor: pointer;
-                    text-shadow: 0 1px 3px rgba(0,0,0,0.8); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
-                .cr-leave:disabled { opacity: 0.5; cursor: default; }
 
                 @media (min-width: 760px) {
                     .cr-room { background-position: center; }

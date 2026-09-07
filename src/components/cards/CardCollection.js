@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardFoot from "@/components/cards/CardFoot";
 
 // ── EVERY CARD IN THE GAME, AND WHOSE IT IS ──────────────────────────────────────────────────────────────
 // Luke: "overall card collection", alongside "design the way cards reflect their pets level". The two are one
@@ -164,14 +165,12 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                 between a card that is hidden and a card that looks broken. */}
             <div className="cc-hem" aria-hidden="true" />
 
-            <button type="button" className="cc-return" onClick={() => router.push("/marketplace/cards/table")}>
-                Return
-            </button>
+            <CardFoot label="Return" onClick={() => router.push("/marketplace/cards/table")} />
 
             <style jsx global>{`
                 .cc { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;
-                    padding: 0 10px 86px; background: #0a0b0f; color: #efe3cd; }
+                    padding: 0 10px 76px; background: #0a0b0f; color: #efe3cd; }
                 .cc-room { position: fixed; inset: 0; z-index: -1;
                     background: #0a0b0f url(/images/cards/chrome/table-room.png) center/cover no-repeat; }
                 .cc-room::after { content: ""; position: absolute; inset: 0;
@@ -251,14 +250,6 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                     background: linear-gradient(180deg, rgba(6,7,10,0), rgba(6,7,10,0.86) 62%, rgba(6,7,10,0.96)); }
 
                 /* The ribbon, pinned, with the grid's own bottom padding keeping cards from under it. */
-                .cc-return { position: fixed; left: 0; bottom: 18px; z-index: 10; width: 158px; height: 52px;
-                    padding: 0 34px 0 10px; border: 0; cursor: pointer; background-color: transparent;
-                    background-image: url(/images/cards/chrome/return-ribbon.png);
-                    background-size: 100% 100%; background-repeat: no-repeat;
-                    font-family: inherit; font-weight: 700; font-size: 15px; color: #ffe6a6;
-                    text-shadow: 0 2px 3px rgba(0,0,0,0.7); text-align: center;
-                    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.55)); }
-                .cc-return:hover { filter: brightness(1.1); }
 
                 @media (min-width: 760px) {
                     .cc-say { font-size: 13.5px; max-width: 560px; }
