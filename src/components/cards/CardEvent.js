@@ -175,8 +175,6 @@ export default function CardEvent({ run, art = {} }) {
                                 <button key={i} type="button" className={`cv-do${spent ? " is-spent" : ""}`}
                                     disabled={busy || tooPoor || spent}
                                     onClick={() => post({ index: i })}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img className="cv-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                                     <span className="cv-do-text">
                                         <b>{c.label}</b>
                                         <i>{spent ? "Already searched." : tooPoor ? `${c.detail} — you cannot afford it` : c.detail}</i>
@@ -296,27 +294,58 @@ export default function CardEvent({ run, art = {} }) {
                    a row of them on a phone would set the text at eight points. */
                 .cv-choices { display: flex; flex-direction: column; gap: 6px; width: min(420px, 94%);
                     margin-top: 4px; }
-                .cv-do { position: relative; display: block; width: 100%; padding: 0; border: 0;
-                    background: none; cursor: pointer; }
+                /* ── THE CHOICES ARE CUT INTO THE WALL, NOT LAID ON IT ────────────────────────────────
+                   Luke, on a photograph of The Black Anvil: "hate these buttons."
+                   They were a DRAWN PLATE — one bitmap of moulded grey metal with a rivet at each end —
+                   stretched to whatever width the screen happened to be with object-fit: fill. Three things
+                   were wrong with that and all three are visible in his photograph:
+
+                     · IT WAS THE ONLY COLD THING ON A WARM SCREEN. The room is lit amber, the art is warm,
+                       the title and the prose are cream — and then three slabs of neutral grey, which is the
+                       one hue this game uses nowhere else. They read as a control panel bolted over the
+                       painting rather than as part of the room.
+                     · A DRAWN BEVEL DOES NOT STRETCH. The asset was painted at one shape and squashed to a
+                       wide shallow one, so the moulding went soft and the rivets flattened into smears — the
+                       plasticky look is a distorted bitmap, not a style choice.
+                     · AND IT COST 34px OF PADDING A SIDE to clear those rivets, on a 375px phone. A third of
+                       every plate was empty metal held open for two dots.
+
+                   Drawn in CSS now, in the game's own palette: dark warm stone with a brass hairline and an
+                   amber rail down the leading edge, which is the only part that needs to say "press me". The
+                   rail is also the hierarchy the three grey slabs never had — it lights on hover and press.
+                   Nothing is stretched, so it is the same object at every width. */
+                .cv-do { position: relative; display: block; width: 100%; cursor: pointer;
+                    padding: 11px 14px 11px 18px; text-align: left; border-radius: 10px;
+                    border: 1px solid rgba(201,162,83,0.30);
+                    background:
+                        linear-gradient(90deg, rgba(255,183,92,0.16) 0 4px, rgba(255,183,92,0) 4px),
+                        linear-gradient(180deg, rgba(38,30,22,0.96), rgba(24,19,15,0.96));
+                    box-shadow: inset 0 1px 0 rgba(255,232,190,0.07), 0 2px 5px rgba(0,0,0,0.45);
+                    transition: border-color 120ms ease-out, background 120ms ease-out; }
+                /* The rail itself — a separate layer so it can light without moving the plate's fill. */
+                .cv-do::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px;
+                    border-radius: 3px; background: linear-gradient(180deg, #ffcf8a, #b9782c);
+                    box-shadow: 0 0 7px rgba(255,180,90,0.35); transition: box-shadow 120ms ease-out; }
+                .cv-do:hover:not(:disabled), .cv-do:focus-visible:not(:disabled) {
+                    border-color: rgba(255,196,110,0.6);
+                    background:
+                        linear-gradient(90deg, rgba(255,183,92,0.22) 0 4px, rgba(255,183,92,0) 4px),
+                        linear-gradient(180deg, rgba(50,39,27,0.97), rgba(31,24,18,0.97)); }
+                .cv-do:hover:not(:disabled)::before { box-shadow: 0 0 12px rgba(255,190,100,0.65); }
+                .cv-do:not(:disabled):active { transform: translateY(1px); }
                 .cv-do:disabled { cursor: default; opacity: 0.5; }
-                .cv-do.is-spent { opacity: 0.34; }
-                .cv-plate { display: block; width: 100%; height: 100%; position: absolute; inset: 0;
-                    object-fit: fill; pointer-events: none; }
-                /* ⚠️ THE TEXT HAS TO SIT INSIDE THE METAL. The plate is a drawn asset with a moulded bevel
-                   and a rivet at each end, and at 18px of padding the label began ON the left bevel and the
-                   detail line ran out past the right rivet — visible in the screenshot Luke sent from his
-                   phone. The inset is the rivet's, not a guess: the art puts them about a tenth of the way in
-                   from each end, so the text starts clear of them and the plate reads as something the words
-                   are stamped on rather than something they are lying across. */
-                .cv-do-text { position: relative; display: flex; flex-direction: column; gap: 1px;
-                    padding: 10px 34px; text-align: left; }
+                /* A door already used keeps its words readable — it is the record of what you did in here. */
+                .cv-do.is-spent { opacity: 0.45; }
+                .cv-do.is-spent::before { background: linear-gradient(180deg, #6d6152, #443c33); box-shadow: none; }
+                .cv-do-text { position: relative; display: flex; flex-direction: column; gap: 2px; }
                 /* ⚠️ NOT INHERITED. The site sets a link colour on anything that looks like a control, which
                    has quietly turned button text blue on this game's screens before. */
-                .cv-do-text b { font-family: var(--cf-card-font); font-size: 14.5px; color: #f7ecd6;
-                    letter-spacing: 0.03em; }
-                .cv-do-text i { font-family: var(--cf-card-font); font-size: 11.5px; line-height: 1.3;
-                    color: #cbbb9f; font-style: normal; }
-                .cv-do:not(:disabled):active .cv-do-text { transform: translateY(1px); }
+                .cv-do-text b { font-family: var(--cf-card-font); font-size: 15px; color: #ffeed2;
+                    letter-spacing: 0.02em; }
+                /* Lifted off #cbbb9f: that was chosen against pale grey metal and this ground is dark, where
+                   it read as a whisper. The detail line is the half that says what the choice COSTS. */
+                .cv-do-text i { font-family: var(--cf-card-font); font-size: 12px; line-height: 1.35;
+                    color: #c3b393; font-style: normal; }
 
                 .cv-pick-over { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
                     padding: 12px; background: rgba(5,6,9,0.82); }

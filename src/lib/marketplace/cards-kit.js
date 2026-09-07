@@ -1114,6 +1114,57 @@ export function roomFight(row, kind = "fight", act = 1) {
 }
 
 // Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
+// ── WHAT A ROOM HANDS OVER ───────────────────────────────────────────────────────────────────────────────
+// ⚠️ THIS LIVED IN cards.js, WHICH THE SIMULATOR CANNOT IMPORT — that module opens a database connection and
+// the sim runs outside Next. So the sim had its own treasure room written by hand, and when the chest was
+// changed to pay a TRINKET the sim carried on handing out forty embers and a maybe-potion. Every completion
+// number measured after that change was measuring a game nobody was playing.
+//
+// The function was always pure — a seed, a row and the perk and potion lists — so it belongs here with the
+// rest of the rules, and cards.js re-exports it so its callers never noticed. This is the same rule the
+// tier odds already follow, and for the same reason: the simulator has to draw the way the browser draws or
+// it is not measuring the browser's game.
+//
+// Threaded off the run's seed and the room's position rather than Math.random, for the same reason every
+// other roll in this game is: a room re-entered after a refresh must not pay twice or pay differently.
+export function grantForRoom(run, row, lane, kind) {
+    let roll = ((run.seed >>> 0) + row * 6151 + lane * 97) >>> 0;
+    const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
+
+    if (kind === "elite") {
+        // Elites are where perks come from, which is what makes taking one worth the health it costs.
+        const held = new Set(run.perks || []);
+        const open = PERK_IDS.filter((id) => !held.has(id));
+        if (open.length) return { perk: open[Math.floor(next() * open.length)] };
+        return { embers: 60 };
+    }
+    if (kind === "treasure") {
+        // ── A CHEST IS A TRINKET ─────────────────────────────────────────────────────────────────────
+        // ⚠️ THIS PAID EMBERS AND A BOTTLE, AND IT IS THE REASON A RUN ARRIVED AT THE ACT ONE BOSS
+        // CARRYING ONE TRINKET. Watched through the browser: act one, stop fourteen, 22 health of 80, an
+        // eighteen-card deck — and a single perk on it, the one you START with. Theirs would have three or
+        // four by that room.
+        //
+        // The arithmetic is not subtle. Every relic in this game came from an elite, elites are eight
+        // percent of the map and barred from the first five floors, so an act hands out one or two. Theirs
+        // has the same elites AND a guaranteed treasure floor whose entire purpose is a relic — the chest
+        // IS the relic room, and row 9 is always treasure on our map too. We were running the same map with
+        // that floor paying pocket money.
+        //
+        // So the chest pays a trinket, and the embers become the consolation for a run already holding
+        // every one there is. The bottle stays: it was the good half of what this used to be.
+        const held = new Set(run.perks || []);
+        const open = PERK_IDS.filter((id) => !held.has(id));
+        if (!open.length) return { embers: 120 };
+        const out = { perk: open[Math.floor(next() * open.length)], embers: 25 };
+        if (next() < 0.4 && (run.potions || []).length < beltSize(run.perks)) {
+            out.potion = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
+        }
+        return out;
+    }
+    return {};
+}
+
 export const stopAt = (n, kind = "fight", act = 1) => ({ n, kind, act, ...roomFight(n, kind, act) });
 
 /**

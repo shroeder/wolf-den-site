@@ -1,5 +1,6 @@
 import "server-only";
 
+export { grantForRoom } from "@/lib/marketplace/cards-kit.js";
 import { db } from "@/lib/db";
 import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -608,46 +609,8 @@ export async function runFixture(buyerId, run) {
 }
 
 
-// ── WHAT A ROOM HANDS OVER ───────────────────────────────────────────────────────────────────────────────
-// Threaded off the run's seed and the room's position rather than Math.random, for the same reason every
-// other roll in this game is: a room re-entered after a refresh must not pay twice or pay differently.
-export function grantForRoom(run, row, lane, kind) {
-    let roll = ((run.seed >>> 0) + row * 6151 + lane * 97) >>> 0;
-    const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
-
-    if (kind === "elite") {
-        // Elites are where perks come from, which is what makes taking one worth the health it costs.
-        const held = new Set(run.perks || []);
-        const open = PERK_IDS.filter((id) => !held.has(id));
-        if (open.length) return { perk: open[Math.floor(next() * open.length)] };
-        return { embers: 60 };
-    }
-    if (kind === "treasure") {
-        // ── A CHEST IS A TRINKET ─────────────────────────────────────────────────────────────────────
-        // ⚠️ THIS PAID EMBERS AND A BOTTLE, AND IT IS THE REASON A RUN ARRIVED AT THE ACT ONE BOSS
-        // CARRYING ONE TRINKET. Watched through the browser: act one, stop fourteen, 22 health of 80, an
-        // eighteen-card deck — and a single perk on it, the one you START with. Theirs would have three or
-        // four by that room.
-        //
-        // The arithmetic is not subtle. Every relic in this game came from an elite, elites are eight
-        // percent of the map and barred from the first five floors, so an act hands out one or two. Theirs
-        // has the same elites AND a guaranteed treasure floor whose entire purpose is a relic — the chest
-        // IS the relic room, and row 9 is always treasure on our map too. We were running the same map with
-        // that floor paying pocket money.
-        //
-        // So the chest pays a trinket, and the embers become the consolation for a run already holding
-        // every one there is. The bottle stays: it was the good half of what this used to be.
-        const held = new Set(run.perks || []);
-        const open = PERK_IDS.filter((id) => !held.has(id));
-        if (!open.length) return { embers: 120 };
-        const out = { perk: open[Math.floor(next() * open.length)], embers: 25 };
-        if (next() < 0.4 && (run.potions || []).length < beltSize(run.perks)) {
-            out.potion = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
-        }
-        return out;
-    }
-    return {};
-}
+// grantForRoom lives in cards-kit now — see the note over it there. It is re-exported from this module
+// because a dozen callers import it from here and the move is not their business.
 
 
 /**

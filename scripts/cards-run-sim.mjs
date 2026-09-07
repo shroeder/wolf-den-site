@@ -244,8 +244,19 @@ function runOnce(seed) {
             continue;
         }
         if (kind === "treasure") {
-            embers += 40;
-            if (next() < 0.55 && potions.length < m.beltSize(perks, ASC)) potions.push(m.POTION_IDS[Math.floor(next() * m.POTION_IDS.length)]);
+            // ⚠️ ASKED, NOT REIMPLEMENTED. This used to hand out forty embers and a maybe-potion, written by
+            // hand — and when the chest was changed to pay a TRINKET (which is what a treasure floor is FOR)
+            // this went on paying pocket money, so every number below was measuring a game nobody plays.
+            // grantForRoom is a rule now and lives in cards-kit for exactly this reason.
+            const got = m.grantForRoom({ seed, perks, potions }, pick.row, pick.lane, "treasure");
+            embers += got.embers || 0;
+            if (got.perk && !perks.includes(got.perk)) {
+                perks.push(got.perk);
+                const pk = m.PERKS[got.perk];
+                if (pk?.maxHp) { hpMax += pk.maxHp; hp += pk.maxHp; }
+                if (pk?.embers) embers += pk.embers;
+            }
+            if (got.potion && potions.length < m.beltSize(perks, ASC)) potions.push(got.potion);
             continue;
         }
         if (kind === "merchant") {

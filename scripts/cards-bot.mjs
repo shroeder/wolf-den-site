@@ -232,7 +232,24 @@ while (runs < RUNS && steps < MAX_STEPS) {
 
     if (st.screen === "map") {
         const open = (st.nodes || []).map((n, i) => ({ ...n, i })).filter((n) => n.open && !n.disabled);
-        if (!open.length) { note("  map: nothing open — stuck"); await shot("map-stuck"); break; }
+        // ⚠️ ONE BAD READ IS NOT A STUCK RUN. This broke off the whole session the first time it saw a map
+        // with nothing lit — and a map with nothing lit is what you get for a moment after tapping a room,
+        // while the server is answering and the next screen has not replaced this one yet. Filmed: the run
+        // had advanced into a fight and the bot had already given up on it.
+        // Three looks before it believes the map, which costs a second and a half in the case that is
+        // genuinely stuck and saves the run in the case that is not.
+        if (!open.length) {
+            let seen = null;
+            for (let look = 0; look < 3 && !seen; look += 1) {
+                await sleep(700);
+                const again = await readScreen();
+                if (again.screen !== "map") { seen = again; break; }
+                const lit = (again.nodes || []).filter((n) => n.open && !n.disabled);
+                if (lit.length) { seen = again; break; }
+            }
+            if (!seen) { note("  map: nothing open — stuck"); await shot("map-stuck"); break; }
+            continue;
+        }
         const hp = Number(String(st.hp || "").split("/")[0]) || 0;
         const max = Number(String(st.hp || "").split("/")[1]) || 1;
         // Hurt? take the fire. Otherwise take the first thing that is not a fight, then a fight.

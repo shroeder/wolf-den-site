@@ -229,8 +229,6 @@ export default function CardRoom({ run, art = {} }) {
                             disabled={busy || (isFire && whole)}
                             onClick={() => post(isFire ? "rest" : "open")}
                         >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="cr-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                             <span className="cr-do-label">
                                 {busy ? "…" : isFire ? (whole ? "Nothing to mend" : `${room.verb} — heal ${heal}`) : room.verb}
                             </span>
@@ -242,8 +240,6 @@ export default function CardRoom({ run, art = {} }) {
                                 disabled={busy || !sharpenable.length}
                                 onClick={() => { setSaid(null); setPicking((v) => !v); }}
                             >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="cr-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                                 <span className="cr-do-label">
                                     {picking ? "Never mind" : sharpenable.length ? "Sharpen a card" : "Nothing left to sharpen"}
                                 </span>
@@ -372,16 +368,27 @@ export default function CardRoom({ run, art = {} }) {
                     100% { opacity: 1; transform: none; }
                 }
 
-                .cr-do { position: relative; width: 210px; height: 50px; margin-top: 6px; padding: 0; border: 0;
-                    background: none; cursor: pointer; display: grid; place-items: center; }
-                .cr-plate { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill;
-                    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.7)); }
+                /* ── THE SAME DOOR THE WRITTEN ROOMS USE ──────────────────────────────────────────────
+                   These were the same stretched grey bitmap the event choices were, and they are two taps
+                   apart in a run — a campfire and then a question mark — so they have to be the same object.
+                   See the long note in CardEvent for why the drawn plate went: it was the one cold thing on
+                   a warm screen and a painted bevel does not survive being squashed to an arbitrary box.
+                   Centred here rather than left-aligned, because a room offers two short verbs rather than a
+                   label over a consequence. */
+                .cr-do { position: relative; min-width: 210px; margin-top: 6px; cursor: pointer;
+                    padding: 13px 22px; border-radius: 10px; text-align: center;
+                    border: 1px solid rgba(201,162,83,0.30);
+                    background: linear-gradient(180deg, rgba(38,30,22,0.96), rgba(24,19,15,0.96));
+                    box-shadow: inset 0 1px 0 rgba(255,232,190,0.07), 0 2px 6px rgba(0,0,0,0.55);
+                    transition: border-color 120ms ease-out, background 120ms ease-out; }
+                .cr-do:hover:not(:disabled), .cr-do:focus-visible:not(:disabled) {
+                    border-color: rgba(255,196,110,0.6);
+                    background: linear-gradient(180deg, rgba(50,39,27,0.97), rgba(31,24,18,0.97)); }
+                .cr-do:not(:disabled):active { transform: translateY(1px); }
                 .cr-do-label { position: relative; font-family: var(--cf-card-font); font-size: 15px;
-                    font-weight: 700; letter-spacing: 0.02em; color: #ffe6d2;
-                    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
-                .cr-do:disabled { cursor: default; }
-                .cr-do:disabled .cr-plate { filter: grayscale(0.7) brightness(0.62); }
-                .cr-do:disabled .cr-do-label { color: #b0806f; }
+                    font-weight: 700; letter-spacing: 0.02em; color: #ffe6d2; }
+                .cr-do:disabled { cursor: default; opacity: 0.5; }
+                .cr-do:disabled .cr-do-label { color: #c0a992; }
 
                 .cr-choices { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
                 /* ── WHICH CARD GOES IN THE COALS ── */
@@ -430,7 +437,7 @@ export default function CardRoom({ run, art = {} }) {
                     .cr-art { width: min(190px, 46vw); }
                     .cr-say { font-size: 12px; }
                     .cr-stage { gap: 6px; padding-top: 4px; }
-                    .cr-do { height: 44px; width: 190px; }
+                    .cr-do { min-width: 190px; padding: 11px 18px; }
                     .cr-do-label { font-size: 13.5px; }
                 }
             `}</style>
