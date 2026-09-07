@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import CardCollection from "@/components/cards/CardCollection";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardProgress, ownedPetIds, petArtFor } from "@/lib/marketplace/cards.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import {
     ALL_CARDS, BASIC_UNLOCKS, CARDS, PERKS, POTIONS, STARTER_PERK, UNLOCKS, unlockedCards,
 } from "@/lib/marketplace/cards-kit.js";
@@ -41,12 +42,22 @@ export default async function CardCollectionPage() {
             const byPlay = Boolean(UNLOCKS[c.id]);
             const owned = Boolean(CARDS[c.id]) || BASIC_UNLOCKS.includes(c.id)
                 || (byPlay ? earned.has(c.id) : have.has(c.pet));
+            const pet = collectibleById(c.pet);
             return {
                 ...c,
                 owned,
-                // What to do about it, in the player's words. Null on an owned card so the client has one
-                // thing to test rather than two.
-                need: owned ? null : byPlay ? UNLOCKS[c.id].how : null,
+                // ⚠️ JUNK IS NOT A CARD YOU HAVE NOT COLLECTED YET. Burn, Dazed, Slimed and Wound are what
+                // the enemies deal INTO your deck; nobody owns them and nobody ever will. Listed among the
+                // cards they came back as "Locked", which is the cabinet promising something it cannot
+                // deliver — Luke, on that tab: "im confused by these cards are they extra unlock ones?"
+                // They are their own shelf now, out of the count and out of both other tabs.
+                junk: Boolean(c.status),
+                // What to do about it, IN EVERY CASE. This only answered for the play-earned cards, so a
+                // pet-locked one printed a bare animal name with no verb — "Anglerfish" — which reads as a
+                // label rather than as the instruction it is meant to be.
+                need: owned ? null
+                    : byPlay ? UNLOCKS[c.id].how
+                        : pet ? `Own the ${pet.name}` : null,
             };
         })
         // Ordered the way you meet them: the deck you start with, then by how deep a card can first appear,
@@ -83,7 +94,10 @@ export default async function CardCollectionPage() {
             art={art}
             trinkets={trinkets}
             potions={potions}
-            counts={{ total: cards.length, owned: cards.filter((c) => c.owned).length }}
+            counts={{
+                total: cards.filter((c) => !c.junk).length,
+                owned: cards.filter((c) => c.owned && !c.junk).length,
+            }}
         />
     );
 }

@@ -34,6 +34,9 @@ const TABS = [
     { key: "locked", label: "Locked" },
     { key: "trinkets", label: "Trinkets" },
     { key: "potions", label: "Potions" },
+    // The enemies' junk. Its own door because it is not a thing you collect — see the note on `junk` in the
+    // page. Last in the row, because it is the shelf you look at once.
+    { key: "junk", label: "Junk" },
 ];
 
 export default function CardCollection({ cards, art, trinkets = [], potions = [], counts }) {
@@ -45,14 +48,18 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
 
     const items = filter === "trinkets" ? trinkets : filter === "potions" ? potions : null;
     const shown = useMemo(
-        () => (filter === "all" ? cards : filter === "mine" ? cards.filter((c) => c.owned)
-            : filter === "locked" ? cards.filter((c) => !c.owned) : []),
+        () => (filter === "junk" ? cards.filter((c) => c.junk)
+            : filter === "all" ? cards.filter((c) => !c.junk)
+                : filter === "mine" ? cards.filter((c) => c.owned && !c.junk)
+                    : filter === "locked" ? cards.filter((c) => !c.owned && !c.junk) : []),
         [cards, filter]
     );
     const looked = look ? cards.find((c) => c.id === look) : null;
     const count = (key) => (key === "all" ? counts.total : key === "mine" ? counts.owned
         : key === "locked" ? counts.total - counts.owned
-            : key === "trinkets" ? trinkets.length : potions.length);
+            : key === "trinkets" ? trinkets.length
+                : key === "potions" ? potions.length
+                    : cards.filter((c) => c.junk).length);
 
     return (
         <div className={`cc ${panelFont.className}`} style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
@@ -118,9 +125,9 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                     <button
                         key={c.id}
                         type="button"
-                        className={`cc-slot${c.owned ? "" : " is-locked"}`}
+                        className={`cc-slot${c.owned || c.junk ? "" : " is-locked"}`}
                         onClick={() => setLook(c.id)}
-                        aria-label={`${c.name}${c.owned ? "" : " — locked"}`}
+                        aria-label={`${c.name}${c.junk ? " — dealt to you by enemies" : c.owned ? "" : " — locked"}`}
                     >
                         <span className="cf-card"><CardFace card={c} art={art[c.pet]} dim={!c.owned} /></span>
                         {/* WHY it is locked, and WHOSE it is. "Locked" on its own is the game telling you no
@@ -129,7 +136,8 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
 
                             ⚠️ UNDER THE CARD, NOT ON IT. Pinned inside the frame it landed squarely on the
                             card's last line of rules text — the one thing on a locked card worth reading. */}
-                        {c.owned ? null : <span className="cc-lock">{c.need || art[c.pet]?.name || c.pet}</span>}
+                        {c.junk ? <span className="cc-lock is-junk">Dealt to you</span>
+                            : c.owned ? null : <span className="cc-lock">{c.need}</span>}
                     </button>
                 ))}
                 {/* Only when the CARD grid is the thing on screen and it is empty. It was printing
@@ -204,6 +212,7 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                     display: flex; flex-direction: column; align-items: center; gap: 3px; }
                 /* LOCKED IS COLD AND STILL LEGIBLE. A card you cannot have is greyed rather than hidden — the
                    point of the cabinet is the empty slots. */
+                .cc-lock.is-junk { color: #8e8371; font-style: italic; }
                 .cc-slot.is-locked .cf-card { filter: grayscale(0.85) brightness(0.5)
                     drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
                 .cc-lock { max-width: 96px; font-size: 10px; line-height: 1.2; letter-spacing: 0.04em;
