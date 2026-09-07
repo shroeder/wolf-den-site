@@ -22,7 +22,7 @@ import {
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { cardById, canUpgrade, POTIONS } from "@/lib/marketplace/cards-kit.js";
-import { eventById } from "@/lib/marketplace/cards-events.js";
+import { CHOOSE, eventById } from "@/lib/marketplace/cards-events.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -190,26 +190,31 @@ export default function CardEvent({ run, art = {} }) {
                 {/* ── AND THE TWO THAT ASK WHICH CARD ─────────────────────────────────────────────────
                     A modal over the room, the way every other "choose one of these" in this game works —
                     see the note on the campfire's picker, which learned it the hard way. */}
-                {pending ? (
+                {/* ── THE ROOM ASKS WHICH CARD ────────────────────────────────────────────────────
+                    Four rooms ask now — burn, sharpen, copy, change — and what each one calls itself comes
+                    from CHOOSE beside the rules rather than from ternaries here. This block used to read
+                    "remove, or else sharpen" in four separate places, so the Duplicator would have opened a
+                    dialog headed "Which one takes the edge" over buttons that said Sharpen and a fire
+                    animation that burned the card you were trying to keep. */}
+                {pending ? (() => {
+                    const ask = CHOOSE[pending.need] || CHOOSE.remove;
+                    return (
                     <div className="cv-pick-over" role="presentation">
                         <div className="cv-pick" role="dialog"
-                            aria-label={pending.need === "remove" ? "Choose a card to burn" : "Choose a card to sharpen"}>
+                            aria-label={`Choose a card to ${ask.verb.toLowerCase()}`}>
                             <div className="cv-pick-bar">
-                                <p className="cv-pick-head">
-                                    {pending.need === "remove" ? "Which one goes." : "Which one takes the edge."}
-                                </p>
+                                <p className="cv-pick-head">{ask.title}</p>
                             </div>
                             <div className="cv-pick-deck">
                                 {deck.map((id, i) => {
                                     const c = cardById(id);
                                     if (!c) return null;
-                                    const can = pending.need === "remove" || canUpgrade(id);
+                                    const can = ask.can(id);
                                     return (
                                         <button key={`${id}-${i}`} type="button"
                                             className={`cv-card${can ? "" : " is-done"}`} disabled={busy || !can}
-                                            aria-label={`${pending.need === "remove" ? "Burn" : "Sharpen"} ${c.name}`}
-                                            onClick={() => sharpen(pending.choice, id,
-                                                pending.need === "remove" ? "burn" : "sharpen")}>
+                                            aria-label={`${ask.verb} ${c.name}`}
+                                            onClick={() => sharpen(pending.choice, id, ask.forge)}>
                                             <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                         </button>
                                     );
@@ -217,7 +222,8 @@ export default function CardEvent({ run, art = {} }) {
                             </div>
                         </div>
                     </div>
-                ) : null}
+                    );
+                })() : null}
             </div>
 
             {forge ? <CardForge card={forge} art={art} mode={forgeMode} /> : null}

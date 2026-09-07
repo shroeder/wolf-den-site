@@ -14,7 +14,8 @@
 // PURE, like the rules and the map: an event is data plus a seed. The server owns what a choice DOES (it
 // needs the perk table and the deck), the screen owns how it reads, and this file owns what exists.
 import {
-    PERKS, PERK_IDS, POTIONS, POTION_IDS, beltSize, canUpgrade, cardById, nextRand, upgradedId,
+    PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS,
+    beltSize, canUpgrade, cardById, nextRand, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
 // ── WHAT A CHOICE CAN DO ─────────────────────────────────────────────────────────────────────────────────
@@ -28,9 +29,31 @@ import {
 //   card         a card INTO the deck, named. This is how a curse arrives.
 //   upgrade      n cards sharpened, taken at random from what can still take it
 //   remove       the screen asks which card, and it leaves the deck for good
+//   copy         the screen asks which card, and a second one goes in beside it (their Duplicator)
+//   transform    the screen asks which card, and something else comes back instead (their Transmogrifier)
+//   cleanse      every piece of junk their enemies dealt you leaves at once (their Divine Fountain)
+//   upgradeAll   sharpen every copy of the cards you started with (their Ancient Writing)
+//   gamble       a weighted list of outcomes, one of which happens (their Wheel of Change, their Joust)
 //   fight        the room becomes that fight, and pays for it
 //   wake         the odds this choice ends in the fight the room has been threatening
 // A choice may carry several at once, which is what makes the good ones a trade rather than a gift.
+
+// ── THE FOUR ROOMS THAT ASK YOU SOMETHING ────────────────────────────────────────────────────────────────
+// Burning, sharpening, copying and changing all need to know WHICH card, so all four stop and put the deck
+// on screen. What each one calls itself lives here rather than in the screen, because the screen held a
+// pair of ternaries — remove, or else sharpen — and a third kind of asking would have shown a room that
+// asked politely and then offered the wrong verb on every plate.
+//
+// `can` is the test for one card. Only sharpening has one: everything else can be done to anything on the
+// table, junk included.
+// `forge` is which of the two ceremonies plays while the server answers — the anvil or the fire. Copying is
+// work done TO a card so it takes the anvil; changing destroys the one you picked, so it takes the fire.
+export const CHOOSE = {
+    remove: { title: "Which one goes.", verb: "Burn", forge: "burn", can: () => true },
+    upgrade: { title: "Which one takes the edge.", verb: "Sharpen", forge: "sharpen", can: (id) => canUpgrade(id) },
+    copy: { title: "Which one comes twice.", verb: "Copy", forge: "sharpen", can: () => true },
+    transform: { title: "Which one changes.", verb: "Change", forge: "burn", can: () => true },
+};
 
 export const EVENTS = [
     // ── THE BIG FISH ─────────────────────────────────────────────────────────────────────────────────────
@@ -276,6 +299,293 @@ export const EVENTS = [
             { label: "Climb past", detail: "Walk on.", effect: {} },
         ],
     },
+    // ══ THE SHRINES ══════════════════════════════════════════════════════════════════════════════════════
+    // Their fourteen "anywhere" rooms are the spine of the question mark: they are the ones that let a run be
+    // FIXED rather than only fed. A deck gets worse on its own — every fight offers cards and most of them
+    // are worse than the ones you have — so a map with no purifier, no forge and no fountain is a map where
+    // the only direction is down. All of these carry act 0, which is this file's word for anywhere.
+    {
+        id: "clearspring", act: 0, name: "The Clear Spring", icon: "shrine",
+        say: "Water comes up through the floor here, and it is the only clean thing you have seen since you started climbing.",
+        choices: [
+            { label: "Drink your fill", detail: "Every piece of junk leaves your deck.", effect: { cleanse: true } },
+            { label: "Fill a skin and go", detail: "Heal a fifth.", effect: { hpPct: 0.2 } },
+        ],
+    },
+    {
+        id: "secondmould", act: 0, name: "The Second Mould", icon: "anvil",
+        say: "A stone press, still warm. Whatever you lay in it, it makes again — and it has been doing this for a very long time without being asked.",
+        choices: [
+            { label: "Press a card", detail: "A second copy, into your deck.", effect: { copy: 1 } },
+            { label: "Leave it cooling", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "embershrine", act: 0, name: "The Ember Shrine", icon: "flame",
+        say: "Somebody has been leaving money here. Quite a lot of it, and for quite a long time, and none of them came back for it.",
+        choices: [
+            { label: "Take a handful", detail: "+120 embers.", effect: { embers: 120 } },
+            { label: "Take all of it", detail: "+300 embers, and a Wound in your deck.", effect: { embers: 300, card: "wound" } },
+            { label: "Leave it where it is", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "stillroom", act: 0, name: "The Still Room", icon: "shrine",
+        say: "Racks of bottles, most of them broken, three of them not. Whoever was distilling here left in a hurry.",
+        choices: [
+            { label: "Take what survived", detail: "Three bottles.", effect: { potion: 3 } },
+            { label: "Leave them", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "changingstone", act: 0, name: "The Changing Stone", icon: "shrine",
+        say: "Lay something on it and something else gets up. It does not take requests.",
+        choices: [
+            { label: "Lay a card on it", detail: "It leaves. Something else arrives.", effect: { transform: 1 } },
+            { label: "Keep your hands to yourself", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "scouring", act: 0, name: "The Scouring", icon: "flame",
+        say: "A narrow fire in a narrow room. It burns one thing and then it goes out, and it has been waiting.",
+        choices: [
+            { label: "Burn a card", detail: "It leaves your deck for good.", effect: { remove: 1 } },
+            { label: "Let it wait", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "turningwheel", act: 0, name: "The Turning Wheel", icon: "shrine",
+        say: "A painted wheel on a spindle, worn smooth on one side by hands. There is no attendant and no rules written anywhere.",
+        choices: [
+            {
+                label: "Spin it",
+                detail: "Something happens. Nobody knows which.",
+                effect: {
+                    gamble: [
+                        { w: 2, say: "It stops on the coins.", embers: 240 },
+                        { w: 2, say: "It stops on the open hand.", perk: 1 },
+                        { w: 2, say: "It stops on the bottle.", potion: 1 },
+                        { w: 2, say: "It stops on the heart.", maxHp: 6 },
+                        { w: 2, say: "It stops on the closed eye.", hpPct: -0.15 },
+                        { w: 1, say: "It stops on the broken tooth.", card: "wound" },
+                    ],
+                },
+            },
+            { label: "Leave it still", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "olddebt", act: 0, name: "The Old Debt", icon: "corpse",
+        say: "It knows your name and it is very pleased about that. It says you have owed it something since before you started.",
+        choices: [
+            { label: "Pay it off", detail: "Pay 150 embers. A trinket.", cost: 150, effect: { perk: 1 } },
+            { label: "Pay it in blood", detail: "Lose 14 health. A trinket.", effect: { hp: -14, perk: 1 } },
+            { label: "Tell it to wait", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "bottler", act: 0, name: "The Bottler", icon: "shrine",
+        say: "She does not sell cards and she does not want to talk about the Road. She sells bottles.",
+        choices: [
+            { label: "Buy one", detail: "Pay 60 embers. A bottle.", cost: 60, effect: { potion: 1 } },
+            { label: "Buy the armful", detail: "Pay 150 embers. Three bottles.", cost: 150, effect: { potion: 3 } },
+            { label: "Nothing today", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "blackanvil", act: 0, name: "The Black Anvil", icon: "anvil",
+        say: "Cold, and it has not been cold long. The tongs on the hook are worth more than the anvil.",
+        choices: [
+            { label: "Use the anvil", detail: "Sharpen a card.", effect: { upgrade: 1 } },
+            { label: "Take the tongs", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Touch nothing", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "watchfire", act: 0, name: "The Watchfire", icon: "flame",
+        say: "Someone laid this fire properly and then did not come back to it. It will take one more thing before it goes out.",
+        choices: [
+            { label: "Feed it a card", detail: "It leaves your deck. A bottle from the ashes.", effect: { remove: 1, potion: 1 } },
+            { label: "Warm your hands", detail: "Heal a sixth.", effect: { hpPct: 0.16 } },
+        ],
+    },
+    {
+        id: "draughtsman", act: 0, name: "The Draughtsman", icon: "anvil",
+        say: "He works on other people's decks for money and has strong opinions about yours, none of which he will share for free.",
+        choices: [
+            { label: "Pay him to sharpen one", detail: "Pay 90 embers. Sharpen a card.", cost: 90, effect: { upgrade: 1 } },
+            { label: "Pay him to cut one out", detail: "Pay 120 embers. Burn a card.", cost: 120, effect: { remove: 1 } },
+            { label: "Pay him for a morning", detail: "Pay 190 embers. Two cards come out sharper.", cost: 190, effect: { upgrade: 2 } },
+            { label: "Keep your money", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "maskseller", act: 0, name: "The Mask Seller", icon: "eye",
+        say: "The masks are all faces. Some of them are faces you recognise, which he does not explain.",
+        choices: [
+            { label: "Wear one", detail: "Lose a sixth of your health. A trinket.", effect: { hpPct: -0.16, perk: 1 } },
+            { label: "Sell him yours", detail: "+90 embers.", effect: { embers: 90 } },
+            { label: "Keep your face", detail: "Walk on.", effect: {} },
+        ],
+    },
+
+    // ══ ACT ONE ══════════════════════════════════════════════════════════════════════════════════════════
+    {
+        id: "litseam", act: 1, name: "The Lit Seam", icon: "flame",
+        say: "There is light coming out of the rock itself, and standing in it makes your teeth ache.",
+        choices: [
+            { label: "Stand in it", detail: "Two cards come out sharper. Lose a fifth of your health.", effect: { upgrade: 2, hpPct: -0.2 } },
+            { label: "Shield your eyes and pass", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "stonewing", act: 1, name: "The Stone Wing", icon: "wall",
+        say: "A carved wing set into the wall at head height, the edge of every feather still sharp enough to open a hand.",
+        choices: [
+            { label: "Cut yourself on it", detail: "Lose 8 health. Burn a card.", effect: { hp: -8, remove: 1 } },
+            { label: "Walk past it", detail: "Walk on.", effect: {} },
+        ],
+    },
+
+    // ══ ACT TWO ══════════════════════════════════════════════════════════════════════════════════════════
+    {
+        id: "carvedpage", act: 2, name: "The Carved Page", icon: "wall",
+        say: "One page of a book, cut into the wall so it could not be taken. It is instructions, and they are for you.",
+        choices: [
+            { label: "Read it through", detail: "Every card you came in with takes an edge.", effect: { upgradeAll: true } },
+            { label: "Chip a piece out", detail: "Burn a card.", effect: { remove: 1 } },
+        ],
+    },
+    {
+        id: "grafter", act: 2, name: "The Grafter", icon: "splint",
+        say: "He works on people rather than gear, and he is very good, and his waiting room is empty for a reason.",
+        choices: [
+            { label: "Let him work", detail: "+10 max health. Lose 12 health.", effect: { maxHp: 10, hp: -12 } },
+            { label: "Take the jar instead", detail: "Two bottles.", effect: { potion: 2 } },
+            { label: "Take what is on the shelf", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+        ],
+    },
+    {
+        id: "thepit", act: 2, name: "The Pit", icon: "fang",
+        say: "A ring of stone seats around a floor with a drain in it. Something down there has heard you arrive.",
+        choices: [
+            { label: "Go down", detail: "An elite. A trinket if you win.", effect: { fight: "d_elite_leader", perk: 1 } },
+            { label: "Climb the seats and leave", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "quietones", act: 2, name: "The Quiet Ones", icon: "corpse",
+        say: "They do not want to hurt you. They want you to stop carrying so much, and they are willing to help with that.",
+        choices: [
+            { label: "Let them lighten you", detail: "-18 max health. A trinket.", effect: { maxHp: -18, perk: 1 } },
+            { label: "Walk through them", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "blackbook", act: 2, name: "The Black Book", icon: "wall",
+        say: "It is open at a page somebody stopped reading. The next page is heavier than the one before it.",
+        choices: [
+            { label: "Read a page", detail: "Lose 6 health.", again: true, effect: { hp: -6 } },
+            { label: "Read another", detail: "Lose 6 health.", again: true, effect: { hp: -6 } },
+            { label: "Read to the end", detail: "Lose 12 health. A trinket.", effect: { hp: -12, perk: 1 } },
+            { label: "Shut it", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "rustaltar", act: 2, name: "The Rust Altar", icon: "shrine",
+        say: "The stains on it are old and the stone under them is not. Something is still being fed here.",
+        choices: [
+            { label: "Give it what it wants", detail: "-8 max health. A trinket.", effect: { maxHp: -8, perk: 1 } },
+            { label: "Break it", detail: "Lose a sixth of your health. +160 embers.", effect: { hpPct: -0.16, embers: 160 } },
+            { label: "Step around it", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "thewager", act: 2, name: "The Wager", icon: "fang",
+        say: "Two of them are going to fight and everyone here has an opinion about which. The big one is favoured. The small one is calm.",
+        choices: [
+            {
+                label: "Back the small one", detail: "Pay 100 embers. Long odds.", cost: 100,
+                effect: {
+                    gamble: [
+                        { w: 1, say: "The small one does not move until it has to.", embers: 380 },
+                        { w: 2, say: "It was over before you looked up.", embers: 0 },
+                    ],
+                },
+            },
+            {
+                label: "Back the big one", detail: "Pay 100 embers. Short odds.", cost: 100,
+                effect: {
+                    gamble: [
+                        { w: 2, say: "It goes the way everyone said it would.", embers: 170 },
+                        { w: 1, say: "The big one goes down in the first exchange.", embers: 0 },
+                    ],
+                },
+            },
+            { label: "Watch for free", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "stonecoffin", act: 2, name: "The Stone Coffin", icon: "corpse",
+        say: "The lid has been moved before and put back badly. Whoever did that is not in the room.",
+        choices: [
+            { label: "Open it", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Leave it shut", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "rookery", act: 2, name: "The Rookery", icon: "fang",
+        say: "Nests all the way up the shaft, and they have been lining them with things taken off the dead.",
+        choices: [
+            { label: "Rob the nests", detail: "+220 embers.", effect: { embers: 220 } },
+            { label: "Take the knife you can see", detail: "Lose 8 health. A trinket.", effect: { hp: -8, perk: 1 } },
+        ],
+    },
+    {
+        id: "beggar", act: 2, name: "The Beggar", icon: "corpse",
+        say: "He is not begging. He is offering, and what he is offering is to take something off you.",
+        choices: [
+            { label: "Pay him", detail: "Pay 90 embers. Burn a card.", cost: 90, effect: { remove: 1 } },
+            { label: "Walk past", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "kneelingman", act: 2, name: "The Kneeling Man", icon: "corpse",
+        say: "He has been kneeling long enough that the floor has taken the shape of him. He is holding something out.",
+        choices: [
+            { label: "Give him what he asks", detail: "Pay 130 embers. A trinket.", cost: 130, effect: { perk: 1 } },
+            { label: "Take it off him", detail: "+130 embers, and a Wound in your deck.", effect: { embers: 130, card: "wound" } },
+            { label: "Walk past", detail: "Walk on.", effect: {} },
+        ],
+    },
+
+    // ══ ACT THREE ════════════════════════════════════════════════════════════════════════════════════════
+    {
+        id: "thesphere", act: 3, name: "The Sphere", icon: "eye",
+        say: "It hangs at chest height without anything holding it, and it has been turning very slowly since before you came in.",
+        choices: [
+            { label: "Break it open", detail: "A fight. A trinket if you win.", effect: { fight: "s_orb", perk: 1 } },
+            { label: "Walk under it", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "listeningstone", act: 3, name: "The Listening Stone", icon: "shrine",
+        say: "It wants a hand on it. It is not clear what it does with what it takes, only that it takes.",
+        choices: [
+            { label: "One hand", detail: "Lose 7 health. A bottle.", again: true, effect: { hp: -7, potion: 1 } },
+            { label: "Both hands", detail: "Lose 12 health. Two bottles.", effect: { hp: -12, potion: 2 } },
+            { label: "Step back", detail: "Walk on.", effect: {} },
+        ],
+    },
+    {
+        id: "redmask", act: 3, name: "The Red Mask", icon: "eye",
+        say: "It is on a stone at eye height, facing the way you came in, and it has been waiting for somebody exactly your size.",
+        choices: [
+            { label: "Wear it", detail: "-10 max health. A trinket.", effect: { maxHp: -10, perk: 1 } },
+            { label: "Leave it on the stone", detail: "Walk on.", effect: {} },
+        ],
+    },
+
 ];
 
 export const eventById = (id) => EVENTS.find((e) => e.id === id) || null;
@@ -319,7 +629,10 @@ export function applyEventChoice(run, ev, index, card = null) {
     if (choice.cost && (run.embers || 0) < choice.cost) return { error: "too_poor" };
 
     // ── THE TWO THAT ASK ─────────────────────────────────────────────────────────────────────────────
-    const needs = eff.remove ? "remove" : eff.upgrade === 1 ? "upgrade" : null;
+    const needs = eff.remove ? "remove"
+        : eff.upgrade === 1 ? "upgrade"
+            : eff.copy ? "copy"
+                : eff.transform ? "transform" : null;
     if (needs && !card) {
         run.at = { ...run.at, pending: { choice: index, need: needs } };
         return { pending: needs };
@@ -331,6 +644,25 @@ export function applyEventChoice(run, ev, index, card = null) {
             if ((run.deck || []).length <= 4) return { error: "deck_too_small" };
             run.deck = run.deck.filter((_, i) => i !== at);
             said.push(`${cardById(card)?.name || "The card"} is gone for good.`);
+        } else if (needs === "copy") {
+            // Beside it, not appended: a deck read in order should show the pair together.
+            run.deck = [...run.deck.slice(0, at + 1), card, ...run.deck.slice(at + 1)];
+            said.push(`There are two ${cardById(card)?.name || "of it"} now.`);
+        } else if (needs === "transform") {
+            // ⚠️ NOT AIMED, AND NOT BACK INTO THE POOL IT CAME FROM. Theirs takes the card away and hands
+            // back a RANDOM one, and being unable to aim it is the whole trade. Drawn from the pool minus
+            // what the deck already holds, so a change cannot answer with a third copy of the thing you
+            // were trying to be rid of.
+            // Its own roll: the shared one below is seeded per ROOM and this arrives on a second request,
+            // so reusing it would hand the same replacement to every card in the deck.
+            let tr = ((run.seed >>> 0) + (run.at?.row || 0) * 7919 + at * 131) >>> 0;
+            const [rr] = nextRand(tr);
+            const held = new Set(run.deck);
+            const open = Object.keys(POOL).filter((id) => !held.has(id));
+            if (!open.length) return { error: "nothing_to_become" };
+            const got = open[Math.floor(rr * open.length)];
+            run.deck = run.deck.map((id, i) => (i === at ? got : id));
+            said.push(`${cardById(card)?.name || "It"} is gone. ${cardById(got)?.name || "Something else"} is in its place.`);
         } else {
             if (!canUpgrade(card)) return { error: "cannot_upgrade" };
             run.deck = run.deck.map((id, i) => (i === at ? upgradedId(id) : id));
@@ -361,12 +693,43 @@ export function applyEventChoice(run, ev, index, card = null) {
         if (moved < 0) said.push(`Lost ${-moved} health.`);
     }
     if (eff.embers) { run.embers = (run.embers || 0) + eff.embers; said.push(`+${eff.embers} embers.`); }
+    // A NUMBER, NOT A FLAG. Their Lab hands over three at once; `potion: 1` reads exactly as it did when
+    // this was a boolean, so every room written before today is unchanged.
     if (eff.potion) {
-        if ((run.potions || []).length < beltSize(run.perks)) {
-            const got = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
-            run.potions = [...(run.potions || []), got];
-            said.push(`A bottle: ${POTIONS[got]?.name || got}.`);
-        } else said.push("A bottle, and nowhere on the belt to put it.");
+        const want = Number(eff.potion) || 0;
+        const got = [];
+        for (let i = 0; i < want; i += 1) {
+            if ((run.potions || []).length >= beltSize(run.perks)) break;
+            const id = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
+            run.potions = [...(run.potions || []), id];
+            got.push(POTIONS[id]?.name || id);
+        }
+        if (got.length) said.push(got.length === 1 ? `A bottle: ${got[0]}.` : `Bottles: ${got.join(", ")}.`);
+        if (got.length < want) said.push("And nowhere on the belt for the rest.");
+    }
+    // ── THE FOUNTAIN ─────────────────────────────────────────────────────────────────────────────────
+    // Every piece of junk at once. Theirs is the only room in the game that does this, and it is the reason
+    // a deck stuffed with Wounds is a bad run rather than a finished one.
+    if (eff.cleanse) {
+        const junk = new Set(STATUS_IDS);
+        const before = (run.deck || []).length;
+        run.deck = (run.deck || []).filter((id) => !junk.has(id));
+        const gone = before - run.deck.length;
+        said.push(gone ? `${gone} ${gone === 1 ? "piece" : "pieces"} of it burned away.` : "There was nothing in your deck that needed it.");
+    }
+    // ── EVERY COPY OF WHAT YOU CAME IN WITH ──────────────────────────────────────────────────────────
+    // Their Ancient Writing sharpens all your Strikes or all your Defends at once. Ours reads the starter
+    // deck for what counts as basic rather than naming the cards here, so a starter card added later is
+    // covered by this room without anybody remembering the room exists.
+    if (eff.upgradeAll) {
+        const basic = new Set(STARTER_DECK);
+        let n = 0;
+        run.deck = (run.deck || []).map((id) => {
+            if (!basic.has(id) || !canUpgrade(id)) return id;
+            n += 1;
+            return upgradedId(id);
+        });
+        said.push(n ? `${n} of the cards you came in with took an edge.` : "Nothing you came in with can take an edge.");
     }
     // A trinket, certain or at odds. Both walk the same path so an ooze that pays and an egg that pays read
     // the same on the way out.
@@ -399,6 +762,54 @@ export function applyEventChoice(run, ev, index, card = null) {
     if (eff.card) {
         run.deck = [...(run.deck || []), eff.card];
         said.push(`${cardById(eff.card)?.name || "Something"} is in your deck now.`);
+    }
+
+    // ── THE WHEEL ────────────────────────────────────────────────────────────────────────────────────
+    // A weighted list where exactly one outcome happens. Two of their best rooms are this shape — the wheel
+    // you spin and the joust you bet on — and both are memorable for the same reason: you chose to accept a
+    // spread rather than a number, and the room tells you which way it fell.
+    //
+    // Deliberately NOT recursive. An outcome carries the handful of plain grants and nothing that asks a
+    // question, because a room that gambles its way into "now pick a card to burn" is a room that has to
+    // hold state across two requests to tell you what it rolled — and the escalating rooms already own the
+    // one slot the map has for that.
+    if (Array.isArray(eff.gamble) && eff.gamble.length) {
+        const total = eff.gamble.reduce((n, g) => n + (Number(g.w) || 1), 0);
+        let r = next() * total;
+        let hit = eff.gamble[eff.gamble.length - 1];
+        for (const g of eff.gamble) { r -= (Number(g.w) || 1); if (r <= 0) { hit = g; break; } }
+        if (hit.say) said.push(hit.say);
+        if (hit.maxHp) {
+            run.hpMax = Math.max(10, run.hpMax + hit.maxHp);
+            run.hp = Math.max(1, Math.min(run.hpMax, run.hp + hit.maxHp));
+            said.push(hit.maxHp > 0 ? `+${hit.maxHp} max health.` : `Lost ${-hit.maxHp} max health.`);
+        }
+        if (hit.hp || hit.hpPct) {
+            const by = (hit.hp || 0) + Math.round((hit.hpPct || 0) * run.hpMax);
+            const before = run.hp;
+            run.hp = Math.max(1, Math.min(run.hpMax, run.hp + by));
+            const moved = run.hp - before;
+            if (moved > 0) said.push(`Healed ${moved}.`);
+            if (moved < 0) said.push(`Lost ${-moved} health.`);
+        }
+        if (hit.embers) { run.embers = Math.max(0, (run.embers || 0) + hit.embers); said.push(hit.embers > 0 ? `+${hit.embers} embers.` : `${-hit.embers} embers gone.`); }
+        if (hit.card) { run.deck = [...(run.deck || []), hit.card]; said.push(`${cardById(hit.card)?.name || "Something"} is in your deck now.`); }
+        if (hit.perk) {
+            const held = new Set(run.perks || []);
+            const open = PERK_IDS.filter((id) => !held.has(id));
+            if (open.length) {
+                const got = open[Math.floor(next() * open.length)];
+                run.perks = [...(run.perks || []), got];
+                said.push(`${PERKS[got]?.name || got}.`);
+                if (PERKS[got]?.maxHp) { run.hpMax += PERKS[got].maxHp; run.hp += PERKS[got].maxHp; }
+                if (PERKS[got]?.embers) run.embers = (run.embers || 0) + PERKS[got].embers;
+            }
+        }
+        if (hit.potion && (run.potions || []).length < beltSize(run.perks)) {
+            const id = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
+            run.potions = [...(run.potions || []), id];
+            said.push(`A bottle: ${POTIONS[id]?.name || id}.`);
+        }
     }
 
     // ── AND THE ROOMS THAT TURN INTO A FIGHT ─────────────────────────────────────────────────────────

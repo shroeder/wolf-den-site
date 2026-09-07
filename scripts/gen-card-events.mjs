@@ -86,6 +86,67 @@ const ART = {
         + "inside them, a bright seed of white at its centre.",
     spire_watcher: "A single enormous eye set into carved stone, the lid half lowered, the iris a ring of "
         + "burning gold, tally marks scratched into the stone all around it.",
+    // ── THE SHRINES ── the fourteen rooms that can turn up in any act ─────────────────────────────────
+    clearspring: "A clear spring welling up through a cracked stone floor into a shallow basin, the water lit "
+        + "pale from below, a tin drinking cup on the rim.",
+    secondmould: "A heavy two-part stone casting mould, hinged open, still glowing faintly orange along the "
+        + "inner seam, with a fresh identical copy of a small object lying in each half.",
+    embershrine: "A low stone offering shelf heaped with loose glowing coins and cinders, some spilled onto "
+        + "the floor, the whole pile giving off a dull orange light.",
+    stillroom: "A wooden rack of apothecary bottles, most of them shattered to stubs, three intact and full "
+        + "of luminous coloured liquid, glass fragments on the shelf.",
+    changingstone: "A flat round altar stone with a spiral groove cut into its face, half of a small object "
+        + "sitting on it dissolving into motes of light while a different shape forms out of the other half.",
+    scouring: "A narrow slot of white flame burning upward out of a cut in a stone floor, a single card curling "
+        + "to black ash at its lip.",
+    turningwheel: "A large painted wooden fortune wheel on an iron spindle, its rim divided into segments "
+        + "marked with a coin, an open hand, a bottle, a heart, a closed eye and a broken tooth.",
+    olddebt: "A tall hooded figure made of shadow holding out an open ledger with a long list of names on it, "
+        + "one line near the bottom freshly written and still wet.",
+    bottler: "A wooden market tray hung on straps, packed with small stoppered bottles of coloured liquid, a "
+        + "brass hand-scale resting on top of it.",
+    blackanvil: "A black iron anvil on a scarred stump with a pair of ornate silver tongs hanging on a hook "
+        + "beside it, the tongs far finer than everything around them.",
+    watchfire: "A properly laid campfire of stacked split logs burning low and steady, a bedroll left unrolled "
+        + "beside it and nobody there.",
+    draughtsman: "A drawing desk at an angle covered in inked plans of cards, a straightedge and a scalpel "
+        + "laid across it, a lamp on a jointed arm leaning in.",
+    maskseller: "A stall board hung with a dozen carved face masks on pegs, each one a different expression, "
+        + "two of the pegs empty.",
+    // ── ACT ONE ──────────────────────────────────────────────────────────────────────────────────────
+    litseam: "A jagged seam of blinding white light splitting a slab of dark rock from top to bottom, hard "
+        + "light spilling out of the crack.",
+    stonewing: "A single carved stone wing set into a wall at head height, every feather edge cut sharp, a "
+        + "dark smear on the lowest one.",
+    // ── ACT TWO ──────────────────────────────────────────────────────────────────────────────────────
+    carvedpage: "A single page of a book carved in relief into a stone wall panel, its lines of text cut deep, "
+        + "one corner chipped away.",
+    grafter: "A surgeon's tray of grafting tools — hooked needles, a bone saw, a clamp — laid out on rolled "
+        + "leather beside a jar of something pale and floating.",
+    thepit: "A round fighting pit floor seen from above, sand raked in circles with a dark iron drain grate at "
+        + "its centre, the lowest ring of stone seats around the edge.",
+    quietones: "Three tall pale translucent figures standing close together with their hands open and lowered, "
+        + "their edges fading into the dark.",
+    blackbook: "A heavy black book lying open on a lectern, the visible page dense with cramped writing, the "
+        + "remaining pages visibly thicker and darker than the ones already turned.",
+    rustaltar: "A squat stone altar block streaked with old rust-coloured stains running down its sides into "
+        + "a shallow channel cut around its base.",
+    thewager: "A leather betting cup upended on a plank table with coins scattered around it and two small "
+        + "carved fighting figures set opposite each other, one large and one small.",
+    stonecoffin: "A stone sarcophagus with its heavy lid shoved aside at an angle, darkness in the gap, deep "
+        + "scrape marks on the rim where the lid was moved.",
+    rookery: "A cluster of large twig nests built into a vertical rock shaft, each one lined with rings, "
+        + "buckles and a knife handle taken off the dead.",
+    beggar: "A begging bowl and a folded blanket on a stone step, a small pair of shears resting in the bowl.",
+    kneelingman: "A gaunt kneeling figure in rags with both hands cupped and held out, the stone worn into a "
+        + "hollow under his knees.",
+    // ── ACT THREE ────────────────────────────────────────────────────────────────────────────────────
+    thesphere: "A polished dark metal sphere hanging unsupported at chest height, seams of pale light running "
+        + "around it, turning very slowly.",
+    listeningstone: "An upright standing stone with two shallow handprints worn into its face at chest height, "
+        + "faint light in the grooves of each print.",
+    redmask: "A lacquered deep red face mask resting upright on a plain stone block, facing straight forward, "
+        + "its eye holes black.",
 };
 
 const FORCE = process.argv.includes("--force");

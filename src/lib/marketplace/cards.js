@@ -623,10 +623,25 @@ export function grantForRoom(run, row, lane, kind) {
         return { embers: 60 };
     }
     if (kind === "treasure") {
-        // A chest is embers and, half the time, a potion — a potion being the thing you can carry OUT of the
-        // room, which is what a chest should feel like.
-        const out = { embers: 40 };
-        if (next() < 0.55 && (run.potions || []).length < beltSize(run.perks)) {
+        // ── A CHEST IS A TRINKET ─────────────────────────────────────────────────────────────────────
+        // ⚠️ THIS PAID EMBERS AND A BOTTLE, AND IT IS THE REASON A RUN ARRIVED AT THE ACT ONE BOSS
+        // CARRYING ONE TRINKET. Watched through the browser: act one, stop fourteen, 22 health of 80, an
+        // eighteen-card deck — and a single perk on it, the one you START with. Theirs would have three or
+        // four by that room.
+        //
+        // The arithmetic is not subtle. Every relic in this game came from an elite, elites are eight
+        // percent of the map and barred from the first five floors, so an act hands out one or two. Theirs
+        // has the same elites AND a guaranteed treasure floor whose entire purpose is a relic — the chest
+        // IS the relic room, and row 9 is always treasure on our map too. We were running the same map with
+        // that floor paying pocket money.
+        //
+        // So the chest pays a trinket, and the embers become the consolation for a run already holding
+        // every one there is. The bottle stays: it was the good half of what this used to be.
+        const held = new Set(run.perks || []);
+        const open = PERK_IDS.filter((id) => !held.has(id));
+        if (!open.length) return { embers: 120 };
+        const out = { perk: open[Math.floor(next() * open.length)], embers: 25 };
+        if (next() < 0.4 && (run.potions || []).length < beltSize(run.perks)) {
             out.potion = POTION_IDS[Math.floor(next() * POTION_IDS.length)];
         }
         return out;

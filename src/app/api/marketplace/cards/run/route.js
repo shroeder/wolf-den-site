@@ -198,12 +198,20 @@ export async function POST(request) {
                 if (run.at.opened) return NextResponse.json({ error: "already_open" }, { status: 400 });
                 const got = grantForRoom(run, run.at.row, run.at.lane, "treasure");
                 run.embers = (run.embers || 0) + (got.embers || 0);
+                // ⚠️ THE PERK GOES THROUGH takePerk, NOT INTO THE ARRAY. A trinket can carry max health or
+                // embers of its own, and the elite payout has always granted them through that one function
+                // — so pushing an id here would have handed over a Mango that was worth nothing. This is
+                // the third caller of it and the reason it exists.
+                const tookPerk = got.perk && takePerk(run, got.perk) ? got.perk : null;
                 // A full belt is not a lost potion quietly: the chest says what it could not give you.
                 const belted = got.potion && (run.potions || []).length < beltSize(run.perks, run.asc);
                 if (belted) run.potions = [...(run.potions || []), got.potion];
                 run.at = {
                     ...run.at,
-                    opened: { embers: got.embers || 0, potion: belted ? got.potion : null, spilled: Boolean(got.potion && !belted) },
+                    opened: {
+                        embers: got.embers || 0, perk: tookPerk,
+                        potion: belted ? got.potion : null, spilled: Boolean(got.potion && !belted),
+                    },
                 };
                 await saveRun(buyer.id, run);
                 return NextResponse.json({ run });

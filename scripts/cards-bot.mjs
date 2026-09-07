@@ -31,6 +31,14 @@ const PORT = Number(arg("--port", 9477));
 // A phone, because that is what this game is played on and it is where every layout bug has been.
 const W = Number(arg("--w", 375)), H = Number(arg("--h", 667));
 const MAX_STEPS = Number(arg("--steps", 900));
+// THE WAY OUT OF ANY ROOM.
+// This bot walked in circles for nine hundred steps because it knew the way out by four different class
+// names -- .cs-leave, .cr-leave, .ct-return, .cc-return -- and those screens were rebuilt to share one
+// bottom band (CardFoot) whose button is .cfoot-go. Nothing in the game was broken; the harness could not
+// find a door that was directly in front of it, and reported that as forty identical failures.
+// A rig that names an element is coupled to the markup, and the markup is the thing being changed. So it
+// asks for the SHARED exit first and keeps the old names behind it.
+const LEAVE = ".cfoot-go, .cs-leave, .cr-leave, .cv-leave, .ct-return, .cc-return";
 
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -249,7 +257,7 @@ while (runs < RUNS && steps < MAX_STEPS) {
             await tap(".cv-card:not(.is-done)");
             await sleep(1800);
             await shot("event-done");
-            await tap(".cv-leave");
+            await tap(LEAVE);
             await sleep(2400);
             continue;
         }
@@ -262,7 +270,7 @@ while (runs < RUNS && steps < MAX_STEPS) {
                 await shot("event-done");
             }
         }
-        await tap(".cv-leave");
+        await tap(LEAVE);
         await sleep(2400);
         continue;
     }
@@ -274,7 +282,7 @@ while (runs < RUNS && steps < MAX_STEPS) {
             await sleep(1800);
             await shot("room-done");
         }
-        await tap(".cr-leave");
+        await tap(LEAVE);
         await sleep(2400);
         continue;
     }
@@ -291,7 +299,7 @@ while (runs < RUNS && steps < MAX_STEPS) {
             if (canBuy) { await tap(".cs-look-buy"); await sleep(1600); note("  shop: bought"); }
             else { await tap(".cs-look-no"); await sleep(500); }
         }
-        const left = await tap(".cs-leave");
+        const left = await tap(LEAVE);
         note(`  shop: leaving (${left ? "pressed" : "COULD NOT FIND the way out"})`);
         await sleep(2400);
         continue;

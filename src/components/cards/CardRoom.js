@@ -8,7 +8,7 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
-import { POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
+import { PERKS, POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -77,6 +77,9 @@ export default function CardRoom({ run, art = {} }) {
     const sharpenable = deck.filter((id) => canUpgrade(id));
     const loot = at.opened || null;
     const gotPotion = loot?.potion ? POTIONS[loot.potion] : null;
+    // The chest is a TRINKET room now (see grantForRoom), so the trinket is the thing on the screen and the
+    // embers are the change. A payout the player cannot see is the oldest bug this game has.
+    const gotPerk = loot?.perk ? PERKS[loot.perk] : null;
 
     const post = useCallback(async (action, extra = {}) => {
         if (busy) return;
@@ -188,6 +191,13 @@ export default function CardRoom({ run, art = {} }) {
                             </span>
                         ) : (
                             <>
+                                {gotPerk ? (
+                                    <span className="cr-gain is-perk">
+                                        <Sprite src={`/images/cards/items/${gotPerk.id}.png`} />
+                                        <b>{gotPerk.name}</b>
+                                        <i>{gotPerk.text}</i>
+                                    </span>
+                                ) : null}
                                 {loot?.embers ? (
                                     <span className="cr-gain"><GiFlame aria-hidden="true" />+{loot.embers} embers</span>
                                 ) : null}
@@ -342,6 +352,15 @@ export default function CardRoom({ run, art = {} }) {
                     text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cr-gain img { width: 22px; height: 22px; object-fit: contain; }
                 .cr-gain.is-lost { font-size: 12.5px; font-weight: 400; color: #a8977f; }
+                /* ── THE TRINKET IS THE CHEST NOW ────────────────────────────────────────────────────
+                   A row rather than a pill, because a trinket has a name AND a rule and the rule is the
+                   half that decides whether the room mattered. The embers underneath are the change. */
+                .cr-gain.is-perk { display: flex; flex-direction: column; align-items: center; gap: 2px;
+                    max-width: 260px; }
+                .cr-gain.is-perk img { width: 44px; height: 44px; }
+                .cr-gain.is-perk b { font-size: 15.5px; color: #ffe6b8; }
+                .cr-gain.is-perk i { font-style: normal; font-size: 12.5px; font-weight: 400;
+                    line-height: 1.35; text-align: center; color: #cdbfa6; }
                 .cr-smithed { display: flex; flex-direction: column; align-items: center; gap: 4px;
                     animation: cr-sharp 0.5s cubic-bezier(.2,1.3,.35,1) both; }
                 .cr-smithed b { font-family: var(--cf-card-font); font-size: 14px; color: #9be08a;

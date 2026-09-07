@@ -53,12 +53,23 @@ const LABEL = {
 
 const W = 100;
 const ROW_H = 26;
-const PAD_TOP = 26;
+// ── THE BOSS NEEDS A ROW OF ITS OWN ──────────────────────────────────────────────────────────────────────
+// ⚠️ THIS WAS 26, WHICH IS EXACTLY WHERE THE LAST ROOM SITS. yOf(RUN_LENGTH - 1) works out to PAD_TOP, and
+// the boss was pinned four units above that — a sixth of one row's gap — so the skull was drawn ON TOP of
+// the final room and their two labels printed over each other. Row 14 is always a rest (see FIXED), so what
+// a player saw one room from the end of an act was the word REST and the words THE BOSS occupying the same
+// line of pixels, on the most important screen the map ever shows.
+//
+// A full row of headroom, and the boss placed one row above the last room rather than a few units above it.
+const PAD_TOP = 26 + 26;
+const BOSS_ROW_UP = 26;   // ROW_H — declared below, so the number rather than the name
 const PAD_BOTTOM = 18;
 const H = PAD_TOP + (RUN_LENGTH - 1) * ROW_H + PAD_BOTTOM;
 
 const xOf = (lane) => 10 + (lane / (MAP_LANES - 1)) * (W - 20);
 const yOf = (row) => H - PAD_BOTTOM - row * ROW_H;
+// One clear row above the last room, which is where the trail from every top-row node now ends.
+const BOSS_Y = yOf(RUN_LENGTH - 1) - BOSS_ROW_UP;
 
 const Ink = ({ kind, className }) => (MARK[kind]
     // eslint-disable-next-line @next/next/no-img-element
@@ -223,7 +234,7 @@ export default function CardMap({ run, art = {} }) {
                             <path
                                 key={`boss-${n.lane}`}
                                 className={`cm-edge${here === `${n.row}:${n.lane}` && bossOpen ? " is-live" : ""}`}
-                                d={`M ${xOf(n.lane)} ${yOf(n.row)} C ${xOf(n.lane)} ${yOf(n.row) - ROW_H * 0.4}, ${W / 2} ${PAD_TOP + ROW_H * 0.4}, ${W / 2} ${PAD_TOP - 4}`}
+                                d={`M ${xOf(n.lane)} ${yOf(n.row)} C ${xOf(n.lane)} ${yOf(n.row) - ROW_H * 0.4}, ${W / 2} ${BOSS_Y + ROW_H * 0.6}, ${W / 2} ${BOSS_Y}`}
                             />
                         ))}
                     </svg>
@@ -257,7 +268,7 @@ export default function CardMap({ run, art = {} }) {
                         type="button"
                         disabled={!bossOpen || busy || !bossNode}
                         className={`cm-node cm-boss${bossOpen ? " is-open" : ""}`}
-                        style={{ left: "50%", top: `${((PAD_TOP - 4) / H) * 100}%` }}
+                        style={{ left: "50%", top: `${(BOSS_Y / H) * 100}%` }}
                         onClick={() => bossNode && enter(bossNode)}
                         aria-label="The boss"
                     >
