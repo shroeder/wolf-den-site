@@ -67,6 +67,9 @@ export default function CardEvent({ run, art = {} }) {
     // the resolver. They stay on screen, greyed, because "you already took that one" is the information the
     // next decision is made against.
     const used = at.used || [];
+    // Every room has a painting now (gen-card-events.mjs); the glyph underneath is what a NEW room shows on
+    // the day it is written and before it is drawn.
+    const hasArt = true;
     const deck = run.deck || [];
 
     const post = useCallback(async (extra) => {
@@ -138,7 +141,13 @@ export default function CardEvent({ run, art = {} }) {
                 ) : null)}
             </div>
 
-            <div className="cv-stage">
+            <div className={`cv-stage${hasArt ? " has-art" : ""}`}>
+                {/* ── THE OBJECT ───────────────────────────────────────────────────────────────────────
+                    A painted thing, like every other room in this game has. The glyph is still here and
+                    still correct — it is what a room with no art yet falls back to — but it is the spare
+                    tyre now rather than the wheel. Sprite handles the 404 without a flash of broken image. */}
+                <Sprite className="cv-art" src={`/images/cards/events/${ev.id}.webp`}
+                    fallback={null} />
                 <span className="cv-mark" aria-hidden="true"><Mark /></span>
                 <h1 className="cv-name">{ev.name}</h1>
                 <p className="cv-say">{ev.say}</p>
@@ -237,11 +246,25 @@ export default function CardEvent({ run, art = {} }) {
                 .cv-hp { font-size: 13px; color: #ff8f7a; font-variant-numeric: tabular-nums; }
                 .cv-em { font-size: 13px; color: #ffb45e; font-variant-numeric: tabular-nums; }
 
+                /* ⚠️ IT WAS TOP-HEAVY AND FULL OF AIR. Photographed on a real phone: a small glyph floating
+                   at 40% of the screen, then a gap, then the plates, then a third of the screen empty under
+                   them. Centring a short column in a tall viewport does that — the content has nothing to
+                   push against. The stage is pinned toward the bottom now with the object above it, which is
+                   how the campfire and the merchant are already built: the thing you look at is high, the
+                   things you press are within a thumb's reach of the bottom. */
                 .cv-stage { flex: 1; width: min(560px, 100%); display: flex; flex-direction: column;
-                    align-items: center; justify-content: center; gap: 9px; padding: 16px 0 6px; }
+                    align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 0 4px; }
 
                 /* The mark on the wall. Big, warm and lit from itself, so the room has an object in it
                    without fourteen paintings existing. */
+                /* The painting. Sized off the viewport so a tall phone gives it room and a short one does
+                   not lose the plates — the same reasoning the campfire's fire is sized by. It throws its own
+                   light, because an object on a dark wall with no glow under it is a sticker. */
+                .cv-art { width: min(210px, 46vw); height: auto; max-height: 34vh; object-fit: contain;
+                    margin-bottom: -2px;
+                    filter: drop-shadow(0 0 30px rgba(255,170,70,0.22)) drop-shadow(0 10px 18px rgba(0,0,0,0.85)); }
+                /* The fallback, for a room written before it is drawn. */
+                .cv-stage.has-art .cv-mark { display: none; }
                 .cv-mark { display: grid; place-items: center; font-size: 70px; color: #e0b878;
                     filter: drop-shadow(0 0 26px rgba(255,170,70,0.32)) drop-shadow(0 8px 14px rgba(0,0,0,0.8)); }
                 /* ── THE ROOM'S OWN TYPEFACE ───────────────────────────────────────────────────────────
@@ -251,10 +274,10 @@ export default function CardEvent({ run, art = {} }) {
                    font. Photographed side by side it reads as a different game's screen — and it is the one
                    screen whose entire job is to be read. The site also styles h1 and button, so these have
                    to say it rather than inherit it. */
-                .cv-name { margin: 2px 0 0; font-family: var(--cf-card-font); font-size: 21px;
+                .cv-name { margin: 0; font-family: var(--cf-card-font); font-size: 20px;
                     letter-spacing: 0.05em; font-weight: 700;
                     color: #f3e6cd; text-shadow: 0 2px 6px rgba(0,0,0,0.9); text-align: center; }
-                .cv-say { margin: 0; max-width: 340px; text-align: center; font-size: 13.5px; line-height: 1.5;
+                .cv-say { margin: 0 0 2px; max-width: 330px; text-align: center; font-size: 13px; line-height: 1.45;
                     color: #c3b49c; font-style: italic; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .cv-warn { margin: 0; font-size: 12.5px; color: #f0c98a; }
 
@@ -265,22 +288,28 @@ export default function CardEvent({ run, art = {} }) {
 
                 /* ── THE PLATES ── full width and stacked, because they are sentences rather than buttons and
                    a row of them on a phone would set the text at eight points. */
-                .cv-choices { display: flex; flex-direction: column; gap: 8px; width: min(420px, 94%);
-                    margin-top: 6px; }
+                .cv-choices { display: flex; flex-direction: column; gap: 6px; width: min(420px, 94%);
+                    margin-top: 4px; }
                 .cv-do { position: relative; display: block; width: 100%; padding: 0; border: 0;
                     background: none; cursor: pointer; }
                 .cv-do:disabled { cursor: default; opacity: 0.5; }
                 .cv-do.is-spent { opacity: 0.34; }
                 .cv-plate { display: block; width: 100%; height: 100%; position: absolute; inset: 0;
                     object-fit: fill; pointer-events: none; }
-                .cv-do-text { position: relative; display: flex; flex-direction: column; gap: 2px;
-                    padding: 11px 16px; text-align: left; }
+                /* ⚠️ THE TEXT HAS TO SIT INSIDE THE METAL. The plate is a drawn asset with a moulded bevel
+                   and a rivet at each end, and at 18px of padding the label began ON the left bevel and the
+                   detail line ran out past the right rivet — visible in the screenshot Luke sent from his
+                   phone. The inset is the rivet's, not a guess: the art puts them about a tenth of the way in
+                   from each end, so the text starts clear of them and the plate reads as something the words
+                   are stamped on rather than something they are lying across. */
+                .cv-do-text { position: relative; display: flex; flex-direction: column; gap: 1px;
+                    padding: 10px 34px; text-align: left; }
                 /* ⚠️ NOT INHERITED. The site sets a link colour on anything that looks like a control, which
                    has quietly turned button text blue on this game's screens before. */
                 .cv-do-text b { font-family: var(--cf-card-font); font-size: 14.5px; color: #f7ecd6;
                     letter-spacing: 0.03em; }
-                .cv-do-text i { font-family: var(--cf-card-font); font-size: 12px; color: #cbbb9f;
-                    font-style: normal; }
+                .cv-do-text i { font-family: var(--cf-card-font); font-size: 11.5px; line-height: 1.3;
+                    color: #cbbb9f; font-style: normal; }
                 .cv-do:not(:disabled):active .cv-do-text { transform: translateY(1px); }
 
                 .cv-pick-over { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
@@ -316,7 +345,7 @@ export default function CardEvent({ run, art = {} }) {
                 .cv-card { padding: 0; border: 0; background: none; cursor: pointer; }
                 .cv-card.is-done { opacity: 0.35; cursor: default; }
 
-                .cv-foot { display: flex; justify-content: center; padding-top: 6px; }
+                .cv-foot { display: flex; justify-content: center; padding-top: 10px; }
                 .cv-leave { padding: 8px 22px; border-radius: 999px; font-family: var(--cf-card-font);
                     font-size: 13px; letter-spacing: 0.05em;
                     color: #e8dcc6; background: rgba(20,16,12,0.72);

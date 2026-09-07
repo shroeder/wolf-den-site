@@ -34,6 +34,17 @@ const owner = { id: primaryOwnerId() };
 
 const cmd = process.argv[2];
 
+// ⚠️ NOTHING MAY CHANGE THE OWNER'S RUN UNLESS A BACKUP IS HELD. `restore` consumes the backup file, and
+// after that the next `stand` or `fresh` walks straight over a live run with nothing to put back — which is
+// exactly what happened: a session restored, carried on filming, and left the owner standing in a room he
+// had never walked into, with no copy of what he actually had. Save first, always.
+const MUTATES = new Set(["fresh", "stand", "reward"]);
+if (MUTATES.has(cmd) && !existsSync(BAK)) {
+    console.log(`refusing to ${cmd}: no backup is held.`);
+    console.log("run `node scripts/cards-rig.mjs save` first — it is the only thing that can put the run back.");
+    process.exit(1);
+}
+
 if (cmd === "save") {
     // ⚠️ A SECOND SAVE MUST NOT EAT THE FIRST ONE. This overwrote the backup file every time it ran, and the
     // third call of a session — made out of habit, to mint a fresh session token — captured the BOT'S dead
