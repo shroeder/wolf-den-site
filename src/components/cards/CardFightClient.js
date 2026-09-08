@@ -9,7 +9,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    ACTS, DRAG_SLOP, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, runScore, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    ACTS, DRAG_SLOP, KEYS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, runScore, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
@@ -1281,6 +1281,21 @@ export default function CardFightClient({ fixture, run = null }) {
                     {runState?.gotPerk && seenPerk !== runState.gotPerk ? (
                         <CardGot trinket={runState.gotPerk} onDone={() => setSeenPerk(runState.gotPerk)} />
                     ) : null}
+                    {/* ── OR WALK AWAY FROM IT ─────────────────────────────────────────────────────
+                        The red key is paid for with the trinket sitting on the screen above this line, and
+                        it is offered only while there is one to refuse. Deliberately AFTER the CardGot, so
+                        the thing being given up has been read before the button to give it up appears. */}
+                    {runState?.gotPerk && seenPerk === runState.gotPerk && !runState.keys?.ruby
+                        && runState.at?.kind === "elite" ? (
+                            <button
+                                type="button"
+                                className="cf-key"
+                                onClick={() => post("takekey", { key: "ruby" })}
+                            >
+                                <b>Take {KEYS.ruby.name} instead</b>
+                                <i>{KEYS.ruby.says}</i>
+                            </button>
+                        ) : null}
                     {/* And the card you just took, on its way into the deck. */}
                     {took ? <CardGot card={took} art={fixture.petArt} /> : null}
 
@@ -2204,6 +2219,15 @@ export default function CardFightClient({ fixture, run = null }) {
                    in full, because every one of these changes how the rest of the run is played and none of
                    them can be read at a glance from a sprite. Stacked on a phone, three across on a desk. */
                 .cf-bossoffers { display: grid; gap: 8px; width: min(340px, 92vw); }
+                /* The refusal is outlined, not filled — it is worth less than what it replaces on every
+                   screen except the one where you have decided to go to the last act. */
+                .cf-key {
+                    display: block; width: min(340px, 92vw); margin: 10px auto 0; padding: 10px 14px;
+                    background: transparent; border: 1px solid #2c6e4a; border-radius: 10px;
+                    text-align: left; cursor: pointer; font: inherit;
+                }
+                .cf-key b { display: block; color: #7fe0a8; font-size: 15px; }
+                .cf-key i { display: block; margin-top: 3px; color: #8a8f98; font-size: 12px; font-style: normal; }
                 .cf-bossperk { display: grid; grid-template-columns: 46px 1fr; grid-template-rows: auto auto;
                     gap: 2px 12px; align-items: center; padding: 10px 12px; cursor: pointer; text-align: left;
                     border-radius: 12px; border: 1px solid rgba(201,162,83,0.4);

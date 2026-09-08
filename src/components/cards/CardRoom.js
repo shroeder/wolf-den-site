@@ -8,7 +8,7 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
-import { PERKS, POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
+import { KEYS, PERKS, POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -70,6 +70,10 @@ export default function CardRoom({ run, art = {} }) {
     const room = ROOM[at.kind] || ROOM.rest;
     const isFire = at.kind === "rest";
     const done = isFire ? Boolean(at.rested) : Boolean(at.opened);
+    // ── THE KEY THIS ROOM COULD GIVE UP ──────────────────────────────────────────────────────────────
+    // KEYS is the authority on which room pays which key, so the room does not carry a second copy of that
+    // fact — and a key already held stops being offered rather than being offered and refused by the server.
+    const keyHere = Object.values(KEYS).find((k) => k.from === at.kind && !run.keys?.[k.id]) || null;
 
     const heal = Math.ceil((run.hpMax || 1) * 0.3);
     const whole = run.hp >= run.hpMax;
@@ -245,6 +249,24 @@ export default function CardRoom({ run, art = {} }) {
                                 </span>
                             </button>
                         ) : null}
+                        {/* ── AND THE THIRD OPTION, WHICH IS TO TAKE NOTHING ─────────────────────
+                            The key sits beside the reward rather than on a screen of its own, because the
+                            cost IS the reward you can see next to it: this button is only ever worth
+                            pressing while the one to its left is obviously better. It shows only when the
+                            room can actually give a key and the run has not already got that one. */}
+                        {keyHere ? (
+                            <button
+                                type="button"
+                                className="cr-do is-key"
+                                disabled={busy}
+                                onClick={() => post("takekey", { key: keyHere.id })}
+                            >
+                                <span className="cr-do-label">
+                                    {busy ? "…" : `Take ${keyHere.name} instead`}
+                                </span>
+                                <span className="cr-do-sub">{keyHere.says}</span>
+                            </button>
+                        ) : null}
                     </div>
                 ) : null}
 
@@ -385,6 +407,14 @@ export default function CardRoom({ run, art = {} }) {
                     border-color: rgba(255,196,110,0.6);
                     background: linear-gradient(180deg, rgba(50,39,27,0.97), rgba(31,24,18,0.97)); }
                 .cr-do:not(:disabled):active { transform: translateY(1px); }
+                /* The key is a REFUSAL, so it is drawn quieter than the thing it refuses — outlined and
+                   green rather than filled, the same green Dexterity uses for "a stat you chose to take". */
+                .cr-do.is-key { background: transparent; border-color: #2c6e4a; }
+                .cr-do.is-key .cr-do-label { color: #7fe0a8; }
+                .cr-do-sub {
+                    display: block; margin-top: 4px; font-size: 12px; line-height: 1.35;
+                    color: #8a8f98; font-weight: 400;
+                }
                 .cr-do-label { position: relative; font-family: var(--cf-card-font); font-size: 15px;
                     font-weight: 700; letter-spacing: 0.02em; color: #ffe6d2; }
                 .cr-do:disabled { cursor: default; opacity: 0.5; }

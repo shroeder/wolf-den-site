@@ -104,7 +104,7 @@ export default function CardShop({ run, art = {} }) {
     const stock = run.shop?.stock || [];
     const bought = run.shop?.bought || [];
     const removed = Boolean(run.shop?.removed);
-    const cost = removalCost(run.removals || 0);
+    const cost = removalCost(run.removals || 0, run.perks, run.asc || 0);
     const deck = run.deck || [];
     const potions = (run.potions || []).map((id) => POTIONS[id]).filter(Boolean);
 

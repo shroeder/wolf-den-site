@@ -638,6 +638,56 @@ export const STATUS_CARDS = {
 };
 export const STATUS_IDS = Object.keys(STATUS_CARDS);
 
+// ── CURSES ───────────────────────────────────────────────────────────────────────────────────────────────
+// The statuses above are the enemy attacking your HAND and they leave when the fight does. A curse is the
+// other thing entirely: it is written into `run.deck` and it is there for the rest of the climb.
+//
+// ⚠️ WHY THE GAME NEEDED THEM. Read the events file end to end and almost every room is upside — take the
+// card, take the relic, take the gold, and the worst outcome on offer is usually "nothing happens". Theirs
+// has fifteen curses and the reason is not cruelty, it is that a CHOICE NEEDS A PRICE. Their best events
+// (the Cleric, Bonfire Spirits, the Golden Idol) all read the same way: something genuinely good, and a cost
+// that follows you out of the room. With no cost to pay, a written room with three choices is a room with
+// one, and that is exactly what ours were.
+//
+// A curse is also what makes deck REMOVAL a real economy. The merchant has always sold it and nobody had a
+// reason to buy — burn a Bite and you have a marginally thinner deck; burn a Regret and you have stopped
+// bleeding. Which is why the last one here cannot be burned at all.
+//
+// The hooks: `unplayable`/`ethereal`/`burn` already existed for the statuses, so four of these cost the
+// engine nothing. Three are new and are read in finishFoeTurn and playCard.
+//
+//   `endWeak` / `endFrail`  gain that debuff at the end of a turn you still hold it
+//   `hpPerHand`             lose that much health for EVERY card in hand, the reason to empty your hand
+//   `hpPerPlay`             lose that much health each time you play any card at all
+//   `noBurn`                the merchant cannot take it off you
+export const CURSE_CARDS = {
+    injury: { id: "injury", name: "Injury", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, text: "Unplayable." },
+    decay: { id: "decay", name: "Decay", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, burn: 2, text: "Unplayable. At the end of your turn, take 2 damage." },
+    doubt: { id: "doubt", name: "Doubt", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, endWeak: 1, text: "Unplayable. At the end of your turn, gain 1 Weak." },
+    shame: { id: "shame", name: "Shame", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, endFrail: 1, text: "Unplayable. At the end of your turn, gain 1 Frail." },
+    clumsy: { id: "clumsy", name: "Clumsy", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, ethereal: true, text: "Unplayable. Ethereal." },
+    // The one that punishes a full hand, which is the opposite of what every other card in the deck wants.
+    regret: { id: "regret", name: "Regret", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, hpPerHand: 1, text: "Unplayable. At the end of your turn, lose 1 health for each card in your hand." },
+    // Theirs is Pain, and it is the one that makes a big turn cost something.
+    ache: { id: "ache", name: "Ache", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, hpPerPlay: 1, text: "Unplayable. Whenever you play a card, lose 1 health." },
+    // ⚠️ AND ONE THAT WILL NOT COME OUT. Theirs is Necronomicurse and the joke is the point: a curse the
+    // shop cannot take is the only card in the game whose cost is permanent, which is what a boss-tier
+    // bargain has to be able to charge. Nothing hands this out except the last act's keys.
+    hollow: { id: "hollow", name: "The Hollow", cost: 0, kind: "curse", target: "self", curse: true,
+        unplayable: true, noBurn: true, hpPerHand: 1,
+        text: "Unplayable. Cannot be removed. At the end of your turn, lose 1 health for each card in your hand." },
+};
+export const CURSE_IDS = Object.keys(CURSE_CARDS);
+/** The ones a room is allowed to hand out — The Hollow is spoken for. */
+export const CURSE_POOL = CURSE_IDS.filter((id) => !CURSE_CARDS[id].noBurn);
+
 export const BASIC_UNLOCKS = ["swipe", "scuttle", "peck", "hoot", "coils", "rally"];
 
 // ── THE CARDS PLAYING EARNS YOU ──────────────────────────────────────────────────────────────────────────
@@ -721,7 +771,7 @@ export const unlockedCards = (progress) => new Set(
 
 /** Every card the game knows about: the starter four, the whole pet pool, what playing earns — and the junk
  *  their enemies deal into your deck, which is a card like any other as far as every renderer is concerned. */
-export const ALL_CARDS = { ...CARDS, ...POOL, ...UNLOCKS, ...STATUS_CARDS };
+export const ALL_CARDS = { ...CARDS, ...POOL, ...UNLOCKS, ...STATUS_CARDS, ...CURSE_CARDS };
 
 // ── HOW HARD A ROOM IS ───────────────────────────────────────────────────────────────────────────────────
 // This was an eight-entry ladder, one row per stop, back when a run was a straight line. The map is fifteen
@@ -1327,6 +1377,10 @@ export const POTIONS = {
 export const POTION_IDS = Object.keys(POTIONS);
 
 export const RUN_LENGTH = 15;
+// The last act is a corridor of three rooms with the door above them — see buildFinalMap. It lives here
+// beside RUN_LENGTH, and not in the map module, for the same reason MAP_ROWS does: how tall an act is has to
+// be one fact that the rules, the map and every label divide by.
+export const FINAL_ROWS = 3;
 
 /**
  * ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────
@@ -1353,6 +1407,21 @@ export const ASCENSION = [
     { n: 8, says: "You start carrying a Wound." },
     { n: 9, says: "Your belt holds one bottle fewer." },
     { n: 10, says: "The bosses hit harder too." },
+    // ── THE SECOND TEN ───────────────────────────────────────────────────────────────────────────────
+    // The first ten make the Spire bigger. These make YOU smaller, which is the shape theirs takes past
+    // ten as well: by this point a player has a deck that beats big numbers, so the rungs that still bite
+    // are the ones that take away the things holding the deck up — the purse, the belt, the fire, the
+    // removals. Rungs 12 and 16 spend the curses, which is what the curses were built for.
+    { n: 11, says: "The merchant knows what you need. Everything on the shelf costs more." },
+    { n: 12, says: "You begin the climb already carrying a curse." },
+    { n: 13, says: "Your purse starts lighter." },
+    { n: 14, says: "The merchant charges half again to burn a card out of your deck." },
+    { n: 15, says: "Bottles are harder to come by." },
+    { n: 16, says: "The elites keep something of themselves in your deck." },
+    { n: 17, says: "Elites are tougher again." },
+    { n: 18, says: "You climb on a smaller bar." },
+    { n: 19, says: "The ordinary rooms hit as hard as the elites did." },
+    { n: 20, says: "The Spire itself is against you. Everything is bigger, and everything hits harder." },
 ];
 export const ASC_MAX = ASCENSION.length;
 
@@ -1371,6 +1440,8 @@ export function ascHpScale(asc, kind = "fight") {
     if (kind === "elite" && ascRule(asc, 3)) k *= 1.25;
     if (kind === "boss" && ascRule(asc, 4)) k *= 1.25;
     if (kind !== "elite" && kind !== "boss" && ascRule(asc, 7)) k *= 1.15;
+    if (kind === "elite" && ascRule(asc, 17)) k *= 1.15;
+    if (ascRule(asc, 20)) k *= 1.1;
     return k;
 }
 
@@ -1379,8 +1450,23 @@ export function ascDamageScale(asc, kind = "fight") {
     let k = 1;
     if (ascRule(asc, 2)) k *= 1.1;
     if (kind === "boss" && ascRule(asc, 10)) k *= 1.2;
+    // Rung nineteen is the one that ends most climbs: an ordinary room stops being the place you rest.
+    if (kind !== "elite" && kind !== "boss" && ascRule(asc, 19)) k *= 1.15;
+    if (ascRule(asc, 20)) k *= 1.1;
     return k;
 }
+
+/** What the shelf multiplies its prices by — rung eleven. */
+export const ascShopScale = (asc = 0) => (ascRule(asc, 11) ? 1.2 : 1);
+
+/** What the run opens its purse with — rung thirteen. */
+export const ascStartEmbers = (base, asc = 0) => (ascRule(asc, 13) ? Math.round(base * 0.6) : base);
+
+/** The bar you climb on — rung eighteen takes a slice off the top, not just the starting fill. */
+export const ascMaxHp = (base, asc = 0) => (ascRule(asc, 18) ? Math.round(base * 0.9) : base);
+
+/** How often a bottle drops — rung fifteen. */
+export const ascPotionScale = (asc = 0) => (ascRule(asc, 15) ? 0.7 : 1);
 
 /**
  * ── WHAT A RUN WAS WORTH ─────────────────────────────────────────────────────────────────────────────────
@@ -1434,9 +1520,31 @@ export function runScore(run = {}) {
 // is a GATE, not an ending. You pay for it in health, you are paid in a relic strong enough to change how you
 // play, and the next act opens harder. Ending at the first boss meant our best runs finished at the exact
 // moment the deck became interesting.
+// ⚠️ ACTS IS "HOW MANY YOU MUST CLEAR", NOT "HOW MANY EXIST". Clearing the third still ends the run and
+// still counts as winning — that has to stay true, because the keys are optional and a player who never
+// picks one up has finished the game they were offered. The fourth act is a door you had to bring keys to.
 export const ACTS = 3;
-export const ACT_NAMES = ["The Sand", "The Deep", "The Spire"];
+export const FINAL_ACT = 4;
+export const ACT_NAMES = ["The Sand", "The Deep", "The Spire", "The Hollow"];
 export const actName = (act) => ACT_NAMES[Math.max(0, Math.min(ACT_NAMES.length - 1, (act || 1) - 1))];
+
+// ── THE THREE KEYS ───────────────────────────────────────────────────────────────────────────────────────
+// Every one of them is a room you walked into and left EMPTY-HANDED. Theirs works this way and it is the
+// best thing about the ending: the fourth act is not unlocked by beating something, it is unlocked by
+// having repeatedly chosen to be weaker than you could have been. A run carrying all three keys arrives at
+// the door with a worse deck, less health and one fewer relic than the same run that ignored them, and that
+// is the entire point — the ending is a bet you place three acts early.
+export const KEYS = {
+    emerald: { id: "emerald", name: "The Green Key", from: "rest",
+        says: "Let the fire go out. It gives you nothing tonight." },
+    sapphire: { id: "sapphire", name: "The Blue Key", from: "treasure",
+        says: "Leave what is in the chest. Take the key under it." },
+    ruby: { id: "ruby", name: "The Red Key", from: "elite",
+        says: "Walk away from what the elite was carrying." },
+};
+export const KEY_IDS = Object.keys(KEYS);
+/** Has this run paid for the door three times over? */
+export const hasAllKeys = (run) => KEY_IDS.every((k) => Boolean(run?.keys?.[k]));
 
 // ── THE BOSS TRINKETS ────────────────────────────────────────────────────────────────────────────────────
 // Theirs are the relics you only ever get from a boss and they are deliberately game-changing, most with a
@@ -1530,15 +1638,19 @@ export const perkById = (id) => ALL_PERKS[String(id || "")] || null;
  */
 export const stopLabel = (stop, { capital = true, act = 0 } = {}) => {
     const n = Math.max(1, Math.floor(Number(stop) || 1));
+    // ⚠️ THE LAST ACT IS NOT FIFTEEN ROOMS LONG. Every label in this game divides by RUN_LENGTH, which read
+    // "STOP 4/15" on a corridor with four rooms in it — a progress figure that says you are a quarter of the
+    // way through the thing you are standing at the end of.
+    const rows = act >= FINAL_ACT ? FINAL_ROWS + 1 : RUN_LENGTH;
     // THE ACT IS ONLY WORTH SAYING ONCE THERE IS MORE THAN ONE. A run that has never been past the first
     // boss should not be reading "Act 1" at itself on every screen.
     const where = act > 1 ? `Act ${act} · ` : "";
-    if (n > RUN_LENGTH) return `${where}${capital ? "The boss" : "the boss"}`;
+    if (n > rows) return `${where}${capital ? "The boss" : "the boss"}`;
     // ⚠️ SHORTER ONCE THE ACT IS ON IT. "ACT 2 · STOP 6 OF 15 · TURN 1" is 27 characters at 11px with wide
     // letter-spacing, and it wrapped onto a second line on a 375px phone — with the "1" of the turn alone
     // underneath. The act buys the room, so the "of" pays for it.
-    if (act > 1) return `${where}${capital ? "Stop" : "stop"} ${n}/${RUN_LENGTH}`;
-    return `${capital ? "Stop" : "stop"} ${n} of ${RUN_LENGTH}`;
+    if (act > 1) return `${where}${capital ? "Stop" : "stop"} ${n}/${rows}`;
+    return `${capital ? "Stop" : "stop"} ${n} of ${rows}`;
 };
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -1580,8 +1692,12 @@ export const SHOP = {
 // A trinket can take a cut off the fire — their Smiling Mask, which is a small number that decides whether
 // a run thins its deck twice or four times. `perks` is optional so every caller that does not have them (the
 // shelf builder, the rig) keeps working unchanged.
-export const removalCost = (removals = 0, perks = null) => {
-    const full = SHOP.removeBase + SHOP.removeStep * Math.max(0, removals);
+export const removalCost = (removals = 0, perks = null, asc = 0) => {
+    // ⚠️ THE WHOLE PRICE, NOT THE STEP. Written without these brackets the rung multiplied only the
+    // escalating term, which is zero on the first burn — so the rung that is supposed to make thinning
+    // expensive changed nothing at all for the one removal most runs actually make.
+    const full = (SHOP.removeBase + SHOP.removeStep * Math.max(0, removals))
+        * (ascRule(asc, 14) ? 1.5 : 1);
     const cut = perks ? Math.min(0.75, perkSum(perks, "removalCut") || 0) : 0;
     return Math.max(10, Math.round(full * (1 - cut)));
 };
@@ -1595,10 +1711,13 @@ const priceIn = ([lo, hi], r) => lo + Math.floor(r * (hi - lo + 1));
  * offers already follow. `cardIds` is handed in because deciding which cards a member is even eligible for
  * needs the database, and this file has never touched it.
  */
-export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds = PERK_IDS } = {}) {
+export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds = PERK_IDS, asc = 0 } = {}) {
     let roll = seed >>> 0;
     const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
     const stock = [];
+    // ⚠️ MARKED UP AT THE END, NOT PER SLOT. Rung eleven scales what is already on the shelf, applied once
+    // to every price below including the sale one — so the strike-through still reads as a real discount
+    // against a real price, rather than a marked-up sale tag sitting beside an unmarked full one.
 
     for (const id of cardIds.slice(0, SHOP.cards)) {
         const tier = Math.max(1, Math.min(3, POOL[id]?.tier || ALL_CARDS[id]?.tier || 1));
@@ -1628,7 +1747,12 @@ export function buildShop(seed, { cardIds = [], potionIds = POTION_IDS, perkIds 
         const was = stock[at].price;
         stock[at] = { ...stock[at], sale: true, was, price: Math.max(1, Math.round(was * (1 - SHOP.saleOff))) };
     }
-    return stock.map((s, i) => ({ ...s, slot: i }));
+    const markup = ascShopScale(asc);
+    return stock.map((s, i) => ({
+        ...s, slot: i,
+        price: Math.max(1, Math.round(s.price * markup)),
+        ...(s.was ? { was: Math.max(1, Math.round(s.was * markup)) } : {}),
+    }));
 }
               // map rows; the boss stands above them
 
@@ -1986,6 +2110,47 @@ export const FOE_SCRIPTS = {
         after: { bolt: [["beam", 100]], beam: [["bolt", 100]] },
     },
     // ── ACT ONE BOSSES ──
+    // ── THE LAST ACT ────────────────────────────────────────────────────────────────────────────────
+    gate_shield: {
+        // Blocks, buffs the one beside it, and hits only when it has nothing better to do. On its own it is
+        // a wall you eventually chip down; beside the Spear it is the reason the Spear kills you.
+        open: "guard",
+        moves: {
+            guard: { key: "guard", label: "Raise", block: 22 },
+            bolster: { key: "bolster", label: "Bolster", block: 12, allies: { strength: 2 } },
+            bash: { key: "bash", label: "Shield Bash", damage: 14 },
+        },
+        after: { guard: [["bolster", 70], ["bash", 30]], bolster: [["guard", 50], ["bash", 50]], bash: [["bolster", 100]] },
+    },
+    gate_spear: {
+        // All damage and a debuff that stops you guarding through it. Kill order is the whole fight.
+        open: "jab",
+        moves: {
+            jab: { key: "jab", label: "Jab", damage: 10, hits: 2 },
+            skewer: { key: "skewer", label: "Skewer", damage: 26 },
+            fray: { key: "fray", label: "Fray", frail: 2, weak: 1 },
+        },
+        after: { jab: [["skewer", 60], ["fray", 40]], skewer: [["jab", 70], ["fray", 30]], fray: [["skewer", 100]] },
+    },
+    heart: {
+        // Theirs opens with a debuff that lands before you have drawn a hand worth protecting, then cycles
+        // enormous multi-hits against single huge ones so that neither pure block nor pure damage covers it.
+        open: "blight",
+        moves: {
+            blight: { key: "blight", label: "Blight", weak: 2, frail: 2, vulnerable: 2 },
+            flail: { key: "flail", label: "Flail", damage: 15, hits: 4 },
+            echo: { key: "echo", label: "Echo", damage: 45 },
+            drain: { key: "drain", label: "Drain", damage: 22, heal: 30 },
+            wither: { key: "wither", label: "Wither", damage: 12, status: { id: "decay", n: 2 } },
+        },
+        after: {
+            blight: [["flail", 55], ["echo", 45]],
+            flail: [["drain", 40], ["echo", 35], ["wither", 25]],
+            echo: [["flail", 45], ["wither", 30], ["drain", 25]],
+            drain: [["blight", 35], ["flail", 65]],
+            wither: [["echo", 60], ["flail", 40]],
+        },
+    },
     warlord: {
         // The Guardian, 240: Charging Up (9 Block), Fierce Bash 32, Vent Steam (Weak 2 + Vulnerable 2),
         // Whirlwind 5x4, Roll Attack 9, Twin Slam 8x2. Mode Shift is a damage-threshold mechanic we do not
@@ -2464,6 +2629,18 @@ export const FOES = {
     slime_king: { id: "slime_king", name: "The Gorging King", hp: [140, 140], script: "slime_king",
         split: { into: ["bruiser", "warden"] } },                                                         // Slime Boss 140
     hexghost: { id: "hexghost", name: "The Sixfold", hp: [250, 250], script: "hexghost" },               // Hexaghost 250
+    // ── THE LAST ACT ─────────────────────────────────────────────────────────────────────────────────
+    // The pair on the door, theirs: one that only blocks and one that only hits, so the fight is a question
+    // about whether your deck can do both things at once rather than either of them very well.
+    gate_shield: { id: "gate_shield", name: "The Shield", hp: [110, 110], script: "gate_shield", plate: 3 },
+    gate_spear:  { id: "gate_spear",  name: "The Spear",  hp: [110, 110], script: "gate_spear" },
+    // ⚠️ AND THE THING BEHIND IT. 750, which is three times the biggest number in this file, and the health
+    // is the least of it — see `pulse` and `invincible` on the engine side. Theirs is the Corrupt Heart and
+    // the reason it is the ending is that it beats decks rather than players: an engine that wins by playing
+    // twelve cards a turn is punished for every one of them, and a deck that wins by one enormous swing
+    // finds the swing capped. There is no build it does not have an answer to, only builds that survive it.
+    heart: { id: "heart", name: "The Heart", hp: [750, 750], script: "heart",
+        pulse: 1, invincible: 200 },
 
     // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
     drowned:    { id: "drowned",    name: "Drowned",    hp: [25, 31],   script: "drowned" },             // Byrd 25-31
@@ -2570,6 +2747,9 @@ export const ENCOUNTERS = [
     { id: "warlord", name: "The Guardian", pool: "boss", weight: 1, foes: ["warlord"] },
     { id: "sundered", name: "The Gorging King", pool: "boss", weight: 1, foes: ["slime_king"] },
     { id: "hollow_king", name: "The Sixfold", pool: "boss", weight: 1, foes: ["hexghost"] },
+    // ── THE LAST ACT ── one room of each kind, because there is only ever one of each.
+    { id: "the_gate", name: "The Gate", pool: "4:elite", weight: 1, foes: ["gate_shield", "gate_spear"] },
+    { id: "the_heart", name: "The Hollow Heart", pool: "4:boss", weight: 1, foes: ["heart"] },
 
     // ══ ACT TWO — THE DEEP (their City) ══════════════════════════════════════════════════════════════════
     { id: "d_sphere", name: "A Sphere", pool: "2:easy", weight: 3, foes: ["sphere"] },
@@ -2648,6 +2828,10 @@ export function buildParty(encounter, seed, { asc = 0, kind = "fight" } = {}) {
             thorns: def.thorns || 0,
             onDeath: def.onDeath || null,
             split: def.split || null,
+            // The last act's two. Same argument as the four above: they are true of the creature, not of
+            // its turn, and a Heart that arrives at the fight without them is a 750-health punching bag.
+            pulse: def.pulse || 0,
+            invincible: def.invincible || 0,
         };
     });
 }
@@ -2775,7 +2959,8 @@ export const cardById = (id) => {
 // is how a hand gets read at speed: you are not reading sentences, you are spotting the two words that decide
 // the turn. Kept here rather than in the card component because the rules own the vocabulary; a screen that
 // invented its own list would drift the moment a card added a keyword.
-export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity"];
+export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity",
+    "Poison", "Artifact", "Regeneration", "Intangible", "Curse"];
 
 // ── WHAT EACH KIND OF CARD IS CALLED ─────────────────────────────────────────────────────────────────────
 // The card face used to name the type with `kind === "attack" ? "Attack" : "Skill"`, which is a ternary that
@@ -2878,6 +3063,10 @@ export function resolveCard(card, attacker = {}, defender = null) {
     if (card.weak) out.weak = card.weak;
     if (card.frail) out.frail = card.frail;
     if (card.dexterity) out.dexterity = card.dexterity;
+    if (card.poison) out.poison = card.poison;
+    if (card.artifact) out.artifact = card.artifact;
+    if (card.regen) out.regen = card.regen;
+    if (card.intangible) out.intangible = card.intangible;
     return out;
 }
 
@@ -2972,8 +3161,18 @@ function stillStanding(hero, perks) {
     return { ...hero, hp: Math.max(1, Math.floor(hero.hpMax / 2)), tailUsed: true };
 }
 
-/** Block eats damage first, and only what is left reaches HP. */
+/**
+ * Block eats damage first, and only what is left reaches HP.
+ *
+ * ⚠️ INTANGIBLE IS APPLIED HERE, NOT AT THE CALL SITE. The creatures have had it since the Darklings (a
+ * `veil` move), but it was clamped where a CARD works out its damage — so a foe was Intangible against your
+ * deck and solid against everything else, and the hero could not be Intangible at all because nothing on the
+ * enemy's side of the board went through that clamp. One funnel, both sides, and `Math.min(1, …)` is
+ * idempotent so the call site that already clamps stays correct.
+ */
 function land(unit, amount) {
+    const raw = Math.max(0, amount);
+    amount = (unit.intangible || 0) > 0 ? Math.min(1, raw) : raw;
     const absorbed = Math.min(unit.block || 0, amount);
     const hit = { ...unit, block: (unit.block || 0) - absorbed, hp: Math.max(0, unit.hp - (amount - absorbed)) };
     // ── PLATED ARMOR ── permanent block that comes back every turn and wears down one point per blow that
@@ -2989,14 +3188,52 @@ function land(unit, amount) {
     return hit;
 }
 
+/**
+ * ── ARTIFACT: THE ONLY ANSWER TO A DEBUFF THERE HAS EVER BEEN ────────────────────────────────────────────
+ * Every debuff in this game has been unconditional — applied, it lands, and the only counterplay was killing
+ * the thing applying it. Theirs gives both sides Artifact: a charge that EATS the next debuff whole and is
+ * spent doing it. It is what makes a Vulnerable-heavy enemy a puzzle rather than a tax, and it is why their
+ * Snecko and their Time Eater are frightening rather than merely large.
+ *
+ * ⚠️ THE WHOLE STACK, NOT THE POINTS. Theirs eats the application, so one Artifact cancels "Vulnerable 3"
+ * entirely rather than reducing it to 2 — which is the difference between a charge worth holding and a
+ * rounding error. Poison counts as a debuff; Strength given by a foe to itself does not.
+ *
+ * Every debuff a card, a potion, a perk or a creature applies goes through here, so a new debuff is covered
+ * the day it is written rather than the day somebody remembers to add it.
+ */
+function debuff(unit, key, amount) {
+    if (!unit || !(amount > 0)) return { unit, applied: 0, eaten: false };
+    if ((unit.artifact || 0) > 0) {
+        return { unit: { ...unit, artifact: unit.artifact - 1 }, applied: 0, eaten: true };
+    }
+    return { unit: { ...unit, [key]: (unit[key] || 0) + amount }, applied: amount, eaten: false };
+}
+
 // Debuffs tick down at the end of the turn of whoever is CARRYING them, so two Vulnerable applied on your turn
 // is two enemy turns of taking half again — not one.
+//
+// ⚠️ POISON IS NOT IN HERE. It is spent by DEALING its damage at the top of the carrier's turn (see
+// poisonTick), not by ageing out at the bottom of it, which is the whole difference between a debuff you
+// wait out and one you have to kill something before.
 const tick = (unit) => ({
     ...unit,
     vulnerable: Math.max(0, (unit.vulnerable || 0) - 1),
     weak: Math.max(0, (unit.weak || 0) - 1),
     frail: Math.max(0, (unit.frail || 0) - 1),
 });
+
+/**
+ * ── POISON ── the damage that does not care about your armour, and the first attrition this game has had.
+ * Theirs: at the start of the poisoned creature's turn it loses that much health THROUGH block, and the
+ * stack then drops by one. So it is worth more the earlier it lands, it finishes a creature you have walked
+ * away from, and it is the only thing in the deck that scales by stacking rather than by hitting harder.
+ */
+function poisonTick(unit) {
+    const n = unit?.poison || 0;
+    if (!(n > 0) || (unit.hp || 0) <= 0) return { unit, dealt: 0 };
+    return { unit: { ...unit, hp: Math.max(0, unit.hp - n), poison: n - 1 }, dealt: n };
+}
 
 // ── DRAWING ──────────────────────────────────────────────────────────────────────────────────────────────
 // When the draw pile runs dry mid-draw the discard is shuffled back in and drawing continues, which is why
@@ -3094,7 +3331,23 @@ function beginTurn(state) {
     // NOT named `tick`: there is a module-level tick() that ages debuffs, and a local number shadowing it
     // inside a turn function is a trap for whoever reaches for it next.
     const hourglass = perkSum(state.perks, "startDamageAll");
-    let ready = opened;
+    // The Invincible ceiling is per turn of YOURS, so the tally clears here and nowhere else.
+    let ready = { ...opened, foes: opened.foes.map((f) => (f.tookTurn ? { ...f, tookTurn: 0 } : f)) };
+    // ── WHAT THE HERO IS CARRYING, PAID AT THE TOP OF THEIR OWN TURN ─────────────────────────────────
+    // Same rule as the creatures: poison bites through armour when its carrier's turn opens, and the stack
+    // drops by one. Regeneration is the mirror of it and pays here for the same reason — a heal at the top
+    // of your turn is health you get to spend, where a heal at the bottom is health the next swing takes.
+    if (!first) {
+        const bitten = poisonTick(ready.hero);
+        let h = bitten.unit;
+        const regen = (h.regen || 0) + perkSum(state.perks, "regen");
+        if (regen > 0 && h.hp > 0) {
+            h = { ...h, hp: Math.min(h.hpMax, h.hp + Math.round(regen * (h.healMult || 1))), regen: Math.max(0, (h.regen || 0) - 1) };
+        }
+        ready = { ...ready, hero: stillStanding(h, state.perks) };
+        if (ready.hero.hp <= 0) ready = { ...ready, over: "lose" };
+    }
+    if (ready.over) return ready;
     if (hourglass > 0 && !first) {
         const hit = ready.foes.map((f) => (f.hp > 0 ? land(f, attackDamage(hourglass, ready.hero, f)) : f));
         const done = reap(hit, ready.hero);
@@ -3197,6 +3450,9 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // is true of the thing whether or not it is its turn.
             plate: Math.max(0, Number(f.plate) || 0),
             thorns: Math.max(0, Number(f.thorns) || 0),
+            pulse: Math.max(0, Number(f.pulse) || 0),
+            invincible: Math.max(0, Number(f.invincible) || 0),
+            tookTurn: 0,
             // Every blow this creature throws is multiplied by its rung — see attackDamage.
             dmgScale: ascDamageScale(asc, kind),
             onDeath: f.onDeath || null,
@@ -3303,9 +3559,17 @@ export function playCard(state, uid, targetIndex = 0) {
                 // Body Slam swings your own guard: the number on the card IS the Block you are holding.
                 const base = (card.damageFromBlock ? (hero.block || 0) : card.damage) + opener;
                 const raw = attackDamage(base, hero, foes[i], card.strengthMult || 1);
-                const dealt = (foes[i].intangible || 0) > 0 ? Math.min(1, raw) : raw;
-                hitFoe(i, (f) => land(f, dealt));
-                events.push({ type: "damage", on: foes[i].id, amount: dealt });
+                const veiled = (foes[i].intangible || 0) > 0 ? Math.min(1, raw) : raw;
+                // ── INVINCIBLE ── there is a ceiling on what a single turn can take off it, and the rest
+                // simply does not land. It is the only thing in the game that beats a combo deck rather
+                // than a bad one: twenty cards in a turn and thirty do the same amount, so the fight has to
+                // be won over many turns while it hits you every one of them. `tookTurn` is banked on the
+                // creature and cleared when your turn opens, so the cap is per YOUR turn — theirs exactly.
+                const cap = foes[i].invincible || 0;
+                const room = cap > 0 ? Math.max(0, cap - (foes[i].tookTurn || 0)) : veiled;
+                const dealt = Math.min(veiled, room);
+                hitFoe(i, (f) => ({ ...land(f, dealt), tookTurn: (f.tookTurn || 0) + dealt }));
+                events.push({ type: "damage", on: foes[i].id, amount: dealt, capped: dealt < veiled });
                 // ── THORNS ── a Spiker hurts you for touching it, before Block, every single swing. A
                 // three-hit card into a room of Spikers is a decision you have to make on purpose.
                 const thorns = foes[i].thorns || 0;
@@ -3337,35 +3601,31 @@ export function playCard(state, uid, targetIndex = 0) {
         hero = { ...hero, hp: Math.min(hero.hpMax, hero.hp + Math.round(card.heal * (hero.healMult || 1))) };
         events.push({ type: "heal", on: "hero", amount: hero.hp - before });
     }
-    if (card.vulnerable) {
+    // ── EVERY DEBUFF A CARD APPLIES GOES THROUGH ONE DOOR ───────────────────────────────────────────
+    // Three near-identical blocks used to sit here, one per debuff, each incrementing the field by hand —
+    // which is why Frail took a fourth copy to add and why nothing could stand in front of any of them.
+    // Artifact needs exactly one place to intercept, so there is exactly one place now, and the day a fifth
+    // debuff is written it is a row in this table rather than another block of the same eight lines.
+    for (const [field, word] of [["vulnerable", "Vulnerable"], ["weak", "Weak"], ["frail", "Frail"], ["poison", "Poison"]]) {
+        if (!card[field]) continue;
         const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
         for (const i of targets) {
-            hitFoe(i, (f) => ({ ...f, vulnerable: (f.vulnerable || 0) + card.vulnerable }));
-            events.push({ type: "debuff", on: foes[i].id, key: "Vulnerable", amount: card.vulnerable });
+            const before = foes[i];
+            const { unit, eaten } = debuff(before, field, card[field]);
+            hitFoe(i, () => unit);
+            events.push(eaten
+                ? { type: "artifact", on: before.id, key: word }
+                : { type: "debuff", on: before.id, key: word, amount: card[field] });
         }
     }
     // ── WEAK ── the defensive half of the pair, and it was already half here: attackDamage has always taken a
     // quarter off a Weak attacker and resolveCard has always reported it, but nothing could APPLY it. A card
     // that makes the big swing smaller is the only answer to an intent you cannot block through, so the run
     // needs it the moment enemies start hitting for sixteen.
-    if (card.weak) {
-        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
-        for (const i of targets) {
-            hitFoe(i, (f) => ({ ...f, weak: (f.weak || 0) + card.weak }));
-            events.push({ type: "debuff", on: foes[i].id, key: "Weak", amount: card.weak });
-        }
-    }
     // ── FRAIL ── the same half-built state Weak was in before it: blockGain has always taken a quarter off a
     // Frail unit and the fight screen has always drawn the tag, but it arrived on the board only ever
     // pointing AT you — four foe moves apply it and not one card could give it back. Foes block (21 moves
     // do), so a card that makes an enemy's guard worse is a real answer and not a courtesy.
-    if (card.frail) {
-        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
-        for (const i of targets) {
-            hitFoe(i, (f) => ({ ...f, frail: (f.frail || 0) + card.frail }));
-            events.push({ type: "debuff", on: foes[i].id, key: "Frail", amount: card.frail });
-        }
-    }
     // Strength is permanent for the fight and adds to EVERY attack after it, which is what makes a card that
     // does nothing on the turn you play it worth a slot.
     if (card.strength) {
@@ -3395,6 +3655,14 @@ export function playCard(state, uid, targetIndex = 0) {
     if (card.dexterityEach) {
         hero = { ...hero, dexterityEach: (hero.dexterityEach || 0) + card.dexterityEach };
         events.push({ type: "buff", on: "hero", key: "Dexterity", amount: card.dexterityEach });
+    }
+    // Artifact, Regeneration and Intangible on your own side. All three are durations you spend rather than
+    // numbers you keep, and all three already have a meaning downstream — which is what makes them cheap to
+    // add and expensive to have gone without.
+    for (const [field, word] of [["artifact", "Artifact"], ["regen", "Regeneration"], ["intangible", "Intangible"]]) {
+        if (!card[field]) continue;
+        hero = { ...hero, [field]: (hero[field] || 0) + card[field] };
+        events.push({ type: "buff", on: "hero", key: word, amount: card[field] });
     }
     // ──── THE VAULTWYRM COUNTS WHAT IS LEFT ──────────────────────────────────────────
     // Block equal to the cards still in the draw pile. Every other block card in the game prints a number;
@@ -3451,6 +3719,18 @@ export function playCard(state, uid, targetIndex = 0) {
             events.push({ type: "debuff", on: foes[i].id, key: "Strength", amount: card.foeStrength });
         }
     }
+
+    // ── ACHE CHARGES FOR THE ACT OF PLAYING ─────────────────────────────────────────────────────────
+    // Counted off the hand as it was when the card was thrown, which is theirs exactly: a curse you are
+    // holding taxes the turn, and drawing a second copy doubles the tax. It goes through land(), so Block
+    // does NOT stop it — the whole point is that there is no guard against your own deck.
+    const ache = state.hand.reduce((n, e) => n + (ALL_CARDS[e.id]?.hpPerPlay || 0), 0);
+    if (ache > 0) hero = { ...hero, hp: Math.max(0, hero.hp - ache) };
+    // ── BEAT OF DEATH ── the same tax, charged by the thing across from you rather than by your own deck.
+    // It is what stops the last fight being won by a hand of twelve cheap cards, and it is why a lean deck
+    // beats a clever one down there.
+    const pulse = foes.reduce((n, f) => n + (f.hp > 0 ? (f.pulse || 0) : 0), 0);
+    if (pulse > 0) hero = { ...hero, hp: Math.max(0, hero.hp - pulse) };
 
     // Anything that just died or came apart, before the state is handed back.
     const reaped = reap(foes, hero);
@@ -3607,12 +3887,29 @@ export function startFoeTurn(state) {
     // ── PLATED ARMOR COMES BACK EVERY TURN, INTANGIBLE RUNS OUT ─────────────────────────────────────────
     // Theirs: the armour is re-applied at the start of the creature's turn (which is why chipping it costs
     // you a card a turn), and Intangible is a duration like Weak.
-    const foes = (state.foes || []).map((f) => (f.hp > 0 ? {
+    const events = [];
+    let foes = (state.foes || []).map((f) => (f.hp > 0 ? {
         ...f,
         block: (f.block || 0) + (f.plate || 0),
         intangible: Math.max(0, (f.intangible || 0) - 1),
     } : f));
-    return { state: { ...state, foes, hero: tick(state.hero) }, events: [] };
+    // Poison bites at the top of the carrier's own turn, so a creature poisoned on your turn pays for it
+    // before it ever swings again — and something you left on 3 health can simply not come back.
+    foes = foes.map((f) => {
+        const { unit, dealt } = poisonTick(f);
+        if (dealt > 0) events.push({ type: "poison", on: f.id, amount: dealt });
+        return unit;
+    });
+    // A creature poison finished still splits, still drops its spore cloud: death is death whatever did it.
+    const reaped = reap(foes, state.hero);
+    const won = reaped.foes.every((f) => f.hp <= 0);
+    return {
+        state: {
+            ...state, foes: reaped.foes, hero: tick(reaped.hero),
+            over: won ? "win" : state.over,
+        },
+        events: [...events, ...reaped.events, ...(won ? [{ type: "over", result: "win" }] : [])],
+    };
 }
 
 /**
@@ -3720,17 +4017,16 @@ export function foeAct(state, i) {
         hero = { ...hero, strength: (hero.strength || 0) - intent.strengthDown };
         events.push({ type: "debuff", on: "hero", amount: intent.strengthDown, stat: "strength" });
     }
-    if (intent.frail) {
-        hero = { ...hero, frail: (hero.frail || 0) + intent.frail };
-        events.push({ type: "debuff", on: "hero", amount: intent.frail, stat: "frail" });
-    }
-    if (intent.weak) {
-        hero = { ...hero, weak: (hero.weak || 0) + intent.weak };
-        events.push({ type: "debuff", on: "hero", amount: intent.weak, stat: "weak" });
-    }
-    if (intent.vulnerable) {
-        hero = { ...hero, vulnerable: (hero.vulnerable || 0) + intent.vulnerable };
-        events.push({ type: "debuff", on: "hero", amount: intent.vulnerable, stat: "vulnerable" });
+    // The same one door the cards use, so an Artifact charge eats a creature's debuff exactly as it eats
+    // yours. Three hand-rolled increments here were the reason the hero could hold Artifact and still be
+    // made Vulnerable by anything on the board.
+    for (const [field] of [["frail"], ["weak"], ["vulnerable"], ["poison"]]) {
+        if (!intent[field]) continue;
+        const { unit, eaten } = debuff(hero, field, intent[field]);
+        hero = unit;
+        events.push(eaten
+            ? { type: "artifact", on: "hero", stat: field }
+            : { type: "debuff", on: "hero", amount: intent[field], stat: field });
     }
     // ── AND IT DECIDES ITS NEXT MOVE NOW, NOT WHEN ITS TURN COMES ROUND ─────────────────────────────
     // The pill has to show the truth for the whole of your turn, so the choice happens the moment this one
@@ -3821,11 +4117,23 @@ export function finishFoeTurn(state) {
     // for the rest of the fight, which is the entire reason it is frightening.
     let hero = state.hero;
     let burned = 0;
+    let endWeak = 0, endFrail = 0, perHand = 0;
     for (const entry of state.hand) {
         const card = ALL_CARDS[entry.id];
         if (card?.burn) burned += card.burn;
+        if (card?.endWeak) endWeak += card.endWeak;
+        if (card?.endFrail) endFrail += card.endFrail;
+        if (card?.hpPerHand) perHand += card.hpPerHand;
     }
+    // Regret charges for the WHOLE hand, itself included — theirs does, and it is what turns a curse from a
+    // dead card into a reason to dump your hand before the turn ends.
+    if (perHand > 0) burned += perHand * state.hand.length;
     if (burned > 0) hero = land(hero, burned);
+    // ⚠️ THROUGH debuff(), so an Artifact charge eats what a curse hands you exactly as it eats what a
+    // creature does. A curse that could walk past the one defence against debuffs would make Artifact a lie.
+    for (const [field, n] of [["weak", endWeak], ["frail", endFrail]]) {
+        if (n > 0) hero = debuff(hero, field, n).unit;
+    }
     const kept = state.hand.filter((entry) => !ALL_CARDS[entry.id]?.ethereal);
     const spent = {
         ...state, hero,

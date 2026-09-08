@@ -2,13 +2,14 @@ import "server-only";
 
 export { grantForRoom, takePerk } from "@/lib/marketplace/cards-kit.js";
 import { db } from "@/lib/db";
-import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
+import { buildFinalMap, buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
-    ASC_MAX, ascRule, beltSize, buildShop, canUpgrade, cardById, drawOffer, encounterById, levelSharpens,
+    ASC_MAX, FINAL_ACT, ascMaxHp, ascPotionScale, ascRule, ascStartEmbers, beltSize, buildShop, canUpgrade,
+    cardById, drawOffer, encounterById, levelSharpens,
     levelWeight, nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
@@ -103,6 +104,8 @@ export async function getCardFightFixture(buyerId, seed, encounter = null, { asc
             // How much it curls for when first hit — a Louse's whole identity, and the one creature field
             // that has to survive the trip from the rules to the fight (see `land` in cards-kit).
             curl: group[i].curl || 0,
+            pulse: group[i].pulse || 0,
+            invincible: group[i].invincible || 0,
             plate: group[i].plate || 0,
             thorns: group[i].thorns || 0,
             onDeath: group[i].onDeath || null,
@@ -167,28 +170,41 @@ const newRun = (seed, asc = 0) => ({
     asc,
     // Rung six starts you already hurt. Theirs does the same and it is nastier than it sounds: the whole
     // act is played on a bar you never had all of.
-    hp: ascRule(asc, 6) ? Math.round(HERO_HP * 0.9) : HERO_HP,
-    hpMax: HERO_HP,
+    // ⚠️ AND RUNG EIGHTEEN TAKES THE TOP OFF THE BAR ITSELF, which is a different rule from rung six: six
+    // starts you at 90% of a full bar and a fire can still fill it, eighteen means the bar was never that
+    // big. Read through ascMaxHp so the two compose rather than one quietly overwriting the other.
+    hp: ascRule(asc, 6) ? Math.round(ascMaxHp(HERO_HP, asc) * 0.9) : ascMaxHp(HERO_HP, asc),
+    hpMax: ascMaxHp(HERO_HP, asc),
     // ── AND A PURSE TO START WITH ────────────────────────────────────────────────────────────────────
     // ⚠️ THEIRS HANDS YOU 99 GOLD BEFORE THE FIRST ROOM and ours handed you nothing, which quietly killed
     // every early room that asks for money: photographed on a real run, the Bonesetter offered a heal for 45
     // and a card burned for 75 and BOTH were greyed out, so a written room with three choices in it was a
     // room with one. Their whole opening — a shop on floor 4 you can actually buy from, a Cleric you can pay
     // — depends on the purse existing. Priced at the same 60% our shelf is priced at against theirs.
-    embers: 60,            // the run's own money — see SKIP_EMBERS. Dies with the run; never touches gold.
+    embers: ascStartEmbers(60, asc),   // the run's money — see SKIP_EMBERS. Dies with the run; never gold.
     // ⚠️ YOU START HOLDING ONE. Theirs does — every character opens with a relic and the Ironclad's heals 6
     // after every win. See STARTER_PERK: it is what makes an act survivable without making a fight easy.
     perks: [STARTER_PERK],
     potions: [],           // up to POTION_SLOTS, drunk in a fight (POTIONS)
     shop: null,            // the merchant's shelf while you are stood in one; cleared on the way out
     removals: 0,           // cards paid to be rid of, for the escalating price — see removalCost
+    // ── THE THREE KEYS ── each one a room walked out of empty-handed. See KEYS; all three open the fourth
+    // act when the third boss falls, and none of them does anything else at all.
+    keys: {},
     // ⚠️ A TIMESTAMP, NOT A FLAG. This key used to be `started: true` further down the object, and adding a
     // clock under the same name left BOTH — the later one won, the top bar subtracted `true` from Date.now()
     // and the run showed as 29,806,893 hours old. One key, one meaning.
     startedAt: Date.now(),
     // Rung eight puts a Wound in the deck before the first room — their Ascender's Bane, and the reason a
     // ten-card deck is a thing you feel.
-    deck: ascRule(asc, 8) ? [...STARTER_DECK, "wound"] : [...STARTER_DECK],
+    // Rung eight shuffles a Wound in — a card you drew instead of a Bite, gone when the fight ends. Rung
+    // twelve is the harder version and the first thing in this game to spend a CURSE: it is written into the
+    // deck, it is there for the whole climb, and the merchant is the only way out of it.
+    deck: [
+        ...STARTER_DECK,
+        ...(ascRule(asc, 8) ? ["wound"] : []),
+        ...(ascRule(asc, 12) ? ["injury"] : []),
+    ],
     offers: null,          // the three on the table after a win, null the rest of the time
     done: null,            // null | "won" | "dead"
     started: true,
@@ -634,8 +650,10 @@ export function potionDrop(run, row, lane) {
     let roll = ((run.seed >>> 0) + row * 7717 + lane * 131) >>> 0;
     const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
     // A trinket can tilt the whole self-correcting ladder — their White Beast Statue, at the gentler end.
-    const luck = (Number.isFinite(run.potionLuck) ? run.potionLuck : POTION_DROP_BASE)
-        + perkSum(run.perks, "potionLuck");
+    // Rung fifteen thins the shelf. It scales the LUCK rather than gating the roll, so the self-correcting
+    // ladder below still works — a dry spell still climbs back, it just climbs from lower down.
+    const luck = ((Number.isFinite(run.potionLuck) ? run.potionLuck : POTION_DROP_BASE)
+        + perkSum(run.perks, "potionLuck")) * ascPotionScale(run.asc || 0);
     if (next() * 100 >= luck) {
         run.potionLuck = Math.min(100, luck + 10);
         return null;
@@ -670,7 +688,7 @@ export async function shopStock(buyerId, run, seed) {
     // Nothing already carried: a shop offering a perk you hold or a potion slot you cannot fill is a slot
     // that wastes the visit.
     const held = new Set(run.perks || []);
-    return buildShop(seed, { cardIds, perkIds: PERK_IDS.filter((id) => !held.has(id)) });
+    return buildShop(seed, { cardIds, perkIds: PERK_IDS.filter((id) => !held.has(id)), asc: run.asc || 0 });
 }
 
 /**
@@ -725,7 +743,11 @@ export function bossOffers(run) {
  */
 export function nextAct(run) {
     run.act = (run.act || 1) + 1;
-    run.map = buildMap(((run.seed >>> 0) + run.act * 7717) >>> 0);
+    // ⚠️ THE LAST ACT IS A CORRIDOR, NOT A SHEET — see buildFinalMap for why it is not simply a shorter
+    // roll of the same generator. Nothing else about walking an act changes, because the node shape does not.
+    run.map = run.act >= FINAL_ACT
+        ? buildFinalMap()
+        : buildMap(((run.seed >>> 0) + run.act * 7717) >>> 0, { asc: run.asc || 0 });
     run.trail = [];
     run.at = null;
     run.stop = 1;

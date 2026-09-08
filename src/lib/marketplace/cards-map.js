@@ -16,7 +16,7 @@
 //
 // PURE AND SEEDED, like cards-kit: a map is a seed plus these rules, so the same run always draws the same
 // map, and a map can be replayed or handed to somebody without shipping the whole structure around.
-import { RUN_LENGTH, ascRule, nextRand } from "@/lib/marketplace/cards-kit.js";
+import { FINAL_ROWS, RUN_LENGTH, ascRule, nextRand } from "@/lib/marketplace/cards-kit.js";
 
 // One number, defined with the rules rather than here, so the map and the difficulty curve cannot
 // disagree about how tall the act is.
@@ -152,6 +152,26 @@ export function buildMap(seed, { asc = 0 } = {}) {
         boss: { row: bossRow, lane: bossLane },
         nodes: [...nodes.values()].map((n) => ({ row: n.row, lane: n.lane, kind: n.kind, next: n.next })),
     };
+}
+
+/**
+ * ── THE LAST ACT IS NOT A SHEET, IT IS A CORRIDOR ────────────────────────────────────────────────────────
+ * Theirs is four rooms and there is no routing decision in any of them: a fire, a shelf, the pair guarding
+ * the door, and the thing behind it. That is deliberate and it is why the act works — you arrive having
+ * already made every choice that matters, carrying the deck those choices built, and the Spire stops
+ * offering you options and simply asks whether the deck is good enough.
+ *
+ * So this is not buildMap with a smaller number: a generated four-row map would put a question mark or a
+ * merchant in the way of the ending and hand the player a route to think about, which is the one thing the
+ * last act must not do. One lane, four rooms, no branches, same node shape as any other map so every screen
+ * that draws a sheet draws this one without knowing it is special.
+ */
+export function buildFinalMap() {
+    const lane = Math.floor((MAP_LANES - 1) / 2);
+    const kinds = ["rest", "merchant", "elite"];
+    const nodes = kinds.map((kind, row) => ({ row, lane, kind, next: [lane] }));
+    nodes.push({ row: FINAL_ROWS, lane, kind: "boss", next: [] });
+    return { rows: FINAL_ROWS, lanes: MAP_LANES, boss: { row: FINAL_ROWS, lane }, nodes, final: true };
 }
 
 /**

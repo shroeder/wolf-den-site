@@ -6,7 +6,7 @@ import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
-import { POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
+import { KEYS, KEY_IDS, POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -198,6 +198,20 @@ export default function CardMap({ run, art = {} }) {
                         <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
                     </button>
                 ))}
+                {/* ── THE KEYS, WHERE THE REST OF WHAT YOU CARRY IS ───────────────────────────────
+                    A key does nothing until the third boss falls, which makes it the one thing in the run
+                    with no feedback of its own — so it has to be visible on the sheet or a player has paid
+                    three rooms for something they cannot confirm they own. Drawn as letters rather than
+                    sprites deliberately: three tiny icons nobody has seen before read as clutter, where
+                    three coloured rings on the same row as the trinkets read as a set with gaps in it. */}
+                {KEY_IDS.some((k) => run.keys?.[k]) ? (
+                    <span className="cm-keys">
+                        {KEY_IDS.map((k) => (
+                            <i key={k} className={`cm-key is-${k}${run.keys?.[k] ? " is-held" : ""}`}
+                                title={run.keys?.[k] ? KEYS[k].name : "not taken"} />
+                        ))}
+                    </span>
+                ) : null}
 
                 <span className="cm-gap" />
                 <Sprite className="cm-ui" src="/images/cards/chrome/ui-floor.png" />
@@ -389,6 +403,15 @@ export default function CardMap({ run, art = {} }) {
                    somebody the name of the only place they have ever been; "The Deep" on act two is telling
                    them the boss they just killed bought them something. */
                 .cm-who.is-deep { display: inline; font-size: 12.5px; color: #ffd9a6; white-space: nowrap; }
+                .cm-keys { display: inline-flex; gap: 4px; align-items: center; margin-left: 2px; }
+                .cm-key {
+                    width: 9px; height: 9px; border-radius: 50%;
+                    border: 1px solid currentColor; opacity: 0.3;
+                }
+                .cm-key.is-held { opacity: 1; background: currentColor; }
+                .cm-key.is-emerald { color: #7fe0a8; }
+                .cm-key.is-sapphire { color: #8fd3ff; }
+                .cm-key.is-ruby { color: #ff8f8f; }
                 .cm-hold { padding: 0 1px; border: 0; background: none; cursor: pointer; line-height: 0; }
                 .cm-hold:active { transform: translateY(1px); }
                 .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;

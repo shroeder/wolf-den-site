@@ -8,8 +8,8 @@ import {
 import { applyEventChoice, eventById, pickEvent } from "@/lib/marketplace/cards-events.js";
 import { reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import {
-    ACTS, BOSS_PERKS, PERKS, beltSize, perkById, perkSum, restHeal, RUN_LENGTH, SKIP_EMBERS, canUpgrade,
-    cardById, pickEncounter,
+    ACTS, ALL_CARDS, BOSS_PERKS, CURSE_POOL, FINAL_ACT, KEYS, PERKS, ascRule, baseIdOf, beltSize,
+    hasAllKeys, perkById, perkSum, restHeal, RUN_LENGTH, SKIP_EMBERS, canUpgrade, cardById, pickEncounter,
     removalCost, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -161,6 +161,43 @@ export async function POST(request) {
                 return NextResponse.json({ run });
             }
 
+            // ── PAY FOR THE DOOR ────────────────────────────────────────────────────────────────────
+            // One action for all three keys, because they are one decision wearing three costumes: you are
+            // stood in a room that is about to give you something, and you take the key instead.
+            //
+            // The room is SPENT either way — `rested`/`opened`/`gotPerk` are cleared or set exactly as the
+            // ordinary path would set them — so a key can never be taken and the reward taken as well, and
+            // a replayed request finds the room already used rather than handing out a second key.
+            if (action === "takekey") {
+                const which = String(body?.key || "");
+                const spec = KEYS[which];
+                if (!spec) return NextResponse.json({ error: "no_such_key" }, { status: 400 });
+                if (run.keys?.[which]) return NextResponse.json({ error: "already_held" }, { status: 400 });
+                if (run.at?.kind !== spec.from) {
+                    return NextResponse.json({ error: "wrong_room" }, { status: 400 });
+                }
+                // Each room has its own word for "already used", and the key has to respect all three.
+                if (spec.from === "rest" && run.at.rested) {
+                    return NextResponse.json({ error: "already_rested" }, { status: 400 });
+                }
+                if (spec.from === "treasure" && run.at.opened) {
+                    return NextResponse.json({ error: "already_open" }, { status: 400 });
+                }
+                // The red key is paid for with the trinket an elite just dropped, so there has to be one on
+                // the table to walk away from.
+                if (spec.from === "elite" && !run.gotPerk) {
+                    return NextResponse.json({ error: "nothing_to_leave" }, { status: 400 });
+                }
+                run.keys = { ...(run.keys || {}), [which]: true };
+                if (spec.from === "rest") run.at = { ...run.at, rested: true, healed: 0, tookKey: which };
+                if (spec.from === "treasure") {
+                    run.at = { ...run.at, opened: { embers: 0, perk: null, potion: null, spilled: false, tookKey: which } };
+                }
+                if (spec.from === "elite") run.gotPerk = null;
+                await saveRun(buyer.id, run);
+                return NextResponse.json({ run });
+            }
+
             // ── THE SMITH ───────────────────────────────────────────────────────────────────────────
             // ⚠️ ONE OR THE OTHER, AND THAT IS THE WHOLE POINT. Their campfire is Rest or Smith and you may
             // only do one, which is what turns a fire into a decision instead of a free stop: health now, or
@@ -275,7 +312,14 @@ export async function POST(request) {
                 if (deck.length <= DECK_FLOOR) {
                     return NextResponse.json({ error: "deck_too_small" }, { status: 400 });
                 }
-                const cost = removalCost(run.removals || 0);
+                // ⚠️ THE HOLLOW DOES NOT COME OUT. The last act charges a curse that cannot be burned for
+                // each of its keys, and a bargain the merchant can undo for embers is not a bargain. Checked
+                // on the server because the shelf is not the authority on what is legal — see the note on
+                // the gate at the top of this file.
+                if (ALL_CARDS[baseIdOf(deck[at])]?.noBurn) {
+                    return NextResponse.json({ error: "cannot_be_removed" }, { status: 400 });
+                }
+                const cost = removalCost(run.removals || 0, run.perks, run.asc || 0);
                 if ((run.embers || 0) < cost) {
                     return NextResponse.json({ error: "too_few_embers" }, { status: 400 });
                 }
@@ -364,6 +408,14 @@ export async function POST(request) {
                 // counts the harder unlocks are keyed to, and they are the two a player remembers doing.
                 await bumpCardProgress(buyer.id, "fights", { bestStop: run.stop });
                 if (run.at?.kind === "elite") await bumpCardProgress(buyer.id, "elites");
+                // ── RUNG SIXTEEN: AN ELITE LEAVES SOMETHING BEHIND ──────────────────────────────────
+                // The relic an elite pays is the reason to fight one, and past rung fifteen that trade needs
+                // a second side to it. Rolled off the run's own seed and the stop, so the same climb dealt
+                // twice hands out the same curse — a run that reloads must not be able to reroll its price.
+                if (run.at?.kind === "elite" && ascRule(run.asc || 0, 16)) {
+                    const pick = CURSE_POOL[((run.seed >>> 0) + run.stop * 7717) % CURSE_POOL.length];
+                    run.deck = [...(run.deck || []), pick];
+                }
                 if (wasBoss) await bumpCardProgress(buyer.id, "bosses");
                 if (wasBoss) {
                     // ── THE BOSS IS A GATE ───────────────────────────────────────────────────────────
@@ -376,7 +428,12 @@ export async function POST(request) {
                     // The LAST act still ends — a game with no end is not a run — and that is the only place
                     // `done: "won"` is set now.
                     run.offers = null;
-                    if ((run.act || 1) >= ACTS) {
+                    // ── AND THE THIRD BOSS IS A DOOR, IF YOU BROUGHT THE KEYS ────────────────────
+                    // Three acts still finishes the game and still counts as a win — see the note on ACTS.
+                    // What all three keys buy is the right to keep going instead, into a corridor that ends
+                    // at the only fight in this game that was built to beat a finished deck.
+                    const opensDoor = (run.act || 1) === ACTS && hasAllKeys(run);
+                    if ((run.act || 1) >= FINAL_ACT || ((run.act || 1) >= ACTS && !opensDoor)) {
                         run.done = "won";
                         run.bossOffers = null;
                         // ── AND IT GOES IN THE LEDGER ────────────────────────────────────────
