@@ -841,6 +841,12 @@ export const PERKS = {
         text: "Every enemy starts each fight Weak, and you start with 4 Block." },
     paper_crane: { id: "paper_crane", name: "Paper Crane", icon: "paw", vulnBonus: 0.15,
         text: "Vulnerable enemies take 65% more damage instead of 50%." },
+    // The third mark. It could not have existed until a creature's guard went through blockGain — see the
+    // note there — because Frail took a quarter off YOUR Block and nothing off theirs.
+    chalk_dust: { id: "chalk_dust", name: "Chalk Dust", icon: "paw", frailAll: 1,
+        text: "Every enemy starts each fight Frail — they brace for a quarter less." },
+    three_marks: { id: "three_marks", name: "Three Marks", icon: "paw", frailAll: 1, weakAll: 1, maxHpDown: 6,
+        text: "Every enemy starts each fight Weak and Frail. -6 max health." },
 
     // ── WHAT COMES BACK ──────────────────────────────────────────────────────────────────────────────
     field_dressing: { id: "field_dressing", name: "Field Dressing", icon: "ration", healAfter: 9,
@@ -2735,6 +2741,9 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // A Bag of Marbles marks the whole room the moment the fight opens — theirs, and the reason it
             // is a good common: it is worth the most in exactly the rooms with the most bodies in them.
             vulnerable: perkSum(perks, "vulnerableAll"),
+            // The third mark, and the one that was unreachable until a foe's guard started going through
+            // blockGain: Frail costs a creature a quarter of everything it braces with.
+            frail: perkSum(perks, "frailAll"),
             // Spent by the first blow that reaches it — see `land`. Zero on everything that does not curl.
             curl: Math.max(0, Number(f.curl) || 0),
             // ── AND THE REST OF WHAT A CREATURE IS ──────────────────────────────────────────────
@@ -3123,7 +3132,11 @@ export function foeAct(state, i) {
         f = { ...f, hp: to };
     }
     if (intent.block) {
-        f = { ...f, block: f.block + intent.block };
+        // ⚠️ THROUGH blockGain, THE WAY YOURS IS. Frail takes a quarter off Block gained and the creatures
+        // have been inflicting it on you since the Lickers arrived — but a foe's guard was added raw here,
+        // so Frail was a status that only ever travelled one way. It is the same function the hero's cards
+        // use, so the rule cannot differ between the two sides of the board.
+        f = { ...f, block: f.block + blockGain(intent.block, f) };
         events.push({ type: "block", on: f.id, amount: intent.block });
     }
     if (intent.damage) {

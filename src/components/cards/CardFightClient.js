@@ -1903,9 +1903,16 @@ export default function CardFightClient({ fixture, run = null }) {
                    directly beneath the control bar, which is absolutely positioned over the board — so the
                    strip was in the DOM, visible, 375px wide, and behind the painted plate. Measured before
                    it was believed. It hangs off the same offset the turn line uses, one line lower. */
+                /* ⚠️ IT WRAPS, BECAUSE A RUN CAN CARRY FIFTEEN. This was one centred row that never wrapped
+                   and had no width, which was fine while the whole catalogue was twenty-six trinkets and a
+                   run held four. It is seventy-five now: measured over four hundred runs the average at the
+                   Spire is ten and the most any run held was FIFTEEN, which at 22px and a 5px gap is 405px
+                   of strip on a 375px phone — the last three simply off the side of the screen, and with
+                   them whatever they do. Two rows is not as tidy as one and is considerably tidier than
+                   losing them. */
                 .cf-trinkets { position: absolute; top: calc(84px + env(safe-area-inset-top)); left: 50%;
-                    transform: translateX(-50%); z-index: 3;
-                    display: flex; justify-content: center; gap: 5px; }
+                    transform: translateX(-50%); z-index: 3; max-width: min(340px, 92vw);
+                    display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 5px; }
                 /* ⚠️ THE PICTURE IS 22px AND THE TARGET MUST NOT BE. A trinket is tapped to read what it
                    does, and a 22x22 target is a miss on a phone — measured by the hit audit, which is the
                    only thing that looks at a control's SIZE rather than its appearance. The padding grows

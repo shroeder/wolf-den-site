@@ -139,6 +139,106 @@ const PERK_ART = {
         + "question mark stamped at its centre, one corner softly bent.",
     molten_egg: "A large dark stone egg cracked in a web of fissures with hot orange light glowing out of "
         + "them, resting in a small nest of blackened wire.",
+
+    // ── THE FORTY-THREE THAT ARRIVED WITH THE SPIRE-PARITY PASS ──────────────────────────────────────────────
+    // Same rule as everything above: say the SHAPE, because these are judged at thumbnail size on a shelf
+    // beside two others. Grouped the way the perk table is, and deliberately spread across silhouettes — a
+    // run holding six of these should be able to tell them apart on the strip without reading a word.
+    acorn_cache: "A cluster of three fat oak acorns still in their rough cups, bound together with a twist of "
+        + "green twine.",
+    thick_pelt: "A thick folded fur pelt, dark and dense, rolled into a squat bundle and strapped with a "
+        + "worn leather belt.",
+    winter_fat: "A round sealed clay crock of pale rendered fat, its wooden lid tied down with cord under a "
+        + "circle of waxed cloth.",
+    hollow_bone: "A short pale hollow legbone cut clean at both ends, one end capped with a carved wooden "
+        + "plug, a thong through a drilled hole.",
+    oak_shield: "A small round shield of pale oak planks with an iron rim and a plain domed boss at its "
+        + "centre, one plank split and mended with a metal staple.",
+    iron_carapace: "A curved segmented plate of blackened iron shaped like a beetle's back, its overlapping "
+        + "bands riveted along each seam.",
+    clay_shard: "A single thick curved shard of fired red clay, broken from a larger vessel, its glazed outer "
+        + "face still carrying part of a painted spiral.",
+    packed_earth: "A dense flat brick of dark packed earth bound with visible dry grass and root fibre, its "
+        + "edges crumbling slightly.",
+    river_stone: "A smooth flat grey river stone, perfectly oval and water-worn, with one pale quartz band "
+        + "running across its face.",
+    iron_claw: "A single curved iron claw the length of a finger, its base wrapped in leather cord, the point "
+        + "honed bright.",
+    desperate_fang: "A long yellowed predator's fang, cracked lengthwise and bound with red thread through a "
+        + "hole drilled at its root.",
+    boars_tusk: "A thick curved boar's tusk, ivory going brown at the root, its tip worn blunt and its base "
+        + "capped in tarnished bronze.",
+    spined_hide: "A stiff square of thick dark hide studded all over with short black quills standing "
+        + "upright, curling at its corners.",
+    quill_mantle: "A short shoulder mantle of overlapping grey quills laid like scales, fastened at the "
+        + "throat with a bone pin.",
+    chipped_marble: "A small polished marble sphere of veined white stone with one chip broken out of its "
+        + "side, showing dull grey underneath.",
+    ash_veil: "A torn length of fine grey gauze, weightless and half-transparent, drifting in a loose fold "
+        + "with pale ash caught in its weave.",
+    paper_crane: "A folded paper crane of pale cream paper, sharply creased, one wing marked with a single "
+        + "red brushstroke.",
+    chalk_dust: "A stub of white chalk worn to a wedge, lying in a small drift of its own pale dust with a "
+        + "single smeared fingerprint through it.",
+    // ⚠️ CAME BACK AS A MINOTAUR. "Three marks" carried no object at all, so the model supplied one — the
+    // same failure the event generator hit twice (see `oldwall` and `winding_halls` there). The subject now
+    // leads with the MATERIAL and says outright that nothing is alive in the frame.
+    three_marks: "A flat rectangular grey stone tablet, close up and filling the frame, with three short "
+        + "slash marks gouged deep into its face, each groove packed with a different coloured pigment — "
+        + "white, blue and red. An inanimate carved stone and nothing else: no creature, no face, no figure, "
+        + "no character.",
+    field_dressing: "A tight roll of clean linen bandage with a curved bronze pin stuck through it and one "
+        + "end unwinding.",
+    sunflower_seed: "One large striped sunflower seed, husk intact, sitting beside a short green shoot just "
+        + "breaking out of a second one.",
+    marrow_broth: "A dented tin cup of thick pale broth with a cracked marrow bone standing upright in it, "
+        + "steam coming off the surface.",
+    spring_water: "A clear glass flask of still water with a cork stopper, catching pale light through it, a "
+        + "single green leaf sealed inside.",
+    feather_bed: "A plump folded quilt of pale ticking stitched in squares, one corner turned back, a loose "
+        + "grey feather resting on it.",
+    banked_coals: "A shallow iron pan of grey ash with three orange coals half-buried in it, faint heat "
+        + "shimmer rising.",
+    oiled_satchel: "A small dark oiled-leather satchel with a brass buckle and a stiff flap, its surface "
+        + "shining with waterproofing.",
+    cork_stopper: "A fat tapered cork stopper with a carved wooden top shaped like a wolf's head, a scrap of "
+        + "wire still twisted around its neck.",
+    glass_vial: "A slim empty glass vial in a woven wicker sleeve, its stopper hanging beside it on a short "
+        + "cord.",
+    courier_sack: "A canvas courier's satchel with a wide worn strap, its flap bulging open with the corners "
+        + "of folded papers showing.",
+    spark_stone: "Two pieces of grey flint held together, one striking the other, with a spray of orange "
+        + "sparks jumping between them.",
+    tinder_box: "A small hinged tin box lying open, packed with dry charred cloth, a striker and a flint "
+        + "resting in the lid.",
+    prospectors_eye: "A brass jeweller's loupe with a chipped lens, its barrel scratched, standing on end.",
+    smiths_mark: "A blacksmith's iron stamp with a wolf's-head die on its face, its striking end mushroomed "
+        + "from hammer blows.",
+    cut_purse: "A fat drawstring coin purse of brown leather, slit open down one side, three gold coins "
+        + "spilling out of the cut.",
+    tallow_candle: "A short fat tallow candle burning with a low smoky flame, thick wax runs down its sides, "
+        + "set on a plain iron pricket.",
+    tortoise_sign: "A carved wooden sign-plate showing a tortoise in profile, the grain worn smooth, a strip "
+        + "of iron nailed across its bottom edge.",
+    long_hunger: "A narrow iron ring set with a single dull red stone, the band worn thin and slightly "
+        + "misshapen from wear.",
+    wide_eye: "A carved bone disc with a wide staring eye incised into it and rubbed with black pigment, a "
+        + "hole drilled at the top.",
+    // ── THE BOSS TRINKETS ────────────────────────────────────────────────────────────────────────────────────
+    coal_heart: "A lump of black anthracite roughly the shape of a heart, split by a glowing orange seam, "
+        + "resting in a nest of fine grey ash.",
+    both_marks: "Two overlapping painted marks on a flat slate — one a red slash, one a blue circle — the "
+        + "pigment thick and still wet at the edges.",
+    barricade_stone: "A squat rectangular block of grey granite with iron banding around its middle and two "
+        + "lifting rings sunk into its top.",
+    demon_tooth: "A single enormous curved black tooth, serrated down one edge, its root wrapped in dark "
+        + "leather and a length of chain.",
+    second_sight: "A pale carved stone mask with two empty eye-holes and a third eye cut into its forehead, "
+        + "the third one lit faintly from within.",
+    gorgons_eye: "A large polished amber eye with a vertical slit pupil, set into a heavy bronze bezel with "
+        + "clawed mounts.",
+    iron_lung: "A bellows of dark iron and stiff leather, its handles worn, shaped unmistakably like a single "
+        + "lung with a ribbed iron pipe leaving the top.",
 };
 
 const JOBS = [
