@@ -167,6 +167,30 @@ export default function CardFightClient({ fixture, run = null }) {
     const [floats, setFloats] = useState([]);
     const [peek, setPeek] = useState(null);
     const [acting, setActing] = useState(false);
+
+    // ── THE STATE THE RULES DECIDE FROM IS A REF, NOT THE RENDER'S COPY ──────────────────────────────────
+    // ⚠️ THIS SILENTLY ATE CARDS. Filmed in a boss fight: four Hops played in a row and the energy pip read
+    // 3/3, 2/3, 2/3, 2/3 — one card was spent and three vanished, with no error, no refusal and no sign on
+    // screen that anything had gone wrong.
+    //
+    // The cause is that `commit` and `onEndTurn` both computed the next state from `fight`, the value closed
+    // over by THIS render. React does not update that value until it re-renders, so two decisions made in the
+    // same frame both start from the state before either of them — and each writes a whole snapshot, so the
+    // last write wins and the first card's damage is erased. An attack made the window enormous rather than
+    // sub-frame: its `setFight` is deliberately held until the animal lands (IMPACT_MS), so for a fifth of a
+    // second after every single attack the screen's idea of the fight is a card behind.
+    //
+    // Two ways in, and the second is the one that costs a run:
+    //   · two cards tapped quickly    → the first is spent and does nothing
+    //   · a card, then End turn       → your last attack of the turn never happened
+    // The second is not a mis-tap. Play the killing blow and immediately end the turn is how everyone plays.
+    //
+    // So the rules read `fightRef`, which is written the instant a decision is made, and `setFight` stays
+    // purely for the picture — an attack still holds its number back until impact, and the ref underneath is
+    // already correct. Everything that advances the fight goes through `land` so the two cannot drift.
+    const fightRef = useRef(fight);
+    const actingRef = useRef(false);
+    const land = useCallback((next) => { fightRef.current = next; setFight(next); }, []);
     // WHICH foe is mid-beat, and whether it is swinging or guarding. One at a time, by construction.
     const [actor, setActor] = useState(null);
     const [played, setPlayed] = useState(null);
@@ -301,9 +325,16 @@ export default function CardFightClient({ fixture, run = null }) {
     //   · a block, a heal, a buff → nothing crosses the sand, so the card is the only acknowledgement there is
     // Either way exactly one thing performs, which is what makes either of them readable.
     const commit = useCallback((uid, target = 0) => {
+        // The party is mid-beat: the foe loop is walking a plan built from its own snapshot and will write
+        // over anything played underneath it. startDrag already refuses here; this is the same rule kept on
+        // the function that actually changes the fight, so no future caller can get in behind it.
+        if (actingRef.current) return;
+        const fight = fightRef.current;
         if (!canPlay(fight, uid)) return;
         const entry = fight.hand.find((c) => c.uid === uid);
         const { state, events } = playCard(fight, uid, target === "self" ? 0 : target);
+        // Booked NOW, whatever the picture does next. The next tap and End turn both read this.
+        fightRef.current = state;
         const willStrike = Boolean(
             cardById(entry.id)?.damage
             && fixture.petArt[cardById(entry.id).pet]?.url
@@ -346,7 +377,11 @@ export default function CardFightClient({ fixture, run = null }) {
                 // and the numbers, the bar and the jolt all land together a fifth of a second later.
                 setSpending(uid);
                 setTimeout(() => {
-                    setFight(state);
+                    // land() would re-book a state the ref already holds; only the picture is owed here, and
+                    // only if nothing has been played on top. A block or a heal resolves on the spot, so a
+                    // fast attack-then-guard would otherwise have this timer repaint the older state at
+                    // impact and walk the guard back off the screen.
+                    if (fightRef.current === state) setFight(state);
                     pushFloats(events);
                     setSpending(null);
                     setShaking(true);
@@ -358,7 +393,7 @@ export default function CardFightClient({ fixture, run = null }) {
         }
         // Everything with nothing in flight — blocks, heals, a card played with no reachable target — resolves
         // on the spot. There is no blow to wait for.
-        setFight(state);
+        land(state);
         pushFloats(events);
     }, [fight, pushFloats]);
 
@@ -384,15 +419,17 @@ export default function CardFightClient({ fixture, run = null }) {
     const [drinking, setDrinking] = useState(null);
     const onDrink = useCallback(async (slot) => {
         const id = (runState?.potions || [])[slot];
-        if (!id || !POTIONS[id] || fight.over || drinking !== null) return;
+        if (!id || !POTIONS[id] || fightRef.current.over || drinking !== null) return;
         setDrinking(slot);
         // ⚠️ THE HEALED HP, NOT THE HP IN THE CLOSURE. `setFight` does not change `fight` under this function,
         // so posting fight.hero.hp sends the number from BEFORE the potion — measured: drink a Blood Tonic at
         // 50/70 and the run row still said 50. The fight's own end-of-fight report would have corrected it,
         // which is exactly what makes it the dangerous kind of wrong: the twelve health is only missing if
         // you close the tab mid-fight, so it looks fine every time you watch it.
-        const next = drinkPotion(fight, id);
-        setFight(next);
+        // The ref, for the third time and the same reason: a bottle drunk inside the impact window of an
+        // attack would otherwise be mixed into the state from BEFORE that attack and undo it.
+        const next = drinkPotion(fightRef.current, id);
+        land(next);
         await post("drink", { slot, hp: next.hero.hp });
         setDrinking(null);
         return next;
@@ -410,7 +447,7 @@ export default function CardFightClient({ fixture, run = null }) {
     const onForfeit = useCallback(() => {
         if (fight.over) return;
         setAskForfeit(false);
-        setFight(forfeit(fight));
+        land(forfeit(fight));
     }, [fight]);
 
     /**
@@ -431,12 +468,15 @@ export default function CardFightClient({ fixture, run = null }) {
     useEffect(() => () => turnTimers.current.forEach(clearTimeout), []);
 
     const onEndTurn = useCallback(() => {
+        // The ref, for the same reason commit reads it: the last card of a turn is very often played and then
+        // immediately followed by End turn, and `fight` is a card behind for IMPACT_MS after every attack.
+        const fight = fightRef.current;
         if (fight.over || acting) return;
-        setActing(true);
+        setActing(true); actingRef.current = true;
         setActor(null);
 
         let cur = startFoeTurn(fight).state;
-        setFight(cur);
+        land(cur);
 
         // Walked as a plan rather than a chain of nested callbacks: the whole turn's timings are decided up
         // front so a clear on unmount kills all of them, and so the pacing is one table you can read.
@@ -459,7 +499,7 @@ export default function CardFightClient({ fixture, run = null }) {
                 const done = foeAct(live, step.i);
                 live = done.state;
                 setActor({ i: step.i, kind: step.kind });
-                setFight(done.state);
+                land(done.state);
                 pushFloats(done.events);
             }, step.at));
             // The lunge is over well before the next foe starts, so two are never mid-swing at once.
@@ -467,10 +507,10 @@ export default function CardFightClient({ fixture, run = null }) {
         }
         timers.push(setTimeout(() => {
             const done = finishFoeTurn(live);
-            setFight(done.state);
+            land(done.state);
             pushFloats(done.events);
             setActor(null);
-            setActing(false);
+            setActing(false); actingRef.current = false;
             // ── HELD, ONCE A TURN ────────────────────────────────────────────────────────────────
             // Here rather than per card: a turn is the unit somebody would mind replaying, and one write
             // covers ten taps. Not for a fight that just ended — `won`/`dead` are posted by the effect
@@ -632,7 +672,7 @@ export default function CardFightClient({ fixture, run = null }) {
     const replay = () => {
         setFloats([]);
         setActive(0);
-        setFight(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes, deck: fixture.deck || null }));
+        land(startFight({ seed: fixture.seed, hero: fixture.hero, foes: fixture.foes, deck: fixture.deck || null }));
     };
 
     // A pick (or a deliberate skip) advances the ladder, and the next stop is a fresh server render — the
