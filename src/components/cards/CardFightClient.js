@@ -1289,7 +1289,7 @@ export default function CardFightClient({ fixture, run = null }) {
                         && runState.at?.kind === "elite" ? (
                             <button
                                 type="button"
-                                className="cf-key"
+                                className="cf-takekey"
                                 onClick={() => post("takekey", { key: "ruby" })}
                             >
                                 <b>Take {KEYS.ruby.name} instead</b>
@@ -2221,13 +2221,21 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-bossoffers { display: grid; gap: 8px; width: min(340px, 92vw); }
                 /* The refusal is outlined, not filled — it is worth less than what it replaces on every
                    screen except the one where you have decided to go to the last act. */
-                .cf-key {
+                /* ⚠️ NOT .cf-key — THAT NAME WAS TAKEN, AND TAKING IT BROKE EVERY CARD IN THE GAME.
+                   CardFace has used .cf-key since it was written for the BOLDED KEYWORD inside a card's
+                   sentence ("Block", "Vulnerable", "Poison"), and both files paint through <style jsx
+                   global>, so this button's rule reached every one of them. A keyword became a 340px-wide
+                   display:block with 10px 14px of padding and an auto margin that computed to -268px,
+                   inside a 72px card — which broke the sentence into five short lines, shoved the first one
+                   up behind the type tab and clipped the rest. Luke, twice, with photographs: "cards all
+                   messed up". A cf- prefix is not a namespace; the card face and the fight screen share it. */
+                .cf-takekey {
                     display: block; width: min(340px, 92vw); margin: 10px auto 0; padding: 10px 14px;
                     background: transparent; border: 1px solid #2c6e4a; border-radius: 10px;
                     text-align: left; cursor: pointer; font: inherit;
                 }
-                .cf-key b { display: block; color: #7fe0a8; font-size: 15px; }
-                .cf-key i { display: block; margin-top: 3px; color: #8a8f98; font-size: 12px; font-style: normal; }
+                .cf-takekey b { display: block; color: #7fe0a8; font-size: 15px; }
+                .cf-takekey i { display: block; margin-top: 3px; color: #8a8f98; font-size: 12px; font-style: normal; }
                 .cf-bossperk { display: grid; grid-template-columns: 46px 1fr; grid-template-rows: auto auto;
                     gap: 2px 12px; align-items: center; padding: 10px 12px; cursor: pointer; text-align: left;
                     border-radius: 12px; border: 1px solid rgba(201,162,83,0.4);
