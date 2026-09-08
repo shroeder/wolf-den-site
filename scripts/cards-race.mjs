@@ -133,6 +133,58 @@ for (const [label, r] of [[`End turn ${GAP}ms after release`, fast], ["End turn 
     console.log(`    foe ${r.foeBefore} → ${r.foeAfter}   (${r.dealt} taken off)\n`);
 }
 
+// ── AND: DOES EVERY CARD YOU THROW ACTUALLY GET PLAYED? ─────────────────────────────
+// A bot transcript showed four cards thrown in one turn and the energy pip reading 3/3, 2/3, 2/3, 2/3 — one
+// spent and three that left no trace at all. That is a DIFFERENT question from the one above: those throws
+// were 300ms apart, well outside the impact hold, so the stale-state fault cannot explain them.
+//
+// So it gets its own measurement. Throw cards one at a time at a human's pace and watch the pip and the hand.
+// A card that leaves neither of them changed is a tap the game accepted and did nothing with, which is the
+// single most expensive kind of bug this screen can have: the player pays attention, commits, and the game
+// silently disagrees about what happened.
+async function spend(n = 4) {
+    await send("Page.navigate", { url: `${BASE}?seed=${SEED}` });
+    for (let i = 0; i < 60; i += 1) { await sleep(250); if (await js(`!!document.querySelector('.cf-hand .cf-card')`)) break; }
+    await sleep(700);
+
+    const steps = [];
+    for (let k = 0; k < n; k += 1) {
+        const before = await board();
+        if (!before.hand.length) break;
+        // The raised card in the middle of the tray is the one a thumb reaches for.
+        const idx = Math.min(before.hand.length - 1, 2);
+        const from = await boxOf(".cf-hand .cf-card", idx);
+        const onto = await boxOf(".cf-foe", 0);
+        if (!from || !onto) break;
+        await mouse("mousePressed", from.x, from.y);
+        for (let i = 1; i <= 8; i += 1) {
+            await mouse("mouseMoved", from.x + ((onto.x - from.x) * i) / 8, from.y + ((onto.y - from.y) * i) / 8);
+            await sleep(30);
+        }
+        await mouse("mouseReleased", onto.x, onto.y);
+        await sleep(700);
+        const after = await board();
+        steps.push({
+            card: before.hand[idx].name || "?",
+            energy: `${before.energy} -> ${after.energy}`,
+            hand: `${before.hand.length} -> ${after.hand.length}`,
+            // A card that could not be afforded is not a fault — the tray refuses to lift it, by design.
+            afford: before.energy,
+            moved: before.energy !== after.energy || before.hand.length !== after.hand.length,
+        });
+    }
+    return steps;
+}
+
+const thrown = await spend(4);
+console.log("  four cards thrown one at a time, 700ms apart");
+for (const t of thrown) {
+    console.log(`    ${t.moved ? " " : "✗"} ${String(t.card).padEnd(16)} energy ${t.energy}   hand ${t.hand}`);
+}
+// Only counts the ones there was energy for: a refused card is the rule working, not a dropped tap.
+const dead = thrown.filter((t) => !t.moved && Number(String(t.afford).split("/")[0]) > 0);
+console.log("");
+
 sock.close();
 chrome.kill();
 if (fast.dealt !== slow.dealt) {
@@ -141,3 +193,9 @@ if (fast.dealt !== slow.dealt) {
     process.exit(1);
 }
 console.log(`✓ both took ${fast.dealt} off. The last card of a turn survives ending it.`);
+if (dead.length) {
+    console.log(`✗ ${dead.length} of ${thrown.length} cards left no trace: thrown with energy to spare, and`
+        + ` neither the pip nor the hand moved.`);
+    process.exit(1);
+}
+console.log(`✓ every card thrown with energy for it was played.`);
