@@ -36,10 +36,21 @@ const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, 
 // banded by tier, so a wooden chest cannot hold a Star Fruit however many you open.
 //
 // The old seed table listed all three chest tiers with tuned odds and nothing ever called them.
-const SEED_CHANCE = { wooden: 0.10, iron: 0.13, gold: 0.16, mythic: 0.18, ascendant: 0.20, eternal: 0.22,
-    celestial: 0.24, primordial: 0.26 };
-const SEED_COUNT = { wooden: 2, iron: 2, gold: 3, mythic: 3, ascendant: 4, eternal: 4,
-    celestial: 5, primordial: 5 };
+// ⚠️ AND IT RAN THE WRONG WAY, WHICH IS WHAT PUT FIVE SEEDS IN A PRIMORDIAL CHEST.
+// Jinxx opened the rarest chest in the game on 2026-09-08 and got Pumpkin, Corn, Corn, Golden Apple,
+// Pumpkin. Measured afterwards (scripts/chest-odds.mjs) a primordial chest was paying SEEDS 2.4x as often
+// as it paid GEAR — 23.1% against 9.8% — and the seeds it paid came out of the same table a gold
+// chest draws from. Her roll was not even unlucky: Corn is rare, Pumpkin is epic, and the Golden Apple is
+// legendary. She got the second-best seed in the game and it read as garbage.
+//
+// The line four comments up already says what seeds ARE: "a supply, not a find". A supply belongs on the
+// chest you open ten of, not the one you open once a month. So the curve is inverted — seeds are what a
+// WOODEN chest is for — and it reaches zero above eternal. Luke's call on the shape of the top chests:
+// keep gear low and make every other outcome premium, which means nothing gold-band can appear in them.
+const SEED_CHANCE = { wooden: 0.16, iron: 0.14, gold: 0.11, mythic: 0.07, ascendant: 0.04, eternal: 0.02,
+    celestial: 0, primordial: 0 };
+const SEED_COUNT = { wooden: 3, iron: 3, gold: 3, mythic: 3, ascendant: 4, eternal: 4,
+    celestial: 0, primordial: 0 };
 
 // How often a chest gives a GEM instead of its ordinary contents. Deliberately in the same order of
 // magnitude as the recipe chance above — a gem should feel like a find, and gear is still what a chest is
@@ -128,7 +139,11 @@ const CHEST_CONSUMABLES = {
     ascendant: { chance: 0.2, pool: ["pot_fury", "pot_berserker", "stone_storm", "scroll_ancient", "treat_mythic", "spin_golden_ticket"] },
     eternal: { chance: 0.32, pool: ["pot_fury", "scroll_ancient", "elixir_renewal", "sands_of_time", "treat_mythic", "treat_ambrosia", "spin_golden_ticket"] },
     celestial: { chance: 0.55, pool: ["elixir_renewal", "sands_of_time", "pot_fury", "scroll_ancient", "treat_ambrosia"] },
-    primordial: { chance: 0.75, pool: ["elixir_renewal", "sands_of_time", "treat_ambrosia"] },
+    // ⚠️ 0.75 HERE WAS THE OTHER HALF OF THE 9.8%. This chain is first-match-wins, so a three-quarters
+    // chance sitting one line above the gear roll means the gear roll mostly never happens. The pool is
+    // good — that was never the problem — but it was eating the chest. Solved against the target rather
+    // than nudged: 0.55 leaves gear at ~24%, which is the band Luke asked for.
+    primordial: { chance: 0.55, pool: ["elixir_renewal", "sands_of_time", "treat_ambrosia"] },
 };
 
 // Level-up chests are deliberately CAPPED at Gold (never Mythic) and reach the higher tiers later, so
@@ -392,7 +407,14 @@ export async function openChest(buyerId, tier) {
 
     if (Math.random() < luckyChance(SEED_CHANCE[tier] || 0, fortune)) {
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
-        const seedBand = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : "chest_gold";
+        // ⚠️ EVERY TIER ABOVE IRON READ THE SAME TABLE. The recipe roll six lines up bands properly and
+        // ends at `chest_high`; this one just stopped, so a primordial chest's seeds were a gold chest's
+        // seeds. Ascendant and eternal — the only tiers above gold that can still pay seeds at all — draw
+        // from the top of the crop ladder now.
+        const seedBand = tier === "wooden" ? "chest_wooden"
+            : tier === "iron" ? "chest_iron"
+            : (tier === "ascendant" || tier === "eternal") ? "chest_high"
+            : "chest_gold";
         const got = [];
         for (let i = 0, n = SEED_COUNT[tier] || 2; i < n; i += 1) {
             const one = await grantSeedFromBand(buyerId, seedBand).catch(() => null);
@@ -420,8 +442,12 @@ export async function openChest(buyerId, tier) {
         const { GEM_KINDS, gemId } = await import("@/lib/marketplace/gems.js");
         const { grantGem } = await import("@/lib/marketplace/jeweller.js");
         const kind = GEM_KINDS[Math.floor(Math.random() * GEM_KINDS.length)];
-        // Tier 2 only from gold and up, and never more than that.
-        const gTier = (tier === "wooden" || tier === "iron") ? 1 : (Math.random() < 0.25 ? 2 : 1);
+        // Tier 2 only from gold and up — except at the two top chests, where a Chipped gem is exactly the
+        // kind of consolation prize this whole change exists to remove. They reach Polished. The ceiling
+        // stays well under Flawless, so the top of the ladder is still something you FUSE toward.
+        const gTier = (tier === "wooden" || tier === "iron") ? 1
+            : (tier === "celestial" || tier === "primordial") ? (Math.random() < 0.45 ? 3 : 2)
+            : (Math.random() < 0.25 ? 2 : 1);
         const got = await grantGem(buyerId, gemId(kind.id, gTier), 1, "chest").catch(() => null);
         if (got?.ok) return { ok: true, remaining: dec.count, gem: got.gem };
         // A gem that failed to grant falls through to ordinary loot rather than eating the chest.
@@ -431,7 +457,11 @@ export async function openChest(buyerId, tier) {
     // (permanently add an elemental affinity) instead.
     const sChance = SCROLL_CHEST_CHANCE[tier] || 0;
     if (sChance && Math.random() < luckyChance(sChance, fortune)) {
-        const cid = Math.random() < 0.12 ? "forge_enchant_scroll" : "forge_power_scroll";
+        // The Enchantment Scroll is the rarer and better of the two. One in eight everywhere meant the best
+        // chest in the game handed out the ordinary scroll seven times in eight, which is the same
+        // consolation-prize shape as the seeds and the chipped gems.
+        const enchantOdds = (tier === "celestial" || tier === "primordial") ? 0.40 : tier === "eternal" ? 0.22 : 0.12;
+        const cid = Math.random() < enchantOdds ? "forge_enchant_scroll" : "forge_power_scroll";
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
         return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };

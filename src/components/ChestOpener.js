@@ -400,7 +400,7 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{isSeeds ? "SEEDS" : isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
+                    <span className="chest-rarity-tag">{isSeeds ? `${RARITY_LABEL[rarity] || rarity} SEEDS`.toUpperCase() : isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
                     {isSeeds ? (
                         <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -408,8 +408,25 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             <div className="chest-reward-name">
                                 {reveal.seeds.length > 1 ? `${reveal.seeds.length} seeds` : reveal.seeds[0].name}
                             </div>
+                            {/* ──── SAY WHICH ONE IS THE GOOD ONE ────────────────────────────────────────
+                                ⚠️ Jinxx opened a Primordial Chest, got a LEGENDARY Golden Apple in the handful,
+                                and read the whole thing as junk — because this line printed five names in one
+                                flat grey row with nothing to separate a Star Fruit from a wheat. rarityOf()
+                                has always coloured the CARD by the best seed in the hand; the words under it
+                                threw that away, which is the one place the member actually reads.
+                                Each seed now wears its own rarity colour, and the tag above says what the
+                                best of them is. The rates that put five gold-band seeds in a primordial
+                                chest are fixed in chests.js — this is so the ones you do get can be read. */}
                             <div className="chest-reward-sub muted">
-                                {reveal.seeds.map((x) => `${x.emoji || "🌱"} ${x.name}`).join(" · ")} — planted in your seed bag.
+                                {reveal.seeds.map((x, i) => (
+                                    <span key={`${x.seedId || x.name}${i}`}>
+                                        {i ? " · " : ""}
+                                        <b style={{ color: RARITY_COLOR[x.rarity] || RARITY_COLOR.common, fontWeight: 600 }}>
+                                            {x.emoji || "🌱"} {x.name}
+                                        </b>
+                                    </span>
+                                ))}
+                                {" "}&mdash; planted in your seed bag.
                             </div>
                         </>
                     ) : isRecipe ? (

@@ -133,6 +133,11 @@ export const SEED_BANDS = {
     chest_wooden: { common: 66, rare: 32, epic: 2 },
     chest_iron: { common: 34, rare: 44, epic: 21, legendary: 1 },
     chest_gold: { common: 12, rare: 38, epic: 41, legendary: 8, mythic: 1 },
+    // ⚠️ THERE WAS NO BAND ABOVE GOLD, so every chest from gold to primordial drew this same row. The
+    // chest that takes a month to earn paid the same seeds as the one that falls out of a delve. Only
+    // ascendant and eternal reach this now — the two chests above them stopped paying seeds entirely —
+    // and it is weighted at the top of the ladder: mostly Golden Apple and Star Fruit, no commons at all.
+    chest_high: { rare: 12, epic: 40, legendary: 36, mythic: 12 },
     // The Armoury crate. Bought with laurels off won bouts, so it sits with the ship rather than the farm.
     arena_win: { rare: 42, epic: 44, legendary: 12, mythic: 2 },
     // A dug-up chest, by board depth. The sea's own supply line into the farm.
