@@ -944,6 +944,61 @@ export const POTIONS = {
         text: "Gain 22 Block." },
     insight: { id: "insight", name: "Insight", icon: "draw", draw: 3, energy: 1,
         text: "Draw 3 cards and gain 1 energy." },
+
+    // ── AND EIGHTEEN MORE, FOR THE SAME REASON THE TRINKETS GREW ─────────────────────────────────────────
+    // Eleven bottles against their forty-odd, on a belt that holds three — so a run that found four potions
+    // had probably seen two of them already. Measured over four hundred runs a hero reaches the Spire
+    // carrying about one and a half, which is the other half of the problem: the belt is only worth a slot
+    // in the top bar if what goes in it can answer a ROOM.
+    //
+    // Every one of these is on a hook drinkPotion already reads, except the two added with them: `frailAll`,
+    // which was worth nothing until a creature's guard went through blockGain, and `thorns`, which the hero
+    // already carried for Bronze Scales.
+
+    // ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────
+    hearth: { id: "hearth", name: "Hearth Draught", icon: "heal", heal: 20, text: "Heal 20." },
+    deep_draught: { id: "deep_draught", name: "Deep Draught", icon: "heal", healPct: 0.4,
+        text: "Heal two fifths of your health." },
+    last_light: { id: "last_light", name: "Last Light", icon: "heal", healPct: 0.5,
+        text: "Heal half your health." },
+    mending: { id: "mending", name: "Mending Draught", icon: "heal", heal: 8, block: 8,
+        text: "Heal 8 and gain 8 Block." },
+
+    // ── THE GUARD ────────────────────────────────────────────────────────────────────────────────────
+    bulwark: { id: "bulwark", name: "Bulwark Brew", icon: "shield", block: 32,
+        text: "Gain 32 Block." },
+    stone_milk: { id: "stone_milk", name: "Stone Milk", icon: "shield", block: 16, thorns: 3,
+        text: "Gain 16 Block, and 3 Thorns for the rest of the fight." },
+    brambles: { id: "brambles", name: "Bramble Oil", icon: "shield", thorns: 6,
+        text: "6 Thorns for the rest of the fight." },
+    tinct_iron: { id: "tinct_iron", name: "Tincture of Iron", icon: "shield", block: 10, strength: 1,
+        text: "Gain 10 Block and 1 Strength." },
+
+    // ── THE TEETH ────────────────────────────────────────────────────────────────────────────────────
+    rage_oil: { id: "rage_oil", name: "Rage Oil", icon: "sword", strength: 3,
+        text: "Gain 3 Strength." },
+    wolfsbane: { id: "wolfsbane", name: "Wolfsbane", icon: "sword", damageAll: 18,
+        text: "Deal 18 damage to ALL enemies." },
+    cinder_flask: { id: "cinder_flask", name: "Cinder Flask", icon: "sword", damageAll: 7, weakAll: 1,
+        text: "Deal 7 damage to ALL enemies and apply 1 Weak." },
+    quicklime: { id: "quicklime", name: "Quicklime", icon: "sword", damageAll: 5, vulnerableAll: 2,
+        text: "Deal 5 damage to ALL enemies and apply 2 Vulnerable." },
+
+    // ── THE MARKS ────────────────────────────────────────────────────────────────────────────────────
+    chalk_flask: { id: "chalk_flask", name: "Chalk Flask", icon: "draw", frailAll: 3,
+        text: "Apply 3 Frail to ALL enemies — they brace for a quarter less." },
+    dread_flask: { id: "dread_flask", name: "Dread Flask", icon: "draw", frailAll: 2, weakAll: 2,
+        text: "Apply 2 Frail and 2 Weak to ALL enemies." },
+    hex_flask: { id: "hex_flask", name: "Hex Flask", icon: "draw", vulnerableAll: 2, weakAll: 2,
+        text: "Apply 2 Vulnerable and 2 Weak to ALL enemies." },
+
+    // ── THE HAND ─────────────────────────────────────────────────────────────────────────────────────
+    clarity: { id: "clarity", name: "Clarity", icon: "draw", draw: 4,
+        text: "Draw 4 cards." },
+    surge: { id: "surge", name: "Surge", icon: "energy", energy: 3,
+        text: "Gain 3 energy." },
+    quick_step: { id: "quick_step", name: "Quick Step", icon: "energy", draw: 1, energy: 1,
+        text: "Draw a card and gain 1 energy." },
 };
 export const POTION_IDS = Object.keys(POTIONS);
 
@@ -2999,6 +3054,9 @@ export function drinkPotion(state, potionId) {
     if (!potion || state.over) return state;
     let next = { ...state, hero: { ...state.hero } };
     if (potion.block) next.hero.block = (next.hero.block || 0) + potion.block;
+    // Liquid Bronze: thorns for the rest of the fight. The hero already carries the field for Bronze Scales,
+    // so a bottle can top it up and nothing downstream needs to learn a new word.
+    if (potion.thorns) next.hero.thorns = (next.hero.thorns || 0) + potion.thorns;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
     // A Toy Fan pays for the act of drinking, whatever was in the bottle — theirs exactly, and it is what
     // makes a belt of situational potions worth carrying at all.
@@ -3018,12 +3076,15 @@ export function drinkPotion(state, potionId) {
     // Every one of these hits the WHOLE room rather than asking for a target: a potion that needs a target
     // needs a targeting mode on a screen where the only tap that matters is playing a card, and theirs are
     // strongest in the rooms with the most bodies in them anyway.
-    if (potion.damageAll || potion.vulnerableAll || potion.weakAll) {
+    if (potion.damageAll || potion.vulnerableAll || potion.weakAll || potion.frailAll) {
         next.foes = next.foes.map((f) => {
             if (f.hp <= 0) return f;
             let out = f;
             if (potion.vulnerableAll) out = { ...out, vulnerable: (out.vulnerable || 0) + potion.vulnerableAll };
             if (potion.weakAll) out = { ...out, weak: (out.weak || 0) + potion.weakAll };
+            // The third mark, drinkable. Worth nothing at all until a creature's guard started going through
+            // blockGain — see the note there.
+            if (potion.frailAll) out = { ...out, frail: (out.frail || 0) + potion.frailAll };
             if (potion.damageAll) out = land(out, attackDamage(potion.damageAll, next.hero, out));
             return out;
         });

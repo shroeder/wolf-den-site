@@ -55,6 +55,47 @@ const POTION_ART = {
         + "stopper, the glass thick and smoked.",
     insight: "A small clear glass sphere on a short brass neck, filled with pale gold light that gathers into "
         + "a single bright point at its centre.",
+    // ── THE EIGHTEEN THAT TOOK THE SHELF TO TWENTY-NINE ──────────────────────────────────────────────────
+    // Silhouette first and silhouette hardest, because there are twenty-nine of these now and three of them
+    // sit side by side on a merchant's shelf at 34px. Sorted by what they DO, so the healing ones share a
+    // family of round bellied shapes, the throwables are heavy-necked and stoppered, and the ones that mark
+    // the room are flat-sided and awkward — a shape you would not drink from.
+    hearth: "A round-bellied earthenware jug glazed warm amber, its short neck stoppered with a wooden bung, "
+        + "a band of soot around its base.",
+    deep_draught: "A deep bulbous flask of dark green glass, wider at the bottom than a hand, filled almost to "
+        + "the neck with still red-gold liquid.",
+    last_light: "A rounded lantern-shaped glass vessel with a brass foot and cap, holding a single soft warm "
+        + "light suspended in clear liquid.",
+    mending: "A squat twin-chambered glass bottle, one chamber of pale gold and one of pale green, joined at "
+        + "the neck under a single cork.",
+    bulwark: "A heavy square-shouldered stone bottle banded in iron with a screw cap, thick and blunt, its "
+        + "grey surface chipped at the corners.",
+    stone_milk: "A wide-mouthed clay crock of thick chalky white liquid with a cloth tied over its mouth, "
+        + "small grey pebbles settled in the bottom.",
+    brambles: "A tall narrow bottle of dark oil with a bramble stem coiled inside it, its thorns pressed "
+        + "against the glass, stoppered with a knot of green wax.",
+    tinct_iron: "A slim apothecary bottle of dull grey-blue liquid with an iron nail standing upright in it, "
+        + "the glass fogged where the metal meets the liquid.",
+    rage_oil: "A stubby wide-shouldered bottle of thick dark red oil, its cork rammed in at an angle, a rag "
+        + "knotted around the neck.",
+    wolfsbane: "A tall throwing-flask of smoked glass with a long weighted neck, filled with churning violet "
+        + "liquid, sealed under a lead cap.",
+    cinder_flask: "A round black-iron grenade flask with a screw top and a short fuse, glowing orange along "
+        + "the seams where the metal has thinned.",
+    quicklime: "A stout sealed pot of coarse white powder with a cracked wax seal over its mouth, faint heat "
+        + "shimmer rising off the top.",
+    chalk_flask: "A flat-sided glass flask of thin milky liquid with chalk sediment drifting through it, its "
+        + "stopper a plug of raw white chalk.",
+    dread_flask: "A flat hexagonal bottle of near-black liquid with a bone stopper, its glass so dark only the "
+        + "highlight along one edge shows the shape.",
+    hex_flask: "A lopsided flat bottle of oily liquid shot through with purple and green, wrapped in a strip "
+        + "of inked parchment covered in small marks.",
+    clarity: "A perfectly clear glass sphere on a short stem, holding water so still it looks empty, a single "
+        + "point of white light at its centre.",
+    surge: "A short thick-walled cylinder of clear glass capped in copper at both ends, with three bright "
+        + "arcs of white lightning stacked inside it.",
+    quick_step: "A narrow flat pocket flask of pale blue glass with a hinged brass cap, small enough to close "
+        + "a hand around, a faint streak of motion inside.",
 };
 
 // ── THE TRINKETS ─────────────────────────────────────────────────────────────────────────────────────────────
