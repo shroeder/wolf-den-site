@@ -189,6 +189,19 @@ export async function POST(request) {
                     return NextResponse.json({ error: "nothing_to_leave" }, { status: 400 });
                 }
                 run.keys = { ...(run.keys || {}), [which]: true };
+                // ── AND THE THIRD ONE COSTS SOMETHING YOU CANNOT PUT DOWN ───────────────────────────
+                // ⚠️ THE HOLLOW WAS UNOBTAINABLE. Its own comment in CURSE_CARDS says "nothing hands this
+                // out except the last act's keys" — and nothing did, because that half was never written.
+                // A card in the table that no path can deal is the same dead content as a card behind a pet
+                // nobody owns; it just hides better, because it reads as finished.
+                //
+                // ONE, on the third key, rather than one per key. Three unremovable curses bleeding for
+                // every card in your hand is not a bet, it is a refusal — and the keys already cost three
+                // rooms' worth of reward. This is the single mark that says the door was opened on purpose,
+                // it lands at the moment the set completes, and the merchant cannot take it.
+                if (hasAllKeys(run) && !(run.deck || []).includes("hollow")) {
+                    run.deck = [...(run.deck || []), "hollow"];
+                }
                 if (spec.from === "rest") run.at = { ...run.at, rested: true, healed: 0, tookKey: which };
                 if (spec.from === "treasure") {
                     run.at = { ...run.at, opened: { embers: 0, perk: null, potion: null, spilled: false, tookKey: which } };

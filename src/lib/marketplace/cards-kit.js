@@ -691,7 +691,10 @@ export const CURSE_CARDS = {
         unplayable: true, hpPerPlay: 1, text: "Unplayable. Whenever you play a card, lose 1 health." },
     // ⚠️ AND ONE THAT WILL NOT COME OUT. Theirs is Necronomicurse and the joke is the point: a curse the
     // shop cannot take is the only card in the game whose cost is permanent, which is what a boss-tier
-    // bargain has to be able to charge. Nothing hands this out except the last act's keys.
+    // bargain has to be able to charge. Exactly one path deals it — the THIRD key, at the moment the set
+    // completes and the door opens (see the takekey action). It is the mark that says you meant to go down
+    // there. For a while this sentence said the keys handed it out and the keys did not, which made it a
+    // card in the table that nothing in the game could deal.
     hollow: { id: "hollow", name: "The Hollow", cost: 0, kind: "curse", target: "self", curse: true,
         unplayable: true, noBurn: true, hpPerHand: 1,
         text: "Unplayable. Cannot be removed. At the end of your turn, lose 1 health for each card in your hand." },
