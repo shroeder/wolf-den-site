@@ -43,34 +43,30 @@
 // good as the one it was born with, and the handful at 1.0 are pets whose whole character is the second thing.
 export const ASCENSION_EFFECTS = {
     // ──── THE THREE FROM THE CELESTIAL AND PRIMORDIAL CHESTS ────────────────────────
-    // ⚠️ ALL THREE ABILITIES ARE CAPPED CLOSE TO WHERE THEY ALREADY SIT, which is the exact trap this file
-    // was rewritten to avoid: the Ferret and the Magpie both carried a capped key, so an amplify Darkstone
-    // came out arithmetically identical to the Lightstone and the choice was a prompt rather than a decision.
-    //
-    // unsealed sits at 22 against a cap of 25, so ANY amplify on the Vaultwyrm is worth +3 and nothing more.
-    // It gets two GRAFTS instead — widen rather than deepen, the Beach Crab's answer. The other two have
-    // real headroom (22 -> 30, 30 -> 40) so they keep the usual shape: a second trade against doubling down.
+    // Each one's Lightstone teaches it a trade in a NEIGHBOURING system and its Darkstone deepens the one it
+    // came with, except where the ability is counted in whole units rather than percent — see the Ammonite.
     vaultwyrm: {
-        light: { name: "Knows The Whole Hoard", kind: "graft", key: "chest_luck", scale: 0.9,
-            note: "It has been counting them since before you got here, and it counts in your favour." },
-        dark: { name: "Sits On It", kind: "graft", key: "gold_find", scale: 1.0,
-            note: "Nothing leaves the pile. Some of it finds its way to you instead." },
+        // A dragon that reads rock, taught to swing at it. forge_salvage is the nearest thing in the game to
+        // "more out of the same stone", and it is the trade a miner picks up next.
+        light: { name: "Breaks Its Own Ore", kind: "graft", key: "forge_salvage", scale: 0.9,
+            note: "It got bored waiting for somebody else to bring the pile in." },
+        // Its floor at the rock face, higher. 12 -> 36 at Lv5 and this carries it to the 38 ceiling.
+        dark: { name: "Takes The Better Half", kind: "amplify", mult: 1.6 },
     },
     lodestar: {
-        // A moth that spends your luck, taught to make some of its own. 1.0 because that second trade IS the
-        // character -- a star you steer by is a star whether or not you are going anywhere.
-        light: { name: "Makes Its Own Light", kind: "graft", key: "fortune", scale: 1.0,
-            note: "It stopped waiting for a night clear enough and started burning." },
-        // 22 -> 30 at the ceiling. Every point of Fortune you own pushes harder on the same door.
-        dark: { name: "Spends All Of It", kind: "amplify", mult: 1.6 },
+        // A moth at the brightest room in the Den, taught to haggle everywhere else in it too.
+        light: { name: "Owed Everywhere", kind: "graft", key: "town_haggle", scale: 0.9,
+            note: "It turns out the favour was never only good on the floor." },
+        dark: { name: "The House Insists", kind: "amplify", mult: 2 },
     },
     ammonite: {
-        // The shrine keeper learning to pass on what the shrine knows. pack_visit is the only key in the game
-        // about your animals teaching each other, which is the same sentence this pet is already made of.
-        light: { name: "Passes It Down", kind: "graft", key: "pack_visit", scale: 0.9,
-            note: "Everything it has outlived, it has also remembered, and it is not precious about it." },
-        // 30 -> 40 at the ceiling: the whole shrine, harder.
-        dark: { name: "Forgets Nothing", kind: "amplify", mult: 1.5 },
+        // ⚠️ NO AMPLIFY HERE, AND NOT FOR BALANCE. `neverturns` is counted in whole raids (/25 at the
+        // consumer), so an amplify of anything under 1.33 rounds to the SAME number of raids and the stone
+        // would visibly do nothing. Two grafts instead, which is the Beach Crab's answer to the same shape.
+        light: { name: "Rides It Out", kind: "graft", key: "sea_plunder", scale: 0.9,
+            note: "Whatever the volley took, it was not taken from the shell." },
+        dark: { name: "Still Going", kind: "graft", key: "following_sea", scale: 1.0,
+            note: "No wind, no tide, no reason. It simply has not stopped." },
     },
 
     // ── THE CASINO'S FIVE AND SABLE'S THREE ───────────────────────────────────────────────────────────────

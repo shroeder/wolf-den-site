@@ -15,7 +15,7 @@ const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2,
 // PET_ACTIVE_BY_RARITY, which pays 22 at ascendant and 30 at eternal — and the level curve runs x1 to x3.5.
 // So an ability whose sensible ceiling is 25 STARTS at 22 and hits the cap at Lv2, leaving Lv2→Lv6 flat:
 //
-//     unsealed     Lv1 22  Lv2 25  Lv3 25  Lv4 25  Lv5 25  Lv6 25
+//     hoarder      Lv1 22  Lv2 25  Lv3 25  Lv4 25  Lv5 25  Lv6 25    (as it was, before its own curve)
 //
 // That is the Gilded Magpie's problem (see its note above) arriving on three brand-new pets at once, and on
 // the Magpie it was accepted because chest_luck IS that bird. Here it would mean the three rarest pets in the
@@ -23,9 +23,18 @@ const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2,
 //
 // These are new keys, so they get a base sized against their OWN ceiling rather than a generic one: low
 // enough that x3 at Lv5 lands just under the cap, so every single rung is worth something.
-const UNSEALED_BY_RARITY = { legendary: 5, mythic: 6, ascendant: 8, eternal: 10 };
-const FORTUNES_DUE_BY_RARITY = { legendary: 6, mythic: 8, ascendant: 10, eternal: 12 };
-const SHRINEKEEPER_BY_RARITY = { legendary: 6, mythic: 8, ascendant: 10, eternal: 12 };
+const HOARDER_BY_RARITY = { legendary: 8, mythic: 10, ascendant: 12, eternal: 14 };
+// ⚠️ SIZED AGAINST THE DISCOUNT THAT ALREADY EXISTS. The Counter has paid a trophy discount since the
+// casino pets shipped — 1.5% a pet, 0.5% a badge, hard-capped at 15% for the whole floor — and that file
+// argues at length that a discount is the ONLY safe casino lever, because anything touching a payout table
+// has to be re-priced against the ceiling every time. It is right, so this joins it rather than inventing a
+// second mechanism, and it is sized like one: a Lv5 Lodestar is worth about five casino pets and no more.
+const HOUSEFAVOUR_BY_RARITY = { legendary: 1.8, mythic: 2.2, ascendant: 2.6, eternal: 3.2 };
+// ⚠️ THIS ONE IS COUNTED IN RAIDS, NOT PERCENT. The consumer divides by 25, so the ladder has to land on
+// whole numbers at sensible rungs: 25 -> +1 raid, 50 -> +2, 75 -> +3. An eternal pet starts at 25 (one extra
+// raid from the day you get it) and reaches three at Lv5. A percentage would have paid nothing until Lv3,
+// which is the "no pity progress bars" problem in reverse — a ladder whose bottom rungs are decoration.
+const NEVERTURNS_BY_RARITY = { legendary: 25, mythic: 25, ascendant: 25, eternal: 25 };
 const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },
     legendary: { chance: 0.15, mult: 2.0 }, mythic: { chance: 0.18, mult: 2.3 }, ascendant: { chance: 0.2, mult: 2.6 }, eternal: { chance: 0.25, mult: 3.0 },
@@ -76,9 +85,9 @@ export const PERK_META = {
     town_haggle:  { icon: "🧳", kind: "town" },
     town_rally:   { icon: "🏘️", kind: "town" },
     chest_luck:   { icon: "🧰", kind: "econ" },
-    unsealed:     { icon: "🗝️", kind: "econ" },
-    fortunes_due: { icon: "🍀", kind: "econ" },
-    shrinekeeper: { icon: "🕯️", kind: "econ" },
+    hoarder:      { icon: "⛏️", kind: "econ" },
+    housefavour:  { icon: "🎰", kind: "econ" },
+    neverturns:   { icon: "⚓", kind: "econ" },
     // ── The eight designed in review ─────────────────────────────────────────────────────────────────────
     green_thumb:  { icon: "🌿", kind: "farm" },
     pack_visit:   { icon: "🐕", kind: "farm" },
@@ -125,9 +134,18 @@ export const PET_PERKS = {
     // are. Each one is consumed at a real call site (chests.js twice, combinePetBonuses once) — the Den's
     // most expensive recurring bug is an ability printed on a card that no code reads, so none of these was
     // written until the thing it describes was working.
-    vaultwyrm: { name: "Sleeps On The Good One", key: "unsealed" },
-    lodestar: { name: "Spends Your Luck", key: "fortunes_due" },
-    ammonite: { name: "Remembers Them All", key: "shrinekeeper" },
+    // ⚠️ THE FIRST CUT OF THESE THREE ALL POINTED AT CHEST LOOT, and one of them multiplied every other
+    // pet you own. Luke: "I dont like altering chest loot. I like it buffing existing systems like casino
+    // sailing digging raiding arena farm etc. dont like buffing all pets thats too op." Both notes are right,
+    // and the second one is the sharper: an ability that scales with the size of your collection is worth
+    // nothing to a new member and unbounded to an old one, which is not a pet, it is a multiplier.
+    //
+    // So each one now lands in ONE system, and deliberately in a system with no pet presence at all. Before
+    // this, nothing in the game gave a pet perk to the mine, the casino or the raid — every existing key
+    // serves the farm, fishing, sailing's voyages, the kitchen, the forge or the town.
+    vaultwyrm: { name: "Knows The Good Rock", key: "hoarder" },        // the mine
+    lodestar: { name: "Drawn To The Lights", key: "housefavour" },     // the casino
+    ammonite: { name: "Does Not Tire", key: "neverturns" },            // sea raids
 
     road_cur: { name: "Never Stops Walking", key: "onslaught" },
     gate_moth: { name: "Finds the Latch", key: "chest_luck" },
@@ -320,14 +338,14 @@ export const SYSTEM_PERK_CAP = {
     chest_luck: 20,     // rarity promotion
     // ──── THE THREE CELESTIAL KEYS ──────────────────────────────────────────────────
     // Ceilings chosen against what each one actually does to a chest, not by feel:
-    // All three sit just above x3 of their ascendant/eternal base (see the curves at the top of this file),
-    // so a Lv5 pet reaches its ceiling and not before — every rung of the ladder buys something.
-    unsealed: 25,       // a QUARTER of your chests ignoring the filler chain is already enormous — at a
-                        // primordial's 24% gear share this roughly doubles it, and no further
-    fortunes_due: 32,   // the promotion CHANCE at full Fortune. One band up, never two, so it can lift a
-                        // celestial roll into primordial but cannot invent a run of them
-    shrinekeeper: 42,   // how much more each enshrined stone is worth. Multiplies a number that is already
-                        // small per pet and only pays at all if you have enshrined anything
+    // All three sit just above x3 of their base (see the curves at the top of this file), so a Lv5 pet
+    // reaches its ceiling and not before — every rung of the ladder buys something.
+    hoarder: 38,        // the rank FLOOR at the rock face, as a percent of a perfect swing. Above ~40 a bad
+                        // run starts out-paying a good one, which would remove the reason to swing well
+    housefavour: 8,     // a SECOND discount at the Counter, capped separately from the floor's own 15% so a
+                        // pet cannot be the reason that ceiling moves for everybody. A sink either way — it
+                        // mints nothing, it buys the same upgrades sooner
+    neverturns: 75,     // COUNTED IN RAIDS: /25 at the consumer, so this ceiling is three extra a day
     green_thumb: 40,    // a seed from rating; rating is already daily-capped
     pack_visit: 50,     // share of the XP, never more than half
     truffle_hog: 100,   // +100% = the 2x ceiling agreed in review
@@ -361,9 +379,9 @@ export const PROC_CAP = {
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
-    if (key === "unsealed") return UNSEALED_BY_RARITY[rarity] || 5;
-    if (key === "fortunes_due") return FORTUNES_DUE_BY_RARITY[rarity] || 6;
-    if (key === "shrinekeeper") return SHRINEKEEPER_BY_RARITY[rarity] || 6;
+    if (key === "hoarder") return HOARDER_BY_RARITY[rarity] || 8;
+    if (key === "housefavour") return HOUSEFAVOUR_BY_RARITY[rarity] || 5;
+    if (key === "neverturns") return NEVERTURNS_BY_RARITY[rarity] || 25;
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
     if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
     if (key === "execute") return EXECUTE_BY_RARITY[rarity] || 0.3;
@@ -454,14 +472,12 @@ function perkDescRaw(key, v, level = 1) {
         case "town_haggle": return `${v}% off everything the travelling merchant and the gold shop sell`;
         case "town_rally": return `+${v}% damage on town raids — the plaza skirmishes, not the weekly boss`;
         case "chest_luck": return `+${v}% chance any chest you open rolls on the NEXT rarity up`;
-        // The celestial three. Each says the NUMBER and the thing it buys, because all three of them change
-        // something invisible -- a branch that is not taken, a roll that is promoted, a stone that pays more.
-        case "unsealed": return `+${v}% of the chests you open ignore recipes, seeds, scrolls and relics `
-            + `entirely and go straight to the gear`;
-        case "fortunes_due": return `Your Fortune now lifts a chest's GEAR roll: up to +${v}% chance of one `
-            + `rarity band higher, scaled by how much Fortune you carry`;
-        case "shrinekeeper": return `Every pet you have enshrined is worth +${v}% more — the whole shrine, `
-            + `not just this one`;
+        // The celestial three, each naming its system out loud. None of them touches a chest.
+        case "hoarder": return `At the rock face your worst swings still pay: the mine treats any run scoring `
+            + `under ${v}% as ${v}%`;
+        case "housefavour": return `Everything at the Counter costs ${v}% less, on top of whatever the floor's `
+            + `own trophies already take off`;
+        case "neverturns": return `+${Math.floor(v / 25)} sea raid${Math.floor(v / 25) === 1 ? "" : "s"} a day`;
         case "recipe_nose": return `+${v}% chance anything that can drop a recipe does`;
         // ── The eight designed in review. Each states the number AND what it buys you. ────────────────────
         case "green_thumb": return `${v}% chance rating a friend's farm drops you a seed too`;
@@ -511,7 +527,15 @@ export function petPerkAt(pet, level) {
     const capped = PROC_CAP[perk.key] != null
         ? Math.min(PROC_CAP[perk.key], raw)
         : capSystemPerk(perk.key, raw);
-    return { ...perk, level: Math.max(1, Number(level) || 1), scaled: Math.round(capped * 10) / 10 };
+    const at = Math.max(1, Number(level) || 1);
+    // ⚠️ AND THE SENTENCE HAS TO MOVE WITH THE NUMBER. `perk.desc` is built by petPerk() at the pet's BASE
+    // value, so a card showing it at Lv5 printed the Lv1 wording — beside a label that reads "grows as it
+    // levels". Harmless-looking on a percentage and outright wrong on an ability counted in whole units: the
+    // Ammonite gives three sea raids at Lv5 and its card said one.
+    // Regenerated from `capped` for the same reason ascensionEffectView generates rather than stores: the one
+    // number the player is shown should be the number the engine is about to apply.
+    const scaled = Math.round(capped * 10) / 10;
+    return { ...perk, level: at, scaled, desc: perkDesc(perk.key, scaled, at) };
 }
 
 // ── WHAT A STONE WOULD DO TO THIS PET, IN WORDS ──────────────────────────────────────────────────────────────
@@ -619,7 +643,7 @@ export const SYSTEM_PERK_KEYS = new Set([
     "kitchen_heat", "kitchen_larder", "kitchen_portion", "kitchen_prep", "recipe_nose",
     "forge_spark", "forge_salvage",
     "town_haggle", "town_rally", "chest_luck",
-    "unsealed", "fortunes_due", "shrinekeeper",
+    "hoarder", "housefavour", "neverturns",
     "green_thumb", "pack_visit", "truffle_hog",
     "night_angler", "second_wind", "storm_sense", "following_sea", "beachcomber",
 ]);
@@ -768,38 +792,13 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     // What differs is what happens on top, and it differs per pet: AMPLIFY runs the pet's own ability at a
     // multiplier chosen against that ability's own ceiling, GRAFT gives it a second one. A grafted ability is
     // applied through applyPerk at the pet's own rarity, so it is capped and merged like any other.
-    // ──── AND THE AMMONITE TENDS THE WHOLE SHRINE ──────────────────────────────────
-    // `shrinekeeper` is the only ability in the game that does nothing on its own. It multiplies what your
-    // OTHER pets are already paying for having been laid to rest — which makes it worthless to a member who
-    // has enshrined nothing and enormous to one with a full shrine, and that asymmetry is the whole point of
-    // an eternal-rarity pet out of the rarest chest there is.
-    //
-    // Read BEFORE the loop, because the loop is the thing it scales. Two rules keep it honest:
-    //   — it is taken UNAMPLIFIED, so an enshrined Ammonite's own stone cannot multiply its own keeper
-    //     value and then multiply the shrine by the result. No pet may compound with itself.
-    //   — it multiplies the BOOST handed to applyPerk, so every ceiling in there still applies. A tended
-    //     shrine reaches its caps sooner; it does not go past them.
-    const keeperPct = (() => {
-        let best = 0;
-        const look = (pet, level) => {
-            if (!pet || (PET_PERKS[pet.id] || {}).key !== "shrinekeeper") return;
-            const raw = petPerkValue(pet.rarity, "shrinekeeper")
-                * petActiveLevelMult(Math.max(1, Number(level) || 1));
-            best = Math.max(best, capSystemPerk("shrinekeeper", raw));
-        };
-        if (equippedPet) look(equippedPet, levelByPet[equippedPet.id] || 1);
-        for (const e of enshrined) look(e?.pet, PET_ENSHRINED_LEVEL);
-        return best;
-    })();
-    const shrineBoost = 1 + keeperPct / 100;
-
     for (const e of enshrined) {
         const pet = e?.pet;
         if (!pet) continue;
         const eff = effectFor(pet.id, e.stone);
-        applyActive(pet, PET_ENSHRINED_LEVEL, (eff?.kind === "amplify" ? (Number(eff.mult) || 1) : 1) * shrineBoost);
+        applyActive(pet, PET_ENSHRINED_LEVEL, eff?.kind === "amplify" ? (Number(eff.mult) || 1) : 1);
         if (eff?.kind === "graft" && eff.key) {
-            applyPerk(eff.key, pet.rarity, PET_ENSHRINED_LEVEL, (Number(eff.scale) || 1) * shrineBoost);
+            applyPerk(eff.key, pet.rarity, PET_ENSHRINED_LEVEL, Number(eff.scale) || 1);
         }
     }
     // Applied ONCE, after every active has had its say. This is the line that makes "enshrined and equipped"

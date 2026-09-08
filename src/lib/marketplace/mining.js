@@ -1377,7 +1377,19 @@ async function claimNode(buyerId, node, row, run = {}) {
     // because there is no fixed hand any more. Averaging is what keeps a long sloppy grind from out-ranking a
     // short clean one: taking twenty swings to break a seam cannot buy you a better rank than taking six.
     const hits = Math.max(1, Number(run.hits) || 1);
-    const pct = Math.max(0, Math.min(1, (run.score || 0) / (hits * HIT_SCORE.pixel)));
+    let pct = Math.max(0, Math.min(1, (run.score || 0) / (hits * HIT_SCORE.pixel)));
+    // ──── THE VAULTWYRM TAKES ITS CUT WHATEVER YOU SWING ──────────────────────────
+    // `hoarder` is the only pet ability that touches the mine and the only thing anywhere that moves RANK.
+    // It raises the FLOOR of a run rather than the ceiling: a sloppy seam is paid as though it had been
+    // swung at reasonably, and a clean one is untouched. That shape matters — a perk that lifted the top
+    // would make a perfect run better than perfect, and the rank ladder is the only reason to aim.
+    // Capped at 38 in SYSTEM_PERK_CAP for the same reason: past about forty a bad run starts out-earning a
+    // good one and there is no longer a point in swinging well.
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const floor = (Number(await getPetSystemPerk(buyerId, "hoarder")) || 0) / 100;
+        if (floor > 0) pct = Math.max(pct, Math.min(1, floor));
+    } catch { /* no companion, no floor */ }
     const rank = rankFor(pct);
 
     // ── WHAT THE SEAM PAYS ───────────────────────────────────────────────────────────────────────────────

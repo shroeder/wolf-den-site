@@ -238,9 +238,16 @@ export const DISCOUNT_MAX = 0.15;
  * What this member pays, as a fraction off. Rounded DOWN to whole chips at the point of sale so a discount
  * can never produce a fractional price, and clamped so no future badge can push it past the cap by accident.
  */
-export function counterDiscount({ pets = 0, badges = 0 } = {}) {
+export function counterDiscount({ pets = 0, badges = 0, housefavour = 0 } = {}) {
     const raw = (Number(pets) || 0) * DISCOUNT_PER_PET + (Number(badges) || 0) * DISCOUNT_PER_BADGE;
-    return Math.max(0, Math.min(DISCOUNT_MAX, raw));
+    // ──── AND ONE PET FROM OUTSIDE THE FLOOR ──────────────────────────────
+    // The Lodestar only falls out of a Celestial Chest, so it is not one of the floor's own trophies and it
+    // is not counted by DISCOUNT_MAX — that cap is the answer to "how much can the CASINO give you", and
+    // moving it would change what every existing collection is worth. This is its own capped term added on
+    // top, so a member who has never touched the floor still gets something for owning the moth, and a
+    // member who has both is not held to a ceiling written before the pet existed.
+    const pet = Math.max(0, Math.min(0.08, (Number(housefavour) || 0) / 100));
+    return Math.max(0, Math.min(DISCOUNT_MAX, raw) + pet);
 }
 
 /** The price after the discount. One function, used by the shelf AND by the till — see the note in
@@ -569,7 +576,7 @@ const statLabel = (k) => STAT_WORDS[k] || k.replace(/([A-Z])/g, " $1").replace(/
 // Both queries are pinned to the CASINO's own ids: `casino_%` badges and the five `casinoExclusive` pets. A
 // discount that quietly counted every badge in the game would grow every time anybody shipped one.
 export async function casinoTrophies(buyerId) {
-    if (!buyerId) return { pets: 0, badges: 0 };
+    if (!buyerId) return { pets: 0, badges: 0, housefavour: 0 };
     const { COLLECTIBLES } = await import("@/lib/marketplace/collectibles.js");
     const casinoPets = COLLECTIBLES.filter((c) => c.casinoExclusive).map((c) => c.id);
     const [pets, badges] = await Promise.all([
@@ -583,7 +590,16 @@ export async function casinoTrophies(buyerId) {
             [buyerId],
         ).catch(() => null),
     ]);
-    return { pets: Number(pets?.n || 0), badges: Number(badges?.n || 0) };
+    // ⚠️ READ HERE AND NOWHERE ELSE. counterDiscount has two callers -- the shelf that quotes a price and
+    // the till that charges one -- and chip-store.js already carries a note about what happens when those two
+    // do their own arithmetic. So the pet term is fetched by the one function they BOTH pass through, which
+    // makes it structurally impossible for the quote and the charge to disagree about it.
+    let housefavour = 0;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        housefavour = Number(await getPetSystemPerk(buyerId, "housefavour")) || 0;
+    } catch { /* no companion, no discount */ }
+    return { pets: Number(pets?.n || 0), badges: Number(badges?.n || 0), housefavour };
 }
 
 /**

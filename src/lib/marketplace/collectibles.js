@@ -234,15 +234,26 @@ export const COLLECTIBLES = [
     // These three are the answer, and they are deliberately NOT bigger numbers on existing keys. Each carries
     // an ability nothing else in the game has, written as code in the system it talks about:
     //
-    //   Vaultwyrm    `unsealed`      its chests cannot be intercepted — they go to the gear
-    //   Lodestar     `fortunes_due`  your Fortune finally lifts a chest's gear roll, which it never has
-    //   Ammonite     `shrinekeeper`  every enshrined pet in your collection counts for more
+    //   Vaultwyrm    `hoarder`       THE MINE — your worst swings at the rock face still pay
+    //   Lodestar     `housefavour`   THE CASINO — everything at the Counter costs less
+    //   Ammonite     `neverturns`    SEA RAIDS — one to three more of them a day
     //
-    // All three are about CHESTS AND COLLECTION, which is what a pet that only falls out of the best chest in
-    // the game should be about. The Ammonite is the first `eternal` pet the Den has ever had.
-    { id: "vaultwyrm", name: "Vaultwyrm", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "gold_find", hint: "It has slept on the good chests so long it knows which ones are lying", spritePrompt: "a majestic coiling golden dragon wyrm curled around a heap of treasure, scales like stacked coins, awe-inspiring" },
-    { id: "lodestar", name: "Lodestar", Icon: GiStarSwirl, color: "#8fd0ff", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "fortune", hint: "Luck was always yours. This is the thing that finally spends it", spritePrompt: "a majestic celestial moth with wings of deep blue night sky scattered with real stars, a small burning star held between its forelegs, awe-inspiring" },
-    { id: "ammonite", name: "The Ammonite", Icon: GiAmmonite, color: "#c9b3ff", rarity: "eternal", source: "chest", chestTier: "primordial", activeStat: "fortune", hint: "Older than the Den, and it remembers every animal you ever laid to rest", spritePrompt: "a majestic ancient spiral-shelled ammonite floating in the air, its fossil shell banded in pale violet and pearl with soft light in the grooves, trailing slow motes, awe-inspiring" },
+    // ⚠️ THE FIRST CUT OF ALL THREE POINTED AT CHEST LOOT and one multiplied every other pet you own.
+    // Luke: "I dont like altering chest loot. I like it buffing existing systems like casino sailing digging
+    // raiding arena farm etc. dont like buffing all pets thats too op."
+    //
+    // Both notes hold. Chest loot is the one table every other system pays INTO, so a pet editing it quietly
+    // re-tunes mining, sailing, delving and the boss at once; and an ability that scales with the size of a
+    // collection is worth nothing to a new member and unbounded to an old one, which is a multiplier rather
+    // than a pet. Each of these now moves exactly one thing in one system, and all three went to systems that
+    // had NO pet perk at all — before this, every key in the game served the farm, fishing, voyages, the
+    // kitchen, the forge or the town. The Ammonite is the first `eternal` pet the Den has ever had.
+    // Affinity in the QUARANTINED layers (DEPTH_META / SEA_META), which is how a pet is allowed to make you
+    // better at one activity without touching boss power. The Vaultwyrm lives in a mountain on a pile of
+    // gold, so it reads rock; the Ammonite is a sea fossil, so it rides out a volley.
+    { id: "vaultwyrm", name: "Vaultwyrm", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "gold_find", depth: { lodesense: 5, hew: 4, prospect: 3 }, hint: "It has lived in the rock so long it can hear which seam is worth the swing", spritePrompt: "a majestic coiling golden dragon wyrm curled around a heap of treasure, scales like stacked coins, awe-inspiring" },
+    { id: "lodestar", name: "Lodestar", Icon: GiStarSwirl, color: "#8fd0ff", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "fortune", hint: "Every moth in the Den ends up at the brightest room in it, and this one is owed a favour there", spritePrompt: "a majestic celestial moth with wings of deep blue night sky scattered with real stars, a small burning star held between its forelegs, awe-inspiring" },
+    { id: "ammonite", name: "The Ammonite", Icon: GiAmmonite, color: "#c9b3ff", rarity: "eternal", source: "chest", chestTier: "primordial", activeStat: "fortune", sea: { ironclad: 6, broadside: 4, plunder: 4 }, hint: "It was in this water before there were ships in it, and it has never once needed to rest", spritePrompt: "a majestic ancient spiral-shelled ammonite floating in the air, its fossil shell banded in pale violet and pearl with soft light in the grooves, trailing slow motes, awe-inspiring" },
 
     { id: "deep_golem", name: "Deep Golem", Icon: GiGolemHead, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "might", depth: { hew: 5, nerve: 4, lodesense: 3 }, hint: "The mountain, walking — master of the deep", spritePrompt: "a majestic hulking golem of dark stone veined with glowing golden ore, awe-inspiring, standing tall" },
 

@@ -134,7 +134,20 @@ const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) :
 // assembling it is the achievement, so it counts what you own rather than what is in your slots.
 async function equippedRaidExtras(buyerId) {
     const owned = await getOwnedSetIds(buyerId).catch(() => []);
-    return { bonusRaids: setRaidBonus(owned), doubleGold: setDoublesRaidGold(owned) };
+    // ──── AND THE AMMONITE DOES NOT TIRE ────────────────────────────────────────
+    // `neverturns` is counted in RAIDS, not percent — /25, so 25 is one extra a day and the ceiling of 75
+    // is three. It joins `bonusRaids`, which is the set-bonus term, so it reaches BOTH callers of this
+    // function (the raid gate and the sailing screen that shows how many you have left) for free. Putting it
+    // at the gate alone would have given you raids the screen never admitted you had.
+    //
+    // Deliberately throughput and not power: nothing here touches guns, hull, accuracy or the matchmaker, so
+    // an ancient shell of a pet cannot distort who you are matched against or what a volley does.
+    let petRaids = 0;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        petRaids = Math.floor((Number(await getPetSystemPerk(buyerId, "neverturns")) || 0) / 25);
+    } catch { /* no companion, no extra raids */ }
+    return { bonusRaids: setRaidBonus(owned) + petRaids, doubleGold: setDoublesRaidGold(owned) };
 }
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
 // RAID_RESET_PAID true (+ tune base) before release.

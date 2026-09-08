@@ -10,7 +10,7 @@ import PetStonesRow from "@/components/PetStonesRow";
 import PetEnshrineReveal from "@/components/PetEnshrineReveal";
 import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { FORTUNE_SHORT } from "@/lib/marketplace/fortune";
-import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
+import { petPerkAt, petRealWorld } from "@/lib/marketplace/pet-perks";
 import { COIN_ICON } from "@/lib/coin-icon";
 import Glyph from "@/components/Glyph";
 
@@ -359,10 +359,12 @@ export default function PetsClient() {
         const tradeable = tradeableSet.has(p.id);
         const giftPending = state?.outgoing?.[p.id] || null; // an offer of THIS pet is already awaiting acceptance
         const passive = petPassive(p);
-        const perk = petPerk(p);
         const price = petPrice(p);
         const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
         const lvl = owned ? state?.petLevels?.[p.id] : null;
+        // At the level it is actually at -- see petPerkAt. petPerk() answers for Lv1 and this panel sits
+        // under the words "grows as it levels".
+        const perk = petPerkAt(p, lvl || 1);
         const isWished = state?.petWish === p.id;
         const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
         return (
@@ -599,8 +601,8 @@ export default function PetsClient() {
                         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                             <span style={{ fontWeight: 800, fontSize: "1.05rem" }}>{ownedCount}<span className="muted" style={{ fontWeight: 600 }}> / {COLLECTIBLES.length} pets collected</span></span>
                             {featured ? (
-                                <span title={petPerk(featured).desc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 999, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.4)", fontSize: "0.85rem", maxWidth: "100%" }}>
-                                    ★ <strong>{featured.name}</strong> <span style={{ opacity: 0.9 }}>· {petPerk(featured).icon} {petPerk(featured).name}</span>
+                                <span title={petPerkAt(featured, state.petLevels?.[featured.id] || 1).desc} style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 999, background: "rgba(255,215,94,0.12)", border: "1px solid rgba(255,215,94,0.4)", fontSize: "0.85rem", maxWidth: "100%" }}>
+                                    ★ <strong>{featured.name}</strong> <span style={{ opacity: 0.9 }}>· {petPerkAt(featured, 1).icon} {petPerkAt(featured, 1).name}</span>
                                 </span>
                             ) : <span className="muted" style={{ marginLeft: "auto" }}>No pet equipped</span>}
                         </div>
@@ -679,9 +681,9 @@ export default function PetsClient() {
                         const owned = ownedSet.has(pet.id);
                         const isFeatured = state.featured === pet.id;
                         const passive = petPassive(pet);
-                        const perk = petPerk(pet);
                         const Icon = pet.Icon;
                         const lvl = owned ? state.petLevels?.[pet.id] : null;
+                        const perk = petPerkAt(pet, lvl || 1);
                         return (
                             <button type="button" key={pet.id} onClick={() => openDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
                                 {newSet.has(pet.id) ? <span className="pet-new-badge">NEW</span> : null}

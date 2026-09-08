@@ -62,16 +62,6 @@ const SEED_COUNT = { wooden: 3, iron: 3, gold: 3, mythic: 3, ascendant: 4, etern
 const GEM_CHEST_CHANCE = { wooden: 0.010, iron: 0.018, gold: 0.030, mythic: 0.045, ascendant: 0.055, eternal: 0.065,
     celestial: 0.075, primordial: 0.085 };
 
-// A pet system perk, read once and never allowed to throw — a member with no companion at all must open
-// chests exactly as they always did. Both celestial abilities go through this rather than each repeating the
-// dynamic import and the catch.
-async function petPerkFor(buyerId, key) {
-    try {
-        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        return Number(await getPetSystemPerk(buyerId, key)) || 0;
-    } catch { return 0; }
-}
-
 // The recipe_nose companion perk, read once per open.
 async function recipeLuckFor(buyerId) {
     try {
@@ -425,18 +415,13 @@ export async function openChest(buyerId, tier) {
     //
     // Fortune doing something POSITIVE for a chest's gear (lifting the rarity roll) is a separate question
     // and a change to the power curve, so it is the owner's call rather than a bug fix. It is not made here.
-    // ──── THE VAULTWYRM OPENS IT FOR YOU ────────────────────────────────────────────
-    // `unsealed` is the celestial dragon's ability and the only thing in the game that can take a chest OUT
-    // of the chain above. Rolled once, here, before any of the four interceptions get a look: if it lands,
-    // recipes, seeds, forge scrolls and relics are all skipped and the chest resolves as gear.
-    //
-    // The pet and the gem still roll. That is deliberate and the ability's own sentence says so — those two
-    // are FINDS rather than things handed to you instead of gear, and a dragon that ate your Sea Wyrm drop
-    // on the way past would be a downgrade wearing a reward.
-    const unsealed = await petPerkFor(buyerId, "unsealed");
-    const straightToGear = unsealed > 0 && Math.random() < unsealed / 100;
-
-    if (!straightToGear && Math.random() < (RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId)) {
+    // ⚠️ NOTHING A PET OWNS MAY REACH INTO THIS CHAIN. A first cut of the celestial pets gave one of them
+    // an ability that skipped these four interceptions outright and another that promoted the gear roll.
+    // Luke's call, and it is the right one: chest loot is the one table in the game every other system pays
+    // INTO, so a pet that edits it is quietly re-tuning mining, sailing, delving and the boss all at once.
+    // Those three abilities now live in the mine, the casino and the sea raid, where each one moves exactly
+    // one thing. This chain is fortune-free and pet-free by design.
+    if (Math.random() < (RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId)) {
         const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
         const rec = await grantRecipeReward(buyerId, band).catch(() => null);
         // Null means they already know every recipe in this band — fall through to the ordinary loot rather
@@ -444,7 +429,7 @@ export async function openChest(buyerId, tier) {
         if (rec) return { ok: true, remaining: dec.count, recipe: rec };
     }
 
-    if (!straightToGear && Math.random() < (SEED_CHANCE[tier] || 0)) {
+    if (Math.random() < (SEED_CHANCE[tier] || 0)) {
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
         // ⚠️ EVERY TIER ABOVE IRON READ THE SAME TABLE. The recipe roll six lines up bands properly and
         // ends at `chest_high`; this one just stopped, so a primordial chest's seeds were a gold chest's
@@ -498,7 +483,7 @@ export async function openChest(buyerId, tier) {
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.
     const sChance = SCROLL_CHEST_CHANCE[tier] || 0;
-    if (!straightToGear && sChance && Math.random() < sChance) {
+    if (sChance && Math.random() < sChance) {
         // The Enchantment Scroll is the rarer and better of the two. One in eight everywhere meant the best
         // chest in the game handed out the ordinary scroll seven times in eight, which is the same
         // consolation-prize shape as the seeds and the chipped gems.
@@ -511,7 +496,7 @@ export async function openChest(buyerId, tier) {
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];
-    if (!straightToGear && cc && Math.random() < cc.chance) {
+    if (cc && Math.random() < cc.chance) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
@@ -541,23 +526,6 @@ export async function openChest(buyerId, tier) {
             if (i >= 0 && i < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[i + 1];
         }
     } catch { /* no companion, no promotion */ }
-    // ──── THE LODESTAR SPENDS THE LUCK YOU ALREADY HAD ──────────────────────────────
-    // Fortune has never touched this roll. rollRarity takes no fortune argument and never has, so on a chest
-    // a member's luck did nothing for the gear and — until it was taken off the interception rolls — was
-    // actively making gear rarer. `fortunes_due` is the one thing in the game that connects the two.
-    //
-    // Scaled by the Fortune you actually carry rather than flat, because that IS the ability: the pet does
-    // not give you luck, it makes the luck you built pay somewhere it never has. FULL_FORTUNE is the point
-    // where a member is getting all of it; the Den's highest today sits near 171.
-    // One band, never two, and never past the top of the ladder.
-    const due = await petPerkFor(buyerId, "fortunes_due");
-    if (due > 0) {
-        const FULL_FORTUNE = 200;
-        if (Math.random() < (due / 100) * Math.min(1, (Number(fortune) || 0) / FULL_FORTUNE)) {
-            const i = RARITY_LADDER.indexOf(rarity);
-            if (i >= 0 && i < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[i + 1];
-        }
-    }
     // Pick the pool by the ROLLED rarity, not the chest tier: Ascendant/Eternal are elite (charged) gear;
     // everything common→mythic comes from the normal loot pool. This lets a chest's spread span both tiers
     // (e.g. an Ascendant chest that under-rolls to mythic still grants a real mythic item).
