@@ -499,7 +499,17 @@ export default function CardShop({ run, art = {} }) {
                     filter: drop-shadow(0 5px 8px rgba(0,0,0,0.7)); }
 
                 /* ── ONE THING FOR SALE ── the card, and a tag hanging off it. */
-                .cs-buy { position: relative; padding: 0 0 14px; border: 0; background: none; cursor: pointer;
+                /* ⚠️ A FIXED WIDTH, AND NOTHING HERE SHRINKS. Both this button and the card inside it were
+                   ordinary flex items with the default flex-shrink of 1, so the shelf row squeezed them:
+                   measured at 375px, a card declaring 96x138 rendered 81x95 and the three buttons came out
+                   81, 141 and 168 wide — different widths for identical goods, which pushed the third card
+                   onto a second row where it sat across the plank and behind its neighbour. The card is a
+                   fixed-size object drawn on a shelf; it is not a thing that flexes.
+                   The bottom padding is the TAG'S room. It was 14px against a ~27px tag, so half the tag hung
+                   over the card and struck through the last line of its sentence — "Gain 4 Blo(39)eneration".
+                   The tag is meant to overlap the SHELF, which is what it does once it has its own space. */
+                .cs-buy { position: relative; padding: 0 0 28px; border: 0; background: none; cursor: pointer;
+                    flex: 0 0 auto; width: var(--cf-w, 96px);
                     display: flex; flex-direction: column; align-items: center; }
                 .cs-buy:disabled { cursor: default; }
                 .cs-buy.is-gone { opacity: 0.4; filter: grayscale(0.6); }
@@ -509,13 +519,22 @@ export default function CardShop({ run, art = {} }) {
                 /* ── THE CARD BOX ── everything inside it is CardFace's. See the note there: the face is one
                    component and the box belongs to the screen, because the fight's fans out and is dragged
                    and this one stands on a plank. */
-                .cs .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
+                /* ⚠️ NO .cs PREFIX HERE — THE BLOCK ALREADY HAS ONE. Every selector in this style element
+                   is served with a .cs prepended, so ".cs .cf-card" reaches the browser as ".cs .cs
+                   .cf-card" and asks for two nested elements with that class. There is one. So the rule has
+                   never matched anything: the shop's cards have been drawn with NO box at all, taking their
+                   size from their own text — measured 81x95 against the 96x138 they declare, and three
+                   different heights for three cards, which is what pushed the third onto a second row and
+                   under the shelf. Every other rule in this block is written bare (.cs-buy, .cs-tag) and
+                   works; these two named the root and quietly stopped applying. */
+                .cf-card { position: relative; flex: 0 0 auto;
+                    width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6));
                     transition: transform 140ms ease-out; }
                 /* The painted moulding. Same asset the hand uses — a card is a card wherever it is. */
-                .cs .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
 
