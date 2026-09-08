@@ -1909,9 +1909,12 @@ export default function CardFightClient({ fixture, run = null }) {
                    Spire is ten and the most any run held was FIFTEEN, which at 22px and a 5px gap is 405px
                    of strip on a 375px phone — the last three simply off the side of the screen, and with
                    them whatever they do. Two rows is not as tidy as one and is considerably tidier than
-                   losing them. */
+                   losing them.
+                   The ceiling is 92vw so a phone wraps, and 560px so a wide screen does NOT: fifteen at 27px
+                   apiece is 405px, which fits on one line anywhere there is room for it. A fixed 340px made
+                   a 1280px screen wrap for no reason. */
                 .cf-trinkets { position: absolute; top: calc(84px + env(safe-area-inset-top)); left: 50%;
-                    transform: translateX(-50%); z-index: 3; max-width: min(340px, 92vw);
+                    transform: translateX(-50%); z-index: 3; max-width: min(92vw, 560px);
                     display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 5px; }
                 /* ⚠️ THE PICTURE IS 22px AND THE TARGET MUST NOT BE. A trinket is tapped to read what it
                    does, and a 22x22 target is a miss on a phone — measured by the hit audit, which is the
