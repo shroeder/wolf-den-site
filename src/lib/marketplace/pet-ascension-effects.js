@@ -42,6 +42,37 @@
 // uncapped stat perk gets a smaller one. GRAFT scales sit at 0.6–1.0 — a second trade learned late is rarely as
 // good as the one it was born with, and the handful at 1.0 are pets whose whole character is the second thing.
 export const ASCENSION_EFFECTS = {
+    // ──── THE THREE FROM THE CELESTIAL AND PRIMORDIAL CHESTS ────────────────────────
+    // ⚠️ ALL THREE ABILITIES ARE CAPPED CLOSE TO WHERE THEY ALREADY SIT, which is the exact trap this file
+    // was rewritten to avoid: the Ferret and the Magpie both carried a capped key, so an amplify Darkstone
+    // came out arithmetically identical to the Lightstone and the choice was a prompt rather than a decision.
+    //
+    // unsealed sits at 22 against a cap of 25, so ANY amplify on the Vaultwyrm is worth +3 and nothing more.
+    // It gets two GRAFTS instead — widen rather than deepen, the Beach Crab's answer. The other two have
+    // real headroom (22 -> 30, 30 -> 40) so they keep the usual shape: a second trade against doubling down.
+    vaultwyrm: {
+        light: { name: "Knows The Whole Hoard", kind: "graft", key: "chest_luck", scale: 0.9,
+            note: "It has been counting them since before you got here, and it counts in your favour." },
+        dark: { name: "Sits On It", kind: "graft", key: "gold_find", scale: 1.0,
+            note: "Nothing leaves the pile. Some of it finds its way to you instead." },
+    },
+    lodestar: {
+        // A moth that spends your luck, taught to make some of its own. 1.0 because that second trade IS the
+        // character -- a star you steer by is a star whether or not you are going anywhere.
+        light: { name: "Makes Its Own Light", kind: "graft", key: "fortune", scale: 1.0,
+            note: "It stopped waiting for a night clear enough and started burning." },
+        // 22 -> 30 at the ceiling. Every point of Fortune you own pushes harder on the same door.
+        dark: { name: "Spends All Of It", kind: "amplify", mult: 1.6 },
+    },
+    ammonite: {
+        // The shrine keeper learning to pass on what the shrine knows. pack_visit is the only key in the game
+        // about your animals teaching each other, which is the same sentence this pet is already made of.
+        light: { name: "Passes It Down", kind: "graft", key: "pack_visit", scale: 0.9,
+            note: "Everything it has outlived, it has also remembered, and it is not precious about it." },
+        // 30 -> 40 at the ceiling: the whole shrine, harder.
+        dark: { name: "Forgets Nothing", kind: "amplify", mult: 1.5 },
+    },
+
     // ── THE CASINO'S FIVE AND SABLE'S THREE ───────────────────────────────────────────────────────────────
     // All eight were falling through to FALLBACK_EFFECT — the deliberately dull pair — and check:ascension
     // was already failing on every one of them. Two were worse than dull: the Ferret and the Magpie both

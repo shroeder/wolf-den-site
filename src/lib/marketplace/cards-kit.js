@@ -528,6 +528,24 @@ export const POOL = {
     sky_whale: { id: "sky_whale", pet: "sky_whale", name: "Sound the Deep", cost: 3, kind: "skill", target: "self", tier: 3,
         block: 30, draw: 1, text: "Gain {block} Block. Draw 1 card.",
         upgrade: { block: 40, draw: 2 } },
+    // ──── THE THREE FROM THE BEST CHESTS ────────────────────────────────────────────
+    // One card each for the Vaultwyrm, the Lodestar and the Ammonite, and each one is the ONLY card in the
+    // game that does its thing: block off the size of your draw pile, draw up to a hand size rather than by
+    // a count, and pull a card back out of the discard. All three hooks were written for these (see playCard)
+    // because every existing one was already spoken for, and a fourth Barricade with a different animal on
+    // the front is exactly the "two cards with one effect is one card and a wasted pet" mistake noted above.
+    vaultwyrm: { id: "vaultwyrm", pet: "vaultwyrm", name: "The Hoard", cost: 2, kind: "skill", target: "self", tier: 3,
+        blockFromDeck: true, text: "Gain Block equal to the cards left in your draw pile.",
+        upgrade: { block: 6 } },
+    lodestar: { id: "lodestar", pet: "lodestar", name: "Follow It", cost: 1, kind: "skill", target: "self", tier: 3,
+        drawTo: 7, exhaust: true, text: "Draw until you are holding 7 cards. Exhaust.",
+        upgrade: { drawTo: 9 } },
+    // Exhausts BY NECESSITY, not for balance -- a recall card that stayed in the discard would recall itself
+    // forever. The note in playCard says the same thing from the other end.
+    ammonite: { id: "ammonite", pet: "ammonite", name: "Long Memory", cost: 1, kind: "skill", target: "self", tier: 3,
+        recall: 1, exhaust: true, text: "Take the last card you discarded back into your hand. Exhaust.",
+        upgrade: { recall: 2 } },
+
     chameleon: { id: "chameleon", pet: "chameleon", name: "Every Colour", cost: 1, kind: "attack", target: "foe", tier: 3,
         damage: 8, strengthMult: 2, text: "Deal {damage} damage. Strength counts twice.",
         upgrade: { damage: 11 } },
@@ -3308,6 +3326,17 @@ export function playCard(state, uid, targetIndex = 0) {
         hero = { ...hero, strengthEach: (hero.strengthEach || 0) + card.strengthEach };
         events.push({ type: "buff", on: "hero", key: "Demon Form", amount: card.strengthEach });
     }
+    // ──── THE VAULTWYRM COUNTS WHAT IS LEFT ──────────────────────────────────────────
+    // Block equal to the cards still in the draw pile. Every other block card in the game prints a number;
+    // this one is worth whatever you have not spent yet, so it is enormous on turn one of a fresh shuffle
+    // and nearly nothing at the bottom of a pile — a card you play EARLY, which no other guard card in
+    // this deck rewards. It reads off `draw` alone and not the discard, deliberately: the hoard is what is
+    // still buried, not what has already been dug up.
+    if (card.blockFromDeck) {
+        const gained = blockGain(state.draw.length, hero);
+        hero = { ...hero, block: (hero.block || 0) + gained };
+        events.push({ type: "block", on: "hero", amount: gained });
+    }
     if (card.blockEach) {
         hero = { ...hero, blockEach: (hero.blockEach || 0) + card.blockEach };
         events.push({ type: "buff", on: "hero", key: "Metallicize", amount: card.blockEach });
@@ -3377,6 +3406,27 @@ export function playCard(state, uid, targetIndex = 0) {
     // Drawn AFTER the card has left the hand and reached the discard, so a card that draws cannot draw itself
     // back, and so a draw that exhausts the pile reshuffles a discard this card is already part of.
     if (card.draw) next = drawCards(next, card.draw);
+    // ──── THE LODESTAR FILLS THE HAND ──────────────────────────────────────────────
+    // Draw UP TO a hand size rather than a fixed count, so it is worth most exactly when you have least — a
+    // dead hand becomes a full one, and a full hand gets nothing. `card.draw` can never do that: a flat draw
+    // is worth the same whether you are holding six cards or none.
+    if (card.drawTo) {
+        const short = card.drawTo - next.hand.length;
+        if (short > 0) next = drawCards(next, short);
+    }
+    // ──── AND THE AMMONITE REMEMBERS ────────────────────────────────────────────────
+    // Takes the most recently discarded card back into your hand. Nothing else in this game moves a card
+    // BACKWARDS out of the discard, which is the point — it turns a card you already spent into a card you
+    // get to spend again, and it is the only way to play the same strong card twice in one turn.
+    // ⚠️ THE CARD CARRYING THIS MUST EXHAUST, and the one that does. Without it the played card is itself
+    // the last thing in the discard by the time this runs (see the `discard:` line above), so it would
+    // recall ITSELF, forever, for one energy.
+    if (card.recall && next.discard.length) {
+        const pile = [...next.discard];
+        const back = [];
+        for (let i = 0; i < card.recall && pile.length; i += 1) back.push(pile.pop());
+        if (back.length) next = { ...next, discard: pile, hand: [...next.hand, ...back] };
+    }
     // A kill's card comes after the card's own draw, and only while the fight is still going — drawing into
     // a won fight is a hand nobody plays and a reshuffle nobody sees.
     if (killDraw && next.over !== "win") next = drawCards(next, killDraw);

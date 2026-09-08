@@ -23,6 +23,7 @@ import {
     GiRat, GiTeapot,
     // Mine pets
     GiEarthWorm, GiBeetleShell, GiGolemHead, GiCrystalGrowth, GiScarabBeetle,
+    GiStarSwirl, GiAmmonite,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -74,6 +75,9 @@ export const PET_PASSIVE_STAT = {
     // Chest
     tropical_fish: "seafaring", axolotl: "reelStrength", butterfly: "xp_gain", squid: "seafaring", jellyfish: "seafaring", octopus: "seafaring",
     corsair_parrot: "crit_chance", marlin: "vitality", anglerfish: "pierce", sea_wyrm: "crit_power",
+    // The celestial three. Owned passives are ordinary stats on purpose — the character is in the ABILITY
+    // (see PET_PERKS), and a pet whose owned-passive was also unique would be two pets in one.
+    vaultwyrm: "gold_find", lodestar: "fortune", ammonite: "tenacity",
     // Boss
     vulture: "might", minotaur: "tenacity", centaur: "vitality", imp: "crit_chance", polar_bear: "tenacity",
     mammoth: "tenacity", wyvern: "pierce", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
@@ -220,6 +224,26 @@ export const COLLECTIBLES = [
     { id: "pit_beetle", name: "Pit Beetle", Icon: GiBeetleShell, color: "#6fb0e6", rarity: "rare", source: "chest", chestTier: "iron", activeStat: "ferocity", depth: { nerve: 4 }, hint: "Shell like a shoring timber", spritePrompt: "a sturdy armoured beetle with a thick iridescent blue-black carapace and stout digging legs" },
     { id: "cinder_scarab", name: "Cinder Scarab", Icon: GiScarabBeetle, color: "#ff9f1c", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_power", depth: { bellows: 5, crucible: 2 }, hint: "It nests in the furnace and fans the coals", spritePrompt: "a glowing ember-orange scarab beetle with cracks of molten light between its wing cases, trailing sparks" },
     { id: "geode_sprite", name: "Geode Sprite", Icon: GiCrystalGrowth, color: "#b98cff", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "fortune", depth: { prospect: 5, hew: 2 }, hint: "Chimes when there is something worth digging for", spritePrompt: "a tiny cheerful crystal elemental sprite made of glowing violet geode shards, floating with a soft inner light" },
+    // ──── THE THREE THAT ONLY THE BEST CHESTS HOLD ──────────────────────────────────
+    // ⚠️ THE TOP THREE CHEST TIERS HAD NO PET OF THEIR OWN. Every chest pet was gated at `ascendant` or
+    // below, and the gate is `chestTier <= opened` — so a Primordial Chest, the rarest object in the game,
+    // could hand you a common Reef Fish and had nothing it alone could give. Worse for a veteran: the pool is
+    // un-owned pets only, so once you hold all seventeen the pet roll returns null every time and drops you
+    // further down the chain toward the consumables.
+    //
+    // These three are the answer, and they are deliberately NOT bigger numbers on existing keys. Each carries
+    // an ability nothing else in the game has, written as code in the system it talks about:
+    //
+    //   Vaultwyrm    `unsealed`      its chests cannot be intercepted — they go to the gear
+    //   Lodestar     `fortunes_due`  your Fortune finally lifts a chest's gear roll, which it never has
+    //   Ammonite     `shrinekeeper`  every enshrined pet in your collection counts for more
+    //
+    // All three are about CHESTS AND COLLECTION, which is what a pet that only falls out of the best chest in
+    // the game should be about. The Ammonite is the first `eternal` pet the Den has ever had.
+    { id: "vaultwyrm", name: "Vaultwyrm", Icon: GiDragonSpiral, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "gold_find", hint: "It has slept on the good chests so long it knows which ones are lying", spritePrompt: "a majestic coiling golden dragon wyrm curled around a heap of treasure, scales like stacked coins, awe-inspiring" },
+    { id: "lodestar", name: "Lodestar", Icon: GiStarSwirl, color: "#8fd0ff", rarity: "ascendant", source: "chest", chestTier: "celestial", activeStat: "fortune", hint: "Luck was always yours. This is the thing that finally spends it", spritePrompt: "a majestic celestial moth with wings of deep blue night sky scattered with real stars, a small burning star held between its forelegs, awe-inspiring" },
+    { id: "ammonite", name: "The Ammonite", Icon: GiAmmonite, color: "#c9b3ff", rarity: "eternal", source: "chest", chestTier: "primordial", activeStat: "fortune", hint: "Older than the Den, and it remembers every animal you ever laid to rest", spritePrompt: "a majestic ancient spiral-shelled ammonite floating in the air, its fossil shell banded in pale violet and pearl with soft light in the grooves, trailing slow motes, awe-inspiring" },
+
     { id: "deep_golem", name: "Deep Golem", Icon: GiGolemHead, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "might", depth: { hew: 5, nerve: 4, lodesense: 3 }, hint: "The mountain, walking — master of the deep", spritePrompt: "a majestic hulking golem of dark stone veined with glowing golden ore, awe-inspiring, standing tall" },
 
     // ── SEA-FIGHT PETS ── the only way to get one is to WIN a fight at sea (an encounter today; fleet and
