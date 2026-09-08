@@ -74,8 +74,12 @@ export const CHEST_TIERS = {
     // The chest is the reward for the tier, so the tier is what it leads with. The remainder keeps its
     // shape — the weight comes off the epic end, which is the part that was already redundant by the
     // time anybody held one of these. Still sums to exactly 100, so these read as percentages.
-    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 20, legendary: 33, mythic: 25, ascendant: 20, eternal: 2 } },
-    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 16, legendary: 30, mythic: 26, ascendant: 20, eternal: 8 } },
+    // ── A CHEST LEADS WITH ITS OWN TIER ─────────────────────────────────────────────────────────────
+    // The rarest chest in the game used to hand you an epic 5% of the time and its own rarity 3%, which is
+    // the wrong way round by a wide margin. These now pay their own name most often and step down from
+    // there, so opening one means what its label says.
+    ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { legendary: 20, mythic: 30, ascendant: 45, eternal: 5 } },
+    eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { mythic: 20, ascendant: 35, eternal: 40, celestial: 5 } },
     // ── THE TWO RAREST CHESTS ARE THE ONLY ROUTE TO THE TWO RAREST TIERS ─────────────────────────────────
     // 55 items — every celestial and every primordial piece — could not be obtained by anything at all: no
     // chest's table listed those rarities, so the top of the ladder was decoration. These are the numbers Luke
@@ -96,9 +100,9 @@ export const CHEST_TIERS = {
     // opens and there is nothing behind it. These two chests are the only route to those two rarities, so
     // they lead with them.
     celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff",
-        weights: { epic: 9, legendary: 24, mythic: 26, ascendant: 20, eternal: 9, celestial: 10, primordial: 2 } },
+        weights: { ascendant: 20, eternal: 30, celestial: 45, primordial: 5 } },
     primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0",
-        weights: { epic: 5, legendary: 14, mythic: 20, ascendant: 20, eternal: 15, celestial: 18, primordial: 8 } },
+        weights: { ascendant: 5, eternal: 20, celestial: 30, primordial: 45 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -150,11 +154,24 @@ function tierForLevel(level) {
 // clear) roughly quadruples the rolls again. Luke: "high tier chests are maybe too rare. but I still
 // want them rare." So a primordial chest lands about once a year across the entire Den and the item
 // inside it is rarer still — which is the promise the comment made and the numbers now keep.
+// ── SOLVED AGAINST A TARGET, NOT PICKED ─────────────────────────────────────────────────────────────────
+// Luke: "maybe like 5 times a month someone gets the 2nd highest tier and once a month they get the highest
+// tier. across everyone, would be my target."
+//
+// These four numbers are the solution to exactly that, against the Den's MEASURED pace of 3.99 elite rolls a
+// day (every tenth delve clear plus every milestone level). Celestial lands 5 items a month across the
+// membership and primordial 1, which is what he asked for.
+//
+// ⚠️ THE BOTTOM TWO HAD TO RISE AS WELL, and that is the part worth knowing. Ascendant is the FOURTH-rarest
+// tier; at the old odds it landed 4 items a month, so pulling celestial up to 5 would have made the
+// second-rarest tier commoner than the fourth and the ladder would read backwards. 15 and 9 keep the order —
+// each tier a bit under twice the one above — and that is a much more generous top end than before: an
+// active delver now sees about five ascendant pieces a year where it used to be one every eighteen months.
 const ELITE_CHEST_LOTTERY = [
-    { tier: "primordial", chance: 0.0005 }, //  ~1 in 2,000 rolls
-    { tier: "celestial", chance: 0.004 }, //    ~1 in 250
-    { tier: "eternal", chance: 0.010 }, //      ~1 in 100
-    { tier: "ascendant", chance: 0.030 }, //    ~1 in 33
+    { tier: "primordial", chance: 0.0102 }, //  ~1 in 98 rolls   -> 1 item a month, Den-wide
+    { tier: "celestial", chance: 0.0737 }, //   ~1 in 14         -> 5 a month
+    { tier: "eternal", chance: 0.1152 }, //     ~1 in 9          -> 9 a month
+    { tier: "ascendant", chance: 0.1957 }, //   ~1 in 5          -> 15 a month
 ];
 
 /**
