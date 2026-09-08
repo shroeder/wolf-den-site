@@ -5,6 +5,7 @@ import { Kreon } from "next/font/google";
 import {
     GiBiceps, GiCardDraw, GiCrackedShield, GiCrossedSwords, GiHeartPlus, GiShield,
     GiSlowBlob, GiSmallFire, GiThunderStruck,
+    GiBrokenHeart, GiBrokenBone, GiDespair, GiTombstone, GiChainedHeart, GiHole,
 } from "react-icons/gi";
 
 import { KEYWORDS, baseIdOf, typeLook, upgradedFields } from "@/lib/marketplace/cards-kit.js";
@@ -192,19 +193,35 @@ const stockStyle = (hue) => ({
 // not one of our pets — there is nothing to put in the window. Theirs draw them as a distinct, ugly object so
 // they read as WRONG at a glance in a fan of your own cards, and that legibility is the whole point: you need
 // to see the dead card without reading it. A grey glyph, no portrait, no rarity.
+// ⚠️ THE CURSES BELONG IN HERE TOO, and the note further down about rim-status-common.png is the previous
+// time this exact hole was found: a card with no `pet` that does not take the glyph path asks for a picture
+// that was never drawn, and every curse in the game renders an empty window. They carry `curse: true` rather
+// than `status: true` — deliberately, they are different things — so every test in this file has to ask for
+// BOTH, which is what `plain` below is for.
 const STATUS_MARK = {
     slimed: GiSlowBlob,
     dazed: GiThunderStruck,
     wound: GiCrackedShield,
     burn: GiSmallFire,
+    // ── AND THE EIGHT CURSES ──
+    injury: GiBrokenBone,
+    decay: GiSmallFire,
+    doubt: GiDespair,
+    shame: GiBrokenHeart,
+    clumsy: GiThunderStruck,
+    regret: GiChainedHeart,
+    ache: GiBrokenBone,
+    hollow: GiHole,
 };
+/** A card drawn as grey stock with a glyph rather than as a pet: the statuses and the curses both. */
+const plain = (card) => Boolean(card?.status || card?.curse || card?.kind === "status" || card?.kind === "curse");
 
 const CardArt = ({ card, pet }) => {
     const [noArt, setNoArt] = useState(false);
     const img = useRef(null);
     useEffect(() => { if (alreadyFailed(img.current)) setNoArt(true); }, [card.id]);
-    if (card.status) {
-        const Mark = STATUS_MARK[card.id] || GiSlowBlob;
+    if (plain(card)) {
+        const Mark = STATUS_MARK[baseIdOf(card.id)] || GiSlowBlob;
         return <span className="cf-status-mark"><Mark aria-hidden="true" /></span>;
     }
     if (!noArt) {
@@ -274,8 +291,8 @@ export default function CardFace({ card, art, dim, live }) {
     const look = typeLook(card.kind);
     // A status card takes no colour from a pet it does not have — it is grey stock and common furniture, so
     // it cannot be mistaken for something of yours at the far end of a fanned hand.
-    const hue = card.status ? "#6b7280" : (art?.color || meta.color);
-    const tint = card.status ? "common" : chromeTint(art?.rarity);
+    const hue = plain(card) ? "#6b7280" : (art?.color || meta.color);
+    const tint = plain(card) ? "common" : chromeTint(art?.rarity);
     // ** A STATUS CARD HAS NO WINDOW SHAPE OF ITS OWN, and asked for one anyway. The chrome is generated for
     // the three things a card can be PLAYED as -- attack, skill, power (gen-card-chrome.mjs, "type is the
     // window's shape") -- and Wound, Slimed, Dazed and Burn are none of them. So the rim url resolved to
@@ -283,7 +300,7 @@ export default function CardFace({ card, art, dim, live }) {
     // as a browser's broken-image glyph. Caught by a 404 in the page log while playing a boss with three
     // Slimed in hand; four cards, and they are the four you are least pleased to draw already.
     // They wear the skill rim: the neutral rounded shape, in the grey the line above already gives them.
-    const shape = (card.status || card.kind === "status") ? "skill" : card.kind;
+    const shape = plain(card) ? "skill" : card.kind;
     return (
         <>
             <span className="cf-stock" style={stockStyle(hue)} />

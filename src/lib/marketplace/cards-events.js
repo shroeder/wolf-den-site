@@ -14,7 +14,7 @@
 // PURE, like the rules and the map: an event is data plus a seed. The server owns what a choice DOES (it
 // needs the perk table and the deck), the screen owns how it reads, and this file owns what exists.
 import {
-    PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS, takePerk,
+    ALL_CARDS, CURSE_IDS, PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS, takePerk,
     beltSize, canUpgrade, cardById, nextRand, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -65,7 +65,7 @@ export const EVENTS = [
         choices: [
             { label: "Eat your fill", detail: "Heal a quarter of your health.", effect: { hpPct: 0.25 } },
             { label: "Swallow the pearl", detail: "+7 max health.", effect: { maxHp: 7 } },
-            { label: "Take the shell it guards", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Take the shell it guards", detail: "A trinket. Something in the shell cuts you and does not stop.", effect: { perk: 1, card: "ache" } },
         ],
     },
 
@@ -147,7 +147,7 @@ export const EVENTS = [
         id: "serpent", act: 0, name: "The Long Serpent", icon: "snake",
         say: "It speaks well, for something with no lips. It is offering you a gift, it says, and it is not lying.",
         choices: [
-            { label: "Take the purse", detail: "180 embers, and a Wound in your deck.", effect: { embers: 180, card: "wound" } },
+            { label: "Take the purse", detail: "180 embers, and you will think about whose it was.", effect: { embers: 180, card: "regret" } },
             { label: "Refuse politely", detail: "Walk on.", effect: {} },
         ],
     },
@@ -160,7 +160,7 @@ export const EVENTS = [
         say: "They are arranged in a circle, and they are all facing you, which mushrooms should not be able to do.",
         choices: [
             { label: "Stamp them out", detail: "A fight. A trinket if you win.", effect: { fight: "two_fungi", perk: 1 } },
-            { label: "Eat one", detail: "Heal a quarter. Something disagrees with you.", effect: { hpPct: 0.25, card: "slimed" } },
+            { label: "Eat one", detail: "Heal a quarter. Something in it disagrees with you, for good.", effect: { hpPct: 0.25, card: "decay" } },
         ],
     },
 
@@ -275,7 +275,7 @@ export const EVENTS = [
         say: "You have been here before. You are fairly sure you have been here before.",
         choices: [
             { label: "Take the long way", detail: "Heal a third.", effect: { hpPct: 0.34 } },
-            { label: "Take the short way", detail: "Lose 18 health. +2 max health and a Wound in your deck.", effect: { hp: -18, maxHp: 2, card: "wound" } },
+            { label: "Take the short way", detail: "Lose 18 health. +2 max health, and you come out of it clumsy.", effect: { hp: -18, maxHp: 2, card: "clumsy" } },
             { label: "Stop and think", detail: "Burn a card.", effect: { remove: 1 } },
         ],
     },
@@ -284,7 +284,7 @@ export const EVENTS = [
         say: "It shows you the thing you came up here to do, and offers to let you skip to the end of it.",
         choices: [
             { label: "Take the fight now", detail: "An elite. A trinket if you win.", effect: { fight: "the_headsman", perk: 1 } },
-            { label: "Take the easy road", detail: "300 embers, and a Wound in your deck.", effect: { embers: 300, card: "wound" } },
+            { label: "Take the easy road", detail: "300 embers, and a doubt you cannot put down.", effect: { embers: 300, card: "doubt" } },
             { label: "Refuse it", detail: "Heal a quarter.", effect: { hpPct: 0.25 } },
         ],
     },
@@ -295,7 +295,7 @@ export const EVENTS = [
         say: "It has been counting the things that come up the stair. It knows exactly how far you have got.",
         choices: [
             { label: "Let it look at you", detail: "Sharpen 2 cards. Lose a fifth of your health.", effect: { upgrade: 2, hpPct: -0.2 } },
-            { label: "Bargain", detail: "220 embers, and a Wound in your deck.", effect: { embers: 220, card: "wound" } },
+            { label: "Bargain", detail: "220 embers, and the shame of having asked.", effect: { embers: 220, card: "shame" } },
             { label: "Climb past", detail: "Walk on.", effect: {} },
         ],
     },
@@ -325,7 +325,7 @@ export const EVENTS = [
         say: "Somebody has been leaving money here. Quite a lot of it, and for quite a long time, and none of them came back for it.",
         choices: [
             { label: "Take a handful", detail: "+120 embers.", effect: { embers: 120 } },
-            { label: "Take all of it", detail: "+300 embers, and a Wound in your deck.", effect: { embers: 300, card: "wound" } },
+            { label: "Take all of it", detail: "+300 embers, and every one of them on your mind.", effect: { embers: 300, card: "regret" } },
             { label: "Leave it where it is", detail: "Walk on.", effect: {} },
         ],
     },
@@ -367,7 +367,7 @@ export const EVENTS = [
                         { w: 2, say: "It stops on the bottle.", potion: 1 },
                         { w: 2, say: "It stops on the heart.", maxHp: 6 },
                         { w: 2, say: "It stops on the closed eye.", hpPct: -0.15 },
-                        { w: 1, say: "It stops on the broken tooth.", card: "wound" },
+                        { w: 1, say: "It stops on the broken tooth.", card: "injury" },
                     ],
                 },
             },
@@ -397,7 +397,7 @@ export const EVENTS = [
         say: "Cold, and it has not been cold long. The tongs on the hook are worth more than the anvil.",
         choices: [
             { label: "Use the anvil", detail: "Sharpen a card.", effect: { upgrade: 1 } },
-            { label: "Take the tongs", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Take the tongs", detail: "A trinket. Your hands never quite close the same way again.", effect: { perk: 1, card: "ache" } },
             { label: "Touch nothing", detail: "Walk on.", effect: {} },
         ],
     },
@@ -462,7 +462,7 @@ export const EVENTS = [
         choices: [
             { label: "Let him work", detail: "+10 max health. Lose 12 health.", effect: { maxHp: 10, hp: -12 } },
             { label: "Take the jar instead", detail: "Two bottles.", effect: { potion: 2 } },
-            { label: "Take what is on the shelf", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Take what is on the shelf", detail: "A trinket, and whatever was keeping it company.", effect: { perk: 1, card: "injury" } },
         ],
     },
     {
@@ -529,7 +529,7 @@ export const EVENTS = [
         id: "stonecoffin", act: 2, name: "The Stone Coffin", icon: "corpse",
         say: "The lid has been moved before and put back badly. Whoever did that is not in the room.",
         choices: [
-            { label: "Open it", detail: "A trinket, and a Wound in your deck.", effect: { perk: 1, card: "wound" } },
+            { label: "Open it", detail: "A trinket, and something in there that is still going.", effect: { perk: 1, card: "decay" } },
             { label: "Leave it shut", detail: "Walk on.", effect: {} },
         ],
     },
@@ -554,7 +554,7 @@ export const EVENTS = [
         say: "He has been kneeling long enough that the floor has taken the shape of him. He is holding something out.",
         choices: [
             { label: "Give him what he asks", detail: "Pay 130 embers. A trinket.", cost: 130, effect: { perk: 1 } },
-            { label: "Take it off him", detail: "+130 embers, and a Wound in your deck.", effect: { embers: 130, card: "wound" } },
+            { label: "Take it off him", detail: "+130 embers, and a doubt about what you are becoming.", effect: { embers: 130, card: "doubt" } },
             { label: "Walk past", detail: "Walk on.", effect: {} },
         ],
     },
@@ -711,7 +711,13 @@ export function applyEventChoice(run, ev, index, card = null) {
     // Every piece of junk at once. Theirs is the only room in the game that does this, and it is the reason
     // a deck stuffed with Wounds is a bad run rather than a finished one.
     if (eff.cleanse) {
-        const junk = new Set(STATUS_IDS);
+        // ⚠️ CURSES TOO, AND THIS IS THE ROOM THAT BREAKS IF THEY ARE FORGOTTEN. Theirs is the Divine
+        // Fountain and it exists to take CURSES off you specifically. Ours read STATUS_IDS alone, which was
+        // right for exactly as long as a status was the only thing a room could write into your deck — the
+        // moment the twelve event prices below became real curses, the cleansing room would have looked at
+        // a deck full of Regret and told you there was nothing that needed it.
+        // The Hollow is excluded by the same rule the merchant obeys: nothing takes it off you.
+        const junk = new Set([...STATUS_IDS, ...CURSE_IDS.filter((id) => !ALL_CARDS[id]?.noBurn)]);
         const before = (run.deck || []).length;
         run.deck = (run.deck || []).filter((id) => !junk.has(id));
         const gone = before - run.deck.length;
