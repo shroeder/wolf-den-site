@@ -400,7 +400,22 @@ export default function BlacksmithClient({ initial }) {
                                     // Tapping a card used to drop you straight into the hammer, so rerolling
                                     // was a different button in a different place for the same object. Now
                                     // the card opens the piece and the piece offers both.
-                                    if (it.rerollPoints > 0) { ac(); setRerolling(it); return; }
+                                    // ⚠️ AND THE FIRST ENHANCE OF EVERY PIECE COULD NOT USE A SCROLL.
+                                    // The panel this opens is the only place both ways of paying are
+                                    // offered, and it opened on rerollPoints alone — which is the SUM OF
+                                    // THE FORGED LINES (crafting.js), so it is zero on anything that has
+                                    // never been forged. A piece at +0, a full parts bin and eight scrolls
+                                    // in hand went straight to the hammer with useScroll hard false.
+                                    // That is the same bug Jinxx reported, still live in the one case the
+                                    // first fix did not cover, and it is the case that matters most: the
+                                    // +0 -> +1 step on every piece anyone ever forges.
+                                    // Open the piece whenever there is a decision in it — a spread to
+                                    // reroll, or parts and a scroll that could each pay for the same work.
+                                    // Straight to the hammer otherwise, so nobody who owns no scrolls has
+                                    // to press through a panel that offers them one choice.
+                                    if (it.rerollPoints > 0 || (it.affordable && powerScrolls > 0 && !it.maxed)) {
+                                        ac(); setRerolling(it); return;
+                                    }
                                     if (it.maxed) { setToast({ kind: "err", text: `${it.name} is at PEAK enchantment — it can't be forged any higher.` }); return; }
                                     const scroll = !it.affordable && powerScrolls > 0; // pay with a Power Scroll if you're short on parts
                                     if (!it.affordable && !scroll) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage, combine, or use a 📜 Power Scroll.` }); return; }
@@ -439,7 +454,17 @@ export default function BlacksmithClient({ initial }) {
                                         : <span className="forge-stat"><i>—</i></span>}
                                 </span>
                                 {it.util ? <span className="forge-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</span> : null}
-                                {!it.affordable && powerScrolls > 0 ? <span className="forge-card-scroll">📜 Use Power Scroll</span> : null}
+                                {/* ⚠️ THIS IS WHY IT STILL LOOKED BROKEN AFTER IT WAS FIXED. The badge only
+                                    appeared when you could NOT afford the parts, so the forge advertised the
+                                    scroll as the thing you fall back on when you are short — and Luke read
+                                    the screen exactly that way two days after the fix shipped: "it looks
+                                    like it only lets you use it if you are out of materials."
+                                    A fix nobody can see from the screen they are standing on has not landed.
+                                    The badge shows whenever a scroll could pay for this piece, and says
+                                    which of the two it is. */}
+                                {powerScrolls > 0 && !it.maxed
+                                    ? <span className="forge-card-scroll">📜 {it.affordable ? "Or spend a Power Scroll" : "Use Power Scroll"}</span>
+                                    : null}
                                 {it.maxed ? <span className="forge-card-cost forge-card-max">✦ PEAK — maxed</span> : (
                                     <span className={`forge-card-cost${it.affordable ? "" : " is-short"}`}>
                                         {parts[it.cost.tier - 1]?.sprite
@@ -560,11 +585,18 @@ export default function BlacksmithClient({ initial }) {
             {rerolling ? (
                 <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setRerolling(null)}>
                     <div className="forge-founder-card" onClick={(e) => e.stopPropagation()}>
-                        <div className="forge-founder-kicker">Reforge</div>
+                        {/* The panel now opens on unforged pieces too (see the card's onClick), and on
+                            those there is nothing to reforge — no forged lines exist yet. Calling itself
+                            Reforge over an empty list and a paragraph about conserved points would be
+                            describing a screen the reader is not looking at. */}
+                        <div className="forge-founder-kicker">{(rerolling.forged || []).length ? "Reforge" : "Enhance"}</div>
                         <h3 className="forge-founder-name">{rerolling.name}</h3>
                         <p className="forge-founder-body" style={{ marginBottom: 10 }}>
-                            Its base stats never change. Only the <b>forged</b> lines below move, and the points
-                            are always conserved — nothing here can make the piece weaker.
+                            {(rerolling.forged || []).length
+                                ? <>Its base stats never change. Only the <b>forged</b> lines below move, and the points
+                                    are always conserved &mdash; nothing here can make the piece weaker.</>
+                                : <>This piece has never been forged. Raising it to <b>+1</b> adds its first forged
+                                    line &mdash; pay in parts, or spend a scroll and keep them.</>}
                         </p>
                         {/* Swap ONE line. The rest of the piece stays exactly as it is. */}
                         <div className="forge-swaplist">

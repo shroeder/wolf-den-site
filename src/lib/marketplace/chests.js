@@ -397,7 +397,25 @@ export async function openChest(buyerId, tier) {
     // Banded by tier: a wooden chest can never produce a Legendary recipe however many you open. Deferred
     // import — chests.js is pulled in by cooking.js, and a static edge back would be a cycle.
     const band = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : tier === "gold" ? "chest_gold" : "chest_high";
-    if (Math.random() < luckyChance((RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId), fortune)) {
+    // ──── FORTUNE DOES NOT DECIDE WHICH BRANCH YOU TAKE ──────────────────────────────
+    // ⚠️ IT USED TO, AND IT COST THE LUCKIEST MEMBERS THEIR GEAR. Every roll in this chain was wrapped in
+    // luckyChance(p, fortune), including the four that INTERCEPT the gear roll — recipe, seeds, scroll,
+    // consumable. Fortune therefore made a chest more likely to hand you something instead of gear, while
+    // rollRarity (the gear roll itself) took no fortune at all. On a chest, luck was purely negative.
+    //
+    // Measured at Jinxx's fortune of 171 (x1.370), before this: a primordial chest reached its gear pool
+    // 9.9% of the time against 23.9% for a member with no fortune at all. She is the unluckiest gear-opener
+    // in the Den BECAUSE she is the luckiest member in it. That is the whole of "every mythic chest has only
+    // ever given me seeds".
+    //
+    // So luck no longer touches branch selection for the things that displace gear. It stays on the two
+    // outcomes that are a FIND rather than a substitution — the pet and the gem — which is what the note
+    // in maybeGrantChestPet already says it is for: "the cap says how good a primordial chest is at coughing
+    // up a pet, and luck is a fact about the person opening it."
+    //
+    // Fortune doing something POSITIVE for a chest's gear (lifting the rarity roll) is a separate question
+    // and a change to the power curve, so it is the owner's call rather than a bug fix. It is not made here.
+    if (Math.random() < (RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId)) {
         const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
         const rec = await grantRecipeReward(buyerId, band).catch(() => null);
         // Null means they already know every recipe in this band — fall through to the ordinary loot rather
@@ -405,7 +423,7 @@ export async function openChest(buyerId, tier) {
         if (rec) return { ok: true, remaining: dec.count, recipe: rec };
     }
 
-    if (Math.random() < luckyChance(SEED_CHANCE[tier] || 0, fortune)) {
+    if (Math.random() < (SEED_CHANCE[tier] || 0)) {
         const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
         // ⚠️ EVERY TIER ABOVE IRON READ THE SAME TABLE. The recipe roll six lines up bands properly and
         // ends at `chest_high`; this one just stopped, so a primordial chest's seeds were a gold chest's
@@ -437,6 +455,9 @@ export async function openChest(buyerId, tier) {
     // TIER 1-2 ONLY, deliberately. The top of the gem ladder should stay something you FUSE toward at the
     // bench rather than something a chest hands you — that is the whole reason gems are tiered. A richer
     // chest raises the CHANCE, never the tier.
+    // Luck stays here and on the pet: a gem is a FIND, not a substitution — nobody opening a chest is
+    // sad to be handed one, so making it likelier is what luck is supposed to do. See the note above the
+    // recipe roll for why the other four lost it.
     const gChance = GEM_CHEST_CHANCE[tier] || 0;
     if (gChance && Math.random() < luckyChance(gChance, fortune)) {
         const { GEM_KINDS, gemId } = await import("@/lib/marketplace/gems.js");
@@ -456,7 +477,7 @@ export async function openChest(buyerId, tier) {
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.
     const sChance = SCROLL_CHEST_CHANCE[tier] || 0;
-    if (sChance && Math.random() < luckyChance(sChance, fortune)) {
+    if (sChance && Math.random() < sChance) {
         // The Enchantment Scroll is the rarer and better of the two. One in eight everywhere meant the best
         // chest in the game handed out the ordinary scroll seven times in eight, which is the same
         // consolation-prize shape as the seeds and the chipped gems.
@@ -469,7 +490,7 @@ export async function openChest(buyerId, tier) {
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
     const cc = CHEST_CONSUMABLES[tier];
-    if (cc && Math.random() < luckyChance(cc.chance, fortune)) {
+    if (cc && Math.random() < cc.chance) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];

@@ -42,6 +42,19 @@ const PET_BASE = number(PETS, "CHEST_PET_BASE");
 const PET_STEP = number(PETS, "CHEST_PET_STEP");
 const PET_CAP = number(PETS, "CHEST_PET_CAP");
 
+// ⚠️ AND FORTUNE MULTIPLIES EVERY ROLL IN THE CHAIN, WHICH RUNS THE WRONG WAY.
+// Every step USED TO be wrapped in luckyChance(p, fortune), including the four that INTERCEPT the gear roll,
+// so a lucky member was more likely to be handed a recipe, a seed or a scroll before the chest ever reached
+// its pool. At Jinxx's fortune of 171 that was 9.9% gear out of a primordial against 23.9% for somebody with
+// no luck at all -- the luckiest member in the Den was its unluckiest gear-opener. Luck now applies only to
+// the pet and the gem. Pass --fortune to see the difference it still makes.
+//   node scripts/chest-odds.mjs --fortune 171
+const fArg = process.argv.indexOf("--fortune");
+const FORTUNE = fArg > 0 ? Number(process.argv[fArg + 1]) || 0 : 0;
+const { fortuneLuck } = await import("../src/lib/marketplace/fortune.js");
+const LUCK = 1 + (FORTUNE ? fortuneLuck(FORTUNE) : 0);
+const lucky = (p) => Math.min(1, p * LUCK);
+
 const TIERS = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 // Which seed table each tier draws from. Kept in step with the line in openChest by hand, which is the one
 // thing in here that CAN drift -- so it is one expression, next to the tables it explains.
@@ -52,7 +65,8 @@ const seedBandOf = (t) => (t === "wooden" ? "chest_wooden"
 
 const pct = (n) => `${(n * 100).toFixed(1)}%`.padStart(6);
 
-console.log("\nWhat one chest pays, by tier. First match wins, so each row eats the ones below it.\n");
+console.log(`\nWhat one chest pays, by tier. First match wins, so each row eats the ones below it.`
+    + `${FORTUNE ? `\nAt fortune ${FORTUNE} — x${LUCK.toFixed(3)} applied to the pet and the gem only.` : ""}\n`);
 console.log("  tier          recipe   seeds     pet     gem  scroll  consum    GEAR   seed table");
 console.log("  " + "-".repeat(88));
 
@@ -69,7 +83,11 @@ for (const t of TIERS) {
     ];
     let left = 1;
     const got = {};
-    for (const [k, p] of steps) { got[k] = left * p; left -= got[k]; }
+    // Luck applies to the pet and the gem only -- the two outcomes that are a FIND rather than a thing
+    // handed to you INSTEAD of gear. It used to apply to all six, which is what made a lucky member the
+    // unluckiest gear-opener in the Den. See the note above the recipe roll in chests.js.
+    const LUCKY_STEPS = new Set(["pet", "gem"]);
+    for (const [k, p] of steps) { got[k] = left * (LUCKY_STEPS.has(k) ? lucky(p) : p); left -= got[k]; }
     got.gear = left;
     rows.push({ t, ...got, band: seedBandOf(t) });
     console.log(`  ${t.padEnd(12)}${pct(got.recipe)}  ${pct(got.seeds)}  ${pct(got.pet)}  ${pct(got.gem)}`
