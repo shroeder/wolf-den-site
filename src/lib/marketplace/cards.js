@@ -633,7 +633,9 @@ export const POTION_DROP_BASE = 40;
 export function potionDrop(run, row, lane) {
     let roll = ((run.seed >>> 0) + row * 7717 + lane * 131) >>> 0;
     const next = () => { const [r, n] = nextRand(roll); roll = n; return r; };
-    const luck = Number.isFinite(run.potionLuck) ? run.potionLuck : POTION_DROP_BASE;
+    // A trinket can tilt the whole self-correcting ladder — their White Beast Statue, at the gentler end.
+    const luck = (Number.isFinite(run.potionLuck) ? run.potionLuck : POTION_DROP_BASE)
+        + perkSum(run.perks, "potionLuck");
     if (next() * 100 >= luck) {
         run.potionLuck = Math.min(100, luck + 10);
         return null;

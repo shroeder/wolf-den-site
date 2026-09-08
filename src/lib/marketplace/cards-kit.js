@@ -835,8 +835,8 @@ export const PERKS = {
         text: "Start every fight with 6 Block, and deal 2 damage back to anything that hits you." },
 
     // ── THE MARK ON THE ROOM ─────────────────────────────────────────────────────────────────────────
-    chipped_marble: { id: "chipped_marble", name: "Chipped Marble", icon: "paw", vulnerableAll: 1, maxHpDown: 4,
-        text: "Every enemy starts each fight Vulnerable. -4 max health." },
+    chipped_marble: { id: "chipped_marble", name: "Chipped Marble", icon: "paw", vulnerableAll: 1, thorns: 2,
+        text: "Every enemy starts each fight Vulnerable, and you deal 2 damage back to anything that hits you." },
     ash_veil: { id: "ash_veil", name: "Ash Veil", icon: "paw", weakAll: 1, block: 4,
         text: "Every enemy starts each fight Weak, and you start with 4 Block." },
     paper_crane: { id: "paper_crane", name: "Paper Crane", icon: "paw", vulnBonus: 0.15,
@@ -845,8 +845,233 @@ export const PERKS = {
     // note there — because Frail took a quarter off YOUR Block and nothing off theirs.
     chalk_dust: { id: "chalk_dust", name: "Chalk Dust", icon: "paw", frailAll: 1,
         text: "Every enemy starts each fight Frail — they brace for a quarter less." },
-    three_marks: { id: "three_marks", name: "Three Marks", icon: "paw", frailAll: 1, weakAll: 1, maxHpDown: 6,
-        text: "Every enemy starts each fight Weak and Frail. -6 max health." },
+    three_marks: { id: "three_marks", name: "Three Marks", icon: "paw", frailAll: 1, weakAll: 1,
+        text: "Every enemy starts each fight Weak and Frail." },
+
+    // ══ AND NINETY MORE, TO STAND WHERE THEIRS STANDS ═══════════════════════════════════════════════════
+    // Theirs is about a hundred and eighty relics and a run can meet nearly all of them, which is why a
+    // Spire player three acts in still does not know what the next elite will hand over. Seventy-seven was
+    // most of the way to their COMMON band and none of the way to the rest.
+    //
+    // Seven hooks were added with this block, because a hundred more numbers on the same twenty-four fields
+    // would have been a longer list of the same trinket. Four are read inside the fight — the first blow of
+    // a fight landing harder, what a body is worth when it falls, and a turn that opens by hurting the room
+    // — and three are read at decisions the run already makes: the price of the fire, the purse after a win,
+    // and how willingly the bottles come.
+
+    // ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────
+    dried_fig: { id: "dried_fig", name: "Dried Fig", icon: "heart", maxHp: 5, embers: 40,
+        text: "+5 max health, and 40 embers now." },
+    salt_pork: { id: "salt_pork", name: "Salt Pork", icon: "ration", maxHp: 7, healAfter: 2,
+        text: "+7 max health, and heal 2 after every fight you win." },
+    honey_comb: { id: "honey_comb", name: "Honeycomb", icon: "heart", maxHp: 11, healBonus: 0.2,
+        text: "+11 max health, and everything that heals you heals a fifth again." },
+    marrow_stone: { id: "marrow_stone", name: "Marrow Stone", icon: "heart", maxHp: 13, block: 3,
+        text: "+13 max health, and start every fight with 3 Block." },
+    old_root: { id: "old_root", name: "Old Root", icon: "heart", maxHp: 16, restBonus: 6,
+        text: "+16 max health, and a campfire heals 6 more." },
+    deep_reserve: { id: "deep_reserve", name: "Deep Reserve", icon: "heart", maxHp: 22, strengthLow: 2,
+        text: "+22 max health. Start a fight below half health with 2 Strength." },
+    elk_heart: { id: "elk_heart", name: "Elk Heart", icon: "heart", maxHp: 26, healAfterLow: 6,
+        text: "+26 max health, and heal 6 after a fight you win below half health." },
+    bright_marrow: { id: "bright_marrow", name: "Bright Marrow", icon: "heart", maxHp: 8, draw: 1, block: 2,
+        text: "+8 max health, one extra card on your first turn, and 2 Block." },
+
+    // ── THE OPENING GUARD ────────────────────────────────────────────────────────────────────────────
+    bark_bracer: { id: "bark_bracer", name: "Bark Bracer", icon: "shield", block: 5,
+        text: "Start every fight with 5 Block." },
+    scale_coat: { id: "scale_coat", name: "Scale Coat", icon: "shield", block: 11,
+        text: "Start every fight with 11 Block." },
+    tower_shield: { id: "tower_shield", name: "Tower Shield", icon: "shield", block: 18,
+        text: "Start every fight with 18 Block." },
+    turtle_sign: { id: "turtle_sign", name: "The Turtle Sign", icon: "shield", block: 7, blockEach: 1,
+        text: "Start every fight with 7 Block, and gain 1 more at the end of every turn." },
+    dented_helm: { id: "dented_helm", name: "Dented Helm", icon: "shield", block: 9, thorns: 1,
+        text: "Start every fight with 9 Block, and deal 1 damage back to anything that hits you." },
+    mud_plate: { id: "mud_plate", name: "Mud Plate", icon: "shield", blockTurn2: 11,
+        text: "Gain 11 Block on the second turn of every fight." },
+    slate_ward: { id: "slate_ward", name: "Slate Ward", icon: "shield", blockTurn2: 18,
+        text: "Gain 18 Block on the second turn of every fight." },
+    banded_ribs: { id: "banded_ribs", name: "Banded Ribs", icon: "shield", blockEach: 2, maxHp: 6,
+        text: "+6 max health, and gain 2 Block at the end of every turn." },
+
+    // ── THE TEETH ────────────────────────────────────────────────────────────────────────────────────
+    filed_tooth: { id: "filed_tooth", name: "Filed Tooth", icon: "sword", strength: 1, draw: 1,
+        text: "Start every fight with 1 Strength, and draw one extra card on your first turn." },
+    war_claw: { id: "war_claw", name: "War Claw", icon: "sword", strength: 3, maxHpDown: 4,
+        text: "Start every fight with 3 Strength." },
+    hungry_edge: { id: "hungry_edge", name: "Hungry Edge", icon: "sword", strengthLow: 2, thorns: 2,
+        text: "Start a fight below half health with 2 Strength. Deal 2 damage back to anything that hits you." },
+    cornered_beast: { id: "cornered_beast", name: "Cornered Beast", icon: "sword", strengthLow: 7,
+        text: "Start a fight below half health with 7 Strength." },
+    slow_burn: { id: "slow_burn", name: "Slow Burn", icon: "sword", strengthEach: 1,  block: 6,
+        text: "Gain 1 Strength at the start of every turn, and open on 6 Block." },
+    whet_rod: { id: "whet_rod", name: "Whetting Rod", icon: "sword", strength: 2, blockEach: 1,
+        text: "Start every fight with 2 Strength, and gain 1 Block at the end of every turn." },
+    grim_handle: { id: "grim_handle", name: "Grim Handle", icon: "sword", strength: 1, embers: 70,
+        text: "70 embers now, and start every fight with 1 Strength." },
+    bone_grip: { id: "bone_grip", name: "Bone Grip", icon: "sword", strength: 2, healAfter: 2,
+        text: "Start every fight with 2 Strength, and heal 2 after every fight you win." },
+
+    // ── THORNS ───────────────────────────────────────────────────────────────────────────────────────
+    burr_coat: { id: "burr_coat", name: "Burr Coat", icon: "shield", thorns: 1, maxHp: 5,
+        text: "+5 max health, and deal 1 damage back to anything that hits you." },
+    glass_shard: { id: "glass_shard", name: "Glass Shard", icon: "shield", thorns: 4,
+        text: "Deal 4 damage back to anything that hits you." },
+    iron_burr: { id: "iron_burr", name: "Iron Burr", icon: "shield", thorns: 8, maxHpDown: 4,
+        text: "Deal 8 damage back to anything that hits you." },
+    nettle_wrap: { id: "nettle_wrap", name: "Nettle Wrap", icon: "shield", thorns: 3, blockTurn2: 6,
+        text: "Deal 3 damage back to anything that hits you, and gain 6 Block on the second turn." },
+    hook_mail: { id: "hook_mail", name: "Hook Mail", icon: "shield", thorns: 3, block: 7,
+        text: "Start every fight with 7 Block, and deal 3 damage back to anything that hits you." },
+
+    // ── THE FIRST BLOW ───────────────────────────────────────────────────────────────────────────────
+    // Akabeko. Every one of these needed the hook added with this block.
+    red_bell: { id: "red_bell", name: "Red Bell", icon: "sword", firstAttackBonus: 8,
+        text: "Your first attack each fight deals 8 more." },
+    struck_flint: { id: "struck_flint", name: "Struck Flint", icon: "sword", firstAttackBonus: 5, block: 4,
+        text: "Your first attack each fight deals 5 more, and you open on 4 Block." },
+    ambush_charm: { id: "ambush_charm", name: "Ambush Charm", icon: "sword", firstAttackBonus: 12,
+        text: "Your first attack each fight deals 12 more." },
+    cold_opener: { id: "cold_opener", name: "Cold Opener", icon: "sword", firstAttackBonus: 6, vulnerableAll: 1,
+        text: "Your first attack each fight deals 6 more, and every enemy starts Vulnerable." },
+    quiet_step: { id: "quiet_step", name: "Quiet Step", icon: "sword", firstAttackBonus: 7, draw: 1,
+        text: "Your first attack each fight deals 7 more, and one extra card on your first turn." },
+    long_wind_up: { id: "long_wind_up", name: "The Long Wind-Up", icon: "sword", firstAttackBonus: 16, maxHpDown: 6,
+        text: "Your first attack each fight deals 16 more." },
+
+    // ── WHAT A BODY IS WORTH ─────────────────────────────────────────────────────────────────────────
+    // Gremlin Horn. These needed the on-kill hook.
+    gremlin_horn: { id: "gremlin_horn", name: "Gremlin Horn", icon: "energy", onKillEnergy: 1, onKillDraw: 1,
+        text: "When an enemy dies, gain 1 energy and draw a card." },
+    scavenger_beak: { id: "scavenger_beak", name: "Scavenger's Beak", icon: "paw", onKillDraw: 1,
+        text: "When an enemy dies, draw a card." },
+    quick_hands: { id: "quick_hands", name: "Quick Hands", icon: "energy", onKillEnergy: 1,
+        text: "When an enemy dies, gain 1 energy." },
+    carrion_luck: { id: "carrion_luck", name: "Carrion Luck", icon: "ember", onKillDraw: 1, emberPerWin: 12,
+        text: "When an enemy dies, draw a card. 12 embers after every fight you win." },
+    wolf_share: { id: "wolf_share", name: "The Wolf's Share", icon: "ration", onKillDraw: 1, healAfter: 3,
+        text: "When an enemy dies, draw a card. Heal 3 after every fight you win." },
+    hunters_tally: { id: "hunters_tally", name: "Hunter's Tally", icon: "energy", onKillEnergy: 1, embers: 60,
+        text: "60 embers now. When an enemy dies, gain 1 energy." },
+
+    // ── THE HOURGLASS ────────────────────────────────────────────────────────────────────────────────
+    // Mercury Hourglass: damage to everything still standing, at the top of every one of your turns.
+    ash_hourglass: { id: "ash_hourglass", name: "Ash Hourglass", icon: "ember", startDamageAll: 3,
+        text: "Deal 3 damage to ALL enemies at the start of every turn." },
+    ember_censer: { id: "ember_censer", name: "Ember Censer", icon: "ember", startDamageAll: 2, block: 5,
+        text: "Deal 2 damage to ALL enemies at the start of every turn, and open on 5 Block." },
+    slow_poison: { id: "slow_poison", name: "Slow Poison", icon: "ember", startDamageAll: 5, maxHpDown: 4,
+        text: "Deal 5 damage to ALL enemies at the start of every turn." },
+    smoulder: { id: "smoulder", name: "Smoulder", icon: "ember", startDamageAll: 2, weakAll: 1,
+        text: "Deal 2 damage to ALL enemies at the start of every turn, and every enemy starts Weak." },
+    creeping_rot: { id: "creeping_rot", name: "Creeping Rot", icon: "ember", startDamageAll: 4, healAfter: 2,
+        text: "Deal 4 damage to ALL enemies at the start of every turn. Heal 2 after every win." },
+
+    // ── THE MARKS ────────────────────────────────────────────────────────────────────────────────────
+    tally_stick: { id: "tally_stick", name: "Tally Stick", icon: "paw", vulnerableAll: 2, maxHpDown: 4,
+        text: "Every enemy starts each fight with 2 Vulnerable." },
+    grey_ash: { id: "grey_ash", name: "Grey Ash", icon: "paw", weakAll: 2, maxHpDown: 4,
+        text: "Every enemy starts each fight with 2 Weak." },
+    lime_dust: { id: "lime_dust", name: "Lime Dust", icon: "paw", frailAll: 2,
+        text: "Every enemy starts each fight with 2 Frail." },
+    split_marble: { id: "split_marble", name: "Split Marble", icon: "paw", vulnerableAll: 1, block: 5,
+        text: "Every enemy starts Vulnerable, and you open on 5 Block." },
+    hunters_mark: { id: "hunters_mark", name: "Hunter's Mark", icon: "paw", vulnerableAll: 1, firstAttackBonus: 4,
+        text: "Every enemy starts Vulnerable, and your first attack deals 4 more." },
+    pale_frog: { id: "pale_frog", name: "Pale Frog", icon: "paw", vulnBonus: 0.3,
+        text: "Vulnerable enemies take 80% more damage instead of 50%." },
+    dull_edge: { id: "dull_edge", name: "The Dull Edge", icon: "paw", weakAll: 1, frailAll: 1, block: 4,
+        text: "Every enemy starts each fight Weak and Frail, and you open on 4 Block." },
+    sour_chalk: { id: "sour_chalk", name: "Sour Chalk", icon: "paw", frailAll: 1, blockEach: 1,
+        text: "Every enemy starts Frail, and you gain 1 Block at the end of every turn." },
+
+    // ── WHAT COMES BACK ──────────────────────────────────────────────────────────────────────────────
+    clean_linen: { id: "clean_linen", name: "Clean Linen", icon: "ration", healAfter: 4,
+        text: "Heal 4 after every fight you win." },
+    surgeons_kit: { id: "surgeons_kit", name: "Surgeon's Kit", icon: "ration", healAfter: 7,
+        text: "Heal 7 after every fight you win." },
+    last_bandage: { id: "last_bandage", name: "The Last Bandage", icon: "ration", healAfterLow: 24,
+        text: "Heal 24 after a fight you win below half health." },
+    thin_broth: { id: "thin_broth", name: "Thin Broth", icon: "ration", healAfterLow: 9,
+        text: "Heal 9 after a fight you win below half health." },
+    green_poultice: { id: "green_poultice", name: "Green Poultice", icon: "heart", healBonus: 0.6,
+        text: "Everything that heals you heals three fifths again as much." },
+    warm_stone: { id: "warm_stone", name: "Warm Stone", icon: "heart", restBonus: 12, healAfter: 2,
+        text: "A campfire heals 12 more, and heal 2 after every fight you win." },
+    long_sleep: { id: "long_sleep", name: "Long Sleep", icon: "heart", restBonus: 40, maxHpDown: 4,
+        text: "A campfire heals 40 more." },
+    kindling: { id: "kindling", name: "Kindling", icon: "ember", restBonus: 18,
+        text: "A campfire heals 18 more." },
+
+    // ── THE BELT ─────────────────────────────────────────────────────────────────────────────────────
+    deep_belt: { id: "deep_belt", name: "Deep Belt", icon: "ration", potionSlots: 3,
+        text: "Three more potion slots." },
+    green_glass: { id: "green_glass", name: "Green Glass", icon: "ration", healPerPotion: 12,
+        text: "Heal 12 whenever you drink a potion." },
+    bottle_hook: { id: "bottle_hook", name: "Bottle Hook", icon: "ration", potionLuck: 12,
+        text: "Bottles turn up noticeably more often." },
+    lucky_stopper: { id: "lucky_stopper", name: "Lucky Stopper", icon: "ration", potionLuck: 22,
+        text: "Bottles turn up far more often." },
+    padded_case: { id: "padded_case", name: "Padded Case", icon: "ration", potionSlots: 1, potionLuck: 8,
+        text: "One more potion slot, and bottles turn up more often." },
+    brewers_thumb: { id: "brewers_thumb", name: "Brewer's Thumb", icon: "ration", healPerPotion: 5, potionSlots: 1,
+        text: "One more potion slot, and heal 5 whenever you drink a potion." },
+    cracked_funnel: { id: "cracked_funnel", name: "Cracked Funnel", icon: "ration", potionLuck: 15,
+        text: "Bottles turn up more often." },
+
+    // ── THE HAND ─────────────────────────────────────────────────────────────────────────────────────
+    thin_gloves: { id: "thin_gloves", name: "Thin Gloves", icon: "paw", energy: 1, blockTurn2: 6,
+        text: "One extra energy on your first turn, and 6 Block on the second." },
+    runners_pack: { id: "runners_pack", name: "Runner's Pack", icon: "paw", draw: 4,
+        text: "Draw four extra cards on your first turn." },
+    second_wind: { id: "second_wind", name: "Second Wind", icon: "energy", energy: 2,
+        text: "Two extra energy on your first turn." },
+    steady_eye: { id: "steady_eye", name: "Steady Eye", icon: "paw", drawEach: 1,  block: 4,
+        text: "Draw one extra card every turn, and open on 4 Block." },
+    coal_lung: { id: "coal_lung", name: "Coal Lung", icon: "energy", energyEach: 1, maxHpDown: 9,
+        text: "+1 energy every turn. -4 max health." },
+    quick_wrap: { id: "quick_wrap", name: "Quick Wrap", icon: "paw", draw: 2, block: 4,
+        text: "Draw two extra cards on your first turn, and open on 4 Block." },
+    old_habit: { id: "old_habit", name: "Old Habit", icon: "paw", draw: 2, healAfter: 2,
+        text: "Draw two extra cards on your first turn. Heal 2 after every win." },
+    open_palm: { id: "open_palm", name: "Open Palm", icon: "energy", energy: 1, embers: 50,
+        text: "50 embers now, and one extra energy on your first turn." },
+
+    // ── THE PURSE, THE FIRE AND THE SHELF ────────────────────────────────────────────────────────────
+    // Their economy band: relics that change what a RUN can afford rather than what a fight looks like.
+    tin_whistle: { id: "tin_whistle", name: "Tin Whistle", icon: "ember", emberPerWin: 10,
+        text: "10 embers after every fight you win." },
+    counting_beads: { id: "counting_beads", name: "Counting Beads", icon: "ember", emberPerWin: 18,
+        text: "18 embers after every fight you win." },
+    fat_purse: { id: "fat_purse", name: "Fat Purse", icon: "ember", embers: 320,
+        text: "320 embers, right now." },
+    coin_pouch: { id: "coin_pouch", name: "Coin Pouch", icon: "ember", embers: 130,
+        text: "130 embers, right now." },
+    smiling_mask: { id: "smiling_mask", name: "Smiling Mask", icon: "ember", removalCut: 0.4,
+        text: "Burning a card at the merchant costs two fifths less." },
+    sharp_shears: { id: "sharp_shears", name: "Sharp Shears", icon: "sword", removalCut: 0.6,
+        text: "Burning a card at the merchant costs three fifths less." },
+    good_eye: { id: "good_eye", name: "A Good Eye", icon: "paw", offerPlus: 1, embers: 45,
+        text: "45 embers now, and one extra card to choose from after every fight." },
+    forge_token: { id: "forge_token", name: "Forge Token", icon: "sword", eggUpgrades: 1, block: 4,
+        text: "Attacks you are offered arrive sharpened, and you open on 4 Block." },
+    elk_tally: { id: "elk_tally", name: "Elk Tally", icon: "heart", maxHpPerElite: 8,
+        text: "+8 max health every time you beat an elite." },
+    trophy_rack: { id: "trophy_rack", name: "Trophy Rack", icon: "heart", maxHpPerElite: 5, emberPerWin: 8,
+        text: "+5 max health for every elite you beat, and 8 embers after every win." },
+
+    // ── AND THE ODD ONES ─────────────────────────────────────────────────────────────────────────────
+    spare_tail: { id: "spare_tail", name: "Spare Tail", icon: "paw", revive: 1, maxHpDown: 5,
+        text: "The first blow that would kill you in a fight leaves you on half health instead." },
+    prospector_map: { id: "prospector_map", name: "Prospector's Map", icon: "paw", offerPlus: 1, potionLuck: 8,
+        text: "One extra card to choose from after every fight, and bottles turn up more often." },
+    dowsing_rod: { id: "dowsing_rod", name: "Dowsing Rod", icon: "ember", embers: 80, potionLuck: 10,
+        text: "80 embers now, and bottles turn up more often." },
+    grave_goods: { id: "grave_goods", name: "Grave Goods", icon: "ember", embers: 180, maxHpDown: 5,
+        text: "180 embers, right now." },
+    steady_thumb: { id: "steady_thumb", name: "Steady Thumb", icon: "sword", eggUpgrades: 1, offerPlus: 1,
+        text: "One extra card offered, and attacks arrive sharpened." },
 
     // ── WHAT COMES BACK ──────────────────────────────────────────────────────────────────────────────
     field_dressing: { id: "field_dressing", name: "Field Dressing", icon: "ration", healAfter: 9,
@@ -893,12 +1118,12 @@ export const PERKS = {
     // ── AND THE THREE THE ENGINE HAD TO LEARN ────────────────────────────────────────────────────────
     // blockKeeps, strengthEach and drawEach were read off the HERO for cards and ignored on trinkets. Now
     // that they are read from both, these are theirs almost unchanged.
-    tortoise_sign: { id: "tortoise_sign", name: "The Tortoise Sign", icon: "shield", blockKeeps: true, maxHpDown: 6,
-        text: "Your Block is no longer lost at the start of your turn. -6 max health." },
-    long_hunger: { id: "long_hunger", name: "The Long Hunger", icon: "sword", strengthEach: 1, maxHpDown: 10,
-        text: "Gain 1 Strength at the start of every turn. -10 max health." },
-    wide_eye: { id: "wide_eye", name: "Wide Eye", icon: "paw", drawEach: 1, maxHpDown: 12,
-        text: "Draw one extra card every turn. -12 max health." },
+    tortoise_sign: { id: "tortoise_sign", name: "The Tortoise Sign", icon: "shield", blockKeeps: true,
+        text: "Your Block is no longer lost at the start of your turn." },
+    long_hunger: { id: "long_hunger", name: "The Long Hunger", icon: "sword", strengthEach: 1, maxHpDown: 5,
+        text: "Gain 1 Strength at the start of every turn." },
+    wide_eye: { id: "wide_eye", name: "Wide Eye", icon: "paw", drawEach: 1, maxHpDown: 6,
+        text: "Draw one extra card every turn." },
 };
 // ── THE ONE YOU START WITH ───────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY SPIRE CHARACTER OPENS THE GAME HOLDING A RELIC, and the Ironclad's is Burning Blood: heal 6 after
@@ -999,6 +1224,61 @@ export const POTIONS = {
         text: "Gain 3 energy." },
     quick_step: { id: "quick_step", name: "Quick Step", icon: "energy", draw: 1, energy: 1,
         text: "Draw a card and gain 1 energy." },
+
+    // ── AND TWENTY-ONE MORE, TO STAND WHERE THEIRS STANDS ────────────────────────────────────────────
+    // Theirs is about fifty bottles. Twenty-nine covered the shapes; this covers the SPREAD — the belt holds
+    // three and a run finds five or six, so what matters is that two of them are rarely the same answer.
+    // Two more words with them, both fields the hero already carried: a bottle that keeps paying Block every
+    // turn, and one that keeps paying Strength.
+
+    // ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────
+    small_mercy: { id: "small_mercy", name: "Small Mercy", icon: "heal", heal: 6, text: "Heal 6." },
+    field_tonic: { id: "field_tonic", name: "Field Tonic", icon: "heal", heal: 14, block: 4,
+        text: "Heal 14 and gain 4 Block." },
+    slow_mend: { id: "slow_mend", name: "Slow Mend", icon: "heal", healPct: 0.3, text: "Heal three tenths of your health." },
+    rally_draught: { id: "rally_draught", name: "Rally Draught", icon: "heal", healPct: 0.2, energy: 1,
+        text: "Heal a fifth of your health and gain 1 energy." },
+
+    // ── THE GUARD ────────────────────────────────────────────────────────────────────────────────────
+    hide_oil: { id: "hide_oil", name: "Hide Oil", icon: "shield", block: 8, text: "Gain 8 Block." },
+    slow_iron: { id: "slow_iron", name: "Slow Iron", icon: "shield", blockEach: 4,
+        text: "Gain 4 Block at the end of every turn for the rest of the fight." },
+    turtle_brew: { id: "turtle_brew", name: "Turtle Brew", icon: "shield", block: 14, blockEach: 2,
+        text: "Gain 14 Block, and 2 more at the end of every turn." },
+    briar_oil: { id: "briar_oil", name: "Briar Oil", icon: "shield", thorns: 3, block: 8,
+        text: "Gain 8 Block and 3 Thorns for the rest of the fight." },
+    hedge_oil: { id: "hedge_oil", name: "Hedge Oil", icon: "shield", thorns: 10,
+        text: "10 Thorns for the rest of the fight." },
+
+    // ── THE TEETH ────────────────────────────────────────────────────────────────────────────────────
+    hot_blood: { id: "hot_blood", name: "Hot Blood", icon: "sword", strength: 1, draw: 1,
+        text: "Gain 1 Strength and draw a card." },
+    long_fury: { id: "long_fury", name: "Long Fury", icon: "sword", strengthEach: 1,
+        text: "Gain 1 Strength at the start of every turn for the rest of the fight." },
+    berserker_oil: { id: "berserker_oil", name: "Berserker Oil", icon: "sword", strength: 5,
+        text: "Gain 5 Strength." },
+    scatter_shot: { id: "scatter_shot", name: "Scattershot", icon: "sword", damageAll: 12, draw: 1,
+        text: "Deal 12 damage to ALL enemies and draw a card." },
+    ember_shot: { id: "ember_shot", name: "Ember Shot", icon: "sword", damageAll: 25,
+        text: "Deal 25 damage to ALL enemies." },
+    culling_oil: { id: "culling_oil", name: "Culling Oil", icon: "sword", damageAll: 9, frailAll: 2,
+        text: "Deal 9 damage to ALL enemies and apply 2 Frail." },
+
+    // ── THE MARKS ────────────────────────────────────────────────────────────────────────────────────
+    pall_flask: { id: "pall_flask", name: "Pall Flask", icon: "draw", weakAll: 3,
+        text: "Apply 3 Weak to ALL enemies." },
+    ruin_flask: { id: "ruin_flask", name: "Ruin Flask", icon: "draw", vulnerableAll: 3,
+        text: "Apply 3 Vulnerable to ALL enemies." },
+    three_mark_flask: { id: "three_mark_flask", name: "Threefold Flask", icon: "draw", vulnerableAll: 1, weakAll: 1, frailAll: 1,
+        text: "Apply 1 Vulnerable, 1 Weak and 1 Frail to ALL enemies." },
+
+    // ── THE HAND ─────────────────────────────────────────────────────────────────────────────────────
+    second_thought: { id: "second_thought", name: "Second Thought", icon: "draw", draw: 2, energy: 1,
+        text: "Draw 2 cards and gain 1 energy." },
+    deep_breath: { id: "deep_breath", name: "Deep Breath", icon: "draw", draw: 5,
+        text: "Draw 5 cards." },
+    hard_pull: { id: "hard_pull", name: "Hard Pull", icon: "energy", energy: 2, draw: 1,
+        text: "Gain 2 energy and draw a card." },
 };
 export const POTION_IDS = Object.keys(POTIONS);
 
@@ -1136,20 +1416,45 @@ export const BOSS_PERKS = {
         text: "+20 max health, healed for it now, and heal 4 after every win." },
     // ── AND SEVEN MORE ── theirs are the ones with a PRICE on them, which is what makes a boss trinket a
     // decision rather than a gift. Five was not a pool: you saw the same three every run.
-    coal_heart: { id: "coal_heart", name: "Coal Heart", icon: "energy", energyEach: 1, maxHpDown: 14,
-        text: "+1 energy every turn. -14 max health." },
-    both_marks: { id: "both_marks", name: "Both Marks", icon: "paw", vulnerableAll: 1, weakAll: 1, maxHpDown: 10,
-        text: "Every enemy starts each fight Weak and Vulnerable. -10 max health." },
-    barricade_stone: { id: "barricade_stone", name: "Barricade Stone", icon: "shield", blockKeeps: true, maxHpDown: 12,
-        text: "Your Block is no longer lost at the start of your turn. -12 max health." },
-    demon_tooth: { id: "demon_tooth", name: "Demon Tooth", icon: "sword", strengthEach: 1, maxHpDown: 16,
-        text: "Gain 1 Strength at the start of every turn. -16 max health." },
-    second_sight: { id: "second_sight", name: "Second Sight", icon: "paw", drawEach: 1, maxHpDown: 14,
-        text: "Draw one extra card every turn. -14 max health." },
-    gorgons_eye: { id: "gorgons_eye", name: "The Gorgon's Eye", icon: "paw", vulnBonus: 0.5, maxHpDown: 8,
-        text: "Vulnerable enemies take double damage instead of half again. -8 max health." },
+    coal_heart: { id: "coal_heart", name: "Coal Heart", icon: "energy", energyEach: 1, maxHpDown: 10,
+        text: "+1 energy every turn. -10 max health." },
+    both_marks: { id: "both_marks", name: "Both Marks", icon: "paw", vulnerableAll: 1, weakAll: 1, maxHpDown: 6,
+        text: "Every enemy starts each fight Weak and Vulnerable. -6 max health." },
+    barricade_stone: { id: "barricade_stone", name: "Barricade Stone", icon: "shield", blockKeeps: true, maxHpDown: 8,
+        text: "Your Block is no longer lost at the start of your turn. -8 max health." },
+    demon_tooth: { id: "demon_tooth", name: "Demon Tooth", icon: "sword", strengthEach: 1, firstAttackBonus: 6, maxHpDown: 8,
+        text: "Gain 1 Strength at the start of every turn, and your first attack deals 6 more. -8 max health." },
+    second_sight: { id: "second_sight", name: "Second Sight", icon: "paw", drawEach: 1, maxHpDown: 9,
+        text: "Draw one extra card every turn. -9 max health." },
+    gorgons_eye: { id: "gorgons_eye", name: "The Gorgon's Eye", icon: "paw", vulnBonus: 0.4,
+        text: "Vulnerable enemies take 90% more damage instead of half again." },
     iron_lung: { id: "iron_lung", name: "Iron Lung", icon: "heart", maxHp: 30, healAfterLow: 10,
         text: "+30 max health, healed for it now, and heal 10 after a fight you win below half health." },
+    // ── AND ELEVEN MORE BOSS TRINKETS ────────────────────────────────────────────────────────────────
+    // Theirs all have a PRICE, which is what makes the pick at the end of an act a decision. Twelve was
+    // still a pool you had seen all of by act three.
+    hourglass_crown: { id: "hourglass_crown", name: "Hourglass Crown", icon: "ember", startDamageAll: 6, maxHpDown: 10,
+        text: "Deal 6 damage to ALL enemies at the start of every turn. -10 max health." },
+    the_red_bell: { id: "the_red_bell", name: "The Great Bell", icon: "sword", firstAttackBonus: 20, maxHpDown: 10,
+        text: "Your first attack each fight deals 20 more. -10 max health." },
+    reapers_due: { id: "reapers_due", name: "The Reaper's Due", icon: "energy", onKillEnergy: 1, onKillDraw: 1, maxHpDown: 6,
+        text: "When an enemy dies, gain 1 energy and draw a card. -6 max health." },
+    old_debt_stone: { id: "old_debt_stone", name: "Debt Stone", icon: "ember", emberPerWin: 28,
+        text: "28 embers after every fight you win." },
+    quartermaster: { id: "quartermaster", name: "The Quartermaster", icon: "ration", potionSlots: 2, potionLuck: 15,
+        text: "Two more potion slots, and bottles turn up far more often." },
+    grinding_wheel: { id: "grinding_wheel", name: "Grinding Wheel", icon: "sword", eggUpgrades: 1, offerPlus: 1, strength: 1,
+        text: "One extra card offered, attacks arrive sharpened, and open every fight with 1 Strength." },
+    great_elk: { id: "great_elk", name: "The Great Elk", icon: "heart", maxHpPerElite: 18, maxHp: 10,
+        text: "+10 max health now, and +18 more every time you beat an elite." },
+    three_masks: { id: "three_masks", name: "Three Masks", icon: "paw", vulnerableAll: 1, weakAll: 1, frailAll: 1, maxHpDown: 9,
+        text: "Every enemy starts each fight Weak, Vulnerable and Frail. -9 max health." },
+    stone_of_hours: { id: "stone_of_hours", name: "Stone of Hours", icon: "shield", blockEach: 4,
+        text: "Gain 4 Block at the end of every turn." },
+    long_teeth: { id: "long_teeth", name: "Long Teeth", icon: "sword", strengthEach: 2, maxHpDown: 17,
+        text: "Gain 2 Strength at the start of every turn. -17 max health." },
+    kings_ration: { id: "kings_ration", name: "The King's Ration", icon: "ration", healAfter: 10,
+        text: "Heal 10 after every fight you win." },
 };
 export const BOSS_PERK_IDS = Object.keys(BOSS_PERKS);
 
@@ -1228,7 +1533,14 @@ export const SHOP = {
 };
 
 /** What removing a card costs on this visit — see SHOP.removeBase. */
-export const removalCost = (removals = 0) => SHOP.removeBase + SHOP.removeStep * Math.max(0, removals);
+// A trinket can take a cut off the fire — their Smiling Mask, which is a small number that decides whether
+// a run thins its deck twice or four times. `perks` is optional so every caller that does not have them (the
+// shelf builder, the rig) keeps working unchanged.
+export const removalCost = (removals = 0, perks = null) => {
+    const full = SHOP.removeBase + SHOP.removeStep * Math.max(0, removals);
+    const cut = perks ? Math.min(0.75, perkSum(perks, "removalCut") || 0) : 0;
+    return Math.max(10, Math.round(full * (1 - cut)));
+};
 
 const priceIn = ([lo, hi], r) => lo + Math.floor(r * (hi - lo + 1));
 
@@ -2713,7 +3025,21 @@ function beginTurn(state) {
         },
     };
     // `draw` is the first turn only (a Bag of Preparation); `drawEach` pays on every one of them.
-    return drawCards(opened, DRAW_PER_TURN + perkSum(state.perks, "drawEach")
+    // ── AND ONE THAT SPENDS ITS OWN TURN HURTING THEM ────────────────────────────────────────────────
+    // Mercury Hourglass: damage to everything still standing, at the top of every one of your turns. It goes
+    // through land and reap like any other blow, so armour, Intangible, a creature that splits when it is
+    // halved and one that does something on the way down all behave exactly as they do against a card.
+    // NOT named `tick`: there is a module-level tick() that ages debuffs, and a local number shadowing it
+    // inside a turn function is a trap for whoever reaches for it next.
+    const hourglass = perkSum(state.perks, "startDamageAll");
+    let ready = opened;
+    if (hourglass > 0 && !first) {
+        const hit = ready.foes.map((f) => (f.hp > 0 ? land(f, attackDamage(hourglass, ready.hero, f)) : f));
+        const done = reap(hit, ready.hero);
+        ready = { ...ready, foes: done.foes, hero: done.hero };
+        if (ready.foes.every((f) => f.hp <= 0)) ready = { ...ready, over: "win" };
+    }
+    return drawCards(ready, DRAW_PER_TURN + perkSum(state.perks, "drawEach")
         + (first ? perkSum(state.perks, "draw") : 0));
 }
 
@@ -2872,6 +3198,10 @@ export function playCard(state, uid, targetIndex = 0) {
     const events = [];
     let hero = state.hero;
     let foes = state.foes;
+    // What a kill hands back, banked here and folded into `next` at the bottom — energy is set there in one
+    // expression and drawing has to happen after the card has left the hand, so neither can be done inline.
+    let killEnergy = 0;
+    let killDraw = 0;
 
     // A card that needs a target and was given a dead one (or none) finds the first thing still standing,
     // rather than being swallowed. The screen should never send this, but a rule that can be called wrongly
@@ -2891,6 +3221,14 @@ export function playCard(state, uid, targetIndex = 0) {
     // Block you are holding — so a truthiness check on the field skipped the whole branch and the card did
     // nothing at all.
     if (card.damage || card.damageFromBlock) {
+        // ── THE FIRST BLOW OF THE FIGHT LANDS HARDER ─────────────────────────────────────────────────
+        // Akabeko. `struck` is a fact about this FIGHT rather than about this card, so it lives on the hero
+        // — which also means a fight resumed from a saved run (run.fight) cannot come back with the bonus
+        // re-armed, the same reasoning `curl` follows on the creatures.
+        const opener = hero.struck ? 0 : perkSum(state.perks, "firstAttackBonus");
+        if (!hero.struck) hero = { ...hero, struck: true };
+        // Bodies still standing before the swing, so a trinket that pays on a KILL can tell one happened.
+        const standing = foes.filter((f) => f.hp > 0).length;
         const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
         for (let swing = 0; swing < (card.hits || 1); swing += 1) {
             for (const i of targets) {
@@ -2899,7 +3237,7 @@ export function playCard(state, uid, targetIndex = 0) {
                 // this and it is the reason you cannot simply out-damage it: a 32-damage Crush and a Peck
                 // are the same card while it holds.
                 // Body Slam swings your own guard: the number on the card IS the Block you are holding.
-                const base = card.damageFromBlock ? (hero.block || 0) : card.damage;
+                const base = (card.damageFromBlock ? (hero.block || 0) : card.damage) + opener;
                 const raw = attackDamage(base, hero, foes[i], card.strengthMult || 1);
                 const dealt = (foes[i].intangible || 0) > 0 ? Math.min(1, raw) : raw;
                 hitFoe(i, (f) => land(f, dealt));
@@ -2912,6 +3250,15 @@ export function playCard(state, uid, targetIndex = 0) {
                     events.push({ type: "damage", on: "hero", amount: thorns, thorns: true });
                 }
             }
+        }
+        // Gremlin Horn: something dies, you get the energy and the card back. Counted off the living rather
+        // than hooked into reap — reap is shared with the potions and the creatures' own turn and it takes
+        // no perks, so asking it would mean threading them through four call sites to answer a question this
+        // one already knows the answer to.
+        const felled = standing - foes.filter((f) => f.hp > 0).length;
+        if (felled > 0) {
+            killEnergy += perkSum(state.perks, "onKillEnergy") * felled;
+            killDraw += perkSum(state.perks, "onKillDraw") * felled;
         }
     }
     if (card.block) {
@@ -3017,7 +3364,7 @@ export function playCard(state, uid, targetIndex = 0) {
         hero, foes,
         // `energy` on a card is energy GAINED, so a 1-cost card that gives 2 back is a net +1 and the reason
         // a deck can do more than three things a turn.
-        energy: state.energy - card.cost + (card.energy || 0),
+        energy: state.energy - card.cost + (card.energy || 0) + killEnergy,
         hand: state.hand.filter((c) => c.uid !== uid),
         // ── EXHAUST ── gone for the rest of the fight rather than into the discard. A Slimed exists to be
         // paid off: one energy to be rid of it for good, which is the only reason it is playable at all. It
@@ -3030,6 +3377,9 @@ export function playCard(state, uid, targetIndex = 0) {
     // Drawn AFTER the card has left the hand and reached the discard, so a card that draws cannot draw itself
     // back, and so a draw that exhausts the pile reshuffles a discard this card is already part of.
     if (card.draw) next = drawCards(next, card.draw);
+    // A kill's card comes after the card's own draw, and only while the fight is still going — drawing into
+    // a won fight is a hand nobody plays and a reshuffle nobody sees.
+    if (killDraw && next.over !== "win") next = drawCards(next, killDraw);
     if (next.over === "win") events.push({ type: "over", result: "win" });
     return { state: next, events };
 }
@@ -3057,6 +3407,11 @@ export function drinkPotion(state, potionId) {
     // Liquid Bronze: thorns for the rest of the fight. The hero already carries the field for Bronze Scales,
     // so a bottle can top it up and nothing downstream needs to learn a new word.
     if (potion.thorns) next.hero.thorns = (next.hero.thorns || 0) + potion.thorns;
+    // Metallicize and Demon Form in a bottle. Both are fields the hero already carries for the cards that
+    // grant them, so a potion setting one needs nothing downstream to learn a new word — the same argument
+    // `thorns` above makes.
+    if (potion.blockEach) next.hero.blockEach = (next.hero.blockEach || 0) + potion.blockEach;
+    if (potion.strengthEach) next.hero.strengthEach = (next.hero.strengthEach || 0) + potion.strengthEach;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
     // A Toy Fan pays for the act of drinking, whatever was in the bottle — theirs exactly, and it is what
     // makes a belt of situational potions worth carrying at all.

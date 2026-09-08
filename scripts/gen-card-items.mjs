@@ -14,6 +14,78 @@ import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
 import { BOSS_PERKS, PERKS, POTIONS } from "../src/lib/marketplace/cards-kit.js";
+
+// ── AND THE HUNDRED AND TWENTY-FOUR NOBODY WAS GOING TO HAND-WRITE ───────────────────────────────────────
+// The catalogue went to 180 trinkets and 50 bottles to stand where theirs stands, and 124 of them arrived
+// with no picture. A trinket with no file renders as an empty gap on the strip, so this is not optional
+// polish — it is the difference between a trinket existing and a trinket being invisible.
+//
+// Hand-writing 124 was not going to happen and one template would have drawn 124 of the same object. What
+// makes this composable is that the NAMES are already objects: a Dried Fig, a Bark Bracer, a Filed Tooth, a
+// Red Bell, an Ash Hourglass. So the name IS the subject, and the only thing that has to be supplied is the
+// material and the treatment — which comes off the trinket's dominant hook, so a thing that guards is drawn
+// in iron and hide and a thing that heals is drawn in linen and clay.
+//
+// A hand-written entry in PERK_ART or POTION_ART always wins. The ones written by hand are better than
+// anything composed, and this is a floor rather than a replacement.
+const HOOK_LOOK = [
+    ["block", "forged in dark iron and boiled hide, dented and scarred from use"],
+    ["blockEach", "forged in dark iron and boiled hide, dented and scarred from use"],
+    ["blockTurn2", "forged in dark iron and boiled hide, dented and scarred from use"],
+    ["blockKeeps", "forged in dark iron and boiled hide, dented and scarred from use"],
+    ["thorns", "bristling and sharp-edged, made of something that would hurt to hold"],
+    ["firstAttackBonus", "wrought in bright steel and lacquer, kept sharp and ready"],
+    ["strength", "wrought in bright steel and bone, heavy in the hand"],
+    ["strengthLow", "wrought in bright steel and bone, heavy in the hand"],
+    ["strengthEach", "wrought in bright steel and bone, heavy in the hand"],
+    ["startDamageAll", "smouldering, with heat shimmer and a dull orange glow inside it"],
+    ["onKillEnergy", "strung on a leather thong and marked with small tally scratches"],
+    ["onKillDraw", "strung on a leather thong and marked with small tally scratches"],
+    ["vulnerableAll", "chalked and pigment-stained, the marks fresh and smudged"],
+    ["weakAll", "chalked and pigment-stained, the marks fresh and smudged"],
+    ["frailAll", "chalked and pigment-stained, the marks fresh and smudged"],
+    ["vulnBonus", "chalked and pigment-stained, the marks fresh and smudged"],
+    ["healAfter", "clean linen and glazed clay, plain and well kept"],
+    ["healAfterLow", "clean linen and glazed clay, plain and well kept"],
+    ["healBonus", "clean linen and glazed clay, plain and well kept"],
+    ["restBonus", "soft and worn, the colours faded from long use"],
+    ["potionSlots", "oiled leather and brass, fitted and buckled"],
+    ["potionLuck", "oiled leather and brass, fitted and buckled"],
+    ["healPerPotion", "oiled leather and brass, fitted and buckled"],
+    ["energy", "crackling faintly, with a hard bright light caught inside it"],
+    ["energyEach", "crackling faintly, with a hard bright light caught inside it"],
+    ["draw", "light and quick-looking, worn smooth where a hand holds it"],
+    ["drawEach", "light and quick-looking, worn smooth where a hand holds it"],
+    ["offerPlus", "light and quick-looking, worn smooth where a hand holds it"],
+    ["emberPerWin", "tarnished brass and old coin, with a warm coppery shine"],
+    ["embers", "tarnished brass and old coin, with a warm coppery shine"],
+    ["removalCut", "tarnished brass and old coin, with a warm coppery shine"],
+    ["eggUpgrades", "smouldering, with heat shimmer and a dull orange glow inside it"],
+    ["maxHpPerElite", "carved from antler and dark wood, old and much handled"],
+    ["maxHp", "carved from antler and dark wood, old and much handled"],
+    ["revive", "carved from antler and dark wood, old and much handled"],
+];
+
+function lookFor(def) {
+    for (const [hook, look] of HOOK_LOOK) if (def[hook]) return look;
+    return "old and much handled, its surface worn smooth";
+}
+
+// "The Long Wind-Up" -> "the long wind-up". The article is kept when the name carries one, because "A The
+// Great Bell" is the shape of every bad generated prompt ever written.
+function asSubject(name) {
+    const n = String(name).trim();
+    return /^(a|an|the)\s/i.test(n) ? n[0].toLowerCase() + n.slice(1) : `a ${n.toLowerCase()}`;
+}
+
+// ⚠️ A BOTTLE HAS TO LOOK LIKE A BOTTLE. Composed from the name alone, "Hedge Oil" came back as a spiky
+// burr — a perfectly good picture of the wrong kind of object. A potion is chosen off a shelf beside two
+// others and its whole silhouette language is vessels, so the subject SAYS vessel and the name becomes what
+// is inside it. A trinket has no such constraint: it is whatever the name says it is.
+const composedItem = (def, potion = false) => (potion
+    ? `a stoppered glass bottle of ${String(def.name).replace(/^(a|an|the)\s+/i, "").toLowerCase()}, `
+        + `${lookFor(def)}, the liquid inside catching the light`
+    : `${asSubject(def.name)}, ${lookFor(def)}`);
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -221,6 +293,19 @@ const PERK_ART = {
         + "red brushstroke.",
     chalk_dust: "A stub of white chalk worn to a wedge, lying in a small drift of its own pale dust with a "
         + "single smeared fingerprint through it.",
+    // ⚠️ THE FOUR THE COMPOSER COULD NOT DO. "Grey Ash", "Warm Stone", "Long Sleep" and "Old Habit" name no
+    // object at all, so the model supplied one and every time it supplied a CHARACTER — a blue minotaur for
+    // Grey Ash, a monk for Old Habit. That is now the fourth time an abstract subject has done this in this
+    // repo (see `oldwall`, `winding_halls` and `three_marks`), and the fix is always the same: name the
+    // material, and say outright that nothing in the frame is alive.
+    grey_ash: "A small heap of fine grey ash on a flat stone, a shallow scoop taken out of one side and a "
+        + "few pale flakes drifting off it. Inanimate ash and stone only: no creature, no figure, no face.",
+    warm_stone: "A smooth oval river stone glowing faintly warm from within, resting in a nest of folded "
+        + "cloth. An inanimate stone and nothing else: no creature, no figure, no face.",
+    long_sleep: "A rolled woollen bedroll tied with two leather straps, a folded blanket strapped on top, "
+        + "standing on end. Bedding only: no creature, no figure, no face, nobody sleeping in it.",
+    old_habit: "A coarse brown monk's robe on a wooden peg, empty and hanging in folds, a knotted rope belt "
+        + "looped over it. An empty garment on a peg: no creature, no figure, no face, nobody wearing it.",
     // ⚠️ CAME BACK AS A MINOTAUR. "Three marks" carried no object at all, so the model supplied one — the
     // same failure the event generator hit twice (see `oldwall` and `winding_halls` there). The subject now
     // leads with the MATERIAL and says outright that nothing is alive in the frame.
@@ -284,17 +369,18 @@ const PERK_ART = {
 
 const JOBS = [
     ...Object.values(POTIONS).map((p) => ({
-        id: p.id, dir: "public/images/cards/potions", subject: POTION_ART[p.id],
+        id: p.id, dir: "public/images/cards/potions", subject: POTION_ART[p.id] || composedItem(p, true),
         store: 256,
     })),
     // BOSS TRINKETS LIVE IN THE SAME FOLDER as the ordinary ones, because every screen that draws a trinket
     // looks it up by id in one place — see takePerk on why there is one catalogue as far as the rest of the
     // game is concerned.
     ...Object.values({ ...PERKS, ...BOSS_PERKS }).map((k) => ({
-        id: k.id, dir: "public/images/cards/items", subject: PERK_ART[k.id],
+        id: k.id, dir: "public/images/cards/items", subject: PERK_ART[k.id] || composedItem(k),
         store: 256,
     })),
 ];
+
 
 const FORCE = process.argv.includes("--force");
 const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();

@@ -311,9 +311,19 @@ export async function POST(request) {
                     + (perkById(id)?.healAfter || 0)
                     + (spent ? (perkById(id)?.healAfterLow || 0) : 0), 0);
                 if (ration) run.hp = Math.min(run.hpMax, run.hp + ration);
+                // ── AND WHAT A WIN IS WORTH IN COIN ──────────────────────────────────────────────
+                // Their Ceramic Fish family: a trinket that pays a little every time, which over sixteen
+                // rooms is a card off the shelf you could not otherwise have bought. Paid here beside the
+                // ration because "the fight is won" is one moment and should have one place.
+                const purse = perkSum(run.perks, "emberPerWin");
+                if (purse) run.embers = (run.embers || 0) + purse;
                 const wonKind = run.at?.kind || "fight";
                 // An elite hands over a perk for the health it just cost you.
                 if (run.at?.kind === "elite") {
+                    // Their Mango-on-a-kill idea: an elite is the only fight worth growing for, and a
+                    // trinket that pays only there is a reason to take the room you would rather walk past.
+                    const grew = perkSum(run.perks, "maxHpPerElite");
+                    if (grew) { run.hpMax += grew; run.hp = Math.min(run.hpMax, run.hp + grew); }
                     const got = grantForRoom(run, run.at.row, run.at.lane, "elite");
                     // takePerk owns the health bump too — see the note on it. Two copies of that is Ember
                     // Heart paying its +8 from an elite and not from the shop.
