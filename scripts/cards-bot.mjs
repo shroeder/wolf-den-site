@@ -386,6 +386,9 @@ let deckSize = 10;
 let attackCards = 5;
 // Cards this turn that were thrown and did not land, and the turn they belong to.
 let turnKey = null;
+// How many turns in a row the bot has been looking at the same screen. A fight legitimately sits on one for
+// a long time; nothing else should.
+let sameScreen = 0, screenWas = null;
 const refused = new Set();
 // How many of each named thing has been bought this run, so the shelf cannot sell four of one bottle.
 const bought = new Map();
@@ -399,6 +402,21 @@ while (runs < RUNS && steps < MAX_STEPS) {
 
     // The same step, seven times over: whatever this screen wants, the bot is not giving it. Photograph it,
     // try the way out, and if there is not one, stop rather than spend the budget discovering there is not.
+    // ⚠️ AND ONE THAT COUNTS SCREENS, NOT SENTENCES. The campfire loop above renamed itself every pass,
+    // so the text-matching watchdog never fired and the run spent its whole budget on one room. This one
+    // asks a duller question — how many turns in a row have I been on this same screen — which no amount
+    // of changing wording can hide from.
+    sameScreen = st.screen === screenWas ? sameScreen + 1 : 0;
+    screenWas = st.screen;
+    if (sameScreen >= 25 && st.screen !== "fight") {
+        note(`  ⚠️  ${sameScreen} turns on the same ${st.screen} — taking the way out`);
+        await shot("stuck-screen");
+        sameScreen = 0;
+        if (!(await tap(LEAVE))) { note("  no way out — stopping"); break; }
+        await sleep(2400);
+        continue;
+    }
+
     if (spinning()) {
         await shot("spinning");
         note(`  ⚠  SPINNING on the same step — trying the way out`);
@@ -583,6 +601,16 @@ while (runs < RUNS && steps < MAX_STEPS) {
         // Two plates on a campfire: heal, or sharpen a card for the rest of the run. Tapping the first one
         // every time means never sharpening anything, and a permanently upgraded card compounds across every
         // remaining fight where the heal is spent by the next elite. Full health? take the edge.
+        // ⚠️ THE SHARPEN PLATE IS A TOGGLE. Its label flips to "Never mind" while the picker is open, so
+        // pressing it again CLOSES the picker — and because the label changed, the note changed, and the
+        // repeat-watchdog below never saw two identical lines. A loop that renames itself every pass is
+        // invisible to a watchdog that matches on text.
+        if (GOOD && await js(`!!document.querySelector('.cr-pick')`)) {
+            note("  fire: picker already open — closing it rather than toggling");
+            await tap(".cr-pick-close");
+            await sleep(700);
+            continue;
+        }
         if (GOOD && (st.roomChoices || []).length > 1) {
             const live = st.roomChoices.map((c, i) => ({ ...c, i })).filter((c) => !c.off);
             const fire = live.find((c) => /heal/i.test(c.label));
@@ -595,20 +623,37 @@ while (runs < RUNS && steps < MAX_STEPS) {
                 // Sharpening opens a picker; take the card the deck leans on most, which is the one it holds
                 // the most copies of — upgrading a card you draw twice a fight beats upgrading a one-off.
                 if (/sharpen/i.test(want.label)) {
+                    // ⚠️ THE PICKABLE THING IS .cr-card, NOT .cf-card. The button carries `is-done` when the
+                    // card has already been sharpened; .cf-card is a SPAN inside it holding the face. So
+                    // `.cf-card:not(.is-done)` excluded nothing — the class it was testing lives one level up —
+                    // and the index it produced counted the already-sharpened cards too. On a deck where most
+                    // cards were done it kept choosing a DISABLED button, which does nothing, forever.
+                    // Filmed: 161 identical campfire screens on one room.
+                    const PICK = ".cr-pick-deck .cr-card:not(.is-done)";
                     const which = await js(`(() => {
-                        const cs = [...document.querySelectorAll('.cr-pick-deck .cf-card:not(.is-done)')];
-                        const n = {}; cs.forEach((c) => { const k = c.querySelector('.cf-banner')?.textContent?.trim();
-                            n[k] = (n[k] || 0) + 1; });
+                        const cs = [...document.querySelectorAll(${JSON.stringify(PICK)})];
+                        const name = (c) => c.querySelector('.cf-banner')?.textContent?.trim() || '';
+                        // The card the deck leans on most: the one it holds the most copies of, tie-broken by
+                        // how much text is on it (a card that does two things is worth sharpening over a card
+                        // that does one).
+                        const n = {}; cs.forEach((c) => { n[name(c)] = (n[name(c)] || 0) + 1; });
                         let bi = 0, bs = -1;
-                        cs.forEach((c, i) => { const k = c.querySelector('.cf-banner')?.textContent?.trim();
-                            const s = (n[k] || 1) * 10 + (c.querySelector('.cf-text')?.textContent || '').length / 40;
-                            if (s > bs) { bs = s; bi = i; } });
-                        return { i: bi, name: cs[bi]?.querySelector('.cf-banner')?.textContent?.trim() || null, of: cs.length };
+                        cs.forEach((c, i) => {
+                            const sc = (n[name(c)] || 1) * 10 + (c.querySelector('.cf-text')?.textContent || '').length / 40;
+                            if (sc > bs) { bs = sc; bi = i; }
+                        });
+                        return { i: bi, name: name(cs[bi]) || null, of: cs.length };
                     })()`);
                     if (which && which.of) {
-                        note(`  fire: sharpening ${which.name}`);
-                        await tap(".cr-pick-deck .cf-card:not(.is-done)", which.i);
+                        note(`  fire: sharpening ${which.name} (${which.of} still sharpenable)`);
+                        await tap(PICK, which.i);
                         await sleep(1600);
+                    } else {
+                        // Everything in the deck is already sharpened. The plate said otherwise, so take the
+                        // way out the panel offers rather than pressing the plate again and reopening it.
+                        note("  fire: nothing left to sharpen — closing the picker");
+                        await tap(".cr-pick-close");
+                        await sleep(700);
                     }
                 }
                 await shot("room-done");
@@ -785,10 +830,15 @@ while (runs < RUNS && steps < MAX_STEPS) {
             .filter((f) => (Number(String(f.hp || "").split("/")[0]) || 0) > 0);
         // The walker hit whoever stood leftmost. A player finishes the one that is nearly dead, because a
         // corpse stops swinging — see aimAt.
-        const aim = GOOD ? aimAt(st).i : (alive[0]?.i ?? 0);
+        // ⚠ NAME THE FOE YOU AIM AT, THEN READ THAT FOE. The line below said `foe ${aim}` and then printed
+        // alive[0]'s health whatever the aim was, so a transcript of a two-foe fight showed the leftmost
+        // creature's bar frozen while the bot was correctly killing the other one — which reads exactly
+        // like damage that does not land. Cost an hour of chasing a bug that was in this line, not the game.
+        const aimed = GOOD ? aimAt(st) : (alive[0] || { i: 0, hp: null });
+        const aim = aimed.i ?? 0;
         const target = hitsFoe(card) ? ".cf-foe" : ".cf-hero";
         note(`  t${(st.turn || "").replace(/.*Turn /, "")} ${st.hp} e:${st.energy || "?"}`
-            + ` — ${card.name} (${card.text}) → ${hitsFoe(card) ? `foe ${aim} ${alive[0]?.hp || ""}` : "self"}`);
+            + ` — ${card.name} (${card.text}) → ${hitsFoe(card) ? `foe ${aim} ${aimed.hp || ""}` : "self"}`);
         // ⚠ THROW FROM THE MIDDLE OF THE TRAY. The hand is a carousel: only the raised card sits fully
         // on screen and the ones at either end are clipped by the edge, so a drag that starts on their
         // visible sliver begins outside the card it meant to pick up. Tapping first is what a thumb does
