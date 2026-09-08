@@ -206,6 +206,16 @@ function runOnce(seed) {
     // building taken out.
     let perks = [m.STARTER_PERK];
     let potions = [];
+    // ⚠️ THE RULE, NOT A THIRD COPY OF IT. This file used to apply a trinket by hand in two places and
+    // between them they knew about maxHp, maxHpDown and embers in different combinations — so a costed perk
+    // measured as free in one path and correct in the other. takePerk is a rule now (see cards-kit); the run
+    // here is a bag of locals rather than an object, so this is the adapter and nothing more.
+    const take = (id) => {
+        const box = { perks, hp, hpMax, embers };
+        if (!m.takePerk(box, id)) return false;
+        perks = box.perks; hp = box.hp; hpMax = box.hpMax; embers = box.embers;
+        return true;
+    };
     let luck = POTION_DROP;
     let embers = 60;   // the purse a run is dealt — see newRun in cards.js
     let removals = 0;
@@ -250,12 +260,7 @@ function runOnce(seed) {
             // grantForRoom is a rule now and lives in cards-kit for exactly this reason.
             const got = m.grantForRoom({ seed, perks, potions }, pick.row, pick.lane, "treasure");
             embers += got.embers || 0;
-            if (got.perk && !perks.includes(got.perk)) {
-                perks.push(got.perk);
-                const pk = m.PERKS[got.perk];
-                if (pk?.maxHp) { hpMax += pk.maxHp; hp += pk.maxHp; }
-                if (pk?.embers) embers += pk.embers;
-            }
+            if (got.perk) take(got.perk);
             if (got.potion && potions.length < m.beltSize(perks, ASC)) potions.push(got.potion);
             continue;
         }
@@ -389,12 +394,7 @@ function runOnce(seed) {
             // measure act two on act one's power.
             const open = m.BOSS_PERK_IDS.filter((id) => !perks.includes(id));
             if (open.length) {
-                const got = open[Math.floor(next() * open.length)];
-                perks = [...perks, got];
-                const k = m.BOSS_PERKS[got] || {};
-                if (k.maxHp) { hpMax += k.maxHp; hp += k.maxHp; }
-                if (k.maxHpDown) { hpMax = Math.max(10, hpMax - k.maxHpDown); hp = Math.min(hp, hpMax); }
-                if (k.embers) embers += k.embers;
+                take(open[Math.floor(next() * open.length)]);
             }
             act += 1;
             arrived.push({ act, hp, hpMax, deck: deck.length, perks: perks.length, potions: potions.length });

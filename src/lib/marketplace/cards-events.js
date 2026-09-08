@@ -14,7 +14,7 @@
 // PURE, like the rules and the map: an event is data plus a seed. The server owns what a choice DOES (it
 // needs the perk table and the deck), the screen owns how it reads, and this file owns what exists.
 import {
-    PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS,
+    PERKS, PERK_IDS, POOL, POTIONS, POTION_IDS, STARTER_DECK, STATUS_IDS, takePerk,
     beltSize, canUpgrade, cardById, nextRand, upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -739,10 +739,10 @@ export function applyEventChoice(run, ev, index, card = null) {
         const open = PERK_IDS.filter((id) => !held.has(id));
         if (open.length) {
             const got = open[Math.floor(next() * open.length)];
-            // The perk catalogue's own bookkeeping, inline: a trinket that raises the bar heals you for it.
-            run.perks = [...(run.perks || []), got];
-            if (PERKS[got]?.maxHp) { run.hpMax += PERKS[got].maxHp; run.hp += PERKS[got].maxHp; }
-            if (PERKS[got]?.embers) run.embers = (run.embers || 0) + PERKS[got].embers;
+            // ⚠️ ASKED, NOT REPEATED. These three lines used to be written out here and applied `maxHp` and
+            // `embers` and nothing else — so a trinket with a PRICE on it paid its upside and skipped its
+            // cost. takePerk is the one place that knows what taking a trinket means.
+            takePerk(run, got);
             said.push(`${PERKS[got]?.name || "A trinket"}.`);
         } else { run.embers = (run.embers || 0) + 60; said.push("Nothing you do not already carry. 60 embers instead."); }
     } else if (eff.maybePerk) said.push("Nothing but scrap.");

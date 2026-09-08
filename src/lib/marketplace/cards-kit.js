@@ -787,6 +787,112 @@ export const PERKS = {
         text: "One extra card to choose from after every fight." },
     molten_egg: { id: "molten_egg", name: "Molten Egg", icon: "ember", eggUpgrades: 1,
         text: "Attacks you are offered after a fight arrive already sharpened." },
+
+    // ══ AND FORTY-FIVE MORE, BECAUSE TWENTY-SEVEN IS NOT THEIRS ══════════════════════════════════════════
+    // Theirs has about a hundred and eighty relics; a run of theirs can meet nearly all of them, so by act
+    // three a Spire player still does not know what is coming. Ours drew from twenty-six, which meant the
+    // back half of every run was picking from things it had already seen. That was the largest single
+    // content gap left in this game.
+    //
+    // Every one of these is one of their relics on a hook the engine ALREADY reads — no new mechanics, no
+    // new branches in the turn loop, and nothing here that can be wrong in a way a test would not catch.
+    // Three fields did have to be wired through to perks (blockKeeps, strengthEach, drawEach); they were
+    // read off the hero for cards and ignored on trinkets, which is why the last three in this block could
+    // not have existed yesterday.
+
+    // ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────
+    acorn_cache: { id: "acorn_cache", name: "Acorn Cache", icon: "heart", maxHp: 6,
+        text: "+6 max health, and healed for it now." },
+    thick_pelt: { id: "thick_pelt", name: "Thick Pelt", icon: "heart", maxHp: 10,
+        text: "+10 max health, and healed for it now." },
+    winter_fat: { id: "winter_fat", name: "Winter Fat", icon: "heart", maxHp: 18,
+        text: "+18 max health, and healed for it now." },
+    hollow_bone: { id: "hollow_bone", name: "Hollow Bone", icon: "heart", maxHp: 9, draw: 1,
+        text: "+9 max health, and one extra card on your first turn." },
+
+    // ── OPENING GUARD ────────────────────────────────────────────────────────────────────────────────
+    oak_shield: { id: "oak_shield", name: "Oak Shield", icon: "shield", block: 8,
+        text: "Start every fight with 8 Block." },
+    iron_carapace: { id: "iron_carapace", name: "Iron Carapace", icon: "shield", block: 14,
+        text: "Start every fight with 14 Block." },
+    clay_shard: { id: "clay_shard", name: "Clay Shard", icon: "shield", blockTurn2: 8,
+        text: "Gain 8 Block on the second turn of every fight." },
+    packed_earth: { id: "packed_earth", name: "Packed Earth", icon: "shield", blockEach: 1, block: 5,
+        text: "Start every fight with 5 Block, and gain 1 more at the end of every turn." },
+    river_stone: { id: "river_stone", name: "River Stone", icon: "shield", blockEach: 3,
+        text: "Gain 3 Block at the end of every turn." },
+
+    // ── TEETH ────────────────────────────────────────────────────────────────────────────────────────
+    iron_claw: { id: "iron_claw", name: "Iron Claw", icon: "sword", strength: 2,
+        text: "Start every fight with 2 Strength." },
+    desperate_fang: { id: "desperate_fang", name: "Desperate Fang", icon: "sword", strengthLow: 5,
+        text: "Start a fight below half health with 5 Strength." },
+    boars_tusk: { id: "boars_tusk", name: "Boar's Tusk", icon: "sword", strength: 1, thorns: 2,
+        text: "Start every fight with 1 Strength, and deal 2 damage back to anything that hits you." },
+    spined_hide: { id: "spined_hide", name: "Spined Hide", icon: "shield", thorns: 5,
+        text: "Deal 5 damage back to anything that hits you." },
+    quill_mantle: { id: "quill_mantle", name: "Quill Mantle", icon: "shield", thorns: 2, block: 6,
+        text: "Start every fight with 6 Block, and deal 2 damage back to anything that hits you." },
+
+    // ── THE MARK ON THE ROOM ─────────────────────────────────────────────────────────────────────────
+    chipped_marble: { id: "chipped_marble", name: "Chipped Marble", icon: "paw", vulnerableAll: 1, maxHpDown: 4,
+        text: "Every enemy starts each fight Vulnerable. -4 max health." },
+    ash_veil: { id: "ash_veil", name: "Ash Veil", icon: "paw", weakAll: 1, block: 4,
+        text: "Every enemy starts each fight Weak, and you start with 4 Block." },
+    paper_crane: { id: "paper_crane", name: "Paper Crane", icon: "paw", vulnBonus: 0.15,
+        text: "Vulnerable enemies take 65% more damage instead of 50%." },
+
+    // ── WHAT COMES BACK ──────────────────────────────────────────────────────────────────────────────
+    field_dressing: { id: "field_dressing", name: "Field Dressing", icon: "ration", healAfter: 9,
+        text: "Heal 9 after every fight you win." },
+    sunflower_seed: { id: "sunflower_seed", name: "Sunflower Seed", icon: "ration", healAfter: 3, maxHp: 5,
+        text: "+5 max health, and heal 3 after every fight you win." },
+    marrow_broth: { id: "marrow_broth", name: "Marrow Broth", icon: "ration", healAfterLow: 18,
+        text: "Heal 18 after a fight you win below half health." },
+    spring_water: { id: "spring_water", name: "Spring Water", icon: "heart", healBonus: 0.35,
+        text: "Everything that heals you heals a third again as much." },
+    feather_bed: { id: "feather_bed", name: "Feather Bed", icon: "heart", restBonus: 25,
+        text: "A campfire heals 25 more." },
+    banked_coals: { id: "banked_coals", name: "Banked Coals", icon: "ember", restBonus: 10, healAfter: 3,
+        text: "A campfire heals 10 more, and heal 3 after every fight you win." },
+
+    // ── THE BELT ─────────────────────────────────────────────────────────────────────────────────────
+    oiled_satchel: { id: "oiled_satchel", name: "Oiled Satchel", icon: "ration", potionSlots: 1,
+        text: "One more potion slot." },
+    cork_stopper: { id: "cork_stopper", name: "Cork Stopper", icon: "ration", healPerPotion: 7,
+        text: "Heal 7 whenever you drink a potion." },
+    glass_vial: { id: "glass_vial", name: "Glass Vial", icon: "ration", potionSlots: 1, healPerPotion: 3,
+        text: "One more potion slot, and heal 3 whenever you drink a potion." },
+
+    // ── THE OPENING HAND ─────────────────────────────────────────────────────────────────────────────
+    courier_sack: { id: "courier_sack", name: "Courier's Sack", icon: "paw", draw: 3,
+        text: "Draw three extra cards on your first turn." },
+    spark_stone: { id: "spark_stone", name: "Spark Stone", icon: "energy", energy: 1, block: 4,
+        text: "One extra energy on your first turn, and start with 4 Block." },
+    tinder_box: { id: "tinder_box", name: "Tinder Box", icon: "energy", energy: 1, draw: 1,
+        text: "One extra energy and one extra card on your first turn." },
+
+    // ── WHAT THE ROOM OFFERS AFTERWARDS ──────────────────────────────────────────────────────────────
+    prospectors_eye: { id: "prospectors_eye", name: "Prospector's Eye", icon: "paw", offerPlus: 1, embers: 60,
+        text: "60 embers now, and one extra card to choose from after every fight." },
+    smiths_mark: { id: "smiths_mark", name: "Smith's Mark", icon: "sword", eggUpgrades: 1, embers: 40,
+        text: "40 embers now. Attacks you are offered after a fight arrive already sharpened." },
+
+    // ── THE PURSE ────────────────────────────────────────────────────────────────────────────────────
+    cut_purse: { id: "cut_purse", name: "Cut Purse", icon: "ember", embers: 200,
+        text: "200 embers, right now." },
+    tallow_candle: { id: "tallow_candle", name: "Tallow Candle", icon: "ember", embers: 90, maxHp: 4,
+        text: "90 embers now, and +4 max health." },
+
+    // ── AND THE THREE THE ENGINE HAD TO LEARN ────────────────────────────────────────────────────────
+    // blockKeeps, strengthEach and drawEach were read off the HERO for cards and ignored on trinkets. Now
+    // that they are read from both, these are theirs almost unchanged.
+    tortoise_sign: { id: "tortoise_sign", name: "The Tortoise Sign", icon: "shield", blockKeeps: true, maxHpDown: 6,
+        text: "Your Block is no longer lost at the start of your turn. -6 max health." },
+    long_hunger: { id: "long_hunger", name: "The Long Hunger", icon: "sword", strengthEach: 1, maxHpDown: 10,
+        text: "Gain 1 Strength at the start of every turn. -10 max health." },
+    wide_eye: { id: "wide_eye", name: "Wide Eye", icon: "paw", drawEach: 1, maxHpDown: 12,
+        text: "Draw one extra card every turn. -12 max health." },
 };
 // ── THE ONE YOU START WITH ───────────────────────────────────────────────────────────────────────────────
 // ⚠️ EVERY SPIRE CHARACTER OPENS THE GAME HOLDING A RELIC, and the Ironclad's is Burning Blood: heal 6 after
@@ -967,6 +1073,22 @@ export const BOSS_PERKS = {
         text: "150 embers now, and one extra card on your first turn." },
     old_wolf: { id: "old_wolf", name: "The Old Wolf", icon: "heart", maxHp: 20, healAfter: 4,
         text: "+20 max health, healed for it now, and heal 4 after every win." },
+    // ── AND SEVEN MORE ── theirs are the ones with a PRICE on them, which is what makes a boss trinket a
+    // decision rather than a gift. Five was not a pool: you saw the same three every run.
+    coal_heart: { id: "coal_heart", name: "Coal Heart", icon: "energy", energyEach: 1, maxHpDown: 14,
+        text: "+1 energy every turn. -14 max health." },
+    both_marks: { id: "both_marks", name: "Both Marks", icon: "paw", vulnerableAll: 1, weakAll: 1, maxHpDown: 10,
+        text: "Every enemy starts each fight Weak and Vulnerable. -10 max health." },
+    barricade_stone: { id: "barricade_stone", name: "Barricade Stone", icon: "shield", blockKeeps: true, maxHpDown: 12,
+        text: "Your Block is no longer lost at the start of your turn. -12 max health." },
+    demon_tooth: { id: "demon_tooth", name: "Demon Tooth", icon: "sword", strengthEach: 1, maxHpDown: 16,
+        text: "Gain 1 Strength at the start of every turn. -16 max health." },
+    second_sight: { id: "second_sight", name: "Second Sight", icon: "paw", drawEach: 1, maxHpDown: 14,
+        text: "Draw one extra card every turn. -14 max health." },
+    gorgons_eye: { id: "gorgons_eye", name: "The Gorgon's Eye", icon: "paw", vulnBonus: 0.5, maxHpDown: 8,
+        text: "Vulnerable enemies take double damage instead of half again. -8 max health." },
+    iron_lung: { id: "iron_lung", name: "Iron Lung", icon: "heart", maxHp: 30, healAfterLow: 10,
+        text: "+30 max health, healed for it now, and heal 10 after a fight you win below half health." },
 };
 export const BOSS_PERK_IDS = Object.keys(BOSS_PERKS);
 
@@ -1114,6 +1236,27 @@ export function roomFight(row, kind = "fight", act = 1) {
 }
 
 // Kept as the shape the fixture builder already reads, so a room and a row arrive the same way a stop did.
+// ── TAKING A TRINKET, AND PAYING FOR IT ──────────────────────────────────────────────────────────────────
+// ⚠️ THIS LIVED IN cards.js WHERE THE EVENT TABLE COULD NOT REACH IT, so cards-events.js grew its own copy
+// that applied `maxHp` and `embers` and knew nothing about `maxHpDown`. Harmless while only boss trinkets
+// carried a price — and four of the ordinary ones do now, so a question-mark room would have handed over
+// the Tortoise Sign's kept Block and quietly skipped the six max health it costs. That is the worst kind of
+// bug this game can have, because nothing about the screen looks wrong.
+//
+// One rule, three callers: the elite and chest payouts, the written rooms, and the simulator.
+export function takePerk(run, perkId) {
+    const perk = PERKS[perkId] || BOSS_PERKS[perkId];
+    if (!perk || (run.perks || []).includes(perkId)) return false;
+    run.perks = [...(run.perks || []), perkId];
+    if (perk.maxHp) { run.hpMax += perk.maxHp; run.hp += perk.maxHp; }
+    if (perk.maxHpDown) {
+        run.hpMax = Math.max(10, run.hpMax - perk.maxHpDown);
+        run.hp = Math.max(1, Math.min(run.hp, run.hpMax));
+    }
+    if (perk.embers) run.embers = (run.embers || 0) + perk.embers;
+    return true;
+}
+
 // ── WHAT A ROOM HANDS OVER ───────────────────────────────────────────────────────────────────────────────
 // ⚠️ THIS LIVED IN cards.js, WHICH THE SIMULATOR CANNOT IMPORT — that module opens a database connection and
 // the sim runs outside Next. So the sim had its own treasure room written by hand, and when the chest was
@@ -2495,13 +2638,22 @@ function beginTurn(state) {
             // makes a fight a fight — and exactly one card in their game turns it off. It reads here rather
             // than as a branch further down because "does my guard survive the turn" is a property of the
             // turn opening, not of the card that said so.
-            block: (first || state.hero.blockKeeps ? state.hero.block : 0)
+            // ⚠️ A TRINKET CAN KEEP IT NOW TOO. `blockKeeps` was read off the HERO only, which is where a
+            // card puts it — so a perk carrying the same field was a line of text and nothing else. Three
+            // fields were like this (see the note by strengthEach below); they are the cheapest kind of new
+            // trinket there is, because the engine already knows what the word means.
+            block: (first || state.hero.blockKeeps || perkSum(state.perks, "blockKeeps") ? state.hero.block : 0)
                 + (state.turn === 1 ? perkSum(state.perks, "blockTurn2") : 0),
             // Demon Form, and the trinket that does the same thing quietly.
-            strength: (state.hero.strength || 0) + (first ? 0 : (state.hero.strengthEach || 0)),
+            // ⚠️ AND FROM PERKS AS WELL AS FROM CARDS. `energyEach` two lines up already read both; this one
+            // read only the hero, so a trinket that said "gain Strength every turn" gained none.
+            strength: (state.hero.strength || 0)
+                + (first ? 0 : (state.hero.strengthEach || 0) + perkSum(state.perks, "strengthEach")),
         },
     };
-    return drawCards(opened, DRAW_PER_TURN + (first ? perkSum(state.perks, "draw") : 0));
+    // `draw` is the first turn only (a Bag of Preparation); `drawEach` pays on every one of them.
+    return drawCards(opened, DRAW_PER_TURN + perkSum(state.perks, "drawEach")
+        + (first ? perkSum(state.perks, "draw") : 0));
 }
 
 // ── THE FIGHT ────────────────────────────────────────────────────────────────────────────────────────────

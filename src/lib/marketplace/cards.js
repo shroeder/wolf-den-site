@@ -1,6 +1,6 @@
 import "server-only";
 
-export { grantForRoom } from "@/lib/marketplace/cards-kit.js";
+export { grantForRoom, takePerk } from "@/lib/marketplace/cards-kit.js";
 import { db } from "@/lib/db";
 import { buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -691,18 +691,7 @@ export async function shopStock(buyerId, run, seed) {
  * is the Coffee Dripper trade — the energy is worth more than the health, but only if you can survive it.
  * `embers` pays out once, here, because a trinket that quietly changes your purse is a trinket nobody sees.
  */
-export function takePerk(run, perkId) {
-    const perk = PERKS[perkId] || BOSS_PERKS[perkId];
-    if (!perk || (run.perks || []).includes(perkId)) return false;
-    run.perks = [...(run.perks || []), perkId];
-    if (perk.maxHp) { run.hpMax += perk.maxHp; run.hp += perk.maxHp; }
-    if (perk.maxHpDown) {
-        run.hpMax = Math.max(10, run.hpMax - perk.maxHpDown);
-        run.hp = Math.max(1, Math.min(run.hp, run.hpMax));
-    }
-    if (perk.embers) run.embers = (run.embers || 0) + perk.embers;
-    return true;
-}
+// takePerk lives in cards-kit now — see the note over it there, and the re-export at the top.
 
 /**
  * The three boss trinkets on the table, and the act that follows them.
