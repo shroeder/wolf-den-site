@@ -30,7 +30,9 @@ const RUNS = Number(arg("--runs", 1200));
 // measured before one of them is written into the tables. Nothing here changes the game; it changes the copy
 // of the game this simulator is playing.
 const DMGX = Number(arg("--dmgx", 1));
-const POTION_DROP = Number(arg("--potions", 40));   // percentage points, the game's POTION_DROP_BASE
+// null unless asked for: the default now comes from the rules through openingRun, so the rung that thins
+// the shelf is visible here instead of being papered over by a copy of the base rate.
+const POTION_DROP = process.argv.includes("--potions") ? Number(arg("--potions", 40)) : null;
 const HPX = Number(arg("--hpx", 1));
 // ── AND WHICH RUNG OF THE LADDER ─────────────────────────────────────────────────────────────────────────
 // The ladder makes the game itself harder a rung at a time (ASCENSION in cards-kit). A rung that cannot be
@@ -196,9 +198,15 @@ function runOnce(seed) {
     // does, and the report says how far a run actually got.
     let act = 1;
     let map = buildMap(seed >>> 0, { asc: ASC });
-    let hpMax = HERO_HP;
-    let hp = m.ascRule(ASC, 6) ? Math.round(HERO_HP * 0.9) : HERO_HP;
-    let deck = m.ascRule(ASC, 8) ? [...m.STARTER_DECK, "wound"] : [...m.STARTER_DECK];   // and STARTER_PERK, paid after every win below
+    // ⚠️ ASK THE RULE FOR THE OPENING STATE. These three lines used to derive it here — a bare HERO_HP, a
+    // hand-rolled rung-six branch and a hand-rolled rung-eight deck — which is to say the simulator opened
+    // every run on a full bar with a full purse whatever rung it claimed to be climbing. Ladder runs at 10,
+    // 15 and 20 came back with IDENTICAL results because four of those rungs only exist in the numbers this
+    // file was making up for itself. See openingRun in cards-kit.
+    const opening = m.openingRun(ASC);
+    let hpMax = opening.hpMax;
+    let hp = opening.hp;
+    let deck = [...opening.deck];   // and STARTER_PERK, paid after every win below
     // ⚠️ THE SIM HAS TO SPEND THE MONEY, TOO. The first cut walked past every shop and every chest, took no
     // perk off an elite and drank nothing — and then reported that nobody finishes the act. Of course nobody
     // finishes: half the player's power in this game is bought, drunk or burned. A shop's card removal alone
@@ -216,8 +224,10 @@ function runOnce(seed) {
         perks = box.perks; hp = box.hp; hpMax = box.hpMax; embers = box.embers;
         return true;
     };
-    let luck = POTION_DROP;
-    let embers = 60;   // the purse a run is dealt — see newRun in cards.js
+    // `--potions` still overrides, because asking "what if bottles were rarer" is what the flag is for; with
+    // no flag it is the rung's number rather than a copy of the default.
+    let luck = POTION_DROP ?? opening.potionLuck;
+    let embers = opening.embers;
     let removals = 0;
     let at = null;
     let recent = [];

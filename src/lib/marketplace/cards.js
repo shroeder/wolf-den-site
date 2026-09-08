@@ -8,8 +8,8 @@ import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
-    ASC_MAX, FINAL_ACT, ascMaxHp, ascPotionScale, ascRule, ascStartEmbers, beltSize, buildShop, canUpgrade,
-    cardById, drawOffer, encounterById, levelSharpens,
+    ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
+    cardById, drawOffer, encounterById, levelSharpens, openingRun,
     levelWeight, nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
@@ -170,18 +170,17 @@ const newRun = (seed, asc = 0) => ({
     asc,
     // Rung six starts you already hurt. Theirs does the same and it is nastier than it sounds: the whole
     // act is played on a bar you never had all of.
-    // ⚠️ AND RUNG EIGHTEEN TAKES THE TOP OFF THE BAR ITSELF, which is a different rule from rung six: six
-    // starts you at 90% of a full bar and a fire can still fill it, eighteen means the bar was never that
-    // big. Read through ascMaxHp so the two compose rather than one quietly overwriting the other.
-    hp: ascRule(asc, 6) ? Math.round(ascMaxHp(HERO_HP, asc) * 0.9) : ascMaxHp(HERO_HP, asc),
-    hpMax: ascMaxHp(HERO_HP, asc),
+    // ⚠️ THE OPENING STATE IS ONE RULE NOW — see openingRun. Every one of these lines existed a second time
+    // in the simulator, which is how four ladder rungs came to measure as doing nothing at all.
+    hp: openingRun(asc).hp,
+    hpMax: openingRun(asc).hpMax,
     // ── AND A PURSE TO START WITH ────────────────────────────────────────────────────────────────────
     // ⚠️ THEIRS HANDS YOU 99 GOLD BEFORE THE FIRST ROOM and ours handed you nothing, which quietly killed
     // every early room that asks for money: photographed on a real run, the Bonesetter offered a heal for 45
     // and a card burned for 75 and BOTH were greyed out, so a written room with three choices in it was a
     // room with one. Their whole opening — a shop on floor 4 you can actually buy from, a Cleric you can pay
     // — depends on the purse existing. Priced at the same 60% our shelf is priced at against theirs.
-    embers: ascStartEmbers(60, asc),   // the run's money — see SKIP_EMBERS. Dies with the run; never gold.
+    embers: openingRun(asc).embers,    // the run's money — see SKIP_EMBERS. Dies with the run; never gold.
     // ⚠️ YOU START HOLDING ONE. Theirs does — every character opens with a relic and the Ironclad's heals 6
     // after every win. See STARTER_PERK: it is what makes an act survivable without making a fight easy.
     perks: [STARTER_PERK],
@@ -197,14 +196,7 @@ const newRun = (seed, asc = 0) => ({
     startedAt: Date.now(),
     // Rung eight puts a Wound in the deck before the first room — their Ascender's Bane, and the reason a
     // ten-card deck is a thing you feel.
-    // Rung eight shuffles a Wound in — a card you drew instead of a Bite, gone when the fight ends. Rung
-    // twelve is the harder version and the first thing in this game to spend a CURSE: it is written into the
-    // deck, it is there for the whole climb, and the merchant is the only way out of it.
-    deck: [
-        ...STARTER_DECK,
-        ...(ascRule(asc, 8) ? ["wound"] : []),
-        ...(ascRule(asc, 12) ? ["injury"] : []),
-    ],
+    deck: openingRun(asc).deck,
     offers: null,          // the three on the table after a win, null the rest of the time
     done: null,            // null | "won" | "dead"
     started: true,
@@ -644,7 +636,11 @@ export async function runFixture(buyerId, run) {
  *
  * Seeded off the room like every other grant, so a re-posted win pays the same bottle rather than a new one.
  */
-export const POTION_DROP_BASE = 40;
+// Re-exported, not redeclared: this was a bare 40 here and another bare 40 in the simulator. See
+// openingRun for what that cost. Imported above as well, because potionDrop reads it locally and a
+// re-export alone binds nothing in this file — which `npm run lint:undef` says out loud and `next build`
+// does not.
+export { POTION_DROP_BASE };
 
 export function potionDrop(run, row, lane) {
     let roll = ((run.seed >>> 0) + row * 7717 + lane * 131) >>> 0;

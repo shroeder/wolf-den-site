@@ -1406,6 +1406,13 @@ export const POTIONS = {
 export const POTION_IDS = Object.keys(POTIONS);
 
 export const RUN_LENGTH = 15;
+// The purse a run is dealt. It lived as a bare 60 in newRun and as a SECOND bare 60 in the simulator, which
+// is the whole reason the rung that lightens it measured as doing nothing — see openingRun below.
+export const START_EMBERS = 60;
+// How often a room drops a bottle, in percentage points. Same story: cards.js held one copy and the
+// simulator held another behind a --potions flag, so the rung that thins the shelf was invisible to the one
+// tool that measures whether a rung is worth having.
+export const POTION_DROP_BASE = 40;
 // The last act is a corridor of three rooms with the door above them — see buildFinalMap. It lives here
 // beside RUN_LENGTH, and not in the map module, for the same reason MAP_ROWS does: how tall an act is has to
 // be one fact that the rules, the map and every label divide by.
@@ -1496,6 +1503,39 @@ export const ascMaxHp = (base, asc = 0) => (ascRule(asc, 18) ? Math.round(base *
 
 /** How often a bottle drops — rung fifteen. */
 export const ascPotionScale = (asc = 0) => (ascRule(asc, 15) ? 0.7 : 1);
+
+/**
+ * ── WHAT A RUN OPENS ON, AND ONE PLACE THAT KNOWS IT ─────────────────────────────────────────────────────
+ * ⚠️ THIS EXISTS BECAUSE FOUR RUNGS MEASURED AS NOTHING. `newRun` derived the opening bar, purse and deck
+ * from the rung; the simulator derived them again, twenty lines of its own, with `let embers = 60` and a
+ * `--potions 40` flag standing in for the real numbers. So a ladder run through the simulator was climbing
+ * with a full purse and an ordinary shelf however high the rung went, and rungs 11 through 15 came back
+ * with results identical to rung 10 — which reads exactly like five rungs that do nothing.
+ *
+ * Worse, the two lines the simulator DID copy went stale the moment newRun learned about ascMaxHp: it was
+ * still opening every run on a full-size bar while the game had already shrunk it.
+ *
+ * A copied constant runs a second, wrong game. Both callers ask this now.
+ */
+export function openingRun(asc = 0) {
+    const hpMax = ascMaxHp(HERO_HP, asc);
+    return {
+        hpMax,
+        // Rung six opens you at nine tenths of whatever the bar turned out to be — it composes with
+        // eighteen rather than overwriting it.
+        hp: ascRule(asc, 6) ? Math.round(hpMax * 0.9) : hpMax,
+        embers: ascStartEmbers(START_EMBERS, asc),
+        potionLuck: POTION_DROP_BASE * ascPotionScale(asc),
+        // Rung eight shuffles in a Wound that leaves with the fight; rung twelve writes a CURSE into the
+        // deck that is there for the whole climb.
+        deck: [
+            ...STARTER_DECK,
+            ...(ascRule(asc, 8) ? ["wound"] : []),
+            ...(ascRule(asc, 12) ? ["injury"] : []),
+        ],
+        perks: [STARTER_PERK],
+    };
+}
 
 /**
  * ── WHAT A RUN WAS WORTH ─────────────────────────────────────────────────────────────────────────────────
