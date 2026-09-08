@@ -276,6 +276,14 @@ export default function CardFace({ card, art, dim, live }) {
     // it cannot be mistaken for something of yours at the far end of a fanned hand.
     const hue = card.status ? "#6b7280" : (art?.color || meta.color);
     const tint = card.status ? "common" : chromeTint(art?.rarity);
+    // ** A STATUS CARD HAS NO WINDOW SHAPE OF ITS OWN, and asked for one anyway. The chrome is generated for
+    // the three things a card can be PLAYED as -- attack, skill, power (gen-card-chrome.mjs, "type is the
+    // window's shape") -- and Wound, Slimed, Dazed and Burn are none of them. So the rim url resolved to
+    // rim-status-common.png, which has never existed, and every curse in the game rendered its picture window
+    // as a browser's broken-image glyph. Caught by a 404 in the page log while playing a boss with three
+    // Slimed in hand; four cards, and they are the four you are least pleased to draw already.
+    // They wear the skill rim: the neutral rounded shape, in the grey the line above already gives them.
+    const shape = (card.status || card.kind === "status") ? "skill" : card.kind;
     return (
         <>
             <span className="cf-stock" style={stockStyle(hue)} />
@@ -332,7 +340,7 @@ export default function CardFace({ card, art, dim, live }) {
                 <span className="cf-art-in" style={{ background: `radial-gradient(ellipse at 50% 62%, ${wash(hue, 0.34)}, rgba(6,8,12,0.94))` }}>
                     <CardArt card={card} pet={art} />
                 </span>
-                <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${card.kind}-${tint}.png)` }} />
+                <span className="cf-rim" style={{ backgroundImage: `url(/images/cards/chrome/rim-${shape}-${tint}.png)` }} />
             </span>
             {/* ── THE TYPE PLATE ──────────────────────────────────────────────────────────────────────
                 A painted plaque with an EMBLEM struck on it, not a CSS rectangle with a word in it. Two
