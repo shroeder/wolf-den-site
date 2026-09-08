@@ -66,7 +66,17 @@ const BOSS_ROW_UP = 26;   // ROW_H — declared below, so the number rather than
 const PAD_BOTTOM = 18;
 const H = PAD_TOP + (RUN_LENGTH - 1) * ROW_H + PAD_BOTTOM;
 
-const xOf = (lane) => 10 + (lane / (MAP_LANES - 1)) * (W - 20);
+// ⚠️ SEVEN LANES EXIST; A GIVEN MAP DOES NOT USE ALL SEVEN. This spread lane 0..6 across the full width
+// unconditionally, so a sheet whose paths happened to occupy the left five lanes was DRAWN in the left five
+// lanes — rooms bunched against one edge with a third of the parchment empty beside them, which reads as a
+// broken layout rather than as a map that happens to lean. Luke, with a photograph of it: "this should be
+// centered horizontally."
+//
+// `shift` is in LANE units, worked out per map from the lanes actually occupied, so the spacing between
+// rooms is untouched and only the cluster moves. The boss is deliberately not part of that sum: it is
+// pinned at 50% (see its marker and the curves that reach it), which is exactly where the middle of a
+// centred cluster now is.
+const xAt = (lane, shift = 0) => 10 + ((lane + shift) / (MAP_LANES - 1)) * (W - 20);
 const yOf = (row) => H - PAD_BOTTOM - row * ROW_H;
 // One clear row above the last room, which is where the trail from every top-row node now ends.
 const BOSS_Y = yOf(RUN_LENGTH - 1) - BOSS_ROW_UP;
@@ -99,6 +109,14 @@ export default function CardMap({ run, art = {} }) {
 
     const map = run.map;
     const trail = useMemo(() => run.trail || [], [run.trail]);
+    // How far the whole sheet has to slide to sit in the middle of its own parchment — see xAt.
+    const laneShift = useMemo(() => {
+        const lanes = (map?.nodes || []).filter((n) => n.kind !== "boss").map((n) => n.lane);
+        if (!lanes.length) return 0;
+        return (MAP_LANES - 1) / 2 - (Math.min(...lanes) + Math.max(...lanes)) / 2;
+    }, [map]);
+    const xOf = useCallback((lane) => xAt(lane, laneShift), [laneShift]);
+
     const taken = useMemo(() => new Set(trail.map((t) => `${t.row}:${t.lane}`)), [trail]);
     const last = trail.length ? trail[trail.length - 1] : null;
     const open = useMemo(
