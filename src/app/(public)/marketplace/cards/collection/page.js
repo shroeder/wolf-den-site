@@ -5,7 +5,7 @@ import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { CARDS_UNLOCKED, cardProgress, ownedPetIds, petArtFor } from "@/lib/marketplace/cards.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import {
-    ALL_CARDS, BASIC_UNLOCKS, CARDS, PERKS, POTIONS, STARTER_PERK, UNLOCKS, unlockedCards,
+    ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, CARDS, PERKS, POTIONS, STARTER_PERK, UNLOCKS, unlockedCards,
 } from "@/lib/marketplace/cards-kit.js";
 
 export const dynamic = "force-dynamic";
@@ -72,16 +72,27 @@ export default async function CardCollectionPage() {
     // where you go to find out what exists, and until now the only way to learn what a Whetstone does was to
     // be handed one mid-run. They are a CATALOGUE, not a collection: nothing here is owned, because nothing
     // in this game keeps a trinket between runs.
-    const trinkets = Object.values(PERKS).map((p) => ({
-        id: p.id, name: p.name, text: p.text,
-        art: `/images/cards/items/${p.id}.png`,
-        // ONE OF THEM IS NOT FOUND, IT IS ISSUED. Warm Blood is what every run opens holding (theirs is
-        // Burning Blood), and telling somebody to go and look for it in a chest is telling them to hunt for
-        // the thing already on their strip.
-        from: p.id === STARTER_PERK
-            ? "You start every run holding this one"
-            : "Elites and chests, or the merchant's shelf",
-    }));
+    // ⚠️ AND THE BOSS TRINKETS, WHICH THIS LEFT OUT. Twelve of them, every one obtainable, and none listed —
+    // while the same screen shows every card you have NOT unlocked with a line telling you where to find it.
+    // A catalogue that hides a sixth of itself is not a catalogue. They come last and say plainly where they
+    // come from, because "beat an act" is a different kind of answer to "look in a chest".
+    const trinkets = [
+        ...Object.values(PERKS).map((p) => ({
+            id: p.id, name: p.name, text: p.text,
+            art: `/images/cards/items/${p.id}.png`,
+            // ONE OF THEM IS NOT FOUND, IT IS ISSUED. Warm Blood is what every run opens holding (theirs is
+            // Burning Blood), and telling somebody to go and look for it in a chest is telling them to hunt
+            // for the thing already on their strip.
+            from: p.id === STARTER_PERK
+                ? "You start every run holding this one"
+                : "Elites and chests, or the merchant's shelf",
+        })),
+        ...Object.values(BOSS_PERKS).map((p) => ({
+            id: p.id, name: p.name, text: p.text,
+            art: `/images/cards/items/${p.id}.png`,
+            from: "Offered only when you beat an act",
+        })),
+    ];
     const potions = Object.values(POTIONS).map((p) => ({
         id: p.id, name: p.name, text: p.text,
         art: `/images/cards/potions/${p.id}.png`,
