@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import {
     GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
-    GiFlame, GiSlowBlob, GiSwordWound,
+    GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves,
 } from "react-icons/gi";
 
 import {
@@ -2389,6 +2389,32 @@ function Bar({ unit, guarding, pending }) {
                         <GiShield aria-hidden="true" />{unit.dexterity}
                     </span>
                 ) : null}
+                {/* ── AND THE FOUR ADDED WITH THE NEW WORDS ────────────────────────────────────────
+                    ⚠️ A STACK YOU CANNOT SEE IS A STACK YOU WILL MISPLAY AROUND — the same sentence written
+                    over Frail three rules up, and it was true again the moment Poison landed: the Venom Sac
+                    opens a fight with 2 Poison on everything and the board showed a creature at full health
+                    and no reason for it to be dying. Poison in particular HAS to be legible, because the
+                    whole decision it creates is "is that going to finish it, or do I need to swing again". */}
+                {unit.poison > 0 ? (
+                    <span className="cfb-tag is-poison" title={`Poison ${unit.poison} — loses ${unit.poison} health at the start of its turn, through Block, then drops by one`}>
+                        <GiPoisonBottle aria-hidden="true" />{unit.poison}
+                    </span>
+                ) : null}
+                {unit.artifact > 0 ? (
+                    <span className="cfb-tag is-artifact" title={`Artifact ${unit.artifact} — eats the next debuff whole`}>
+                        <GiMagicShield aria-hidden="true" />{unit.artifact}
+                    </span>
+                ) : null}
+                {unit.regen > 0 ? (
+                    <span className="cfb-tag is-regen" title={`Regeneration ${unit.regen} — heals ${unit.regen} at the start of its turn, then drops by one`}>
+                        <GiThreeLeaves aria-hidden="true" />{unit.regen}
+                    </span>
+                ) : null}
+                {unit.intangible > 0 ? (
+                    <span className="cfb-tag is-intang" title={`Intangible ${unit.intangible} — everything that reaches it lands as 1`}>
+                        <GiGhost aria-hidden="true" />{unit.intangible}
+                    </span>
+                ) : null}
             </div>
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
@@ -2470,6 +2496,12 @@ function Bar({ unit, guarding, pending }) {
                 /* Green against Strength's orange: the two growth stats have to be told apart at a glance
                    on a 375px board, and they sit next to each other. */
                 .cfb-tag.is-dex { color: #7fe0a8; border-color: #2c6e4a; }
+                /* Poison is the only one of these that is counting DOWN to something happening, so it is
+                   the loudest — a sour green nothing else on the board uses. */
+                .cfb-tag.is-poison { color: #b8e04a; border-color: #4f6e2c; }
+                .cfb-tag.is-artifact { color: #ffd98f; border-color: #6e5c2c; }
+                .cfb-tag.is-regen { color: #86e0b0; border-color: #2c6e52; }
+                .cfb-tag.is-intang { color: #cfd6e0; border-color: #4a5260; }
             `}</style>
         </div>
     );

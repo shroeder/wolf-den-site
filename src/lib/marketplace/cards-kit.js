@@ -198,9 +198,12 @@ export const POOL = {
         upgrade: { damage: 7, weak: 2 } },
     // ⚠️ 14 FOR TWO WAS THE WORST BLOCK IN THE GAME PER ENERGY — below Ghostly Armor (10 for one) and below
     // our own Scuttle (8 for one). The game's big defend has to be worth the turn it costs.
+    // Was the second plain "Gain Block", and a big one is the least interesting card a defensive deck can
+    // hold. A shell turns the next thing aside rather than absorbing it, which is Artifact — and it gives the
+    // hero a reason to hold a guard card against a room full of debuffs rather than against damage.
     shell: { id: "shell", pet: "turtle", name: "Shell Up", cost: 2, kind: "skill", target: "self", tier: 1,
-        block: 16, text: "Gain {block} Block.",
-        upgrade: { block: 21 } },
+        block: 12, artifact: 1, text: "Gain {block} Block and {artifact} Artifact.",
+        upgrade: { block: 16, artifact: 2 } },
 
     // ── TIER 2 ── the cards a deck is actually built around.
     // ⚠️ WAS 7 TO ALL FOR TWO ENERGY, which is half of Cleave: theirs is 8 to every enemy for ONE, and it is
@@ -243,9 +246,13 @@ export const POOL = {
         upgrade: { damage: 15 } },
     // 10 Block AND two cards for one energy beat every skill in Spire's first act (Shrug It Off is 8 and one
     // card). Eight keeps it the best skill in this deck without making the rest of the tier pointless.
-    inkcloud: { id: "inkcloud", pet: "squid", name: "Ink Cloud", cost: 1, kind: "skill", target: "self", tier: 3,
-        block: 8, draw: 2, text: "Gain {block} Block. Draw 2 cards.",
-        upgrade: { block: 12 } },
+    // Poison's only home in the pool, and it had to be one: the two obviously venomous pets in this game
+    // (the scorpion and the jellyfish) are both behind the collection gate, so a stacking damage axis whose
+    // every card is unowned is an axis nobody plays with. A squid fouling the water reaches everything in
+    // the room, which is also the shape poison wants — it is worth the most where there is most of it.
+    inkcloud: { id: "inkcloud", pet: "squid", name: "Ink Cloud", cost: 1, kind: "attack", target: "foe", tier: 3,
+        damage: 4, all: true, poison: 3, text: "Deal {damage} damage to ALL enemies. Apply {poison} Poison.",
+        upgrade: { poison: 5 } },
     crush: { id: "crush", pet: "kraken", name: "Crush", cost: 3, kind: "attack", target: "foe", tier: 3,
         damage: 32, text: "Deal {damage} damage.",
         upgrade: { damage: 42 } },
@@ -375,9 +382,12 @@ export const POOL = {
     entrench: { id: "entrench", pet: "ladybug", name: "Entrench", cost: 2, kind: "skill", target: "self", tier: 2,
         blockDouble: true, text: "Double your Block.",
         upgrade: { cost: 1 } },
+    // A card called Ghostly Armour that gained flat Block was a name doing nothing. Theirs is Apparition and
+    // it is the shape this needs: one turn of taking 1 from everything, and the card is GONE for the fight —
+    // an answer you get to use once, held for the turn the intent says you cannot survive.
     ghostarmor: { id: "ghostarmor", pet: "scarecrow_crow", name: "Ghostly Armour", cost: 1, kind: "skill", target: "self", tier: 2,
-        block: 10, text: "Gain {block} Block.",
-        upgrade: { block: 13 } },
+        intangible: 1, exhaust: true, text: "Gain {intangible} Intangible. Exhaust.",
+        upgrade: { intangible: 2 } },
 
     // ── TIER 3 ──
     demonform: { id: "demonform", pet: "ember_whelp", name: "Demon Form", cost: 3, kind: "power", target: "self", tier: 3,
@@ -418,9 +428,11 @@ export const POOL = {
     barn_cat: { id: "barn_cat", pet: "barn_cat", name: "Mouser", cost: 1, kind: "attack", target: "foe", tier: 1,
         damage: 6, heal: 3, text: "Deal {damage} damage. Heal {heal}.",
         upgrade: { damage: 8, heal: 5 } },
+    // Free, and it pays over the turns rather than now: the first card in the deck that is worth more in a
+    // long fight than a short one without being a power. Rooting is the word for exactly that.
     piglet: { id: "piglet", pet: "piglet", name: "Rooting", cost: 0, kind: "skill", target: "self", tier: 1,
-        block: 5, text: "Gain {block} Block.",
-        upgrade: { block: 8 } },
+        block: 4, regen: 3, text: "Gain {block} Block and {regen} Regeneration.",
+        upgrade: { regen: 5 } },
     fawn: { id: "fawn", pet: "fawn", name: "Skittish", cost: 1, kind: "skill", target: "self", tier: 1,
         block: 5, heal: 3, text: "Gain {block} Block. Heal {heal}.",
         upgrade: { block: 8, heal: 5 } },
@@ -822,6 +834,18 @@ export const PERKS = {
     // and it is the reason an eleven-turn boss stops being a losing race.
     tide_glass: { id: "tide_glass", name: "Tideglass", icon: "shield", dexterityEach: 1,
         text: "Gain 1 Dexterity each turn of a fight." },
+    // ── ONE TRINKET PER NEW WORD ─────────────────────────────────────────────────────────────────────
+    // ⚠️ THIS IS WHERE A NEW MECHANIC HAS TO LAND FIRST, and it is the lesson of the last pass: a verb that
+    // lives only on cards lives only for the players who own the right pets, and three of the four cards
+    // carrying Dexterity were unreachable on the one account that can play this game. PERK_IDS and
+    // POTION_IDS are drawn from whole — no collection, no gate — so every one of these is on the table for
+    // anybody from the first shop onward.
+    venom_sac: { id: "venom_sac", name: "Venom Sac", icon: "paw", poisonAll: 2,
+        text: "Every fight opens with 2 Poison on everything in the room." },
+    ward_stone: { id: "ward_stone", name: "Ward Stone", icon: "shield", artifact: 1,
+        text: "Start every fight with 1 Artifact, which eats the first debuff put on you." },
+    green_bough: { id: "green_bough", name: "Green Bough", icon: "heart", regen: 2,
+        text: "Gain 2 Regeneration at the start of every fight." },
     // Theirs: Burning Blood. The relic the Ironclad opens every single run holding — see STARTER_PERK below.
     warm_blood: { id: "warm_blood", name: "Warm Blood", icon: "heart", healAfter: 6,
         text: "Heal 6 after every fight you win." },
@@ -1245,6 +1269,11 @@ export const POTIONS = {
     bark: { id: "bark", name: "Barkskin", icon: "shield", block: 12, text: "Gain 12 Block." },
     fury: { id: "fury", name: "Bottled Fury", icon: "sword", strength: 2, text: "Gain 2 Strength." },
     poise: { id: "poise", name: "Bottled Poise", icon: "shield", dexterity: 2, text: "Gain 2 Dexterity." },
+    venom: { id: "venom", name: "Venom Flask", icon: "sword", poisonAll: 5, text: "Apply 5 Poison to ALL enemies." },
+    ward: { id: "ward", name: "Ward Draught", icon: "shield", artifact: 2, text: "Gain 2 Artifact." },
+    sap: { id: "sap", name: "Green Sap", icon: "heal", regen: 5, text: "Gain 5 Regeneration." },
+    // The one that answers a turn you cannot survive, which is what the belt is for.
+    wisp: { id: "wisp", name: "Wisp Flask", icon: "shield", intangible: 1, text: "Gain 1 Intangible." },
     spark: { id: "spark", name: "Spark", icon: "energy", energy: 2, text: "Gain 2 energy." },
 
     // ── AND THE REST OF THE SHELF ────────────────────────────────────────────────────────────────────
@@ -3229,6 +3258,11 @@ const tick = (unit) => ({
  * stack then drops by one. So it is worth more the earlier it lands, it finishes a creature you have walked
  * away from, and it is the only thing in the deck that scales by stacking rather than by hitting harder.
  */
+// ⚠️ AND NOTHING IN THE BESTIARY APPLIES IT, ON PURPOSE. The debuff funnel carries `poison` for creatures
+// as well, so a foe move could spit venom tomorrow — but theirs has no enemy that poisons you either. It is
+// a player's axis in their game, held by one character and a handful of relics, and the asymmetry is the
+// point: Poison is the thing you bring to the Spire rather than the thing it brings to you. The hook is
+// here and unused rather than absent, which is the difference between a decision and an oversight.
 function poisonTick(unit) {
     const n = unit?.poison || 0;
     if (!(n > 0) || (unit.hp || 0) <= 0) return { unit, dealt: 0 };
@@ -3405,6 +3439,11 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
                 + ((hero.hp || HERO_HP) / (hero.hpMax || HERO_HP) < 0.5 ? perkSum(perks, "strengthLow") : 0),
             // The guard-side twin, same shape and same place, so a Dexterity perk is a line in PERKS too.
             dexterity: perkSum(perks, "dexterity"),
+            // A charge waiting for the first debuff of the fight, and a slow heal that starts on turn two —
+            // both read here for the same reason every other opening perk is: the engine stays a function of
+            // its state, and a trinket of this shape is a line in PERKS rather than a branch in the loop.
+            artifact: perkSum(perks, "artifact"),
+            regen: perkSum(perks, "regen"),
             // Damage back to anything that swings at you — Bronze Scales, straight. The creatures have had
             // this since the Spikers arrived; it is the same field on the other side of the board.
             thorns: perkSum(perks, "thorns"),
@@ -3442,6 +3481,9 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // The third mark, and the one that was unreachable until a foe's guard started going through
             // blockGain: Frail costs a creature a quarter of everything it braces with.
             frail: perkSum(perks, "frailAll"),
+            // The fourth mark. Same shape as the three above it, and the one that keeps working after the
+            // fight has stopped going your way — a creature you never touch again still dies of it.
+            poison: perkSum(perks, "poisonAll"),
             // Spent by the first blow that reaches it — see `land`. Zero on everything that does not curl.
             curl: Math.max(0, Number(f.curl) || 0),
             // ── AND THE REST OF WHAT A CREATURE IS ──────────────────────────────────────────────
@@ -3814,6 +3856,11 @@ export function drinkPotion(state, potionId) {
     if (potion.strengthEach) next.hero.strengthEach = (next.hero.strengthEach || 0) + potion.strengthEach;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
     if (potion.dexterity) next.hero.dexterity = (next.hero.dexterity || 0) + potion.dexterity;
+    // The three that are durations rather than numbers. Same argument as thorns above: the hero already
+    // carries every one of these fields for the cards that grant them, so nothing downstream learns a word.
+    if (potion.artifact) next.hero.artifact = (next.hero.artifact || 0) + potion.artifact;
+    if (potion.regen) next.hero.regen = (next.hero.regen || 0) + potion.regen;
+    if (potion.intangible) next.hero.intangible = (next.hero.intangible || 0) + potion.intangible;
     // A Toy Fan pays for the act of drinking, whatever was in the bottle — theirs exactly, and it is what
     // makes a belt of situational potions worth carrying at all.
     const fan = perkSum(state.perks, "healPerPotion");
@@ -3832,7 +3879,7 @@ export function drinkPotion(state, potionId) {
     // Every one of these hits the WHOLE room rather than asking for a target: a potion that needs a target
     // needs a targeting mode on a screen where the only tap that matters is playing a card, and theirs are
     // strongest in the rooms with the most bodies in them anyway.
-    if (potion.damageAll || potion.vulnerableAll || potion.weakAll || potion.frailAll) {
+    if (potion.damageAll || potion.vulnerableAll || potion.weakAll || potion.frailAll || potion.poisonAll) {
         next.foes = next.foes.map((f) => {
             if (f.hp <= 0) return f;
             let out = f;
@@ -3841,6 +3888,7 @@ export function drinkPotion(state, potionId) {
             // The third mark, drinkable. Worth nothing at all until a creature's guard started going through
             // blockGain — see the note there.
             if (potion.frailAll) out = { ...out, frail: (out.frail || 0) + potion.frailAll };
+            if (potion.poisonAll) out = { ...out, poison: (out.poison || 0) + potion.poisonAll };
             if (potion.damageAll) out = land(out, attackDamage(potion.damageAll, next.hero, out));
             return out;
         });

@@ -264,6 +264,18 @@ const worth = (c, need = null) => {
     v += num(t, /(\d+) Vulnerable/i) * 3;
     v += num(t, /(\d+) Weak/i) * 3;
     v += num(t, /(\d+) Thorns/i) * 2;
+    // ── THE WORDS ADDED AFTER THIS FUNCTION WAS WRITTEN ─────────────────────────────────────
+    // ⚠ A CARD THIS CANNOT READ SCORES ZERO AND IS NEVER PLAYED. Ghostly Armour is "Gain 1 Intangible.
+    // Exhaust" — no damage, no block — so it scored -2.5 and the bot would have refused it in a hand and
+    // skipped it at every reward screen, which reads in a transcript as a card nobody wants rather than a
+    // scorer that cannot see it. Priced the same way the simulator prices them, deliberately: two scorers
+    // disagreeing about what a card is worth is two different players being measured.
+    v += num(t, /(\d+) Poison/i) * 2.2 * (/ALL enemies/i.test(t) ? 1.6 : 1);
+    v += num(t, /(\d+) Intangible/i) * 12;
+    v += num(t, /(\d+) Artifact/i) * 4;
+    v += num(t, /(\d+) Regeneration/i) * 1.05;
+    v += num(t, /(?:Gain|and)\s+(\d+) Dexterity/i) * 5;
+    if (/Dexterity each turn/i.test(t)) v += 20;
     if (/Gain \d+ Energy|\+\d+ Energy/i.test(t)) v += 9;
     if (/Exhaust/i.test(t)) v -= 2.5;                             // once, then gone
     // ──── AND WHAT THE DECK IS SHORT OF ────────────────────────────────────────────────────

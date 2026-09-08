@@ -447,7 +447,26 @@ function runOnce(seed) {
                     + (c.strengthEach || 0) * 22 + (c.blockEach || 0) * 7 + (c.energyEach || 0) * 18
                     + (c.blockKeeps ? 16 : 0) + (c.strengthMult ? 7 : 0) + (c.damageFromBlock ? 9 : 0)
                     + (c.blockDouble ? 8 : 0) + (c.strengthDouble ? 10 : 0) + (c.thorns || 0) * 2
-                    + (c.foeStrength || 0) * 5 - (c.selfHp || 0) * 1.2);
+                    + (c.foeStrength || 0) * 5 - (c.selfHp || 0) * 1.2
+                    // ── AND THE WORDS THIS SCORER DID NOT KNOW ──────────────────────────────────────
+                    // ⚠️ A CARD THIS CANNOT READ IS A CARD THAT IS NEVER DRAFTED, and the run that proves it
+                    // is the one taken right after Poison/Artifact/Regeneration/Intangible landed: Ghostly
+                    // Armour scored ZERO here (no damage, no block) and the simulator reported the act-three
+                    // clear rate falling. Nothing about the game had got worse — four cards had become
+                    // invisible to the thing measuring it. Any new keyword has to be priced HERE on the same
+                    // day it is written, or the next balance number is a measurement of this function.
+                    //
+                    // Poison stacks and ticks down, so N points land about N + (N-1) + … over the fight —
+                    // in practice a little over twice its face against anything that lives three turns, and
+                    // it goes through Block, which damage does not.
+                    + (c.poison || 0) * 2.2 * (c.all ? 1.6 : 1)
+                    // A whole enemy turn reduced to 1. Priced against what a mid-act turn actually swings.
+                    + (c.intangible || 0) * 12
+                    // Worth about what the debuff it eats was worth, and it eats the whole stack.
+                    + (c.artifact || 0) * 4
+                    // Heals N, then N-1, … — the triangle, at the going rate for healing.
+                    + (c.regen || 0) * 1.5 * 0.7
+                    + (c.dexterity || 0) * 5 + (c.dexterityEach || 0) * 20);
                 return raw / Math.max(1, c.cost || 1);
             };
             const takeIt = offer.slice().sort((a, b) => worth(b) - worth(a))[0];
