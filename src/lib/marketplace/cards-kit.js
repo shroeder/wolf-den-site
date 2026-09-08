@@ -208,9 +208,13 @@ export const POOL = {
     stampede: { id: "stampede", pet: "kangaroo", name: "Stampede", cost: 1, kind: "attack", target: "foe", tier: 2,
         damage: 8, all: true, text: "Deal {damage} damage to ALL enemies.",
         upgrade: { damage: 11 } },
+    // ⚠️ THIS AND Raucous Call WERE THE SAME CARD, and the note beside that one said so out loud: "Screech is
+    // already Weak 2 to the room for one energy — this is the cheap version." A cheap version of a card is a
+    // second copy of it with a discount, not a different thing to hold. Screech is now the one that also
+    // takes their GUARD apart, which is what the energy is for: Raucous Call still owns "Weak, for free".
     screech: { id: "screech", pet: "bat", name: "Screech", cost: 1, kind: "skill", target: "foe", tier: 2,
-        weak: 2, all: true, text: "Apply {weak} Weak to ALL enemies.",
-        upgrade: { weak: 3 } },
+        weak: 2, frail: 2, all: true, text: "Apply {weak} Weak and {frail} Frail to ALL enemies.",
+        upgrade: { weak: 3, frail: 3 } },
     coils: { id: "coils", pet: "serpent", name: "Coils", cost: 1, kind: "attack", target: "foe", tier: 2,
         damage: 6, vulnerable: 2, text: "Deal {damage} damage. Apply {vulnerable} Vulnerable.",
         upgrade: { damage: 9, vulnerable: 3 } },
@@ -444,11 +448,14 @@ export const POOL = {
     seahorse: { id: "seahorse", pet: "seahorse", name: "Drift", cost: 1, kind: "skill", target: "self", tier: 2,
         block: 8, strength: 1, text: "Gain {block} Block and {strength} Strength.",
         upgrade: { block: 11, strength: 2 } },
+    // Six cards in this pool read "Gain {block} Block" and nothing else, which is one card printed six times
+    // at six numbers. A bird standing on one leg is the most Dexterity-shaped thing in the cabinet, so this
+    // is the one that carries the stat: less Block up front, and every guard card after it gains more.
     flamingo: { id: "flamingo", pet: "flamingo", name: "One-Legged Stand", cost: 2, kind: "skill", target: "self", tier: 2,
-        block: 18, text: "Gain {block} Block.",
-        upgrade: { block: 24 } },
-    // Screech is already "Weak 2 to the room for one energy" — this is the cheap version of the same idea,
-    // which is a different card to hold rather than a second copy of one.
+        block: 14, dexterity: 2, text: "Gain {block} Block and {dexterity} Dexterity.",
+        upgrade: { block: 18, dexterity: 3 } },
+    // The free one: Weak to the whole room for nothing, where Screech charges an energy and takes their guard
+    // apart as well. Same target, different question — what a second card in a role should be.
     toucan: { id: "toucan", pet: "toucan", name: "Raucous Call", cost: 0, kind: "skill", target: "foe", tier: 2,
         all: true, weak: 1, text: "Apply {weak} Weak to ALL enemies.",
         upgrade: { weak: 2 } },
@@ -482,9 +489,12 @@ export const POOL = {
     unicorn: { id: "unicorn", pet: "unicorn", name: "Purest Magic", cost: 2, kind: "skill", target: "self", tier: 3,
         heal: 20, exhaust: true, text: "Heal {heal}. Exhaust.",
         upgrade: { heal: 28 } },
+    // Was the eighth "Gain Block, draw a card". Their Footwork is a card that gains you NOTHING on the turn
+    // you play it and is still a first pick, because the stat is worth more than the block it replaces from
+    // about turn three onwards — a shape this pool had nowhere.
     pegasus: { id: "pegasus", pet: "pegasus", name: "Take Wing", cost: 1, kind: "skill", target: "self", tier: 3,
-        block: 12, draw: 2, text: "Gain {block} Block. Draw 2 cards.",
-        upgrade: { block: 16 } },
+        dexterity: 2, draw: 1, text: "Gain {dexterity} Dexterity. Draw 1 card.",
+        upgrade: { dexterity: 3 } },
     baby_rex: { id: "baby_rex", pet: "baby_rex", name: "Apex", cost: 2, kind: "attack", target: "foe", tier: 3,
         damage: 22, text: "Deal {damage} damage.",
         upgrade: { damage: 28 } },
@@ -525,9 +535,13 @@ export const POOL = {
     spice_moth: { id: "spice_moth", pet: "spice_moth", name: "Spice", cost: 1, kind: "power", target: "self", tier: 3,
         strength: 2, block: 4, text: "Gain {strength} Strength and {block} Block.",
         upgrade: { strength: 3, block: 7 } },
-    sky_whale: { id: "sky_whale", pet: "sky_whale", name: "Sound the Deep", cost: 3, kind: "skill", target: "self", tier: 3,
-        block: 30, draw: 1, text: "Gain {block} Block. Draw 1 card.",
-        upgrade: { block: 40, draw: 2 } },
+    // The defensive Demon Form, and the reason the long fights were unwinnable: every guard card in the deck
+    // printed a FLAT number, so a deck that survived turn three was no better at surviving turn twelve while
+    // the thing across from it grew all fight. Three energy and nothing happens; by turn six every Block card
+    // you own is worth four more than it says.
+    sky_whale: { id: "sky_whale", pet: "sky_whale", name: "Sound the Deep", cost: 2, kind: "power", target: "self", tier: 3,
+        dexterityEach: 1, text: "Gain {dexterityEach} Dexterity each turn.",
+        upgrade: { dexterityEach: 2 } },
     // ──── THE THREE FROM THE BEST CHESTS ────────────────────────────────────────────
     // One card each for the Vaultwyrm, the Lodestar and the Ammonite, and each one is the ONLY card in the
     // game that does its thing: block off the size of your draw pile, draw up to a hand size rather than by
@@ -741,12 +755,23 @@ export const PERKS = {
         text: "Start every fight with 1 Strength." },
     tin_shield: { id: "tin_shield", name: "Tin Shield", icon: "shield", block: 6,
         text: "Start every fight with 6 Block." },
+    // ── AND THE GUARD SIDE OF WHETSTONE ──────────────────────────────────────────────────────────────
+    // Whetstone has been the opening Strength trinket since the day perks landed and there has never been
+    // one facing the other way, because until Dexterity existed there was no stat for it to give. A relic
+    // that makes every guard card in the deck better is a different run from one that makes every attack
+    // better, and a pool where only one of those exists is a pool that only builds one deck.
+    silk_wrap: { id: "silk_wrap", name: "Silk Wrap", icon: "shield", dexterity: 1,
+        text: "Start every fight with 1 Dexterity." },
     lucky_paw: { id: "lucky_paw", name: "Lucky Paw", icon: "paw", draw: 1,
         text: "Draw one extra card on your first turn." },
     old_lantern: { id: "old_lantern", name: "Old Lantern", icon: "lantern", energy: 1,
         text: "One extra energy on your first turn." },
     iron_ration: { id: "iron_ration", name: "Iron Ration", icon: "ration", healAfter: 5,
         text: "Heal 5 after every fight you win." },
+    // The quiet one that wins long fights rather than short ones — it is worth nothing in a two-turn room
+    // and it is the reason an eleven-turn boss stops being a losing race.
+    tide_glass: { id: "tide_glass", name: "Tideglass", icon: "shield", dexterityEach: 1,
+        text: "Gain 1 Dexterity each turn of a fight." },
     // Theirs: Burning Blood. The relic the Ironclad opens every single run holding — see STARTER_PERK below.
     warm_blood: { id: "warm_blood", name: "Warm Blood", icon: "heart", healAfter: 6,
         text: "Heal 6 after every fight you win." },
@@ -1169,6 +1194,7 @@ export const POTIONS = {
     blood: { id: "blood", name: "Blood Tonic", icon: "heal", heal: 12, text: "Heal 12." },
     bark: { id: "bark", name: "Barkskin", icon: "shield", block: 12, text: "Gain 12 Block." },
     fury: { id: "fury", name: "Bottled Fury", icon: "sword", strength: 2, text: "Gain 2 Strength." },
+    poise: { id: "poise", name: "Bottled Poise", icon: "shield", dexterity: 2, text: "Gain 2 Dexterity." },
     spark: { id: "spark", name: "Spark", icon: "energy", energy: 2, text: "Gain 2 energy." },
 
     // ── AND THE REST OF THE SHELF ────────────────────────────────────────────────────────────────────
@@ -2749,7 +2775,7 @@ export const cardById = (id) => {
 // is how a hand gets read at speed: you are not reading sentences, you are spotting the two words that decide
 // the turn. Kept here rather than in the card component because the rules own the vocabulary; a screen that
 // invented its own list would drift the moment a card added a keyword.
-export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Strength"];
+export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity"];
 
 // ── WHAT EACH KIND OF CARD IS CALLED ─────────────────────────────────────────────────────────────────────
 // The card face used to name the type with `kind === "attack" ? "Attack" : "Skill"`, which is a ternary that
@@ -2821,10 +2847,22 @@ export function attackDamage(base, attacker = {}, defender = {}, mult = 1) {
  * modified Block permanently in hand and cannot do the same for damage. When Dexterity and Frail arrive they
  * belong HERE, in this function, and nothing that renders a card will need to know they exist.
  */
-/** Block gained while Frail is 25% less, rounded down — theirs exactly. */
+/**
+ * ── THE DEFENSIVE HALF OF attackDamage, AND IT HAS TO BE THE SAME SHAPE ──────────────────────────────────
+ * Block = (base + Dexterity), then Frail takes a quarter off, floored — theirs exactly, in that order,
+ * because the order is worth a point of Block on almost every card that has ever been printed.
+ *
+ * ⚠️ DEXTERITY IS WHY THE BLOCK CARDS WERE ALL THE SAME CARD. The attack half of this game has a stat that
+ * grows (Strength) and a debuff that eats it (Weak), so an attack card can be about its number OR about
+ * scaling that number. The block half had neither: no stat, and a Frail nothing could apply. Every guard
+ * card was therefore forced to differentiate on a SECOND effect stapled to it, which is why eight of them
+ * read "gain Block, draw a card" and seven read "gain Block, gain Strength". Give Block a stat of its own
+ * and those eight become eight different cards without a word of their text changing.
+ */
 export function blockGain(base, unit = {}) {
     const n = Math.max(0, Number(base) || 0);
-    return (unit.frail || 0) > 0 ? Math.floor(n * 0.75) : n;
+    const withDex = Math.max(0, n + (Number(unit.dexterity) || 0));
+    return (unit.frail || 0) > 0 ? Math.floor(withDex * 0.75) : withDex;
 }
 
 export function resolveCard(card, attacker = {}, defender = null) {
@@ -2838,6 +2876,8 @@ export function resolveCard(card, attacker = {}, defender = null) {
     if (card.heal) out.heal = card.heal;
     if (card.vulnerable) out.vulnerable = card.vulnerable;
     if (card.weak) out.weak = card.weak;
+    if (card.frail) out.frail = card.frail;
+    if (card.dexterity) out.dexterity = card.dexterity;
     return out;
 }
 
@@ -3040,6 +3080,10 @@ function beginTurn(state) {
             // read only the hero, so a trinket that said "gain Strength every turn" gained none.
             strength: (state.hero.strength || 0)
                 + (first ? 0 : (state.hero.strengthEach || 0) + perkSum(state.perks, "strengthEach")),
+            // The guard-side Demon Form. Reads the perks as well as the hero for the reason written above:
+            // the version that read only the hero made a trinket promising a stat every turn pay nothing.
+            dexterity: (state.hero.dexterity || 0)
+                + (first ? 0 : (state.hero.dexterityEach || 0) + perkSum(state.perks, "dexterityEach")),
         },
     };
     // `draw` is the first turn only (a Bag of Preparation); `drawEach` pays on every one of them.
@@ -3106,6 +3150,8 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             // would grow mid-fight every time a blow landed and the number over a card would be a lie.
             strength: perkSum(perks, "strength")
                 + ((hero.hp || HERO_HP) / (hero.hpMax || HERO_HP) < 0.5 ? perkSum(perks, "strengthLow") : 0),
+            // The guard-side twin, same shape and same place, so a Dexterity perk is a line in PERKS too.
+            dexterity: perkSum(perks, "dexterity"),
             // Damage back to anything that swings at you — Bronze Scales, straight. The creatures have had
             // this since the Spikers arrived; it is the same field on the other side of the board.
             thorns: perkSum(perks, "thorns"),
@@ -3115,7 +3161,7 @@ export function startFight({ seed = 1, hero = {}, foe = null, foes = null, deck:
             vulnMult: 1.5 + (perkSum(perks, "vulnBonus") || 0),
             // A Magic Flower: everything that heals you heals more.
             healMult: 1 + (perkSum(perks, "healBonus") || 0),
-            vulnerable: 0, weak: 0,
+            vulnerable: 0, weak: 0, frail: 0,
         },
         foes: party.map((f, i) => ({
             id: `f${i}`,
@@ -3309,11 +3355,31 @@ export function playCard(state, uid, targetIndex = 0) {
             events.push({ type: "debuff", on: foes[i].id, key: "Weak", amount: card.weak });
         }
     }
+    // ── FRAIL ── the same half-built state Weak was in before it: blockGain has always taken a quarter off a
+    // Frail unit and the fight screen has always drawn the tag, but it arrived on the board only ever
+    // pointing AT you — four foe moves apply it and not one card could give it back. Foes block (21 moves
+    // do), so a card that makes an enemy's guard worse is a real answer and not a courtesy.
+    if (card.frail) {
+        const targets = card.all ? foes.map((f, i) => i).filter((i) => foes[i].hp > 0) : [ti];
+        for (const i of targets) {
+            hitFoe(i, (f) => ({ ...f, frail: (f.frail || 0) + card.frail }));
+            events.push({ type: "debuff", on: foes[i].id, key: "Frail", amount: card.frail });
+        }
+    }
     // Strength is permanent for the fight and adds to EVERY attack after it, which is what makes a card that
     // does nothing on the turn you play it worth a slot.
     if (card.strength) {
         hero = { ...hero, strength: (hero.strength || 0) + card.strength };
         events.push({ type: "buff", on: "hero", key: "Strength", amount: card.strength });
+    }
+    // Dexterity is Strength for the guard hand: permanent for the fight, and it adds to every Block a CARD
+    // gains after it, including the powers that tick one out each turn — everything that goes through
+    // blockGain. The flat Block a perk opens the fight on and the Block in a bottle are deliberately not
+    // scaled by it, the same way their Tin Shield and their Block Potion are not.
+    // Same reason Strength is worth a card that does nothing on the turn you play it.
+    if (card.dexterity) {
+        hero = { ...hero, dexterity: (hero.dexterity || 0) + card.dexterity };
+        events.push({ type: "buff", on: "hero", key: "Dexterity", amount: card.dexterity });
     }
     // ── AND THE REST OF WHAT A CARD CAN BE ───────────────────────────────────────────────────────────
     // Every one of these is a shape their deck has and ours did not, which is why ours stopped getting
@@ -3325,6 +3391,10 @@ export function playCard(state, uid, targetIndex = 0) {
     if (card.strengthEach) {
         hero = { ...hero, strengthEach: (hero.strengthEach || 0) + card.strengthEach };
         events.push({ type: "buff", on: "hero", key: "Demon Form", amount: card.strengthEach });
+    }
+    if (card.dexterityEach) {
+        hero = { ...hero, dexterityEach: (hero.dexterityEach || 0) + card.dexterityEach };
+        events.push({ type: "buff", on: "hero", key: "Dexterity", amount: card.dexterityEach });
     }
     // ──── THE VAULTWYRM COUNTS WHAT IS LEFT ──────────────────────────────────────────
     // Block equal to the cards still in the draw pile. Every other block card in the game prints a number;
@@ -3463,6 +3533,7 @@ export function drinkPotion(state, potionId) {
     if (potion.blockEach) next.hero.blockEach = (next.hero.blockEach || 0) + potion.blockEach;
     if (potion.strengthEach) next.hero.strengthEach = (next.hero.strengthEach || 0) + potion.strengthEach;
     if (potion.strength) next.hero.strength = (next.hero.strength || 0) + potion.strength;
+    if (potion.dexterity) next.hero.dexterity = (next.hero.dexterity || 0) + potion.dexterity;
     // A Toy Fan pays for the act of drinking, whatever was in the bottle — theirs exactly, and it is what
     // makes a belt of situational potions worth carrying at all.
     const fan = perkSum(state.perks, "healPerPotion");
@@ -3781,11 +3852,16 @@ export function endTurn(state) {
     // wiped before anything ever hit it. Theirs works exactly this way, and the trinket that does the same
     // thing (Oddly Smooth Stone) reads the same field.
     const steady = (state.hero.blockEach || 0) + perkSum(state.perks, "blockEach");
+    // ⚠️ THE NUMBER THAT FLOATS UP IS THE NUMBER THAT LANDED. This added blockGain(steady) to the bar and
+    // then announced the raw `steady`, so a Frail hero holding Metallicize 3 gained 2 Block and watched a
+    // "+3" float off their own head — and with Dexterity in the game the gap opens the other way too. One
+    // value, computed once, used by both.
+    const gained = steady > 0 ? blockGain(steady, state.hero) : 0;
     const opened = steady > 0
-        ? { ...state, hero: { ...state.hero, block: (state.hero.block || 0) + blockGain(steady, state.hero) } }
+        ? { ...state, hero: { ...state.hero, block: (state.hero.block || 0) + gained } }
         : state;
     let cur = startFoeTurn(opened).state;
-    const events = steady > 0 ? [{ type: "block", on: "hero", amount: steady }] : [];
+    const events = steady > 0 ? [{ type: "block", on: "hero", amount: gained }] : [];
     for (let i = 0; i < cur.foes.length; i += 1) {
         const step = foeAct(cur, i);
         cur = step.state;

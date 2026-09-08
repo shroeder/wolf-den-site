@@ -2357,6 +2357,14 @@ function Bar({ unit, guarding, pending }) {
                         <GiBiceps aria-hidden="true" />{unit.strength}
                     </span>
                 ) : null}
+                {/* DEXTERITY sits beside Strength deliberately: they are the same kind of thing — the two
+                    stats a fight can grow — and a player who has learned to look for the arm should find
+                    the shield in the same row rather than hunting a different corner for it. */}
+                {unit.dexterity > 0 ? (
+                    <span className="cfb-tag is-dex" title={`Dexterity ${unit.dexterity} — gains ${unit.dexterity} more Block`}>
+                        <GiShield aria-hidden="true" />{unit.dexterity}
+                    </span>
+                ) : null}
             </div>
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
@@ -2435,6 +2443,9 @@ function Bar({ unit, guarding, pending }) {
                 .cfb-tag.is-vuln { color: #ffcf6a; border-color: #6e5a24; }
                 .cfb-tag.is-weak { color: #c8a6ff; border-color: #4c3d6e; }
                 .cfb-tag.is-str { color: #ff9f6a; border-color: #6e4a2c; }
+                /* Green against Strength's orange: the two growth stats have to be told apart at a glance
+                   on a 375px board, and they sit next to each other. */
+                .cfb-tag.is-dex { color: #7fe0a8; border-color: #2c6e4a; }
             `}</style>
         </div>
     );
