@@ -10,6 +10,22 @@ export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12
 // income settler (pet-income.js) and the perk/owned-bonus display. Nerfed to 1/5 of the original 2.
 export const GOLD_PER_POINT = 0.4;
 const FIRST_HIT_BY_RARITY = { common: 1.3, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.6, ascendant: 3.0, eternal: 3.5 };
+// ──── THE THREE CELESTIAL KEYS GET THEIR OWN CURVE ──────────────────────────────────
+// ⚠️ WITHOUT THIS, LEVELLING THEM DOES NOTHING. Everything not listed in petPerkValue falls through to
+// PET_ACTIVE_BY_RARITY, which pays 22 at ascendant and 30 at eternal — and the level curve runs x1 to x3.5.
+// So an ability whose sensible ceiling is 25 STARTS at 22 and hits the cap at Lv2, leaving Lv2→Lv6 flat:
+//
+//     unsealed     Lv1 22  Lv2 25  Lv3 25  Lv4 25  Lv5 25  Lv6 25
+//
+// That is the Gilded Magpie's problem (see its note above) arriving on three brand-new pets at once, and on
+// the Magpie it was accepted because chest_luck IS that bird. Here it would mean the three rarest pets in the
+// game are the three where levelling is pointless, which is the opposite of what a chase pet is for.
+//
+// These are new keys, so they get a base sized against their OWN ceiling rather than a generic one: low
+// enough that x3 at Lv5 lands just under the cap, so every single rung is worth something.
+const UNSEALED_BY_RARITY = { legendary: 5, mythic: 6, ascendant: 8, eternal: 10 };
+const FORTUNES_DUE_BY_RARITY = { legendary: 6, mythic: 8, ascendant: 10, eternal: 12 };
+const SHRINEKEEPER_BY_RARITY = { legendary: 6, mythic: 8, ascendant: 10, eternal: 12 };
 const ERUPT_BY_RARITY = {
     common: { chance: 0.08, mult: 1.5 }, rare: { chance: 0.1, mult: 1.6 }, epic: { chance: 0.12, mult: 1.8 },
     legendary: { chance: 0.15, mult: 2.0 }, mythic: { chance: 0.18, mult: 2.3 }, ascendant: { chance: 0.2, mult: 2.6 }, eternal: { chance: 0.25, mult: 3.0 },
@@ -304,11 +320,13 @@ export const SYSTEM_PERK_CAP = {
     chest_luck: 20,     // rarity promotion
     // ──── THE THREE CELESTIAL KEYS ──────────────────────────────────────────────────
     // Ceilings chosen against what each one actually does to a chest, not by feel:
+    // All three sit just above x3 of their ascendant/eternal base (see the curves at the top of this file),
+    // so a Lv5 pet reaches its ceiling and not before — every rung of the ladder buys something.
     unsealed: 25,       // a QUARTER of your chests ignoring the filler chain is already enormous — at a
                         // primordial's 24% gear share this roughly doubles it, and no further
-    fortunes_due: 30,   // the promotion CHANCE at full Fortune. One band up, never two, so it can lift a
+    fortunes_due: 32,   // the promotion CHANCE at full Fortune. One band up, never two, so it can lift a
                         // celestial roll into primordial but cannot invent a run of them
-    shrinekeeper: 40,   // how much more each enshrined stone is worth. Multiplies a number that is already
+    shrinekeeper: 42,   // how much more each enshrined stone is worth. Multiplies a number that is already
                         // small per pet and only pays at all if you have enshrined anything
     green_thumb: 40,    // a seed from rating; rating is already daily-capped
     pack_visit: 50,     // share of the XP, never more than half
@@ -343,6 +361,9 @@ export const PROC_CAP = {
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
+    if (key === "unsealed") return UNSEALED_BY_RARITY[rarity] || 5;
+    if (key === "fortunes_due") return FORTUNES_DUE_BY_RARITY[rarity] || 6;
+    if (key === "shrinekeeper") return SHRINEKEEPER_BY_RARITY[rarity] || 6;
     if (key === "erupt") return ERUPT_BY_RARITY[rarity] || ERUPT_BY_RARITY.epic;
     if (key === "chain_strike") return CHAIN_BY_RARITY[rarity] || 0.1;
     if (key === "execute") return EXECUTE_BY_RARITY[rarity] || 0.3;
@@ -512,9 +533,30 @@ export function ascensionEffectView(pet, stone) {
     // a whole number produces things like "+6.6000000000000005/hr", which is a number nobody wrote.
     const round1 = (x) => Math.round(x * 10) / 10;
     const procCap = PROC_CAP[key];
+    // ──── AND THE LEVEL MULTIPLIER, WHICH THIS CARD HAS NEVER APPLIED ──────────────────
+    // ⚠️ 203 OF 211 STONE CARDS UNDERSTATED WHAT THE ENGINE PAYS, nearly all of them by exactly 3.5x.
+    // An enshrined ability is applied by combinePetBonuses at PET_ENSHRINED_LEVEL — `applyActive(pet,
+    // PET_ENSHRINED_LEVEL, mult)` — and applyPerk multiplies by petActiveLevelMult(6) = 3.5 before capping.
+    // This card multiplied the Lv1 base by the stone's factor and stopped, so the Bunny's Lightstone read
+    // "+2.7 farm_seed" against an engine that pays 9.5, and the Lodestar's read "+22 Fortune" against 92.
+    //
+    // The direction is the merciful one — nobody was sold a number they did not get — but it is the same
+    // class of fault as the overstatement this whole function was rewritten to fix, and on the same
+    // irreversible screen: a member choosing a stone was comparing two numbers, both wrong, against a
+    // ceiling that only one of them was anywhere near. Two stones that both look capped are not a choice.
+    //
+    // So the shapes below mirror applyPerk branch for branch rather than approximating it. first_hit is a
+    // MULTIPLIER and grows as `1 + (v-1)*mult`; erupt scales its chance only; extra_strike is its own ladder
+    // and reaches certainty at this level. Everything else is v * mult, capped where the engine caps.
+    const lvl = petActiveLevelMult(PET_ENSHRINED_LEVEL);
+    const gain = factor * lvl;
     const scaled = raw && typeof raw === "object"
-        ? { ...raw, chance: round1(Math.min(procCap ?? 1, raw.chance * factor) * 100) / 100 }
-        : round1(procCap != null ? Math.min(procCap, raw * factor) : capSystemPerk(key, raw * factor));
+        ? { ...raw, chance: round1(Math.min(procCap ?? 1, raw.chance * gain) * 100) / 100 }
+        : key === "first_hit"
+            ? round1(Math.min(PROC_CAP.first_hit, 1 + (raw - 1) * gain))
+            : key === "extra_strike"
+                ? round1(Math.min(1, (0.2 + 0.2 * (PET_ENSHRINED_LEVEL - 1)) * factor))
+                : round1(procCap != null ? Math.min(procCap, raw * gain) : capSystemPerk(key, raw * gain));
     const meta = PERK_META[key] || { icon: "🐾" };
     return {
         stone,
