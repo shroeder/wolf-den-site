@@ -22,6 +22,8 @@
 import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
+import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
+import { POOL } from "../src/lib/marketplace/cards-kit.js";
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -50,6 +52,80 @@ const ART = {
         + "fireside beyond",
 };
 
+// ── AND THE HUNDRED AND SEVEN THAT NOBODY WAS EVER GOING TO HAND-WRITE ───────────────────────────────────
+// Four cards had a painted scene and 107 did not, so all but four fell back to the pet's portrait — a clean
+// cut-out floating on a coloured panel, which is exactly the "sticker" this file's own opening paragraph
+// says card art exists to avoid.
+//
+// Hand-writing 107 of these was never going to happen, and a single formulaic template would have produced
+// 107 near-identical pictures, which is worse than the fallback. So the subject is COMPOSED from three
+// things the data already holds and which vary independently:
+//
+//   · THE ANIMAL, from the pet's own `spritePrompt` in collectibles.js — "a fluffy grey wolf pup", "a
+//     hulking bear cub". Every one of the 107 cards is a different pet, so this alone never repeats.
+//   · THE ACTION, from what the card actually DOES. A card that hits twice is drawn mid-flurry; a card that
+//     only blocks is drawn braced and side-on; a card that draws is drawn catching sight of something. This
+//     is the same reasoning the window's SHAPE already follows — attack comes to a point, skill is round.
+//   · THE GROUND, rotated off the card id so neighbours on a reward screen do not share a backdrop.
+//
+// A hand-written entry in ART always wins. The four that exist are better than anything composed, and this
+// is a floor rather than a replacement.
+const PET_ART = Object.fromEntries(
+    (Array.isArray(COLLECTIBLES) ? COLLECTIBLES : Object.values(COLLECTIBLES))
+        .filter((c) => c.spritePrompt).map((c) => [c.id, c.spritePrompt]),
+);
+
+const GROUNDS = [
+    "a cold moonlit forest clearing beyond",
+    "a sunlit reed-bed and open water beyond",
+    "a golden dusk field of long grass beyond",
+    "a red canyon of wind-carved rock beyond",
+    "a dim cavern of wet stone and dripping water beyond",
+    "a snowfield under a pale winter sky beyond",
+    "a ruined stone courtyard with ivy over it beyond",
+    "a stormy shoreline of black rock and spray beyond",
+];
+
+function actionFor(card) {
+    const dmg = (card.damage || 0) * (card.hits || 1);
+    if (card.heal) return "curled and at rest, eyes half closed, warm light washing over it and a haze of "
+        + "warmth rising";
+    if (card.hits > 1) return "caught mid-flurry landing a second blow, the first still blurred behind it, "
+        + "dust and speed streaks thrown out around it";
+    if (card.all && card.damage) return "spinning to lash out at everything around it at once, a ring of "
+        + "force and scattered debris thrown outward";
+    if (card.damage && dmg >= 10) return "throwing its whole weight into one heavy blow straight at the "
+        + "viewer, braced hard on its back legs at the moment of impact";
+    if (card.damage) return "lunging straight at the viewer mid-strike, reaching, fur and dust ruffled by "
+        + "the lunge, speed streaks trailing behind";
+    if (card.strength) return "rearing up as power gathers visibly around it, muscles set, light bleeding "
+        + "off its shoulders";
+    if (card.energy) return "surging forward in a burst, trailing bright light behind it";
+    // No "ears up" — eleven of these are birds, fish and a sloth, and the phrase was writing a mammal over
+    // the top of them.
+    if (card.draw) return "head snapping round, alert and wide-eyed, catching sight of something just off "
+        + "the frame";
+    if (card.vulnerable || card.weak) return "baring its teeth in a low snarl that makes the air in front of "
+        + "it shimmer and warp";
+    if (card.block) return "braced low and side-on behind a raised guard, weathering a blow, the impact "
+        + "throwing dust and sparks off in front of it";
+    return "standing alert and squared to the viewer, poised on the edge of moving";
+}
+
+function composed(card) {
+    const full = PET_ART[card.pet];
+    if (!full) return null;
+    // ⚠️ THE LEADING CLAUSE ONLY. A handful of these carry their own scene inside them — the storm crow's is
+    // "a glossy black storm crow with a silver coin held in its beak, wind-ruffled feathers, storm light on
+    // its wings" — and appending an action to that produced a run-on describing two different pictures, with
+    // the coin still in its beak while it spun to attack. The animal is the part before the first comma; the
+    // action this file composes is the rest of the sentence.
+    const pet = full.split(",")[0].trim();
+    let n = 0;
+    for (const ch of String(card.id)) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+    return `${pet} ${actionFor(card)}, ${GROUNDS[n % GROUNDS.length]}`;
+}
+
 // Card art is looked at small and in a hurry, between reading a cost and reading a sentence. It needs one
 // clear action and a loud palette, not a landscape somebody has to study.
 const EXTRA = "Composed for a small wide card window: ONE clear action filling the frame, read in a glance. "
@@ -61,7 +137,10 @@ const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? 
 const FORCE = process.argv.includes("--force");
 
 let made = 0, skipped = 0, spent = 0;
-for (const [id, subject] of Object.entries(ART)) {
+// Every card in the pool, not just the hand-written table: a card with an entry uses it, and every other
+// card gets a composed one. See the note over `composed`.
+const JOBS = Object.values(POOL).map((c) => [c.id, ART[c.id] || composed(c)]).filter(([, subj]) => subj);
+for (const [id, subject] of JOBS) {
     if (only && !only.has(id)) continue;
     const dest = `${OUT}/${id}.webp`;
     if (fs.existsSync(dest) && !FORCE) { skipped += 1; continue; }
