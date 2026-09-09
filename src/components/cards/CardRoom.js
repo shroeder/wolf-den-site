@@ -469,7 +469,8 @@ export default function CardRoom({ run, art = {} }) {
                    z-index higher, and tapping the dark takes you back to the deck rather than out of the room. */
                 .cr-prev-over { position: fixed; inset: 0; z-index: 4200; display: grid; place-items: center;
                     padding: 18px; background: rgba(4,6,10,0.82); backdrop-filter: blur(2px); }
-                .cr-prev { display: flex; flex-direction: column; align-items: center; gap: 14px;
+                .cr-prev { align-self: center; justify-self: center;
+                    display: flex; flex-direction: column; align-items: center; gap: 14px;
                     padding: 18px 16px; border-radius: 14px; background: #10141c;
                     border: 1px solid #2a3242; box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
                 .cr-prev-head { margin: 0; font-size: 15px; letter-spacing: 0.04em; color: #e7ecf4; }

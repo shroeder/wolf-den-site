@@ -422,7 +422,13 @@ export default function CardFightClient({ fixture, run = null }) {
     // a tooltip, which is nothing at all on the phone this game is played on. So a potion you were carrying
     // for the fight that needed it could be spent by one mis-aimed thumb, permanently, without ever having
     // been read. Holds the belt slot being looked at.
+    // ⚠️ THE BOTTLE, NOT A BELT SLOT. It started as a slot index, which was fine while the belt was the only
+    // place a potion could be looked at — and then the reward screen's drop pill needed the same panel and
+    // has no slot at all, because the bottle it names may have gone straight to a full belt and spilled.
+    // { id, slot } — a null slot means it is not yours to drink from here, so the panel only reads it out.
     const [reading, setReading] = useState(null);
+    // Which satchel is open: "potions", "perks", or nothing.
+    const [shelf, setShelf] = useState(null);
     const onDrink = useCallback(async (slot) => {
         const id = (runState?.potions || [])[slot];
         if (!id || !POTIONS[id] || fightRef.current.over || drinking !== null) return;
@@ -444,7 +450,6 @@ export default function CardFightClient({ fixture, run = null }) {
     // What the run is carrying, resolved once — the fight state keeps perk IDS because the engine only needs
     // the numbers off them (perkSum), and the screen needs the names and the pictures.
     const perksHeld = (runState?.perks || fight.perks || []).map((id) => perkById(id)).filter(Boolean);
-    const [perkPeek, setPerkPeek] = useState(null);
 
     const [askForfeit, setAskForfeit] = useState(false);
     // The result panel carries the same weapon: "Give up the run" is one press from ending a live run, and it
@@ -927,26 +932,29 @@ export default function CardFightClient({ fixture, run = null }) {
                             <Sprite src="/images/cards/chrome/card-back.png" className="cf-pile-art" />
                             <span className="cf-pile-n">{fight.discard.length}</span>
                         </button>
-                        {/* ── AND WHAT IS ON YOUR BELT ────────────────────────────────────────────────
-                            Beside the piles because it is the same kind of fact — a resource you are holding
-                            — and because the right-hand group is the two things that END a turn and must not
-                            grow a third neighbour. EMPTY SLOTS ARE NOT DRAWN, the rule the whole game's bars
-                            already follow. */}
-                        <span className="cf-belt">
-                        {(runState?.potions || []).map((id, i) => POTIONS[id] ? (
-                            <button
-                                key={`${id}${i}`}
-                                type="button"
-                                className={`cf-potion${drinking === i ? " is-going" : ""}`}
-                                disabled={Boolean(fight.over) || drinking !== null}
-                                onClick={() => setReading(i)}
-                                title={`${POTIONS[id].name} — ${POTIONS[id].text}`}
-                                aria-label={`${POTIONS[id].name}: ${POTIONS[id].text}. Look at it.`}
-                            >
-                                <Sprite src={`/images/cards/potions/${id}.png`} className="cf-potion-art" />
+                        {/* ── ONE BUTTON FOR THE BELT, ONE FOR THE TRINKETS ───────────────────────────
+                            Luke: "can we just have a potions button and perks button, each opens a modal."
+                            The belt used to draw a bottle per potion up here and the trinkets sat in a second
+                            row under the stop line — so the two things you are CARRYING were in two different
+                            places, drawn at two different sizes, and both of them 26px pictures with no words.
+                            They are two doors now, each with a count on it, and what is behind them is a list
+                            you can actually read. EMPTY IS NOT DRAWN, the rule the whole game's bars follow. */}
+                        {(runState?.potions || []).length ? (
+                            <button type="button" className="cf-satchel"
+                                onClick={() => setShelf("potions")}
+                                aria-label={`Potions, ${(runState?.potions || []).length} carried`}>
+                                <Sprite src={`/images/cards/potions/${(runState?.potions || [])[0]}.png`} className="cf-satchel-art" />
+                                <span className="cf-satchel-n">{(runState?.potions || []).length}</span>
                             </button>
-                        ) : null)}
-                        </span>
+                        ) : null}
+                        {perksHeld.length ? (
+                            <button type="button" className="cf-satchel"
+                                onClick={() => setShelf("perks")}
+                                aria-label={`Trinkets, ${perksHeld.length} carried`}>
+                                <Sprite src={`/images/cards/items/${perksHeld[0].id}.png`} className="cf-satchel-art" />
+                                <span className="cf-satchel-n">{perksHeld.length}</span>
+                            </button>
+                        ) : null}
                     </div>
                     <div className="cf-top-group">
                         <div className="cf-energy" aria-label={`${fight.energy} of ${fight.energyMax} energy`}>
@@ -979,27 +987,8 @@ export default function CardFightClient({ fixture, run = null }) {
                     Spire keeps its relics along the top of the fight for exactly this reason. Ours sit on
                     the stop/turn line, which is the only strip up here with room, and they are TAPPABLE for
                     the rule — the map taught that a hover is not an explanation on a phone. */}
-                {perksHeld.length ? (
-                    <div className="cf-trinkets">
-                        {perksHeld.map((perk) => (
-                            <button
-                                key={perk.id}
-                                type="button"
-                                className={`cf-trinket${perkPeek === perk.id ? " is-lit" : ""}`}
-                                onClick={() => setPerkPeek(perkPeek === perk.id ? null : perk.id)}
-                                title={`${perk.name} — ${perk.text}`}
-                                aria-label={`${perk.name} — ${perk.text}`}
-                            >
-                                <Sprite src={`/images/cards/items/${perk.id}.png`} className="cf-trinket-art" />
-                            </button>
-                        ))}
-                    </div>
-                ) : null}
-                {perkPeek && perkById(perkPeek) ? (
-                    <p className="cf-trinket-say" role="status">
-                        <b>{perkById(perkPeek).name}</b> {perkById(perkPeek).text}
-                    </p>
-                ) : null}
+{/* The trinkets had their own row under the stop line; they are behind the satchel button in the
+                    top bar now, beside the potions, because "what am I carrying" is one question. */}
 
                 <div className="cf-turn">
                     {run ? `${stopLabel(runState?.stop || run.stop, { act: runState?.act || run.act })} · ` : ""}Turn {fight.turn}
@@ -1028,7 +1017,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     announced swing, and its own place to drop a card. One enemy could only ever ask "do I
                     attack or do I block"; three ask the question a hand of cards is actually for, which is
                     where the damage should go. */}
-                <div className="cf-party" ref={partyRef}>
+                <div className={`cf-party${fight.foes.filter((f) => f.hp > 0).length > 2 ? " is-crowd" : ""}`} ref={partyRef}>
                     {fight.foes.map((foe, i) => {
                         const dead = foe.hp <= 0;
                         const swing = intentDamage(fight, i);
@@ -1078,19 +1067,13 @@ export default function CardFightClient({ fixture, run = null }) {
                                 </span>
                                 <span className="cf-shade" aria-hidden="true" />
                                 {dead ? null : <Bar unit={foe} guarding={guarded[i]} pending={pendingFor(foe, i)} />}
-                                {/* ── WHAT IT IS, THEN WHO IT IS ─────────────────────────────────────────
-                                    Nothing named the enemies at all before this, which quietly wasted the
-                                    whole moveset design: you cannot learn that a Warden guards for 14 if
-                                    nothing ever tells you the thing in front of you is a Warden. The
-                                    creature leads because it is the half that repeats; the Road fighter
-                                    whose portrait it is wearing sits under it as the flavour it always was. */}
-                                {dead ? null : (
-                                    <span className="cf-who">
-                                        <b>{foe.foeName || foe.name}</b>
-                                        {foe.foeName && foe.name && foe.foeName !== foe.name
-                                            ? <i>{foe.name}</i> : null}
-                                    </span>
-                                )}
+                                {/* ⚠️ THE NAMES USED TO HANG HERE AND THEY ARE GONE. Luke: "I dont like the
+                                    text underneath them, and I dont like how it offsets them vertically."
+                                    Both halves are right, and the second is the one worth writing down: the
+                                    hero has no name block, so a name under every foe lifted the foe bars off
+                                    the hero's line and the four gauges stopped agreeing about where a health
+                                    bar lives. The creature type is still legible — it is the sprite, and the
+                                    intent above it says what it is about to do. */}
                             </div>
                         );
                     })}
@@ -1337,15 +1320,31 @@ export default function CardFightClient({ fixture, run = null }) {
                                 drop nobody notices is a resource nobody plans around. A full belt says so
                                 too, because "you were owed one and had nowhere to put it" is information a
                                 player uses on the very next chest. */}
+                            {/* ⚠️ A BUTTON, BECAUSE IT NAMES SOMETHING AND NAMED THINGS GET LOOKED AT. This was a
+                                div: the one place in the run a potion is introduced to you, and the only thing it
+                                would tell you was its name. Luke, with a photograph of a Chalk Flask sitting over
+                                three cards he was choosing between: "I need to be able to click the chalk flask and
+                                see a modal details." The slot it went to is passed when there is one, so a bottle
+                                that reached your belt can be drunk from here and a spilled one is only read. */}
                             {runState.dropped?.potion ? (
-                                <div className={`cf-drop${runState.dropped.spilled ? " is-spilled" : ""}`}>
+                                <button
+                                    type="button"
+                                    className={`cf-drop${runState.dropped.spilled ? " is-spilled" : ""}`}
+                                    aria-label={`${POTIONS[runState.dropped.potion]?.name}: ${POTIONS[runState.dropped.potion]?.text}. Look at it.`}
+                                    onClick={() => setReading({
+                                        id: runState.dropped.potion,
+                                        slot: runState.dropped.spilled
+                                            ? null
+                                            : (runState?.potions || []).lastIndexOf(runState.dropped.potion),
+                                    })}
+                                >
                                     <Sprite src={`/images/cards/potions/${runState.dropped.potion}.png`} className="cf-drop-art" />
                                     <span>
                                         {runState.dropped.spilled
                                             ? `${POTIONS[runState.dropped.potion]?.name} — no belt slot free`
                                             : POTIONS[runState.dropped.potion]?.name}
                                     </span>
-                                </div>
+                                </button>
                             ) : null}
                             <div className="cf-offers">
                                 {runState.offers.map((id) => {
@@ -1438,13 +1437,45 @@ export default function CardFightClient({ fixture, run = null }) {
                 </div>
             ) : null}
 
+            {/* ── WHAT YOU ARE CARRYING, AS A LIST YOU CAN READ ───────────────────────────────────────
+                One panel for both satchels, because they are the same question asked of two piles. A potion
+                row opens the bottle (which can be drunk from there); a trinket row is a statement and has
+                nothing to press, so it is not a button pretending to be one. */}
+            {shelf ? (
+                <div className="cf-shelf-over" role="presentation" onClick={() => setShelf(null)}>
+                    <div className="cf-shelf" role="dialog" aria-modal="true"
+                        aria-label={shelf === "potions" ? "Potions" : "Trinkets"}
+                        onClick={(e) => e.stopPropagation()}>
+                        <p className="cf-shelf-head">{shelf === "potions" ? "On your belt" : "What you are carrying"}</p>
+                        {shelf === "potions"
+                            ? (runState?.potions || []).map((id, i) => POTIONS[id] ? (
+                                <button key={`${id}${i}`} type="button" className="cf-shelf-row"
+                                    onClick={() => { setShelf(null); setReading({ id, slot: i }); }}>
+                                    <Sprite src={`/images/cards/potions/${id}.png`} className="cf-shelf-art" />
+                                    <span><b>{POTIONS[id].name}</b><i>{POTIONS[id].text}</i></span>
+                                </button>
+                            ) : null)
+                            : perksHeld.map((perk) => (
+                                <span key={perk.id} className="cf-shelf-row is-flat">
+                                    <Sprite src={`/images/cards/items/${perk.id}.png`} className="cf-shelf-art" />
+                                    <span><b>{perk.name}</b><i>{perk.text}</i></span>
+                                </span>
+                            ))}
+                        <button type="button" className="cf-read-back" onClick={() => setShelf(null)}>Close</button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* ── THE BOTTLE, HELD UP ─────────────────────────────────────────────────────────────────
                 One tap to look, a second deliberate one to pour. The picture is the size a picture should be
                 when you are deciding something with it, and the sentence is the potion's own — the same
                 string the belt could only ever put in a tooltip. */}
-            {reading !== null && POTIONS[(runState?.potions || [])[reading]] ? (() => {
-                const pid = (runState?.potions || [])[reading];
+            {reading && POTIONS[reading.id] ? (() => {
+                const pid = reading.id;
                 const pot = POTIONS[pid];
+                // Drinkable only when the bottle is actually on the belt. A spilled drop names a potion you
+                // never received, and offering a Drink button for it would be a lie with a consequence.
+                const slot = Number.isInteger(reading.slot) && reading.slot >= 0 ? reading.slot : null;
                 return (
                     <div className="cf-read-over" role="presentation" onClick={() => setReading(null)}>
                         <div className="cf-read" role="dialog" aria-modal="true" aria-label={pot.name}
@@ -1452,13 +1483,17 @@ export default function CardFightClient({ fixture, run = null }) {
                             <Sprite src={`/images/cards/potions/${pid}.png`} className="cf-read-art" />
                             <b className="cf-read-name">{pot.name}</b>
                             <i className="cf-read-text">{pot.text}</i>
-                            <button type="button" className="cf-read-go"
-                                disabled={Boolean(fight.over) || drinking !== null}
-                                onClick={() => { const slot = reading; setReading(null); onDrink(slot); }}>
-                                Drink it
-                            </button>
+                            {slot !== null ? (
+                                <button type="button" className="cf-read-go"
+                                    disabled={Boolean(fight.over) || drinking !== null}
+                                    onClick={() => { setReading(null); onDrink(slot); }}>
+                                    Drink it
+                                </button>
+                            ) : (
+                                <i className="cf-read-note">Your belt was full, so this one was left behind.</i>
+                            )}
                             <button type="button" className="cf-read-back" onClick={() => setReading(null)}>
-                                Put it back
+                                {slot !== null ? "Put it back" : "Close"}
                             </button>
                         </div>
                     </div>
@@ -1674,9 +1709,6 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px;
                     flex: 0 0 auto; min-width: 0; }
                 .cf-top-group.is-left { flex: 0 1 auto; }
-                .cf-belt { display: flex; align-items: center; gap: 4px; min-width: 0;
-                    overflow-x: auto; scrollbar-width: none; }
-                .cf-belt::-webkit-scrollbar { display: none; }
                 .cf-forfeit { display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
                     background: rgba(10,12,16,0.5); border: 1px solid #39424f; border-radius: 999px;
                     color: #9aa6b4; font-size: 15px; }
@@ -1702,9 +1734,15 @@ export default function CardFightClient({ fixture, run = null }) {
                    centred on its own boxes would have three different foot heights. */
                 .cf-party { position: absolute; right: 0; bottom: 0; top: 0; width: 66%;
                     display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
-                /* Negative margins: they stand close enough to overlap, which is what lets them be full size. */
+                /* ⚠️ THE OVERLAP IS FOR A CROWD, AND TWO IS NOT A CROWD. These cells carried a -4% margin
+                   on every side unconditionally, so a pair of foes stood shoulder to shoulder with their
+                   bars touching on a row that had room to spare — Luke, with a photograph of two: "enemy hp
+                   bars overlap, seems like there's plenty of room for them not to." The overlap exists so
+                   THREE can be full size, which is a real trade and still applies; it just has nothing to
+                   buy when there are two. The is-crowd class is set from the living-foe count. */
                 .cf-foe { position: relative; left: auto; right: auto; bottom: calc(var(--cf-tray-h) + 10px);
-                    width: 38%; margin: 0 -4%; cursor: pointer; pointer-events: auto; }
+                    width: 38%; margin: 0 1%; cursor: pointer; pointer-events: auto; }
+                .cf-party.is-crowd .cf-foe { margin: 0 -4%; }
                 /* The one you are pointing at comes to the front of the crowd. */
                 .cf-foe.is-target { z-index: 3; }
 /* SAME SCALE AS THE PLAYER. Shrinking them to fit three abreast made the fight look like a man
@@ -1725,34 +1763,17 @@ export default function CardFightClient({ fixture, run = null }) {
                    bars run together into one continuous gauge. At 0.84 they overlapped by 5px at 412 and 4px
                    at 375. The probe now measures the narrowest gap between any two bars and fails under 4px,
                    because this has regressed twice. */
-                .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.74); }
+                .cf-party .cfb { max-width: calc(var(--cf-figure) * 0.84); }
+                .cf-party.is-crowd .cfb { max-width: calc(var(--cf-figure) * 0.74); }
                 .cf-party .cfb-hp { font-size: 13px; }
                 .cf-party .cf-intent b { font-size: 17px; }
                 /* Under the health bar, centred on the body. Small caps for the creature so it reads as a
                    TYPE rather than a person, and the fighter's own name quieter beneath it. */
-                /* ── AND THEY HAVE TO NOT RUN INTO EACH OTHER ────────────────────────────────────────
-                   Measured at 390 wide: the three fighter cells are 98px and OVERLAP by about 20px each, so
-                   three names left to size themselves came out 3px apart — which is not a collision by the
-                   numbers and reads as one line of text at 9.5px. Clipped to the cell with a real gutter, so
-                   a long fighter name ellipsises instead of shoving up against its neighbour. */
-                .cf-who { display: flex; flex-direction: column; align-items: center; gap: 1px;
-                    margin-top: 2px; line-height: 1.1; text-align: center; pointer-events: none;
-                    max-width: 100%; padding: 0 6px; box-sizing: border-box; }
-                .cf-who b, .cf-who i { display: block; max-width: 100%;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .cf-who b { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
-                    color: #f0e2c6; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-                .cf-who i { font-size: 9.5px; font-style: normal; color: #a89a86;
-                    text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
-                /* ── THE FLAVOUR LINE IS A WIDE-SCREEN LUXURY ────────────────────────────────────────
-                   Clipping it was not enough and could not be: the fighter cells OVERLAP by about 20px at
-                   phone width, so two centred names land 3px apart however narrow you make them, and 3px at
-                   9.5px reads as one run-on line — "The Drowned Boy THE LODE ITSELF". The creature names sit
-                   comfortably apart at the same width because they are short, and they are the half that
-                   matters: JACKAL is what you are learning, the Road fighter is decoration. So the phone
-                   keeps the type and drops the person, and the desktop, which has the room, shows both. */
-                .cf-who i { display: none; }
-                @media (min-width: 700px) { .cf-who i { display: block; } }
+                /* The rules that sized and clipped the foe names lived here — a whole block about keeping
+                   three of them from running into each other at 9.5px, and a media query that showed the Road
+                   fighter's name only on a wide screen. The names are gone (see the note in the markup), and
+                   a stylesheet full of rules for an element nothing renders is the next person's wild goose
+                   chase, so they went with it. */
                 /* A buff is the enemy getting better, a curse is you getting worse — two colours, so the row
                    reads at a glance without anybody learning six glyphs. */
                 .cf-intent-marks .is-buff { color: #ffb45e; }
@@ -2001,41 +2022,42 @@ export default function CardFightClient({ fixture, run = null }) {
                    The ceiling is 92vw so a phone wraps, and 560px so a wide screen does NOT: fifteen at 27px
                    apiece is 405px, which fits on one line anywhere there is room for it. A fixed 340px made
                    a 1280px screen wrap for no reason. */
-                .cf-trinkets { position: absolute; top: calc(84px + env(safe-area-inset-top)); left: 50%;
-                    transform: translateX(-50%); z-index: 3; max-width: min(92vw, 560px);
-                    display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 5px; }
-                /* ⚠️ THE PICTURE IS 22px AND THE TARGET MUST NOT BE. A trinket is tapped to read what it
-                   does, and a 22x22 target is a miss on a phone — measured by the hit audit, which is the
-                   only thing that looks at a control's SIZE rather than its appearance. The padding grows
-                   the box to 38px without moving the art, and the negative margin keeps the strip's spacing
-                   exactly where it was so nothing on screen shifts. */
-                .cf-trinket { padding: 8px; margin: -8px; border: 0; background: none; cursor: pointer;
-                    line-height: 0;
-                    border-radius: 50%; }
-                .cf-trinket-art { width: 22px; height: 22px; object-fit: contain;
+                /* The loose-bottle belt, the trinket strip and the caption line under it all had rules
+                   here. Nothing renders any of them now, and a stylesheet full of rules for elements that do
+                   not exist is the next person's wild goose chase. */
+                /* ── THE TWO SATCHELS ────────────────────────────────────────────────────────────────
+                   Sized like the draw and discard piles beside them, because they are the same kind of
+                   control: a thing you are holding, with a number on it, that opens to show you what. The
+                   loose-bottle belt and the trinket strip that used to live under the stop line are both
+                   gone; their rules went with them rather than being left for somebody to find. */
+                .cf-satchel { position: relative; padding: 6px 4px; border: 0; background: none;
+                    cursor: pointer; line-height: 0; }
+                .cf-satchel-art { width: 24px; height: 24px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
-                .cf-trinket.is-lit .cf-trinket-art { filter: drop-shadow(0 0 6px rgba(255,214,140,0.9))
-                    drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+                .cf-satchel-n { position: absolute; right: -1px; bottom: 2px; min-width: 13px;
+                    padding: 0 3px; border-radius: 999px; background: #12161f; border: 1px solid #3a4353;
+                    font-size: 10px; line-height: 14px; color: #e7ecf4; font-variant-numeric: tabular-nums; }
+                .cf-shelf-over { position: fixed; inset: 0; z-index: 4300; display: grid; place-items: center;
+                    padding: 20px; background: rgba(4,6,10,0.84); backdrop-filter: blur(2px); }
+                .cf-shelf { align-self: center; justify-self: center;
+                    display: flex; flex-direction: column; gap: 8px; width: min(320px, 90vw);
+                    max-height: 76dvh; overflow-y: auto; padding: 16px 14px; border-radius: 14px;
+                    background: #10141c; border: 1px solid #2a3242; box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
+                .cf-shelf-head { margin: 0 0 2px; text-align: center; font-size: 12px; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: #7d8696; }
+                .cf-shelf-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
+                    border-radius: 10px; border: 1px solid #2a3242; background: #151a24; cursor: pointer;
+                    font: inherit; text-align: left; }
+                .cf-shelf-row.is-flat { cursor: default; }
+                .cf-shelf-row b { display: block; font-size: 14px; color: #ffe9b8; }
+                .cf-shelf-row i { display: block; font-style: normal; font-size: 12px; line-height: 1.35;
+                    color: #c6cedb; }
+                .cf-shelf-art { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
                 /* ⚠️ ABOVE THE FIGHTERS. At z-index 3 the plate was painted and then a foe was painted on top
                    of it — the sentence's second line read as "fight you w" with a swordsman across the rest. */
-                .cf-trinket-say { position: absolute; top: calc(110px + env(safe-area-inset-top)); left: 50%;
-                    transform: translateX(-50%); z-index: 9;
-                    margin: 0; max-width: 280px; text-align: center; font-size: 11.5px;
-                    line-height: 1.35; color: #d8cbb4;
-                    /* ON A PLATE. It floats over the middle of the board, which is where the enemies stand —
-                       unbacked, the sentence and a foe's sprite were the same picture. */
-                    padding: 4px 10px; border-radius: 8px; background: rgba(8,9,12,0.9);
-                    box-shadow: inset 0 0 0 1px rgba(201,162,83,0.28); }
-                .cf-trinket-say b { color: #ffd9a6; }
 
                 /* A BOTTLE IS A BUTTON, and it has to read as one at 26px on a painted bar: no plate, no
                    border, a lift on press and a fade while the server catches up. */
-                .cf-potion { padding: 0 1px; background: none; border: 0; cursor: pointer; line-height: 0; }
-                .cf-potion-art { width: 26px; height: 26px; object-fit: contain;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7)); }
-                .cf-potion:active .cf-potion-art { transform: translateY(1px); }
-                .cf-potion:disabled { cursor: default; }
-                .cf-potion.is-going .cf-potion-art { opacity: 0.35; }
 
                 .cf-pile { position: relative; width: 34px; padding: 0; background: none; border: 0;
                     display: flex; flex-direction: column; align-items: center; }
@@ -2266,7 +2288,8 @@ export default function CardFightClient({ fixture, run = null }) {
                    asked; tapping the dark is "no" and costs nothing. */
                 .cf-read-over { position: fixed; inset: 0; z-index: 4300; display: grid; place-items: center;
                     padding: 20px; background: rgba(4,6,10,0.84); backdrop-filter: blur(2px); }
-                .cf-read { display: flex; flex-direction: column; align-items: center; gap: 10px;
+                .cf-read { align-self: center; justify-self: center;
+                    display: flex; flex-direction: column; align-items: center; gap: 10px;
                     width: min(300px, 88vw); padding: 20px 18px; border-radius: 14px;
                     background: #10141c; border: 1px solid #2a3242; box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
                 .cf-read-art { width: 84px; height: 84px; object-fit: contain;
@@ -2278,6 +2301,8 @@ export default function CardFightClient({ fixture, run = null }) {
                     border: 1px solid #6e5c2c; background: #2a2314; color: #ffd75e;
                     font: inherit; font-size: 15px; font-weight: 700; }
                 .cf-read-go:disabled { opacity: 0.45; cursor: default; }
+                .cf-read-note { font-style: normal; font-size: 12px; line-height: 1.4; text-align: center;
+                    color: #b6a6ff; }
                 .cf-read-back { padding: 6px; border: 0; background: none; cursor: pointer;
                     font: inherit; font-size: 13px; color: #8a8f98; }
                 .cf-takekey {
@@ -2311,9 +2336,14 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* The line under the banner that names the bottle a fight paid. Quiet — it is a note, not a
                    second decision — and it goes amber when the belt was full, because that is the half of it
                    a player has to act on. */
+                /* It is a button now (see the note by the markup), so it has to say so: a browser's own
+                   button font and alignment would otherwise land in the middle of a pill that was styled as
+                   a label. Inheriting the font and taking the cursor is the whole difference. */
                 .cf-drop { display: inline-flex; align-items: center; gap: 7px; margin: -2px auto 2px;
                     padding: 4px 11px 4px 5px; border-radius: 999px; font-size: 12.5px; letter-spacing: .01em;
-                    color: #e8dcc6; background: rgba(20, 16, 12, .62); border: 1px solid rgba(226, 199, 143, .3); }
+                    color: #e8dcc6; background: rgba(20, 16, 12, .62); border: 1px solid rgba(226, 199, 143, .3);
+                    font-family: inherit; font-weight: inherit; cursor: pointer; }
+                .cf-drop:active { transform: translateY(1px); }
                 .cf-drop.is-spilled { color: #f0c98a; border-color: rgba(240, 201, 138, .45); }
                 .cf-drop-art { width: 20px; height: 20px; object-fit: contain; display: block; }
 
