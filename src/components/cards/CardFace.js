@@ -243,9 +243,27 @@ const STATUS_MARK = {
 const plain = (card) => Boolean(card?.status || card?.curse || card?.kind === "status" || card?.kind === "curse");
 
 const CardArt = ({ card, pet }) => {
-    const [noArt, setNoArt] = useState(false);
+    // ── ONE FAILURE IS NOT PROOF THE FILE IS MISSING ─────────────────────────────────────────────────────
+    // ⚠️ THIS IS WHY A CARD LOOKED DIFFERENT IN THE CABINET AND IN THE PREVIEW. The collection draws 130
+    // faces at once and asks for 130 illustrations, 4.8MB of them, in one go. A phone does not run 130
+    // requests; it queues them and abandons the ones that take too long — and an abandoned request fires
+    // `error`, exactly like a 404 does. The card then fell back to the pet's portrait FOREVER, because the
+    // fallback was a one-way latch.
+    //
+    // So the same card was a small centred sprite in the grid and its full painted illustration in the
+    // preview, which opens one image and always gets it. Luke: "the art is different between the card
+    // preview and actual card render and I prefer the card render." The preview was the correct one; the
+    // grid was showing 130 cards' worth of give-up.
+    //
+    // Two changes. The image is lazy now, so a card asks for its picture when it is near the screen rather
+    // than all of them on open — which is the actual cure, and it makes the cabinet cheaper besides. And a
+    // failure is retried once with a fresh request before the portrait is accepted, so a single abandoned
+    // fetch costs a moment instead of the illustration.
+    const [tries, setTries] = useState(0);
+    const noArt = tries > 1;
     const img = useRef(null);
-    useEffect(() => { if (alreadyFailed(img.current)) setNoArt(true); }, [card.id]);
+    useEffect(() => { setTries(0); }, [card.id]);
+    useEffect(() => { if (alreadyFailed(img.current)) setTries((n) => n + 1); }, [card.id]);
     // ── A CURSE IS PAINTED NOW, LIKE EVERYTHING ELSE ─────────────────────────────────────────────────
     // This used to return the glyph and stop, ahead of the image, so the twelve curses and statuses were the
     // only cards in a deck of 133 drawn as a grey plate with a flat icon on it. Luke, looking at a Burn in
@@ -266,8 +284,10 @@ const CardArt = ({ card, pet }) => {
         return (
             <img
                 ref={img}
-                className="cf-art-full" src={`/images/cards/${baseIdOf(card.id)}.webp`} alt="" draggable="false"
-                onError={() => setNoArt(true)}
+                className="cf-art-full" alt="" draggable="false" loading="lazy" decoding="async"
+                // The retry carries a query so the browser re-requests rather than serving its own failure.
+                src={`/images/cards/${baseIdOf(card.id)}.webp${tries ? `?r=${tries}` : ""}`}
+                onError={() => setTries((n) => n + 1)}
             />
         );
     }
