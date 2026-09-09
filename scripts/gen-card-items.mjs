@@ -33,6 +33,15 @@ const HOOK_LOOK = [
     ["blockEach", "forged in dark iron and boiled hide, dented and scarred from use"],
     ["blockTurn2", "forged in dark iron and boiled hide, dented and scarred from use"],
     ["blockKeeps", "forged in dark iron and boiled hide, dented and scarred from use"],
+    // The keyword trinkets and bottles added with Dexterity, Poison, Artifact, Regeneration and Intangible.
+    // Every one of these arrived with a hook this table had never seen, fell through to the default look and
+    // then to no file at all — five trinkets and four bottles drawn as an empty gap on the shelf.
+    ["dexterity", "spun from pale silk and smooth glass, light and finely balanced"],
+    ["dexterityEach", "spun from pale silk and smooth glass, light and finely balanced"],
+    ["poisonAll", "glistening and faintly wet, in sickly green and dark chitin"],
+    ["artifact", "carved from pale warding stone and cut with one hard geometric seal"],
+    ["regen", "green and still living, with new growth and damp bark on it"],
+    ["intangible", "half there, pale and smoke-like, its edges going translucent"],
     ["thorns", "bristling and sharp-edged, made of something that would hurt to hold"],
     ["firstAttackBonus", "wrought in bright steel and lacquer, kept sharp and ready"],
     ["strength", "wrought in bright steel and bone, heavy in the hand"],

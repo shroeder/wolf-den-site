@@ -23,7 +23,7 @@ import fs from "node:fs";
 import sharp from "sharp";
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
-import { POOL } from "../src/lib/marketplace/cards-kit.js";
+import { CURSE_CARDS, POOL, STATUS_CARDS } from "../src/lib/marketplace/cards-kit.js";
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
@@ -50,6 +50,42 @@ const ART = {
     purr: "a small tabby kitten curled up purring against a warm hearthstone, eyes closed and utterly content, "
         + "soft golden firelight washing over its fur and a gentle haze of warmth rising around it, a cosy "
         + "fireside beyond",
+};
+
+// ── THE TWELVE THAT ARE NOT PETS ─────────────────────────────────────────────────────────────────────────
+// The curses and the statuses. They were drawn as a grey plate with a flat glyph on it, which is a reasonable
+// placeholder and reads, next to 121 painted cards, as the game having forgotten to finish them. Luke: "we
+// cant have cards with no sprite art."
+//
+// Hand-written rather than composed, because there is no pet to compose FROM — the subject of a curse is the
+// thing itself, and twelve is a number a person can write. They are the only cards in the deck with no
+// creature in them, and that is the point: a curse is what the room did to you, not something alive.
+const JUNK_ART = {
+    injury: "a wooden splint strapped tight to a forearm with leather cord over grubby linen wrapping, the "
+        + "arm held in a canvas sling, the bandage travel-stained and fraying at the edge, a cold stone "
+        + "floor and a dropped rag beyond",
+    decay: "a blackened apple core furred with grey mould on damp earth, small flies rising off it, the rot "
+        + "spreading outward in a dark ring",
+    doubt: "a lantern-cast shadow on a passage wall that does not match the shape casting it, the flame "
+        + "guttering low, a narrow cellar corridor going dark beyond",
+    shame: "a hooded figure with its face turned away into deep shadow, hands hanging open and empty, a warm "
+        + "lit doorway behind it that it is walking away from",
+    clumsy: "a dropped clay cup shattering against flagstones, caught mid-bounce, shards and a spray of spilled "
+        + "water flying outward, a spreading dark puddle",
+    regret: "a half-burnt letter curling in the last of a dying fire, the ink still legible on the blackening "
+        + "paper, embers going out around it",
+    ache: "a long iron nail driven clean through a thick leather strap, rust bleeding out in a stain around "
+        + "the puncture, laid on a cold workbench",
+    hollow: "the picked-clean ribcage of some small animal sitting upright in cold grey ash, wind-scoured and "
+        + "empty, nothing else left of it",
+    slimed: "a thick rope of luminous green slime hanging and dripping off the edge of a rusted blade, pooling "
+        + "below in a slow bright puddle",
+    wound: "a torn strip of linen bandage soaked through dark red, unravelled across bare wooden boards, one "
+        + "end still wet",
+    dazed: "a swarm of small pale lights circling slowly in the dark, blurred and doubled as though seen by "
+        + "someone who has just been hit hard, everything behind them out of focus",
+    burn: "a small hungry fire eating its way across the corner of a sheet of parchment, embers dropping away "
+        + "and the paper curling black",
 };
 
 // ── AND THE HUNDRED AND SEVEN THAT NOBODY WAS EVER GOING TO HAND-WRITE ───────────────────────────────────
@@ -139,7 +175,12 @@ const FORCE = process.argv.includes("--force");
 let made = 0, skipped = 0, spent = 0;
 // Every card in the pool, not just the hand-written table: a card with an entry uses it, and every other
 // card gets a composed one. See the note over `composed`.
-const JOBS = Object.values(POOL).map((c) => [c.id, ART[c.id] || composed(c)]).filter(([, subj]) => subj);
+const JOBS = [
+    ...Object.values(POOL).map((c) => [c.id, ART[c.id] || composed(c)]),
+    // The curses and statuses come off their own table — see JUNK_ART. They are not in POOL and never will
+    // be (nothing offers you a curse as a reward), so walking POOL alone left all twelve of them unpainted.
+    ...Object.keys({ ...CURSE_CARDS, ...STATUS_CARDS }).map((id) => [id, JUNK_ART[id]]),
+].filter(([, subj]) => subj);
 for (const [id, subject] of JOBS) {
     if (only && !only.has(id)) continue;
     const dest = `${OUT}/${id}.webp`;

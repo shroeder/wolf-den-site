@@ -77,12 +77,6 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                     whether it turns up sharpened (see levelWeight in cards-kit), and both of those are
                     invisible unless the screen that shows your collection says so. What it deliberately does
                     NOT change is the numbers — see the same note for why. */}
-                <p className="cc-say">
-                    Every card is a pet. Own the pet and its card can be dealt to you; take that pet up a level
-                    and the card is drawn as what it grew into, turns up more often, and from level five
-                    arrives already sharpened. What it does never changes — a levelled pet hits for what it
-                    always hit for.
-                </p>
                 <div className="cc-tabs" role="tablist">
                     {TABS.map((f) => (
                         <button
@@ -194,8 +188,6 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
 
                 .cc-head { width: min(760px, 100%); display: flex; flex-direction: column; align-items: center;
                     gap: 8px; padding: 10px 0 8px; }
-                .cc-say { margin: 0; max-width: 460px; text-align: center; font-size: 12.5px; line-height: 1.4;
-                    color: #c3b49c; font-style: italic; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 /* WRAPS, because five pills is 420px of tabs on a 375px phone and a row that overflows hides
                    the first and last one — which here are "All" and "Potions", the two you reach for most. */
                 .cc-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
@@ -274,9 +266,6 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
 
                 /* The ribbon, pinned, with the grid's own bottom padding keeping cards from under it. */
 
-                @media (min-width: 760px) {
-                    .cc-say { font-size: 13.5px; max-width: 560px; }
-                }
             `}</style>
         </div>
     );

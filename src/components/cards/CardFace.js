@@ -232,10 +232,16 @@ const CardArt = ({ card, pet }) => {
     const [noArt, setNoArt] = useState(false);
     const img = useRef(null);
     useEffect(() => { if (alreadyFailed(img.current)) setNoArt(true); }, [card.id]);
-    if (plain(card)) {
-        const Mark = STATUS_MARK[baseIdOf(card.id)] || GiSlowBlob;
-        return <span className="cf-status-mark"><Mark aria-hidden="true" /></span>;
-    }
+    // ── A CURSE IS PAINTED NOW, LIKE EVERYTHING ELSE ─────────────────────────────────────────────────
+    // This used to return the glyph and stop, ahead of the image, so the twelve curses and statuses were the
+    // only cards in a deck of 133 drawn as a grey plate with a flat icon on it. Luke, looking at a Burn in
+    // the middle of a boss fight: "we cant have cards with no sprite art." They have one each now — the
+    // splint, the mould, the shadow that does not match — and the glyph is what is left when a file is
+    // missing rather than what a curse IS.
+    //
+    // The order is what matters: try the picture first for every card, and let `plain` decide only what the
+    // FALLBACK is. A pet card with no file falls back to its pet's portrait; a curse has no pet to fall back
+    // to, so it falls back to the glyph that used to be its whole face.
     if (!noArt) {
         // WARNING: THE BASE ID, NOT THE CARD ID. A handful of cards have a painted illustration of their own
         // (bite, hop, pounce, purr) and an upgraded copy travels as "bite+" — for which there is no file, so
@@ -250,6 +256,10 @@ const CardArt = ({ card, pet }) => {
                 onError={() => setNoArt(true)}
             />
         );
+    }
+    if (plain(card)) {
+        const Mark = STATUS_MARK[baseIdOf(card.id)] || GiSlowBlob;
+        return <span className="cf-status-mark"><Mark aria-hidden="true" /></span>;
     }
     return <Sprite src={pet?.url} className="cf-art-img" flip={pet?.flip} />;
 };
