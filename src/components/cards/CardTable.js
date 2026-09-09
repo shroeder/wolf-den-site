@@ -32,6 +32,8 @@ export default function CardTable({ run, history = null }) {
     // ── WHICH RUNG YOU ARE CLIMBING ──────────────────────────────────────────────────────────────────
     // Opens on the highest one you have earned, because that is the one somebody who has been climbing wants
     // and nobody wants to press the arrow eight times. It can be walked back down: a bad week is allowed.
+    const rank = history?.rank || null;
+    const track = history?.track || [];
     const open = Math.max(0, Math.min(ASC_MAX, Number(history?.open) || 0));
     const [asc, setAsc] = useState(open);
 
@@ -154,6 +156,57 @@ export default function CardTable({ run, history = null }) {
                     </div>
                 ) : null}
 
+                {/* ── WHAT YOU ARE, AND WHAT IS COMING ────────────────────────────────────────────────
+                    The front room used to end at a best score and five result lines, which is a record of
+                    the past and nothing to come back for. Eight cards have been earnable by playing since
+                    they were written and this screen never said so — the only way to learn one had opened
+                    was to be dealt it mid-run and not recognise it.
+                    So: one bar that only ever fills, the name the table calls you, and the eight laid out
+                    where you can see which one is closest. */}
+                {rank ? (
+                    <div className="ct-rank">
+                        <div className="ct-rank-top">
+                            <b className="ct-rank-name">{rank.name}</b>
+                            <span className="ct-rank-lv">Rank {rank.level}</span>
+                        </div>
+                        <div className="ct-bar" role="presentation">
+                            <i style={{ width: `${Math.round(rank.part * 100)}%` }} />
+                        </div>
+                        <p className="ct-rank-say">
+                            {rank.next
+                                ? <>{rank.need.toLocaleString()} to <b>{rank.next.name}</b></>
+                                : "Top of the ladder."}
+                        </p>
+                    </div>
+                ) : null}
+
+                {track?.length ? (
+                    <div className="ct-track">
+                        <p className="ct-track-head">
+                            Cards from playing
+                            <b>{track.filter((t) => t.open).length}/{track.length}</b>
+                        </p>
+                        <ul className="ct-track-list">
+                            {track.map((t) => (
+                                <li key={t.id} className={t.open ? "is-open" : ""}>
+                                    <span className="ct-track-name">{t.open ? t.name : "Locked"}</span>
+                                    {t.open ? (
+                                        <i className="ct-track-by">{t.by === "rank" ? `Rank ${t.level}` : "Earned"}</i>
+                                    ) : (
+                                        <>
+                                            <i className="ct-track-how">{t.how}</i>
+                                            <span className="ct-track-bar">
+                                                <i style={{ width: `${Math.round(t.part * 100)}%` }} />
+                                            </span>
+                                            <em className="ct-track-at">{t.at}/{t.want}</em>
+                                        </>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
+
                 <button type="button" className="ct-see" onClick={() => router.push("/marketplace/cards/collection")}>
                     See every card
                 </button>
@@ -169,7 +222,7 @@ export default function CardTable({ run, history = null }) {
                    figure worth being big; the runs under it are a list you skim. */
                 /* ── THE LADDER ── a stepper and the list of what it does. Deliberately plain: it is a thing
                    you read once before you commit and never look at again during the run. */
-                .ct-ladder { width: min(340px, 92%); margin: 4px auto 2px; }
+                .ct-ladder { width: min(360px, 100%); margin: 4px auto 2px; }
                 .ct-rungs { display: flex; align-items: center; justify-content: center; gap: 10px; }
                 .ct-rung { width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
                     border: 1px solid rgba(226,199,143,0.34); background: rgba(20,16,12,0.7);
@@ -183,7 +236,7 @@ export default function CardTable({ run, history = null }) {
                     flex-direction: column; gap: 2px; }
                 .ct-rung-rules li { font-size: 11.5px; line-height: 1.35; color: #b3a68f; text-align: center; }
 
-                .ct-record { width: min(340px, 92%); margin: 2px auto 0; }
+                .ct-record { width: min(360px, 100%); margin: 2px auto 0; }
                 .ct-best { display: flex; align-items: baseline; justify-content: center; gap: 8px;
                     margin: 0 0 6px; font-family: var(--ct-card-font, inherit); }
                 .ct-best span { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8e8371; }
@@ -213,9 +266,14 @@ export default function CardTable({ run, history = null }) {
                 .ct-room::after { content: ""; position: absolute; inset: 0;
                     background: radial-gradient(ellipse at 50% 42%, rgba(10,11,15,0.05), rgba(6,7,10,0.88) 78%); }
 
+                /* ⚠️ THE COLUMN HAD NO SIDE PADDING AT ALL. Luke: "no padding its right up against the
+                   walls of the phone." Every panel under the dealer was a full-width block butted against
+                   the bezel, which is the one thing that makes a screen read as unfinished however good the
+                   art on it is. The gutter is on the STAGE rather than on each panel so a panel added later
+                   inherits it instead of having to remember. */
                 .ct-stage { margin-top: auto; width: min(680px, 100%);
                     display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-                    gap: 10px; padding-bottom: 6px; }
+                    gap: 10px; padding: 0 16px 6px; box-sizing: border-box; }
 
                 /* ── HIM ── bottom-anchored, because he is drawn seated behind a table and the table edge is
                    the bottom of the cutout. Floating him in the middle of the room stands him up. */
@@ -248,6 +306,51 @@ export default function CardTable({ run, history = null }) {
                     text-decoration-color: rgba(195,180,156,0.4);
                     text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
                 .ct-see:hover { color: #ffe6d2; }
+
+                /* ── THE RANK ── the one number on this screen that only goes up. Big name, small level,
+                   and a bar that is worth watching move: the fill is lit rather than flat, because a bar
+                   that glows is the difference between a statistic and a reward. */
+                .ct-rank { width: min(360px, 100%); margin: 2px auto 0; text-align: center; }
+                .ct-rank-top { display: flex; align-items: baseline; justify-content: center; gap: 9px; }
+                .ct-rank-name { font-size: 19px; letter-spacing: 0.06em; color: #ffd9a6;
+                    text-shadow: 0 0 14px rgba(255,190,110,0.35), 0 2px 5px rgba(0,0,0,0.9); }
+                .ct-rank-lv { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+                    color: #8e8371; }
+                .ct-bar { position: relative; height: 9px; margin: 6px 0 4px; border-radius: 999px;
+                    background: rgba(10,9,12,0.75); box-shadow: inset 0 0 0 1px rgba(226,199,143,0.2); overflow: hidden; }
+                .ct-bar i { display: block; height: 100%; border-radius: 999px;
+                    background: linear-gradient(90deg, #b6702c, #ffc061 70%, #ffe6b8);
+                    box-shadow: 0 0 10px rgba(255,178,80,0.55); transition: width 600ms ease; }
+                .ct-rank-say { margin: 0; font-size: 11.5px; color: #b3a68f; }
+                .ct-rank-say b { color: #e8dcc6; font-weight: 700; }
+
+                /* ── THE TRACK ── eight rows, because eight chips in a strip cannot say how close you are
+                   and how close you are is the entire point. An open one is a name in gold and stops
+                   talking; a shut one keeps its bar and its count. */
+                .ct-track { width: min(360px, 100%); margin: 0 auto; }
+                .ct-track-head { display: flex; align-items: baseline; justify-content: space-between;
+                    margin: 0 0 5px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+                    color: #8e8371; }
+                .ct-track-head b { font-size: 12px; letter-spacing: 0.04em; color: #ffd9a6; }
+                .ct-track-list { list-style: none; margin: 0; padding: 0; display: flex;
+                    flex-direction: column; gap: 3px; }
+                .ct-track-list li { display: grid; grid-template-columns: 72px 1fr auto; align-items: center;
+                    gap: 8px; padding: 5px 9px; border-radius: 8px; background: rgba(18,16,20,0.55);
+                    box-shadow: inset 0 0 0 1px rgba(226,199,143,0.08); }
+                .ct-track-list li.is-open { background: rgba(40,30,16,0.55);
+                    box-shadow: inset 0 0 0 1px rgba(255,190,110,0.26); }
+                .ct-track-name { font-size: 12px; color: #7d7263; letter-spacing: 0.02em; }
+                .is-open .ct-track-name { color: #ffd9a6; font-weight: 700; }
+                .ct-track-how { grid-column: 2; font-style: normal; font-size: 10.5px; color: #9a8e7c;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .ct-track-by { grid-column: 2 / span 2; font-style: normal; font-size: 10.5px;
+                    letter-spacing: 0.1em; text-transform: uppercase; color: #9be08a; text-align: right; }
+                .ct-track-bar { grid-column: 2; grid-row: 2; height: 4px; border-radius: 999px;
+                    background: rgba(10,9,12,0.8); overflow: hidden; }
+                .ct-track-bar i { display: block; height: 100%; border-radius: 999px;
+                    background: linear-gradient(90deg, #6b5330, #d6a45c); }
+                .ct-track-at { font-style: normal; font-size: 10.5px; color: #b3a68f;
+                    font-variant-numeric: tabular-nums; }
 
                 /* ⚠️ PINNED, AND NOTHING UNDERNEATH IT. The map's own ribbon covered the run's only reachable
                    room on a phone (see the note in CardMap), and the first cut of this screen sprang the same

@@ -10,7 +10,7 @@ import {
     HERO_HP, POTIONS, POTION_IDS, RUN_LENGTH, SHOP, STARTER_DECK, STARTER_PERK, UNLOCKS, buildParty,
     ASC_MAX, FINAL_ACT, POTION_DROP_BASE, ascPotionScale, ascRule, beltSize, buildShop, canUpgrade,
     cardById, drawOffer, encounterById, levelSharpens, openingRun,
-    levelWeight, nextRand, perkSum, pickEncounter, runScore, stopAt, unlockedCards,
+    levelWeight, nextRand, perkSum, pickEncounter, rankFor, runScore, stopAt, unlockTrack, unlockedCards,
     upgradedId,
 } from "@/lib/marketplace/cards-kit.js";
 
@@ -288,7 +288,16 @@ export async function runHistory(buyerId, many = 5) {
         [buyerId]
     ).catch(() => null);
     const won = Math.max(-1, Number(climbed?.top ?? -1));
-    return { recent, best, runs: recent.length, open: Math.max(0, Math.min(ASC_MAX, won + 1)) };
+    // ── AND WHAT THE TABLE CALLS YOU ────────────────────────────────────────────────────────────────
+    // The front room had a best score and five result lines and nothing that grows, so there was nothing to
+    // come back FOR between one run and the next. The rank and the track are that: one bar that only ever
+    // fills, and eight cards you can see coming.
+    const [xp, progress] = await Promise.all([cardXp(buyerId), cardProgress(buyerId)]);
+    const rank = rankFor(xp);
+    return {
+        recent, best, runs: recent.length, open: Math.max(0, Math.min(ASC_MAX, won + 1)),
+        rank, track: unlockTrack(progress, rank.level), progress,
+    };
 }
 
 export async function saveRun(buyerId, run) {
@@ -340,6 +349,21 @@ export async function ownedPetIds(buyerId) {
  * has to guard for it.
  */
 const NO_PROGRESS = { rooms: 0, fights: 0, elites: 0, bosses: 0, smiths: 0, burns: 0, buys: 0, best_stop: 0, runs: 0 };
+/**
+ * Lifetime score, which is the card game's XP — see RANKS in the rules.
+ *
+ * Its own function rather than a column on mkt_cards_progress because the number is already in
+ * mkt_cards_result, once per finished run, and a second copy of it is two places to be wrong about how well
+ * somebody has played. SUM over a member's own rows is an index hit; the counter table stays what it is.
+ */
+export async function cardXp(buyerId) {
+    const row = await db.queryOne(
+        `SELECT COALESCE(SUM(score), 0)::int AS xp FROM mkt_cards_result WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+    return Math.max(0, Number(row?.xp || 0));
+}
+
 export async function cardProgress(buyerId) {
     const row = await db.queryOne(
         `SELECT rooms, fights, elites, bosses, smiths, burns, buys, best_stop, runs
@@ -411,9 +435,14 @@ export async function ownedPetLevels(buyerId) {
 }
 
 export async function eligibleCards(buyerId, run) {
-    const [levels, progress] = await Promise.all([ownedPetLevels(buyerId), cardProgress(buyerId)]);
+    // Three questions, one round trip apiece, asked together — none of them waits on the others. The xp is
+    // here because a card now opens on EITHER road (its counter or its rank), and the reward screen has to
+    // agree with the front room about which cards you have.
+    const [levels, progress, xp] = await Promise.all([
+        ownedPetLevels(buyerId), cardProgress(buyerId), cardXp(buyerId),
+    ]);
     const have = new Set(levels.keys());
-    const earned = unlockedCards(progress);
+    const earned = unlockedCards(progress, rankFor(xp).level);
     const maxTier = stopAt(run.at?.row ? run.at.row + 1 : run.stop, run.at?.kind, run.act || 1).offer;
     // A CARD YOU EARNED BY PLAYING IGNORES THE PET GATE. That is the entire point of it — see the note above
     // UNLOCKS — but it still obeys DEPTH, because tier is about what a fight at this stop should be handing

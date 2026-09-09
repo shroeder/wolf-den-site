@@ -728,17 +728,17 @@ export const UNLOCKS = {
     nip: { id: "nip", pet: "bunny", name: "Nip", cost: 0, kind: "attack", target: "foe", tier: 1,
         damage: 4, text: "Deal {damage} damage.",
         upgrade: { damage: 6 },
-        need: { rooms: 10 }, how: "Walk into 10 rooms" },
+        need: { rooms: 10 }, how: "Walk into 10 rooms", level: 2 },
     // Shrug It Off: 8 Block, draw 1, one energy.
     fleece: { id: "fleece", pet: "sheep", name: "Fleece", cost: 1, kind: "skill", target: "self", tier: 1,
         block: 7, draw: 1, text: "Gain {block} Block. Draw 1 card.",
         upgrade: { block: 10 },
-        need: { fights: 10 }, how: "Win 10 fights" },
+        need: { fights: 10 }, how: "Win 10 fights", level: 3 },
     // Iron Wave: 5 damage and 5 Block for one.
     waddle: { id: "waddle", pet: "penguin", name: "Waddle", cost: 1, kind: "attack", target: "foe", tier: 1,
         damage: 5, block: 5, text: "Deal {damage} damage. Gain {block} Block.",
         upgrade: { damage: 7, block: 7 },
-        need: { buys: 5 }, how: "Buy 5 things from the merchant" },
+        need: { buys: 5 }, how: "Buy 5 things from the merchant", level: 4 },
     // Twin Strike is 5 twice for one; three of three is the same 9-10 with more surface for Strength.
     // ⚠️ THIS WAS SWARM, EXACTLY — same cost, same damage, same number of hits, a different animal on the
     // front. Two cards with one effect is one card and a wasted pet: the whole promise of a deck made of your
@@ -746,7 +746,7 @@ export const UNLOCKS = {
     flock: { id: "flock", pet: "hen", name: "Flock", cost: 1, kind: "attack", target: "foe", tier: 2,
         damage: 4, hits: 2, block: 4, text: "Deal {damage} damage twice. Gain {block} Block.",
         upgrade: { damage: 5, block: 6 },
-        need: { best_stop: 8 }, how: "Reach stop 8 of a run" },
+        need: { best_stop: 8 }, how: "Reach stop 8 of a run", level: 5 },
     // ⚠️ THE FIRST DRAFT OF THIS CARD WAS SCREECH. Two Weak to every enemy for one energy is exactly what
     // Screech already does, and an unlock that hands you a card you can already be offered is not a reward.
     // This is the other half of Uppercut instead — both debuffs, one target, no damage — which nothing else
@@ -754,22 +754,22 @@ export const UNLOCKS = {
     dazzle: { id: "dazzle", pet: "butterfly", name: "Dazzle", cost: 1, kind: "skill", target: "foe", tier: 2,
         weak: 2, vulnerable: 2, text: "Apply {weak} Weak and {vulnerable} Vulnerable.",
         upgrade: { weak: 3, vulnerable: 3 },
-        need: { elites: 1 }, how: "Beat an elite" },
+        need: { elites: 1 }, how: "Beat an elite", level: 6 },
     // Uppercut is 13 for two with two debuffs; a plain two-energy attack in that band is 14-16.
     thunder: { id: "thunder", pet: "eagle", name: "Thunderstoop", cost: 2, kind: "attack", target: "foe", tier: 2,
         damage: 14, text: "Deal {damage} damage.",
         upgrade: { damage: 18 },
-        need: { smiths: 5 }, how: "Sharpen 5 cards at a fire" },
+        need: { smiths: 5 }, how: "Sharpen 5 cards at a fire", level: 7 },
     // Bandage Up heals 4 for nothing but exhausts; ours stays, so it is one energy for 6 and a little Block.
     mudbath: { id: "mudbath", pet: "axolotl", name: "Mud Bath", cost: 1, kind: "skill", target: "self", tier: 2,
         heal: 6, block: 4, text: "Heal {heal}. Gain {block} Block.",
         upgrade: { heal: 9 },
-        need: { burns: 3 }, how: "Burn 3 cards out of a deck" },
+        need: { burns: 3 }, how: "Burn 3 cards out of a deck", level: 8 },
     // Inflame: +2 Strength for one energy, permanent for the fight. The draw is the boss's payment.
     warcry: { id: "warcry", pet: "warbanner_wolf", name: "War Cry", cost: 1, kind: "power", target: "self", tier: 3,
         strength: 2, draw: 1, text: "Gain {strength} Strength. Draw 1 card.",
         upgrade: { strength: 3 },
-        need: { bosses: 1 }, how: "Beat the boss" },
+        need: { bosses: 1 }, how: "Beat the boss", level: 9 },
 };
 
 /**
@@ -782,9 +782,86 @@ export const UNLOCKS = {
 export const UNLOCK_IDS = Object.keys(UNLOCKS);
 export const meetsNeed = (progress, need) => Object.entries(need || {})
     .every(([k, v]) => Number(progress?.[k] || 0) >= Number(v));
-export const unlockedCards = (progress) => new Set(
-    UNLOCK_IDS.filter((id) => meetsNeed(progress, UNLOCKS[id].need))
+
+// ── WHAT THE TABLE CALLS YOU ─────────────────────────────────────────────────────────────────────────────
+// Luke: "we should have unlocked cards as you get levels in the card game, just like slay the spire, and we
+// should have flavor ranks on each level."
+//
+// The eight cards above were already earned by PLAYING, which is the right idea, but each one hung off a
+// single counter — buy five things from the merchant, burn three cards — and a player who simply does not
+// shop never opened Waddle however many hundreds of rooms they walked. Counters reward a HABIT. A rank
+// rewards the hours, and it is the one number that only ever goes up.
+//
+// So a card opens on EITHER road: meet its counter, or reach its rank. Nothing that was earned can be lost
+// by this — it is strictly a second door into the same room.
+//
+// XP IS LIFETIME SCORE, summed over every finished run, because that number already exists, already means
+// "how well did you do", and already survives a death. A run of Luke's scores 80-220, so the early rungs
+// come every couple of runs and the top of the ladder is a season's work rather than an evening's.
+export const RANKS = [
+    { level: 1, xp: 0, name: "Mark" },
+    { level: 2, xp: 150, name: "Hand" },
+    { level: 3, xp: 400, name: "Cutpurse" },
+    { level: 4, xp: 800, name: "Dealer" },
+    { level: 5, xp: 1400, name: "Card Sharp" },
+    { level: 6, xp: 2200, name: "Second Story" },
+    { level: 7, xp: 3200, name: "Table Runner" },
+    { level: 8, xp: 4500, name: "Nightjar" },
+    { level: 9, xp: 6200, name: "Deep Player" },
+    { level: 10, xp: 8500, name: "The House" },
+    { level: 11, xp: 11500, name: "Ivory" },
+    { level: 12, xp: 15000, name: "Kingmaker" },
+];
+export const RANK_MAX = RANKS[RANKS.length - 1].level;
+
+/**
+ * The rung this much lifetime score stands on, and how far along it is.
+ *
+ * Returns the bar the screen draws as well as the name, because a rank with no distance to the next one is
+ * a label rather than progress — and the whole point of putting it on the front room is that you can see
+ * yourself moving.
+ */
+export function rankFor(xp = 0) {
+    const total = Math.max(0, Number(xp) || 0);
+    let at = RANKS[0];
+    for (const r of RANKS) if (total >= r.xp) at = r;
+    const next = RANKS.find((r) => r.level === at.level + 1) || null;
+    const span = next ? next.xp - at.xp : 0;
+    return {
+        level: at.level, name: at.name, xp: total, from: at.xp,
+        next, need: next ? next.xp - total : 0,
+        // A finished ladder reads as full rather than as a division by zero.
+        part: next ? Math.max(0, Math.min(1, (total - at.xp) / span)) : 1,
+    };
+}
+
+export const unlockedCards = (progress, level = 0) => new Set(
+    UNLOCK_IDS.filter((id) => meetsNeed(progress, UNLOCKS[id].need)
+        || (UNLOCKS[id].level > 0 && Number(level) >= UNLOCKS[id].level))
 );
+
+/**
+ * The unlock track, as rows a screen can draw: what it is, whether it is open, and both roads to it.
+ *
+ * ⚠️ THE TRACK EXISTED AND NOTHING DREW IT. Eight cards have been earnable by playing since they were
+ * written and the front room said nothing about any of them, so the only way to find out one had opened was
+ * to be offered it mid-run and not recognise it. A ladder nobody can see is not a ladder.
+ */
+export function unlockTrack(progress, level = 0) {
+    return UNLOCK_IDS.map((id) => {
+        const c = UNLOCKS[id];
+        const byNeed = meetsNeed(progress, c.need);
+        const byRank = c.level > 0 && Number(level) >= c.level;
+        const [key, want] = Object.entries(c.need || {})[0] || [];
+        const at = Math.min(Number(progress?.[key] || 0), Number(want) || 0);
+        return {
+            id, name: c.name, how: c.how, level: c.level, open: byNeed || byRank,
+            by: byNeed ? "need" : byRank ? "rank" : null,
+            at, want: Number(want) || 0,
+            part: want ? Math.max(0, Math.min(1, at / want)) : 0,
+        };
+    });
+}
 
 /** Every card the game knows about: the starter four, the whole pet pool, what playing earns — and the junk
  *  their enemies deal into your deck, which is a card like any other as far as every renderer is concerned. */
