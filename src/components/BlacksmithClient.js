@@ -1085,8 +1085,22 @@ export function EnhanceResultModal({ res, onClose }) {
     const upgradedCount = lines.filter((l) => (l.gained || 0) > 0).length;
     const addedCount = lines.filter((l) => l.isNew && (l.gained || 0) > 0).length;
     // What the skill tier did, in words (breakpoints 25/50/75/~100% → 1..4 stats forged).
-    const scenarioText = gainedPts <= 0 ? "already maxed"
-        : `${upgradedCount} stat${upgradedCount === 1 ? "" : "s"} up${addedCount ? ` · ${addedCount} NEW` : ""}`;
+    //
+    // ⚠️ "ALREADY MAXED" WAS A LIE, AND IT WAS THE ONLY THING A WHIFF EVER SAID. Stats stopped having a cap
+    // some time ago — the note in crafting.js is explicit, "a line grows for as long as you feed it" — so a
+    // forge that gains nothing is almost never a finished piece. It is a MISS: score under 25% on the
+    // mini-game and the strike carries no stat points, which the rules have always called a whiff.
+    //
+    // So the one screen a player sees after a bad run told them their item was done. ValkyrieSylve, in the
+    // bug channel: "Just upgraded my Power Band (ring) and got no stats raised on it...." Her ring was not
+    // maxed and never could be; she missed, and nothing on the screen said so or said it was worth another
+    // swing. `scenario` is the server's own word for how many stats the strike earned, so it answers this
+    // directly rather than being inferred from the absence of gains.
+    const whiffed = gainedPts <= 0 && res.scenario === 0;
+    const scenarioText = gainedPts > 0
+        ? `${upgradedCount} stat${upgradedCount === 1 ? "" : "s"} up${addedCount ? ` · ${addedCount} NEW` : ""}`
+        : whiffed ? "the strike carried no stats"
+            : res.allMaxed ? "no room left for a new line" : "no stats this time";
     const hits = res.hits || {};
     const TIERS = [
         { key: "pixel", label: "Pixel-perfect", color: "#ffd75e" },
@@ -1135,6 +1149,15 @@ export function EnhanceResultModal({ res, onClose }) {
                             <span className="chain-arrow" aria-hidden="true">→</span>
                             <span className="chain-yield">⚒ {scenarioText}</span>
                         </div>
+                        {/* A miss is a real outcome and it needs to read as one. Without this the screen is a
+                            celebration with nothing in it, which is what makes a whiff read as a broken forge
+                            rather than as a bad run — and the level and the XP DID land, so say that too. */}
+                        {whiffed ? (
+                            <p className="forge-tally-whiff" style={{ animationDelay: `${chainDelay + 120}ms` }}>
+                                Under a quarter of the bar and the strike carries no stat points. The piece
+                                still took the level and the experience — swing again.
+                            </p>
+                        ) : null}
                         <button type="button" className="forge-tally-skip" onClick={() => setPhase("reveal")}>Tap to reveal →</button>
                     </div>
                 </div>
@@ -1795,6 +1818,8 @@ export const FORGE_CSS = `
 .forge-tally-row b { font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 900; }
 .forge-tally-sum { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 900; color: #2a1000; background: linear-gradient(180deg,#ffe07a,#f3b23a); border-radius: 11px; padding: 9px 13px; opacity: 0; animation: forgeTallyPop .5s cubic-bezier(.2,1.5,.3,1) both; box-shadow: 0 4px 14px rgba(243,178,58,0.4); }
 .forge-tally-sum b { font-size: 18px; font-weight: 900; }
+.forge-tally-whiff { max-width: 300px; margin: 10px auto 0; text-align: center; font-size: 12px; line-height: 1.45;
+    color: #d7b9a0; opacity: 0; animation: forgeTallyPop .5s cubic-bezier(.2,1.5,.3,1) both; }
 .forge-tally-skip { display: block; margin: 12px auto 0; background: none; border: none; color: #b9a892; font-size: 12px; font-weight: 700; cursor: pointer; }
 @keyframes forgeTallyIn { 0% { opacity: 0; transform: translateX(-14px); } 100% { opacity: 1; transform: translateX(0); } }
 @keyframes forgeTallyPop { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: 1; transform: scale(1); } }
