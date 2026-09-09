@@ -9,6 +9,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { spinSources, splitChips } from "@/lib/marketplace/casino-win-source.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── PLAYING THE FIVE-REEL MACHINE ────────────────────────────────────────────────────────────────────────────
 // Gold in, chips out, and the gold never comes back. That asymmetry is the whole design (see chips.js), and it
@@ -253,6 +254,9 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
         wonChips: won, multiple: Number((r.total / stake).toFixed(3)),
         features, forced: Boolean(want), from,
     }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing
+    // says it is coming.
+    await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     return {
         ok: true,

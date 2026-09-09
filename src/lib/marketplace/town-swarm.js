@@ -700,9 +700,12 @@ export async function strikeEnemy(buyerId, enemyId, damage) {
         [hit.event_id, hit.wave]
     ).catch(() => null);
     if (killed) await trackActivity(buyerId, "swarm_kill", { kind: hit.kind, wave: Number(hit.wave), eventId: Number(hit.event_id) }).catch(() => {});
-    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
-    // nothing says it is coming.
-    await surpriseChest(buyerId, "town_raid", SURPRISE_WEIGHT.normal).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing says
+    // it is coming.
+    // ⚠️ ON THE KILL, NOT ON THE SWING, and the line above is why: this function runs on every HIT and only
+    // logs when one lands the killing blow. Rolling per hit would have made a raid the loudest faucet in the
+    // game by a distance, against a rate that was solved on kills.
+    if (killed) await surpriseChest(buyerId, "town_raid", SURPRISE_WEIGHT.normal).catch(() => {});
     return {
         ok: true, damage: dmg, killed,
         enemyId: Number(hit.id), kind: hit.kind, hp: Number(hit.hp), hpMax: Number(hit.hp_max),

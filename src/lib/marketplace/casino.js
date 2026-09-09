@@ -7,6 +7,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { grantHaul } from "@/lib/marketplace/fishing.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 import {
     settleBets,
 } from "@/lib/marketplace/casino-rounds.js";
@@ -666,6 +667,9 @@ export async function spinSlot(buyerId, { bet, machine } = {}) {
         jackpot: reels.every((r) => r === m.symbols[0].id),
         streak: meter.streak || 0,
     }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing
+    // says it is coming.
+    await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     return {
         ok: true, machine: m.id, reels, mult, bet: stake, won, chips: bank, prize, onHouse,
@@ -1133,6 +1137,9 @@ export async function playKeno(buyerId, { bet, picks = [] } = {}) {
         // How many numbers they picked is the one choice this game gives them, so it is worth keeping.
         features: [], picks: clean.length, hits: hits.length,
     }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing
+    // says it is coming.
+    await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     // ── THE CROUPIER'S CAT PUSHES CHIPS BACK ─────────────────────────────────────────────────────────
     // Only on a LOSING ticket, only on the stake that actually lost, and only sometimes: REFUND_CHANCE
