@@ -23,6 +23,7 @@ import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { cardById, canUpgrade, POTIONS } from "@/lib/marketplace/cards-kit.js";
 import { CHOOSE, eventById } from "@/lib/marketplace/cards-events.js";
+import { CURSE_CARDS } from "@/lib/marketplace/cards-kit.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -45,6 +46,14 @@ const MARK = {
     wall: GiStoneBlock,
     eye: GiEyeOfHorus,
     fang: GiFangs,
+};
+
+/** The curse a choice will put in your deck, if it will. Off the effect, never off the prose. */
+const curseOf = (choice) => {
+    const e = choice?.effect || {};
+    const ids = [e.card, ...(Array.isArray(e.cards) ? e.cards : [])].filter(Boolean);
+    const hit = ids.find((id) => CURSE_CARDS[id]);
+    return hit ? CURSE_CARDS[hit] : null;
 };
 
 export default function CardEvent({ run, art = {} }) {
@@ -190,6 +199,22 @@ export default function CardEvent({ run, art = {} }) {
                                     <span className="cv-do-text">
                                         <b>{c.label}</b>
                                         <i>{spent ? "Already searched." : tooPoor ? `${c.detail} — you cannot afford it` : c.detail}</i>
+                                        {/* ── AND IT SAYS WHICH CURSE, BY NAME ────────────────────────
+                                            The Tide Pool's third option reads "A trinket. Something in the
+                                            shell cuts you and does not stop", which is good writing and
+                                            tells a player nothing about what they are agreeing to: a
+                                            permanent card in their deck called Ache that bleeds them every
+                                            turn. Theirs never does this — a Spire event that hands you a
+                                            curse NAMES it, because a curse is a known quantity and the
+                                            trade is only a trade if you can price it.
+                                            Read off the choice's own effect rather than written into the
+                                            detail line by hand, so a curse added to an event tomorrow says
+                                            so without anybody remembering to write it. */}
+                                        {curseOf(c) ? (
+                                            <em className="cv-curse">
+                                                Adds <b>{curseOf(c).name}</b> — {curseOf(c).text}
+                                            </em>
+                                        ) : null}
                                     </span>
                                 </button>
                             );
@@ -358,6 +383,11 @@ export default function CardEvent({ run, art = {} }) {
                    it read as a whisper. The detail line is the half that says what the choice COSTS. */
                 .cv-do-text i { font-family: var(--cf-card-font); font-size: 12px; line-height: 1.35;
                     color: #c3b393; font-style: normal; }
+                /* Purple, because that is the colour a curse card's stock is, and a warning that
+                   matches the thing it warns about needs no legend. */
+                .cv-curse { display: block; margin-top: 5px; font-style: normal; font-size: 11px;
+                    line-height: 1.4; color: #c58bff; }
+                .cv-curse b { color: #d9b3ff; font-weight: 800; }
 
                 .cv-pick-over { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
                     padding: 12px; background: rgba(5,6,9,0.82); }
