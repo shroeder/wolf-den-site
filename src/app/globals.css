@@ -17754,6 +17754,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cas-name { font-family: var(--font-display); font-size: 1.1rem; color: #ffd75e; }
 .cas-purse { font-family: var(--font-display); font-weight: 900; color: #ffd75e; }
 .cas-purse i { font-style: normal; font-size: 10px; color: #98a0aa; margin-left: 4px; }
+/* The token figure sits UNDER the chip one rather than beside it: the header is already tight at 320px and
+   two numbers on one line read as one number with a typo in it. Chips are the cool figure and tokens the
+   warm one, so which is which lands before either is read. See tokens.js. */
+.cas-purse { display: inline-block; text-align: right; line-height: 1.15; }
+.cas-purse-tok { display: block; font-weight: 800; color: #7fe0ff; }
+.cas-purse-tok i { color: #6a93a3; }
 
 /* ── BUYING CHIPS ─────────────────────────────────────────────────────────────────────────────────────────
    Directly under the purse, because with a chips-only floor this is the door onto it: today's free thousand,

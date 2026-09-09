@@ -7,6 +7,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // the cage, and gold no longer touches the floor.) The original read: the stake is still gold because a
 // table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { moveTokens } from "@/lib/marketplace/tokens.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── THE SHARED FLOOR ─────────────────────────────────────────────────────────────────────────────────────────
@@ -133,7 +134,10 @@ export async function settleBets(buyerId, game, { roll, score, reason }) {
         // the bet was worth; the payout is converted once, here, and nowhere else.
         const wonChips = won > 0 ? chipsFor(won, 1) : 0;
         if (wonChips > 0) {
-            await moveChips(buyerId, wonChips, reason, {
+        // ⚠️ THE WIN IS PAID IN TOKENS, NOT CHIPS. The stake left as chips and does not come back — see
+        // tokens.js and migration 436. Every game on the floor pays the same currency, so the Counter's
+        // prices mean one thing no matter which machine somebody prefers.
+            await moveTokens(buyerId, wonChips, reason, {
                 ref: String(row.id),
                 meta: { bet: row.stake, round: String(row.round), wonGold: won, rate: CHIP_RATE },
             });

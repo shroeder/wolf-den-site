@@ -10,6 +10,7 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplac
 // Chips in, chips out. The stake used to be gold — see the long note in blackjack.js — and the cage now sells
 // the chips instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
@@ -126,7 +127,8 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
     const won = wonGold > 0 ? chipsFor(wonGold, 1) : 0;
     // `chips` already holds the balance after the stake — the win moves it again rather than shadowing it.
     if (won > 0) {
-        const after = await moveChips(buyerId, won, "casino_bingo_win", {
+        // ⚠ The win is TOKENS; the stake was chips and is gone. See tokens.js.
+        const after = await moveTokens(buyerId, won, "casino_bingo_win", {
             meta: { bet: stake, tier: score.tier, lines: score.lines.length, dragon: burnt.length,
             pattern: patternHit.hit ? today.id : null, patternMult: patternHit.mult, wonGold, rate: CHIP_RATE },
         });

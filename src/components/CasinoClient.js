@@ -902,6 +902,9 @@ export default function CasinoClient({ initial }) {
         setSt((p) => (p ? {
             ...p,
             chips: r?.staked ?? r?.chips ?? p.chips,
+            // The win landed in TOKENS. `chips` above is the fuel left after the stake and cannot have
+            // gone up — see the note on the response in casino-slot5-play.js.
+            tokens: r?.tokens ?? p.tokens,
             ...(r?.gold != null ? { gold: r.gold } : {}),
         } : p));
     }, []);
@@ -958,7 +961,9 @@ export default function CasinoClient({ initial }) {
 
     const buyChip = useCallback(async (item) => {
         const r = await casPost({ action: "chip_buy", item });
-        if (r?.ok) setSt((p) => (p ? { ...p, chips: r.balance } : p));
+        // `balance` off the shelf is the TOKEN balance, because the shelf is priced in tokens — see
+        // chipShelf. `chips` rides along beside it so the header can still say what is left to play with.
+        if (r?.ok) setSt((p) => (p ? { ...p, tokens: r.balance, chips: r.chips ?? p.chips } : p));
         return r || { ok: false };
     }, []);
 
@@ -1580,7 +1585,16 @@ export default function CasinoClient({ initial }) {
             <header className="cas-top">
                 <a className="cas-out" href="/marketplace/town">← Town</a>
                 <b className="cas-name">The Casino</b>
-                <span className="cas-purse">{money(st?.chips)}<i>chips</i></span>
+                {/* ── ⚠️ TWO PURSES, AND THEY ARE NEVER ADDED ───────────────────────────
+                    Luke: "You buy chips, you earn tokens by winning, that way chips always goes down."
+                    CHIPS are what you feed a machine and they only ever go down. TOKENS are what a machine
+                    pays and the only thing the Counter takes. One figure could not say which of the two a
+                    spin had just moved, and the whole point of the split is that a spin moves both, in
+                    opposite directions. See tokens.js and migration 436. */}
+                <span className="cas-purse">
+                    {money(st?.chips)}<i>chips</i>
+                    <b className="cas-purse-tok">{money(st?.tokens)}<i>tokens</i></b>
+                </span>
             </header>
 
             {/* ── BUYING CHIPS ────────────────────────────────────────────────────────────────────────────

@@ -2,8 +2,9 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import {
-    chipItem, moveChips, chipShelf, casinoTrophies, counterDiscount, pricedFor, basePriceFor,
+    chipItem, chipShelf, casinoTrophies, counterDiscount, pricedFor, basePriceFor,
 } from "@/lib/marketplace/chips.js";
+import { moveTokens } from "@/lib/marketplace/tokens.js";
 import { getCasinoPerks, grantCasinoPerk, revokeCasinoPerk } from "@/lib/marketplace/casino-perks.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -76,8 +77,18 @@ export async function buyWithChips(buyerId, itemId) {
         if (had) return { ok: false, error: "already_owned" };
     }
 
-    // Charged first. `moveChips` guards the balance inside the UPDATE and returns null if it could not.
-    const after = await moveChips(buyerId, -price, "store", { ref: item.id, meta: { name: item.name, list: item.price, paid: price } });
+    // ── ⚠️ THE COUNTER TAKES TOKENS NOW, NOT CHIPS ────────────────────────────────
+    // Chips are what you feed a machine and tokens are what a machine pays; this till is the only door
+    // tokens leave by. That split is what lets the floor pay 121% without the shelf emptying — the
+    // generosity inflates FUEL, and what you can actually take is bounded by the chips you bought with
+    // gold. See tokens.js and migration 436.
+    //
+    // The prices did not move. A pet was 50,000 chips and is 50,000 tokens: at about 1.21 tokens per chip
+    // staked that is roughly 41,000 gold of chips instead of 50,000 gold, so everything on this shelf is
+    // about 17% cheaper than it was this morning. Deliberate — the floor had been unplayed for nine days
+    // and the direction of every change today is the same direction.
+    // Charged first. `moveTokens` guards the balance inside the UPDATE and returns null if it could not.
+    const after = await moveTokens(buyerId, -price, "store", { ref: item.id, meta: { name: item.name, list: item.price, paid: price } });
     if (after === null) return { ok: false, error: "not_enough_chips" };
 
     // The receipt, and the second half of the once-only guard. If THIS is the write that loses the race, the
@@ -89,7 +100,7 @@ export async function buyWithChips(buyerId, itemId) {
          RETURNING id`,
         [buyerId, item.id, price, Boolean(item.once)]).catch(() => null);
     if (item.once && !receipt) {
-        await moveChips(buyerId, price, "store_refund", { ref: item.id, meta: { why: "already owned" } });
+        await moveTokens(buyerId, price, "store_refund", { ref: item.id, meta: { why: "already owned" } });
         return { ok: false, error: "already_owned" };
     }
 
@@ -100,7 +111,7 @@ export async function buyWithChips(buyerId, itemId) {
         if (item.kind === "stat" || item.kind === "unlock") await revokeCasinoPerk(buyerId, item.ref);
         // Put it back, and take the receipt with it — otherwise a once-only item is marked owned and was
         // never delivered, which is the worst outcome available and the hardest to notice.
-        await moveChips(buyerId, price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
+        await moveTokens(buyerId, price, "store_refund", { ref: item.id, meta: { why: "grant failed" } });
         if (receipt) await db.query(`DELETE FROM mkt_chip_purchase WHERE id = $1`, [receipt.id]).catch(() => {});
         return { ok: false, error: "grant_failed" };
     }

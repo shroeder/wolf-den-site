@@ -20,6 +20,7 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplac
 // The stake is still taken in GOLD, deliberately. That is the mint: gold staked is what chips are made of, and
 // a table that took chips and paid chips would be a closed loop that never touches the economy it belongs to.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
@@ -134,7 +135,11 @@ async function settleAll(buyerId, row, dealerCards, hands) {
 
     let chips = null;
     if (back > 0) {
-        chips = await moveChips(buyerId, back, "casino_blackjack_win", {
+        // ⚠️ TOKENS, and that includes the part of `back` that is the returned stake. On this floor a
+        // stake does not come back — the chips were spent to sit down. A push therefore pays your
+        // stake in tokens rather than refunding chips, which is the same arithmetic for the player
+        // and keeps the one rule the whole split rests on: chips only ever go down. See tokens.js.
+        chips = await moveTokens(buyerId, back, "casino_blackjack_win", {
             ref: String(row.id),
             meta: { bet: results.reduce((n, r) => n + r.bet, 0), outcomes: results.map((r) => r.outcome),
                 goldStaked: row.stake, backGold, wonGold, rate: CHIP_RATE, hands: hands.length },

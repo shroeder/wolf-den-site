@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { moveChips, chipsFor, CHIP_RATE } from "@/lib/marketplace/chips.js";
+import { moveTokens, tokenBalance } from "@/lib/marketplace/tokens.js";
 import { slot5, playSpin, FREE_SPIN_OFFERS, LINES, COLOSSAL_ROWS, COLOSSAL_TOTAL_LINES } from "@/lib/marketplace/casino-slot5.js";
 import { MIN_BET, MAX_BET, tickCasinoQuests } from "@/lib/marketplace/casino.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -218,9 +219,21 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     const gold = spinSources(r, stake);
     const from = splitChips(won, gold);
-    let chips = null;
+    // ── ⚠️ THE STAKE CAME OUT OF CHIPS AND THE WIN GOES INTO TOKENS ────────────────────
+    // Luke: "You buy chips, you earn tokens by winning, that way chips always goes down, and gold is spent
+    // to sink into chips." So a spin is not a wager that can come back — the chips are gone the moment the
+    // reels turn, and what a win pays is a different quantity that only spends at the Counter.
+    //
+    // This is the line that makes the floor's generosity safe. While one currency did both jobs, the return
+    // rate WAS the prize faucet and 121% meant an unbounded Counter; now 121% means your fuel lasts, and
+    // what you can take off the shelf is bounded by the chips you bought. See tokens.js and migration 436.
+    //
+    // ⚠️ AND THE TWO BALANCES ARE NEVER ADDED. `bank` is chips after the stake; `won` is tokens. They are
+    // different quantities that happen to share a scale, which is exactly the trap casino-report.js was
+    // rewritten to get out of — read its header before writing anything that puts them in one number.
+    let tokens = null;
     if (won > 0) {
-        chips = await moveChips(buyerId, won, want ? "slot5_forced" : "slot5", {
+        tokens = await moveTokens(buyerId, won, want ? "slot5_forced" : "slot5", {
             ref: m.id,
             meta: { bet: stake, machine: m.id, forced: Boolean(want), from },
         });
@@ -260,12 +273,15 @@ export async function spinSlot5(buyerId, { bet, machine, offerId, force } = {}) 
 
     return {
         ok: true,
-        // No gold moved — the cage is the only place gold touches the floor now. `bank` is the balance right
-        // after the stake; `chips` is it again after any win.
-        chips: chips ?? bank ?? await chipsOf(buyerId),
-        // The balance the instant the stake left, before a single reel has stopped. The purse drops to this
-        // now and only reaches `chips` when the reveal is over — otherwise the number at the top of the
-        // screen announces the win before the machine does. See the note in casino.js.
+        // No gold moved — the cage is the only place gold touches the floor now.
+        // ⚠️ `chips` NO LONGER GOES UP. It is the fuel left after the stake and nothing this spin did can
+        // raise it; a win lands in `tokens`. The screen shows both, and the purse at the top of the floor
+        // is the CHIP one — that is the number a player is spending.
+        chips: bank ?? await chipsOf(buyerId),
+        tokens: tokens ?? await tokenBalance(buyerId),
+        // The balance the instant the stake left, before a single reel has stopped. Kept even though
+        // `chips` is now the same number: the client reads it, and a spin that pays nothing and a spin
+        // whose reveal has not finished are still two different states to it.
         staked: bank,
         bet: stake,
         // The grid, and everything the grid turned into. The client animates from this and computes nothing.

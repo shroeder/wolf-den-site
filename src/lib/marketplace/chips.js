@@ -618,13 +618,20 @@ export async function chipShelf(buyerId, { vip = false, shelf = null } = {}) {
         : shelf === "unlock" ? UNLOCK_STORE
             : vip ? VIP_STORE : CHIP_STORE;
     const { getCasinoPerks } = await import("@/lib/marketplace/casino-perks.js");
-    const [balance, owned, trophies, perks] = await Promise.all([
-        chipBalance(buyerId), ownedOnce(buyerId), casinoTrophies(buyerId), getCasinoPerks(buyerId),
+    // ⚠️ `balance` IS THE TOKEN BALANCE, because this shelf is priced in tokens — the Counter stopped
+    // taking chips (see chip-store.js and migration 436). It keeps the name because the screen reads it by
+    // that name and the meaning is unchanged: it is what you have to spend HERE. `chips` rides along beside
+    // it so the same screen can also say what is left to play with, which is now a different number.
+    const { tokenBalance } = await import("@/lib/marketplace/tokens.js");
+    const [balance, chips, owned, trophies, perks] = await Promise.all([
+        tokenBalance(buyerId), chipBalance(buyerId), ownedOnce(buyerId),
+        casinoTrophies(buyerId), getCasinoPerks(buyerId),
     ]);
     const discount = counterDiscount(trophies);
     const details = await Promise.all(list.map((i) => detailFor(i).catch(() => null)));
     return {
         balance,
+        chips,
         // What the floor's own trophies are taking off, and what earned it — a discount nobody can see the
         // source of is a discount nobody believes they have, which is the same argument as the pet rail at
         // the top of the casino screen.
