@@ -608,7 +608,14 @@ export default function CardFace({ card, art, dim, live, onKey = null }) {
                     padding: calc(var(--cf-w, 96px) * 0.015) calc(var(--cf-w, 96px) * 0.125) 0;
                     font-size: calc(var(--cf-w, 96px) * 0.109); line-height: 1.16; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
-                .cf-line { display: block; width: 100%; font-style: normal; }
+                /* ⚠️ THE SENTENCE ASSERTS ITS OWN TYPOGRAPHY, because twice now an ancestor has taken it
+                   away. A card is dropped into six different screens and each of those screens has its own
+                   type — small caps, tracked-out labels, uppercase captions — and any bare element selector
+                   above it wins over a single class. Written at .cf-card .cf-line so it outranks the
+                   bare-element shape that caused it, rather than at .cf-line which loses to it. */
+                .cf-card .cf-line { display: block; width: 100%; font-style: normal;
+                    font-size: inherit; font-weight: inherit; letter-spacing: normal;
+                    text-transform: none; color: inherit; }
                 /* THE SIDE PADDING DOES NOT SHRINK WITH THE TYPE. It is there to clear the moulding's rails,
                    which are the same width whatever size the sentence is set at — buying two characters a
                    line back by moving the text under the metal is trading one clipped word for another. */

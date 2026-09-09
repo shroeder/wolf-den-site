@@ -341,12 +341,12 @@ export default function CardRoom({ run, art = {} }) {
                         <div className="cr-prev-pair">
                             <span className="cr-prev-one">
                                 <span className="cf-card"><CardFace card={cardById(preview.id)} art={art[cardById(preview.id)?.pet]} /></span>
-                                <i>now</i>
+                                <i className="cr-prev-tag">now</i>
                             </span>
                             <span className="cr-prev-arrow" aria-hidden="true">→</span>
                             <span className="cr-prev-one">
                                 <span className="cf-card"><CardFace card={cardById(upgradedId(preview.id))} art={art[cardById(preview.id)?.pet]} /></span>
-                                <i>after</i>
+                                <i className="cr-prev-tag">after</i>
                             </span>
                         </div>
                         <div className="cr-prev-do">
@@ -486,7 +486,15 @@ export default function CardRoom({ run, art = {} }) {
                 .cr-prev-head { margin: 0; font-size: 15px; letter-spacing: 0.04em; color: #e7ecf4; }
                 .cr-prev-pair { display: flex; align-items: center; gap: 10px; }
                 .cr-prev-one { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-                .cr-prev-one i { font-style: normal; font-size: 11px; letter-spacing: 0.14em;
+                /* ⚠️ THIS WAS a bare descendant selector AND IT REACHED INTO THE CARD. CardFace draws its sentence as
+                   <i className="cf-line">, so a bare element selector on an ancestor styled the card's own
+                   text: 11px, uppercase, 0.14em of letter-spacing and a grey it never asked for. Luke: "cant
+                   read, also its not using the right font???" It WAS the right font — Kreon, tracked out and
+                   capitalised until it read as somebody else's. The wider tracking then pushed the sentence
+                   to an extra line and the bottom of it under the rail.
+                   Same family as the .cf-key collision. A card is a component, not a place to put a
+                   descendant selector. */
+                .cr-prev-tag { font-style: normal; font-size: 11px; letter-spacing: 0.14em;
                     text-transform: uppercase; color: #7d8696; }
                 .cr-prev-arrow { font-size: 20px; color: #7fe0a8; }
                 .cr-prev-do { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
