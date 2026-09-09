@@ -33,7 +33,27 @@ const readPref = () => {
 };
 let pref = readPref();
 
-const MUSIC_GAIN = 0.13;   // low on purpose: this sits UNDER a fight, it does not lead one
+// ⚠️ 0.13 AT 73Hz IS NOT QUIET MUSIC, IT IS NO MUSIC. Luke, in a fight, twice: "no music?"
+// It was playing. A phone loudspeaker is a sealed driver about a centimetre across and it rolls off hard
+// below roughly 500Hz — and every note here was under it. The fight's drone sat at root/2 = 73Hz and its
+// arpeggio at 147-220Hz, all of it at a thirteenth of full volume.
+// Rendered arithmetically and pushed through a 4th-order high-pass at 500Hz, which is about what that
+// speaker does to a signal:
+//     fight   -24.7 dB full band  ->  -59.5 dB out of a phone   (1.8% survives)
+//     map     -25.4 dB            ->  -56.2 dB                  (2.9%)
+//     boss    -25.0 dB            ->  -47.5 dB                  (7.5%)
+// -59 dB is silence. It was correct on headphones and on a laptop, which is where it was written, and it
+// has never once been heard on the device the game is played on.
+// Three changes, and the two that matter are about PITCH rather than volume: the arpeggio moves up an
+// octave and the drone up to the root, so the notes land in a register the speaker can actually move air
+// at. The gain then comes up to 0.3 on top of that.
+//     fight   -20.8 dB            ->  -41.8 dB                  (9.0%)
+//     map     -20.4 dB            ->  -36.1 dB                  (16.5%)
+//     boss    -20.5 dB            ->  -37.2 dB                  (14.7%)
+// Still well under the effects, which is right — this is the room's hum, not a soundtrack. It is now a
+// hum you can hear. If it needs to move again, move the OCTAVE before the gain; eighteen of the twenty
+// decibels above came from the octave.
+const MUSIC_GAIN = 0.3;   // low on purpose: this sits UNDER a fight, it does not lead one
 
 export const soundPref = () => ({ ...pref });
 
@@ -240,8 +260,10 @@ export function playMusic(key) {
         for (const detune of [-4, 4]) {
             try {
                 const o = a.createOscillator(); const g = a.createGain();
-                o.type = "sine"; o.frequency.value = spec.root / 2; o.detune.value = detune;
-                g.gain.value = 0.42;
+                // AT THE ROOT, NOT AN OCTAVE UNDER IT. See MUSIC_GAIN: root/2 put every drone between 55
+                // and 110Hz, which a phone speaker cannot reproduce at all.
+                o.type = "sine"; o.frequency.value = spec.root; o.detune.value = detune;
+                g.gain.value = 0.3;
                 o.connect(g); g.connect(musicBus); o.start();
                 voices.push(o);
             } catch { /* ignore */ }
@@ -249,7 +271,10 @@ export function playMusic(key) {
     }
 
     let i = 0;
-    const semitone = (n) => spec.root * (2 ** (n / 12));
+    // AN OCTAVE UP, for the reason written by MUSIC_GAIN: the tune was pitched under the speaker.
+    // The intervals are untouched, so every track is the same tune in the same mode — the scale going
+    // darker between the acts is still the whole arrangement.
+    const semitone = (n) => spec.root * 2 * (2 ** (n / 12));
     const beat = () => {
         if (!ctx || ctx.state !== "running") return;
         const n = spec.steps[i % spec.steps.length];

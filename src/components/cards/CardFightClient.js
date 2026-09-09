@@ -27,6 +27,7 @@ import { STATUS_ART, marksOn } from "@/components/cards/status-art.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
+import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
 // the floating number and the screen jolt are all timed off this one value, because the whole point of the
@@ -1363,7 +1364,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     <div className="cf-sheet" onClick={(e) => e.stopPropagation()}>
                         <div className="cf-title"><span>{peek === "draw" ? "Draw pile" : "Discard"}</span></div>
                         <p className="cf-note">{peek === "draw" ? "Sorted — the order is the game." : "In the order it fell."}</p>
-                        <div className="cf-sheet-cards">
+                        <div className="cf-sheet-cards cf-deck-grid">
                             {pileList.map((card, i) => (
                                 <div key={`${card.id}-${i}`} className="cf-card is-static">
                                     <CardFace card={card} art={fixture.petArt[card.pet]} onKey={setKeyWord} />
@@ -1656,6 +1657,7 @@ export default function CardFightClient({ fixture, run = null }) {
                 as a warning. Every selector below is under the `.cf` prefix, which is this screen and nothing
                 else. Same trap the mine hit; the answer there was global CSS too. */}
             <style jsx global>{`
+                ${DECK_GRID_CSS}
                 /* ── ONE SPACE, NOT A PICTURE ABOVE A SHELF ──────────────────────────────────────────────
                    Measured off Spire's own frame with a percentage grid laid on it: their fighters stand with
                    their feet at 62%, health bars at 70%, the hand from 78% — and the FLOOR RUNS EDGE TO EDGE
@@ -1736,7 +1738,13 @@ export default function CardFightClient({ fixture, run = null }) {
                        three groups fighting over 200px, so there they sit on the panels and that is fine —
                        nobody is admiring a rivet on a 412px screen. */
                     .cf .cf-top { padding-left: calc(195 * var(--cf-bar-h) / 120 + 16px);
-                        padding-right: calc(195 * var(--cf-bar-h) / 120 + 16px); }
+                        padding-right: calc(195 * var(--cf-bar-h) / 120 + 16px);
+                        /* ⚠️ AND THE FURNITURE GOES BACK TO FULL SIZE. The compact set exists
+                           because a phone cannot hold 398px of controls; a 900px window holds it three
+                           times over, and these are the numbers this bar was measured at before the phone
+                           ever needed shrinking. Nothing about the desktop strip changes. */
+                        --cf-gap: 10px; --cf-pile: 34px; --cf-chip: 28px; --cf-gem: 46px;
+                        --cf-end-w: 104px; }
                     .cf .cf-hero { left: 9%; width: 26%; }
                     .cf .cf-party { right: 5%; width: 52%; }
                 }
@@ -1808,9 +1816,33 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* THE GRADIENT IS GONE and the bar is a drawn object. The gradient existed to keep white text
                    legible over a lit floor; a painted opaque plate does that job and stops the strip reading
                    as five widgets floating on a dark smear. Fixed height so the plate has a box to fill. */
+                /* ── ⚠️ EIGHT CONTROLS, AND THEY DID NOT FIT ON ANY PHONE ────────────
+                   Luke, with the energy gem sitting on top of his belt: "mana is just sitting over icons
+                   what is up with that."
+                   Measured, at the sizes this bar used to hard-code: the left lane wants 156px (two piles,
+                   the potion belt, the trinket pouch), the gem 46, the right lane 180 (guide, forfeit, End
+                   turn) and the two gaps 16 — 398px of furniture. A 393px phone has 369 to give it and a
+                   360px phone has 336, so the row was over by 29 to 102 pixels on EVERY handset there is.
+                   space-between with negative free space does not wrap and does not scroll: it packs from
+                   the left and lets the overflow run under whatever is painted next. The left lane is the
+                   only one allowed to shrink, so its BOX shrank and its contents did not — the pouch
+                   stayed where it was and the gem was painted over the top of it. At 369px the gem covered
+                   the trinket pouch completely and half the potion belt, which is exactly what Luke was
+                   looking at: a bottle, a gem, and a stray number with no icon attached to it.
+                   ⚠️ SO THE SIZES ARE VARIABLES NOW, NOT LITERALS, and the phone gets a smaller
+                   set. Every control is still there and still pressable; they are simply drawn at the size
+                   the screen can actually hold. The desktop block further down restores the numbers this
+                   bar had before, because a 900px window was never the screen with the problem.
+                       phone   126 + 40 + 152 + 12 = 330  (fits 360px, which gives 336)
+                       <=360   108 + 36 + 132 +  8 = 284  (fits 320px, which gives 296)
+                   Measured with CDP at 320/360/369/375/393/412 before and after, on a fixture built
+                   from this block verbatim; then on the live fight at 369, which is Luke's phone.
+                   If any of these change, measure again — the failure is invisible in a screenshot
+                   taken at 900px and it was invisible at 393 too, where only the pouch was buried. */
                 .cf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 6;
-                    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                    display: flex; align-items: center; justify-content: space-between; gap: var(--cf-gap);
                     --cf-bar-h: 58px;
+                    --cf-gap: 6px; --cf-pile: 28px; --cf-chip: 26px; --cf-gem: 40px; --cf-end-w: 88px;
                     height: calc(var(--cf-bar-h) + env(safe-area-inset-top));
                     padding: env(safe-area-inset-top) 12px 0 12px; background: none; }
                 /* ── THREE PIECES, AND ONLY THE MIDDLE STRETCHES ──────────────────────────────────────────
@@ -1835,6 +1867,12 @@ export default function CardFightClient({ fixture, run = null }) {
                    drawn at — auto 100% against a 120-tall source is exactly the border-image's own scale, so
                    the stone runs continuously from cap to cap at any width.
                    clip: padding-box keeps the tile out of the border area, which is where the caps live. */
+                /* A 320px screen leaves 296, which the phone set above still misses by 34. One more
+                   step down rather than a control taken away — 284, with twelve to spare. */
+                @media (max-width: 360px) {
+                    .cf-top { --cf-gap: 4px; --cf-pile: 26px; --cf-chip: 24px; --cf-gem: 36px;
+                        --cf-end-w: 76px; }
+                }
                 .cf-top-plate { position: absolute; inset: 0; z-index: 0; pointer-events: none;
                     border-style: solid; border-color: transparent;
                     border-width: 0 calc(195 * var(--cf-bar-h) / 120);
@@ -1855,10 +1893,11 @@ export default function CardFightClient({ fixture, run = null }) {
                    the two buttons on the right. The belt is the only thing here whose width is not known in
                    advance, so it is the only thing allowed to give — it shrinks and scrolls sideways inside
                    its own lane rather than spending the button's pixels. */
-                .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px;
-                    flex: 0 0 auto; min-width: 0; }
+                .cf-top-group { position: relative; z-index: 1; display: flex; align-items: center;
+                    gap: var(--cf-gap); flex: 0 0 auto; min-width: 0; }
                 .cf-top-group.is-left { flex: 0 1 auto; }
-                .cf-forfeit { display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+                .cf-forfeit { display: grid; place-items: center;
+                    width: var(--cf-chip); height: var(--cf-chip); padding: 0;
                     background: rgba(10,12,16,0.5); border: 1px solid #39424f; border-radius: 999px;
                     color: #9aa6b4; font-size: 15px; }
                 .cf-forfeit:disabled { opacity: 0.35; }
@@ -2201,12 +2240,12 @@ export default function CardFightClient({ fixture, run = null }) {
                    the bottle was sitting on its shoulder, so the two read as one control. The group gets its
                    own right-hand margin rather than each button getting wider — widening the buttons moves
                    the piles on the far left too. */
-                .cf-satchel { position: relative; padding: 6px 5px; border: 0; background: none;
+                .cf-satchel { position: relative; padding: 5px 1px; border: 0; background: none;
                     cursor: pointer; line-height: 0; }
-                .cf-satchel-glyph { width: 22px; height: 22px; color: #d8c39a;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
-                .cf-satchel-art { width: 24px; height: 24px; object-fit: contain;
-                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+                .cf-satchel-glyph { width: calc(var(--cf-chip) - 4px); height: calc(var(--cf-chip) - 4px);
+                    color: #d8c39a; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+                .cf-satchel-art { width: calc(var(--cf-chip) - 2px); height: calc(var(--cf-chip) - 2px);
+                    object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
                 .cf-satchel-n { position: absolute; right: -1px; bottom: 2px; min-width: 13px;
                     padding: 0 3px; border-radius: 999px; background: #12161f; border: 1px solid #3a4353;
                     font-size: 10px; line-height: 14px; color: #e7ecf4; font-variant-numeric: tabular-nums; }
@@ -2232,10 +2271,10 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* A BOTTLE IS A BUTTON, and it has to read as one at 26px on a painted bar: no plate, no
                    border, a lift on press and a fade while the server catches up. */
 
-                .cf-pile { position: relative; width: 34px; padding: 0; background: none; border: 0;
+                .cf-pile { position: relative; width: var(--cf-pile); padding: 0; background: none; border: 0;
                     display: flex; flex-direction: column; align-items: center; }
-                .cf-pile-art { width: 30px; height: 42px; object-fit: contain;
-                    filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
+                .cf-pile-art { width: calc(var(--cf-pile) - 2px); height: calc(var(--cf-pile) * 1.235);
+                    object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.6)); }
                 .cf-pile.is-discard .cf-pile-art { transform: rotate(7deg); opacity: 0.82; }
                 /* ── A COUNT, NOT AN ALERT ───────────────────────────────────────────────────────────
                    Luke: "i dont like the red badges on the card piles." He is right, and the reason is that a
@@ -2244,7 +2283,8 @@ export default function CardFightClient({ fixture, run = null }) {
                    is just a number, and it is a number you want to be able to read without being nagged by it.
                    So it becomes a struck plaque instead: the same slate the cost diamond and the chrome are
                    painted in, sitting across the bottom of the pile like a label on a box. */
-                .cf-pile-n { position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+                .cf-pile-n { position: absolute; top: calc(var(--cf-pile) * 0.706); left: 50%;
+                    transform: translateX(-50%);
                     min-width: 20px; padding: 0 4px; border-radius: 3px;
                     background: linear-gradient(180deg, #6b7280, #2b3038);
                     border: 1px solid #10131a; color: #f2f5f8; font-size: 11px; font-weight: 800; line-height: 1.45;
@@ -2253,19 +2293,21 @@ export default function CardFightClient({ fixture, run = null }) {
 
                 /* THE BIGGEST THING IN THE TRAY, which is what it should be: every decision on a turn is made
                    against it, and it used to be the smallest. */
-                .cf-energy { position: relative; width: 46px; height: 46px;
+                .cf-energy { position: relative; width: var(--cf-gem); height: var(--cf-gem);
                     display: grid; place-items: center; }
                 .cf-energy-art { width: 100%; height: 100%; object-fit: contain;
                     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
-                .cf-energy-n { position: absolute; font-family: var(--cf-card-font); font-size: 18px;
+                .cf-energy-n { position: absolute; font-family: var(--cf-card-font);
+                    font-size: calc(var(--cf-gem) * 0.39);
                     font-weight: 700; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,0.85); line-height: 1; }
                 .cf-energy-n i { font-style: normal; font-size: 11px; opacity: 0.85; }
 
-                .cf-end { position: relative; width: 104px; height: 40px; padding: 0;
-                    background: none; border: 0; display: grid; place-items: center; }
+                .cf-end { position: relative; width: var(--cf-end-w); height: calc(var(--cf-end-w) * 0.385);
+                    padding: 0; background: none; border: 0; display: grid; place-items: center; }
                 .cf-end-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill;
                     filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
-                .cf-end-label { position: relative; font-family: var(--cf-card-font); font-size: 14px;
+                .cf-end-label { position: relative; font-family: var(--cf-card-font);
+                    font-size: calc(var(--cf-end-w) * 0.159);
                     font-weight: 700; color: #1b1f27; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
                 /* ⚠️ IT DOES NOT GO TRANSPARENT. Luke: "end turn goes transparent when I use it, which I don't
                    really like." Fading a control to 55% opacity lets the ARENA through it — the stone floor
@@ -2314,17 +2356,17 @@ export default function CardFightClient({ fixture, run = null }) {
                     100% { transform: translate(0, 0); }
                 }
 
-                /* NOTE: the press-and-hold read overlay lived here and is gone — the hand inspects
-                   continuously now, so there is nothing to summon. */
-                .cf-read { position: fixed; inset: 0; z-index: 5100; display: grid; place-items: center;
-                    background: rgba(6,7,10,0.72); pointer-events: none; }
-                .cf-read-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
-                    display: flex; flex-direction: column; align-items: center;
-                    transform: scale(2.1); animation: cfRead 140ms ease-out; }
-                .cf-read-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
-                    pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
-                    background-repeat: no-repeat; background-size: 100% 100%; }
-                @keyframes cfRead { from { transform: scale(1.5); opacity: 0; } to { transform: scale(2.1); opacity: 1; } }
+                /* ⚠️ THE PRESS-AND-HOLD READ OVERLAY IS GONE AND ITS CSS STAYED, WHICH IS HOW THE
+                   POTIONS DIED. Luke, with a bottle open and the button pressed: "potions dont work."
+                   That overlay owned .cf-read and was pointer-events: none, which is right for a decoration
+                   nobody can touch. The bottle panel then took the same class name, and a second .cf-read
+                   rule at equal specificity only overrides the properties it RESTATES — it says nothing
+                   about pointer-events, so the dead rule kept handing the live modal "you cannot press
+                   this", inherited by Drink it and Put it back alike. A panel you can read, cannot press,
+                   and can only leave with the browser's own back button.
+                   The rule is deleted rather than corrected: nothing renders .cf-read-card any more either.
+                   ⚠️ DO NOT REINTRODUCE A SECOND .cf-read. If a future overlay needs one, give it its own
+                   name — this file has ~200 class names and two of them silently sharing one is unfindable. */
 
                 /* ── THE CARD, LEAVING ─────────────────────────────────────────────────────────────────
                    This used to be the whole show: the card held centre-field at 1.5x for 640ms, because
@@ -2542,7 +2584,8 @@ export default function CardFightClient({ fixture, run = null }) {
                     display: grid; justify-items: center; gap: 12px; text-align: center;
                     background: rgba(12,15,21,0.96); border: 1px solid rgba(201,162,83,0.35); border-radius: 12px;
                     box-shadow: 0 18px 50px rgba(0,0,0,0.7); }
-                .cf-sheet-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+                /* The three-across grid it sits in is DECK_GRID_CSS at the top of this block — see deck-grid.js for
+                   why the wrapping row it used to be came out two-wide on a 355px phone. */
                 @media (max-width: 460px) {
                     .cf-offer { --cf-offer-s: 1.0; }
                     .cf-offers { gap: 6px; }
@@ -2722,24 +2765,38 @@ function Bar({ unit, guarding, pending, onMark }) {
                    decoration and wrong for the thing a player most needs to ask about. */
                 .cfb-tags { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
                     display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
-                .cfb-mark { width: 17px; height: 17px; object-fit: contain; flex: 0 0 auto;
+                .cfb-mark { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto;
                     filter: drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }
-                .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
-                    font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
+                /* ── THE NUMBER IS THE POINT OF THE TAG ──────────────────────────────────────────────
+                   ⚠️ Luke, looking at a 3 of Strength: "cant read the bumber of my strength." It was 10px,
+                   which is smaller than any other number on this board — the health bar's numeral is 17,
+                   the intent's is 20 — and it is the one a player is doing arithmetic with. 13px, heavier,
+                   and cut out of the plate with a shadow so it survives being drawn over lit sand. */
+                .cfb-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px 1px 4px;
+                    border-radius: 999px; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums;
+                    color: #f2f5f8; text-shadow: 0 1px 2px rgba(0,0,0,0.95);
+                    background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
+                /* ⚠️ THESE SELECTORS ARE THE RULES' OWN FIELD NAMES AND MUST STAY THAT WAY. They are
+                   written from m.key, which comes from MARK_ORDER — strength, dexterity,
+                   vulnerable, intangible. Four of them were abbreviated here (is-str, is-dex, is-vuln,
+                   is-intang) and so matched NOTHING: Strength, Dexterity, Vulnerable and Intangible each
+                   drew a tag with no colour and no border of its own, which is half the row and includes
+                   both of the marks a player is actively stacking. Nothing failed loudly; they just quietly
+                   went grey. Keyed off status-art.js, so a mark added there gets a colour by being named. */
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }
                 .cfb-tag.is-frail { color: #b6a6ff; border-color: #453a6e; }
-                .cfb-tag.is-vuln { color: #ffcf6a; border-color: #6e5a24; }
+                .cfb-tag.is-vulnerable { color: #ffcf6a; border-color: #6e5a24; }
                 .cfb-tag.is-weak { color: #c8a6ff; border-color: #4c3d6e; }
-                .cfb-tag.is-str { color: #ff9f6a; border-color: #6e4a2c; }
+                .cfb-tag.is-strength { color: #ff9f6a; border-color: #6e4a2c; }
                 /* Green against Strength's orange: the two growth stats have to be told apart at a glance
                    on a 375px board, and they sit next to each other. */
-                .cfb-tag.is-dex { color: #7fe0a8; border-color: #2c6e4a; }
+                .cfb-tag.is-dexterity { color: #7fe0a8; border-color: #2c6e4a; }
                 /* Poison is the only one of these that is counting DOWN to something happening, so it is
                    the loudest — a sour green nothing else on the board uses. */
                 .cfb-tag.is-poison { color: #b8e04a; border-color: #4f6e2c; }
                 .cfb-tag.is-artifact { color: #ffd98f; border-color: #6e5c2c; }
                 .cfb-tag.is-regen { color: #86e0b0; border-color: #2c6e52; }
-                .cfb-tag.is-intang { color: #cfd6e0; border-color: #4a5260; }
+                .cfb-tag.is-intangible { color: #cfd6e0; border-color: #4a5260; }
             `}</style>
         </div>
     );

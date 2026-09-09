@@ -12,6 +12,7 @@ import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { KEYS, KEY_IDS, POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
+import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -375,7 +376,7 @@ export default function CardMap({ run, art = {} }) {
                     <div className="cm-panel is-wide" onClick={(e) => e.stopPropagation()} role="presentation"
                         style={{ "--cf-card-font": CARD_FONT.style.fontFamily }}>
                         <h2>Your deck — {(run.deck || []).length} cards</h2>
-                        <div className="cm-deck-list">
+                        <div className="cm-deck-list cf-deck-grid">
                             {deck.map(({ card, n }) => (
                                 <span key={card.id} className="cm-deck-card">
                                     <span className="cf-card"><CardFace card={card} art={art[card.pet]} onKey={setKeyWord} /></span>
@@ -430,6 +431,7 @@ export default function CardMap({ run, art = {} }) {
             ) : null}
 
             <style jsx global>{`
+                ${DECK_GRID_CSS}
                 .cm { position: fixed; inset: 0; z-index: 4000; color: #e9edf2;
                     display: grid; grid-template-rows: auto 1fr auto; overflow: hidden;
                     /* The ground the rest of the game is made of: near-black, warmed from below as though
@@ -604,7 +606,8 @@ export default function CardMap({ run, art = {} }) {
                 .cm-carry-row i { display: block; margin-top: 1px; font-style: normal; font-size: 12px;
                     line-height: 1.35; color: #c6cdd6; }
 
-                .cm-deck-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+                /* The three-across grid it sits in is DECK_GRID_CSS at the top of this block — see deck-grid.js for
+                   why the wrapping row it used to be came out two-wide on a 355px phone. */
                 .cm-deck-card { position: relative; }
                 .cm-deck-n { position: absolute; right: -3px; bottom: 4px; z-index: 5;
                     min-width: 17px; height: 17px; padding: 0 3px; border-radius: 9px;

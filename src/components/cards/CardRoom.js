@@ -11,6 +11,7 @@ import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { KEYS, KEY_WHY, PERKS, POTIONS, canUpgrade, cardById, keyProgress, upgradedId } from "@/lib/marketplace/cards-kit.js";
+import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -304,7 +305,7 @@ export default function CardRoom({ run, art = {} }) {
                                 Never mind
                             </button>
                         </div>
-                        <div className="cr-pick-deck">
+                        <div className="cr-pick-deck cf-deck-grid">
                             {deck.map((id, i) => {
                                 const c = cardById(id);
                                 if (!c) return null;
@@ -370,6 +371,7 @@ export default function CardRoom({ run, art = {} }) {
             {/* Global for the same reason the shop's is: every selector is under `.cr`, which is this screen
                 and nothing else on the site. */}
             <style jsx global>{`
+                ${DECK_GRID_CSS}
                 .cr { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;
                     padding: 0 10px 76px; background: #0a0b0f; color: #efe3cd; }
@@ -516,7 +518,8 @@ export default function CardRoom({ run, art = {} }) {
                 .cr-pick-head { margin: 0; text-align: left; font-size: 14px; color: #ffcf9a; }
                 /* The panel scrolls, not the grid inside it — a scroller inside a scroller on a phone is
                    two things that both eat the same drag. */
-                .cr-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+                /* The three-across grid it sits in is DECK_GRID_CSS at the top of this block — see deck-grid.js for
+                   why the wrapping row it used to be came out two-wide on a 355px phone. */
                 .cr-card { padding: 0; border: 0; background: none; cursor: pointer; }
                 .cr-card:disabled { cursor: default; }
                 /* A copy that has already been to the fire is still SHOWN — a deck with its upgrades hidden is

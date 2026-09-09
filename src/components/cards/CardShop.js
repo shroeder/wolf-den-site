@@ -11,6 +11,7 @@ import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
+import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -403,7 +404,7 @@ export default function CardShop({ run, art = {} }) {
                         <button type="button" className="cs-pick-out" disabled={busy}
                             onClick={() => setPicking(false)}>Never mind</button>
                     </div>
-                    <div className="cs-pick-deck">
+                    <div className="cs-pick-deck cf-deck-grid">
                         {deck.map((id, i) => {
                             const c = cardById(id);
                             if (!c) return null;
@@ -434,6 +435,7 @@ export default function CardShop({ run, art = {} }) {
             <CardFoot label="Move on" busy={busy} onClick={() => post({ action: "leave" })} />
 
             <style jsx global>{`
+                ${DECK_GRID_CSS}
                 .cs { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center; gap: 10px;
                     /* ends above the foot band — see CardFoot */
@@ -713,7 +715,8 @@ export default function CardShop({ run, art = {} }) {
                     background: transparent; border: 1px solid rgba(203,184,148,0.35); border-radius: 999px;
                     padding: 5px 12px; cursor: pointer; }
                 .cs-pick-out:hover { color: #f0e2c6; border-color: rgba(240,226,198,0.6); }
-                .cs-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+                /* The three-across grid it sits in is DECK_GRID_CSS at the top of this block — see deck-grid.js for
+                   why the wrapping row it used to be came out two-wide on a 355px phone. */
                 .cs-pick .cs-buy { padding-bottom: 0; }
 
                 /* The map's ribbon, so leaving looks the same wherever you are leaving from. */

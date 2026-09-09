@@ -743,7 +743,7 @@ export async function shopStock(buyerId, run, seed) {
  *
  * Threaded off the run's own seed and its act, so reloading the choice screen re-offers the same three — the
  * same rule the card rewards and the merchant's shelf already follow. One you already carry cannot be offered
- * again; with five in the catalogue and one taken per boss, act three still has a real choice.
+ * again; the catalogue is twenty and a run takes one per boss, so the pool never runs thin.
  */
 export function bossOffers(run) {
     const held = new Set(run.perks || []);
