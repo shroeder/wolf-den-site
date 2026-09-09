@@ -2313,7 +2313,15 @@ export default function CardFightClient({ fixture, run = null }) {
                    messed up". A cf- prefix is not a namespace; the card face and the fight screen share it. */
                 /* The bottle held up. Above the board and above the hand, because it is a question being
                    asked; tapping the dark is "no" and costs nothing. */
-                .cf-read-over { position: fixed; inset: 0; z-index: 4300; display: grid; place-items: center;
+                /* ⚠️ 4300 PUT IT UNDER THE REWARD SCREEN. This is the potion note Luke asked for by name —
+                   "I need to be able to click the chalk flask and see a modal details" — and the flask he
+                   was pointing at was ON the reward screen, which is exactly where it did not work: tapping
+                   the bottle opened the note BEHIND the three cards, dimmed to nearly nothing. Photographed
+                   at 375x667 with an Insight won off a fight.
+                   A note opened FROM a screen has to sit above that screen, so the detail modals now share
+                   one band and stack in the order you would open them: the bottle at 8000, a creature at
+                   8500, and the keyword you tapped inside either of those on top at 9000. */
+                .cf-read-over { position: fixed; inset: 0; z-index: 8000; display: grid; place-items: center;
                     padding: 20px; background: rgba(4,6,10,0.84); backdrop-filter: blur(2px); }
                 .cf-read { align-self: center; justify-self: center;
                     display: flex; flex-direction: column; align-items: center; gap: 10px;
