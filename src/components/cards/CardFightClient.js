@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import {
     GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
-    GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves,
+    GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves, GiSwapBag,
 } from "react-icons/gi";
 
 import {
@@ -447,11 +447,19 @@ export default function CardFightClient({ fixture, run = null }) {
         // you close the tab mid-fight, so it looks fine every time you watch it.
         // The ref, for the third time and the same reason: a bottle drunk inside the impact window of an
         // attack would otherwise be mixed into the state from BEFORE that attack and undo it.
-        const next = drinkPotion(fightRef.current, id);
-        land(next);
-        await post("drink", { slot, hp: next.hero.hp });
-        setDrinking(null);
-        return next;
+        // ⚠️ FINALLY, OR ONE THROW DISABLES THE BUTTON FOR THE REST OF THE FIGHT. `drinking` is what the
+        // Drink button reads to stop a double tap, and it was cleared on the happy path only — so anything
+        // drinkPotion could throw on left a bottle you could open, read and press with nothing happening
+        // ever again. Luke: "when i click drink it it doesnt do anything." That is the shape of it, and a
+        // dead control that looks alive is the worst version of any bug.
+        try {
+            const next = drinkPotion(fightRef.current, id);
+            land(next);
+            await post("drink", { slot, hp: next.hero.hp });
+            return next;
+        } finally {
+            setDrinking(null);
+        }
     }, [runState, fight, drinking, post]);
 
     // What the run is carrying, resolved once — the fight state keeps perk IDS because the engine only needs
@@ -962,7 +970,14 @@ export default function CardFightClient({ fixture, run = null }) {
                             <button type="button" className="cf-satchel"
                                 onClick={() => setShelf("potions")}
                                 aria-label={`Potions, ${(runState?.potions || []).length} carried`}>
-                                <Sprite src={`/images/cards/potions/${(runState?.potions || [])[0]}.png`} className="cf-satchel-art" />
+                                {/* ⚠️ A FIXED GLYPH, NOT THE FIRST ITEM'S ART. Both satchels used to wear
+                                    whatever they happened to be holding first, and the starter TRINKET is
+                                    Warm Blood — whose picture is a bottle. So the trinket pouch and the
+                                    potion belt were two bottles side by side, and Luke read the trinket as
+                                    a potion he could not drink: "why do I have a persistent potion that
+                                    says I healed 6 at the end of each fight". A control that changes what
+                                    it looks like based on its contents cannot be learned. */}
+                                <Sprite src="/images/cards/chrome/ui-potion.png" className="cf-satchel-art" />
                                 <span className="cf-satchel-n">{(runState?.potions || []).length}</span>
                             </button>
                         ) : null}
@@ -970,7 +985,7 @@ export default function CardFightClient({ fixture, run = null }) {
                             <button type="button" className="cf-satchel"
                                 onClick={() => setShelf("perks")}
                                 aria-label={`Trinkets, ${perksHeld.length} carried`}>
-                                <Sprite src={`/images/cards/items/${perksHeld[0].id}.png`} className="cf-satchel-art" />
+                                <GiSwapBag className="cf-satchel-glyph" aria-hidden="true" />
                                 <span className="cf-satchel-n">{perksHeld.length}</span>
                             </button>
                         ) : null}
@@ -1518,11 +1533,18 @@ export default function CardFightClient({ fixture, run = null }) {
                             <b className="cf-read-name">{pot.name}</b>
                             <i className="cf-read-text">{pot.text}</i>
                             {slot !== null ? (
-                                <button type="button" className="cf-read-go"
-                                    disabled={Boolean(fight.over) || drinking !== null}
-                                    onClick={() => { setReading(null); onDrink(slot); }}>
-                                    Drink it
-                                </button>
+                                <>
+                                    <button type="button" className="cf-read-go"
+                                        disabled={Boolean(fight.over) || drinking !== null}
+                                        onClick={() => { setReading(null); onDrink(slot); }}>
+                                        Drink it
+                                    </button>
+                                    {/* A greyed button with no sentence beside it is indistinguishable from
+                                        a broken one. The fight being over is the only reason it refuses. */}
+                                    {fight.over ? (
+                                        <i className="cf-read-note">The fight is over — bottles keep until the next one.</i>
+                                    ) : null}
+                                </>
                             ) : (
                                 <i className="cf-read-note">Your belt was full, so this one was left behind.</i>
                             )}
@@ -2068,8 +2090,15 @@ export default function CardFightClient({ fixture, run = null }) {
                    control: a thing you are holding, with a number on it, that opens to show you what. The
                    loose-bottle belt and the trinket strip that used to live under the stop line are both
                    gone; their rules went with them rather than being left for somebody to find. */
-                .cf-satchel { position: relative; padding: 6px 4px; border: 0; background: none;
+                /* ⚠️ 4px OF PADDING PUT THE BELT AGAINST THE ENERGY GEM. Luke: "move potions left they are
+                   underneath the mana cost." The gem is the one number a player checks every single turn and
+                   the bottle was sitting on its shoulder, so the two read as one control. The group gets its
+                   own right-hand margin rather than each button getting wider — widening the buttons moves
+                   the piles on the far left too. */
+                .cf-satchel { position: relative; padding: 6px 5px; border: 0; background: none;
                     cursor: pointer; line-height: 0; }
+                .cf-satchel-glyph { width: 22px; height: 22px; color: #d8c39a;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
                 .cf-satchel-art { width: 24px; height: 24px; object-fit: contain;
                     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
                 .cf-satchel-n { position: absolute; right: -1px; bottom: 2px; min-width: 13px;
