@@ -9,7 +9,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    ACTS, DRAG_SLOP, KEYS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    ACTS, DRAG_SLOP, KEYS, KEY_WHY, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal, keyProgress,
     heroEndTurn, intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
@@ -1319,6 +1319,9 @@ export default function CardFightClient({ fixture, run = null }) {
                             >
                                 <b>Take {KEYS.ruby.name} instead</b>
                                 <i>{KEYS.ruby.says}</i>
+                                {/* Same sentence the campfire prints. See KEY_WHY — the price was the only
+                                    thing any of the three key buttons ever said. */}
+                                <em>{KEY_WHY} {keyProgress(runState)}</em>
                             </button>
                         ) : null}
                     {/* And the card you just took, on its way into the deck. */}
@@ -2347,6 +2350,8 @@ export default function CardFightClient({ fixture, run = null }) {
                 }
                 .cf-takekey b { display: block; color: #7fe0a8; font-size: 15px; }
                 .cf-takekey i { display: block; margin-top: 3px; color: #8a8f98; font-size: 12px; font-style: normal; }
+                .cf-takekey em { display: block; margin-top: 5px; color: #9be08a; font-size: 11px;
+                    line-height: 1.4; font-style: normal; }
                 .cf-bossperk { display: grid; grid-template-columns: 46px 1fr; grid-template-rows: auto auto;
                     gap: 2px 12px; align-items: center; padding: 10px 12px; cursor: pointer; text-align: left;
                     border-radius: 12px; border: 1px solid rgba(201,162,83,0.4);

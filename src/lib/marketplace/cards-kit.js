@@ -1727,6 +1727,23 @@ export const KEYS = {
         says: "Walk away from what the elite was carrying." },
 };
 export const KEY_IDS = Object.keys(KEYS);
+
+// ── AND WHAT THEY ARE FOR, WHICH NOTHING SAID ────────────────────────────────────────────────────────────
+// ⚠️ EVERY KEY BUTTON PRINTED ITS COST AND NEVER ITS PURPOSE. The campfire offered "Take The Green Key
+// instead — let the fire go out, it gives you nothing tonight", which is a clear price on an unnamed thing.
+// A player who does not already know the keys exist is being asked to give up a 24-point heal for a coloured
+// noun, three times, and the reward for doing it is the largest hidden thing in the game: a fourth act. Of
+// course nobody took one.
+//
+// One sentence, owned by the rules, printed everywhere a key is offered or held.
+export const KEY_WHY = "All three open the door under the Spire, and a fourth act behind it.";
+/** How far along the set this run is, as a sentence a button can wear. */
+export const keyProgress = (run) => {
+    const held = KEY_IDS.filter((k) => Boolean(run?.keys?.[k])).length;
+    return held === 0 ? "Your first of three."
+        : held === 1 ? "Your second of three."
+            : held === 2 ? "The last of the three." : "You have all three.";
+};
 /** Has this run paid for the door three times over? */
 export const hasAllKeys = (run) => KEY_IDS.every((k) => Boolean(run?.keys?.[k]));
 

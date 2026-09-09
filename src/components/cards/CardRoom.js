@@ -8,7 +8,7 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
-import { KEYS, PERKS, POTIONS, canUpgrade, cardById, upgradedId } from "@/lib/marketplace/cards-kit.js";
+import { KEYS, KEY_WHY, PERKS, POTIONS, canUpgrade, cardById, keyProgress, upgradedId } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -270,6 +270,8 @@ export default function CardRoom({ run, art = {} }) {
                                     {busy ? "…" : `Take ${keyHere.name} instead`}
                                 </span>
                                 <span className="cr-do-sub">{keyHere.says}</span>
+                                {/* The price was the only thing this button ever said. See KEY_WHY. */}
+                                <span className="cr-do-why">{KEY_WHY} {keyProgress(run)}</span>
                             </button>
                         ) : null}
                     </div>
@@ -458,6 +460,10 @@ export default function CardRoom({ run, art = {} }) {
                     display: block; margin-top: 4px; font-size: 12px; line-height: 1.35;
                     color: #8a8f98; font-weight: 400;
                 }
+                /* The purpose, under the price. Quieter than the cost line above it and warmer than
+                   the body text, because it is the only part of this button that is good news. */
+                .cr-do-why { display: block; margin-top: 5px; font-size: 11px; line-height: 1.4;
+                    color: #9be08a; opacity: 0.92; }
                 .cr-do-label { position: relative; font-family: var(--cf-card-font); font-size: 15px;
                     font-weight: 700; letter-spacing: 0.02em; color: #ffe6d2; }
                 .cr-do:disabled { cursor: default; opacity: 0.5; }
