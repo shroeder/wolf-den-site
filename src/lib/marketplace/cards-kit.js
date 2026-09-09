@@ -3703,6 +3703,43 @@ export const foeIntent = (state, i = 0) => {
     return script.moves[foe?.next] || script.moves[script.open] || Object.values(script.moves)[0];
 };
 
+/**
+ * What the creature is about to do, in a sentence.
+ *
+ * ── THE PILL IS A PROMISE AND THE PROMISE IS IN GLYPHS ───────────────────────────────────────────────────
+ * The board draws an intent as crossed swords and a number, a shield, a bicep, a blob — which is Spire's own
+ * shorthand and is right for reading a room at a glance. What it cannot do is tell a player who has never
+ * seen it what any of it MEANS, and the creatures lost their names as well (they hung under the health bars
+ * and pushed the four gauges out of line, so they went). So a fight could open with two things you cannot
+ * name doing something you cannot read.
+ *
+ * This is the sentence version, for the note you get by tapping one. It is here rather than in the screen
+ * because it names the same fields the pill draws and the engine spends — a second description of a move,
+ * written in the component, is the card-text problem again in a different room.
+ */
+export function intentSay(state, i = 0) {
+    const beat = foeIntent(state, i);
+    if (!beat) return "It has not decided yet.";
+    const bits = [];
+    const hits = Math.max(1, Math.floor(Number(beat.hits) || 1));
+    if (beat.damage) {
+        const each = intentDamage(state, i) / hits;
+        bits.push(hits > 1
+            ? `Strike you ${hits} times for ${Math.round(each)} each — ${intentDamage(state, i)} in all`
+            : `Strike you for ${intentDamage(state, i)}`);
+    }
+    if (beat.block) bits.push(`Guard itself with ${beat.block} Block`);
+    if (beat.strength) bits.push(`Grow ${beat.strength} Strength${beat.allies ? ", and its allies with it" : ""}`);
+    if (beat.heal) bits.push(`Heal ${beat.heal}`);
+    if (beat.weak) bits.push(`Put ${beat.weak} Weak on you`);
+    if (beat.vulnerable) bits.push(`Put ${beat.vulnerable} Vulnerable on you`);
+    if (beat.frail) bits.push(`Put ${beat.frail} Frail on you`);
+    if (beat.poison) bits.push(`Put ${beat.poison} Poison on you`);
+    if (beat.cards?.length || beat.card) bits.push("Shuffle something into your deck");
+    if (beat.summon?.length) bits.push("Call in something else");
+    return bits.length ? bits.join(". ") + "." : "Wait, and watch you.";
+}
+
 /** What that intent will actually land for, after Strength, Weak and your Vulnerable. Shown, never hidden. */
 export const intentDamage = (state, i = 0) => {
     const intent = foeIntent(state, i);

@@ -19,6 +19,7 @@ import {
 // NOT. What is left here is the BOX: how big a card is, the moulding around it, and the four states only a
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardFoeNote from "@/components/cards/CardFoeNote";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
@@ -170,6 +171,8 @@ export default function CardFightClient({ fixture, run = null }) {
     const [peek, setPeek] = useState(null);
     // The gold word the player asked about — see CardKeyNote.
     const [keyWord, setKeyWord] = useState(null);
+    // Which creature the player asked about — see CardFoeNote.
+    const [foeNote, setFoeNote] = useState(null);
     const [acting, setActing] = useState(false);
 
     // ── THE STATE THE RULES DECIDE FROM IS A REF, NOT THE RENDER'S COPY ──────────────────────────────────
@@ -677,8 +680,14 @@ export default function CardFightClient({ fixture, run = null }) {
 
     // Tapping a body plays the ACTIVE card at it — the half of the interaction a mouse can do, and the half
     // that has to name a target now there are three of them. Tapping yourself is how a heal finds you.
+    // ── A TAP WITH NOTHING RAISED ASKS WHAT IT IS ────────────────────────────────────────────────────
+    // This returned early on `!activeEntry`, so tapping a creature with an empty hand did nothing at all —
+    // and the board says nothing about a foe beyond a glyph and a number, because the names came off the
+    // health bars at Luke's request. That is a free gesture on the one thing in the room a player most needs
+    // explained, so it opens the note. With a card raised the tap still aims it, exactly as before.
     const onFoeTap = (i) => {
-        if (!activeEntry || fight.foes[i]?.hp <= 0) return;
+        if (fight.foes[i]?.hp <= 0) return;
+        if (!activeEntry) { setFoeNote(i); return; }
         if (cardById(activeEntry.id)?.target === "foe") commit(activeEntry.uid, i);
     };
     // Whether the card in the middle can be afforded at all — the bodies stop inviting a tap they would
@@ -1049,8 +1058,18 @@ export default function CardFightClient({ fixture, run = null }) {
                                         that only drew swords and shields would leave the Hexer's turn blank
                                         and the Ramper's roar invisible — a fight you cannot plan against,
                                         which is the opposite of the point. Same four glyphs the cards use. */}
+                                {/* ⚠️ THE PILL IS THE INSPECT, NOT THE BODY. A tap on the creature already
+                                    means "aim the raised card at you", and a card is ALWAYS raised — the
+                                    hand keeps one in the middle — so there is no such thing as a free tap on
+                                    a body to spend on asking a question. Measured the hard way: wiring the
+                                    note to the body played a Bite into the first foe instead of opening it.
+                                    The pill is the one part of a creature that is already ABOUT its next
+                                    move, so it is the honest place to ask what that move is. It stops the
+                                    event so aiming still belongs to the body underneath. */}
                                 {dead ? null : (
-                                    <div className="cf-intent" title={beat.label}>
+                                    <button type="button" className="cf-intent" title={beat.label}
+                                        aria-label={`What ${foe.name || "it"} is about to do`}
+                                        onClick={(e) => { e.stopPropagation(); setFoeNote(i); }}>
                                         <span className="cf-intent-marks">
                                             {beat.damage ? <GiCrossedSwords aria-hidden="true" /> : null}
                                             {beat.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
@@ -1060,7 +1079,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                             {beat.vulnerable ? <GiCrackedShield className="is-curse" aria-hidden="true" /> : null}
                                         </span>
                                         {beat.damage ? <b>{swing}</b> : null}
-                                    </div>
+                                    </button>
                                 )}
                                 <div className="cf-floats">
                                     {floats.filter((f) => f.on === foe.id).map((f) => (
@@ -1254,6 +1273,8 @@ export default function CardFightClient({ fixture, run = null }) {
             {/* ⚠️ THE ONE PLACE A PLAYER ACTUALLY NEEDS THIS is mid-fight, holding a card that says Frail at
                 them for the first time. It mounts at the root rather than inside the pile dialog so it sits
                 over whatever is open. */}
+            <CardFoeNote fight={fight} index={foeNote} onClose={() => setFoeNote(null)} onKey={setKeyWord} />
+
             <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 
             {fight.over ? (
@@ -1917,8 +1938,12 @@ export default function CardFightClient({ fixture, run = null }) {
                     100% { transform: translateY(0) scaleX(1) scaleY(1); }
                 }
 
+                /* A button now, so the reset is a reset: a button brings its own font, box, background and
+                   padding and every one of those would move the pill off the creature's head. The padding is
+                   the only thing added — a glyph and two digits is a small thing to ask a thumb to find. */
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
-                    margin-bottom: 4px; }
+                    margin-bottom: 4px; font: inherit; color: inherit; background: none; border: 0;
+                    padding: 4px 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
                 .cf-intent-marks { display: inline-flex; align-items: center; gap: 3px; font-size: 21px;
                     color: #ffd0c4; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.9)); }
                 .cf-intent-marks .is-guard { font-size: 17px; color: #9fd2ff; }
