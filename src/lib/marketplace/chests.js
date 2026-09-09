@@ -244,6 +244,9 @@ export async function surpriseChest(buyerId, source = "surprise", weight = SURPR
     // A per-action roll pays whoever performs the most actions, which is the shape that got farmed before,
     // and it would make the CHEAPEST action in the game the optimal one. A ceiling of one costs a normal
     // player nothing and removes the reason to sit on a plant button.
+    // It counts a top chest from ANY source, not only a surprise — so a mining ascendant blocks one the same
+    // day. Deliberately the firmer reading: the ceiling is "one of these a day", not "one of these a day per
+    // faucet", and at roughly one a day Den-wide the two almost never collide anyway.
     const had = await db.queryOne(
         `SELECT 1 AS x FROM mkt_chest_grant
           WHERE buyer_id = $1 AND tier = ANY($2)
@@ -254,7 +257,49 @@ export async function surpriseChest(buyerId, source = "surprise", weight = SURPR
     if (had) return null;
     await addChests(buyerId, { [won]: 1 },
         { source: String(source || "surprise").slice(0, 40), meta: { surprise: true, weight } });
+    await announceSurprise(buyerId, won, source).catch(() => {});
     return won;
+}
+
+// Where it fell, in words. The POINT of naming the room is the design itself: a member who reads "out of the
+// stockpot" three days after reading "off the reels" has learned the rule without anybody explaining it —
+// which is the only way to teach a thing that never announces itself in advance.
+const SURPRISE_WHERE = {
+    fishing: "on the end of a line", fishing_dig: "buried on the shore",
+    cooking: "out of the stockpot", forge_smelt: "in the bottom of the crucible",
+    mining_trip: "down the mine", forge_salvage: "in a pile of scrap",
+    farm_plant: "turned up in the soil", farm_harvest: "in among the harvest",
+    casino: "on the floor of the casino", arena_bout: "in the sand of the ring",
+    town_raid: "off something that fell in the plaza", boss_hit: "loose from the boss",
+    sailing: "hauled out of the sea", daily_spin: "off the wheel",
+    pet_petting: "dragged in by an animal", stockade: "at the stockade",
+    consumable: "at the bottom of the bottle", feature_daily: "left lying about",
+    delve_clear: "at the bottom of the delve",
+};
+
+/**
+ * ── AND THE DEN HEARS ABOUT IT ───────────────────────────────────────────────────────────────────────────
+ * A surprise nobody sees is not a surprise, it is an inventory that changed. These land about once a DAY
+ * across the whole Den, so a line in the announce channel is a rare event rather than noise — and it goes
+ * through postSystemChat, which means it is the Arbiter speaking and members who have muted milestone posts
+ * do not get it.
+ *
+ * Costs a round trip, and can afford to: nothing reaches this line unless a roll of about 1 in 5,676 has
+ * already come in.
+ */
+async function announceSurprise(buyerId, tier, source) {
+    const who = await db.queryOne(`SELECT display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const name = who?.display_name;
+    if (!name) return false;
+    const label = CHEST_TIERS[tier]?.label || `${tier} chest`;
+    const where = SURPRISE_WHERE[source] || "somewhere in the Den";
+    // The two rarest are worth a different sentence. Everything else gets the plain one, because the plain
+    // one is the format members will see most and it should not read like a trumpet every time.
+    const body = tier === "primordial" || tier === "celestial"
+        ? `A ${label} — ${where}, and it went to ${name}. There is no telling where the next one turns up.`
+        : `${name} found a ${label} ${where}.`;
+    const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
+    return postSystemChat(body, "milestone");
 }
 
 /**
