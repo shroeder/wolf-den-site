@@ -236,11 +236,16 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                 .cc-item em { display: block; margin-top: 3px; font-style: normal; font-size: 11px;
                     letter-spacing: 0.03em; color: #8e8069; }
 
-                .cc .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
+                /* ⚠️ NO ROOT PREFIX — THE BLOCK ALREADY ADDS ONE. Written as ".cc .cf-card" this is served
+                   as ".cc .cc .cf-card", which asks for two nested elements with that class; there is one, so
+                   the rule never applied and the card was drawn with no box, taking its size from its own
+                   text. Found in the shop, where three cards came out three different sizes and fell off the
+                   shelf; the same line was in four files. */
+                .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
-                .cc .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
                 /* Held up: the same face at a size the sentence on it can be read at — which it now is.
@@ -249,7 +254,7 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                    61px window and 10.5px text inside a box three quarters larger and the result was a
                    slit of animal over an empty slab. The face reads these two numbers now (see the note
                    at the top of CardFace's stylesheet) and everything on it is a fraction of them. */
-                .cc .cf-card.is-big { --cf-w: 168px; --cf-h: 242px; }
+                .cf-card.is-big { --cf-w: 168px; --cf-h: 242px; }
 
                 .cc-over { position: fixed; inset: 0; z-index: 4100; display: grid; place-items: center;
                     padding: 16px; background: rgba(4,5,8,0.88); }

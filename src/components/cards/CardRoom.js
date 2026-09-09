@@ -444,11 +444,16 @@ export default function CardRoom({ run, art = {} }) {
                 /* A copy that has already been to the fire is still SHOWN — a deck with its upgrades hidden is
                    a deck you cannot plan with — it simply cannot be chosen again. */
                 .cr-card.is-done { opacity: 0.45; filter: grayscale(0.55); }
-                .cr .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
+                /* ⚠️ NO ROOT PREFIX — THE BLOCK ALREADY ADDS ONE. Written as ".cr .cf-card" this is served
+                   as ".cr .cr .cf-card", which asks for two nested elements with that class; there is one, so
+                   the rule never applied and the card was drawn with no box, taking its size from its own
+                   text. Found in the shop, where three cards came out three different sizes and fell off the
+                   shelf; the same line was in four files. */
+                .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
-                .cr .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
 

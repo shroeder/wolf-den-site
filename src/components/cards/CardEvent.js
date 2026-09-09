@@ -367,14 +367,19 @@ export default function CardEvent({ run, art = {} }) {
                    own button belonged to the NEIGHBOURING card's stock layer, not to the button — so every tap
                    landed on a sibling and the picker could not be used at all. The bot sat in it for a
                    hundred and thirty steps saying "choosing a card" and never chose one. */
-                .cv .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
+                /* ⚠️ NO ROOT PREFIX — THE BLOCK ALREADY ADDS ONE. Written as ".cv .cf-card" this is served
+                   as ".cv .cv .cf-card", which asks for two nested elements with that class; there is one, so
+                   the rule never applied and the card was drawn with no box, taking its size from its own
+                   text. Found in the shop, where three cards came out three different sizes and fell off the
+                   shelf; the same line was in four files. */
+                .cf-card { position: relative; width: var(--cf-w, 96px); height: var(--cf-h, 138px); padding: 0 0 8px;
                     display: flex; flex-direction: column; align-items: center;
                     background: none; border: 0; border-radius: 9px;
                     filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
                 /* The painted moulding, laid over the clipped picture — the same overlay every other screen
                    that draws a card puts on it. Sizing the box without this gives a card with no frame and
                    its pieces sitting where the flex column did not put them. */
-                .cv .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
+                .cf-card::after { content: ""; position: absolute; inset: -1px; z-index: 2;
                     pointer-events: none; background-image: url(/images/cards/chrome/frame.png);
                     background-repeat: no-repeat; background-size: 100% 100%; }
                 .cv-card { padding: 0; border: 0; background: none; cursor: pointer; }
