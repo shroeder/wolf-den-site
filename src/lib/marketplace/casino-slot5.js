@@ -638,6 +638,51 @@ const VAULT = {
     second: { kind: "gems", label: "The Gem Vault" },
 };
 
+// ── ⚠️ ONE DIAL PER CABINET, AND THE TABLES ARE MULTIPLIED BY IT AT IMPORT ───────────────
+// Luke: "slots are pissing people off. we need to up the win rates."
+//
+// The floor was not stingy by the numbers — The Hunt returns 97.6% and four of the five cabinets sit in the
+// mid-nineties — and it was still true that nobody had pressed a slot since 31 August. What the RTP hides is
+// the SHAPE, which is the thing casino-sim's own header warns about: a high hit rate and a low ceiling means
+// you win constantly, in coppers, while the bankroll walks downhill and nothing ever happens. Measured on
+// the shipped tables: buy in 5,000 and play for a Counter pet and you go broke 89% of the time.
+//
+// And The Deep was six and a half points below every other cabinet at 90.03%, which nothing had decided —
+// it is simply where its table landed.
+//
+// So each machine carries a `pay` and every payout multiplier it owns is scaled by that number when this
+// module loads. It is done HERE, once, rather than at the point a win is paid, because a spin's total has
+// three exits (base, cascade-fire, colossal) and the SCREEN reads the same numbers the payout does: scaling
+// a total on the way out would show a player a line paying 13.2 and bank 15.8. Scale the table and every
+// number downstream — line wins, scatters, the meter, the bonus rounds that pay off the same ladder — is
+// consistent by construction.
+//
+// ⚠️ THE DIALS ARE SOLVED, NOT CHOSEN. Each one is the number that puts its cabinet on TARGET_RTP when
+// measured by scripts/casino-sim.mjs, which drives this exact function. Change the target, re-run the sim,
+// write the new dials down. Do not eyeball them: the bonus rounds are a fixed share of the return and do
+// not move with this dial, so the relationship between the dial and the RTP is different on every cabinet.
+export const TARGET_RTP = 0.99;
+HUNT.pay = 1.045;
+HARVEST.pay = 1.031;
+DEEP.pay = 1.038;
+MENAGERIE.pay = 1.033;
+VAULT.pay = 1.058;
+
+// Multiplies every paying number a cabinet owns. `pays` is symbol -> count -> multiple of the line bet and
+// `scatterPays` is count -> multiple of the total bet; both are payouts and nothing else in the machine is.
+// Reel strips, trigger counts and spin counts are deliberately untouched — this changes what a win is
+// WORTH, never how often one lands, so the rhythm of the machine is exactly the rhythm that was tuned.
+for (const m of [HUNT, HARVEST, DEEP, MENAGERIE, VAULT]) {
+    const k = Number(m.pay) || 1;
+    if (k === 1) continue;
+    for (const table of Object.values(m.pays || {})) {
+        for (const n of Object.keys(table)) table[n] = Number((table[n] * k).toPrecision(6));
+    }
+    for (const n of Object.keys(m.scatterPays || {})) {
+        m.scatterPays[n] = Number((m.scatterPays[n] * k).toPrecision(6));
+    }
+}
+
 export const SLOTS5 = { slot: HUNT, slot2: HARVEST, slot3: DEEP, slot4: MENAGERIE, slot5: VAULT };
 export const slot5 = (id) => SLOTS5[id] || SLOTS5.slot;
 

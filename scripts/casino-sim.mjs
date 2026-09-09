@@ -61,7 +61,7 @@ Buy in ${BANK.toLocaleString()} chips, play ${m.label} at ${BET} a spin until br
 console.log("This is the question an RTP cannot answer: does anybody ever actually get there?");
 console.log("EXTRA x on top of the shipped paytable — 1.00 means the machine as it ships");
 console.log("payout x   reached goal   went broke   median spins");
-for (const edge of [1, 0.97, 0.95, 0.92, 0.90, 0.85]) {
+for (const edge of (process.env.SIM_EDGES ? process.env.SIM_EDGES.split(',').map(Number) : [1, 0.97, 0.95, 0.92, 0.90, 0.85])) {
     let won = 0, spinsTotal = 0;
     for (let r = 0; r < RUNS; r++) {
         let bank = BANK, meter = [], n = 0;
