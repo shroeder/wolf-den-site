@@ -20,6 +20,8 @@ import {
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoeNote from "@/components/cards/CardFoeNote";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
@@ -153,6 +155,8 @@ export default function CardFightClient({ fixture, run = null }) {
     useEffect(() => {
         if (!run || !fight.over || reported.current === fight.over) return;
         reported.current = fight.over;
+        // The one guarded place a fight can end, so the fanfare cannot double-fire either.
+        sfx(fight.over === "win" ? "win" : "lose");
         post(fight.over === "win" ? "won" : "dead", { hp: fight.hero.hp });
     }, [run, fight.over, fight.hero.hp, post]);
     // ── THE HAND IS ALWAYS INSPECTING SOMETHING ─────────────────────────────────────────────────────
@@ -313,6 +317,18 @@ export default function CardFightClient({ fixture, run = null }) {
             if (e.type === "damage") made.push({ id: (floatSeq.current += 1), on: e.on, kind: "damage", text: `-${e.amount}` });
             else if (e.type === "block") made.push({ id: (floatSeq.current += 1), on: e.on, kind: "block", text: `+${e.amount}` });
             else if (e.type === "debuff") made.push({ id: (floatSeq.current += 1), on: e.on, kind: "debuff", text: `${e.key} ${e.amount}` });
+            // ── AND EVERY ONE OF THEM MAKES A NOISE ──────────────────────────────────────────────────
+            // The engine already hands this function every single thing that happens in a fight, which
+            // makes it the one place worth wiring: a sound added to a new event type lands here and
+            // nowhere else. Damage TO THE HERO is a different sound from damage he deals, because the
+            // whole point of an impact noise is telling you which way it went without looking.
+            if (e.type === "damage") sfx(e.on === "hero" ? "hurt" : (e.amount >= 12 ? "crit" : "hit"));
+            else if (e.type === "block") sfx("block");
+            else if (e.type === "debuff") sfx("debuff");
+            else if (e.type === "heal") sfx("heal");
+            else if (e.type === "buff") sfx("buff");
+            else if (e.type === "poison") sfx("poison");
+            else if (e.type === "down" || e.type === "death") sfx("foeDown");
         }
         if (!made.length) return;
         setFloats((cur) => [...cur, ...made]);
@@ -337,8 +353,14 @@ export default function CardFightClient({ fixture, run = null }) {
         // the function that actually changes the fight, so no future caller can get in behind it.
         if (actingRef.current) return;
         const fight = fightRef.current;
-        if (!canPlay(fight, uid)) return;
+        // ⚠️ A REFUSAL IS AN EVENT TOO. Both of these used to return in silence, so a card you could not
+        // afford and a tap that landed mid-animation felt identical to a broken button. They are the two
+        // moments a player most needs told something, and they cost one short buzz each.
+        if (!canPlay(fight, uid)) { sfx("denied"); return; }
         const entry = fight.hand.find((c) => c.uid === uid);
+        // The card's own kind picks the noise: a blade, a ward, a thing that stays on the table.
+        const kind = cardById(entry?.id)?.kind;
+        sfx(kind === "attack" ? "attack" : kind === "power" ? "power" : "skill");
         const { state, events } = playCard(fight, uid, target === "self" ? 0 : target);
         // Booked NOW, whatever the picture does next. The next tap and End turn both read this.
         fightRef.current = state;
@@ -453,6 +475,7 @@ export default function CardFightClient({ fixture, run = null }) {
         // ever again. Luke: "when i click drink it it doesnt do anything." That is the shape of it, and a
         // dead control that looks alive is the worst version of any bug.
         try {
+            sfx("potion");
             const next = drinkPotion(fightRef.current, id);
             land(next);
             await post("drink", { slot, hp: next.hero.hp });
@@ -505,6 +528,7 @@ export default function CardFightClient({ fixture, run = null }) {
         // blockEach trinket pay HERE, before the party swings, so the block they give is block that
         // actually eats a hit. Driving the clock ourselves meant calling startFoeTurn directly, which
         // stepped over the whole thing — it paid in the simulator and paid nothing on screen.
+        sfx("endTurn");
         const mine = heroEndTurn(fight);
         let cur = startFoeTurn(mine.state).state;
         land(cur);
@@ -693,6 +717,16 @@ export default function CardFightClient({ fixture, run = null }) {
     // and the board says nothing about a foe beyond a glyph and a number, because the names came off the
     // health bars at Luke's request. That is a free gesture on the one thing in the room a player most needs
     // explained, so it opens the note. With a card raised the tap still aims it, exactly as before.
+    // ── THE ROOM'S OWN HUM ───────────────────────────────────────────────────────────────────────────
+    // An elite and a boss are the same screen as an ordinary fight, so nothing but the run's own idea of
+    // what room this is can pick the track. Over means the fight is done and the reward is on screen, which
+    // is a different feeling and gets the map's music back.
+    useCardSound(
+        fight.over ? "map"
+            : runState?.at?.kind === "boss" ? "boss"
+                : runState?.at?.kind === "elite" ? "elite" : "fight",
+    );
+
     const onFoeTap = (i) => {
         if (fight.foes[i]?.hp <= 0) return;
         if (!activeEntry) { setFoeNote(i); return; }
@@ -720,6 +754,8 @@ export default function CardFightClient({ fixture, run = null }) {
     // you tapped was the one you got. It lifts and settles into the deck now — see CardGot — and the request
     // goes out as it starts moving, so nothing is waiting on the network.
     const takeCard = async (id) => {
+        // Taking a card and taking the embers instead are different results and should not sound the same.
+        sfx(id ? "card" : "embers");
         if (id) setTook(id);
         const sent = post(id ? "pick" : "skip", id ? { id } : {});
         const [next] = await Promise.all([

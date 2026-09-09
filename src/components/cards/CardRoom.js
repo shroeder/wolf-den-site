@@ -8,6 +8,8 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { KEYS, KEY_WHY, PERKS, POTIONS, canUpgrade, cardById, keyProgress, upgradedId } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
@@ -83,6 +85,8 @@ export default function CardRoom({ run, art = {} }) {
     const heal = Math.ceil((run.hpMax || 1) * 0.3);
     const whole = run.hp >= run.hpMax;
     const deck = run.deck || [];
+    // A fire hums; a chest room borrows the map's air.
+    useCardSound(isFire ? "campfire" : "map");
     const sharpenable = deck.filter((id) => canUpgrade(id));
     const loot = at.opened || null;
     const gotPotion = loot?.potion ? POTIONS[loot.potion] : null;
@@ -236,7 +240,7 @@ export default function CardRoom({ run, art = {} }) {
                             type="button"
                             className="cr-do"
                             disabled={busy || (isFire && whole)}
-                            onClick={() => post(isFire ? "rest" : "open")}
+                            onClick={() => { sfx(isFire ? "rest" : "chest"); post(isFire ? "rest" : "open"); }}
                         >
                             <span className="cr-do-label">
                                 {busy ? "…" : isFire ? (whole ? "Nothing to mend" : `${room.verb} — heal ${heal}`) : room.verb}
@@ -264,7 +268,7 @@ export default function CardRoom({ run, art = {} }) {
                                 type="button"
                                 className="cr-do is-key"
                                 disabled={busy}
-                                onClick={() => post("takekey", { key: keyHere.id })}
+                                onClick={() => { sfx("key"); post("takekey", { key: keyHere.id }); }}
                             >
                                 <span className="cr-do-label">
                                     {busy ? "…" : `Take ${keyHere.name} instead`}

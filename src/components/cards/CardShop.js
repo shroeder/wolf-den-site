@@ -8,6 +8,8 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -129,7 +131,10 @@ export default function CardShop({ run, art = {} }) {
     // The one irreversible thing this shop does, and it used to happen in silence. Same ceremony the campfire
     // uses (CardForge), opposite ending: the card catches and goes up as embers. The request leaves as the
     // card starts moving, so the fire is not waiting on the network.
+    // The merchant keeps a brighter room than the rest of the run.
+    useCardSound("shop");
     const burnCard = useCallback(async (id, index) => {
+        sfx("burn");
         if (busy || burning) return;
         setBusy(true);
         setSaid(null);
@@ -333,7 +338,7 @@ export default function CardShop({ run, art = {} }) {
                             type="button"
                             className="cs-look-buy"
                             disabled={busy || shownGone || shortBy > 0 || beltFull}
-                            onClick={() => post({ action: "buy", slot: shown.slot })}
+                            onClick={() => { sfx("buy"); post({ action: "buy", slot: shown.slot }); }}
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="cs-look-plate" src="/images/cards/chrome/button-plate.png" alt="" />

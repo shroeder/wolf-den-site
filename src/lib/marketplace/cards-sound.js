@@ -1,0 +1,272 @@
+// ── THE CARD GAME MAKES A NOISE NOW ──────────────────────────────────────────────────────────────────────
+// Luke: "we need music sound effects and vibrations, run automatically ... for every single detail of the
+// card game."
+//
+// SYNTHESISED, NOT SHIPPED. Every sound here is built out of oscillators and one noise buffer at the moment
+// it plays. That is already the house pattern — the forge, the farm and the delve each carry a small
+// WebAudio helper — and it is the right one for this game in particular: the card art is 4.8MB and a phone
+// on a bad connection already loses pictures to it. A sound pack would be the same problem again, arriving
+// late, for a fight that lasts ninety seconds. This costs nothing to fetch, works offline, and has no
+// loading state anywhere in it.
+//
+// ⚠️ ONE MODULE, NOT ONE PER SCREEN. The three helpers that already exist are the same twelve lines copied
+// three times and they have already drifted apart. The fight, the map, the shop, the campfire, the events
+// and the front room all pull from here, so "what a card sounds like" has exactly one answer.
+//
+// AUTOPLAY: a browser will not let a page make noise before it has been touched. The context is built
+// suspended and wake() resumes it on the first real gesture — see useCardSound.
+
+const isBrowser = () => typeof window !== "undefined";
+
+let ctx = null;
+let master = null;
+let musicBus = null;
+
+const PREF = "wolfden.cards.sound";
+const DEFAULTS = { sfx: true, music: true, haptics: true };
+const readPref = () => {
+    if (!isBrowser()) return { ...DEFAULTS };
+    try {
+        const raw = window.localStorage.getItem(PREF);
+        return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : { ...DEFAULTS };
+    } catch { return { ...DEFAULTS }; }
+};
+let pref = readPref();
+
+const MUSIC_GAIN = 0.13;   // low on purpose: this sits UNDER a fight, it does not lead one
+
+export const soundPref = () => ({ ...pref });
+
+export function setSoundPref(next) {
+    pref = { ...pref, ...next };
+    try { window.localStorage.setItem(PREF, JSON.stringify(pref)); } catch { /* private mode */ }
+    if (master) master.gain.value = pref.sfx ? 1 : 0;
+    if (musicBus) musicBus.gain.value = pref.music ? MUSIC_GAIN : 0;
+    if (!pref.music) stopMusic();
+    return soundPref();
+}
+
+function boot() {
+    if (!isBrowser() || ctx) return ctx;
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = pref.sfx ? 1 : 0;
+        master.connect(ctx.destination);
+        musicBus = ctx.createGain();
+        musicBus.gain.value = pref.music ? MUSIC_GAIN : 0;
+        musicBus.connect(ctx.destination);
+    } catch { ctx = null; }
+    return ctx;
+}
+
+/** Off the first gesture. Until this runs everything below is a no-op that costs nothing. */
+export function wake() {
+    const a = boot();
+    if (!a) return false;
+    if (a.state === "suspended") a.resume().catch(() => {});
+    return a.state !== "suspended";
+}
+
+export const audioAwake = () => Boolean(ctx && ctx.state === "running");
+const live = () => { const a = boot(); return a && a.state === "running" ? a : null; };
+
+// ── THE THREE THINGS EVERY SOUND IS MADE OF ──────────────────────────────────────────────────────────────
+// A pitched tone with an envelope, a band of noise, and a run of notes. Everything named below is an
+// arrangement of these, which is what keeps the palette sounding like one game rather than six afternoons.
+
+/** A pitched note. `to` bends the pitch across its life, which is most of the character. */
+function tone({ freq = 440, to = null, dur = 0.14, type = "triangle", gain = 0.16, delay = 0 } = {}) {
+    const a = live(); if (!a) return;
+    try {
+        const t = a.currentTime + delay;
+        const o = a.createOscillator();
+        const g = a.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, t);
+        if (to) o.frequency.exponentialRampToValueAtTime(Math.max(1, to), t + dur);
+        // A four-millisecond attack rather than an instant one. A click at the head of a note is the single
+        // thing that makes synthesised audio sound cheap, and this is what it costs to avoid.
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + dur + 0.02);
+    } catch { /* a sound is never worth throwing over */ }
+}
+
+let noiseBuf = null;
+/** A band of noise — impacts, fire, paper, stone. Filtered, because raw white noise is a hiss and nothing more. */
+function noise({ dur = 0.16, gain = 0.14, freq = 900, q = 1.1, type = "bandpass", delay = 0, sweepTo = null } = {}) {
+    const a = live(); if (!a) return;
+    try {
+        if (!noiseBuf) {
+            noiseBuf = a.createBuffer(1, Math.floor(a.sampleRate * 1.2), a.sampleRate);
+            const d = noiseBuf.getChannelData(0);
+            for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
+        }
+        const t = a.currentTime + delay;
+        const src = a.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const f = a.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+        if (sweepTo) f.frequency.exponentialRampToValueAtTime(Math.max(40, sweepTo), t + dur);
+        const g = a.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(f); f.connect(g); g.connect(master);
+        src.start(t); src.stop(t + dur + 0.02);
+    } catch { /* ignore */ }
+}
+
+/** Notes in a row. A chord arpeggiated is what good news sounds like. */
+const run = (freqs, { step = 0.055, ...rest } = {}) =>
+    freqs.forEach((f, i) => tone({ freq: f, delay: i * step, ...rest }));
+
+// ── VIBRATION ────────────────────────────────────────────────────────────────────────────────────────────
+// ⚠️ ANDROID ONLY, AND THAT IS FINE. iOS Safari has never implemented navigator.vibrate and is not going to,
+// so this is a bonus where it exists rather than something the game leans on. Patterns are deliberately
+// short: a phone buzzing for a third of a second on every card is why people turn haptics off.
+export function haptic(pattern) {
+    if (!isBrowser() || !pref.haptics) return;
+    try { navigator.vibrate?.(pattern); } catch { /* ignore */ }
+}
+
+// ── EVERY SOUND THE CARD GAME MAKES ──────────────────────────────────────────────────────────────────────
+// Named for the EVENT, never for the noise, so a screen asks for "attack" and not for "a sawtooth at 190Hz".
+// That is what lets the whole palette be re-tuned here without touching a component.
+export const SFX = {
+    // the hand
+    draw: () => noise({ dur: 0.09, gain: 0.05, freq: 2600, q: 0.7, sweepTo: 1500 }),
+    raise: () => tone({ freq: 520, to: 640, dur: 0.07, type: "sine", gain: 0.05 }),
+    attack: () => { noise({ dur: 0.11, gain: 0.16, freq: 1500, sweepTo: 420 }); tone({ freq: 190, to: 90, dur: 0.13, type: "sawtooth", gain: 0.13 }); haptic(18); },
+    skill: () => { tone({ freq: 430, to: 660, dur: 0.16, type: "sine", gain: 0.11 }); haptic(12); },
+    power: () => { run([392, 523, 659], { dur: 0.2, type: "sine", gain: 0.1, step: 0.06 }); haptic([12, 30, 18]); },
+    denied: () => { tone({ freq: 150, dur: 0.1, type: "square", gain: 0.07 }); haptic([12, 40, 12]); },
+    exhaust: () => noise({ dur: 0.34, gain: 0.09, freq: 1700, sweepTo: 240 }),
+    discard: () => noise({ dur: 0.07, gain: 0.05, freq: 1200, q: 0.6 }),
+
+    // what lands
+    hit: () => { noise({ dur: 0.1, gain: 0.15, freq: 900, sweepTo: 200 }); tone({ freq: 130, to: 70, dur: 0.11, type: "square", gain: 0.09 }); },
+    crit: () => { noise({ dur: 0.15, gain: 0.2, freq: 2200, sweepTo: 300 }); tone({ freq: 260, to: 80, dur: 0.18, type: "sawtooth", gain: 0.15 }); haptic([26, 24, 26]); },
+    hurt: () => { tone({ freq: 220, to: 96, dur: 0.2, type: "sawtooth", gain: 0.15 }); noise({ dur: 0.13, gain: 0.1, freq: 500, sweepTo: 160 }); haptic(34); },
+    block: () => { tone({ freq: 300, to: 420, dur: 0.13, type: "triangle", gain: 0.1 }); noise({ dur: 0.08, gain: 0.07, freq: 3000, q: 2.2 }); haptic(10); },
+    guarded: () => { noise({ dur: 0.1, gain: 0.11, freq: 3400, q: 3, sweepTo: 1800 }); tone({ freq: 520, to: 380, dur: 0.1, type: "sine", gain: 0.07 }); },
+    heal: () => run([523, 659, 880], { dur: 0.22, type: "sine", gain: 0.09, step: 0.05 }),
+    buff: () => run([330, 415, 494], { dur: 0.2, type: "triangle", gain: 0.08, step: 0.045 }),
+    debuff: () => { tone({ freq: 300, to: 170, dur: 0.26, type: "sine", gain: 0.09 }); haptic(16); },
+    poison: () => { tone({ freq: 210, to: 150, dur: 0.22, type: "sine", gain: 0.07 }); noise({ dur: 0.18, gain: 0.05, freq: 700, q: 2 }); },
+    foeDown: () => { tone({ freq: 300, to: 60, dur: 0.42, type: "sawtooth", gain: 0.13 }); noise({ dur: 0.4, gain: 0.11, freq: 1200, sweepTo: 120 }); haptic([30, 40, 60]); },
+
+    // the turn
+    turn: () => { tone({ freq: 300, to: 400, dur: 0.14, type: "sine", gain: 0.07 }); SFX.draw(); },
+    endTurn: () => { tone({ freq: 400, to: 260, dur: 0.16, type: "triangle", gain: 0.08 }); haptic(14); },
+    energy: () => tone({ freq: 700, to: 900, dur: 0.06, type: "sine", gain: 0.05 }),
+
+    // things you pick up
+    potion: () => { tone({ freq: 620, to: 880, dur: 0.2, type: "sine", gain: 0.1 }); noise({ dur: 0.12, gain: 0.05, freq: 2600, q: 1.6, delay: 0.05 }); haptic([14, 26, 14]); },
+    trinket: () => { run([523, 784, 1047], { dur: 0.26, type: "sine", gain: 0.1, step: 0.07 }); haptic([16, 30, 16, 30, 40]); },
+    card: () => { run([440, 587, 740], { dur: 0.24, type: "triangle", gain: 0.1, step: 0.06 }); haptic([14, 24, 30]); },
+    embers: () => run([880, 1170], { dur: 0.12, type: "sine", gain: 0.07, step: 0.05 }),
+    curse: () => { tone({ freq: 190, to: 120, dur: 0.5, type: "sawtooth", gain: 0.1 }); noise({ dur: 0.4, gain: 0.07, freq: 420, q: 2.4 }); haptic([40, 60, 40]); },
+
+    // the fire, the anvil, the shelf
+    sharpen: () => { noise({ dur: 0.2, gain: 0.14, freq: 3200, q: 1.4, sweepTo: 5200 }); tone({ freq: 660, to: 990, dur: 0.22, type: "triangle", gain: 0.1, delay: 0.06 }); haptic([18, 26, 30]); },
+    burn: () => { noise({ dur: 0.5, gain: 0.12, freq: 900, sweepTo: 260, q: 0.8 }); tone({ freq: 240, to: 110, dur: 0.42, type: "sawtooth", gain: 0.08 }); haptic([24, 40, 24]); },
+    rest: () => run([392, 494, 587, 784], { dur: 0.5, type: "sine", gain: 0.08, step: 0.13 }),
+    buy: () => { run([784, 1047], { dur: 0.14, type: "sine", gain: 0.09, step: 0.06 }); haptic(16); },
+    key: () => { run([523, 698, 880, 1175], { dur: 0.5, type: "sine", gain: 0.11, step: 0.1 }); haptic([20, 40, 20, 40, 80]); },
+    chest: () => { noise({ dur: 0.24, gain: 0.12, freq: 700, q: 1, sweepTo: 2400 }); run([659, 880, 1175], { dur: 0.3, type: "sine", gain: 0.1, step: 0.08, delay: 0.1 }); haptic([20, 30, 50]); },
+
+    // the room, the map, the run
+    tap: () => { tone({ freq: 620, dur: 0.045, type: "sine", gain: 0.05 }); haptic(8); },
+    open: () => tone({ freq: 420, to: 620, dur: 0.12, type: "sine", gain: 0.07 }),
+    close: () => tone({ freq: 520, to: 340, dur: 0.1, type: "sine", gain: 0.06 }),
+    step: () => { noise({ dur: 0.12, gain: 0.08, freq: 600, q: 0.9, sweepTo: 260 }); haptic(12); },
+    elite: () => { tone({ freq: 160, to: 110, dur: 0.7, type: "sawtooth", gain: 0.12 }); noise({ dur: 0.6, gain: 0.08, freq: 300, q: 1.4 }); haptic([40, 60, 40]); },
+    boss: () => { tone({ freq: 110, to: 70, dur: 1.1, type: "sawtooth", gain: 0.15 }); tone({ freq: 165, to: 105, dur: 1.0, type: "square", gain: 0.07, delay: 0.08 }); noise({ dur: 0.9, gain: 0.09, freq: 240, q: 1.2 }); haptic([60, 80, 60, 80, 120]); },
+    win: () => { run([523, 659, 784, 1047], { dur: 0.42, type: "sine", gain: 0.12, step: 0.11 }); haptic([30, 50, 30, 50, 100]); },
+    lose: () => { run([392, 330, 262, 196], { dur: 0.6, type: "sine", gain: 0.11, step: 0.16 }); haptic([80, 120, 200]); },
+    rank: () => { run([523, 659, 784, 1047, 1319], { dur: 0.5, type: "sine", gain: 0.13, step: 0.1 }); haptic([25, 40, 25, 40, 25, 40, 120]); },
+    unlock: () => { run([440, 554, 659, 880], { dur: 0.44, type: "triangle", gain: 0.12, step: 0.09 }); haptic([20, 35, 20, 35, 90]); },
+};
+
+/** Play by name, ignoring anything this palette has never heard of. */
+export const sfx = (name) => { try { SFX[name]?.(); } catch { /* ignore */ } };
+
+// ── MUSIC ────────────────────────────────────────────────────────────────────────────────────────────────
+// A slow arpeggio over a held drone, built the same way as everything above and scheduled a note at a time.
+// It is NOT a soundtrack — it is the room's own hum at a thirteenth of full volume, and its whole job is to
+// stop a fight feeling like a spreadsheet. Each track is a scale and a tempo, and the tension between the
+// acts is the SCALE going darker rather than the arrangement getting busier.
+const TRACKS = {
+    table: { root: 196.00, steps: [0, 3, 7, 10, 7, 3], beat: 0.62, type: "sine", drone: true },
+    map: { root: 174.61, steps: [0, 5, 7, 12, 7, 5], beat: 0.55, type: "triangle", drone: true },
+    fight: { root: 146.83, steps: [0, 3, 7, 3], beat: 0.36, type: "triangle", drone: true },
+    elite: { root: 130.81, steps: [0, 3, 6, 3, 10, 3], beat: 0.30, type: "sawtooth", drone: true },
+    boss: { root: 110.00, steps: [0, 1, 5, 6, 5, 1], beat: 0.44, type: "sawtooth", drone: true },
+    shop: { root: 220.00, steps: [0, 4, 7, 11, 7, 4], beat: 0.44, type: "sine", drone: false },
+    campfire: { root: 164.81, steps: [0, 7, 12, 7], beat: 0.78, type: "sine", drone: true },
+    event: { root: 155.56, steps: [0, 2, 3, 7, 3, 2], beat: 0.50, type: "sine", drone: true },
+};
+
+let music = null;
+
+export function stopMusic() {
+    if (!music) return;
+    clearInterval(music.timer);
+    music.voices.forEach((v) => { try { v.stop(); } catch { /* already stopped */ } });
+    music = null;
+}
+
+/**
+ * Start, or switch to, a track.
+ *
+ * ⚠️ CALLING IT WITH THE TRACK ALREADY PLAYING IS A NO-OP. A component may call this on every render without
+ * restarting the music underneath itself, which is the bug every hand-rolled game soundtrack has.
+ */
+export function playMusic(key) {
+    if (!isBrowser() || !pref.music) return;
+    const spec = TRACKS[key];
+    if (!spec) { stopMusic(); return; }
+    if (music && music.key === key) return;
+    const a = live(); if (!a) return;
+    stopMusic();
+
+    const voices = [];
+    // Two oscillators a few cents apart. That beating is what makes a held note breathe instead of sit still.
+    if (spec.drone) {
+        for (const detune of [-4, 4]) {
+            try {
+                const o = a.createOscillator(); const g = a.createGain();
+                o.type = "sine"; o.frequency.value = spec.root / 2; o.detune.value = detune;
+                g.gain.value = 0.42;
+                o.connect(g); g.connect(musicBus); o.start();
+                voices.push(o);
+            } catch { /* ignore */ }
+        }
+    }
+
+    let i = 0;
+    const semitone = (n) => spec.root * (2 ** (n / 12));
+    const beat = () => {
+        if (!ctx || ctx.state !== "running") return;
+        const n = spec.steps[i % spec.steps.length];
+        i += 1;
+        try {
+            const t = ctx.currentTime;
+            const o = ctx.createOscillator(); const g = ctx.createGain();
+            o.type = spec.type; o.frequency.value = semitone(n);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.5, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + spec.beat * 0.95);
+            o.connect(g); g.connect(musicBus);
+            o.start(t); o.stop(t + spec.beat);
+        } catch { /* ignore */ }
+    };
+    beat();
+    music = { key, timer: setInterval(beat, spec.beat * 1000), voices };
+}
+
+export const musicPlaying = () => (music ? music.key : null);

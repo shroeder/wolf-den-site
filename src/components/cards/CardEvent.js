@@ -24,6 +24,8 @@ import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
 import { cardById, canUpgrade, POTIONS } from "@/lib/marketplace/cards-kit.js";
 import { CHOOSE, eventById } from "@/lib/marketplace/cards-events.js";
 import { CURSE_CARDS } from "@/lib/marketplace/cards-kit.js";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -113,7 +115,10 @@ export default function CardEvent({ run, art = {} }) {
 
     // The same shape the campfire's smith uses: the request goes out as the card starts moving, so the fire
     // is never waiting on the network.
+    // A question mark has its own air — unsettled, and not quite a fight.
+    useCardSound("event");
     const sharpen = useCallback(async (index, card, mode = "sharpen") => {
+        sfx(mode === "burn" ? "burn" : "sharpen");
         if (busy || forge) return;
         setBusy(true);
         setSaid(null);
@@ -195,7 +200,7 @@ export default function CardEvent({ run, art = {} }) {
                             return (
                                 <button key={i} type="button" className={`cv-do${spent ? " is-spent" : ""}`}
                                     disabled={busy || tooPoor || spent}
-                                    onClick={() => post({ index: i })}>
+                                    onClick={() => { sfx(curseOf(c) ? "curse" : "open"); post({ index: i }); }}>
                                     <span className="cv-do-text">
                                         <b>{c.label}</b>
                                         <i>{spent ? "Already searched." : tooPoor ? `${c.detail} — you cannot afford it` : c.detail}</i>

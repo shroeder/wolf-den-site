@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import CardFoot from "@/components/cards/CardFoot";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
@@ -32,6 +34,8 @@ export default function CardTable({ run, history = null }) {
     // ── WHICH RUNG YOU ARE CLIMBING ──────────────────────────────────────────────────────────────────
     // Opens on the highest one you have earned, because that is the one somebody who has been climbing wants
     // and nobody wants to press the arrow eight times. It can be walked back down: a bad week is allowed.
+    // The back room, warm and slow — see TRACKS.
+    useCardSound("table");
     const rank = history?.rank || null;
     // The shut unlock nearest to opening — the only one that changes what a player does next.
     const [showAll, setShowAll] = useState(false);
@@ -48,6 +52,7 @@ export default function CardTable({ run, history = null }) {
     // the ending survives a reload (see the note in the page), starting again has to be an actual request —
     // which is also the honest shape: the seat is where you choose to go again.
     const sit = async () => {
+        sfx("step");
         setGoing(true);
         // A finished run is replaced by a new one AT THE CHOSEN RUNG — which is the only place the ladder is
         // ever picked, so it has to travel with the request rather than be assumed.

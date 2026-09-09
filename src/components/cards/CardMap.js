@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { GiSoundOn, GiSoundWaves, GiSpeakerOff } from "react-icons/gi";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardKeyNote from "@/components/cards/CardKeyNote";
+import useCardSound from "@/components/cards/useCardSound";
+import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { KEYS, KEY_IDS, POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
 
@@ -135,7 +138,10 @@ export default function CardMap({ run, art = {} }) {
         el.scrollTop = Math.max(0, rowY - el.clientHeight * 0.62);
     }, [last]);
 
+    // The map's own hum, and a footfall on the room you chose.
+    const sound = useCardSound("map");
     const enter = useCallback(async (node) => {
+        sfx(node?.kind === "boss" ? "boss" : node?.kind === "elite" ? "elite" : "step");
         if (busy) return;
         setBusy(true);
         await fetch("/api/marketplace/cards/run", {
@@ -242,6 +248,16 @@ export default function CardMap({ run, art = {} }) {
                 </button>
                 <button type="button" className="cm-tool cm-key" aria-label="What the marks mean"
                     onClick={() => setKeyOpen(true)}>?</button>
+                {/* ── AND A WAY TO TURN IT OFF ────────────────────────────────────────────────────────
+                    Sound that cannot be silenced is sound that gets the whole TAB muted, and a muted tab
+                    loses the impacts as well as the hum. One press drops the music and keeps the effects,
+                    two presses drop both — which is the order people want them in: the arpeggio is the part
+                    that wears out on a bus, the thud when something hits you is not. */}
+                <button type="button" className="cm-tool cm-sound"
+                    aria-label={sound.pref.music ? "Music on" : sound.pref.sfx ? "Music off, sounds on" : "Sound off"}
+                    onClick={() => sound.toggle(sound.pref.music ? "music" : "sfx")}>
+                    {sound.pref.music ? <GiSoundOn /> : sound.pref.sfx ? <GiSoundWaves /> : <GiSpeakerOff />}
+                </button>
             </div>
 
             <div className="cm-sheet" ref={sheet}>
@@ -440,6 +456,7 @@ export default function CardMap({ run, art = {} }) {
                 .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;
                     display: grid; place-items: center; }
                 .cm-tool img { width: 24px; height: 24px; object-fit: contain; }
+                .cm-sound svg { width: 20px; height: 20px; color: #c9b892; }
                 .cm-key { border-radius: 50%; font: inherit; font-size: 14px; font-weight: 700;
                     color: #a9b6c6; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
                 .cm-key:hover { color: #ffe6a6; box-shadow: inset 0 0 0 1px rgba(255,214,140,0.5); }
