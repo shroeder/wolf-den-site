@@ -1422,7 +1422,14 @@ async function claimNode(buyerId, node, row, run = {}) {
     if (Math.random() < luckyChance(rank.bonus + luck + dEff.findBonus, await fortuneFor(buyerId).catch(() => 0))) {
         const roll = Math.random();
         const lift = rank.key === "s" ? 1 : 0;
-        const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
+        // ⚠️ STOPS AT MYTHIC. This used to reach ascendant on a perfect swing at the deepest seam, and
+        // measured over 30 days it was producing TWENTY-TWO of them a month — on its own, one and a half
+        // times the Den-wide target for that tier, and every single ascendant chest in the game's history
+        // came out of this one line. That is the same concentration Luke objected to in the delve, in a
+        // different room: "I don't like that the Delve is the only place you can get them."
+        // Mining still pays top chests — a trip and a smelt both roll the surprise, like everything else
+        // does — it just no longer has a private ladder to the fourth-rarest thing in the game.
+        const ladder = ["wooden", "iron", "gold", "mythic", "mythic"];
         if (roll < 0.34) {
             const t = ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden";
             await addChests(buyerId, { [t]: 1 }, { source: "mining" }).catch(() => {});

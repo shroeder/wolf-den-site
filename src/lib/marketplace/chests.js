@@ -182,12 +182,6 @@ function tierForLevel(level) {
 // second-rarest tier commoner than the fourth and the ladder would read backwards. 15 and 9 keep the order —
 // each tier a bit under twice the one above — and that is a much more generous top end than before: an
 // active delver now sees about five ascendant pieces a year where it used to be one every eighteen months.
-const ELITE_CHEST_LOTTERY = [
-    { tier: "primordial", chance: 0.0102 }, //  ~1 in 98 rolls   -> 1 item a month, Den-wide
-    { tier: "celestial", chance: 0.0737 }, //   ~1 in 14         -> 5 a month
-    { tier: "eternal", chance: 0.1152 }, //     ~1 in 9          -> 9 a month
-    { tier: "ascendant", chance: 0.1957 }, //   ~1 in 5          -> 15 a month
-];
 
 // ── THE SURPRISE ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke: "I'd like you to be able to get high tier chests from just about every single thing in the game, but
@@ -312,10 +306,11 @@ async function announceSurprise(buyerId, tier, source) {
  * game and was paying wooden, iron and gold chests exclusively — 2,455 of them and never once anything
  * above gold.
  */
-export function eliteRoll(fortune = 0) {
-    for (const e of ELITE_CHEST_LOTTERY) if (Math.random() < luckyChance(e.chance, fortune)) return e.tier;
-    return null;
-}
+// The elite lottery and its eliteRoll() stood here, rolled by exactly two callers: a milestone level and
+// every tenth delve clear. Both were milestones — things you can feel coming — and both are gone, because
+// that is the opposite of a surprise. surpriseChest above inherited the targets they were solved against,
+// so keeping the table would have been a second set of odds for a thing with no rolls left.
+//   still the targets in force:  15 ascendant, 9 eternal, 5 celestial, 1 primordial a month, Den-wide
 
 function rollRarity(weights) {
     const total = Object.values(weights).reduce((s, w) => s + w, 0);
@@ -380,23 +375,17 @@ export async function syncLevelChests(buyerId) {
 
     if (level <= row.chest_level) return {};
     const tally = {};
-    // Fortune is luck everywhere, and an elite chest riding on a milestone is a drop roll like any other.
-    // Asked once for the whole walk — several levels can land at once off a big raid.
-    const fortune = await fortuneFor(buyerId).catch(() => 0);
     for (let L = row.chest_level + 1; L <= level; L++) {
         // The milestone, and the ONLY level-up chest: a Gold Chest every tenth level, exactly as the track
         // says. The loop still walks every level so that gaining several at once (which happens constantly
         // from a big raid) cannot skip a milestone it passed through.
         if (L % 10 !== 0) continue;
         tally.gold = (tally.gold || 0) + 1;
-        // Elite lottery: a tiny shot at an Ascendant→Primordial chest riding ON the milestone. It used to roll
-        // on every level from 20, which is ten rolls per advertised chest — the same leak wearing a different
-        // hat, and the reason three Ascendants are already out. Odds per roll are untouched; only the number
-        // of rolls changes, so an elite chest stays a real thing that happens, just at the promised cadence.
-        if (L >= 20) {
-            const won = eliteRoll(fortune);
-            if (won) tally[won] = (tally[won] || 0) + 1;
-        }
+        // ⚠️ NO ELITE ROLL HERE ANY MORE. A milestone level is exactly the shape Luke ruled out — a thing you
+        // can feel coming — and it was the second faucet doing it. Levelling is a CONSEQUENCE of doing
+        // things, and every one of those things already rolls for a surprise (see surpriseChest), so paying
+        // again at the milestone counted the same actions twice. The advertised Gold Chest every tenth level
+        // is untouched; it is the reward the track actually promises.
     }
     // A run of levels that crossed no milestone grants nothing — don't write an empty grant row.
     if (!Object.keys(tally).length) {
