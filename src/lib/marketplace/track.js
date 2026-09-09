@@ -28,7 +28,11 @@ function progressLabel(rule, current, target) {
         case "badge_count": return `${current} / ${target} badges earned`;
         case "leaderboard_top": return current >= 1 ? "Reached #1" : "Climb to #1";
         case "all_milestones": return current >= 1 ? "All complete" : "Complete every way to earn";
-        case "onboarding_complete": return current >= 1 ? "All onboarding done" : "Finish every onboarding step";
+        // ⚠️ NOT "Finish every onboarding step". That sentence reads as the Pathfinder — the visible 33-step
+        // guide — and this is a different list of seven: a purchase, Discord linked, a filled-in profile, a
+        // message, a friend, a wishlist card and one thing equipped. A member who finished the Pathfinder and
+        // did not get this badge reported it as broken, which is a fair reading of what it said.
+        case "onboarding_complete": return current >= target ? "All getting-started steps done" : `${current} / ${target} getting-started steps`;
         case "trade_count": return `${current} / ${target} trades`;
         case "cards_traded": return `${current} / ${target} cards traded`;
         case "trade_value": return `$${current.toLocaleString()} / $${target.toLocaleString()} traded`;

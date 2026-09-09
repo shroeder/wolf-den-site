@@ -298,7 +298,15 @@ export async function getMemberMetrics(buyerId) {
     const progress = await getRewardsProgress(buyerId).catch(() => ({}));
     const allMilestones = ["spend", "first_purchase", "discord_link", "profile_complete", "daily_active"].every((k) => Boolean(progress[k]));
     // Onboarding completionist: every one-time getting-started task done (the EARN checklist's one-timers).
-    const onboardingComplete = ["first_purchase", "discord_link", "profile_complete", "first_message", "first_friend", "first_wishlist", "first_equip"].every((k) => Boolean(progress[k]));
+    // ── THE SEVEN, AND HOW MANY OF THEM ARE DONE ─────────────────────────────────────────────────────
+    // ⚠️ THIS REPORTED A YES OR A NO AND THE BADGE SAYS "Finish every onboarding step", which reads exactly
+    // like the PATHFINDER — the visible, 33-step, 14-chapter thing at /marketplace/guide that walks you
+    // through the Den. They are not the same list. ValkyrieSylve finished the Pathfinder, did not get the
+    // badge, and reported it as broken; it is not broken, she is missing three of these seven, and there was
+    // no way for her to find that out. A binary cannot tell you which step you are short.
+    const ONBOARDING = ["first_purchase", "discord_link", "profile_complete", "first_message", "first_friend", "first_wishlist", "first_equip"];
+    const onboardingDone = ONBOARDING.filter((k) => Boolean(progress[k])).length;
+    const onboardingComplete = onboardingDone === ONBOARDING.length;
 
     const tenureDays = buyer?.created_at ? Math.floor((Date.now() - new Date(buyer.created_at).getTime()) / 86400000) : 0;
     const levelObj = levelForXp(xp);
@@ -333,6 +341,8 @@ export async function getMemberMetrics(buyerId) {
         isTop: topRow?.id === buyerId,
         allMilestones,
         onboardingComplete,
+        onboardingDone,
+        onboardingTotal: ONBOARDING.length,
         messages: messageRow?.n || 0,
         badgeCount: badgeRow?.n || 0,
         cropsHarvested: farmRow?.harvests || 0,
@@ -617,7 +627,9 @@ export function progressForRule(rule, threshold, m) {
         case "badge_count": return { current: m.badgeCount, target: t };
         case "leaderboard_top": return { current: m.isTop ? 1 : 0, target: 1 };
         case "all_milestones": return { current: m.allMilestones ? 1 : 0, target: 1 };
-        case "onboarding_complete": return { current: m.onboardingComplete ? 1 : 0, target: 1 };
+        // Counted, not answered yes-or-no, so the track can say WHICH of the seven is still outstanding
+        // rather than "not yet" forever. The badge still needs all of them.
+        case "onboarding_complete": return { current: m.onboardingDone ?? (m.onboardingComplete ? 1 : 0), target: m.onboardingTotal ?? 1 };
         case "trade_count": return { current: m.tradeCount, target: t };
         case "cards_traded": return { current: m.cardsTraded, target: t };
         case "trade_value": return { current: m.tradeValue, target: t };
