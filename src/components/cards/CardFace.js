@@ -88,9 +88,23 @@ export const Sprite = ({ src, fallback, className, flip }) => {
 // inside the text and that is most of why its cards are legible at a glance, so ours do the same — off the
 // vocabulary the RULES own (cards-kit), not a list this file invented.
 const KEY_RE = new RegExp(`\\b(${KEYWORDS.join("|")})\\b`, "g");
-const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
-    KEYWORDS.includes(part) ? <b key={`k${i}`} className="cf-key">{part}</b> : part
-));
+// ── AND WHEN THE SCREEN CAN ANSWER FOR THEM, THEY ARE PRESSABLE ──────────────────────────────────────────
+// Eleven gold words and no way to ask about any of them is worse than plain text: it advertises a rule you
+// cannot read. Where a card is sitting STILL — the cabinet, the deck list, the card you tapped mid-fight —
+// each keyword becomes a button that says what it does.
+//
+// ⚠️ OPT-IN, VIA A PROP, AND THAT IS DELIBERATE. The hand is dragged, not tapped, and a button inside a card
+// being dragged is a button that eats the drag. A face is only given onKey by a screen where the card is
+// not going anywhere, so the hand keeps plain bold text and nothing about playing a card changes.
+const withKeywords = (text, onKey) => String(text).split(KEY_RE).map((part, i) => {
+    if (!KEYWORDS.includes(part)) return part;
+    if (!onKey) return <b key={`k${i}`} className="cf-key">{part}</b>;
+    return (
+        <button key={`k${i}`} type="button" className="cf-key is-ask"
+            aria-label={`What ${part} does`}
+            onClick={(e) => { e.stopPropagation(); onKey(part); }}>{part}</button>
+    );
+});
 
 /**
  * ── THE CARD'S SENTENCE, WITH THE REAL NUMBERS IN IT ─────────────────────────────────────────────────────
@@ -147,7 +161,7 @@ const textSize = (card, live) => {
     if (filled.length > 40) return " is-small";
     return "";
 };
-const withNumbers = (card, live) => {
+const withNumbers = (card, live, onKey) => {
     const parts = plurals(card.text, card, live).split(KEY_FIELD);
     // ── AND THE ONES THE FIRE MOVED STAY GREEN ───────────────────────────────────────────────────────────
     // Spire lights an upgraded card's improved numbers permanently, not only while something in the fight is
@@ -156,7 +170,7 @@ const withNumbers = (card, live) => {
     const sharpened = upgradedFields(card);
     return parts.map((part, i) => {
         // split() on a capturing group alternates literal, capture, literal, capture...
-        if (i % 2 === 0) return <span key={`t${i}`}>{withKeywords(part)}</span>;
+        if (i % 2 === 0) return <span key={`t${i}`}>{withKeywords(part, onKey)}</span>;
         const base = Number(card[part]) || 0;
         const now = live && live[part] != null ? Number(live[part]) : base;
         const cls = now > base ? " is-up" : now < base ? " is-down" : sharpened.has(part) ? " is-up" : "";
@@ -308,7 +322,7 @@ const chromeTint = (rarity) => {
  * Renders the INSIDE of a card only. The caller owns the box: put it in an element with class `cf-card` and
  * the moulding, the size and the drop shadow come with it.
  */
-export default function CardFace({ card, art, dim, live }) {
+export default function CardFace({ card, art, dim, live, onKey = null }) {
     const meta = RARITY_META[art?.rarity] || RARITY_META.common;
     const look = typeLook(card.kind);
     // A status card takes no colour from a pet it does not have — it is grey stock and common furniture, so
@@ -406,7 +420,7 @@ export default function CardFace({ card, art, dim, live }) {
                     cannot centre it directly: withNumbers returns a run of inline spans, and any flex or
                     grid on their parent would take each one as an item and stack the sentence into a
                     column of fragments. One block wrapper keeps them a paragraph. */}
-                <i className="cf-line">{withNumbers(card, live)}</i>
+                <i className="cf-line">{withNumbers(card, live, onKey)}</i>
             </span>
 
             {/* ⚠️ GLOBAL, FOR THE SAME REASON THE FIGHT'S BLOCK IS. styled-jsx scopes a rule to the
@@ -584,6 +598,14 @@ export default function CardFace({ card, art, dim, live }) {
                 .cf-text.is-micro { font-size: calc(var(--cf-w, 96px) * 0.081); line-height: 1.06; }
                 /* The two words that decide the turn, lit. */
                 .cf-key { color: #ffd75e; font-weight: 800; }
+                /* A keyword that can be asked about. Everything here is a RESET back to the sentence it sits
+                   in — a button brings its own font, box and padding, and a single one of those left in
+                   place re-flows the line it is part of. The colour is not set: it comes from .cf-key above,
+                   so the two kinds of keyword are the same gold and only the dotted rule tells them apart. */
+                button.cf-key.is-ask { display: inline; margin: 0; padding: 0; border: 0; background: none;
+                    font: inherit; font-weight: 800; letter-spacing: inherit; line-height: inherit;
+                    cursor: pointer; text-decoration: underline dotted rgba(255,215,94,0.55);
+                    text-underline-offset: 2px; }
                 /* An unmodified number is just text. One the fight has moved is called out — green up, red
                    down — and nothing else on the card changes, so the eye goes to the digit rather than to a
                    card that has started glowing. */

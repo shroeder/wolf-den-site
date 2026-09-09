@@ -19,6 +19,7 @@ import {
 // NOT. What is left here is the BOX: how big a card is, the moulding around it, and the four states only a
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
@@ -166,6 +167,8 @@ export default function CardFightClient({ fixture, run = null }) {
     const [drag, setDrag] = useState(null);
     const [floats, setFloats] = useState([]);
     const [peek, setPeek] = useState(null);
+    // The gold word the player asked about — see CardKeyNote.
+    const [keyWord, setKeyWord] = useState(null);
     const [acting, setActing] = useState(false);
 
     // ── THE STATE THE RULES DECIDE FROM IS A REF, NOT THE RENDER'S COPY ──────────────────────────────────
@@ -1237,7 +1240,7 @@ export default function CardFightClient({ fixture, run = null }) {
                         <div className="cf-sheet-cards">
                             {pileList.map((card, i) => (
                                 <div key={`${card.id}-${i}`} className="cf-card is-static">
-                                    <CardFace card={card} art={fixture.petArt[card.pet]} />
+                                    <CardFace card={card} art={fixture.petArt[card.pet]} onKey={setKeyWord} />
                                 </div>
                             ))}
                             {pileList.length ? null : <p className="cf-note">Empty.</p>}
@@ -1246,6 +1249,11 @@ export default function CardFightClient({ fixture, run = null }) {
                     </div>
                 </div>
             ) : null}
+
+            {/* ⚠️ THE ONE PLACE A PLAYER ACTUALLY NEEDS THIS is mid-fight, holding a card that says Frail at
+                them for the first time. It mounts at the root rather than inside the pile dialog so it sits
+                over whatever is open. */}
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 
             {fight.over ? (
                 /* ── BUILT OFF THE REFERENCE, NOT OFF A GUESS ─────────────────────────────────────────

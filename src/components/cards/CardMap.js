@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 import { MAP_LANES, reachable } from "@/lib/marketplace/cards-map.js";
 import { KEYS, KEY_IDS, POTIONS, RUN_LENGTH, actName, cardById, perkById } from "@/lib/marketplace/cards-kit.js";
 
@@ -90,6 +91,8 @@ export default function CardMap({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [deckOpen, setDeckOpen] = useState(false);
+    // The gold word the player asked about — see CardKeyNote.
+    const [keyWord, setKeyWord] = useState(null);
     // The legend, behind a button. See the note in the render: a key pinned open over the sheet was covering
     // the quarter of the map you most needed to look at.
     const [keyOpen, setKeyOpen] = useState(false);
@@ -351,7 +354,7 @@ export default function CardMap({ run, art = {} }) {
                         <div className="cm-deck-list">
                             {deck.map(({ card, n }) => (
                                 <span key={card.id} className="cm-deck-card">
-                                    <span className="cf-card"><CardFace card={card} art={art[card.pet]} /></span>
+                                    <span className="cf-card"><CardFace card={card} art={art[card.pet]} onKey={setKeyWord} /></span>
                                     {n > 1 ? <b className="cm-deck-n">×{n}</b> : null}
                                 </span>
                             ))}
@@ -366,6 +369,8 @@ export default function CardMap({ run, art = {} }) {
                     </div>
                 </div>
             ) : null}
+
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 
             {/* ── WHAT YOU ARE CARRYING ── opened by pressing any trinket or potion; the one you pressed is
                 lit, so a press on the third relic answers the question you actually asked. */}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardFoot from "@/components/cards/CardFoot";
 
 // ── EVERY CARD IN THE GAME, AND WHOSE IT IS ──────────────────────────────────────────────────────────────
@@ -45,6 +46,8 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
     // The card you pressed, held big with its pet named underneath. A 96px card is a card you can identify;
     // it is not a card you can READ, and the whole point of a cabinet is reading the thing.
     const [look, setLook] = useState(null);
+    // The gold word the player asked about, if any — see CardKeyNote.
+    const [keyWord, setKeyWord] = useState(null);
 
     const items = filter === "trinkets" ? trinkets : filter === "potions" ? potions : null;
     const shown = useMemo(
@@ -143,7 +146,7 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
             {looked ? (
                 <div className="cc-over" onClick={() => setLook(null)} role="presentation">
                     <div className="cc-look" onClick={(e) => e.stopPropagation()} role="presentation">
-                        <span className="cf-card is-big"><CardFace card={looked} art={art[looked.pet]} /></span>
+                        <span className="cf-card is-big"><CardFace card={looked} art={art[looked.pet]} onKey={setKeyWord} /></span>
                         <b className="cc-look-pet">{art[looked.pet]?.name || looked.pet}</b>
                         <p className="cc-look-note">
                             {looked.owned
@@ -160,6 +163,9 @@ export default function CardCollection({ cards, art, trinkets = [], potions = []
                     </div>
                 </div>
             ) : null}
+
+            {/* Over the preview rather than inside it, so closing the note leaves the card where it was. */}
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 
             {/* ⚠️ THE RIBBON FLOATS OVER A SCROLLING GRID, so the cards have to go BEHIND it rather than
                 collide with it. The list keeps a ribbon's worth of padding at its end (nothing is stranded
