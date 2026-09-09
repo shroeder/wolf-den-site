@@ -888,12 +888,46 @@ export default function CardFightClient({ fixture, run = null }) {
     // near the wrist. The angle widens with a fuller hand, and the overlap tightens to match, because ten
     // cards and five have to live in the same 375px.
     const handSize = fight.hand.length;
+    // The fan's travel is measured against the glass, so the glass has to be a number this render can see.
+    const [viewW, setViewW] = useState(() => (typeof window === "undefined" ? 375 : window.innerWidth));
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+        const on = () => setViewW(window.innerWidth);
+        window.addEventListener("resize", on, { passive: true });
+        return () => window.removeEventListener("resize", on);
+    }, []);
     // 5 x 84 wide at -18 is a 348px row, and 22px of shoulder each side for the fan put it at 392 —
     // seventeen wider than the phone it has to sit in, so the outer cost gems hung off the screen. At -24 the
     // row is 368 and everything is on the glass. What you lose is the tail of a sentence at REST, which is
     // what picking the card up is for.
-    const overlap = handSize > 5 ? -58 : -38;
+    // ── THE FAN SLIDES; THE CARDS DO NOT SHRINK ──────────────────────────────────────────────────────
+    // Luke, holding eight: "struggles when we have too many cards, solution is not to make the cards
+    // smaller, but shift the cards as I hover towards the edge, as if the fan of cards rotates."
+    //
+    // That is exactly right and it is what a real hand of cards does. The old answer was to tighten the
+    // overlap as the hand grew — at eight cards that buried two-thirds of every card and made the outer ones
+    // unreadable at any size, because a card you can see a third of is not a smaller card, it is a sliver.
+    //
+    // So the overlap stops tightening past six, the row is allowed to be WIDER than the phone, and the whole
+    // fan translates so that whichever card you are on comes to the middle. The card you are reading is
+    // always at full size in the centre of the screen; the ones you are not reading are allowed to be off
+    // the edge, because that is where your attention is not.
+    // ⚠️ THE OVERLAP STOPS TIGHTENING. It used to go to -58 past five cards, which on a hand of eight buries
+    // two thirds of every card — and a card you can see a third of is not a smaller card, it is a sliver. It
+    // holds at -26 instead, the row is allowed to be wider than the phone, and the fan slides.
+    const overlap = handSize > 5 ? -26 : -38;
     const spread = handSize > 5 ? 2.8 : 4;
+    // What one card advances the row by, and how far the fan may travel before its own ends come inside the
+    // screen — clamped, so a small hand never moves at all and a large one never over-scrolls into blank space.
+    const CARD_W = 84;
+    const step = CARD_W + overlap;
+    const handW = CARD_W + (handSize - 1) * step;
+    // A hand that fits does not move at all. One that does not fit brings whichever card you are on to the
+    // middle of the glass and lets the rest run off both edges — which is the whole idea: the cards you are
+    // not reading are allowed to be somewhere your attention is not.
+    const fanShift = handW <= viewW - 16
+        ? 0
+        : -(activeIndex - (handSize - 1) / 2) * step;
     const fanOf = (i) => {
         const mid = (handSize - 1) / 2;
         const off = i - mid;
@@ -1183,7 +1217,7 @@ export default function CardFightClient({ fixture, run = null }) {
 
             {/* ── THE HAND ──────────────────────────────────────────────────────────────────────────── */}
             <div className="cf-tray" ref={trayRef}>
-                <div className="cf-hand">
+                <div className="cf-hand" style={{ transform: `translateX(${Math.round(fanShift)}px)` }}>
                     {fight.hand.map((entry, i) => {
                         const card = cardById(entry.id);
                         const playable = canPlay(fight, entry.uid);
@@ -2074,8 +2108,13 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* BLED OFF THE BOTTOM. Their cards run past the edge of the screen, so what you read at rest is the
                    cost, the name, the picture and the type — the sentence is what picking one up is for. Ours were
                    fully visible and therefore had to be tiny to fit. */
+                /* The row may be wider than the screen now — see fanShift — so it must not wrap and must not
+                   be squeezed by its parent. The slide is eased rather than instant: the whole point is that
+                   the fan turns under your thumb, and a jump does not read as a turn. */
                 .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 26px 10px 0;
-                    margin-bottom: -18px; }
+                    margin-bottom: -18px; flex-wrap: nowrap; flex: 0 0 auto; will-change: transform;
+                    transition: transform 220ms cubic-bezier(.2,.9,.3,1); }
+                .cf-hand > * { flex: 0 0 auto; }
                 /* 80x108 — near enough Spire's 0.78 wide-to-tall, and the reason the text can be read at all.
                    The 72x114 this started at was a 0.63 card, too narrow for its own sentence, which is what
                    forced the font down to 8px in the first place. */
