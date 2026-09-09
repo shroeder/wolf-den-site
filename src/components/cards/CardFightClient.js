@@ -2508,7 +2508,7 @@ function Bar({ unit, guarding, pending }) {
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
                    column he stands in, and the NUMBER is the loud part rather than the bar. */
-                .cfb { width: 100%; max-width: calc(var(--cf-figure) * 0.9); }
+                .cfb { position: relative; width: 100%; max-width: calc(var(--cf-figure) * 0.9); }
                 /* LEANER, and sitting under the fighter rather than being a widget beside them. Theirs is a
                    thin bar with the number over it; ours was a fat rounded pill, which is the shape of a
                    progress indicator on a settings page. */
@@ -2574,7 +2574,18 @@ function Bar({ unit, guarding, pending }) {
                         1px -1px 0 rgba(0,0,0,0.95), -1px -1px 0 rgba(0,0,0,0.95); }
 /* Under the bar for both fighters, the way theirs are — buffs and debuffs belong to the body they
                    are stuck to, not to a panel somewhere else on the screen. */
-                .cfb-tags { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 6px; min-height: 18px; }
+                /* ⚠️ OUT OF THE FLOW, SO A STATUS CANNOT MOVE A HEALTH BAR. These sat under the bar as
+                   ordinary content with a min-height and a wrapping row — so a foe carrying four debuffs was
+                   TALLER than the one beside it carrying one, and since the cells are anchored at the bottom
+                   the taller block pushed its own bar up. Two enemies then disagreed about where a health bar
+                   lives, and both disagreed with the hero, who usually carries none at all. Luke, after the
+                   names came off for the same reason: "also I dont want debuffs to offset them vertically
+                   either." Absolute, hanging off the bottom edge of the bar, so the bar's box is the bar's
+                   box no matter what anybody is carrying — and the row may now wrap to two lines without
+                   costing anything, which is what the min-height was quietly buying before. */
+                .cfb-tags { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
+                    display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;
+                    pointer-events: none; }
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }
