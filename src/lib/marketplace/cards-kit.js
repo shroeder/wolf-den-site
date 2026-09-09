@@ -3036,6 +3036,31 @@ export const cardById = (id) => {
 export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity",
     "Poison", "Artifact", "Regeneration", "Intangible", "Curse"];
 
+// ── AND WHAT EACH OF THEM ACTUALLY DOES ──────────────────────────────────────────────────────────────────
+// The face has painted these eleven words gold since the day it was written, which tells a player that the
+// word MATTERS and not one thing about what it does. Eleven gold words and no way to ask about any of them
+// is worse than plain text: it advertises a rule you cannot read. Spire puts the definition one tap away
+// from every place a card is sitting still.
+//
+// ⚠️ THESE ARE DESCRIPTIONS OF CODE ABOVE, NOT A SECOND COPY OF THE RULES. Every number here is read off
+// the function that enforces it — the quarter off is `Math.floor(x * 0.75)` in attackDamage and blockGain,
+// the half again is `vulnMult: 1.5`, the tick is `tick()`, Poison going through Block is poisonTick
+// subtracting from `hp` and never touching `block`, and Artifact eating exactly one is `debuff()`. If one of
+// those changes, this changes with it, and the card face is where a player will notice that it did not.
+export const KEYWORD_TEXT = {
+    Block: "Soaks damage before your health does. Whatever is left of it is gone at the start of your next turn, unless something you are carrying says otherwise.",
+    Strength: "Every attack you play hits for this much more — and for each separate hit, so it is worth most on the cards that strike twice.",
+    Dexterity: "Every card that gives you Block gives this much more.",
+    Weak: "The attacks it plays land for a quarter less. It wears off by one each turn.",
+    Vulnerable: "Everything that hits it lands for half again as much. It wears off by one each turn.",
+    Frail: "The Block it gains is a quarter smaller. It wears off by one each turn.",
+    Poison: "At the top of its carrier's turn it deals its number straight to health — Block does not stop it — and then drops by one. It kills things that were going to run out of turns.",
+    Artifact: "Eats the next debuff aimed at it instead of letting it land. One charge is spent per debuff, however big that debuff was.",
+    Regeneration: "Heals its number at the end of the turn, then drops by one.",
+    Intangible: "While it lasts, every hit that lands is cut to 1 damage, however hard it was thrown.",
+    Curse: "A card that cannot be played and does nothing good. The harm is the slot it takes up in the hand you drew.",
+};
+
 // ── WHAT EACH KIND OF CARD IS CALLED ─────────────────────────────────────────────────────────────────────
 // The card face used to name the type with `kind === "attack" ? "Attack" : "Skill"`, which is a ternary that
 // quietly calls a Power a Skill the day one exists. The rules own the vocabulary — the same argument KEYWORDS
@@ -4245,24 +4270,42 @@ export function finishFoeTurn(state) {
  * floors HP at zero, so the outcome was the same) and pushed damage events for blows nobody could take. Now
  * both paths stop, and they stop identically because there is only one implementation of stopping.
  */
-export function endTurn(state) {
+/**
+ * ── METALLICIZE PAYS ON THE WAY OUT ──────────────────────────────────────────────────────────────────
+ * ⚠️ AT THE END OF YOUR TURN, NOT THE START OF IT, and the difference is the whole card: block gained here
+ * stands through the swing that is about to land, where block gained at the top of a turn would be wiped
+ * before anything ever hit it. Theirs works exactly this way, and the trinkets that do the same thing
+ * (Oddly Smooth Stone, River Stone, Banded Ribs) read the same field.
+ *
+ * ⚠️ THIS IS ITS OWN STEP BECAUSE THE HERO'S END OF TURN IS ITS OWN STEP. It used to live inside endTurn,
+ * ahead of the call to startFoeTurn — and endTurn is the ATOMIC path, which only the simulator walks. The
+ * screen drives the clock itself and called startFoeTurn directly, so it stepped straight over this block
+ * and every blockEach source in the game paid the sim and paid the player NOTHING: two cards (Metallicize,
+ * Slow Iron) and nine trinkets and bottles besides. It measured perfectly and did not exist.
+ *
+ * The lesson is the one the file keeps relearning: when an atomic function is split into steps for the
+ * screen, every line of it has to land in one of the steps, not just the ones that were already loops.
+ */
+export function heroEndTurn(state) {
     if (!state || state.over) return { state, events: [] };
-    // ── METALLICIZE PAYS ON THE WAY OUT ──────────────────────────────────────────────────────────────
-    // ⚠️ AT THE END OF YOUR TURN, NOT THE START OF IT, and the difference is the whole card: block gained
-    // here stands through the swing that is about to land, where block gained at the top of a turn would be
-    // wiped before anything ever hit it. Theirs works exactly this way, and the trinket that does the same
-    // thing (Oddly Smooth Stone) reads the same field.
     const steady = (state.hero.blockEach || 0) + perkSum(state.perks, "blockEach");
+    if (steady <= 0) return { state, events: [] };
     // ⚠️ THE NUMBER THAT FLOATS UP IS THE NUMBER THAT LANDED. This added blockGain(steady) to the bar and
     // then announced the raw `steady`, so a Frail hero holding Metallicize 3 gained 2 Block and watched a
     // "+3" float off their own head — and with Dexterity in the game the gap opens the other way too. One
     // value, computed once, used by both.
-    const gained = steady > 0 ? blockGain(steady, state.hero) : 0;
-    const opened = steady > 0
-        ? { ...state, hero: { ...state.hero, block: (state.hero.block || 0) + gained } }
-        : state;
-    let cur = startFoeTurn(opened).state;
-    const events = steady > 0 ? [{ type: "block", on: "hero", amount: gained }] : [];
+    const gained = blockGain(steady, state.hero);
+    return {
+        state: { ...state, hero: { ...state.hero, block: (state.hero.block || 0) + gained } },
+        events: [{ type: "block", on: "hero", amount: gained }],
+    };
+}
+
+export function endTurn(state) {
+    if (!state || state.over) return { state, events: [] };
+    const opened = heroEndTurn(state);
+    let cur = startFoeTurn(opened.state).state;
+    const events = [...opened.events];
     for (let i = 0; i < cur.foes.length; i += 1) {
         const step = foeAct(cur, i);
         cur = step.state;

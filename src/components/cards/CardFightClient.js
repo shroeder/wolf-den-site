@@ -10,7 +10,7 @@ import {
 
 import {
     ACTS, DRAG_SLOP, KEYS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, runScore, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
-    intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
+    heroEndTurn, intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
 // ── THE FACE IS NOT DRAWN HERE ANY MORE ──────────────────────────────────────────────────────────────────
@@ -486,8 +486,14 @@ export default function CardFightClient({ fixture, run = null }) {
         setActing(true); actingRef.current = true;
         setActor(null);
 
-        let cur = startFoeTurn(fight).state;
+        // ⚠️ THE HERO'S END OF TURN COMES FIRST, and the screen has to ask for it. Metallicize and every
+        // blockEach trinket pay HERE, before the party swings, so the block they give is block that
+        // actually eats a hit. Driving the clock ourselves meant calling startFoeTurn directly, which
+        // stepped over the whole thing — it paid in the simulator and paid nothing on screen.
+        const mine = heroEndTurn(fight);
+        let cur = startFoeTurn(mine.state).state;
         land(cur);
+        pushFloats(mine.events);
 
         // Walked as a plan rather than a chain of nested callbacks: the whole turn's timings are decided up
         // front so a clear on unmount kills all of them, and so the pacing is one table you can read.
@@ -503,7 +509,7 @@ export default function CardFightClient({ fixture, run = null }) {
         }
 
         // Re-run the same steps live, on the clock, so what the screen shows IS what the rules did.
-        let live = startFoeTurn(fight).state;
+        let live = startFoeTurn(heroEndTurn(fight).state).state;
         const timers = [];
         for (const step of plan) {
             timers.push(setTimeout(() => {
