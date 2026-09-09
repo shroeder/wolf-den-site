@@ -22,6 +22,7 @@ import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoeNote from "@/components/cards/CardFoeNote";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
+import { STATUS_ART, marksOn } from "@/components/cards/status-art.js";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
@@ -1079,7 +1080,7 @@ export default function CardFightClient({ fixture, run = null }) {
                     </div>
                     <span className="cf-body"><Sprite src={fixture.hero.art} className="cf-sprite" flip={fixture.hero.flip} /></span>
                     <span className="cf-shade" aria-hidden="true" />
-                    <Bar unit={fight.hero} guarding={guarded.hero} pending={pendingFor(fight.hero, "hero")} />
+                    <Bar unit={fight.hero} guarding={guarded.hero} pending={pendingFor(fight.hero, "hero")} onMark={setKeyWord} />
                 </div>
 
                 {/* ── THE PARTY ────────────────────────────────────────────────────────────────────────
@@ -1121,13 +1122,25 @@ export default function CardFightClient({ fixture, run = null }) {
                                     <button type="button" className="cf-intent" title={beat.label}
                                         aria-label={`What ${foe.name || "it"} is about to do`}
                                         onClick={(e) => { e.stopPropagation(); setFoeNote(i); }}>
+                                        {/* ⚠️ SIX MARKS FOR TEN KINDS OF MOVE, AND THE MISSING FOUR ARE HOW A
+                                            BOSS CAME TO DO NOTHING. Three creatures open a fight by
+                                            shuffling junk into your deck or calling in more of themselves —
+                                            slime_king, the act-one boss, is one of them — and this row had
+                                            no mark for either, so its first turn drew an empty pill. Luke:
+                                            "turn 1 the boss does nothing?" It was telling him everything it
+                                            was about to do, in a vocabulary missing the word for it.
+                                            Driven off the beat's own fields now, so a move that grows a new
+                                            one gets a mark by adding a picture rather than a branch. */}
                                         <span className="cf-intent-marks">
-                                            {beat.damage ? <GiCrossedSwords aria-hidden="true" /> : null}
-                                            {beat.block ? <GiShield className="is-guard" aria-hidden="true" /> : null}
-                                            {beat.strength ? <GiBiceps className="is-buff" aria-hidden="true" /> : null}
-                                            {beat.heal ? <GiHeartPlus className="is-buff" aria-hidden="true" /> : null}
-                                            {beat.weak ? <GiSlowBlob className="is-curse" aria-hidden="true" /> : null}
-                                            {beat.vulnerable ? <GiCrackedShield className="is-curse" aria-hidden="true" /> : null}
+                                            {["damage", "block", "strength", "heal", "weak", "vulnerable",
+                                                "frail", "poison", "status", "summon"]
+                                                .filter((k) => beat[k])
+                                                .map((k) => {
+                                                    const art = STATUS_ART[k === "damage" ? "attack" : k];
+                                                    return art ? (
+                                                        <Sprite key={k} src={art.src} className="cf-intent-mark" />
+                                                    ) : null;
+                                                })}
                                         </span>
                                         {beat.damage ? <b>{swing}</b> : null}
                                     </button>
@@ -1146,7 +1159,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                     <Sprite src={foe.art} fallback={foe.artFallback} className="cf-sprite" />
                                 </span>
                                 <span className="cf-shade" aria-hidden="true" />
-                                {dead ? null : <Bar unit={foe} guarding={guarded[i]} pending={pendingFor(foe, i)} />}
+                                {dead ? null : <Bar unit={foe} guarding={guarded[i]} pending={pendingFor(foe, i)} onMark={setKeyWord} />}
                                 {/* ⚠️ THE NAMES USED TO HANG HERE AND THEY ARE GONE. Luke: "I dont like the
                                     text underneath them, and I dont like how it offsets them vertically."
                                     Both halves are right, and the second is the one worth writing down: the
@@ -1999,14 +2012,22 @@ export default function CardFightClient({ fixture, run = null }) {
                     100% { transform: translateY(0) scaleX(1) scaleY(1); }
                 }
 
-                /* A button now, so the reset is a reset: a button brings its own font, box, background and
-                   padding and every one of those would move the pill off the creature's head. The padding is
-                   the only thing added — a glyph and two digits is a small thing to ask a thumb to find. */
+                /* A button, so the reset is a reset: a button brings its own font, box, background and
+                   padding and every one of those would move the pill off the creature's head.
+                   ⚠️ AND IT SITS ON THE CREATURE, NOT ABOVE ITS PICTURE. Every fighter sprite is die-cut
+                   inside a square with a lot of empty sky at the top, so a mark placed above the IMAGE box
+                   floats a long way above the actual head — measured at about fifty pixels of nothing
+                   between the two. Luke: "center them on the players and enemies." The negative margin pulls
+                   the row back down over that transparent band, which is where a player's eye already is.
+                   Percentages resolve against WIDTH here, and the fighter is 44% of the screen. */
                 .cf-intent { display: flex; flex-direction: column; align-items: center; gap: 1px;
-                    margin-bottom: 4px; font: inherit; color: inherit; background: none; border: 0;
-                    padding: 4px 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-                .cf-intent-marks { display: inline-flex; align-items: center; gap: 3px; font-size: 21px;
-                    color: #ffd0c4; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.9)); }
+                    margin-bottom: -20%; z-index: 4; font: inherit; color: inherit; border: 0;
+                    padding: 3px 9px; border-radius: 999px; cursor: pointer;
+                    background: rgba(8,10,15,0.55); -webkit-tap-highlight-color: transparent; }
+                .cf-intent-marks { display: inline-flex; align-items: center; justify-content: center;
+                    gap: 3px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.9)); }
+                .cf-intent-mark { width: 26px; height: 26px; object-fit: contain;
+                    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)); }
                 .cf-intent-marks .is-guard { font-size: 17px; color: #9fd2ff; }
                 /* Outlined rather than boxed, the way a number painted onto a scene has to be. */
                 .cf-intent b { font-family: var(--cf-card-font); font-size: 20px; font-weight: 700; color: #fff;
@@ -2509,7 +2530,7 @@ export default function CardFightClient({ fixture, run = null }) {
 
 /** Name, health, and the block standing in front of it. */
 /** Health, and whatever is stuck to the body it belongs to. No name: the fighter is the identification. */
-function Bar({ unit, guarding, pending }) {
+function Bar({ unit, guarding, pending, onMark }) {
     const pct = Math.max(0, Math.min(100, (unit.hp / unit.hpMax) * 100));
     // ── WHAT THE CARD IN YOUR HAND WOULD DO TO THIS BAR ─────────────────────────────────────────────────
     // Luke: "I don't see the preview of the hp damage when I target enemy." Spire does not draw one — theirs
@@ -2552,63 +2573,23 @@ function Bar({ unit, guarding, pending }) {
                 Spire puts a row of small marked icons under the health bar, and the reason is arithmetic:
                 three statuses written as words ("Vulnerable 2", "Weak 1", "Strength 3") is a wrapping
                 paragraph under a 168px bar on a phone. The title carries the word for anyone who needs it. */}
+            {/* ── WHAT THIS FIGHTER IS CARRYING ───────────────────────────────────────────────────────
+                ⚠️ TWELVE HAND-WRITTEN BLOCKS BECAME ONE LOOP, and the glyphs became paintings. Luke: "I hate
+                the icons, use sprites." They were react-icons SVGs rather than emoji, but a flat
+                single-colour arm at eighteen pixels on a phone does not read as different from one — and it
+                sat on the only screen in the game with no painted furniture on it.
+                Each mark is a BUTTON now, because the fastest way to learn what Frail does is to press the
+                thing that says Frail. It opens the same note the card faces open, so one wording answers the
+                word wherever a player meets it. */}
             <div className="cfb-tags">
-                {unit.vulnerable > 0 ? (
-                    <span className="cfb-tag is-vuln" title={`Vulnerable ${unit.vulnerable} — takes 50% more damage`}>
-                        <GiCrackedShield aria-hidden="true" />{unit.vulnerable}
-                    </span>
-                ) : null}
-                {unit.weak > 0 ? (
-                    <span className="cfb-tag is-weak" title={`Weak ${unit.weak} — deals 25% less damage`}>
-                        <GiSwordWound aria-hidden="true" />{unit.weak}
-                    </span>
-                ) : null}
-                {/* FRAIL is the third of their three basic debuffs and the only one that attacks a defensive
-                    hand: a status you are carrying and cannot see is a status you will misplay around. */}
-                {unit.frail > 0 ? (
-                    <span className="cfb-tag is-frail" title={`Frail ${unit.frail} — gains 25% less Block`}>
-                        <GiCrackedShield aria-hidden="true" />{unit.frail}
-                    </span>
-                ) : null}
-                {unit.strength > 0 ? (
-                    <span className="cfb-tag is-str" title={`Strength ${unit.strength}`}>
-                        <GiBiceps aria-hidden="true" />{unit.strength}
-                    </span>
-                ) : null}
-                {/* DEXTERITY sits beside Strength deliberately: they are the same kind of thing — the two
-                    stats a fight can grow — and a player who has learned to look for the arm should find
-                    the shield in the same row rather than hunting a different corner for it. */}
-                {unit.dexterity > 0 ? (
-                    <span className="cfb-tag is-dex" title={`Dexterity ${unit.dexterity} — gains ${unit.dexterity} more Block`}>
-                        <GiShield aria-hidden="true" />{unit.dexterity}
-                    </span>
-                ) : null}
-                {/* ── AND THE FOUR ADDED WITH THE NEW WORDS ────────────────────────────────────────
-                    ⚠️ A STACK YOU CANNOT SEE IS A STACK YOU WILL MISPLAY AROUND — the same sentence written
-                    over Frail three rules up, and it was true again the moment Poison landed: the Venom Sac
-                    opens a fight with 2 Poison on everything and the board showed a creature at full health
-                    and no reason for it to be dying. Poison in particular HAS to be legible, because the
-                    whole decision it creates is "is that going to finish it, or do I need to swing again". */}
-                {unit.poison > 0 ? (
-                    <span className="cfb-tag is-poison" title={`Poison ${unit.poison} — loses ${unit.poison} health at the start of its turn, through Block, then drops by one`}>
-                        <GiPoisonBottle aria-hidden="true" />{unit.poison}
-                    </span>
-                ) : null}
-                {unit.artifact > 0 ? (
-                    <span className="cfb-tag is-artifact" title={`Artifact ${unit.artifact} — eats the next debuff whole`}>
-                        <GiMagicShield aria-hidden="true" />{unit.artifact}
-                    </span>
-                ) : null}
-                {unit.regen > 0 ? (
-                    <span className="cfb-tag is-regen" title={`Regeneration ${unit.regen} — heals ${unit.regen} at the start of its turn, then drops by one`}>
-                        <GiThreeLeaves aria-hidden="true" />{unit.regen}
-                    </span>
-                ) : null}
-                {unit.intangible > 0 ? (
-                    <span className="cfb-tag is-intang" title={`Intangible ${unit.intangible} — everything that reaches it lands as 1`}>
-                        <GiGhost aria-hidden="true" />{unit.intangible}
-                    </span>
-                ) : null}
+                {marksOn(unit).map((m) => (
+                    <button key={m.key} type="button" className={`cfb-tag is-${m.key}`}
+                        aria-label={`${m.label} ${m.n}. What it does.`}
+                        onClick={(e) => { e.stopPropagation(); if (m.word) onMark?.(m.word); }}>
+                        <Sprite src={m.src} className="cfb-mark" />
+                        {m.n}
+                    </button>
+                ))}
             </div>
             <style jsx global>{`
 /* Narrower and thinner than it was: theirs is about as wide as the fighter, not as wide as the
@@ -2688,9 +2669,12 @@ function Bar({ unit, guarding, pending }) {
                    either." Absolute, hanging off the bottom edge of the bar, so the bar's box is the bar's
                    box no matter what anybody is carrying — and the row may now wrap to two lines without
                    costing anything, which is what the min-height was quietly buying before. */
+                /* Centred on the fighter, and PRESSABLE — it was pointer-events:none, which is right for a
+                   decoration and wrong for the thing a player most needs to ask about. */
                 .cfb-tags { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px;
-                    display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;
-                    pointer-events: none; }
+                    display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+                .cfb-mark { width: 17px; height: 17px; object-fit: contain; flex: 0 0 auto;
+                    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }
                 .cfb-tag { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
                     font-size: 10px; font-weight: 800; background: rgba(10,12,16,0.85); border: 1px solid #3a4354; }
                 .cfb-tag.is-block { color: #8fd3ff; border-color: #33566e; }

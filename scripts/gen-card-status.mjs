@@ -55,6 +55,11 @@ const ART = {
     // ── the enemy's next move ────────────────────────────────────────────────────────────────────────
     attack: "two crossed blades, bright polished steel with a hard highlight along each edge",
     heal: "a warm red heart with a soft golden cross of light over it",
+    // ⚠️ THESE TWO EXIST BECAUSE THE PILL COULD NOT DRAW THEM. Three creatures open a fight with a move that
+    // shuffles junk into your deck or calls in more of them, and the intent row had no mark for either — so
+    // the act-one boss's first turn rendered an EMPTY pill and read as "the boss does nothing".
+    status: "a torn dog-eared playing card, blank and grey, with a jagged crack running across its face",
+    summon: "a curved brass war-horn raised and blowing, with three faint sound rings coming off its bell",
 };
 
 const only = (() => { const i = process.argv.indexOf("--only"); return i > -1 ? new Set(process.argv[i + 1].split(",")) : null; })();
