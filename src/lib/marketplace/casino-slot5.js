@@ -651,22 +651,42 @@ const VAULT = {
 // it is simply where its table landed.
 //
 // So each machine carries a `pay` and every payout multiplier it owns is scaled by that number when this
-// module loads. It is done HERE, once, rather than at the point a win is paid, because a spin's total has
+// module loads. TARGET_RTP below is the height of the floor and the only number worth arguing about. It is done HERE, once, rather than at the point a win is paid, because a spin's total has
 // three exits (base, cascade-fire, colossal) and the SCREEN reads the same numbers the payout does: scaling
 // a total on the way out would show a player a line paying 13.2 and bank 15.8. Scale the table and every
 // number downstream — line wins, scatters, the meter, the bonus rounds that pay off the same ladder — is
 // consistent by construction.
 //
 // ⚠️ THE DIALS ARE SOLVED, NOT CHOSEN. Each one is the number that puts its cabinet on TARGET_RTP when
-// measured by scripts/casino-sim.mjs, which drives this exact function. Change the target, re-run the sim,
-// write the new dials down. Do not eyeball them: the bonus rounds are a fixed share of the return and do
-// not move with this dial, so the relationship between the dial and the RTP is different on every cabinet.
-export const TARGET_RTP = 0.99;
-HUNT.pay = 1.045;
-HARVEST.pay = 1.031;
-DEEP.pay = 1.038;
-MENAGERIE.pay = 1.033;
-VAULT.pay = 1.058;
+// measured by scripts/casino-solve-dials.mjs, which drives this exact function. Change the target, re-run
+// it, write the suggested column back, run it again. Do not eyeball them: the bonus rounds are a fixed
+// share of the return and only partly move with this dial, so the relationship between the dial and the
+// RTP is different on every cabinet AND changes with the size of the dial. The Vault took three passes to
+// converge and needed 1.469 where The Menagerie needed 1.268 for the same return.
+//
+// ── ⚠️ THE FLOOR IS ABOVE 100% ON PURPOSE, AND THAT MAKES IT A FAUCET ─────────────────────
+// The first pass of this dial brought every cabinet to 99%, which took the bust rate from 89% to 85% —
+// true, measured, and not what anybody would notice. Luke picked the number off the table it was priced
+// against: "50 percent went broke."
+//
+// Half is a different machine, not a kinder one. It needs about 121% to pay, so EVERY SPIN IS NOW +EV: a
+// player who keeps pressing trends upward with no ceiling, and the only thing bounding a chip balance is
+// how long somebody is willing to sit there. The cabinets have stopped being the casino's sink.
+//
+// THAT IS A DECISION AND NOT AN ACCIDENT, and the note in casino-dont-balance-to-a-number already said
+// where the real sink belongs: "the real sink is what chips COST at the Counter, priced by hand. That is
+// the lever, not RTP." The floor's height is what makes the room worth walking into; the Counter is what
+// makes the chips worth winning. This file now only does the first job.
+//
+// ⚠️ SO THE THING TO WATCH IS THE COUNTER, NOT THIS NUMBER. If prizes start falling out of the shop
+// faster than they should, the answer is the price list — not walking these dials back down, which is the
+// move Luke has asked me twice not to make.
+export const TARGET_RTP = 1.215;   // ≈ 47% of buy-ins bust, measured over 6,000 ruin runs
+HUNT.pay = 1.321;
+HARVEST.pay = 1.265;
+DEEP.pay = 1.274;
+MENAGERIE.pay = 1.268;
+VAULT.pay = 1.469;
 
 // Multiplies every paying number a cabinet owns. `pays` is symbol -> count -> multiple of the line bet and
 // `scatterPays` is count -> multiple of the total bet; both are payouts and nothing else in the machine is.
