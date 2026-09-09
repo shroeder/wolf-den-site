@@ -11,7 +11,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
-import { DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
+import { CLEAR_PURSE_MULT, DELVE_FLOORS, DELVE_SHARD_DOUBLOONS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 
@@ -431,8 +431,11 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     // the true number. Only the clear purse is invented here, so only the purse is minted here. Minting the
     // sum again would halve the run twice, and the card's own purse line (which prints bonusGold) would then
     // disagree with the gold tile beside it — which is the shape of the bug this pair of changes closes.
-    const bonusGold = cleared ? mint(Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * 6), "delve") : 0;
-    const bonusXp = cleared ? Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * 6) : 0;
+    // Four, not six — the other two moved onto the boss itself, where the fight that earned them happens.
+    // See BOSS_PAY_MULT in the catalogue for why. Imported rather than typed, so the pair cannot drift and
+    // quietly start minting more than the seven floors' worth this has always been.
+    const bonusGold = cleared ? mint(Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * CLEAR_PURSE_MULT), "delve") : 0;
+    const bonusXp = cleared ? Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * CLEAR_PURSE_MULT) : 0;
     const totalGold = gold + bonusGold;
     const totalXp = xp + bonusXp;
 

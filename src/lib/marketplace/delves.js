@@ -11,7 +11,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { luckyChance } from "@/lib/marketplace/fortune.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import {
-    DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
+    BOSS_PAY_MULT, DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
     delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
     potionCount, potionHealFrac, wardCut,
     DELVE_SHARD_DOUBLOONS,
@@ -497,10 +497,15 @@ export async function delveAct(buyerId, action, choice = null) {
         const lines = [`You hit ${run.foe.name} for ${you}.`];
         if (run.foe.hp <= 0) {
             const ev = floor.event;
-            const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * (ev.lootMult || 1));
-            const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
-            const paid = bank(run, { gold, xp });
             const isBoss = ev.kind === KIND.boss;
+            // See BOSS_PAY_MULT: the boss floor is built rather than authored and so carries no lootMult,
+            // which left the hardest fight in the dungeon paying the flat baseline. Its purse is multiplied
+            // here, where gold and XP are decided, and NOT through lootMult — that field also drives the
+            // drop rolls below, so using it would have tripled the boss's gear as a side effect.
+            const payMult = (ev.lootMult || 1) * (isBoss ? BOSS_PAY_MULT : 1);
+            const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * payMult);
+            const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * payMult);
+            const paid = bank(run, { gold, xp });
             const got = await rollFightLoot(buyerId, run, d, { mult: ev.lootMult || 1, boss: isBoss });
             // A dungeon boss is one run per dungeon per day, so this is the most RELIABLE of the four stone
             // sources — you can plan around it — which is why its rate is the one most carefully kept down.

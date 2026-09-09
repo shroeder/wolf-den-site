@@ -14,6 +14,26 @@ export const DELVE_FLOORS = 10;
 // when the deck is dealt, not by rerolling encounters mid-run (see dealFloors).
 export const MIN_FIGHTS = 5;
 
+// ── WHAT THE BOSS IS WORTH, AND WHAT CLEARING IS WORTH ───────────────────────────────────────────────────
+// Sunflower Jinxx: "The mobs in lower floors in the dungeon are paying more gold than the final boss now?"
+//
+// She was right, and the reason is that the boss floor is BUILT rather than authored — see the push in
+// delves.js — so it never got a lootMult, while every ordinary encounter has one. The Old One pays x2, a
+// Hoarder's Burrow x1.4, a Warren King's Hoard x7, and the thing at the bottom of the dungeon paid x1: the
+// flat baseline, less than half of what a bad-tempered badger three floors up was worth.
+//
+// The RUN was always paid properly — the clear purse is six times a floor and only lands if the boss goes
+// down, so the floor totalled seven. But a purse handed over on the wrap-up screen is not the same event as
+// the number that comes off the boss when it dies, and the number that came off the boss was an insult.
+//
+// So the points move rather than multiply: the kill takes three and the purse drops six to four. Seven
+// before, seven after, no gold minted that was not being minted already.
+//
+// ⚠️ NOT lootMult, DELIBERATELY. That field also scales the drop rolls in rollFightLoot, so raising it would
+// have tripled the boss's gear and parts as a side effect of paying it properly for its gold.
+export const BOSS_PAY_MULT = 3;
+export const CLEAR_PURSE_MULT = 4;
+
 export { KIND } from "@/lib/marketplace/delve-kinds.js";
 export { DECKS, EVENTS, eventsFor } from "@/lib/marketplace/delve-events.js";
 
