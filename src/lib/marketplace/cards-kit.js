@@ -1736,7 +1736,12 @@ export const KEY_IDS = Object.keys(KEYS);
 // course nobody took one.
 //
 // One sentence, owned by the rules, printed everywhere a key is offered or held.
-export const KEY_WHY = "All three open the door under the Spire, and a fourth act behind it.";
+// ⚠️ IT NAMED THE ACT IN A STRING. Luke: "it references the spire which we dont have." The third
+// act IS called that — see ACT_NAMES — but the sentence said so in its own words, so the name lived in
+// two places and a player who had not reached act three was being told about a landmark by a proper
+// noun with nothing behind it. Built from ACT_NAMES now: rename the act and every screen that offers
+// or holds a key follows it, and the door is described by where it is rather than by what it is called.
+export const KEY_WHY = `All three open the door beneath ${ACT_NAMES[2]}, and a fourth act behind it.`;
 /** How far along the set this run is, as a sentence a button can wear. */
 export const keyProgress = (run) => {
     const held = KEY_IDS.filter((k) => Boolean(run?.keys?.[k])).length;

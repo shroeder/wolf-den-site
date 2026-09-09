@@ -12,6 +12,8 @@ import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { KEYS, KEY_WHY, PERKS, POTIONS, canUpgrade, cardById, keyProgress, upgradedId } from "@/lib/marketplace/cards-kit.js";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
+import CardGot from "@/components/cards/CardGot";
+import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -94,6 +96,24 @@ export default function CardRoom({ run, art = {} }) {
     // The chest is a TRINKET room now (see grantForRoom), so the trinket is the thing on the screen and the
     // embers are the change. A payout the player cannot see is the oldest bug this game has.
     const gotPerk = loot?.perk ? PERKS[loot.perk] : null;
+
+    // ── OPENING A CHEST IS A MOMENT, AND IT WAS A LIST ──────────────────────────────
+    // Luke: "opening a chest needs a result modal that shows the sprite and juicy dopamine effects and the
+    // description." The trinket appeared as a 30px picture in a row of gains under the lid, next to the
+    // embers, in the same weight as the embers — and the trinket is the thing you will carry for the rest of
+    // the run while the embers are change.
+    // It uses CardGot, which is the component that already knows how to hold a payout up: the elite's
+    // trinket has had this ceremony since the day the strip was found to be invisible. A second one written
+    // here would be the same screen twice, and the two would drift.
+    //
+    // ⚠️ ONLY WHEN IT IS NEW. `at.opened` persists on the run, so a chest you walked back into would
+    // otherwise re-open itself in your face. The perk that was ALREADY there when this screen mounted is a
+    // chest you have opened; one that appears afterwards is one you just opened.
+    const hadOnMount = useRef(null);
+    if (hadOnMount.current === null) hadOnMount.current = loot?.perk || "";
+    const [seenLoot, setSeenLoot] = useState(null);
+    const revealPerk = !isFire && gotPerk && hadOnMount.current !== gotPerk.id && seenLoot !== gotPerk.id
+        ? gotPerk.id : null;
 
     const post = useCallback(async (action, extra = {}) => {
         if (busy) return;
@@ -267,19 +287,30 @@ export default function CardRoom({ run, art = {} }) {
                         {keyHere ? (
                             <button
                                 type="button"
-                                className="cr-do is-key"
+                                className="ck-offer"
                                 disabled={busy}
+                                style={{
+                                    "--ck-glow": KEY_TINT[keyHere.id]?.glow,
+                                    "--ck-edge": KEY_TINT[keyHere.id]?.edge,
+                                    "--ck-ink": KEY_TINT[keyHere.id]?.ink,
+                                }}
                                 onClick={() => { sfx("key"); post("takekey", { key: keyHere.id }); }}
                             >
-                                <span className="cr-do-label">
-                                    {busy ? "…" : `Take ${keyHere.name} instead`}
-                                </span>
-                                <span className="cr-do-sub">{keyHere.says}</span>
+                                {/* THE KEY IS DRAWN NOW. See key-offer.js — this button was a line of text
+                                    beside a painted object at 132px, which is not a choice, it is a
+                                    formality. */}
+                                <Sprite className="ck-offer-art" src={keyArt(keyHere.id)} />
+                                <b>{busy ? "…" : `Take ${keyHere.name} instead`}</b>
+                                <i>{keyHere.says}</i>
                                 {/* The price was the only thing this button ever said. See KEY_WHY. */}
-                                <span className="cr-do-why">{KEY_WHY} {keyProgress(run)}</span>
+                                <em>{KEY_WHY} {keyProgress(run)}</em>
                             </button>
                         ) : null}
                     </div>
+                ) : null}
+
+                {revealPerk ? (
+                    <CardGot trinket={revealPerk} onDone={() => setSeenLoot(revealPerk)} />
                 ) : null}
 
                 {/* ── THE DECK, OVER THE ROOM ────────────────────────────────────────────────────────
@@ -372,6 +403,7 @@ export default function CardRoom({ run, art = {} }) {
                 and nothing else on the site. */}
             <style jsx global>{`
                 ${DECK_GRID_CSS}
+                ${KEY_OFFER_CSS}
                 .cr { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;
                     padding: 0 10px 76px; background: #0a0b0f; color: #efe3cd; }

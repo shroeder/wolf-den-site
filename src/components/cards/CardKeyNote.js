@@ -1,5 +1,6 @@
 "use client";
 
+import { Sprite } from "@/components/cards/CardFace";
 import { KEYWORD_TEXT } from "@/lib/marketplace/cards-kit.js";
 
 // ── WHAT THAT GOLD WORD MEANS ────────────────────────────────────────────────────────────────────────────
@@ -13,14 +14,21 @@ import { KEYWORD_TEXT } from "@/lib/marketplace/cards-kit.js";
 // The text comes from KEYWORD_TEXT in the rules, beside the functions that enforce it, rather than from a
 // copy here — the whole reason a card's own sentence is a template over its fields is that two places to say
 // what a number is means one of them is wrong by next week.
+// ⚠️ IT IS OPENED FROM TWO PLACES THAT KNOW DIFFERENT AMOUNTS. A gold word on a card face is a rule
+// with no number attached — "Weak" means the same thing wherever it is printed. A tag under a fighter is
+// that rule with a quantity ON somebody, and "how much Weak am I carrying" is most of what the player is
+// asking when they press it. So `word` takes either: a plain string from a card, or {word, n, src} from a
+// tag, which also hands over the emblem so the thing you tapped is the thing that opens.
 export default function CardKeyNote({ word, onClose }) {
-    if (!word) return null;
+    const it = typeof word === "string" ? { word } : (word || {});
+    if (!it.word) return null;
     return (
         <div className="ck-over" role="presentation" onClick={onClose}>
-            <div className="ck" role="dialog" aria-label={`What ${word} does`}
+            <div className="ck" role="dialog" aria-label={`What ${it.word} does`}
                 onClick={(e) => e.stopPropagation()}>
-                <p className="ck-word">{word}</p>
-                <p className="ck-say">{KEYWORD_TEXT[word] || "No note for this one yet."}</p>
+                {it.src ? <Sprite src={it.src} className="ck-mark" /> : null}
+                <p className="ck-word">{it.word}{Number.isFinite(it.n) ? <em className="ck-n">{it.n}</em> : null}</p>
+                <p className="ck-say">{KEYWORD_TEXT[it.word] || "No note for this one yet."}</p>
                 <button type="button" className="ck-out" onClick={onClose}>Got it</button>
             </div>
 
@@ -34,8 +42,19 @@ export default function CardKeyNote({ word, onClose }) {
                     background: linear-gradient(180deg, #1b1d25, #12141a);
                     border: 1px solid rgba(255,215,94,0.3);
                     box-shadow: 0 18px 40px rgba(0,0,0,0.7); text-align: center; }
+                /* Big, because at this size the emblem is being LEARNED rather than read — the whole
+                   point of tapping one is to find out what that little picture over the health bar was. */
+                .ck-mark { display: block; width: 62px; height: 62px; margin: 2px auto 8px;
+                    object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6)); }
                 .ck-word { margin: 0 0 8px; font-size: 19px; font-weight: 800; letter-spacing: 0.05em;
                     color: #ffd75e; text-shadow: 0 0 16px rgba(255,215,94,0.28); }
+                /* The amount, in the same slate the cost diamond and the pile counts are painted in, so a
+                   number on this screen always looks like a number this game printed. */
+                .ck-n { display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 999px;
+                    font-style: normal; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums;
+                    color: #f2f5f8; background: linear-gradient(180deg, #6b7280, #2b3038);
+                    border: 1px solid #10131a; vertical-align: 2px;
+                    box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); }
                 .ck-say { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; color: #d9d2c4; }
                 .ck-out { font: inherit; font-size: 13px; letter-spacing: 0.04em; color: #14161d;
                     background: linear-gradient(180deg, #ffd88a, #e0a94e); border: 0; border-radius: 999px;

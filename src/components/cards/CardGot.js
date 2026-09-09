@@ -42,6 +42,22 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
     return (
         <div className={`got${isCard ? " is-card" : ""}`} role="dialog" aria-live="polite" aria-modal="true">
             <span className="got-glow" aria-hidden="true" />
+            {/* ── THE PART THAT IS JUST FEELING ──────────────────────────────────
+                Luke, on the chest: "needs a result modal that shows the sprite and juicy dopamine effects
+                and the description." The glow behind the object was the whole of it — a still warm circle,
+                which is light to READ something in rather than a payout.
+                A slow wheel of rays behind the object and twelve sparks thrown out of it on the first beat.
+                Both are aria-hidden and neither can be pressed: they are decoration over a control that
+                covers the whole panel, so nothing here can eat the tap that dismisses it.
+                Not on the card path — a card you already chose does not get a fanfare, see the note above. */}
+            {isCard ? null : <span className="got-rays" aria-hidden="true" />}
+            {isCard ? null : (
+                <span className="got-sparks" aria-hidden="true">
+                    {Array.from({ length: 12 }, (_, i) => (
+                        <span key={i} className="got-spark" style={{ "--a": `${i * 30}deg`, "--d": `${(i % 3) * 60}ms` }} />
+                    ))}
+                </span>
+            )}
 
             {face ? (
                 <span className={`got-card${going ? " is-going" : ""}`}>
@@ -80,6 +96,47 @@ export default function CardGot({ card = null, trinket = null, art = {}, onDone 
 
                 /* THE TRINKET, drawn at the size its picture was made for. It sits in the strip at 22px for
                    the rest of the run; this is the one time it is ever big enough to actually look at. */
+                /* A WHEEL, NOT A FLASH. Sixteen rays turning once every twenty seconds: at that speed
+                   you never catch it moving, you only notice that the light is alive. A fast spin reads as
+                   a loading spinner, which is the one thing a reward must not look like. */
+                /* Measured by eye at 369x700: the first cut was 0.16 alpha over 7deg spokes and it read as
+                   a printed sunburst behind the object rather than as light coming off it. Half the
+                   opacity and a third of the width, and it is a shimmer you notice without looking at. */
+                .got-rays { position: absolute; width: 460px; height: 460px; pointer-events: none;
+                    background: repeating-conic-gradient(from 0deg,
+                        rgba(255,226,164,0.085) 0deg 2.4deg, rgba(255,226,164,0) 2.4deg 22.5deg);
+                    -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 28%, transparent 60%);
+                    mask-image: radial-gradient(circle, transparent 12%, #000 28%, transparent 60%);
+                    animation: got-rays-in 0.6s ease-out both, got-spin 20s linear infinite; }
+                @keyframes got-rays-in { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+                @keyframes got-spin { to { transform: rotate(360deg); } }
+
+                /* Thrown once, on the beat the object lands. --a is the angle each one leaves on and --d
+                   staggers them so it reads as a burst rather than as a ring expanding. */
+                /* ⚠️ CENTRED EXPLICITLY. A zero-size absolute box with no inset falls back to its STATIC
+                   position — which in this column is above the object, so the burst went off in the empty
+                   air over its head. It has to be pinned to the middle of the panel, which is where the
+                   thing it is coming out of is. */
+                .got-sparks { position: absolute; top: 50%; left: 50%; width: 0; height: 0;
+                    pointer-events: none; }
+                /* ⚠️ THEY HAVE TO LEAVE THE GLOW OR THEY ARE NOT THERE. The first cut threw 7px gold dots
+                   at 0.85s out to 124px — which is INSIDE the 190px glow, so they were warm dots on a warm
+                   circle and photographed as nothing at all at 250ms and at 500ms both. White-hot, bigger,
+                   drawn as a streak rather than a dot, and thrown past the glow's own edge, which is the
+                   only place on this panel where a moving highlight has anything to move against. */
+                .got-spark { position: absolute; width: 5px; height: 14px; margin: -7px 0 0 -2.5px;
+                    border-radius: 999px;
+                    background: linear-gradient(180deg, #fffdf2, #ffd07a 55%, rgba(255,150,40,0));
+                    box-shadow: 0 0 10px rgba(255,225,160,0.9);
+                    transform: rotate(var(--a)) translateY(0) scale(0);
+                    animation: got-spark-out 1s cubic-bezier(.12,.7,.25,1) var(--d) both; }
+                @keyframes got-spark-out {
+                    0% { transform: rotate(var(--a)) translateY(-16px) scaleY(0.4) scaleX(0.6); opacity: 0; }
+                    18% { opacity: 1; }
+                    70% { opacity: 1; }
+                    100% { transform: rotate(var(--a)) translateY(-208px) scaleY(1.6) scaleX(0.7); opacity: 0; }
+                }
+
                 .got-item { position: relative; width: 132px; height: 132px; object-fit: contain;
                     filter: drop-shadow(0 0 26px rgba(255,180,90,0.55)) drop-shadow(0 10px 18px rgba(0,0,0,0.8));
                     animation: got-rise 0.55s cubic-bezier(.2,.9,.25,1) both; }

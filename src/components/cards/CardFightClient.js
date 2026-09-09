@@ -28,6 +28,7 @@ import CardKeyNote from "@/components/cards/CardKeyNote";
 import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
+import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
 // the floating number and the screen jolt are all timed off this one value, because the whole point of the
@@ -615,9 +616,24 @@ export default function CardFightClient({ fixture, run = null }) {
         }
         // A card you play on yourself is dropped anywhere on the field, which is what Spire does with its
         // untargeted cards: there is nothing to point at, so pointing is not asked for.
+        //
+        // ⚠️ BUT THE FIELD IS THE WHOLE SCREEN, SO THERE WAS NO WAY TO CHANGE YOUR MIND. Luke: "when i
+        // drag a card that has a buff on me and then I decide against using it I drag the card back down,
+        // but it still uses the card." .cf-field is inset: 0 — it runs underneath the hand as well as above
+        // it — so every pixel on the glass was a valid drop and a self-targeting card could not be put
+        // back. A card aimed at a FOE has always been cancellable (release anywhere that is not a creature),
+        // so the two halves of the same gesture behaved differently, and the half you could not undo was the
+        // one whose mistakes are permanent: Metallicize spent on the wrong turn is gone.
+        //
+        // The tray's own top edge is the floor now — the same seam the raised card is measured against, see
+        // the note by trayRef. Above it plays; back down over the hand it came from puts it back. That reads
+        // as the gesture undoing itself rather than as a rule, which is why the hand is the right boundary
+        // and an arbitrary height up the screen is not.
         const box = fieldRef.current?.getBoundingClientRect();
         if (!box) return null;
-        return y >= box.top && y <= box.bottom ? "self" : null;
+        const seam = trayRef.current?.getBoundingClientRect().top;
+        const floor = Number.isFinite(seam) ? seam : box.bottom;
+        return y >= box.top && y < floor ? "self" : null;
     }, [fight.hand, foeUnder]);
 
 
@@ -1423,9 +1439,16 @@ export default function CardFightClient({ fixture, run = null }) {
                         && runState.at?.kind === "elite" ? (
                             <button
                                 type="button"
-                                className="cf-takekey"
+                                className="ck-offer"
+                                style={{
+                                    "--ck-glow": KEY_TINT.ruby.glow,
+                                    "--ck-edge": KEY_TINT.ruby.edge,
+                                    "--ck-ink": KEY_TINT.ruby.ink,
+                                }}
                                 onClick={() => post("takekey", { key: "ruby" })}
                             >
+                                {/* Same control the campfire and the chest draw — see key-offer.js. */}
+                                <Sprite className="ck-offer-art" src={keyArt("ruby")} />
                                 <b>Take {KEYS.ruby.name} instead</b>
                                 <i>{KEYS.ruby.says}</i>
                                 {/* Same sentence the campfire prints. See KEY_WHY — the price was the only
@@ -1658,6 +1681,7 @@ export default function CardFightClient({ fixture, run = null }) {
                 else. Same trap the mine hit; the answer there was global CSS too. */}
             <style jsx global>{`
                 ${DECK_GRID_CSS}
+                ${KEY_OFFER_CSS}
                 /* ── ONE SPACE, NOT A PICTURE ABOVE A SHELF ──────────────────────────────────────────────
                    Measured off Spire's own frame with a percentage grid laid on it: their fighters stand with
                    their feet at 62%, health bars at 70%, the hand from 78% — and the FLOOR RUNS EDGE TO EDGE
@@ -2141,7 +2165,21 @@ export default function CardFightClient({ fixture, run = null }) {
                    design, so the bottom line of every resting card was off-screen — measured 813 on a 780
                    viewport. A card whose text is cut off is a card you have to pick up to read, which is the
                    whole thing the dial exists to avoid. */
+                /* ── ⚠️ THE HAND'S BOX ATE EVERY TAP MEANT FOR A STATUS TAG ────────────────
+                   Luke: "I need to be able to click a debuff or buff under an enemy and see a modal
+                   describing the debuff or buff and amount." They were already buttons and had been since
+                   the day they were drawn — they were simply unreachable.
+                   Measured at 369x800 on a standalone ?seed= fight: the health bars end at y=602, the tag
+                   row hangs 4px under them at 606-628, and this tray's box begins at y=612. So the bottom
+                   sixteen pixels of every tag sat inside the hand, and the hand is painted after the
+                   fighters — elementFromPoint at the centre of a tag came back as the tray's own DIV. The
+                   tags were VISIBLE the whole time, because the tray's background is none and the fan sits
+                   lower than its box, which is why this reads as a dead control rather than a hidden one.
+                   The tray is a layout box with nothing drawn on it and no handler of its own, so it has no
+                   business receiving a pointer at all. The cards take theirs back below. Nothing else in
+                   here is pressable, and the swipe starts on a card, not on the space beside one. */
                 .cf-tray { position: absolute; left: 0; right: 0; bottom: 40px; z-index: 5; background: none;
+                    pointer-events: none;
                     display: flex; flex-direction: column-reverse;
                     padding: 0 6px calc(2px + env(safe-area-inset-bottom)); }
                 /* The lift on a picked card happens INSIDE this padding, and the cost badge sits inside the
@@ -2153,6 +2191,12 @@ export default function CardFightClient({ fixture, run = null }) {
                 /* The row may be wider than the screen now — see fanShift — so it must not wrap and must not
                    be squeezed by its parent. The slide is eased rather than instant: the whole point is that
                    the fan turns under your thumb, and a jump does not read as a turn. */
+
+                /* ⚠️ THE CARDS, NOT THE HAND. .cf-hand is the fan's container and its box is the
+                   whole tray, so giving IT the pointers back put the swallowing straight back —
+                   measured, elementFromPoint over a tag came back as .cf-hand instead of the tray.
+                   Only a card is a thing you can press. */
+                .cf-tray .cf-card { pointer-events: auto; }
                 .cf-hand { display: flex; justify-content: center; align-items: flex-end; padding: 26px 10px 0;
                     margin-bottom: -18px; flex-wrap: nowrap; flex: 0 0 auto; will-change: transform;
                     transition: transform 220ms cubic-bezier(.2,.9,.3,1); }
@@ -2539,15 +2583,8 @@ export default function CardFightClient({ fixture, run = null }) {
                     color: #b6a6ff; }
                 .cf-read-back { padding: 6px; border: 0; background: none; cursor: pointer;
                     font: inherit; font-size: 13px; color: #8a8f98; }
-                .cf-takekey {
-                    display: block; width: min(340px, 92vw); margin: 10px auto 0; padding: 10px 14px;
-                    background: transparent; border: 1px solid #2c6e4a; border-radius: 10px;
-                    text-align: left; cursor: pointer; font: inherit;
-                }
-                .cf-takekey b { display: block; color: #7fe0a8; font-size: 15px; }
-                .cf-takekey i { display: block; margin-top: 3px; color: #8a8f98; font-size: 12px; font-style: normal; }
-                .cf-takekey em { display: block; margin-top: 5px; color: #9be08a; font-size: 11px;
-                    line-height: 1.4; font-style: normal; }
+                /* .cf-takekey is gone — the key offer is KEY_OFFER_CSS now, shared with the campfire
+                   and the chest. See key-offer.js. */
                 .cf-bossperk { display: grid; grid-template-columns: 46px 1fr; grid-template-rows: auto auto;
                     gap: 2px 12px; align-items: center; padding: 10px 12px; cursor: pointer; text-align: left;
                     border-radius: 12px; border: 1px solid rgba(201,162,83,0.4);
@@ -2696,7 +2733,7 @@ function Bar({ unit, guarding, pending, onMark }) {
                 {marksOn(unit).map((m) => (
                     <button key={m.key} type="button" className={`cfb-tag is-${m.key}`}
                         aria-label={`${m.label} ${m.n}. What it does.`}
-                        onClick={(e) => { e.stopPropagation(); if (m.word) onMark?.(m.word); }}>
+                        onClick={(e) => { e.stopPropagation(); if (m.word) onMark?.({ word: m.word, n: m.n, src: m.src }); }}>
                         <Sprite src={m.src} className="cfb-mark" />
                         {m.n}
                     </button>
