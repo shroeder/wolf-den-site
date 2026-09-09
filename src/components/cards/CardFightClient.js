@@ -1744,7 +1744,7 @@ export default function CardFightClient({ fixture, run = null }) {
                            times over, and these are the numbers this bar was measured at before the phone
                            ever needed shrinking. Nothing about the desktop strip changes. */
                         --cf-gap: 10px; --cf-pile: 34px; --cf-chip: 28px; --cf-gem: 46px;
-                        --cf-end-w: 104px; }
+                        --cf-end-w: 104px; --cf-belt-sep: 18px; }
                     .cf .cf-hero { left: 9%; width: 26%; }
                     .cf .cf-party { right: 5%; width: 52%; }
                 }
@@ -1833,8 +1833,10 @@ export default function CardFightClient({ fixture, run = null }) {
                    set. Every control is still there and still pressable; they are simply drawn at the size
                    the screen can actually hold. The desktop block further down restores the numbers this
                    bar had before, because a 900px window was never the screen with the problem.
-                       phone   126 + 40 + 152 + 12 = 330  (fits 360px, which gives 336)
-                       <=360   108 + 36 + 132 +  8 = 284  (fits 320px, which gives 296)
+                       phone   136 + 40 + 148 + 12 = 336  (fits 361px, the narrowest this set sees, which gives 337)
+                       <=360   116 + 36 + 130 +  8 = 290  (fits 320px, which gives 296)
+                   — the left lane's 138 and 116 include --cf-belt-sep, the break between the card piles
+                   and the belt; see .cf-pile + .cf-satchel below.
                    Measured with CDP at 320/360/369/375/393/412 before and after, on a fixture built
                    from this block verbatim; then on the live fight at 369, which is Luke's phone.
                    If any of these change, measure again — the failure is invisible in a screenshot
@@ -1842,7 +1844,8 @@ export default function CardFightClient({ fixture, run = null }) {
                 .cf-top { position: absolute; top: 0; left: 0; right: 0; z-index: 6;
                     display: flex; align-items: center; justify-content: space-between; gap: var(--cf-gap);
                     --cf-bar-h: 58px;
-                    --cf-gap: 6px; --cf-pile: 28px; --cf-chip: 26px; --cf-gem: 40px; --cf-end-w: 88px;
+                    --cf-gap: 6px; --cf-pile: 28px; --cf-chip: 26px; --cf-gem: 40px; --cf-end-w: 84px;
+                    --cf-belt-sep: 12px;
                     height: calc(var(--cf-bar-h) + env(safe-area-inset-top));
                     padding: env(safe-area-inset-top) 12px 0 12px; background: none; }
                 /* ── THREE PIECES, AND ONLY THE MIDDLE STRETCHES ──────────────────────────────────────────
@@ -1871,7 +1874,7 @@ export default function CardFightClient({ fixture, run = null }) {
                    step down rather than a control taken away — 284, with twelve to spare. */
                 @media (max-width: 360px) {
                     .cf-top { --cf-gap: 4px; --cf-pile: 26px; --cf-chip: 24px; --cf-gem: 36px;
-                        --cf-end-w: 76px; }
+                        --cf-end-w: 74px; --cf-belt-sep: 8px; }
                 }
                 .cf-top-plate { position: absolute; inset: 0; z-index: 0; pointer-events: none;
                     border-style: solid; border-color: transparent;
@@ -2242,6 +2245,22 @@ export default function CardFightClient({ fixture, run = null }) {
                    the piles on the far left too. */
                 .cf-satchel { position: relative; padding: 5px 1px; border: 0; background: none;
                     cursor: pointer; line-height: 0; }
+                /* ── THE PILES ARE ONE THING AND THE BELT IS ANOTHER ─────────────────────────
+                   Luke, once the gem was off them: "potions and trophy up top need to move right a bit."
+                   Once the lane fitted, everything in it sat at one even spacing, so the two card piles and
+                   the two satchels read as one run of four unrelated buttons crammed into the left cap —
+                   six pixels from the discard pile to the potion belt, and twenty-four from the trinket
+                   pouch to the gem. What you are CARRYING and what is left in your DECK are two different
+                   questions, so there is a break between them and the belt sits in the middle of the span
+                   instead of against the piles.
+                   The adjacent-sibling selector is deliberate: it puts the break at the boundary itself
+                   rather than on a nth-child, so an empty belt (the potion satchel is not drawn when you
+                   carry none — EMPTY IS NOT DRAWN) leaves the pouch correctly separated instead of glued
+                   to the piles.
+                   ⚠️ IT IS PAID FOR, NOT ADDED. The strip had three pixels of slack at 369 and none at
+                   320; End turn gives up four pixels on the phone and two more below 360 to buy this. See
+                   the arithmetic at the top of the block — there is no free space on this bar. */
+                .cf-pile + .cf-satchel { margin-left: var(--cf-belt-sep); }
                 .cf-satchel-glyph { width: calc(var(--cf-chip) - 4px); height: calc(var(--cf-chip) - 4px);
                     color: #d8c39a; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
                 .cf-satchel-art { width: calc(var(--cf-chip) - 2px); height: calc(var(--cf-chip) - 2px);

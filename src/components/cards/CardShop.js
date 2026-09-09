@@ -526,7 +526,13 @@ export default function CardShop({ run, art = {} }) {
                     display: flex; flex-direction: column; align-items: center; }
                 .cs-buy:disabled { cursor: default; }
                 .cs-buy.is-gone { opacity: 0.4; filter: grayscale(0.6); }
-                .cs-buy:hover:not(:disabled) .cf-card { transform: translateY(-6px) scale(1.04); }
+                /* Behind (hover: hover) for the reason written by .cs-good below — this one moves a
+                   CHILD rather than the button, so it was not eating its own taps, but a card left
+                   hanging in the air after a tap on a phone is the same rule doing the same wrong
+                   thing more quietly. */
+                @media (hover: hover) {
+                    .cs-buy:hover:not(:disabled) .cf-card { transform: translateY(-6px) scale(1.04); }
+                }
                 .cs-buy:focus-visible .cf-card { transform: translateY(-6px) scale(1.04); }
 
                 /* ── THE CARD BOX ── everything inside it is CardFace's. See the note there: the face is one
@@ -610,7 +616,29 @@ export default function CardShop({ run, art = {} }) {
                     color: inherit; font: inherit; transition: transform 140ms ease-out; }
                 .cs-good:disabled { cursor: default; }
                 .cs-good.is-gone { opacity: 0.4; filter: grayscale(0.6); }
-                .cs-good:hover:not(:disabled), .cs-good:focus-visible { transform: translateY(-5px); }
+                /* ── ⚠️ A LIFT ON HOVER IS A BUTTON THAT CANNOT BE TAPPED ──────────────────
+                   Luke, on the merchant's shelf: "when i click smooth stone it needs to open a modal, right
+                   now it flashes a component beneath quickly and I cant interact with the component because
+                   it goes away."
+                   A phone has no pointer to hover with, so Chrome puts an element into :hover on POINTERDOWN
+                   and takes it out again after. This rule moved the button five pixels up the instant the
+                   finger touched it — so by pointerup the finger was no longer over the button, and a click
+                   is dispatched on the nearest common ancestor of where the press started and where it
+                   ended. Traced at frame resolution on a real touch sequence:
+                       30ms  POINTERDOWN on .cs-plinth      (inside the button)
+                      138ms  CLICK       on .cs-line.is-goods   (the CONTAINER)
+                   The button's own onClick never ran. Near the middle of a 96px button five pixels is not
+                   enough to escape it and the tap works, which is why it read as intermittent rather than
+                   broken — and the trinket stands 47px up a plinth, so the thumb goes near its edge.
+                   ⚠️ SO EVERY HOVER RULE THAT MOVES SOMETHING IS BEHIND (hover: hover). A device with a
+                   real pointer keeps the lift; a touch screen never asks for it. Colour-only :hover rules
+                   are left alone — the worst they do on a phone is stay lit.
+                   Same fault as the pointer-capture one: an affordance for a mouse, breaking the input the
+                   game is actually played with. */
+                .cs-good:focus-visible { transform: translateY(-5px); }
+                @media (hover: hover) {
+                    .cs-good:hover:not(:disabled) { transform: translateY(-5px); }
+                }
                 .cs-obj { position: relative; height: 84px; width: 100%; display: grid; place-items: end center; }
                 .cs-goodart { position: relative; z-index: 2; max-width: 64px; max-height: 66px;
                     object-fit: contain; filter: drop-shadow(0 5px 7px rgba(0,0,0,0.7)); }
