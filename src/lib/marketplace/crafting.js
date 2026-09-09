@@ -21,6 +21,7 @@ import { rollUtil, parseUtil, describeUtil, getEquippedUtilTotals, UTIL_BASE_CHA
 import { getElementOverrides, describeItemElements, reforgeCost, DUAL_ELEMENT_CHANCE } from "@/lib/marketplace/item-element.js";
 import { ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -336,6 +337,9 @@ export async function salvageItem(buyerId, itemId) {
     const xp = 4 + cfg.tier * 3;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "forge_salvage", SURPRISE_WEIGHT.normal).catch(() => {});
 
     await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop } });
     await bumpDaily(buyerId, "salvages", 1);

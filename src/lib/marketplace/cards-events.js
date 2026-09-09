@@ -621,6 +621,8 @@ export function pickEvent(seed, act = 1, seen = []) {
  * what it did — a room that pays silently is the chest bug all over again.
  */
 export function applyEventChoice(run, ev, index, card = null) {
+    // Every card this choice put an edge on, in the order it happened — see the note by eff.upgrade.
+    const sharpened = [];
     const choice = ev?.choices?.[index];
     if (!choice) return { error: "no_such_choice" };
     const eff = choice.effect || {};
@@ -667,6 +669,7 @@ export function applyEventChoice(run, ev, index, card = null) {
             if (!canUpgrade(card)) return { error: "cannot_upgrade" };
             run.deck = run.deck.map((id, i) => (i === at ? upgradedId(id) : id));
             said.push(`${cardById(card)?.name || "The card"} comes out sharper.`);
+            sharpened.push(card);
         }
     }
 
@@ -762,6 +765,12 @@ export function applyEventChoice(run, ev, index, card = null) {
             const [c] = open.splice(at, 1);
             run.deck = run.deck.map((id, i) => (i === c.i ? upgradedId(id) : id));
             took.push(cardById(c.id)?.name || c.id);
+            // ── AND WHICH ONES, NOT ONLY WHAT THEY WERE CALLED ───────────────────────────────────────
+            // The room said "Pilfer and Hop came out sharper" and that was the whole of it — a sentence
+            // where the campfire, doing the identical thing to one card, puts it in the fire and shows you
+            // the numbers change. The ceremony already exists (CardForge) and the only reason this room
+            // could not play it is that it reported NAMES. Ids, so the screen can show the work.
+            sharpened.push(c.id);
         }
         said.push(took.length ? `${took.join(" and ")} came out sharper.` : "Nothing here can take an edge.");
     }
@@ -828,7 +837,7 @@ export function applyEventChoice(run, ev, index, card = null) {
     if (encId) {
         run.at = { ...run.at, kind: "fight", enc: encId, pending: null, fromEvent: ev.id };
         said.push(woke ? "Something comes up the passage behind you." : "They come apart when you step on them, and then they come at you.");
-        return { said, fight: true };
+        return { said, sharpened, fight: true };
     }
 
     // ── THE ROOMS YOU CAN STAY IN ────────────────────────────────────────────────────────────────────
@@ -844,5 +853,5 @@ export function applyEventChoice(run, ev, index, card = null) {
     const used = [...(run.at?.used || []), index];
     const more = choice.again && used.length < ev.choices.length - 1;
     run.at = { ...run.at, pending: null, used, spent: !more, said: [...(more ? (run.at?.said || []) : []), ...said] };
-    return { said, more };
+    return { said, sharpened, more };
 }

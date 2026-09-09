@@ -17,6 +17,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { hasPower, equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -390,6 +391,9 @@ export async function startTrip(buyerId) {
     const run = { depth: startDepth, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb, current_node_id = NULL WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
     await trackActivity(buyerId, "mine_trip", {}).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "mining_trip", SURPRISE_WEIGHT.normal).catch(() => {});
     return { ok: true, ...(await getMiningState(buyerId)) };
 }
 
@@ -1666,6 +1670,9 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     const melted = await db.queryOne(`UPDATE mkt_mining SET ore_smelted = COALESCE(ore_smelted, 0) + $2 WHERE buyer_id = $1 RETURNING ore_smelted`, [buyerId, spend]).catch(() => null);
     if ((Number(melted?.ore_smelted) || 0) >= 1000) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
     await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, batches: n, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length, refunded }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "forge_smelt", SURPRISE_WEIGHT.normal).catch(() => {});
     // By the BATCH, not by the tap — batching must never be a way to do less quest progress for the same ore
     // (or more, which is why it is n and not n + 1).
     await bumpQuestProgress(buyerId, "ore_smelt", n).catch(() => {});

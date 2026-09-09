@@ -1187,6 +1187,7 @@ const PROC_BOSSES = [
 import { RARITY_RANK as REWARD_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 // A boss is a ten-day fight for the whole pack. Its drops had only a CAP, no floor, so the roll could hand out
 // three commons — a week and a half of everyone's effort paying out in grey. There is now a floor as well:
 // rare (blue) at minimum, epic at most. `floorRarity` is a parameter rather than a constant so raising the bar
@@ -1452,6 +1453,9 @@ export async function attackBoss(buyerId) {
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
     const elemProc = elem.matches > 0 ? `${weaknessInfo(boss.weakness)?.emoji || "✨"} ${weaknessInfo(boss.weakness)?.label || ""} weakness +${elem.bonusPct}%` : null;
     await trackActivity(buyerId, "boss_attack", { damage, crit, boss: boss.name, defeated }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "boss_hit", SURPRISE_WEIGHT.normal).catch(() => {});
     // The felling blow, not every strike. The boss is the main route to Exquisite and Legendary recipes, and
     // gating it on the kill is what keeps those tiers weekly rather than farmable.
     if (defeated) {

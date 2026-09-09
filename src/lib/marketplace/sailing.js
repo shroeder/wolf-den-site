@@ -45,6 +45,7 @@ import { maybeGrantSeaFightPet } from "@/lib/marketplace/pet-drops.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantDoubloons, so this static import can't cycle.
 import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── YOU DIG UP A CHEST. THAT IS THE WHOLE MODEL. ─────────────────────────────────────────────────────────────
 // It used to be shards: a dig paid 2-3 fragments, ten of a tier fused into that tier's chest, and six other
@@ -1997,6 +1998,9 @@ export async function waveAtSailor(buyerId) {
     await awardXp(buyerId, "sail_wave", { points: WAVE_XP, gold: WAVE_COINS }).catch(() => {});
     await bumpQuestProgress(buyerId, "wave", 1).catch(() => {}); // "Greet a passing sailor" daily quest
     await trackActivity(buyerId, "sail_wave", {}).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "sailing", SURPRISE_WEIGHT.normal).catch(() => {});
     // Milestone badges for friendliness (cumulative waves).
     const wt = waved.waves_total || 0;
     if (wt >= BADGE_WAVE_FRIENDLY) await grantEventBadge(buyerId, "wave_friendly").catch(() => {});

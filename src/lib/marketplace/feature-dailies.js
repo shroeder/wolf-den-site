@@ -15,6 +15,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── Per-feature daily quests (farm + sailing) ───────────────────────────────────────────────────────────────
 // A dedicated, always-present set of 3 daily bounties shown on each feature's own screen (like the Forge's).
@@ -150,5 +151,8 @@ export async function claimFeatureDaily(buyerId, feature, key) {
     if (t.reward.chest) await addChests(buyerId, { [t.reward.chest]: 1 }, { source: "feature_daily", meta: { key: t.key } }).catch(() => {});
     await awardXp(buyerId, `${feature}_daily`, { points: 20, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "feature_daily", { feature, key, gold: t.reward.gold || 0, chest: t.reward.chest || null }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "feature_daily", SURPRISE_WEIGHT.light).catch(() => {});
     return { ok: true, reward: t.reward, dailies: await getFeatureDailies(buyerId, feature) };
 }

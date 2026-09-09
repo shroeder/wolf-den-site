@@ -139,7 +139,12 @@ export async function POST(request) {
                 const out = applyEventChoice(run, ev, index, body?.card ? String(body.card) : null);
                 if (out.error) return NextResponse.json({ error: out.error }, { status: 400 });
                 await saveRun(buyer.id, run);
-                return NextResponse.json({ run });
+                // ⚠️ THE CARDS GO BACK WITH IT, NOT ONLY THE ROOM. A room that sharpens two cards at random
+                // has to be able to show the same fire the campfire shows, and the screen cannot animate what
+                // it was never told — the reply carried `run` alone, so the only evidence anything had
+                // happened was a sentence. Rides beside the run rather than on it: it is what just happened,
+                // not part of the run's state, and it must not survive a reload and play a second time.
+                return NextResponse.json({ run, sharpened: out.sharpened || [] });
             }
 
             // ── THE CAMPFIRE ────────────────────────────────────────────────────────────────────────

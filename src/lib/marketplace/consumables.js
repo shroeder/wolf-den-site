@@ -12,6 +12,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs.js";
 import { RECIPES, MASTER_RECIPES, SEASON_RECIPES } from "@/lib/marketplace/cooking-recipes.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -581,6 +582,9 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
         if (!dec) return { ok: false, error: "none_owned" };
         await trackActivity(buyerId, "use_consumable", { id, name: c.name });
+        // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+        // nothing says it is coming.
+        await surpriseChest(buyerId, "consumable", SURPRISE_WEIGHT.light).catch(() => {});
         if (e.type === "recharge") {
             await db.query(`UPDATE mkt_user_item SET charges_left = $3 WHERE buyer_id = $1 AND item_id = $2`, [buyerId, targetItemId, def.charges || 0]).catch(() => {});
             return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied: `${def.name} fully recharged — ${def.charges} charges` };

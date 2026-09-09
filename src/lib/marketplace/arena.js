@@ -46,6 +46,7 @@ import { act, openRing, ringResult } from "@/lib/marketplace/arena-ring.js";
 import { arenaRating, fighterFields } from "@/lib/marketplace/arena-engine.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { hasUnlock } from "@/lib/marketplace/casino-perks.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
@@ -2255,6 +2256,9 @@ export async function startBout(buyerId, targetId = null) {
         [buyerId, JSON.stringify(bout), rung > 0]
     ).catch(() => {});
     await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower: bout.theirPower }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "arena_bout", SURPRISE_WEIGHT.normal).catch(() => {});
     // A passive bout is already decided and pays out here. An interactive one has barely begun — it pays when
     // the ring says it is over, on whichever beat that turns out to be. See settle().
     return settle(buyerId, bout);

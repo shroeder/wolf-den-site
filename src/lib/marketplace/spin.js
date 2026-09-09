@@ -21,6 +21,7 @@ import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 import { equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
@@ -804,6 +805,9 @@ export async function doSpin(buyerId) {
     if (respinChance > 0 && Math.random() < respinChance) { await grantSpinTokens(buyerId, 1).catch(() => {}); refunded = true; }
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "daily_spin", SURPRISE_WEIGHT.light).catch(() => {});
 
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
     const prizeOut = {

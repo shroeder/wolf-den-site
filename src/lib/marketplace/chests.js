@@ -189,6 +189,74 @@ const ELITE_CHEST_LOTTERY = [
     { tier: "ascendant", chance: 0.1957 }, //   ~1 in 5          -> 15 a month
 ];
 
+// ── THE SURPRISE ─────────────────────────────────────────────────────────────────────────────────────────
+// Luke: "I'd like you to be able to get high tier chests from just about every single thing in the game, but
+// I'd like it to be a really, really low percent chance and a complete surprise. I don't like that the Delve
+// is the only place you can get them."
+//
+// He is describing the opposite of a milestone. The delve's every-tenth-clear was built to be FELT COMING,
+// which is right for a reward you work toward and wrong for this — and in its first day it handed out three
+// top chests from one room, which is how a rare thing stops being rare and stops being a surprise at once.
+//
+// So: every real action in the game rolls, the chance is tiny, and nothing tells you it is coming.
+//
+// ⚠️ THE NUMBERS ARE SOLVED AGAINST MEASURED VOLUME, NOT PICKED. The Den does ~5,676 weighted actions a day
+// (14 days, 45 active members). These four hold the Den-wide totals on the target the elite lottery was
+// already built around — 15 ascendant, 9 eternal, 5 celestial, 1 primordial a month — with ANY top chest
+// landing on 1 action in 5,676: a member doing 123 things a day meets one about every 46 days. Re-measure
+// and re-solve if the Den's pace moves.
+const SURPRISE_PER_WEIGHT = {
+    primordial: 0.0000059,   // 1 in 170,000 weight-1 actions ->  1 a month, Den-wide
+    celestial: 0.0000294,    // 1 in  34,000                  ->  5 a month
+    eternal: 0.0000529,      // 1 in  19,000                  ->  9 a month
+    ascendant: 0.0000881,    // 1 in  11,000                  -> 15 a month
+};
+export const SURPRISE_TIERS = Object.keys(SURPRISE_PER_WEIGHT);
+
+// What one action is worth as a roll. A thing you LOOK at is not in here at all; a thing that takes a real
+// turn of the game is worth three of a thing you tap through, and finishing something hard is worth eight.
+// Nothing is worth zero, because "just about every single thing" is the point — the farm pays at the same
+// rate as the mine, it just pays per plant rather than per descent.
+export const SURPRISE_WEIGHT = { light: 1, normal: 3, heavy: 8 };
+
+/**
+ * ── ROLL FOR A SURPRISE, ANYWHERE ────────────────────────────────────────────────────────────────────────
+ * Call at the END of any completed action. Returns the tier granted, or null, which is almost always.
+ *
+ * ⚠️ THE ROLL HAPPENS BEFORE THE DATABASE IS ASKED ANYTHING. This runs on every action in the game — about
+ * seven thousand a day — and a query per action is the bill (CLAUDE.md: round trips ARE the Active CPU
+ * meter). Losing costs zero round trips. Only a winner, about one a day across the whole Den, pays for the
+ * cap check and the grant.
+ *
+ * ⚠️ AND FORTUNE DELIBERATELY DOES NOT APPLY. Every other drop roll reads it, and reading it here would mean
+ * a query on every action to answer a question that comes back "no" 99.98% of the time. It is also the wrong
+ * idea: this is not a reward for having built luck, it is the game handing somebody something for no reason.
+ * Fortune still governs mining's ladder and the level track.
+ */
+export async function surpriseChest(buyerId, source = "surprise", weight = SURPRISE_WEIGHT.light) {
+    if (!buyerId || !(weight > 0)) return null;
+    let won = null;
+    for (const [tier, per] of Object.entries(SURPRISE_PER_WEIGHT)) {
+        if (Math.random() < per * weight) { won = tier; break; }
+    }
+    if (!won) return null;
+    // ── ONE A DAY, PER MEMBER ────────────────────────────────────────────────────────────────────────
+    // A per-action roll pays whoever performs the most actions, which is the shape that got farmed before,
+    // and it would make the CHEAPEST action in the game the optimal one. A ceiling of one costs a normal
+    // player nothing and removes the reason to sit on a plant button.
+    const had = await db.queryOne(
+        `SELECT 1 AS x FROM mkt_chest_grant
+          WHERE buyer_id = $1 AND tier = ANY($2)
+            AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'America/Chicago') AT TIME ZONE 'America/Chicago'
+          LIMIT 1`,
+        [buyerId, SURPRISE_TIERS]
+    ).catch(() => null);
+    if (had) return null;
+    await addChests(buyerId, { [won]: 1 },
+        { source: String(source || "surprise").slice(0, 40), meta: { surprise: true, weight } });
+    return won;
+}
+
 /**
  * ── ONE ROLL OF THE ELITE LOTTERY ────────────────────────────────────────────────────────────────────
  * Ordered rarest-first and stops at the first hit, so a roll yields at most one chest. Returns the tier

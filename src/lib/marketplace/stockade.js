@@ -6,6 +6,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
 import { hasPower, powerUsesLeft, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 import sharp from "sharp";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 
 // ── THE STOCKADE ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -188,6 +189,9 @@ export async function actOnOccupant(viewerId, kind) {
         meta: { target: occupant.alias || occupant.buyer_id },
     }).catch(() => {});
     await trackActivity(viewerId, "stockade_act", { kind, target: occupant.alias }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(viewerId, "stockade", SURPRISE_WEIGHT.light).catch(() => {});
 
     return { ok: true, kind, xp, gold, left: Math.max(0, cap - Number(claimed.count)) };
 }

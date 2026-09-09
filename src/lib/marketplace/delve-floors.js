@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { addChests, eliteRoll } from "@/lib/marketplace/chests.js";
+import { addChests, surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 import { fortuneFor } from "@/lib/marketplace/fortune-server.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -509,23 +509,18 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
             cleared ? 1 : 0, died ? 1 : 0, floorsDone, run.floor]
     ).catch(() => null);
 
-    // ── AND EVERY TENTH CLEAR ROLLS FOR AN ELITE CHEST ───────────────────────────────────────────────────
-    // ⚠️ THE HARDEST REPEATABLE THING IN THE GAME PAID THE LOWEST CHESTS. Measured over the Den's whole
-    // history: the delve has handed out 2,455 chests and not one of them was above gold, while the ONLY
-    // route to an Ascendant-or-better chest was a milestone level-up — which the entire Den produces 0.94 of
-    // a day. That is why 87 of the 124 top-tier items have never been owned by anybody, and why celestial
-    // and primordial had never been seen at all.
+    // ── AND A CLEAR ROLLS FOR A SURPRISE, LIKE EVERYTHING ELSE DOES ─────────────────────────────────────
+    // ⚠️ THIS WAS A MILESTONE AND IT SHOULD NOT HAVE BEEN. Every tenth clear rolled the elite lottery, which
+    // is a shape built to be FELT COMING — right for a reward you work toward, wrong for a surprise. In its
+    // first day it produced three top chests, all out of this one room, and Luke's read was the correct one:
+    // "I don't like that the Delve is the only place you can get them... that's the opposite of what I was
+    // hoping to do."
     //
-    // EVERY TENTH CLEAR, deliberately, and it is the same shape as the level track's every-tenth-level: a
-    // milestone you can feel coming rather than a coin flip on every run. It has to be gated — clears run
-    // about thirty a DAY across the Den, so a roll on each one would be thirty-two times the level-up faucet
-    // and the top of the ladder would stop being rare, which is the one thing it must stay.
-    //
-    // Fortune applies here exactly as it does on the level track, because eliteRoll is the same roll.
-    if (cleared && stats?.runs_cleared && Number(stats.runs_cleared) % 10 === 0) {
-        const luck = await fortuneFor(buyerId).catch(() => 0);
-        const won = eliteRoll(luck);
-        if (won) await addChests(buyerId, { [won]: 1 }, { source: "delve_milestone", meta: { clears: Number(stats.runs_cleared) } }).catch(() => {});
+    // A delve clear is now worth what it should be — the heaviest single roll in the game, because it is the
+    // hardest repeatable thing in it — but it is the SAME roll the farm and the kitchen and the sea make, at
+    // the same tiny odds, with nothing counting down to it. See surpriseChest.
+    if (cleared) {
+        await surpriseChest(buyerId, "delve_clear", SURPRISE_WEIGHT.heavy).catch(() => {});
     }
 
     // ── ASCENSION POWERS ON THE WAY OUT ──────────────────────────────────────────────────────────────────

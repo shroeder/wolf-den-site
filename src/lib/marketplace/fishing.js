@@ -14,6 +14,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { hasPower, oneIn, equippedPowers, powerRoll } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
 import { COIN_ICON } from "@/lib/coin-icon";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -1142,6 +1143,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
         // handing back an empty net.
         const prize = haul || await grantHaul(buyerId, "fragment", tier).catch(() => null);
         await trackActivity(buyerId, "fish_treasure", { kind: prize?.kind || "none", tier, quality: q0 }).catch(() => {});
+        // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+        // nothing says it is coming.
+        await surpriseChest(buyerId, "fishing_dig", SURPRISE_WEIGHT.normal).catch(() => {});
         return { ok: true, landed: true, treasure: true, tier, prize, quality: q0 };
     }
 
@@ -1273,6 +1277,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     if (bonusFish.length) await checkFishingBadges(buyerId).catch(() => {});
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "fishing", SURPRISE_WEIGHT.normal).catch(() => {});
     await checkFishingBadges(buyerId).catch(() => {});
 
     // Is this the biggest one in the whole Den? Checked after the insert, so it includes this catch.

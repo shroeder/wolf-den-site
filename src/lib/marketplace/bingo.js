@@ -11,6 +11,7 @@ import { casinoPerks, rollCasinoPrize, tickCasinoQuests } from "@/lib/marketplac
 // the chips instead, so the conversion happens once, in front of you, rather than invisibly at every machine.
 import { moveChips, chipsFor, chipBalance, CHIP_RATE } from "@/lib/marketplace/chips.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── THE BINGO HALL ───────────────────────────────────────────────────────────────────────────────────────────
 // The money half. The rules and the maths are in bingo-kit.js, which knows nothing about gold or chips — same
@@ -139,6 +140,9 @@ export async function buyBingoCard(buyerId, { bet, force = false } = {}) {
         features: [...(burnt.length ? ["dragon"] : []), ...(patternHit.hit ? [`pattern:${today.id}`] : [])],
         lines: score.lines.length, burnt: burnt.length,
     }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "casino", SURPRISE_WEIGHT.light).catch(() => {});
 
     // Six lines or more is this game's rarest good thing — about one card in two thousand — so it is what
     // counts as the jackpot for the prize shelf.

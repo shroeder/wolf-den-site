@@ -26,6 +26,7 @@ import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { powerRoll, hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // The Farm: a member's owned pets roam a little pasture. You can PET pets — a shared daily budget of 3
 // (rechargeable for gold at a doubling cost), spent on your OWN pets (once/day/pet) OR a friend's pets when
@@ -925,6 +926,9 @@ export async function petPet(petterId, petId, ownerId = null) {
     const playerXp = own ? PET_PET_PLAYER_XP : PET_OTHER_PLAYER_XP;
     await awardXp(petterId, own ? "pet_farm" : "pet_farm_other", { points: playerXp, gold: goldGained }).catch(() => {});
     await trackActivity(petterId, own ? "pet_farm" : "pet_other", { petId, owner: own ? undefined : petOwner }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and nothing says
+    // it is coming. Petting somebody else's animals counts too; it is a thing you did.
+    await surpriseChest(petterId, "pet_petting", SURPRISE_WEIGHT.light).catch(() => {});
     await bumpQuestProgress(petterId, "pet_animal", 1).catch(() => {});
     // A SEPARATE metric for someone else's pet. "pet_animal" fires on your own too, so a bounty built on it
     // can be finished without ever leaving your own farm — which is exactly how the social half of this

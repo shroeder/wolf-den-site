@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { ARCHETYPES, npcPower } from "@/lib/marketplace/arena-npc.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // ── THE SHARED SWARM ─────────────────────────────────────────────────────────────────────────────────────────
 // A skirmish raid is now a real, finite, SHARED roster of foes: 5 waves, then a chieftain, then it's over.
@@ -699,6 +700,9 @@ export async function strikeEnemy(buyerId, enemyId, damage) {
         [hit.event_id, hit.wave]
     ).catch(() => null);
     if (killed) await trackActivity(buyerId, "swarm_kill", { kind: hit.kind, wave: Number(hit.wave), eventId: Number(hit.event_id) }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "town_raid", SURPRISE_WEIGHT.normal).catch(() => {});
     return {
         ok: true, damage: dmg, killed,
         enemyId: Number(hit.id), kind: hit.kind, hp: Number(hit.hp), hpMax: Number(hit.hp_max),

@@ -20,6 +20,7 @@ import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
 // same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
@@ -1631,6 +1632,9 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     await db.query(`UPDATE mkt_recipe_known SET times_cooked = times_cooked + 1 WHERE buyer_id = $1 AND recipe_id = $2`, [buyerId, recipeId]).catch(() => {});
     await awardXp(buyerId, "cooking", { points: xp, gold: 0, meta: { recipe: rec.id, tier } }).catch(() => {});
     await trackActivity(buyerId, "cooked", { recipe: rec.id, tier, made: made.id, portions, bumped, freeCook, quality: q, chain: chainN }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "cooking", SURPRISE_WEIGHT.normal).catch(() => {});
     await cookingBadges(buyerId, { recipeId, quality: q, chain: chainN }).catch(() => {});
     // Daily bounties. A prep counts for the prep task, a dish for the dish task, and a run graded "perfect" or
     // better counts for the skill one — so the three tasks can't all be cleared by the same three taps.

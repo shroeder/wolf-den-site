@@ -20,6 +20,7 @@ import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { hasPower, oneIn, equippedPowers, claimPowerUse, powerRoll } from "@/lib/marketplace/ascension-powers.js";
 import { mint } from "@/lib/marketplace/gold-rate.js";
+import { surpriseChest, SURPRISE_WEIGHT } from "@/lib/marketplace/chests.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -453,6 +454,9 @@ export async function plantSeed(buyerId, slot, seedId) {
         return { ok: false, error: "occupied" };
     }
     await trackActivity(buyerId, "plant_seed", { seedId }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "farm_plant", SURPRISE_WEIGHT.light).catch(() => {});
     await bumpQuestProgress(buyerId, "plant_seed", 1).catch(() => {});
     return { ok: true, garden: await getGarden(buyerId) };
 }
@@ -576,6 +580,9 @@ export async function harvestPlot(buyerId, slot) {
     // every chest tier, digs, raids — so the entire seed economy was petting a pet and buying packets.
     const harvestSeed = await dropSeedFrom(buyerId, "harvest_crop").catch(() => null);
     await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, loot: loot.label, tier: loot.tier }).catch(() => {});
+    // Every real action in the game rolls for a top-tier chest — see surpriseChest. Tiny, and
+    // nothing says it is coming.
+    await surpriseChest(buyerId, "farm_harvest", SURPRISE_WEIGHT.light).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
     // Earned cosmetic: the "Harvest Crown" border at 20 lifetime harvests. Reuses the harvest_crop activity
     // count (just logged above), so it needs no new counter. Idempotent grant into mkt_cosmetic_unlock.
