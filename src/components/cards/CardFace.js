@@ -430,7 +430,19 @@ export default function CardFace({ card, art, dim, live }) {
                    caller that renders a face without the .cf-card class on its wrapper would not get a
                    slightly wrong card, it would get an unstyled column of spans. Eighteen call sites draw
                    one of these; the fallback means the nineteenth cannot break it. */
-                .cf-card { --cf-w: 96px; --cf-h: 138px; }
+                /* ⚠️ A CARD IS A FIXED PIECE OF GEOMETRY AND MUST NOT BE SQUEEZED. Everything on this face
+                   is a fraction of --cf-w and --cf-h, so the moment something shrinks the BOX without
+                   shrinking those numbers, the art keeps its height, the sentence loses its band, and the
+                   last line goes under the bottom rail. Two ways in, and the face was open to both:
+                     · flex-shrink. A card sitting in a column flex (the preview modal, the reward row) is a
+                       flex item with the default shrink of 1, so a short viewport takes the difference out
+                       of the card — and cf-text is the only thing on it with flex: 1 to give.
+                     · the phone's own text scaling. Android's font-size setting multiplies rendered text and
+                       leaves the 168px card exactly 168px, which is the same squeeze reached from the other
+                       end. A card is a picture with words ON it, not a paragraph, so it opts out — the way
+                       to read one bigger is the preview, which is what the preview is for. */
+                .cf-card { --cf-w: 96px; --cf-h: 138px; flex: none;
+                    text-size-adjust: none; -webkit-text-size-adjust: none; }
                 .cf-stock { position: absolute; inset: calc(var(--cf-w, 96px) * 0.042); z-index: 0;
                     border-radius: calc(var(--cf-w, 96px) * 0.063); }
                 /* A DIAMOND HUNG OFF THE CORNER, in dark stone with a white numeral — theirs, and it reads
@@ -533,7 +545,14 @@ export default function CardFace({ card, art, dim, live }) {
                    And the emblem is bigger and embossed. A dark glyph at 10px on a mid-grey plate is a
                    smudge at the size a card is actually played at — legible in a screenshot blown up
                    four times and not on a phone, which is the wrong way round. */
-                .cf-type { position: relative; z-index: 3; margin-top: calc(var(--cf-h, 138px) * -0.087);
+                /* ⚠️ THE PLATE USED TO HANG BELOW THE WINDOW AND CHARGE THE SENTENCE FOR IT. It was pulled
+                   up by -0.087 of the card and stands 0.109 tall, so a fifth of its height hung into the
+                   text's band as flow — a strip of dead room running the full width of the card that only
+                   the middle third had anything in it. Luke: "why do we leave so much room between the
+                   bottom of the icon and the text, can we use that room for the text?" Pulled up by its own
+                   full height it sits ON the rail where it always looked like it sat, costs the sentence
+                   nothing, and the band keeps the difference. */
+                .cf-type { position: relative; z-index: 3; margin-top: calc(var(--cf-h, 138px) * -0.109);
                     width: calc(var(--cf-w, 96px) * 0.354); height: calc(var(--cf-h, 138px) * 0.109);
                     display: grid; place-items: center; background-repeat: no-repeat; background-size: 100% 100%;
                     color: #171b22; font-size: calc(var(--cf-h, 138px) * 0.080); line-height: 1;
@@ -552,7 +571,7 @@ export default function CardFace({ card, art, dim, live }) {
                    size; the sentence stops before them and wraps instead. */
                 .cf-text { font-family: var(--cf-card-font); position: relative; z-index: 1; flex: 1; width: 100%;
                     display: flex; align-items: center; justify-content: center;
-                    padding: calc(var(--cf-w, 96px) * 0.042) calc(var(--cf-w, 96px) * 0.125) 0;
+                    padding: calc(var(--cf-w, 96px) * 0.015) calc(var(--cf-w, 96px) * 0.125) 0;
                     font-size: calc(var(--cf-w, 96px) * 0.109); line-height: 1.16; text-align: center; color: #eef2f8;
                     overflow: hidden; overflow-wrap: break-word; }
                 .cf-line { display: block; width: 100%; font-style: normal; }
