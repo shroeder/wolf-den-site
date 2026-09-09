@@ -209,22 +209,25 @@ export default function CardMap({ run, art = {} }) {
                 {/* WHAT YOU ARE CARRYING, INLINE. The trinkets had a band of their own, and then a column of
                     their own; both were furniture for something you own between zero and four of. They sit
                     beside the potions now — one row, one tap each, and nothing at all when empty. */}
-                {perks.map((id) => {
-                    const perk = perkById(id);
-                    if (!perk) return null;
-                    return (
-                        <button key={id} type="button" className="cm-hold" onClick={() => setCarry(id)}
-                            aria-label={`${perk.name} — ${perk.text}`}>
-                            <Sprite className="cm-ui" src={`/images/cards/items/${id}.png`} />
+                {/* The one part of the bar allowed to run past its width — see cm-carry. */}
+                <div className="cm-carry">
+                    {perks.map((id) => {
+                        const perk = perkById(id);
+                        if (!perk) return null;
+                        return (
+                            <button key={id} type="button" className="cm-hold" onClick={() => setCarry(id)}
+                                aria-label={`${perk.name} — ${perk.text}`}>
+                                <Sprite className="cm-ui" src={`/images/cards/items/${id}.png`} />
+                            </button>
+                        );
+                    })}
+                    {potions.map((p, i) => (
+                        <button key={`${p.id}${i}`} type="button" className="cm-hold" onClick={() => setCarry(p.id)}
+                            aria-label={`${p.name} — ${p.text}`}>
+                            <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
                         </button>
-                    );
-                })}
-                {potions.map((p, i) => (
-                    <button key={`${p.id}${i}`} type="button" className="cm-hold" onClick={() => setCarry(p.id)}
-                        aria-label={`${p.name} — ${p.text}`}>
-                        <Sprite className="cm-ui" src={`/images/cards/potions/${p.id}.png`} />
-                    </button>
-                ))}
+                    ))}
+                </div>
                 {/* ── THE KEYS, WHERE THE REST OF WHAT YOU CARRY IS ───────────────────────────────
                     A key does nothing until the third boss falls, which makes it the one thing in the run
                     with no feedback of its own — so it has to be visible on the sheet or a player has paid
@@ -429,8 +432,31 @@ export default function CardMap({ run, art = {} }) {
                         linear-gradient(180deg, #0b0d12 0%, #12151c 55%, #0b0d12 100%); }
 
                 /* ── THE BAR ── one row, small, and everything on it is a thing you can press. */
+                /* ⚠️ THIS BAR WAS PUSHING THE WHOLE MAP OFF THE SCREEN. It is a flex row with no width on
+                   it, so it grew to whatever its contents wanted — the act name, health, embers, then one
+                   button per potion and per trinket. Measured at 375: the bar came out 633px wide, which
+                   made the sheet 633 wide, which made cm-inner resolve min(460px, 100%) to 460 and start it
+                   at x=87. Twenty-one of the map's fifty-eight rooms were off the right-hand edge, and Luke
+                   could not reach them. Act two is where it bites because act two is where you are carrying
+                   five things.
+                   The bar is pinned to the width it actually has, and the row of things you are holding is
+                   the part allowed to scroll — losing a trinket off the end of a scrollable strip costs a
+                   swipe, where losing half the map costs the run. */
                 .cm-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px;
+                    width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden;
                     background: rgba(10,12,17,0.92); border-bottom: 1px solid rgba(255,255,255,0.06); }
+                /* ⚠️ AND ONLY ONE THING IS ALLOWED TO SHRINK. Letting every child shrink fixed the overflow
+                   and broke the bar instead: health ran into the act name and the reading came out as
+                   "THE DE(heart)P34/7". Numbers must not compress — they are the two figures a player checks
+                   on this screen — so they hold their size, the act NAME takes an ellipsis, and the row of
+                   things you are carrying absorbs whatever is left and scrolls. */
+                .cm-bar > * { flex-shrink: 0; }
+                /* The name does NOT shrink. Ellipsised down to "T.." it is worse than absent, and the
+                   carried row can give up every pixel this bar needs on its own. */
+                .cm-who { flex-shrink: 0; white-space: nowrap; }
+                .cm-carry { display: flex; align-items: center; gap: 2px;
+                    flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+                .cm-carry::-webkit-scrollbar { display: none; }
                 .cm-ui { width: 21px; height: 21px; object-fit: contain; }
                 .cm-hp { font-size: 14px; font-weight: 700; color: #ff8f7a; font-variant-numeric: tabular-nums; }
                 .cm-em { font-size: 14px; font-weight: 700; color: #ffb63d; font-variant-numeric: tabular-nums; }
