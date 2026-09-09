@@ -1539,7 +1539,7 @@ export const ASCENSION = [
     { n: 17, says: "Elites are tougher again." },
     { n: 18, says: "You climb on a smaller bar." },
     { n: 19, says: "The ordinary rooms hit as hard as the elites did." },
-    { n: 20, says: "The Spire itself is against you. Everything is bigger, and everything hits harder." },
+    { n: 20, says: "The Kiln itself is against you. Everything is bigger, and everything hits harder." },
 ];
 export const ASC_MAX = ASCENSION.length;
 
@@ -1709,7 +1709,22 @@ export function runScore(run = {}) {
 // picks one up has finished the game they were offered. The fourth act is a door you had to bring keys to.
 export const ACTS = 3;
 export const FINAL_ACT = 4;
-export const ACT_NAMES = ["The Sand", "The Deep", "The Spire", "The Hollow"];
+// ── ⚠️ ACT THREE IS NOT CALLED THE SPIRE ANY MORE, AND IT NEVER LOOKED LIKE ONE ──────────
+// Luke: "it references the spire which we dont have." He is right twice over. The name was carried
+// straight over from the game this one is measured against, and it does not describe anything in ours —
+// look at scene-spire.webp, which is what a player actually stands in for the whole act: a stone chamber
+// hung with chains and a brick arch full of live coals. That is a KILN. There is no tower anywhere in it.
+//
+// The Kiln keeps the set's rhythm — the definite article and one plain noun, same as the three around it —
+// and it makes the run read as a descent through four rooms rather than a climb up a building somebody
+// else owns: open ground, then water, then fire, then nothing. It also makes the keys' own sentence true:
+// the door is BENEATH the Kiln, and The Hollow is under the fire.
+//
+// ⚠️ THE IDS ARE NOT RENAMED AND MUST NOT BE. `spire_warden`, `s_boss` and scene-spire.webp are DATA:
+// a live run's map stores encounter ids in its own rows, so renaming one mid-run hands a player a boss
+// that cannot be looked up. What a place is CALLED is copy; what it is keyed by is a record. Only the copy
+// changes here, which is why the word survives in this file and appears nowhere on a screen.
+export const ACT_NAMES = ["The Sand", "The Deep", "The Kiln", "The Hollow"];
 export const actName = (act) => ACT_NAMES[Math.max(0, Math.min(ACT_NAMES.length - 1, (act || 1) - 1))];
 
 // ── THE THREE KEYS ───────────────────────────────────────────────────────────────────────────────────────
@@ -2876,7 +2891,7 @@ export const FOES = {
     nemesis:    { id: "nemesis",    name: "Nemesis",    hp: [185, 185], script: "nemesis" },             // Nemesis 185
     reptomancer:{ id: "reptomancer",name: "The Serpent Caller", hp: [180, 190], script: "reptomancer" }, // Reptomancer 180-190
     // ── ACT THREE BOSSES ──
-    spire_warden: { id: "spire_warden", name: "The Spire Warden", hp: [300, 300], script: "spire_warden",
+    spire_warden: { id: "spire_warden", name: "The Kiln Warden", hp: [300, 300], script: "spire_warden",
         onDeath: { rebirth: 320 } },                                                                      // Awakened One 300 then 320
     time_eater: { id: "time_eater", name: "The Hour Eater", hp: [456, 456], script: "time_eater" },      // Time Eater 456
     donu:       { id: "donu",       name: "Donu",       hp: [250, 250], script: "donu" },                // Donu 250
@@ -3004,7 +3019,7 @@ export const ENCOUNTERS = [
     { id: "s_elite_nemesis", name: "Nemesis", pool: "3:elite", weight: 3, foes: ["nemesis"] },
     { id: "s_elite_repto", name: "The Serpent Caller", pool: "3:elite", weight: 3, foes: ["reptomancer", "spiker"] },
 
-    { id: "s_boss", name: "The Spire Warden", pool: "3:boss", weight: 1, foes: ["spire_warden"] },
+    { id: "s_boss", name: "The Kiln Warden", pool: "3:boss", weight: 1, foes: ["spire_warden"] },
     { id: "s_boss_time", name: "The Hour Eater", pool: "3:boss", weight: 1, foes: ["time_eater"] },
     { id: "s_boss_pair", name: "Donu and Deca", pool: "3:boss", weight: 1, foes: ["donu", "deca"] },
 ];
