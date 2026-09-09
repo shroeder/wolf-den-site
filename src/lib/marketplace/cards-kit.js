@@ -1642,6 +1642,39 @@ export const SCORE = {
 };
 
 /** The score for a run in whatever state it ended. `acts` is how many were CLEARED, not which one you died in. */
+/**
+ * The same score, itemised — one row per thing the run earned.
+ *
+ * ⚠️ runScore IS THIS FUNCTION'S TOTAL, not a second sum beside it. The end screen wanted a tally it could
+ * count up a line at a time, and the fastest way to get one is to re-add the terms in the component — which
+ * is how a screen ends up telling you 176 while the scoreboard records 180. There is one arithmetic; this
+ * exposes its working, and runScore adds the same rows up.
+ */
+export function scoreParts(run = {}) {
+    const act = Math.max(1, Math.min(ACTS, Number(run.act) || 1));
+    const stop = Math.max(0, Number(run.stop) || 0);
+    const won = run.done === "won";
+    const rooms = (act - 1) * RUN_LENGTH + Math.min(RUN_LENGTH + 1, stop);
+    const cleared = won ? ACTS : act - 1;
+    const asc = Math.max(0, Math.min(ASC_MAX, Number(run.asc) || 0));
+    const rows = [
+        { key: "rooms", say: "Rooms walked", at: rooms, each: SCORE.room },
+        { key: "acts", say: "Acts cleared", at: cleared, each: SCORE.actCleared },
+        { key: "perks", say: "Trinkets carried", at: (run.perks || []).length, each: SCORE.perk },
+        { key: "cards", say: "Cards in the deck", at: (run.deck || []).length, each: SCORE.card },
+    ];
+    if (won) {
+        rows.push({ key: "finished", say: "Walked out alive", at: 1, each: SCORE.finished });
+        rows.push({ key: "hp", say: "Health you kept", at: Math.max(0, Number(run.hp) || 0), each: SCORE.aliveHp });
+    }
+    const raw = rows.reduce((n, r) => n + r.at * r.each, 0);
+    return {
+        rows: rows.filter((r) => r.at > 0),
+        raw, asc, mult: 1 + asc * SCORE.rung,
+        total: Math.round(raw * (1 + asc * SCORE.rung)),
+    };
+}
+
 export function runScore(run = {}) {
     const act = Math.max(1, Math.min(ACTS, Number(run.act) || 1));
     const stop = Math.max(0, Number(run.stop) || 0);

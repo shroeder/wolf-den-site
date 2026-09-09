@@ -9,7 +9,7 @@ import {
 } from "react-icons/gi";
 
 import {
-    ACTS, DRAG_SLOP, KEYS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, runScore, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
+    ACTS, DRAG_SLOP, KEYS, RUN_LENGTH, SKIP_EMBERS, canPlay, cardById, finishFoeTurn, foeAct, foeIntent, forfeit, incomingTotal,
     heroEndTurn, intentDamage, resolveCard, splitDamage, startFoeTurn, stopLabel,
     drinkPotion, playCard, startFight, BOSS_PERKS, POTIONS, perkById,
 } from "@/lib/marketplace/cards-kit.js";
@@ -20,6 +20,7 @@ import {
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardKeyNote from "@/components/cards/CardKeyNote";
+import CardTally from "@/components/cards/CardTally";
 import CardGot, { GOT_CARD_MS } from "@/components/cards/CardGot";
 
 // 44% of the 460ms lunge below — the frame the animal actually reaches what it was thrown at. The health bar,
@@ -1415,12 +1416,7 @@ export default function CardFightClient({ fixture, run = null }) {
                                 of why there was no reason to play a second one. Shown on both endings, not
                                 just the win: dying on act two with a big deck is a real result and the
                                 player should be able to see it was better than the last one. */}
-                            {runState?.done ? (
-                                <p className="cf-score">
-                                    <b>{runScore(runState).toLocaleString()}</b>
-                                    <span>points</span>
-                                </p>
-                            ) : null}
+                            {runState?.done ? <CardTally run={runState} /> : null}
                             <div className="cf-result-btns">
                                 {/* Leaves to the table, not to the town — same as the map's ribbon. A run that
                                     just ended is exactly when you want the sharp in front of you asking for
@@ -2245,14 +2241,6 @@ export default function CardFightClient({ fixture, run = null }) {
                    act opens." — was in the SITE's sans, sitting between two things that were not. The same
                    fault the written rooms had. The site styles p, b and i, so every one of these has to
                    name the face. */
-                /* Big and quiet: the figure is the thing, and the word under it is only there so nobody has
-                   to guess what the figure counts. */
-                .cf-score { margin: 6px 0 2px; display: flex; flex-direction: column; align-items: center;
-                    gap: 0; font-family: var(--cf-card-font); }
-                .cf-score b { font-size: 34px; line-height: 1; color: #ffd9a6;
-                    text-shadow: 0 2px 8px rgba(0,0,0,0.9); }
-                .cf-score span { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
-                    color: #8e8371; }
 
                 .cf-note { margin: 0; max-width: 32ch; font-family: var(--cf-card-font); font-size: 13px;
                     color: #b9c3d0; text-align: center; }
