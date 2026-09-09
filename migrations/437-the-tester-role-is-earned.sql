@@ -1,0 +1,30 @@
+-- ── THE TESTER ROLE IS EARNED, NOT HANDED OVER ───────────────────────────────────────────────────────────────
+-- Luke, correcting yesterday's build: "the tester role is earned via bug report count rewarded over 5. admins
+-- and staff are allowed in not because they own the tester role, but because the channel permits owners and
+-- staff as well."
+--
+-- Both halves matter and they are separate rules:
+--
+--   THE ROLE is a rung on a ladder that already exists. migration 425 built bug_spotter / bug_hunter /
+--   bug_finder / bug_exterminator at 1 / 5 / 10 / 25 rewarded reports, granted automatically by
+--   syncEarnedBadges off the bounty ledger. Five is bug_hunter exactly, so Tester now comes off THAT badge —
+--   the same way ROLES.bugfinder comes off bug_finder, and for the reason written beside it: counting to five
+--   a second time here would be a second definition of one milestone, and the day the two disagree the game
+--   is telling somebody they qualify for a room it will not let them into.
+--
+--   THE ROOM is a separate question with its own answer in channelsFor. Owners and staff are in it because
+--   the CHANNEL admits them, not because they hold the role — the same way they are in the VIP room without
+--   having spent seven hundred dollars. Conflating the two is what this migration removes.
+--
+-- ⚠️ SO THE ADMIN-GRANTED BADGE GOES. Migration 435 created `tester` as an admin_only badge because a role
+-- has to come from a fact the server holds and "somebody agreed to test" was not one. It is now: five
+-- rewarded reports. Leaving the badge in place would leave TWO ways to hold one role, which is a trap
+-- rather than a convenience — a hand-granted tester and an earned one would drift the first time anybody
+-- changed what the role means.
+--
+-- Safe to delete outright: checked against production before writing this, the badge has been live for a
+-- day and NOBODY WEARS IT. Nothing is taken off anybody. The two members who qualify on the ledger today —
+-- GrayKitsune and Sunflower Jinxx, both already wearing bug_hunter — walk into the room the moment this
+-- deploys, having earned it weeks ago.
+DELETE FROM mkt_user_badge WHERE badge_slug = 'tester';
+DELETE FROM mkt_badge WHERE slug = 'tester';

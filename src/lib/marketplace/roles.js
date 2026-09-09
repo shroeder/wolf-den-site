@@ -44,12 +44,12 @@ export const ROLES = {
     // being given it or by spending — which is exactly why Luke asked for it, and why it sits with the others
     // rather than on the rank ladder underneath them.
     // ── THE PEOPLE WHO PLAY IT BEFORE IT IS FINISHED ──────────────────────────────
-    // Luke: "lets make a testing channel. and users with the tester role will automatically be in it along
-    // with owners and staff."
-    // Given rather than earned — it names a job somebody agreed to do, so it comes off an admin-only badge
-    // (migration 435), which is the same mechanism `owner` and `staff` already use and the one Luke can hand
-    // out from the admin app without a deploy. It sits ABOVE Bug Finder for the same reason Staff sits above
-    // VIP: a designation the house gave you outranks a milestone you passed.
+    // Luke: "the tester role is earned via bug report count rewarded over 5."
+    // EARNED, off the ladder that already counts them — bug_hunter, five rewarded reports, granted by
+    // syncEarnedBadges from the bounty ledger (migration 425). It is not handed out: an admin-granted
+    // version of this shipped for one day and was removed in migration 437, because two ways to hold one
+    // role is a trap rather than a convenience.
+    // It sits between VIP and Bug Finder: five reports is a real rung and ten is the louder one above it.
     tester: { key: "tester", name: "Tester", tone: "#5fd8e8", glow: true },
     bugfinder: { key: "bugfinder", name: "Bug Finder", tone: "#8fe39a", glow: true },
 };
@@ -99,7 +99,7 @@ export async function standingFor(buyerId) {
         // The two badges that carry standing. Read here, in the same round trip as the rest, so granting the
         // role costs nothing extra — see the note by `roles` below for why the badge counts at all.
         db.query(
-            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff', 'tester', 'bug_finder')`,
+            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff', 'bug_hunter', 'bug_finder')`,
             [buyerId],
         ).catch(() => []),
     ]);
@@ -124,8 +124,11 @@ export async function standingFor(buyerId) {
     if (isOwner(buyerId) || wears.has("owner")) roles.push(ROLES.owner);
     if (isStaff(buyerId) || wears.has("staff")) roles.push(ROLES.staff);
     if (spentCents >= VIP_CENTS) roles.push(ROLES.vip);
-    // Off its badge, like owner and staff above it — see ROLES.tester and migration 435.
-    if (wears.has("tester")) roles.push(ROLES.tester);
+    // ⚠️ OFF bug_hunter, WHICH IS THE FIVE-REPORT RUNG — not off a badge called `tester`, which no longer
+    // exists (migration 437). Same argument as the line below it: the threshold is already counted once,
+    // by auto_rule 'bugs_rewarded' with its own number beside it, and a second count here would be a second
+    // definition of one milestone.
+    if (wears.has("bug_hunter")) roles.push(ROLES.tester);
     // ── AND THIS ONE COMES OFF ITS BADGE, ON PURPOSE ─────────────────────────────────────────────────────
     // The threshold is ten bugs, and the badge at ten already knows that — auto_rule 'bugs_rewarded' with a
     // threshold beside it in the badge table, granted by syncEarnedBadges. Counting to ten a SECOND time here
@@ -204,8 +207,11 @@ export function channelsFor(buyerId, roles = []) {
     // running the shop being absent from it would make it a room the shop cannot hear.
     if (has("vip") || has("staff") || has("owner")) out.push("vip");
     if (has("staff") || has("owner")) out.push("staff");
-    // The house is in the testing room by default, on the same reasoning that puts it in the VIP room: a
-    // room about unfinished work that the people making it are not in is a room nobody can answer.
+    // ⚠️ THREE SEPARATE REASONS TO BE IN THIS ROOM, and only the first is the Tester role. Luke: "admins
+    // and staff are allowed in not because they own the tester role, but because the channel permits owners
+    // and staff as well." Same shape as the VIP line above: the house is admitted by the door, not by
+    // qualifying. A room about unfinished work that the people making it are not in is a room nobody can
+    // answer.
     if (has("tester") || has("staff") || has("owner")) out.push("testing");
     return out;
 }
@@ -236,15 +242,25 @@ export async function channelMemberIds(channel) {
     const house = houseBuyerIds();
     // The back room is the two lists and nothing else — there is no way to spend your way into it.
     if (chan === "staff") return house;
-    // ── THE TESTING ROOM IS THE HOUSE PLUS WHOEVER WAS GIVEN THE BADGE ──────────────────
-    // ⚠️ AND IT ASKS FOR THE BADGE-WEARERS OF ALL THREE, not just `tester`. channelsFor lets somebody in
-    // on any of tester / staff / owner, and standingFor reads those last two off a BADGE as well as off the
-    // hardcoded lists — three people wear the owner badge who are not in OWNER_BUYER_IDS. Building this
-    // roster from houseBuyerIds alone would draw a room smaller than the one the door actually admits, which
-    // is the exact fault the note above this function was written about.
+    // ── THE TESTING ROOM IS TWO DIFFERENT RULES, AND THEY ARE NOT THE SAME RULE ─────────────
+    // Luke: "admins and staff are allowed in not because they own the tester role, but because the channel
+    // permits owners and staff as well."
+    //
+    //   EARNED   — five rewarded bug reports, which is the bug_hunter rung. That is the Tester role.
+    //   ADMITTED — the house, because the CHANNEL lets it in, exactly the way it is in the VIP room without
+    //              anybody having spent seven hundred dollars.
+    //
+    // Two sources on purpose. Reading one badge list for all of it, which is what this did for a day, says
+    // that staff hold the tester role — and the day somebody asks "how did they qualify", the answer would
+    // be wrong. It also has to match channelsFor exactly or the rail and the gate describe two rooms; see
+    // the note above this function.
+    //
+    // ⚠️ THE HOUSE IS BOTH LISTS AND BOTH BADGES. standingFor reads owner and staff off a BADGE as well as
+    // off the hardcoded ids — three people wear the owner badge who are not in OWNER_BUYER_IDS — so a roster
+    // built from houseBuyerIds alone would draw a smaller room than the door actually admits.
     if (chan === "testing") {
         const rows = await db.query(
-            `SELECT DISTINCT buyer_id FROM mkt_user_badge WHERE badge_slug IN ('tester', 'staff', 'owner')`,
+            `SELECT DISTINCT buyer_id FROM mkt_user_badge WHERE badge_slug IN ('bug_hunter', 'staff', 'owner')`,
         ).catch(() => []);
         return [...new Set([...house, ...(rows || []).map((r) => String(r.buyer_id))])];
     }
