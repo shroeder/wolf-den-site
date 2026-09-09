@@ -828,14 +828,41 @@ const statSig = (stats = {}) => DEDUP_STAT_KEYS.map((k) => `${k}:${stats[k] || 0
             const pIdx = DEDUP_STAT_KEYS.indexOf(primary);
             let chosen = base;
             if (used.has(statSig(base)) && pIdx >= 0) {
-                for (let t = 1; t <= 24; t++) {
-                    const secOffset = ((t - 1) % (DEDUP_STAT_KEYS.length - 1)) + 1;
-                    const sec = DEDUP_STAT_KEYS[(pIdx + secOffset) % DEDUP_STAT_KEYS.length];
-                    const move = Math.min(1 + Math.floor((t - 1) / (DEDUP_STAT_KEYS.length - 1)), (base[primary] || 0) - 1);
-                    if (move <= 0 || sec === primary) continue;
-                    const cand = { ...base, [primary]: base[primary] - move, [sec]: (base[sec] || 0) + move };
-                    if (!used.has(statSig(cand))) { chosen = cand; break; }
-                }
+                // ⚠️ THIS IS WHERE EVERY "+1 CRIT POWER" ON A PRIMORDIAL CAME FROM. The shuffle moved points
+                // from the biggest stat into a secondary picked by rotating the key list, and did it with
+                // `(base[sec] || 0) + move` — so when the item did not already carry that secondary, the
+                // dedup CREATED the line, at exactly `move`, which is 1 on the first attempt. 174 items, 47%
+                // of the catalogue, came out of this loop wearing a stat worth one point.
+                //
+                // The budget really is preserved, which is what the note above claims and why this went
+                // unnoticed for so long — but a budget is not what a player reads. They read a card, and an
+                // Exalted Plate that says "+1 Crit Chance" under four real numbers reads as a broken item.
+                // GrayKitsune, on an ascendant: "Ascendant chest with no special ability... overall
+                // downgrade." He was looking at a line that does nothing.
+                //
+                // So: spend the points into a line the piece ALREADY has, which is genuinely invisible. Only
+                // open a new line if nothing else separates this item from its twin, and then at a size
+                // somebody would actually notice rather than at one point.
+                const carries = (k) => (base[k] || 0) > 0;
+                const shuffle = (allowNew) => {
+                    for (let t = 1; t <= 24; t += 1) {
+                        const secOffset = ((t - 1) % (DEDUP_STAT_KEYS.length - 1)) + 1;
+                        const sec = DEDUP_STAT_KEYS[(pIdx + secOffset) % DEDUP_STAT_KEYS.length];
+                        if (sec === primary) continue;
+                        if (!allowNew && !carries(sec)) continue;
+                        const step = 1 + Math.floor((t - 1) / (DEDUP_STAT_KEYS.length - 1));
+                        // A line the piece already has can take a single point. A NEW line arrives at a
+                        // tenth of the stat it came out of, or three, whichever is larger.
+                        const move = carries(sec)
+                            ? step
+                            : Math.max(step, 3, Math.round((base[primary] || 0) * 0.1));
+                        if (move <= 0 || move >= (base[primary] || 0)) continue;
+                        const cand = { ...base, [primary]: base[primary] - move, [sec]: (base[sec] || 0) + move };
+                        if (!used.has(statSig(cand))) return cand;
+                    }
+                    return null;
+                };
+                chosen = shuffle(false) || shuffle(true) || base;
             }
             it.stats = chosen;
             used.add(statSig(chosen));
