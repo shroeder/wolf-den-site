@@ -8,7 +8,7 @@ import MemberHeroCard from "@/components/MemberHeroCard";
 
 // The broadcast half of the hub. One list, read by the section split, the top-tab badge and the room strip —
 // so a new channel is added HERE and in channelsFor on the server, and nothing else has to be remembered.
-const ROOM_TABS = ["global", "announce", "bugs", "vip", "staff"];
+const ROOM_TABS = ["global", "announce", "bugs", "vip", "staff", "testing"];
 import { borderClass } from "@/lib/marketplace/borders.js";
 import NoticeBody from "@/components/NoticeBody";
 
@@ -556,6 +556,7 @@ export default function SocialHub() {
                                     ["bugs", "Bugs", "social-bugs", room("bugs")],
                                     ...(channels.includes("vip") ? [["vip", "VIP", "social-vip", room("vip")]] : []),
                                     ...(channels.includes("staff") ? [["staff", "Staff", "social-staff", room("staff")]] : []),
+                                    ...(channels.includes("testing") ? [["testing", "Testing", "social-testing", room("testing")]] : []),
                                 ] : [
                                     ["messages", "Messages", "social-messages", unread > 0 ? unread : null],
                                     ["friends", "Friends", "social-friends", incomingCount > 0 ? incomingCount : null],

@@ -98,6 +98,11 @@ const ICONS = {
     // REPORTING things they have found, which is closer to collecting specimens than to repairing machinery,
     // and neither a tool nor a triangle would be told apart from the shield or the scroll at 18px.
     "social-bugs": "A large iridescent green-and-teal beetle with a hard shell and dark legs, seen from directly above, caught under a round brass-rimmed magnifying lens tilted over it",
+    // The testing room. NOT another bug shape — the beetle above already owns "something is broken", and
+    // this room is the opposite end of that: people looking at a thing that has not shipped yet. A conical
+    // flask is the one silhouette left in this strip that is a TRIANGLE, so it cannot be confused at 18px
+    // with the beetle's oval, the staff shield, the VIP posts or the news scroll.
+    "social-testing": "A conical laboratory flask standing upright, thick glass with a cork stopper, filled to two thirds with glowing cyan liquid throwing light up the inside of the glass, a few bubbles rising in it and a small wolf-head crest etched on the front of the flask",
     // The Casino. A CABINET rather than cards or dice: the floor is nine slot machines and one card table, so
     // the machine is what the place actually is — and at 18px a fanned hand of cards is a smudge while a lit
     // box with three symbols in a window is a silhouette. Deliberately not a die (the Daily Spin owns

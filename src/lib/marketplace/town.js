@@ -679,7 +679,8 @@ export async function sendTownChat(buyerId, body, channel = "global") {
     // the member has earned, the same list the tab was drawn from.
     // `bugs` is writable by everybody, like the plaza — a bug room only members with a role can post in is a
     // suggestion box with the lid welded on.
-    const chan = ["global", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const { WRITABLE_CHANNELS } = await import("@/lib/marketplace/roles.js");
+    const chan = WRITABLE_CHANNELS.includes(String(channel)) ? String(channel) : "global";
     // Nobody writes to the noticeboard but the house. postSystemChat inserts directly and never comes
     // through here, so this needs no exception for the Arbiter — it just closes the room to members.
     if (String(channel) === "announce") return { ok: false, error: "read_only" };
@@ -753,8 +754,10 @@ export async function sendTownChat(buyerId, body, channel = "global") {
  * carries the seen mark, so a member who is not in a room cannot be given a count for it — the badge cannot
  * leak the existence of a conversation the tab is hiding.
  */
-export async function channelUnread(buyerId, channels = ["global", "announce", "bugs"]) {
+export async function channelUnread(buyerId, channels = null) {
     if (!buyerId) return {};
+    const { OPEN_CHANNELS } = await import("@/lib/marketplace/roles.js");
+    const want = channels || [...OPEN_CHANNELS];
     const rows = await db.query(
         `SELECT c.channel, COUNT(*)::int AS n
            FROM mkt_town_chat c
@@ -772,10 +775,15 @@ export async function channelUnread(buyerId, channels = ["global", "announce", "
             -- global and announce are NOT windowed (see the note by since in the feed query) and nobody
             -- gets a member row for them, so they keep the old meaning or every badge in the plaza goes to
             -- zero.
-            AND (c.channel IN ('global', 'announce', 'bugs')
+            -- ⚠️ THE OPEN ROOMS ARE NAMED BY roles.js, NOT BY THIS STRING. They were listed here as a
+            -- literal, so a room added anywhere else in the codebase silently landed on the WRONG side of
+            -- this rule: a new private room would have been treated as open and counted its whole history
+            -- at every member, and a new open room would have counted nothing at all until somebody opened
+            -- it. Passed in as a parameter off OPEN_CHANNELS.
+            AND (c.channel = ANY($3)
                  OR (m.joined_at IS NOT NULL AND c.created_at >= m.joined_at))
           GROUP BY c.channel`,
-        [buyerId, channels],
+        [buyerId, want, [...OPEN_CHANNELS]],
         // `seen_at` arrives in migration 403. For the minutes between the new code serving and that landing,
         // this query names a column that does not exist — which would show every member a badge counting the
         // whole history of every room. Falling back to the plaza's own mark keeps the numbers sane until the
@@ -787,7 +795,7 @@ export async function channelUnread(buyerId, channels = ["global", "announce", "
           WHERE c.channel = ANY($2) AND c.buyer_id <> $1
             AND c.created_at > COALESCE(b.global_chat_seen_at, NOW() - INTERVAL '7 days')
           GROUP BY c.channel`,
-        [buyerId, channels],
+        [buyerId, want],
     ).catch(() => []));
     const out = {};
     for (const r of rows || []) out[r.channel] = r.n;
@@ -812,8 +820,11 @@ export async function channelUnread(buyerId, channels = ["global", "announce", "
 // ONLINE IS THE SAME 90-SECOND WINDOW THE PLAZA USES. One definition of "here" in the whole game; a rail
 // that called somebody online while the plaza did not would be two answers to one question.
 export async function channelRoster(buyerId, channel = "global") {
-    const chan = ["global", "announce", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
-    const gated = chan === "vip" || chan === "staff";
+    const { CHANNEL_KEYS, OPEN_CHANNELS } = await import("@/lib/marketplace/roles.js");
+    const chan = CHANNEL_KEYS.includes(String(channel)) ? String(channel) : "global";
+    // Anything that is not an open room has a door on it, which is one rule rather than a list of rooms
+    // somebody has to remember to extend. See CHANNELS in roles.js.
+    const gated = !OPEN_CHANNELS.includes(chan);
 
     // AUTHORISED SERVER-SIDE, against the earned list rather than the tab that was asked for — the same rule
     // getGlobalChat applies, because a roster is as much a leak as a transcript. Knowing who is in the staff
@@ -910,7 +921,8 @@ export async function markGlobalChatSeen(buyerId) {
 
 export async function getGlobalChat(buyerId = null, limit = 40, channel = "global") {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
-    const chan = ["global", "announce", "bugs", "vip", "staff"].includes(String(channel)) ? String(channel) : "global";
+    const { CHANNEL_KEYS, OPEN_CHANNELS } = await import("@/lib/marketplace/roles.js");
+    const chan = CHANNEL_KEYS.includes(String(channel)) ? String(channel) : "global";
 
     // ── A PRIVATE ROOM IS AUTHORISED AND WINDOWED ────────────────────────────────────────────────────────
     // Two separate rules, and they are not the same rule. AUTHORISED: you are in the room or you get nothing,
@@ -919,7 +931,7 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
     // to see messages from after your join date" — so a new VIP opens a door rather than being handed a
     // transcript of a conversation they were not part of.
     let since = null;
-    if (chan !== "global" && chan !== "announce" && chan !== "bugs") {
+    if (!OPEN_CHANNELS.includes(chan)) {
         if (!buyerId) return [];
         const { standingFor, channelsFor, joinedAt } = await import("@/lib/marketplace/roles.js");
         const { roles } = await standingFor(buyerId);

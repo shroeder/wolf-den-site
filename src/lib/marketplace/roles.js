@@ -43,6 +43,14 @@ export const ROLES = {
     // Ten reports that became fixes. The only role in here you earn by making the game better rather than by
     // being given it or by spending — which is exactly why Luke asked for it, and why it sits with the others
     // rather than on the rank ladder underneath them.
+    // ── THE PEOPLE WHO PLAY IT BEFORE IT IS FINISHED ──────────────────────────────
+    // Luke: "lets make a testing channel. and users with the tester role will automatically be in it along
+    // with owners and staff."
+    // Given rather than earned — it names a job somebody agreed to do, so it comes off an admin-only badge
+    // (migration 435), which is the same mechanism `owner` and `staff` already use and the one Luke can hand
+    // out from the admin app without a deploy. It sits ABOVE Bug Finder for the same reason Staff sits above
+    // VIP: a designation the house gave you outranks a milestone you passed.
+    tester: { key: "tester", name: "Tester", tone: "#5fd8e8", glow: true },
     bugfinder: { key: "bugfinder", name: "Bug Finder", tone: "#8fe39a", glow: true },
 };
 
@@ -91,7 +99,7 @@ export async function standingFor(buyerId) {
         // The two badges that carry standing. Read here, in the same round trip as the rest, so granting the
         // role costs nothing extra — see the note by `roles` below for why the badge counts at all.
         db.query(
-            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff', 'bug_finder')`,
+            `SELECT badge_slug FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('owner', 'staff', 'tester', 'bug_finder')`,
             [buyerId],
         ).catch(() => []),
     ]);
@@ -116,6 +124,8 @@ export async function standingFor(buyerId) {
     if (isOwner(buyerId) || wears.has("owner")) roles.push(ROLES.owner);
     if (isStaff(buyerId) || wears.has("staff")) roles.push(ROLES.staff);
     if (spentCents >= VIP_CENTS) roles.push(ROLES.vip);
+    // Off its badge, like owner and staff above it — see ROLES.tester and migration 435.
+    if (wears.has("tester")) roles.push(ROLES.tester);
     // ── AND THIS ONE COMES OFF ITS BADGE, ON PURPOSE ─────────────────────────────────────────────────────
     // The threshold is ten bugs, and the badge at ten already knows that — auto_rule 'bugs_rewarded' with a
     // threshold beside it in the badge table, granted by syncEarnedBadges. Counting to ten a SECOND time here
@@ -146,32 +156,57 @@ export async function setRole(buyerId, key) {
 // Luke: "two new channels, one for VIPs and one for staff and owners. These only show up as tabs in social if
 // you are in that group. Owners and staff are by default able to participate in VIP chat. The chats are
 // exclusive so non-members can't see into them."
+// ⚠️ THIS MAP WAS EXPORTED AND READ BY NOTHING, AND IT HAD ALREADY DRIFTED: the bug room has existed
+// since Luke asked for it and was never added here, while town.js, SocialHub and the social rig each kept
+// their own hand-written list of the same rooms. Adding the testing room meant editing SIX places that all
+// had to agree, which is the shape of the next bug rather than the shape of a feature.
+// So it is the source now — town.js authorises reads, writes and rosters off CHANNEL_KEYS and OPEN_CHANNELS
+// below, and a new room is this object plus a line in channelsFor.
 export const CHANNELS = {
-    global: { key: "global", name: "Global" },
+    global: { key: "global", name: "Global", open: true },
     // ── ANNOUNCEMENTS ────────────────────────────────────────────────────────────────────────────────────
     // Luke: "let's make an announcements channel and have arena messages and arbiter messages go there."
     // Everybody can read it and nobody can write to it but the house — see sendTownChat, which refuses it
     // outright. It is a room in the same sense a noticeboard is a room.
-    announce: { key: "announce", name: "News", readOnly: true },
+    announce: { key: "announce", name: "News", readOnly: true, open: true },
+    // ── WHY BUGS IS ITS OWN ROOM ─────────────────────────────────────────────────────────────────────────
+    // Luke, in the plaza: "Ill make a new channel for bugs separate from global chat." The Den reports a lot
+    // of them, and every report was landing in the same stream as the chat — so a bug scrolled away in
+    // minutes, three people would report the same one without seeing each other, and asking a follow-up
+    // question meant scrolling back through a conversation to find what it was about.
+    bugs: { key: "bugs", name: "Bugs", open: true },
     vip: { key: "vip", name: "VIP" },
     staff: { key: "staff", name: "Staff" },
+    // ── THE TESTING ROOM ─────────────────────────────────────────────────────
+    // Luke: "lets make a testing channel. and users with the tester role will automatically be in it along
+    // with owners and staff."
+    // Not the bug room, and the difference is worth writing down: bugs is a PUBLIC room where the whole Den
+    // reports what broke on the live site. This is a private one for the people looking at something that has
+    // not shipped, which means what gets said in here is about unreleased work — exactly the thing the plaza
+    // must not see. Same shape as the staff room: exclusive both ways, no reading in from outside.
+    testing: { key: "testing", name: "Testing" },
 };
+
+/** Every room there is, in the order the tab strip draws them. */
+export const CHANNEL_KEYS = Object.keys(CHANNELS);
+/** The rooms with no door on them: everybody in the Den is in these, signed in or not. */
+export const OPEN_CHANNELS = CHANNEL_KEYS.filter((k) => CHANNELS[k].open);
+/** The rooms you can say something in. `announce` is the house's noticeboard and refuses every write. */
+export const WRITABLE_CHANNELS = CHANNEL_KEYS.filter((k) => !CHANNELS[k].readOnly);
 
 /** Which channels a member may read and write. Global is everybody, including signed-out readers. */
 export function channelsFor(buyerId, roles = []) {
     const has = (k) => roles.some((r) => r.key === k);
     // Announcements and the bug room sit beside the plaza: no gate, no join window, everybody has both.
     //
-    // ── WHY BUGS IS ITS OWN ROOM ─────────────────────────────────────────────────────────────────────────
-    // Luke, in the plaza: "Ill make a new channel for bugs separate from global chat." The Den reports a lot
-    // of them, and every report was landing in the same stream as the chat — so a bug scrolled away in
-    // minutes, three people would report the same one without seeing each other, and asking a follow-up
-    // question meant scrolling back through a conversation to find what it was about.
-    const out = ["global", "announce", "bugs"];
+    const out = [...OPEN_CHANNELS];
     // Owners and staff are in the VIP room by default, on Luke's call — the room is a perk, and the people
     // running the shop being absent from it would make it a room the shop cannot hear.
     if (has("vip") || has("staff") || has("owner")) out.push("vip");
     if (has("staff") || has("owner")) out.push("staff");
+    // The house is in the testing room by default, on the same reasoning that puts it in the VIP room: a
+    // room about unfinished work that the people making it are not in is a room nobody can answer.
+    if (has("tester") || has("staff") || has("owner")) out.push("testing");
     return out;
 }
 
@@ -196,11 +231,23 @@ export function channelsFor(buyerId, roles = []) {
  */
 export async function channelMemberIds(channel) {
     const chan = String(channel || "");
-    if (chan !== "vip" && chan !== "staff") return null;
+    if (chan !== "vip" && chan !== "staff" && chan !== "testing") return null;
     const { houseBuyerIds } = await import("@/lib/marketplace/owner.js");
     const house = houseBuyerIds();
     // The back room is the two lists and nothing else — there is no way to spend your way into it.
     if (chan === "staff") return house;
+    // ── THE TESTING ROOM IS THE HOUSE PLUS WHOEVER WAS GIVEN THE BADGE ──────────────────
+    // ⚠️ AND IT ASKS FOR THE BADGE-WEARERS OF ALL THREE, not just `tester`. channelsFor lets somebody in
+    // on any of tester / staff / owner, and standingFor reads those last two off a BADGE as well as off the
+    // hardcoded lists — three people wear the owner badge who are not in OWNER_BUYER_IDS. Building this
+    // roster from houseBuyerIds alone would draw a room smaller than the one the door actually admits, which
+    // is the exact fault the note above this function was written about.
+    if (chan === "testing") {
+        const rows = await db.query(
+            `SELECT DISTINCT buyer_id FROM mkt_user_badge WHERE badge_slug IN ('tester', 'staff', 'owner')`,
+        ).catch(() => []);
+        return [...new Set([...house, ...(rows || []).map((r) => String(r.buyer_id))])];
+    }
     // ── AND VIP IS THE HOUSE PLUS EVERYBODY OVER THE LINE ────────────────────────────────────────────────
     // The same two sources standingFor adds up, in one pass over the membership instead of one query each:
     // the in-store purchase events (falling back to dividing the XP back out for the 48 rows that predate the

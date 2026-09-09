@@ -16,7 +16,7 @@ import SocialHub from "@/components/SocialHub";
 //
 // It is deliberately at the busy end — every room present, a badge on most of them, unread mail and a friend
 // request — because a bar that holds when everything has a number on it holds when nothing does.
-const CHANNELS = ["global", "announce", "bugs", "vip", "staff"];
+const CHANNELS = ["global", "announce", "bugs", "vip", "staff", "testing"];
 
 const SAY = [
     { id: 1, alias: "soullessshiitake", name: "SoullessShiitake", body: "Jewelcutter changes are a huge win", role: "legend", ago: "6m ago" },
