@@ -58,7 +58,10 @@ const ART = {
     // ⚠️ THESE TWO EXIST BECAUSE THE PILL COULD NOT DRAW THEM. Three creatures open a fight with a move that
     // shuffles junk into your deck or calls in more of them, and the intent row had no mark for either — so
     // the act-one boss's first turn rendered an EMPTY pill and read as "the boss does nothing".
-    status: "a torn dog-eared playing card, blank and grey, with a jagged crack running across its face",
+    // First draw came back as a plain grey rectangle — a blank card IS a blank rectangle, and at 22px on a
+    // dark board it read as a missing image rather than as an emblem. Given something to be.
+    status: "a tattered parchment card curling at its corners, scorched brown at the edges, with a heavy "
+        + "black X scrawled across its face in dripping ink",
     summon: "a curved brass war-horn raised and blowing, with three faint sound rings coming off its bell",
 };
 
