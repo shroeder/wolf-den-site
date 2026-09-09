@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 import {
     GiBiceps, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiHeartPlus, GiShield,
-    GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves, GiSwapBag,
+    GiFlame, GiSlowBlob, GiSwordWound, GiGhost, GiPoisonBottle, GiMagicShield, GiThreeLeaves, GiSwapBag, GiBookmarklet,
 } from "react-icons/gi";
 
 import {
@@ -20,6 +20,7 @@ import {
 // fight has (picked, spent, unaffordable, ghosted).
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoeNote from "@/components/cards/CardFoeNote";
+import CardGuide from "@/components/cards/CardGuide";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { STATUS_ART, marksOn } from "@/components/cards/status-art.js";
@@ -178,6 +179,7 @@ export default function CardFightClient({ fixture, run = null }) {
     const [keyWord, setKeyWord] = useState(null);
     // Which creature the player asked about — see CardFoeNote.
     const [foeNote, setFoeNote] = useState(null);
+    const [guideOpen, setGuideOpen] = useState(false);
     const [acting, setActing] = useState(false);
 
     // ── THE STATE THE RULES DECIDE FROM IS A REF, NOT THE RENDER'S COPY ──────────────────────────────────
@@ -1036,6 +1038,12 @@ export default function CardFightClient({ fixture, run = null }) {
                     <div className="cf-top-group">
                         {/* A door rather than a word — it is the one control up here you are not meant to
                             reach for. */}
+                        {/* Beside the door, because they are the two controls up here that are not about
+                            this turn. A player holding a card that says Frail at them for the first time is
+                            in a fight, not on the map, so the guide has to be reachable from here. */}
+                        <button type="button" className="cf-forfeit" onClick={() => setGuideOpen(true)} title="How this works" aria-label="How this works">
+                            <GiBookmarklet aria-hidden="true" />
+                        </button>
                         <button type="button" className="cf-forfeit" onClick={() => setAskForfeit(true)} disabled={Boolean(fight.over)} title="Forfeit" aria-label="Forfeit">
                             <GiExitDoor aria-hidden="true" />
                         </button>
@@ -1338,6 +1346,8 @@ export default function CardFightClient({ fixture, run = null }) {
                 them for the first time. It mounts at the root rather than inside the pile dialog so it sits
                 over whatever is open. */}
             <CardFoeNote fight={fight} index={foeNote} onClose={() => setFoeNote(null)} onKey={setKeyWord} />
+
+            <CardGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
 
             <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 

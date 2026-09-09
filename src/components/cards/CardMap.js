@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { GiSoundOn, GiSoundWaves, GiSpeakerOff } from "react-icons/gi";
+import { GiBookmarklet, GiSoundOn, GiSoundWaves, GiSpeakerOff } from "react-icons/gi";
 import { useRouter } from "next/navigation";
 import { Cinzel } from "next/font/google";
 
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
+import CardGuide from "@/components/cards/CardGuide";
 import CardKeyNote from "@/components/cards/CardKeyNote";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
@@ -99,6 +100,7 @@ export default function CardMap({ run, art = {} }) {
     // The legend, behind a button. See the note in the render: a key pinned open over the sheet was covering
     // the quarter of the map you most needed to look at.
     const [keyOpen, setKeyOpen] = useState(false);
+    const [guideOpen, setGuideOpen] = useState(false);
     // ── WHAT YOU ARE CARRYING, ON A SCREEN YOU CAN OPEN ──────────────────────────────────────────────
     // Luke: "seeing perks from the map like Slay the Spire."
     //
@@ -251,6 +253,9 @@ export default function CardMap({ run, art = {} }) {
                 </button>
                 <button type="button" className="cm-tool cm-key" aria-label="What the marks mean"
                     onClick={() => setKeyOpen(true)}>?</button>
+                {/* The map legend answers "what is that room". This answers everything else. */}
+                <button type="button" className="cm-tool cm-guide" aria-label="How the game works"
+                    onClick={() => setGuideOpen(true)}><GiBookmarklet /></button>
                 {/* ── AND A WAY TO TURN IT OFF ────────────────────────────────────────────────────────
                     Sound that cannot be silenced is sound that gets the whole TAB muted, and a muted tab
                     loses the impacts as well as the hum. One press drops the music and keeps the effects,
@@ -389,6 +394,8 @@ export default function CardMap({ run, art = {} }) {
                 </div>
             ) : null}
 
+            <CardGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
+
             <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
 
             {/* ── WHAT YOU ARE CARRYING ── opened by pressing any trinket or potion; the one you pressed is
@@ -482,7 +489,7 @@ export default function CardMap({ run, art = {} }) {
                 .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;
                     display: grid; place-items: center; }
                 .cm-tool img { width: 24px; height: 24px; object-fit: contain; }
-                .cm-sound svg { width: 20px; height: 20px; color: #c9b892; }
+                .cm-sound svg, .cm-guide svg { width: 20px; height: 20px; color: #c9b892; }
                 .cm-key { border-radius: 50%; font: inherit; font-size: 14px; font-weight: 700;
                     color: #a9b6c6; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
                 .cm-key:hover { color: #ffe6a6; box-shadow: inset 0 0 0 1px rgba(255,214,140,0.5); }
