@@ -384,7 +384,7 @@ function seaEffects(sea = {}) {
 
 // Roll the merchant ONCE per voyage, lazily, at the "arrived" interstitial (landed, no dig yet, not rolled).
 // merchant_json: NULL = not rolled; {none:true} = rolled/no merchant; an object = the merchant is here.
-async function rollMerchant(buyerId) {
+async function rollMerchant(buyerId, retry = 0) {
     const row = await readRow(buyerId);
     if (!row || row.dig_state || row.merchant_json != null) return;
     // A PAUSED VOYAGE HAS NOT ARRIVED. The clock stops while something is alongside, and `returns_at` is only
@@ -433,7 +433,31 @@ async function rollMerchant(buyerId) {
     // concurrent read of the same landing — therefore burned somebody's Treasure Map and produced nothing.
     // Clearing it in the SAME guarded update means the flag and the shelf are one decision: the roll that wins
     // spends the map, and a roll that does not win leaves it in the pack for the next landing.
-    const rolled = await db.queryOne(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, force_merchant = FALSE, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL RETURNING buyer_id`, [buyerId, JSON.stringify(offer)]).catch(() => null);
+    // ── AND THE FLAG IS COMPARED, NOT JUST CLEARED ───────────────────────────────────────────────────────
+    // ⚠️ THE SECOND HALF OF THE SAME RACE. Clearing the map in this guarded write closed the case where two
+    // reads of one landing both delivered — but `forced` is read twenty lines above and the flag was cleared
+    // here UNCONDITIONALLY, so the other order was still open: a roll that read the flag as false, then a
+    // Treasure Map applied while this function was deciding, then this write landing "no merchant today" AND
+    // turning the map off. The map was spent, nothing came of it, and the guarantee was gone.
+    //
+    // GrayKitsune, 25 August: "I used a treasure map that never activated the merchant, I thought it would
+    // pop on the next one and it didnt, just vanished instead." SoullessShiitake hit the same thing on the
+    // 7th. Both are this window, which is small and is exactly as wide as one landing's page load.
+    //
+    // So the update only fires while the flag still reads the way this roll decided against, which makes the
+    // read and the clear one atomic decision. A roll that loses that comparison lost to a map, so it rolls
+    // again — once — and that second pass reads force_merchant as true and honours it.
+    const rolled = await db.queryOne(
+        `UPDATE mkt_sailing SET merchant_json = $2::jsonb, force_merchant = FALSE, updated_at = NOW()
+          WHERE buyer_id = $1 AND merchant_json IS NULL AND COALESCE(force_merchant, FALSE) = $3
+          RETURNING buyer_id`,
+        [buyerId, JSON.stringify(offer), forced]).catch(() => null);
+    if (!rolled && retry < 1) {
+        const again = await readRow(buyerId).catch(() => null);
+        // Only when the shelf is still empty: a lost race against another DELIVERY is the case the guard was
+        // already handling correctly and must not be rolled a second time.
+        if (again && again.merchant_json == null) return rollMerchant(buyerId, retry + 1);
+    }
     if (rolled && !offer.none) {
         await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
         // Count the encounter; the exclusive elephant pet unlocks on the MERCHANT_PET_ENCOUNTERS-th meeting.
@@ -3175,8 +3199,11 @@ export async function applyTreasureMap(buyerId) {
     const row = await readRow(buyerId);
     const ashore = row?.departed_at && row?.returns_at && !row.encounter_paused_at
         && Date.now() >= new Date(row.returns_at).getTime();
-    if (!ashore) return "The map is in your pack — the Gold Merchant is waiting when you make landfall.";
-    if (row?.dig_state) return "You have already started digging here, so the map keeps until your next landing.";
+    // ⚠️ THESE TWO SENTENCES USED TO SAY THE MAP WAS STILL IN THE PACK. It is not — useConsumable spends it
+    // before this function is reached, and what carries forward is the MARK it leaves, not the paper. A
+    // player told "the map is in your pack" who then cannot find one reasonably concludes it was eaten.
+    if (!ashore) return "The map is spent and the mark is set — the Gold Merchant will be waiting when you make landfall.";
+    if (row?.dig_state) return "You have already started digging here, so the mark holds for your next landing instead.";
     // Ashore, shelf already decided: tear it up and roll again, with the map's guarantee in force.
     await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await rollMerchant(buyerId).catch(() => {});
