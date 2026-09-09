@@ -33,7 +33,10 @@ export default function CardTable({ run, history = null }) {
     // Opens on the highest one you have earned, because that is the one somebody who has been climbing wants
     // and nobody wants to press the arrow eight times. It can be walked back down: a bad week is allowed.
     const rank = history?.rank || null;
+    // The shut unlock nearest to opening — the only one that changes what a player does next.
+    const [showAll, setShowAll] = useState(false);
     const track = history?.track || [];
+    const next = [...track].filter((t) => !t.open).sort((a, b) => b.part - a.part)[0] || null;
     const open = Math.max(0, Math.min(ASC_MAX, Number(history?.open) || 0));
     const [asc, setAsc] = useState(open);
 
@@ -62,6 +65,28 @@ export default function CardTable({ run, history = null }) {
             <div className="ct-room" aria-hidden="true" />
 
             <div className="ct-stage">
+                {/* ── THE FIRST THING ON THE SCREEN IS THE THING THAT ONLY GOES UP ────────────────────
+                    ⚠️ THIS WAS AT THE BOTTOM AND NOBODY WOULD EVER HAVE SEEN IT. Photographed at 375x667:
+                    the rank sat under a five-row list of deaths, half of it behind the Return ribbon, and
+                    the unlock track was entirely off the screen. A progress bar below the fold is not
+                    progress, it is a fact stored somewhere. It goes first now, before the dealer. */}
+                {rank ? (
+                    <div className="ct-rank">
+                        <div className="ct-rank-top">
+                            <b className="ct-rank-name">{rank.name}</b>
+                            <span className="ct-rank-lv">Rank {rank.level}</span>
+                        </div>
+                        <div className="ct-bar" role="presentation">
+                            <i style={{ width: `${Math.round(rank.part * 100)}%` }} />
+                        </div>
+                        <p className="ct-rank-say">
+                            {rank.next
+                                ? <>{rank.need.toLocaleString()} more to <b>{rank.next.name}</b></>
+                                : "Top of the ladder."}
+                        </p>
+                    </div>
+                ) : null}
+
                 <p className="ct-say">
                     {live
                         ? "Your seat's still warm. The deck hasn't moved."
@@ -94,6 +119,39 @@ export default function CardTable({ run, history = null }) {
                     <img className="ct-plate" src="/images/cards/chrome/button-plate.png" alt="" />
                     <span className="ct-do-label">{going ? "…" : live ? "Sit back down" : "Sit down"}</span>
                 </button>
+
+                {/* ── AND ONE LINE ABOUT WHAT IS COMING ───────────────────────────────────────────────
+                    The track was eight rows of mostly-finished goals, which is a checklist rather than a
+                    pull. The one that is CLOSEST is the only row that changes what somebody does next, so
+                    that is the row it shows — with the rest a tap away for anybody who wants the list. */}
+                {next ? (
+                    <button type="button" className="ct-next" onClick={() => setShowAll((v) => !v)}>
+                        <span className="ct-next-tag">Next card</span>
+                        {/* The count sits BESIDE the sentence, not under the bar — grid fills in DOM order,
+                            and a bar that spans both columns pushes anything after it onto a new row. */}
+                        <b>{next.how}</b>
+                        <em>{next.at}/{next.want}</em>
+                        <span className="ct-next-bar"><i style={{ width: `${Math.round(next.part * 100)}%` }} /></span>
+                    </button>
+                ) : track.length ? (
+                    <button type="button" className="ct-next is-done" onClick={() => setShowAll((v) => !v)}>
+                        <span className="ct-next-tag">Cards from playing</span>
+                        <b>All {track.length} earned</b>
+                    </button>
+                ) : null}
+
+                {showAll && track.length ? (
+                    <ul className="ct-track-list">
+                        {track.map((t) => (
+                            <li key={t.id} className={t.open ? "is-open" : ""}>
+                                <span className="ct-track-name">{t.open ? t.name : "Locked"}</span>
+                                {t.open
+                                    ? <i className="ct-track-by">{t.by === "rank" ? `Rank ${t.level}` : "Earned"}</i>
+                                    : <><i className="ct-track-how">{t.how}</i><em className="ct-track-at">{t.at}/{t.want}</em></>}
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
 
                 {/* ── THE CABINET, FROM THE FRONT ROOM ────────────────────────────────────────────────
                     The collection is the thing you can look at when you do NOT want to start a run, which is
@@ -143,64 +201,15 @@ export default function CardTable({ run, history = null }) {
                             </i>
                         </p>
                         <ul className="ct-runs">
-                            {history.recent.map((r, i) => (
+                            {/* Three, not five. A front room whose largest element is a list of the ways
+                                you have died is a screen that argues against sitting down. */}
+                            {history.recent.slice(0, 3).map((r, i) => (
                                 <li key={i} className={r.outcome === "won" ? "is-won" : ""}>
                                     <span>{r.outcome === "won" ? "Won" : "Died"}</span>
                                     <i>{r.outcome === "won"
                                         ? "all three acts"
                                         : `${actName(r.act)}, stop ${r.stop}`}</i>
                                     <b>{Number(r.score).toLocaleString()}</b>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ) : null}
-
-                {/* ── WHAT YOU ARE, AND WHAT IS COMING ────────────────────────────────────────────────
-                    The front room used to end at a best score and five result lines, which is a record of
-                    the past and nothing to come back for. Eight cards have been earnable by playing since
-                    they were written and this screen never said so — the only way to learn one had opened
-                    was to be dealt it mid-run and not recognise it.
-                    So: one bar that only ever fills, the name the table calls you, and the eight laid out
-                    where you can see which one is closest. */}
-                {rank ? (
-                    <div className="ct-rank">
-                        <div className="ct-rank-top">
-                            <b className="ct-rank-name">{rank.name}</b>
-                            <span className="ct-rank-lv">Rank {rank.level}</span>
-                        </div>
-                        <div className="ct-bar" role="presentation">
-                            <i style={{ width: `${Math.round(rank.part * 100)}%` }} />
-                        </div>
-                        <p className="ct-rank-say">
-                            {rank.next
-                                ? <>{rank.need.toLocaleString()} to <b>{rank.next.name}</b></>
-                                : "Top of the ladder."}
-                        </p>
-                    </div>
-                ) : null}
-
-                {track?.length ? (
-                    <div className="ct-track">
-                        <p className="ct-track-head">
-                            Cards from playing
-                            <b>{track.filter((t) => t.open).length}/{track.length}</b>
-                        </p>
-                        <ul className="ct-track-list">
-                            {track.map((t) => (
-                                <li key={t.id} className={t.open ? "is-open" : ""}>
-                                    <span className="ct-track-name">{t.open ? t.name : "Locked"}</span>
-                                    {t.open ? (
-                                        <i className="ct-track-by">{t.by === "rank" ? `Rank ${t.level}` : "Earned"}</i>
-                                    ) : (
-                                        <>
-                                            <i className="ct-track-how">{t.how}</i>
-                                            <span className="ct-track-bar">
-                                                <i style={{ width: `${Math.round(t.part * 100)}%` }} />
-                                            </span>
-                                            <em className="ct-track-at">{t.at}/{t.want}</em>
-                                        </>
-                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -277,7 +286,7 @@ export default function CardTable({ run, history = null }) {
 
                 /* ── HIM ── bottom-anchored, because he is drawn seated behind a table and the table edge is
                    the bottom of the cutout. Floating him in the middle of the room stands him up. */
-                .ct-sharp { width: min(320px, 66vw); height: auto; object-fit: contain; margin-bottom: -4px;
+                .ct-sharp { width: min(230px, 50vw); height: auto; object-fit: contain; margin-bottom: -4px;
                     filter: drop-shadow(0 14px 22px rgba(0,0,0,0.85)); }
 
                 .ct-say { margin: 0; max-width: 340px; text-align: center; font-size: 13.5px; line-height: 1.4;
@@ -327,11 +336,25 @@ export default function CardTable({ run, history = null }) {
                 /* ── THE TRACK ── eight rows, because eight chips in a strip cannot say how close you are
                    and how close you are is the entire point. An open one is a name in gold and stops
                    talking; a shut one keeps its bar and its count. */
-                .ct-track { width: min(360px, 100%); margin: 0 auto; }
-                .ct-track-head { display: flex; align-items: baseline; justify-content: space-between;
-                    margin: 0 0 5px; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
-                    color: #8e8371; }
-                .ct-track-head b { font-size: 12px; letter-spacing: 0.04em; color: #ffd9a6; }
+                /* ── THE ONE THING THAT IS CLOSE ─────────────────────────────────────────────────────
+                   A row you can press, because pressing it is how you get the other seven. Laid out as a
+                   grid rather than a flex row so the bar keeps its width whatever the sentence is. */
+                .ct-next { width: min(360px, 100%); margin: 0 auto; display: grid;
+                    grid-template-columns: 1fr auto; gap: 3px 10px; align-items: baseline;
+                    padding: 8px 11px; border-radius: 10px; cursor: pointer; text-align: left;
+                    font: inherit; color: inherit; background: rgba(40,30,16,0.5);
+                    border: 1px solid rgba(255,190,110,0.24); }
+                .ct-next-tag { grid-column: 1 / -1; font-size: 10px; letter-spacing: 0.16em;
+                    text-transform: uppercase; color: #8e8371; }
+                .ct-next b { font-size: 12.5px; font-weight: 700; color: #ffd9a6; }
+                .ct-next em { font-style: normal; font-size: 11px; color: #b3a68f;
+                    font-variant-numeric: tabular-nums; }
+                .ct-next-bar { grid-column: 1 / -1; height: 4px; border-radius: 999px;
+                    background: rgba(10,9,12,0.8); overflow: hidden; }
+                .ct-next-bar i { display: block; height: 100%; border-radius: 999px;
+                    background: linear-gradient(90deg, #6b5330, #ffc061); }
+                .ct-next.is-done b { color: #9be08a; }
+
                 .ct-track-list { list-style: none; margin: 0; padding: 0; display: flex;
                     flex-direction: column; gap: 3px; }
                 .ct-track-list li { display: grid; grid-template-columns: 72px 1fr auto; align-items: center;
@@ -360,14 +383,14 @@ export default function CardTable({ run, history = null }) {
 
                 @media (max-width: 560px) { .ct-stage { padding-bottom: 74px; } }
                 @media (min-width: 760px) {
-                    .ct-sharp { width: min(400px, 34vw); }
+                    .ct-sharp { width: min(300px, 26vw); }
                     .ct-say { font-size: 15px; max-width: 440px; }
                 }
                 /* A phone leaves about 441px once the browser's chrome is off it, and he is the tallest thing
                    on the screen — the same fold the campfire's second button fell under. He gives way; the
                    button he is asking you to press does not. */
                 @media (max-height: 560px) {
-                    .ct-sharp { width: min(190px, 44vw); }
+                    .ct-sharp { width: min(150px, 36vw); }
                     .ct-say { font-size: 12.5px; }
                     .ct-stage { gap: 6px; }
                     .ct-do { height: 44px; width: 190px; }
