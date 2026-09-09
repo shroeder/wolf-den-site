@@ -212,6 +212,12 @@ export default function CardMap({ run, art = {} }) {
                 {/* WHAT YOU ARE CARRYING, INLINE. The trinkets had a band of their own, and then a column of
                     their own; both were furniture for something you own between zero and four of. They sit
                     beside the potions now — one row, one tap each, and nothing at all when empty. */}
+                {/* ── WHAT YOU ARE CARRYING, AS ONE GROUP ─────────────────────────────────────────
+                    The trinkets, the potions and the keys are the same question asked three ways, and on a
+                    phone they share a row of their own — see the media query by .cm-bar. The wrapper is
+                    display: contents on a wide screen, so a desktop bar is laid out exactly as it was
+                    before this group existed. */}
+                <div className="cm-carried">
                 {/* The one part of the bar allowed to run past its width — see cm-carry. */}
                 <div className="cm-carry">
                     {perks.map((id) => {
@@ -245,6 +251,7 @@ export default function CardMap({ run, art = {} }) {
                         ))}
                     </span>
                 ) : null}
+                </div>
 
                 <span className="cm-gap" />
                 <Sprite className="cm-ui" src="/images/cards/chrome/ui-floor.png" />
@@ -454,6 +461,40 @@ export default function CardMap({ run, art = {} }) {
                 .cm-bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px;
                     width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden;
                     background: rgba(10,12,17,0.92); border-bottom: 1px solid rgba(255,255,255,0.06); }
+                /* ── ⚠️ AT ACT THREE ON A PHONE, THIS BAR LOST ITS LAST TWO BUTTONS ──────────────
+                   Measured on the live run at 369x800, reading the bar's own children:
+                       cm-who 66 | hp 37 | embers 23 | CARRY 0 | gap 0 | floor 15 | four tools 120
+                       guide ends at 374, sound spans 380-410 — a 369px screen
+                   So the sound toggle was ENTIRELY off the glass and the guide was half off, and the strip
+                   of everything you are carrying had been squeezed to ZERO WIDTH: eleven trinkets and three
+                   potions, none of them drawn. The bar is overflow: hidden, so none of it announced itself.
+                   That is also why "no music?" could not be answered by the person asking it — the control
+                   that turns the music on is the last child of this row, and the last child is what falls
+                   off the end.
+                   ⚠️ IT IS 53 PIXELS OVER AT ITS NARROWEST, and the act name coming back at act two (see
+                   .cm-who.is-deep) is 72 of the pixels it needed. Shrinking is not the answer here the way
+                   it was on the fight's strip: what is on this row is one variable-length thing and eight
+                   fixed ones, and the variable one is the one being crushed.
+                   So on a phone the carried strip takes a ROW OF ITS OWN. It gets the full width — twelve
+                   items visible instead of none — and everything else fits its row with room to spare. The
+                   map is a scrolling sheet, so the thirty pixels come out of somewhere that has them. */
+                /* Invisible to the layout on a wide screen: the bar's children are exactly what they
+                   always were, in the same order, with the same gaps. */
+                .cm-carried { display: contents; }
+                @media (max-width: 520px) {
+                    .cm-bar { flex-wrap: wrap; row-gap: 4px; column-gap: 4px; }
+                    .cm-bar > * { order: 1; }
+                    .cm-bar > .cm-carried { display: flex; align-items: center; gap: 4px;
+                        order: 2; flex: 1 0 100%; min-width: 0; }
+                    /* ⚠️ AND THE ACT NAME GOES BACK TO BEING THE FIRST THING TO GO, which is what the
+                       note above .cm-who says it is. It was hidden on a phone until .cm-who.is-deep brought
+                       it back from act two — 66 pixels plus its gap, on the row that was already 53 over.
+                       The act still travels on the fight's own line and on the front room's summary. */
+                    /* ⚠️ PREFIXED, because .cm-who.is-deep is declared FURTHER DOWN this sheet and a
+                       media query adds no specificity — at equal weight the later rule wins and this
+                       one silently did nothing. Measured: the name was still 66px wide at 369. */
+                    .cm-bar .cm-who.is-deep { display: none; }
+                }
                 /* ⚠️ AND ONLY ONE THING IS ALLOWED TO SHRINK. Letting every child shrink fixed the overflow
                    and broke the bar instead: health ran into the act name and the reading came out as
                    "THE DE(heart)P34/7". Numbers must not compress — they are the two figures a player checks
@@ -463,8 +504,19 @@ export default function CardMap({ run, art = {} }) {
                 /* The name does NOT shrink. Ellipsised down to "T.." it is worse than absent, and the
                    carried row can give up every pixel this bar needs on its own. */
                 .cm-who { flex-shrink: 0; white-space: nowrap; }
+                /* \u2500\u2500 IT SCROLLS, AND NOTHING SAID SO \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+                   The scrollbar is hidden on purpose (a native bar across a 30px game HUD looks like a
+                   defect), which leaves a run carrying fifteen trinkets with a strip that simply ENDS at
+                   the edge of the bar and no reason to think anything is past it. The last thing you can
+                   see looks like the last thing you have.
+                   So the right edge fades. A mask rather than a gradient overlay, because the bar behind it
+                   is translucent and a painted fade would show as a smear over the map. When the strip does
+                   not overflow the fade sits over empty space and costs nothing \u2014 .cm-carry takes the
+                   leftover width whether or not it needs it. */
                 .cm-carry { display: flex; align-items: center; gap: 2px;
-                    flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+                    flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none;
+                    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+                    mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); }
                 .cm-carry::-webkit-scrollbar { display: none; }
                 .cm-ui { width: 21px; height: 21px; object-fit: contain; }
                 .cm-hp { font-size: 14px; font-weight: 700; color: #ff8f7a; font-variant-numeric: tabular-nums; }
@@ -486,7 +538,17 @@ export default function CardMap({ run, art = {} }) {
                 .cm-key.is-emerald { color: #7fe0a8; }
                 .cm-key.is-sapphire { color: #8fd3ff; }
                 .cm-key.is-ruby { color: #ff8f8f; }
-                .cm-hold { padding: 0 1px; border: 0; background: none; cursor: pointer; line-height: 0; }
+                /* \u26a0\uFE0F 23x21, WHICH IS UNDER THE FLOOR THIS GAME'S OWN AUDIT SETS. cards-hits calls
+                   anything below 24px "a miss waiting to happen on a phone" and it called every trinket and
+                   every potion in this strip exactly that: a 21px picture with one pixel of padding either
+                   side, in a row where the next one starts two pixels later. Tapping the wrong bottle here
+                   is not costly \u2014 it opens the wrong note \u2014 but it is the same thumb and the same row that
+                   the fight's belt was rebuilt for.
+                   28x28 now, which is the size .cm-tool beside it already is, so the bar reads as one set of
+                   controls rather than as icons of two different sizes. The PICTURE stays 21px; what grew is
+                   the thing you are aiming at. */
+                .cm-hold { flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; background: none;
+                    cursor: pointer; display: grid; place-items: center; }
                 .cm-hold:active { transform: translateY(1px); }
                 .cm-tool { width: 30px; height: 30px; padding: 0; border: 0; background: none; cursor: pointer;
                     display: grid; place-items: center; }

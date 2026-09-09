@@ -85,14 +85,22 @@ const report = await js(`(() => { try {
     const roots = modal ? [modal]
         : ['.cf', '.cv', '.cr', '.cs', '.cm', '.cc', '.ct'].map((s) => document.querySelector(s)).filter(Boolean);
     const controls = roots.flatMap((root) => [...root.querySelectorAll('button, [role="button"], a[href]')]);
-    // Is this control inside something that scrolls? Then being below the fold is reachable, not lost.
-    const scrolls = (el) => {
+    // Is this control inside something that scrolls? Then being past the fold is reachable, not lost.
+    // \u26a0\uFE0F BOTH AXES. This asked only about overflowY, so a SIDEWAYS scroller was invisible to it — and
+    // the map's carried-items strip is exactly that: .cm-carry holds every trinket and potion in the run and
+    // scrolls horizontally. With eleven of them the audit reported eleven controls as "off screen, cannot
+    // scroll to it" when every one is a flick away, which is the cry-wolf failure this file's own header
+    // says would get it ignored the third time it ran.
+    const scroller = (el) => {
         for (let n = el.parentElement; n; n = n.parentElement) {
             const st = getComputedStyle(n);
-            if (/(auto|scroll)/.test(st.overflowY) && n.scrollHeight > n.clientHeight + 4) return true;
+            if (/(auto|scroll)/.test(st.overflowY) && n.scrollHeight > n.clientHeight + 4) return n;
+            if (/(auto|scroll)/.test(st.overflowX) && n.scrollWidth > n.clientWidth + 4) return n;
         }
-        return document.scrollingElement && document.scrollingElement.scrollHeight > innerHeight + 4;
+        return null;
     };
+    const scrolls = (el) => Boolean(scroller(el))
+        || Boolean(document.scrollingElement && document.scrollingElement.scrollHeight > innerHeight + 4);
     for (const el of controls) {
         const r = el.getBoundingClientRect();
         const label = (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 34)
@@ -105,9 +113,24 @@ const report = await js(`(() => { try {
             continue;
         }
         if (el.disabled) continue;
+        // \u26a0\uFE0F A CONTROL SCROLLED OUT OF ITS OWN SCROLLER CANNOT BE HIT-TESTED WHERE IT IS NOT.
+        // The clamp below pulls the sample point back inside the viewport, which is right for a control
+        // hanging half off the fold and nonsense for one sitting 200px to the right inside a strip that
+        // clips it: the clamped point lands on whatever happens to be at the screen edge, and the audit
+        // reported the map's trinkets as "covered by cm-tool" — the sound button, at the far right of a bar
+        // they are nowhere near. Scroll it into view first and re-read the box; if it still cannot be
+        // reached, THAT is the finding.
+        const sc = scroller(el);
+        if (sc) {
+            const b = sc.getBoundingClientRect();
+            if (r.right < b.left + 1 || r.left > b.right - 1 || r.bottom < b.top + 1 || r.top > b.bottom - 1) {
+                el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+        }
+        const rr = el.getBoundingClientRect();
         // Clamped into the viewport so a control half off the fold is judged on the half you can reach.
-        const x = Math.min(innerWidth - 1, Math.max(1, r.left + r.width / 2));
-        const y = Math.min(innerHeight - 1, Math.max(1, r.top + r.height / 2));
+        const x = Math.min(innerWidth - 1, Math.max(1, rr.left + rr.width / 2));
+        const y = Math.min(innerHeight - 1, Math.max(1, rr.top + rr.height / 2));
         const hit = document.elementFromPoint(x, y);
         if (!hit) { out.push({ label, why: 'nothing at its centre' }); continue; }
         if (!el.contains(hit) && !hit.contains(el)) {
@@ -123,8 +146,8 @@ const report = await js(`(() => { try {
             if (!(fixed && scrolls(el))) out.push({ label, why: 'covered by ' + who });
         }
         // A touch target under 32px is a miss waiting to happen on a phone.
-        if (Math.min(r.width, r.height) < 24) {
-            out.push({ label, why: 'tiny target ' + Math.round(r.width) + 'x' + Math.round(r.height) });
+        if (Math.min(rr.width, rr.height) < 24) {
+            out.push({ label, why: 'tiny target ' + Math.round(rr.width) + 'x' + Math.round(rr.height) });
         }
     }
     return JSON.stringify({ n: controls.length, out });
