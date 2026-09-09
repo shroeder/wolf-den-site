@@ -105,13 +105,25 @@ const withKeywords = (text) => String(text).split(KEY_RE).map((part, i) => (
  * moving its numbers, so it shows what it is worth, not what it would hit for.
  */
 const KEY_FIELD = /\{(\w+)\}/g;
+// ── AND ONE THAT IS NOT A NUMBER ─────────────────────────────────────────────────────────────────────────
+// ⚠️ TEMPLATING A COUNT MEANS TEMPLATING ITS PLURAL. Twenty-five cards changed a number on upgrade that
+// their own sentence never printed — Hoot draws three and went on saying "Draw 2 cards." forever, which is
+// the two-sources-of-truth bug the note above CARDS warns about, still live in every field except damage
+// and block. Templating them is the fix, and "Draw {draw} cards." reads "Draw 1 cards." on the base card.
+// So {s:draw} is an "s" unless the field is exactly 1. Resolved BEFORE the number pass, so it never reaches
+// withNumbers and cannot be mistaken for a value to colour green.
+const PLURAL_FIELD = /\{s:(\w+)\}/g;
+const plurals = (text, card, live) => String(text || "").replace(PLURAL_FIELD, (_, f) => {
+    const now = live && live[f] != null ? live[f] : card?.[f];
+    return Number(now) === 1 ? "" : "s";
+});
 /**
  * How much room this card's sentence needs, as a class rather than a computed style — see the note by
  * `.cf-text`. Measured on the sentence with its NUMBERS IN, because "Deal {damage} damage" is nine characters
  * shorter than what a level-5 Crush actually prints, and it is the printed line that has to fit.
  */
 const textSize = (card, live) => {
-    const filled = String(card.text || "").replace(KEY_FIELD, (_, f) => {
+    const filled = plurals(card.text, card, live).replace(KEY_FIELD, (_, f) => {
         const now = live && live[f] != null ? live[f] : card[f];
         return String(now ?? "");
     });
@@ -136,7 +148,7 @@ const textSize = (card, live) => {
     return "";
 };
 const withNumbers = (card, live) => {
-    const parts = String(card.text || "").split(KEY_FIELD);
+    const parts = plurals(card.text, card, live).split(KEY_FIELD);
     // ── AND THE ONES THE FIRE MOVED STAY GREEN ───────────────────────────────────────────────────────────
     // Spire lights an upgraded card's improved numbers permanently, not only while something in the fight is
     // moving them, and it is the same green: green means "better than the card this started as", whether the

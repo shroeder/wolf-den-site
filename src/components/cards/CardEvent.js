@@ -87,6 +87,18 @@ export default function CardEvent({ run, art = {} }) {
         if (r?.error === "too_poor") { setSaid("Not enough embers."); return; }
         if (r?.error === "deck_too_small") { setSaid("Any fewer cards and there is no deck left."); return; }
         if (r?.error && r.error !== "already_chosen") { setSaid("Nothing comes of it."); return; }
+        // ── AND IF THE ROOM PUT AN EDGE ON ANYTHING, SHOW THE FIRE ───────────────────────────────────
+        // ⚠️ THE ROOM USED TO JUST SAY SO. "Pilfer and Hop came out sharper" was the whole of it — a
+        // sentence, where the campfire doing the identical thing to ONE card puts it in the coals and shows
+        // you the numbers change. The ceremony already existed; the only reason this room could not play it
+        // is that the server reported NAMES. It reports ids now, so the screen can run the same CardForge
+        // the smith does, one card after another, before the room reloads underneath it.
+        for (const id of r?.sharpened || []) {
+            setForgeMode("sharpen");
+            setForge(id);
+            await new Promise((res) => { timers.current.push(setTimeout(res, FORGE_MS)); });
+        }
+        setForge(null);
         router.refresh();
     }, [busy, router]);
 
