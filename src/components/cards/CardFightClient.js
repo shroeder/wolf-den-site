@@ -417,6 +417,12 @@ export default function CardFightClient({ fixture, run = null }) {
     // immediately, then tell the server the bottle is gone. A potion that waits for a round trip before the
     // block appears is a potion you drink twice.
     const [drinking, setDrinking] = useState(null);
+    // ── WHAT IS IN THE BOTTLE, BEFORE IT IS GONE ─────────────────────────────────────────────────────
+    // The belt used to drink on the tap. A 26px picture, no words on it, and a `title` attribute — which is
+    // a tooltip, which is nothing at all on the phone this game is played on. So a potion you were carrying
+    // for the fight that needed it could be spent by one mis-aimed thumb, permanently, without ever having
+    // been read. Holds the belt slot being looked at.
+    const [reading, setReading] = useState(null);
     const onDrink = useCallback(async (slot) => {
         const id = (runState?.potions || [])[slot];
         if (!id || !POTIONS[id] || fightRef.current.over || drinking !== null) return;
@@ -933,9 +939,9 @@ export default function CardFightClient({ fixture, run = null }) {
                                 type="button"
                                 className={`cf-potion${drinking === i ? " is-going" : ""}`}
                                 disabled={Boolean(fight.over) || drinking !== null}
-                                onClick={() => onDrink(i)}
+                                onClick={() => setReading(i)}
                                 title={`${POTIONS[id].name} — ${POTIONS[id].text}`}
-                                aria-label={`Drink ${POTIONS[id].name}: ${POTIONS[id].text}`}
+                                aria-label={`${POTIONS[id].name}: ${POTIONS[id].text}. Look at it.`}
                             >
                                 <Sprite src={`/images/cards/potions/${id}.png`} className="cf-potion-art" />
                             </button>
@@ -1431,6 +1437,33 @@ export default function CardFightClient({ fixture, run = null }) {
                     )}
                 </div>
             ) : null}
+
+            {/* ── THE BOTTLE, HELD UP ─────────────────────────────────────────────────────────────────
+                One tap to look, a second deliberate one to pour. The picture is the size a picture should be
+                when you are deciding something with it, and the sentence is the potion's own — the same
+                string the belt could only ever put in a tooltip. */}
+            {reading !== null && POTIONS[(runState?.potions || [])[reading]] ? (() => {
+                const pid = (runState?.potions || [])[reading];
+                const pot = POTIONS[pid];
+                return (
+                    <div className="cf-read-over" role="presentation" onClick={() => setReading(null)}>
+                        <div className="cf-read" role="dialog" aria-modal="true" aria-label={pot.name}
+                            onClick={(e) => e.stopPropagation()}>
+                            <Sprite src={`/images/cards/potions/${pid}.png`} className="cf-read-art" />
+                            <b className="cf-read-name">{pot.name}</b>
+                            <i className="cf-read-text">{pot.text}</i>
+                            <button type="button" className="cf-read-go"
+                                disabled={Boolean(fight.over) || drinking !== null}
+                                onClick={() => { const slot = reading; setReading(null); onDrink(slot); }}>
+                                Drink it
+                            </button>
+                            <button type="button" className="cf-read-back" onClick={() => setReading(null)}>
+                                Put it back
+                            </button>
+                        </div>
+                    </div>
+                );
+            })() : null}
 
             {/* ── GLOBAL, AND IT HAS TO BE ────────────────────────────────────────────────────────────
                 styled-jsx scopes a rule to the elements THIS component renders, and the sprite and the card
@@ -2229,6 +2262,24 @@ export default function CardFightClient({ fixture, run = null }) {
                    inside a 72px card — which broke the sentence into five short lines, shoved the first one
                    up behind the type tab and clipped the rest. Luke, twice, with photographs: "cards all
                    messed up". A cf- prefix is not a namespace; the card face and the fight screen share it. */
+                /* The bottle held up. Above the board and above the hand, because it is a question being
+                   asked; tapping the dark is "no" and costs nothing. */
+                .cf-read-over { position: fixed; inset: 0; z-index: 4300; display: grid; place-items: center;
+                    padding: 20px; background: rgba(4,6,10,0.84); backdrop-filter: blur(2px); }
+                .cf-read { display: flex; flex-direction: column; align-items: center; gap: 10px;
+                    width: min(300px, 88vw); padding: 20px 18px; border-radius: 14px;
+                    background: #10141c; border: 1px solid #2a3242; box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
+                .cf-read-art { width: 84px; height: 84px; object-fit: contain;
+                    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55)); }
+                .cf-read-name { font-size: 17px; color: #ffe9b8; letter-spacing: 0.02em; }
+                .cf-read-text { font-style: normal; font-size: 13px; line-height: 1.4; text-align: center;
+                    color: #c6cedb; }
+                .cf-read-go { width: 100%; padding: 11px; margin-top: 4px; border-radius: 10px; cursor: pointer;
+                    border: 1px solid #6e5c2c; background: #2a2314; color: #ffd75e;
+                    font: inherit; font-size: 15px; font-weight: 700; }
+                .cf-read-go:disabled { opacity: 0.45; cursor: default; }
+                .cf-read-back { padding: 6px; border: 0; background: none; cursor: pointer;
+                    font: inherit; font-size: 13px; color: #8a8f98; }
                 .cf-takekey {
                     display: block; width: min(340px, 92vw); margin: 10px auto 0; padding: 10px 14px;
                     background: transparent; border: 1px solid #2c6e4a; border-radius: 10px;

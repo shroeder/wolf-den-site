@@ -8,7 +8,7 @@ import { GiFlame } from "react-icons/gi";
 import CardFace, { CARD_FONT, Sprite } from "@/components/cards/CardFace";
 import CardFoot from "@/components/cards/CardFoot";
 import CardForge, { FORGE_MS } from "@/components/cards/CardForge";
-import { KEYS, PERKS, POTIONS, canUpgrade, cardById } from "@/lib/marketplace/cards-kit.js";
+import { KEYS, PERKS, POTIONS, canUpgrade, cardById, upgradedId } from "@/lib/marketplace/cards-kit.js";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -63,6 +63,11 @@ export default function CardRoom({ run, art = {} }) {
     // frame the face swaps on. Held on the client because the SERVER only ever reports the finished card —
     // and the whole point of this screen is the half-second where it is neither.
     const [forge, setForge] = useState(null);
+    // ── WHAT THE FIRE WOULD DO, BEFORE IT DOES IT ────────────────────────────────────────────────────
+    // The picker used to commit on the tap: one press on a 96px card and a permanent, once-a-fire decision
+    // was spent, with nothing on screen saying what the card would become. Holds { id, index } while the
+    // player is looking at the answer.
+    const [preview, setPreview] = useState(null);
     const timers = useRef([]);
     useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
@@ -302,7 +307,7 @@ export default function CardRoom({ run, art = {} }) {
                                     <button key={`${id}-${i}`} type="button"
                                         className={`cr-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                         aria-label={can ? `Sharpen ${c.name}` : `${c.name}, already sharpened`}
-                                        onClick={() => forgeCard(id, i)}>
+                                        onClick={() => setPreview({ id, index: i })}>
                                         <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
                                     </button>
                                 );
@@ -312,6 +317,44 @@ export default function CardRoom({ run, art = {} }) {
                     </div>
                 ) : null}
             </div>
+
+            {/* ── THE ANSWER, BEFORE THE DECISION ─────────────────────────────────────────────────────────
+                A fire sharpens ONE card and you get one fire, so this is among the most permanent choices
+                the run offers — and it was made by tapping a small picture of a card whose upgraded numbers
+                appear nowhere on this screen. Both faces, side by side, the same components the rest of the
+                game draws cards with: what you have, and what it becomes. The upgraded one prints its
+                improved numbers in green on its own (see upgradedFields), so the difference reads without
+                anything here having to explain it. */}
+            {preview ? (
+                <div className="cr-prev-over" role="presentation"
+                    onClick={() => setPreview(null)}>
+                    <div className="cr-prev" role="dialog" aria-modal="true"
+                        aria-label={`Sharpen ${cardById(preview.id)?.name || "this card"}?`}
+                        onClick={(e) => e.stopPropagation()}>
+                        <p className="cr-prev-head">Into the coals?</p>
+                        <div className="cr-prev-pair">
+                            <span className="cr-prev-one">
+                                <span className="cf-card"><CardFace card={cardById(preview.id)} art={art[cardById(preview.id)?.pet]} /></span>
+                                <i>now</i>
+                            </span>
+                            <span className="cr-prev-arrow" aria-hidden="true">→</span>
+                            <span className="cr-prev-one">
+                                <span className="cf-card"><CardFace card={cardById(upgradedId(preview.id))} art={art[cardById(preview.id)?.pet]} /></span>
+                                <i>after</i>
+                            </span>
+                        </div>
+                        <div className="cr-prev-do">
+                            <button type="button" className="cr-do" disabled={busy}
+                                onClick={() => { const p = preview; setPreview(null); forgeCard(p.id, p.index); }}>
+                                <span className="cr-do-label">Sharpen it</span>
+                            </button>
+                            <button type="button" className="cr-prev-back" onClick={() => setPreview(null)}>
+                                Choose another
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {forge ? <CardForge card={forge} art={art} /> : null}
 
@@ -422,6 +465,22 @@ export default function CardRoom({ run, art = {} }) {
 
                 .cr-choices { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
                 /* ── WHICH CARD GOES IN THE COALS ── */
+                /* The preview sits OVER the picker, so it is a step above it — same scrim treatment, one
+                   z-index higher, and tapping the dark takes you back to the deck rather than out of the room. */
+                .cr-prev-over { position: fixed; inset: 0; z-index: 4200; display: grid; place-items: center;
+                    padding: 18px; background: rgba(4,6,10,0.82); backdrop-filter: blur(2px); }
+                .cr-prev { display: flex; flex-direction: column; align-items: center; gap: 14px;
+                    padding: 18px 16px; border-radius: 14px; background: #10141c;
+                    border: 1px solid #2a3242; box-shadow: 0 18px 40px rgba(0,0,0,0.6); }
+                .cr-prev-head { margin: 0; font-size: 15px; letter-spacing: 0.04em; color: #e7ecf4; }
+                .cr-prev-pair { display: flex; align-items: center; gap: 10px; }
+                .cr-prev-one { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+                .cr-prev-one i { font-style: normal; font-size: 11px; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: #7d8696; }
+                .cr-prev-arrow { font-size: 20px; color: #7fe0a8; }
+                .cr-prev-do { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
+                .cr-prev-back { padding: 8px; border: 0; background: none; cursor: pointer;
+                    font: inherit; font-size: 13px; color: #8a8f98; }
                 .cr-pick-over { position: fixed; inset: 0; z-index: 4100; display: grid; place-items: center;
                     padding: 14px; background: rgba(4,5,8,0.88); }
                 .cr-pick { width: min(560px, 100%); max-height: 84dvh; overflow-y: auto; padding: 14px;
