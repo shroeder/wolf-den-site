@@ -136,7 +136,8 @@ export const EVENTS = [
         id: "offering", act: 0, name: "The Offering", icon: "flame",
         say: "The fire has been kept up by people who wanted something. It is still hungry.",
         choices: [
-            { label: "Feed it a card", detail: "Burn a card. Take a trinket.", effect: { remove: 1, perk: 1 } },
+            { label: "Feed it a card", detail: "Burn a card. A bottle out of the ashes.", effect: { remove: 1, potion: 1 } },
+            { label: "Reach into the coals", detail: "A trinket. Your hands do not come back the same. -6 max health.", effect: { perk: 1, maxHp: -6 } },
             { label: "Warm your hands and go", detail: "Heal 12.", effect: { hp: 12 } },
         ],
     },
@@ -197,8 +198,8 @@ export const EVENTS = [
         say: "There are names cut into it, layers deep. Some of them are still being cut.",
         choices: [
             { label: "Cut a name deeper", detail: "Upgrade a card.", effect: { upgrade: 1 } },
-            { label: "Scratch one out", detail: "Burn a card.", effect: { remove: 1 } },
-            { label: "Add your own", detail: "+9 max health.", effect: { maxHp: 9 } },
+            { label: "Scratch one out", detail: "Burn a card. The wall takes its own back. Lose 8 health.", effect: { remove: 1, hp: -8 } },
+            { label: "Add your own", detail: "+12 max health. You are on the wall now, and you know it.", effect: { maxHp: 12, card: "doubt" } },
         ],
     },
 
@@ -237,7 +238,19 @@ export const EVENTS = [
         choices: [
             { label: "Read one properly", detail: "Sharpen a card.", effect: { upgrade: 1 } },
             { label: "Tear one out", detail: "Burn a card. +40 embers.", effect: { remove: 1, embers: 40 } },
-            { label: "Take what floats", detail: "A potion and 60 embers.", effect: { potion: 1, embers: 60 } },
+            { label: "Take what floats", detail: "Whatever the water pushed to the near wall.", effect: { potion: 1 } },
+            {
+                label: "Swim for the deep shelf", detail: "The good pages are the drowned ones. Lose a tenth of your health.",
+                effect: {
+                    hpPct: -0.1,
+                    gamble: [
+                        { w: 3, say: "Two pages, dry inside an oilskin.", potion: 1, embers: 90 },
+                        { w: 2, say: "A whole shelf nobody reached, and a purse behind it.", embers: 200 },
+                        { w: 2, say: "Pulp, all of it, and a long way back up.", hpPct: -0.08 },
+                        { w: 1, say: "Something down there had come for the same shelf.", card: "injury" },
+                    ],
+                },
+            },
         ],
     },
     {
@@ -333,7 +346,8 @@ export const EVENTS = [
         id: "stillroom", act: 0, name: "The Still Room", icon: "shrine",
         say: "Racks of bottles, most of them broken, three of them not. Whoever was distilling here left in a hurry.",
         choices: [
-            { label: "Take what survived", detail: "Three bottles.", effect: { potion: 3 } },
+            { label: "Take what survived", detail: "Three bottles. The air in here is not only dust. Lose 10 health.", effect: { potion: 3, hp: -10 } },
+            { label: "Take one and go", detail: "A bottle, and out before you breathe much.", effect: { potion: 1 } },
             { label: "Leave them", detail: "Walk on.", effect: {} },
         ],
     },
@@ -452,7 +466,7 @@ export const EVENTS = [
         id: "carvedpage", act: 2, name: "The Carved Page", icon: "wall",
         say: "One page of a book, cut into the wall so it could not be taken. It is instructions, and they are for you.",
         choices: [
-            { label: "Read it through", detail: "Every card you came in with takes an edge.", effect: { upgradeAll: true } },
+            { label: "Read it through", detail: "Every card you came in with takes an edge. Holding all of it costs you. -8 max health.", effect: { upgradeAll: true, maxHp: -8 } },
             { label: "Chip a piece out", detail: "Burn a card.", effect: { remove: 1 } },
         ],
     },

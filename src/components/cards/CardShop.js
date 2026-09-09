@@ -391,8 +391,13 @@ export default function CardShop({ run, art = {} }) {
             {burning ? <CardForge card={burning} art={art} mode="burn" /> : null}
 
             {picking ? (
+                <div className="cs-pick-over" role="presentation">
                 <div className="cs-pick" role="dialog" aria-label="Choose a card to burn">
-                    <p className="cs-pick-head">Feed one to the fire.</p>
+                    <div className="cs-pick-bar">
+                        <p className="cs-pick-head">Feed one to the fire.</p>
+                        <button type="button" className="cs-pick-out" disabled={busy}
+                            onClick={() => setPicking(false)}>Never mind</button>
+                    </div>
                     <div className="cs-pick-deck">
                         {deck.map((id, i) => {
                             const c = cardById(id);
@@ -406,6 +411,7 @@ export default function CardShop({ run, art = {} }) {
                             );
                         })}
                     </div>
+                </div>
                 </div>
             ) : null}
 
@@ -685,11 +691,24 @@ export default function CardShop({ run, art = {} }) {
                     font: inherit; font-size: 12px; letter-spacing: 0.05em; color: #9d8a72; }
 
                 /* ── CHOOSING WHAT TO BURN ── */
-                .cs-pick { width: min(1000px, 100%); padding: 10px; border-radius: 10px;
-                    background: rgba(8,9,12,0.82); box-shadow: inset 0 0 0 1px rgba(255,180,94,0.18); }
-                .cs-pick-head { margin: 0 0 8px; text-align: center; font-size: 14px; color: #ffcf9a; }
-                .cs-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-                    max-height: 46vh; overflow-y: auto; }
+                /* Burning a card is the one irreversible thing the shop does, and it used to open as a
+                   block appended BELOW the shelves — so the deck rendered underneath the stall, the page
+                   grew, and the heading sat next to the brazier button whose label had flipped to
+                   "Never mind". Reading order said the description belonged to the cancel. It is a
+                   decision, so it gets a dialog over the room, the same as the campfire and the events. */
+                .cs-pick-over { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+                    padding: 12px; background: rgba(5,6,9,0.84); }
+                .cs-pick { width: min(1000px, 96vw); max-height: 86dvh; overflow-y: auto; padding: 10px;
+                    border-radius: 12px; background: #14161d;
+                    border: 1px solid rgba(255,180,94,0.28); }
+                .cs-pick-bar { position: sticky; top: -10px; z-index: 1; display: flex; align-items: center;
+                    justify-content: space-between; gap: 10px; background: #14161d; padding: 4px 2px 10px; }
+                .cs-pick-head { margin: 0; font-size: 14px; color: #ffcf9a; }
+                .cs-pick-out { flex: 0 0 auto; font: inherit; font-size: 12px; color: #cbb894;
+                    background: transparent; border: 1px solid rgba(203,184,148,0.35); border-radius: 999px;
+                    padding: 5px 12px; cursor: pointer; }
+                .cs-pick-out:hover { color: #f0e2c6; border-color: rgba(240,226,198,0.6); }
+                .cs-pick-deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
                 .cs-pick .cs-buy { padding-bottom: 0; }
 
                 /* The map's ribbon, so leaving looks the same wherever you are leaving from. */
