@@ -52,6 +52,39 @@ const CAPTAINS = {
     fleet_bomb: P("A wild-eyed mortar master in a heavy blast apron and ear defenders, arms full of fuses, delighted."),
     fleet_manowar: P("A stern naval commodore in a pristine white and gold uniform with a bicorn hat, hands behind his back, sword at his hip, utterly certain of himself."),
     fleet_boss_sovereign: P("ADMIRAL VANE — a towering figure in black armour chased with gold, a crimson admiral's cloak, a crowned helm under one arm, a golden sabre in hand. The final opponent: regal, cold, unmistakably the best of them."),
+
+    // -- PAST THE FLAGSHIP ------------------------------------------------------------------------------
+    // The twenty-five added with ranks 16-40. Every one of them is somebody a player can now take PRISONER
+    // rather than only sink, so these faces are looked at for far longer than the original fifteen ever
+    // were: a captive sits in the brig being read. Written to be readable AS A DISPOSITION -- proud, frightened,
+    // greedy or loyal is rolled per capture, so no face may commit to one, but every face has to be able to
+    // carry any of the four. See captains.js.
+    fleet_thorn: P("CUTTER THORNE -- a crisp young revenue officer in a spotless navy coat with white facings and brass buttons, bicorn hat under one arm, gloved hand resting on a sheathed sword. Correct, humourless, well-fed."),
+    fleet_assize: P("THE ASSIZEMAN -- a gaunt magistrate at sea in black robes over a naval coat, a rolled warrant in one fist, spectacles, a coil of rope on his belt. Grim and utterly certain."),
+    fleet_hammerfall: P("HAMMERFALL ORD -- an enormous bombardier in a scorched leather coat, one ear wrapped in bandage, a heavy iron mortar key slung over his shoulder, powder-burnt hands."),
+    fleet_assurance: P("ASSURANCE VELL -- a prosperous convoy captain in a well-cut grey coat with a fur collar, ledger tucked under one arm, a small brass spyglass, unhurried and rich."),
+    fleet_boss_ash: P("COMMODORE ASH -- a naval commodore in full dress: black and gold coat heavy with braid, epaulettes, sash, gloved hands crossed on the pommel of a dress sword. Immaculate, cold and utterly commanding."),
+    fleet_blockade: P("BLOCKADE HARROW -- a sun-bleached station captain in a faded uniform gone soft at the seams, long unkempt beard, a mug in one hand, boots worn through. Nine years bored and dangerous with it."),
+    fleet_sixtyfour: P("SIXTY-FOUR VOSS -- a slab-shouldered line captain in a plain working coat, no ornament at all, arms folded, jaw set. A man who is a gun platform in human form."),
+    fleet_verdict: P("VERDICT IREMONGER -- an ironclad commander in a riveted steel breastplate over an oilskin coat, one eye behind a smoked-glass lens, a heavy wrench through his belt. Industrial and merciless."),
+    fleet_gallowglass: P("GALLOWGLASS RUE -- a mercenary captain in mismatched fine armour from four nations, rings on every finger, a purse on the belt, a sabre across the back. Expensive and entirely for hire."),
+    fleet_boss_reprisal: P("ADMIRAL VANE, older and worse -- a towering pirate admiral in a black coat veined with gold repair-work like scar tissue, deep red sash, a broken crown pinned at the throat, one eye clouded white. Vengeful and magnificent."),
+    fleet_choir: P("THE SALT CHOIR -- a drowned brig's master, waterlogged uniform streaming seawater, skin grey-blue, seaweed in his hair and collar, eyes lit pale. Standing perfectly still and dripping."),
+    fleet_marigold: P("MARIGOLD AMES -- a long-drowned merchant captain in a faded flowered waistcoat under a rotted coat, coral growing along one shoulder, holding a barnacled ledger, sad rather than frightening."),
+    fleet_court: P("BARNACLE COURT -- a figure more reef than person, a coral-crusted coat with anemones along the collar, a face half-swallowed by living stone, one clear human eye remaining."),
+    fleet_lamprey: P("THE LAMPREY -- a boarding-hulk master hung with iron hooks and chain, a low hood, a grapnel in each hand, a mouth of too many small teeth. Predatory and close."),
+    fleet_boss_marshal: P("THE TIDE MARSHAL -- an immense barge-lord in a barnacled black coat trailing dripping chains from both wrists, a lantern-crown of green light, feet planted wide. Ominous, heavy, immovable."),
+    fleet_gravemouth: P("GRAVEMOUTH SULL -- a whaling captain in an oiled coat armoured with lashed whale bone, a harpoon over one shoulder, a jaw-bone gorget at the throat, oil-black hands."),
+    fleet_widows: P("THE NINE WIDOWS -- a single translucent captain rendered as nine overlapping ghostly figures slightly out of register, pale blue-white, nine sets of mourning veils layered like double vision."),
+    fleet_pressgang: P("PRESSGANG ODOM -- a squat brutal crimp in a heavy tar-black coat, a ring of keys on his belt, chain coiled over one shoulder, a cudgel in hand. Oppressive and quiet."),
+    fleet_undertow: P("UNDERTOW VANE -- a storm captain wreathed in her own weather, dark coat streaming with rain that touches nothing else, faint lightning in her drenched hair, spray frozen around her boots."),
+    fleet_boss_fathom: P("MOTHER FATHOM -- an abyssal matriarch, vast and ancient, deep-sea life growing along a trailing black gown, a single anglerfish lure hanging over her brow casting pale light, eyes like sockets. Prehistoric and enormous."),
+    fleet_reckoning: P("THE LONG RECKONING -- a captain assembled from many, a coat stitched from dozens of different uniforms and colours, mismatched boots and gloves, a face that does not quite settle. Wrong in a way that is hard to name."),
+    fleet_regret: P("CARTOGRAPHER REGRET -- a scholarly charting captain in a pale coat printed with faint map lines and coastlines, brass dividers in one hand, an astrolabe at the hip, spectacles. Precise and unsettling."),
+    fleet_line: P("THE UNBROKEN LINE -- eleven captains drawn as one figure in tight overlapping formation receding into itself, the nearest in full detail in a line-of-battle coat, the rest ghosted behind him in the same pose."),
+    fleet_seventeen: P("HULL SEVENTEEN -- a featureless prototype commander in a smooth dark sealed suit with no visible face, angular fins along the shoulders, perfectly circular lenses where eyes would be, gloved hands at its sides."),
+    fleet_boss_harbour: P("THE LAST HARBOUR -- the keeper of a drowned mooring: a colossal still figure in a coat of fused ship timbers and broken windows lit from within, anchors and chain hanging from the shoulders, a single lit doorway at the chest. Final and enormous."),
+
 };
 
 const args = process.argv.slice(2);

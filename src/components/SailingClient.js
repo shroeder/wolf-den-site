@@ -20,6 +20,7 @@ import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
 import ConsumableShelf from "@/components/ConsumableShelf";
 import Coin from "@/components/Coin";
+import Brig from "@/components/Brig";
 
 // How long the tailwind gust lasts, in ms. ONE source of truth: the boat's `sailGust` CSS animation, the
 // passing-traffic speed-up, and the FX overlay are all timed to this so the whole moment ends together.
@@ -1244,6 +1245,18 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             </section>
 
             </> : null}
+
+            {/* ── THE BRIG ────────────────────────────────────────────────────────────────────────────
+                Under the gun deck because that is where the fight ends and where a prisoner comes from.
+                ⚠️ OWNER-GATED, AND THE GATE IS IN THREE PLACES BY DESIGN: here (the door), the API route
+                (the play path), and finishFleetBattle (whether an offer is ever made at all). A feature
+                gated only at the door still lets somebody buy a captain they cannot go and look at.
+                See captains.js CAPTAINS_PUBLIC — flipping that one constant opens all three. */}
+            {station === "guns" && state.owner === true ? (
+                <section className="card">
+                    <Brig />
+                </section>
+            ) : null}
 
             {station === "guns" && state.combat ? <>
                 <section className="card">

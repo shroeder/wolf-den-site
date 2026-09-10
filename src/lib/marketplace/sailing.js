@@ -18,6 +18,7 @@ import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { captainsOpenTo } from "@/lib/marketplace/captains.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, foePlanks, BATTLE_STATE_V,
@@ -3157,6 +3158,20 @@ async function finishFleetBattle(buyerId, meta, res) {
         [buyerId, res.win && first ? want : depth, res.win ? 1 : 0, res.win ? 0 : 1]
     ).catch(() => {});
     await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, rounds: res.state.round }).catch(() => {});
+    // ── AND HER CAPTAIN IS STANDING ON YOUR DECK ─────────────────────────────────────────────────────
+    // Written AFTER the reward is paid and never in front of it: this only ever ADDS an offer, so a
+    // failure here costs a capture and cannot cost a win. See the note in captains.js on why the choice
+    // is a priced offer rather than a fork that holds the payout.
+    // ⚠️ OWNER-GATED, AND THE GATE COMES IN A PAIR — this half stops the offer being made, and the brig
+    // route stops it being acted on. Removing only one of them is how a member ends up buying something
+    // they cannot open. See captainsOpenTo.
+    let captainOffer = null;
+    if (res.win && captainsOpenTo(isOwner(buyerId))) {
+        try {
+            const { offerCaptain, brigHasRoom } = await import("@/lib/marketplace/captains-store.js");
+            if (await brigHasRoom(buyerId)) captainOffer = await offerCaptain(buyerId, want);
+        } catch { /* the brig is optional — a battle never fails for it */ }
+    }
     if (res.win) {
         const depthNow = Math.max(depth, first ? want : depth);
         if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});
@@ -3165,6 +3180,8 @@ async function finishFleetBattle(buyerId, meta, res) {
         if (depthNow >= MAX_FLEET_RANK) await grantEventBadge(buyerId, "fleet_admiral").catch(() => {});
         if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
     }
+    // The victory screen reads `captainOffer` to draw the choice; everything else about `paid` is unchanged.
+    if (captainOffer) paid.push({ kind: "captain", offer: captainOffer });
     return paid;
 }
 
