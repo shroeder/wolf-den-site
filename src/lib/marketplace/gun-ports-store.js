@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { GUN_PORTS, gunPortsFor } from "@/lib/marketplace/gun-ports.js";
+import { GUN_PORTS, gunPortsFor, MAX_DRAWN, withPlaced } from "@/lib/marketplace/gun-ports.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
 // ── SAVED GUN PLACEMENTS ─────────────────────────────────────────────────────────────────────────────────────
@@ -20,7 +20,12 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // Seven was the cap the Cannons track enforces — right for a PLAYER'S boat, and two short for the enemy.
 // Encounter ships field up to nine (the Dread Corsair and the Drowned Admiral both do), so a saved battery
 // was silently truncated and the last two barrels could never be placed at all.
-const MAX_PORTS = 9;
+//
+// ⚠️ AND THEN NINE STOPPED BEING TRUE. The fleet goes to forty ranks and the ships past the flagship carry
+// ten to twenty-two guns. This number is no longer a local opinion about the lab — it is the same cap the
+// renderer works to, so it is imported rather than re-typed. A gun this table refuses to hold is a gun the
+// player cannot aim at. See the tiered battery in gun-ports.js.
+const MAX_PORTS = MAX_DRAWN;
 
 /** Trim anything the lab sends to the shape the renderer needs: {x,y} in 0-1, at most one battery's worth. */
 export function sanitizePorts(raw) {
@@ -80,8 +85,10 @@ export const facing = (flip, art, base = false) => Boolean(base) !== Boolean(fli
 export function portsWithSaved(saved, art, deckPct, n) {
     const count = Math.max(0, Math.min(MAX_PORTS, Math.floor(n) || 0));
     if (!count) return [];
+    // A saved battery that is SHORTER than the ship's gun count is topped up from the spread rather than
+    // truncating the ship — same rule, and same reason, as the hand-placed table in gun-ports.js.
     const placed = saved?.[art];
-    if (placed?.length) return placed.slice(0, count);
+    if (placed?.length) return withPlaced(placed, deckPct, count, art);
     return gunPortsFor(art, deckPct, count);
 }
 

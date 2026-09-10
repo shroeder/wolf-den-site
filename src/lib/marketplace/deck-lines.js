@@ -28,6 +28,42 @@ export const FLEET_DECK = {
     fleet_bomb: 28,
     fleet_manowar: 34,        // fills its frame, deck sits high
     fleet_boss_sovereign: 34,
+
+    // -- PAST THE FLAGSHIP ------------------------------------------------------------------------
+    // The twenty-five added past rank 15. These were read off the same contact sheet as the fifteen
+    // above (scan-ship-zones.mjs --sheet, which draws the split this number makes), not guessed --
+    // and they matter for more than the crew's feet now: scan-ship-zones ITERATES THIS TABLE, so a
+    // hull with no line here gets no zone map, and a hull with no zone map has no tappable sails and
+    // no tappable hull. That is exactly how these twenty-five shipped, and how GrayKitsune came to be
+    // unable to hit the timber on a Revenue Cutter except by Reckoning. A new hull needs a line here.
+    fleet_thorn: 30,
+    fleet_assize: 30,
+    fleet_hammerfall: 30,
+    fleet_assurance: 30,
+    fleet_boss_ash: 30,
+    fleet_blockade: 30,
+    fleet_sixtyfour: 30,
+    fleet_verdict: 30,
+    fleet_gallowglass: 30,
+    fleet_boss_reprisal: 30,
+    fleet_choir: 30,
+    fleet_marigold: 30,
+    fleet_court: 30,
+    fleet_lamprey: 30,
+    fleet_boss_marshal: 30,
+    fleet_gravemouth: 30,
+    fleet_widows: 30,
+    fleet_pressgang: 30,
+    fleet_undertow: 30,
+    fleet_boss_fathom: 30,
+    fleet_reckoning: 30,
+    fleet_regret: 30,
+    fleet_line: 30,
+    fleet_seventeen: 30,
+    // NOT A SHIP. The Last Harbour is a mooring wall of fused wrecks, and at 30 the split filed four
+    // storeys of lit windows under "her canvas" — a player aiming at sails would have been tapping a
+    // building. Raised until only the broken masts along its top are rigging.
+    fleet_boss_harbour: 60,
 };
 
 /** The player's own boat, keyed by FORM tier (1-11). Mirrors the sailing scene's own deck placement. */
