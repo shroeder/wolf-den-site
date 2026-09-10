@@ -989,9 +989,9 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     const items = free.slice(0, Math.min(free.length, finds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
-    // petStamina comes from the caller: every owned seafaring pet adds a dig, capped at +4 across the whole
-    // menagerie. A count rather than a percentage, so stacking converges instead of compounding. Passed in
-    // because newBoard is synchronous and the lookup is a query.
+    // petStamina comes from the caller: every owned seafaring pet adds digs, and since 2026-09-10 there is
+    // NO ceiling on the total — see SYSTEM_PASSIVE_CAP, which no longer holds a seafaring entry and which
+    // records what a full collection is worth. Passed in because newBoard is synchronous and it is a query.
     // Deep Ballast buys four more digs; Twice-Landed makes landfall twice, which is a second board's worth of
     // digging on the same island rather than a second island — the board is the island, so doubling the budget
     // is what "twice" means here.

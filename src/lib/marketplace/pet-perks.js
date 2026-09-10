@@ -446,13 +446,17 @@ function perkDescRaw(key, v, level = 1) {
         case "petXp": return `+${v}% pet XP from tending your farm while equipped`;
         case "angling": return `+${v} angling — your casts hook better fish`;
         case "reelStrength": return `+${v} reel strength — big fish are far less likely to break the line`;
-        // ── AND IT SAYS THE CAP, BECAUSE THE CAP IS THE WHOLE STORY ─────────────────────────────────────
-        // SYSTEM_PASSIVE_CAP holds seafaring at 4 for the entire owned collection, so once you are at four
-        // every further sea pet adds exactly nothing to it. GrayKitsune, who owns four of the six: "I obtained
-        // a Jellyfish which gives +4 Seafaring and pet stats still only say +4.. and I also stayed at the same
-        // amount of total digs as I had before obtaining the pet." He read a card promising +4 and a total
-        // that did not move, and correctly filed it as a bug. It is the cap, and the card never mentioned it.
-        case "seafaring": return `+${v} dig stamina on every voyage — that many more holes before you are done (capped at +${SYSTEM_PASSIVE_CAP.seafaring} across your whole collection)`;
+        // ── THERE IS NO CEILING ON THIS ONE ANY MORE ────────────────────────────────────────────────────
+        // ⚠️ THIS LINE USED TO END "(capped at +4 across your whole collection)" AND THAT WAS THE PROBLEM
+        // BEING DESCRIBED RATHER THAN THE ANSWER TO IT. GrayKitsune, who owns four of the six seafaring
+        // pets: "I obtained a Jellyfish which gives +4 Seafaring and pet stats still only say +4.. and I
+        // also stayed at the same amount of total digs as I had before obtaining the pet." He filed that
+        // as a bug, was told it was the cap working, said it again, was told again, and said it a third
+        // time. Luke's call, in the end: "seafaring is capped but shouldn't be."
+        //
+        // So every sea pet counts now, and this sentence says so. See SYSTEM_PASSIVE_CAP for what a full
+        // collection is actually worth, which is a great deal.
+        case "seafaring": return `+${v} dig stamina on every voyage — that many more holes before you are done, and every seafaring pet you own adds its own`;
         // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────
         // Every one states the exact number and exactly what it changes. "+2 seed luck" tells a member nothing;
         // "1 harvest in 12 comes up double" tells them whether they want it.
@@ -627,14 +631,27 @@ export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 export const SYSTEM_PASSIVE_STATS = new Set([
     "seedLuck", "growSpeed", "petXp",   // farm
     "angling", "reelStrength",          // fishing
-    "seafaring",                        // sailing — dig stamina, a capped resource so stacking converges
+    "seafaring",                        // sailing — dig stamina, UNCAPPED since 2026-09-10, see below
 ]);
 // Ceilings on the OWNED total. A full collection at Lv5 with an aura lands near 29 on the farm stats today, so
 // 30 keeps a complete menagerie at roughly its current best while stopping a future pet from pushing past it.
 export const SYSTEM_PASSIVE_CAP = {
     seedLuck: 30, growSpeed: 30, petXp: 30, angling: 25, reelStrength: 25,
-    // Stamina is DIGS, not a percentage — a whole collection adds at most four extra digs a trip.
-    seafaring: 4,
+    // ── ⚠️ SEAFARING IS DELIBERATELY ABSENT, AND THAT IS A DECISION, NOT AN OMISSION ──────────────────
+    // It was 4. GrayKitsune reported the +4 ceiling three times — "seafaring on pets is not working
+    // correctly and seems capped at 4" — and was told, by me, in the bugs channel, that it was a
+    // deliberate ceiling and not a fault. Luke: "seafaring is capped but shouldn't be." He is the one
+    // who decides that, so the entry is gone and the sum is whatever the collection is worth.
+    //
+    // ⚠️ WHAT THAT IS WORTH, MEASURED, because the number is large and the next person to read this
+    // should not have to find it out from a dig: six pets carry seafaring — tropical fish +1, squid +4,
+    // jellyfish +4, octopus +6, sea serpent +6, kraken +9 — which is +30 for a complete set at level one
+    // and +60 at level five, where the passive multiplier is x2. The base budget is 12 digs plus up to
+    // +10 from the Excavation track, so a finished collection roughly QUADRUPLES a maxed captain's dig.
+    //
+    // If that turns out to be too much, this is the whole dial: put `seafaring: 25` back and it lines up
+    // with angling and reelStrength. Nothing else needs touching — capSystemPerk and the menagerie
+    // aura's Long Table multiplier both read this table and only this table.
 };
 
 export const SYSTEM_PERK_KEYS = new Set([
