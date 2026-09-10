@@ -14,7 +14,13 @@ import { Haptic, unlock } from "@/components/arena/arena-audio.js";
 // gold is what a member already thinks in, so it is printed under every price. It is not a second currency
 // being asked for; it is the same number in a unit you can feel.
 
-export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
+// ⚠️ IT TAKES TOKENS, AND IT WAS BEING HANDED CHIPS. The shelf has been priced in tokens since
+// migration 436 — chipShelf returns the token balance as `balance` — but this component preferred a
+// `chips` prop over it, so the number on the till and every "can you afford it" check were reading the
+// wrong purse. They matched only because the migration seeded one from the other; the first spin pulled
+// them apart. Luke, looking at the Counter: "did we update to be tokens?" The prices had. The screen had
+// not, and underneath the label it was doing arithmetic with fuel.
+export default function ChipStore({ tokens, onBuy, onRefresh, single = false }) {
     const [shelf, setShelf] = useState(null);
     const [busy, setBusy] = useState(null);
     const [said, setSaid] = useState(null);
@@ -82,7 +88,7 @@ export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
             setSaid({ good: true, text: `${r.name} is yours.` });
             Cas.jackpot(); Haptic.crit();
         } else {
-            setSaid({ good: false, text: r?.error === "not_enough_chips" ? "Not enough chips for that."
+            setSaid({ good: false, text: r?.error === "not_enough_chips" ? "Not enough tokens for that."
                 : r?.error === "already_owned" ? "You already have that one."
                 // Not a failure — the opposite. They have finished the band this page draws from, and being
                 // told "that did not go through" for that is the machine blaming you for being good at it.
@@ -104,8 +110,8 @@ export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
     return (
         <div className="cs">
             <div className="cs-head">
-                <b>{Number(chips ?? shelf?.balance ?? 0).toLocaleString()}</b>
-                <i>chips</i>
+                <b>{Number(tokens ?? shelf?.balance ?? 0).toLocaleString()}</b>
+                <i>tokens</i>
             </div>
             <p className="cs-intro">Won at the machines. Good here and nowhere else.</p>
 
@@ -187,7 +193,7 @@ export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
                                 <>
                                     <b>{item.price.toLocaleString()}</b>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src="/images/casino/hud-chip.webp" alt="chips" width={16} height={16} />
+                                    <img src="/images/casino/hud-chip.webp" alt="tokens" width={16} height={16} />
                                 </>
                             )}
                         </span>
@@ -234,10 +240,10 @@ export default function ChipStore({ chips, onBuy, onRefresh, single = false }) {
                             disabled={Boolean(busy) || open.owned || !open.afford}
                             onClick={() => buy(open)}>
                             {open.owned ? "You already have this"
-                                : !open.afford ? `${(open.price - (chips ?? shelf.balance ?? 0)).toLocaleString()} more chips needed`
+                                : !open.afford ? `${(open.price - (tokens ?? shelf.balance ?? 0)).toLocaleString()} more tokens needed`
                                 : busy === open.id ? "…"
-                                : open.kind === "stat" ? `Train — ${open.price.toLocaleString()} chips`
-                                : `Take it — ${open.price.toLocaleString()} chips`}
+                                : open.kind === "stat" ? `Train — ${open.price.toLocaleString()} tokens`
+                                : `Take it — ${open.price.toLocaleString()} tokens`}
                         </button>
                     </div>
                 </div>

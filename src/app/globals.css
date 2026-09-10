@@ -17764,6 +17764,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    warm one, so which is which lands before either is read. See tokens.js. */
 .cas-purse { display: inline-block; text-align: right; line-height: 1.15; }
 .cas-purse-tok { display: block; font-weight: 800; color: #7fe0ff; }
+/* ⚠️ IN THE PANEL HEADER THE TWO RAN TOGETHER: "26,716 25,884 tokens" on one line, with only a sprite
+   to say which was which. .cas-purse-sm is an inline-flex row, so the block above became a flex ITEM beside
+   the chip figure instead of a line under it. It wraps to its own line here, right-aligned under the chips,
+   which is the same shape the floor header already uses. Two currencies that are never added must never
+   look like one number with a space in it. */
+.cas-purse-sm { flex-wrap: wrap; justify-content: flex-end; row-gap: 1px; }
+.cas-purse-sm .cas-purse-tok { flex: 1 0 100%; text-align: right; font-size: 0.82em; }
 .cas-purse-tok i { color: #6a93a3; }
 
 /* ── BUYING CHIPS ─────────────────────────────────────────────────────────────────────────────────────────

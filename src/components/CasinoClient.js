@@ -143,7 +143,7 @@ const MACHINES = [
     // At the far end, past every machine, which is where a cashier's window belongs: you walk the whole
     // floor to reach it and you pass everything you could have been playing on the way back. It is the only
     // thing in the room that is not a game, and the only place chips are worth anything.
-    { id: "store", x: 92, label: "The Counter", kind: "Chips", live: true },
+    { id: "store", x: 92, label: "The Counter", kind: "Tokens", live: true },
 ];
 
 // Where the rope is: on the wall's SECOND arch, which lands at 11.8% of the world once both the world and
@@ -1574,7 +1574,7 @@ export default function CasinoClient({ initial }) {
     // everybody else is concerned.
     if (vip) {
         return (
-            <VipLounge state={vip} chips={st?.chips} me={st?.me}
+            <VipLounge state={vip} chips={st?.chips} tokens={st?.tokens} me={st?.me}
                 onChips={(n) => setSt((p) => ({ ...p, chips: n }))}
                 onClose={() => setVip(null)} />
         );
@@ -1719,7 +1719,7 @@ export default function CasinoClient({ initial }) {
                         // He names BOTH ways past him, because there are two and one of them is buyable:
                         // the role is real money spent, and the pass is a million chips at the Counter. A
                         // door that only says no is a dead end; this one is a price.
-                        setErr("The doorman does not move. \u201cMembers, or a pass. The Counter sells one \u2014 a million chips.\u201d");
+                        setErr("The doorman does not move. \u201cMembers, or a pass. The Counter sells one \u2014 a million tokens.\u201d");
                     }}>
                     {/* Inside the arch. The people are real \u2014 their own avatars, at their own positions in
                         the lounge \u2014 pushed back with a dark wash and a little scale so they read as being
@@ -1920,10 +1920,17 @@ export default function CasinoClient({ initial }) {
                             page and unreachable from a seat, so the coin figure up here answered a question
                             nobody sitting down can act on. "balance still showing coin for many slots when
                             it isnt relevant." One sprite, one number, and it is the one the bet comes from. */}
+                        {/* ⚠️ AND NOW THERE ARE TWO NUMBERS AGAIN, FOR A DIFFERENT REASON THAN LAST TIME.
+                            The coin figure was removed from here because gold is spent at the cage and a
+                            player in a seat cannot act on it. Tokens are the opposite: they are what this
+                            machine is PAYING, they change on the spin you are watching, and the Counter is
+                            the only place they go. A machine that shows you what it takes and hides what it
+                            gives is a machine you cannot tell you are winning at. See tokens.js. */}
                         <span className="cas-purse-sm">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/casino/hud-chip.webp" alt="" width={15} height={15} />
                             <b className="cas-purse-chips">{money(st?.chips)}</b>
+                            <b className="cas-purse-tok">{money(st?.tokens)}<i>tokens</i></b>
                         </span>
                     </div>
 
@@ -2151,7 +2158,7 @@ export default function CasinoClient({ initial }) {
                         there is no state in which the screen and the paytable disagree about which game
                         this is. */}
                     {at.live && at.id === "store" ? (
-                        <ChipStore chips={st?.chips} onBuy={buyChip} onRefresh={shelf} />
+                        <ChipStore tokens={st?.tokens} onBuy={buyChip} onRefresh={shelf} />
                     ) : at.live && SLOTS5[at.id] ? (
                         <Slot5
                             machineId={at.id}

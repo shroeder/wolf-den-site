@@ -76,7 +76,10 @@ const WALK_PER_SEC = 46;
 // which is a sprite teleporting rather than a person moving.
 const WALK_TICK_MS = 40;
 
-export default function VipLounge({ state, chips, me, onClose, onChips }) {
+// ⚠️ BOTH PURSES. The vendor behind the rope sells off the Counter's shelf, which is priced in
+// TOKENS — so the number beside the door has to be the one the till will actually take. `chips` still
+// comes in because the lounge's own tables are played with them. See tokens.js and migration 436.
+export default function VipLounge({ state, chips, tokens, me, onClose, onChips }) {
     const [st, setSt] = useState(state || null);
     const [x, setX] = useState(24);
     const [facing, setFacing] = useState(1);
@@ -323,9 +326,9 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
             <header className="vip-top">
                 <button type="button" className="vip-out" onClick={onClose}>← The floor</button>
                 <b>The Lounge</b>
-                <span className="vip-purse">{Number(chips || 0).toLocaleString()}
+                <span className="vip-purse">{Number(tokens || 0).toLocaleString()}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/images/casino/hud-chip.webp" alt="chips" width={14} height={14} />
+                    <img src="/images/casino/hud-chip.webp" alt="tokens" width={14} height={14} />
                 </span>
             </header>
 
@@ -471,7 +474,7 @@ export default function VipLounge({ state, chips, me, onClose, onChips }) {
                     <div className="vip-modal-body">
                         <h4>Sable opens the case</h4>
                         <p className="vip-said">Three of them. Nobody out on the floor can have these.</p>
-                        <ChipStore chips={chips} onBuy={buy} onRefresh={shelf} single />
+                        <ChipStore tokens={tokens} onBuy={buy} onRefresh={shelf} single />
                     </div>
                   </div>
                 </div>
