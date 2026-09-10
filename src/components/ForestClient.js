@@ -350,6 +350,16 @@ export default function ForestClient() {
                     mask-composite: intersect; }
                 /* The stump is die-cut and sits in the middle of its cell — masking it just eats the bark. */
                 .fr-patch.is-bare img { -webkit-mask-image: none; mask-image: none; }
+                /* ⚠️ EVERY PATCH ALTERNATES, BECAUSE THERE ARE SIX PATCHES AND EIGHT KINDS OF TREE. Two birches
+                   next to each other were the same picture twice, down to the knot holes, and a stand with a
+                   visible copy-paste in it stops being a wood. Mirroring every even cell means any two NEIGHBOURS
+                   — and the two diagonals a six-cell grid can pair up — are never the same image, whatever grew
+                   there. Mirrored rather than nudged because the light shafts in these run close to vertical, so
+                   flipping one costs nothing the eye can catch, while a few pixels of crop shift would not have
+                   been enough to break the twin. The brightness jitter is the second layer of the same trick. */
+                .fr-patch:nth-child(even) img { transform: scaleX(-1); }
+                .fr-patch:nth-child(3n) img { filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)) brightness(.93) saturate(1.06); }
+                .fr-patch:nth-child(4n) img { filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)) brightness(1.06); }
                 .fr-patch.is-bare { cursor: default; animation: none; }
                 .fr-patch.is-bare img { opacity: .6; object-fit: contain; aspect-ratio: 3 / 4; }
                 .fr-patch:not(.is-bare):hover img { filter: drop-shadow(0 6px 14px rgba(0,0,0,.8)) brightness(1.12); }
