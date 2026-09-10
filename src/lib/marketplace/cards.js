@@ -3,7 +3,7 @@ import "server-only";
 export { grantForRoom, takePerk } from "@/lib/marketplace/cards-kit.js";
 import { db } from "@/lib/db";
 import { buildFinalMap, buildMap, reachable, resolveUnknown } from "@/lib/marketplace/cards-map.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { isOwner, isStaff } from "@/lib/marketplace/owner.js";
 import { ladderFoe, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import {
     ACTS, ALL_CARDS, BASIC_UNLOCKS, BOSS_PERKS, BOSS_PERK_IDS, CARDS, FOE_SCRIPTS, PERKS, PERK_IDS, POOL,
@@ -27,7 +27,34 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 // isOwner — the hardcoded single-account key for unreleased features, deliberately NOT hasOwnerStanding, which
 // answers "does this person run the shop" and would let three people into a prototype. On launch day this
 // becomes `Boolean(buyerId)` and that is the whole flip.
-export const CARDS_UNLOCKED = (buyerId) => isOwner(buyerId);
+// ── WHO CAN OPEN THE CARD GAME ───────────────────────────────────────────────
+// Luke: "lets open the card game up to testers."
+//
+// The house and anybody holding the Tester role — five rewarded bug reports, the bug_hunter rung, see
+// ROLES.tester. Staff come too: Eric is in the testing room and inviting somebody to test a thing they
+// cannot open is not an invitation.
+//
+// ⚠️ IT IS ASYNC NOW, AND EVERY CALLER HAD TO LEARN THAT. A role lives in the database, so this stopped
+// being a pure function the moment it stopped being a hardcoded list. The note in hud/route.js already
+// says why the rule lives HERE and is imported rather than copied: "on launch day CARDS_UNLOCKED becomes
+// Boolean(buyerId) in one place, and a second copy of the rule in the menu would keep the door shut for
+// everyone after the page had opened." That is the door and the play path — they are separate gates and
+// they must move together.
+//
+// ⚠️ AND IT IS ON THE HUD, WHICH BILLS ON EVERY NAVIGATION BY EVERY MEMBER. The owner check short-
+// circuits first and costs nothing; everybody else pays ONE indexed existence check against
+// mkt_user_badge, which is the narrowest question that answers this. Do not widen it into standingFor
+// here — that is four reads for a boolean, on the one component the chrome-fanout rule exists to protect.
+// See npm run check:chrome.
+export async function CARDS_UNLOCKED(buyerId) {
+    if (!buyerId) return false;
+    if (isOwner(buyerId) || isStaff(buyerId)) return true;
+    const row = await db.queryOne(
+        `SELECT 1 AS ok FROM mkt_user_badge WHERE buyer_id = $1 AND badge_slug IN ('bug_hunter', 'staff', 'owner') LIMIT 1`,
+        [buyerId],
+    ).catch(() => null);
+    return Boolean(row);
+}
 
 // ── EVERY FACE IN THIS FIGHT IS ART WE ALREADY PAID FOR ──────────────────────────────────────────────────
 // The cards are pets: 118 of them are drawn and sitting in mkt_pet_sprite. The foe is one of the hundred named

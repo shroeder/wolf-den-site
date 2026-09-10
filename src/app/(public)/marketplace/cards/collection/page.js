@@ -22,7 +22,7 @@ export const metadata = {
 export default async function CardCollectionPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards/collection");
-    if (!CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
+    if (!await CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
 
     const [have, art, progress] = await Promise.all([
         ownedPetIds(buyer.id),

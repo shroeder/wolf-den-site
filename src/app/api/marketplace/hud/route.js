@@ -94,7 +94,7 @@ export async function GET(request) {
             // The cards prototype, owner-only. The gate is IMPORTED rather than re-written as isOwner(id) here:
             // on launch day CARDS_UNLOCKED becomes Boolean(buyerId) in one place, and a second copy of the rule
             // in the menu would keep the door shut for everyone after the page had opened.
-            cards: CARDS_UNLOCKED(id),
+            cards: await CARDS_UNLOCKED(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
             mine: {
                 unlocked: Boolean(mining?.unlocked),

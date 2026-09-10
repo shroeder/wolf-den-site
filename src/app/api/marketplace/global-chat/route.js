@@ -58,7 +58,8 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ ok: false, error: "not_signed_in" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
-            const res = await sendTownChat(buyer.id, body?.body, body?.channel || "global");
+            const res = await sendTownChat(buyer.id, body?.body, body?.channel || "global",
+                { imageUrl: body?.imageUrl || null });
             return NextResponse.json(res, { status: res.ok ? 200 : 400 });
         } catch (error) {
             return internalError(error, { event: "marketplace.global_chat.send.failure" });

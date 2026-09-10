@@ -814,6 +814,8 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
     }, []);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
+    // The screenshot waiting to go with the next message, in the one room that takes them.
+    const [pic, setPic] = useState(null);
     const [note, setNote] = useState("");   // why the last message was refused
     const endRef = useRef(null);
     // Whether we have already dropped this thread to its newest message once. A ref, not state: flipping it
@@ -894,22 +896,44 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
         scrollToEndIfPinned(endRef, true);
     }, [messages]);
 
+    // ── A SCREENSHOT GOES WITH THE MESSAGE ───────────────────────────────────────
+    // Two requests: the file goes to the blob store first and the message carries the URL it came back
+    // with. Uploading on SEND rather than on PICK, so choosing a file and then changing your mind costs
+    // nothing and leaves nothing behind — and so the picture and the words arrive as one message or as
+    // neither, which is what stops a bug room filling with orphan screenshots nobody captioned.
     async function send(e) {
         e.preventDefault();
         const body = input.trim();
         if (!body || sending) return;
         setNote("");
         setSending(true);
+        let imageUrl = null;
+        if (pic) {
+            const form = new FormData();
+            form.append("file", pic);
+            form.append("channel", channel);
+            const up = await fetch("/api/marketplace/chat-image", { method: "POST", body: form }).catch(() => null);
+            const ud = up && up.ok ? await up.json().catch(() => null) : null;
+            if (!ud?.url) {
+                const why = ud?.error || (up ? "upload_failed" : "offline");
+                setSending(false);
+                setNote(why === "too_big" ? "That picture is over 4MB — try a screenshot rather than a photo."
+                    : why === "not_an_image" ? "That is not a picture the room can show."
+                        : "The picture did not go up. The message was not sent.");
+                return;
+            }
+            imageUrl = ud.url;
+        }
         const r = await fetch("/api/marketplace/global-chat", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ body, channel }),
+            body: JSON.stringify({ body, channel, imageUrl }),
         }).catch(() => null);
         if (r && r.ok) {
             // Sending is talking: the room is live again, so drop straight back to the 12s cadence rather than
             // leaving the person who just spoke waiting 36s to see a reply.
             quiet.current = 0; tick.current = 0;
-            setInput(""); setNote(""); await load(); scrollToEndIfPinned(endRef, true);
+            setInput(""); setPic(null); setNote(""); await load(); scrollToEndIfPinned(endRef, true);
         } else {
             // ── A REFUSED MESSAGE HAS TO SAY SO ──────────────────────────────────────────────────────────
             // This branch did nothing at all: the text stayed in the box, nothing moved, and the only reading
@@ -1042,6 +1066,17 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                                 {m.notice
                                     ? <NoticeBody body={m.body} className="gchat-body" />
                                     : <span className="gchat-body" title={relTime(m.at)}>{m.body}</span>}
+                                {/* A tester's screenshot. Opens full size in a tab rather than in a
+                                    lightbox nobody asked for — the thing you want to do with a bug
+                                    screenshot is look at it properly, and the browser is already good
+                                    at that. eslint-disable: these are blob URLs from our own store and
+                                    next/image cannot size a picture it has never seen. */}
+                                {m.image ? (
+                                    <a className="gchat-pic" href={m.image} target="_blank" rel="noreferrer">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={m.image} alt="" loading="lazy" />
+                                    </a>
+                                ) : null}
                             </span>
                         </div>
                         );
@@ -1073,6 +1108,15 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                     maxLength={channel === "bugs" ? 400 : 200}
                     autoCapitalize="sentences"
                 />
+                {/* Only where the server will accept one — see IMAGE_CHANNELS in town.js. The picker is a
+                    courtesy, not the lock: the upload route checks the room and the membership itself. */}
+                {channel === "testing" ? (
+                    <label className="social-pic" title="Attach a screenshot">
+                        {pic ? "\u2713" : "\uD83D\uDCF7"}
+                        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                            onChange={(e) => setPic(e.target.files?.[0] || null)} />
+                    </label>
+                ) : null}
                 <button type="submit" className="btn-gold" disabled={sending || !input.trim()}>Send</button>
             </form>
         </div>

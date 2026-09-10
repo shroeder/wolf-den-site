@@ -23598,3 +23598,17 @@ body.cas-seated .social-fab { display: none; }
    like the paid no-op it replaces. */
 .quest-note { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; font-size: 0.78rem; line-height: 1.4;
   color: #ffd9a8; background: rgba(255,176,60,0.1); border: 1px solid rgba(255,176,60,0.28); }
+
+/* ── A SCREENSHOT IN THE TESTING ROOM ────────────────────────────────────────────────────────────────────
+   Capped rather than full-bleed: a phone screenshot is 1200px tall and a message that fills the room is a
+   message nobody can scroll past. Tap it and the browser opens it properly, which is the thing you actually
+   want to do with a bug report. */
+.gchat-pic { display: block; margin-top: 6px; }
+.gchat-pic img { display: block; max-width: min(240px, 100%); max-height: 220px; width: auto; height: auto;
+    border-radius: 10px; border: 1px solid #2a3242; object-fit: cover; }
+/* The picker is a chip beside Send, not a second button competing with it — the message is still the point
+   and the picture is the attachment. It shows a tick once something is chosen, because a file input that
+   looks identical before and after you pick is how people send the same screenshot twice. */
+.social-pic { flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px;
+    border-radius: 10px; border: 1px solid #2a3242; background: #151a24; cursor: pointer; font-size: 16px; }
+.social-pic input { display: none; }

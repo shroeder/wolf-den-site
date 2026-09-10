@@ -35,7 +35,7 @@ export default async function CardsPage({ searchParams }) {
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cards");
     // Owner-gated while it is a prototype. A member who wanders in goes back to the town rather than meeting a
     // half-built game — the same bounce the mine and the kitchen used before they opened.
-    if (!CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
+    if (!await CARDS_UNLOCKED(buyer.id)) redirect("/marketplace/town");
 
     const q = await searchParams;
     const asked = Number.parseInt(q?.seed, 10);

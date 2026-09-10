@@ -1,0 +1,13 @@
+-- ── A MESSAGE CAN CARRY A PICTURE ────────────────────────────────────────────────────────────────────────────
+-- Luke, opening the card game to testers: "for the tester channel, allow them to upload images as part of
+-- their messages. you and I will use that to iterate and fix."
+--
+-- ⚠️ THIS IS THE WHOLE POINT OF THE ROOM. Every card-game fix in the last two days started with a screenshot
+-- Luke took on his phone and pasted into a chat — the buried HUD bar, the mana gem sitting on the belt, the
+-- unreadable strength number, the shelf that would not open. Not one of them was diagnosable from prose:
+-- "the top bar looks wrong" is a feeling, and a 369px screenshot with the gem overlapping the pouch is a
+-- measurement. Asking testers to describe a layout bug in words is asking them to do the hard half badly.
+--
+-- One nullable column. A message is still a message — the body stays required, so a picture is an ATTACHMENT
+-- to something somebody said rather than a post of its own, which is what keeps a bug room readable.
+ALTER TABLE mkt_town_chat ADD COLUMN IF NOT EXISTS image_url TEXT;

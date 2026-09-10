@@ -33,7 +33,7 @@ export async function POST(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ error: "not_signed_in" }, { status: 401 });
-            if (!CARDS_UNLOCKED(buyer.id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
+            if (!await CARDS_UNLOCKED(buyer.id)) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");

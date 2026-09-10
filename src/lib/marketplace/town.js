@@ -670,7 +670,21 @@ export async function contributeTownProject(buyerId, projectId, amount) {
 
 // Post a chat message that pops as a speech bubble over your avatar for everyone in the plaza (owner-gated
 // during the build). Trimmed + length-capped; empties are dropped.
-export async function sendTownChat(buyerId, body, channel = "global") {
+// ── WHICH ROOMS TAKE A PICTURE ────────────────────────────────────────────────
+// Luke: "for the tester channel, allow them to upload images as part of their messages."
+//
+// Just the one room, deliberately. The plaza is 200 characters and a fast scroll; a room where anybody can
+// paste an image is a different kind of room and moderating it is a job nobody has. The testing room is six
+// named people who are there to file bugs, which is the one place where a picture IS the report — every
+// card-game fix this week started with a screenshot, because "the top bar looks wrong" is a feeling and a
+// 369px shot with the gem overlapping the pouch is a measurement.
+//
+// The bug room is the obvious next candidate and is deliberately NOT included yet: it is public, and the
+// difference between six testers and the whole Den is the entire moderation question.
+export const IMAGE_CHANNELS = new Set(["testing"]);
+export const canPostImage = (channel) => IMAGE_CHANNELS.has(String(channel || ""));
+
+export async function sendTownChat(buyerId, body, channel = "global", { imageUrl = null } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
 
     // ── THE PRIVATE ROOMS ARE CHECKED HERE, NOT ONLY WHERE THEY ARE DRAWN ────────────────────────────────
@@ -731,7 +745,17 @@ export async function sendTownChat(buyerId, body, channel = "global") {
         if ((burst?.n || 0) >= 6) return { ok: false, error: "too_fast" };
     }
 
-    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body, channel) VALUES ($1, $2, $3)`, [buyerId, text, chan]).catch(() => {});
+    // ⚠️ THE URL IS ONLY TRUSTED IF THE ROOM TAKES ONE. It arrives in a POST body like the channel name
+    // does, and the same argument applies: a tab that only draws a file picker for the testing room is a
+    // hidden door, not a locked one. Checked against the room the write is actually landing in, after the
+    // channel itself has been validated — so a picture aimed at the plaza is dropped rather than stored.
+    // The upload route is the other half and checks membership before it ever reaches the blob store.
+    const pic = canPostImage(chan) && typeof imageUrl === "string" && /^https:\/\//.test(imageUrl)
+        ? imageUrl.slice(0, 500) : null;
+    await db.query(
+        `INSERT INTO mkt_town_chat (buyer_id, body, channel, image_url) VALUES ($1, $2, $3, $4)`,
+        [buyerId, text, chan, pic],
+    ).catch(() => {});
     await trackActivity(buyerId, "town_chat", { channel: chan, length: text.length }).catch(() => {});
     // Chatting pays NOTHING. It used to tick a "send 5 chats" daily, which turned the Den's global feed into
     // five identical wolf emoji from whoever wanted the 80 gold. See the note in town-quests.js.
@@ -965,7 +989,10 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
     // The plaza query is deliberately cached for the whole room — one join per poll for everybody. A private
     // room's answer depends on WHO IS ASKING (their join date), so caching it under a shared key would serve
     // one member's window to the next. Global keeps the shared read; vip and staff take their own.
-    const sql = `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind, c.channel,
+    // ⚠️ image_url arrives in migration 438 and the LEGACY query below deliberately does not name it —
+    // same reason c.channel is absent from that one. For the minutes between this code serving and the
+    // column landing, asking for it throws, and the fallback is the thing that has to still work.
+    const sql = `SELECT c.id, c.body, c.created_at, c.buyer_id, c.kind, c.channel, c.image_url,
                 b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.role, b.xp
            FROM mkt_town_chat c
            JOIN mkt_buyer b ON b.id = c.buyer_id
@@ -1005,6 +1032,8 @@ export async function getGlobalChat(buyerId = null, limit = 40, channel = "globa
     return rows.slice().reverse().filter((r) => !(hideMilestones && r.kind === "milestone")).map((r) => ({
         id: String(r.id),
         body: r.body,
+        // Null on every message that is not a tester's screenshot — see IMAGE_CHANNELS.
+        image: r.image_url || null,
         at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
         alias: r.alias || null,
         // Fall back to the @handle before the generic "Wolf" — the plaza roster already does this, and skipping it
