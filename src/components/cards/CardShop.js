@@ -12,6 +12,7 @@ import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
 import { POTIONS, beltSize, cardById, perkById, removalCost } from "@/lib/marketplace/cards-kit.js";
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 
 // ── THE MERCHANT ─────────────────────────────────────────────────────────────────────────────────────────
 // Luke, looking at the first cut: "the merchant looks nothing like it, it doesn't Slay the Spire."
@@ -102,6 +103,16 @@ export default function CardShop({ run, art = {} }) {
     // the tap that would have told you was the tap that spent the embers. Every price on this screen is most
     // of a run's income and every purchase is final, so the shelf opens the thing first and buys second.
     const [look, setLook] = useState(null);
+// ── ⚠️ THE GOLD WORDS DID NOTHING ON THIS SCREEN ─────────────────────────────────
+// From the testing room: "What is Exhaust, Intangible, Artifact? There is no rollover text for the terms
+// to explain them." He met all three on the merchant's shelf, where the words are painted gold and are
+// not buttons — CardFace only makes them pressable when it is handed onKey, and only two screens in the
+// game ever handed it one.
+//
+// The rule CardFace states is that a face being DRAGGED must not carry buttons, because a button eats the
+// drag. That is the fight's hand and nothing else. Every screen where a card is sitting still to be READ
+// should explain its own words, which is most of them.
+    const [keyWord, setKeyWord] = useState(null);
 
     const embers = run.embers || 0;
     const stock = run.shop?.stock || [];
@@ -240,7 +251,7 @@ export default function CardShop({ run, art = {} }) {
                                     >
                                         {item.sale && !gone ? <span className="cs-flag">Sale</span> : null}
                                         <span className="cf-card">
-                                            <CardFace card={card} art={art[card.pet]} dim={poor && !gone} />
+                                            <CardFace card={card} art={art[card.pet]} dim={poor && !gone} onKey={setKeyWord} />
                                         </span>
                                         <PriceTag price={item.price} sold={gone} sale={item.sale} poor={poor} was={item.was} />
                                     </button>
@@ -308,7 +319,7 @@ export default function CardShop({ run, art = {} }) {
                     <div className="cs-look-in">
                         <div className="cs-look-art">
                             {shownCard ? (
-                                <span className="cf-card"><CardFace card={shownCard} art={art[shownCard.pet]} /></span>
+                                <span className="cf-card"><CardFace card={shownCard} art={art[shownCard.pet]} onKey={setKeyWord} /></span>
                             ) : (
                                 <Sprite className="cs-look-obj" src={goodsArt(shown)} />
                             )}
@@ -412,7 +423,7 @@ export default function CardShop({ run, art = {} }) {
                                 <button key={`${id}-${i}`} type="button" className="cs-buy" disabled={busy}
                                     aria-label={`Burn ${c.name}`}
                                     onClick={() => burnCard(id, i)}>
-                                    <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
+                                    <span className="cf-card"><CardFace card={c} art={art[c.pet]} onKey={setKeyWord} /></span>
                                 </button>
                             );
                         })}
@@ -434,6 +445,7 @@ export default function CardShop({ run, art = {} }) {
                 card game's own `.cf-` prefix. */}
             <CardFoot label="Move on" busy={busy} onClick={() => post({ action: "leave" })} />
 
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
             <style jsx global>{`
                 ${DECK_GRID_CSS}
                 .cs { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;

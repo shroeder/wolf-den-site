@@ -3191,8 +3191,19 @@ export const cardById = (id) => {
 // is how a hand gets read at speed: you are not reading sentences, you are spotting the two words that decide
 // the turn. Kept here rather than in the card component because the rules own the vocabulary; a screen that
 // invented its own list would drift the moment a card added a keyword.
+// ⚠️ THREE MECHANICS WERE WRITTEN AS PROSE AND EXPLAINED NOWHERE. From the testing room, first night:
+// "What is Exhaust, Intangible, Artifact? There is no rollover text for the terms to explain them."
+// Two of those had notes and were simply unreachable on the screen he was looking at — fixed by handing
+// onKey to every face that is sitting still. The third had no note at all, and a sweep of every card face
+// for capitalised words with nothing behind them found two more of the same kind:
+//     Exhaust      27 cards
+//     Unplayable   11 cards
+//     Ethereal      2 cards
+// All three are rules you have to know to plan a turn, and all three were ordinary black text. They are
+// gold and pressable now, from the same one list the rest come off.
 export const KEYWORDS = ["Block", "Vulnerable", "Weak", "Frail", "Strength", "Dexterity",
-    "Poison", "Artifact", "Regeneration", "Intangible", "Curse"];
+    "Poison", "Artifact", "Regeneration", "Intangible", "Curse",
+    "Exhaust", "Unplayable", "Ethereal"];
 
 // ── AND WHAT EACH OF THEM ACTUALLY DOES ──────────────────────────────────────────────────────────────────
 // The face has painted these eleven words gold since the day it was written, which tells a player that the
@@ -3217,6 +3228,9 @@ export const KEYWORD_TEXT = {
     Regeneration: "Heals its number at the end of the turn, then drops by one.",
     Intangible: "While it lasts, every hit that lands is cut to 1 damage, however hard it was thrown.",
     Curse: "A card that cannot be played and does nothing good. The harm is the slot it takes up in the hand you drew.",
+    Exhaust: "The card is gone for the rest of this fight once it is played — not into the discard, out of the deck entirely. It comes back for the next fight.",
+    Unplayable: "It cannot be played at all. It is in your hand to take up the space, and the only ways out of it are drawing past it or something that removes cards.",
+    Ethereal: "If it is still in your hand when the turn ends, it burns away instead of going to the discard — so it is gone for this fight unless you use it now.",
 };
 
 // ── WHAT EACH KIND OF CARD IS CALLED ─────────────────────────────────────────────────────────────────────
@@ -4056,10 +4070,11 @@ export function playCard(state, uid, targetIndex = 0) {
         // paid off: one energy to be rid of it for good, which is the only reason it is playable at all. It
         // is the same field their own exhausting cards use, so a real card wanting it later just says so.
         discard: card.exhaust ? state.discard : [...state.discard, entry],
-        // The fight is over when the LAST one is down, not the first.
-        over: (hero = stillStanding(hero, state.perks)).hp <= 0
-            ? "lose" : foes.every((f) => f.hp <= 0) ? "win" : state.over,
+        // The fight is over when the LAST one is down, not the first — settled below, by the one
+        // function that knows the rule. See settle().
+        hero: (hero = stillStanding(hero, state.perks)),
     };
+    next = settle(next);
     // Drawn AFTER the card has left the hand and reached the discard, so a card that draws cannot draw itself
     // back, and so a draw that exhausts the pile reshuffles a discard this card is already part of.
     if (card.draw) next = drawCards(next, card.draw);
@@ -4162,7 +4177,9 @@ export function drinkPotion(state, potionId) {
     }
     if (potion.energy) next.energy = (next.energy || 0) + potion.energy;
     if (potion.draw) next = drawCards(next, potion.draw);
-    return next;
+    // ⚠️ A BOTTLE CAN WIN THE FIGHT. Five of these throw damage at the whole room and nothing here
+    // asked whether it had killed the last one — the board emptied and the fight ran on. See settle().
+    return settle(next);
 }
 
 /**
@@ -4172,6 +4189,41 @@ export function drinkPotion(state, potionId) {
  * the day a forfeit costs something (a trip, a rung, the run), it will cost it here, once, rather than in
  * whichever screen happened to offer the button.
  */
+/**
+ * ── ⚠️ IS ANYBODY LEFT? ASKED IN ONE PLACE ─────────────────────────────────────
+ * From the testing room, an hour after it opened. GrayKitsune: "2 battles where the enemy vanished and
+ * then I still had a turn after where the moment I use any card it ends the battle."
+ *
+ * Exactly right, and it is three bugs of one shape. The win was decided in THREE separate places and the
+ * board can be emptied in more than three ways:
+ *
+ *     playCard      asked            — kill something with a card and the fight ends
+ *     endOfTurn     asked            — poison finishing the last one ends it
+ *     beginTurn     asked (hourglass)
+ *     foeAct        NEVER ASKED      — a creature that kills itself on your Thorns, or dies to the poison
+ *                                      reaped on its own turn, left every foe dead and the fight running
+ *     drinkPotion   NEVER ASKED      — a Cinder Flask or an Ember Shot taking the last one did the same
+ *     heroEndTurn   asked only "lose"
+ *
+ * In every one of those the corpse is removed, the board draws empty, and the next thing you do runs a
+ * path that DOES ask — which is why "the moment I use any card it ends the battle". The fight was already
+ * won; nothing had said so.
+ *
+ * ⚠️ SO EVERY PATH THAT CAN TAKE A FOE'S LAST HIT POINT GOES THROUGH HERE. Adding a fourth copy of
+ * `foes.every(f => f.hp <= 0)` would have fixed the two reported cases and left the next one to be found
+ * by a member. It is one question, so it is one function.
+ *
+ * Order matters: the hero dying is checked first, because a mutual kill is a loss. That is the rule
+ * playCard already had and it is kept.
+ */
+export const settle = (state) => {
+    if (!state || state.over) return state;
+    if ((state.hero?.hp ?? 1) <= 0) return { ...state, over: "lose" };
+    const foes = state.foes || [];
+    if (foes.length && foes.every((f) => f.hp <= 0)) return { ...state, over: "win" };
+    return state;
+};
+
 export const forfeit = (state) => (state?.over ? state : { ...state, over: "lose", gaveUp: true });
 
 /**
@@ -4407,8 +4459,10 @@ export function foeAct(state, i) {
     events.push(...reaped.events);
 
     return {
-        state: { ...stateAfterStatus, hero: (hero = stillStanding(hero, state.perks)), foes, rng,
-            over: hero.hp <= 0 ? "lose" : state.over },
+        // ⚠️ settle(), NOT `hero.hp <= 0 ? "lose"`. A creature can die on its OWN turn — on your
+        // Thorns, or to the poison reaped three lines above — and this asked only whether YOU had died.
+        // The last foe could fall here and the fight carried on. See settle().
+        state: settle({ ...stateAfterStatus, hero: (hero = stillStanding(hero, state.perks)), foes, rng }),
         events,
         acted: true,
         // What it DID, so the screen can lunge for a blow and merely raise a shield for a guard rather than
@@ -4448,11 +4502,10 @@ export function finishFoeTurn(state) {
         if (n > 0) hero = debuff(hero, field, n).unit;
     }
     const kept = state.hand.filter((entry) => !ALL_CARDS[entry.id]?.ethereal);
-    const spent = {
-        ...state, hero,
-        over: (hero = stillStanding(hero, state.perks)).hp <= 0 ? "lose" : state.over,
+    const spent = settle({
+        ...state, hero: (hero = stillStanding(hero, state.perks)),
         discard: [...state.discard, ...kept], hand: [],
-    };
+    });
     if (spent.over === "lose") return { state: spent, events: [{ type: "over", result: "lose" }] };
     return { state: beginTurn(spent), events: [] };
 }

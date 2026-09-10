@@ -26,6 +26,7 @@ import { CHOOSE, eventById } from "@/lib/marketplace/cards-events.js";
 import { CURSE_CARDS } from "@/lib/marketplace/cards-kit.js";
 import useCardSound from "@/components/cards/useCardSound";
 import { sfx } from "@/lib/marketplace/cards-sound.js";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 
 const panelFont = Cinzel({ subsets: ["latin"], weight: ["600", "700"], display: "swap" });
 
@@ -62,6 +63,16 @@ export default function CardEvent({ run, art = {} }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
     const [said, setSaid] = useState(null);
+// ── ⚠️ THE GOLD WORDS DID NOTHING ON THIS SCREEN ─────────────────────────────────
+// From the testing room: "What is Exhaust, Intangible, Artifact? There is no rollover text for the terms
+// to explain them." He met all three on the merchant's shelf, where the words are painted gold and are
+// not buttons — CardFace only makes them pressable when it is handed onKey, and only two screens in the
+// game ever handed it one.
+//
+// The rule CardFace states is that a face being DRAGGED must not carry buttons, because a button eats the
+// drag. That is the fight's hand and nothing else. Every screen where a card is sitting still to be READ
+// should explain its own words, which is most of them.
+    const [keyWord, setKeyWord] = useState(null);
     // A shrine that sharpens a card is doing what a campfire does, so it looks like what a campfire does —
     // see CardForge. Burning a card is a different act and does not borrow the ceremony.
     const [forge, setForge] = useState(null);
@@ -255,7 +266,7 @@ export default function CardEvent({ run, art = {} }) {
                                             className={`cv-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                             aria-label={`${ask.verb} ${c.name}`}
                                             onClick={() => sharpen(pending.choice, id, ask.forge)}>
-                                            <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
+                                            <span className="cf-card"><CardFace card={c} art={art[c.pet]} onKey={setKeyWord} /></span>
                                         </button>
                                     );
                                 })}
@@ -275,6 +286,7 @@ export default function CardEvent({ run, art = {} }) {
             </div>
 
             {/* Global for the same reason the campfire's is: every selector is under `.cv`. */}
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
             <style jsx global>{`
                 .cv { position: fixed; inset: 0; z-index: 4000; overflow-y: auto; overscroll-behavior: contain;
                     display: flex; flex-direction: column; align-items: center;

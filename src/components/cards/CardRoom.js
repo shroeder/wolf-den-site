@@ -14,6 +14,7 @@ import { KEYS, KEY_WHY, PERKS, POTIONS, canUpgrade, cardById, keyProgress, upgra
 import { DECK_GRID_CSS } from "@/components/cards/deck-grid.js";
 import CardGot from "@/components/cards/CardGot";
 import { KEY_OFFER_CSS, KEY_TINT, keyArt } from "@/components/cards/key-offer.js";
+import CardKeyNote from "@/components/cards/CardKeyNote";
 
 // ── THE CAMPFIRE AND THE CHEST ───────────────────────────────────────────────────────────────────────────
 // The two rooms on the map that were never rooms.
@@ -63,6 +64,16 @@ export default function CardRoom({ run, art = {} }) {
     // The fire asks a question now (see the note by the buttons) and the answer is a card, so the
     // picker is the same shape the brazier in the shop already uses.
     const [picking, setPicking] = useState(false);
+// ── ⚠️ THE GOLD WORDS DID NOTHING ON THIS SCREEN ─────────────────────────────────
+// From the testing room: "What is Exhaust, Intangible, Artifact? There is no rollover text for the terms
+// to explain them." He met all three on the merchant's shelf, where the words are painted gold and are
+// not buttons — CardFace only makes them pressable when it is handed onKey, and only two screens in the
+// game ever handed it one.
+//
+// The rule CardFace states is that a face being DRAGGED must not carry buttons, because a button eats the
+// drag. That is the fight's hand and nothing else. Every screen where a card is sitting still to be READ
+// should explain its own words, which is most of them.
+    const [keyWord, setKeyWord] = useState(null);
     // ── THE CARD THAT IS IN THE FIRE RIGHT NOW ───────────────────────────────────────────────────────
     // `from` is the card you chose and `to` is what it becomes; `turned` flips at the flash, which is the
     // frame the face swaps on. Held on the client because the SERVER only ever reports the finished card —
@@ -211,7 +222,7 @@ export default function CardRoom({ run, art = {} }) {
                         {isFire && at.smithedId && cardById(at.smithedId) ? (
                             <span className="cr-smithed">
                                 <span className="cf-card">
-                                    <CardFace card={cardById(at.smithedId)} art={art[cardById(at.smithedId).pet]} />
+                                    <CardFace card={cardById(at.smithedId)} art={art[cardById(at.smithedId).pet]} onKey={setKeyWord} />
                                 </span>
                                 <b>Sharper.</b>
                             </span>
@@ -346,7 +357,7 @@ export default function CardRoom({ run, art = {} }) {
                                         className={`cr-card${can ? "" : " is-done"}`} disabled={busy || !can}
                                         aria-label={can ? `Sharpen ${c.name}` : `${c.name}, already sharpened`}
                                         onClick={() => setPreview({ id, index: i })}>
-                                        <span className="cf-card"><CardFace card={c} art={art[c.pet]} /></span>
+                                        <span className="cf-card"><CardFace card={c} art={art[c.pet]} onKey={setKeyWord} /></span>
                                     </button>
                                 );
                             })}
@@ -372,12 +383,12 @@ export default function CardRoom({ run, art = {} }) {
                         <p className="cr-prev-head">Into the coals?</p>
                         <div className="cr-prev-pair">
                             <span className="cr-prev-one">
-                                <span className="cf-card"><CardFace card={cardById(preview.id)} art={art[cardById(preview.id)?.pet]} /></span>
+                                <span className="cf-card"><CardFace card={cardById(preview.id)} art={art[cardById(preview.id)?.pet]} onKey={setKeyWord} /></span>
                                 <i className="cr-prev-tag">now</i>
                             </span>
                             <span className="cr-prev-arrow" aria-hidden="true">→</span>
                             <span className="cr-prev-one">
-                                <span className="cf-card"><CardFace card={cardById(upgradedId(preview.id))} art={art[cardById(preview.id)?.pet]} /></span>
+                                <span className="cf-card"><CardFace card={cardById(upgradedId(preview.id))} art={art[cardById(preview.id)?.pet]} onKey={setKeyWord} /></span>
                                 <i className="cr-prev-tag">after</i>
                             </span>
                         </div>
@@ -401,6 +412,7 @@ export default function CardRoom({ run, art = {} }) {
 
             {/* Global for the same reason the shop's is: every selector is under `.cr`, which is this screen
                 and nothing else on the site. */}
+            <CardKeyNote word={keyWord} onClose={() => setKeyWord(null)} />
             <style jsx global>{`
                 ${DECK_GRID_CSS}
                 ${KEY_OFFER_CSS}

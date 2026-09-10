@@ -238,6 +238,30 @@ export default function SocialHub() {
     const lastPeople = useRef("messages");
     const [thread, setThread] = useState(null);
 
+    // ── ⚠️ ANYTHING ON THE PAGE CAN OPEN THIS ───────────────────────────────────
+    // From the testing room, on the first night: "I have no chat/etc ability when I am on that page either,
+    // I had to open a new tab to open this chat."
+    //
+    // He is right and the reason is structural rather than an oversight. The card game is a fixed layer at
+    // z-index 4000, so it is a stacking context — this hub's button sits at 900 and is simply underneath
+    // the whole game. Raising the button over 4000 would put it over the game's OWN modals too (their 8000
+    // and 9000 are relative to the game's 4000), and it would land in the bottom-right corner, which on a
+    // fight screen is the hand. A tester reporting a bug would be tapping through their own cards.
+    //
+    // So the door goes where the game already has room for one: the guide, reachable from the map and from
+    // inside a fight. It asks for the hub by NAME rather than reaching into it, which is the only way a
+    // screen inside another stacking context can do this without a z-index argument nobody wins.
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+        const openTo = (e) => {
+            const room = String(e?.detail?.channel || "");
+            setOpen(true);
+            if (room) { setTab(room); lastRoom.current = room; }
+        };
+        window.addEventListener("wolfden-open-social", openTo);
+        return () => window.removeEventListener("wolfden-open-social", openTo);
+    }, []);
+
     const [inbox, setInbox] = useState(null);
     const [friends, setFriends] = useState(null); // { friends, incoming, outgoing }
     const [discoverQ, setDiscoverQ] = useState("");

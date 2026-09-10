@@ -77,6 +77,21 @@ export default function CardGuide({ open, onClose }) {
                         bar, the pill above a creature. All of them answer.</li>
                 </ul>
 
+                {/* ── THE WAY TO SAY SOMETHING IS BROKEN, FROM INSIDE THE GAME ────────────────
+                    From the testing room: "I have no chat/etc ability when I am on that page either, I had
+                    to open a new tab to open this chat." Leaving the game to report a bug is the highest
+                    friction there is in a room whose entire purpose is reporting bugs — and the run is
+                    saved every turn, so the trip is safe; it was only ever hidden.
+                    The guide is the right home for it: it is the one panel reachable BOTH from the map and
+                    from inside a fight, and it costs neither of those bars a button they do not have room
+                    for — see the arithmetic on the fight's control strip and on the map's tool row.
+                    It asks for the hub by name; see the listener in SocialHub. */}
+                <button type="button" className="cg-tell" onClick={() => {
+                    onClose?.();
+                    window.dispatchEvent(new CustomEvent("wolfden-open-social", { detail: { channel: "testing" } }));
+                }}>
+                    Something broken? Tell the Testing room
+                </button>
                 <button type="button" className="cg-out" onClick={onClose}>Close</button>
             </div>
 
@@ -101,6 +116,10 @@ export default function CardGuide({ open, onClose }) {
                     line-height: 1.45; color: #b3a68f; }
                 .cg-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
                 .cg-notes li { font-size: 11.5px; line-height: 1.45; color: #b3a68f; }
+                .cg-tell { display: block; width: 100%; margin: 18px 0 0; padding: 11px 14px;
+                    border-radius: 10px; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 700;
+                    border: 1px dashed #3c4a5e; background: #151a24; color: #9fd0ff; }
+                .cg-tell:hover { border-color: #5f86ad; color: #cfe6ff; }
                 .cg-out { display: block; margin: 16px auto 0; font: inherit; font-size: 13px;
                     letter-spacing: 0.04em; color: #14161d; font-weight: 700;
                     background: linear-gradient(180deg, #ffd88a, #e0a94e); border: 0;
