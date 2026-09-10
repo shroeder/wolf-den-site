@@ -7058,7 +7058,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 }
 .social-global-composer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 2px; /* Opaque by 60% rather than 34%: the transparent stretch let the newest message read through the composer,
      which looked like the text was drifting rather than being covered. */
-    background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 60%); }
+    /* ⚠️ 60% WAS ENOUGH FOR ONE LINE AND IS NOT ENOUGH FOR TWO. The testing room's composer wraps to a
+       second line for the Screenshot button, and the fade was still reaching solid 40% of the way down — so
+       the newest message read straight through the new line, which is the exact fault the 34% -> 60% change
+       was made to fix, back when the bar was half as tall. Solid by a quarter of the way down now, which
+       covers both lines and costs nothing in the rooms that only have one. */
+    background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 26%); }
 .social-global-composer input { flex: 1 1 auto; min-width: 0; padding: 11px 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.92rem; }
 .social-global-composer .btn-gold { flex: 0 0 auto; }
 .gchat-row { display: flex; gap: 9px; align-items: flex-start; }
@@ -23609,6 +23614,36 @@ body.cas-seated .social-fab { display: none; }
 /* The picker is a chip beside Send, not a second button competing with it — the message is still the point
    and the picture is the attachment. It shows a tick once something is chosen, because a file input that
    looks identical before and after you pick is how people send the same screenshot twice. */
-.social-pic { flex: 0 0 auto; display: grid; place-items: center; width: 38px; height: 38px;
-    border-radius: 10px; border: 1px solid #2a3242; background: #151a24; cursor: pointer; font-size: 16px; }
+/* ⚠️ IT SAYS THE WORD. This was a 38px square with a camera in it and nothing else — a control whose
+   entire explanation was an icon, in a room whose whole purpose is the thing that icon does. Luke: "it needs
+   to be apparent that you can attach images in the tester chat." Nobody goes hunting for a feature they were
+   never told about, so it is a labelled button and it holds its ground next to Send. */
+.social-pic { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 38px;
+    padding: 0 12px; border-radius: 10px; border: 1px dashed #3c4a5e; background: #151a24;
+    color: #9fd0ff; cursor: pointer; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.social-pic:hover { border-color: #5f86ad; color: #cfe6ff; }
+.social-pic svg { width: 17px; height: 17px; flex: none; }
+/* Solid once something is on it, so "chosen" and "not chosen" are not the same picture. */
+.social-pic.has-pic { border-style: solid; border-color: #2c6e4a; color: #7fe0a8; background: #14201a; }
 .social-pic input { display: none; }
+
+/* ⚠️ THE PICKER SITS ABOVE THE BOX, NOT IN THE ROW. Three controls in one composer row cut the
+   placeholder to "What broke, and what you" at 393px — measured — and the placeholder is the only
+   instruction anybody reads in a room like this. Above it, the input keeps its full width and the button
+   is MORE visible rather than less. */
+/* ⚠️ IT LIVES INSIDE THE STICKY COMPOSER. Put in the feed above it, this is ordinary scrolling content
+   sitting at the very end of the conversation — so it rendered UNDERNEATH the composer that is pinned over
+   the top of it, half off the bottom of the screen. Measured at 369x560. It is the composer's own first
+   line now, full width, so the input keeps its width and the button cannot be scrolled away from. */
+.social-global-composer { flex-wrap: wrap; }
+.social-pic-row { flex: 1 0 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; }
+.social-pic-row .social-pic-chip { flex: 1 1 180px; margin: 0; }
+
+/* The attachment itself — a file you cannot see is a file you send twice. */
+.social-pic-chip { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; padding: 6px 10px;
+    border-radius: 10px; border: 1px solid #2c6e4a; background: #14201a; font-size: 12px; color: #7fe0a8; }
+.social-pic-chip svg { width: 15px; height: 15px; flex: none; }
+.social-pic-chip b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-weight: 700; color: #cfe6d6; }
+.social-pic-chip button { flex: none; border: 0; background: none; cursor: pointer; font: inherit;
+    font-size: 11.5px; color: #8a8f98; text-decoration: underline; }

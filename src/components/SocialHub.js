@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { GiPhotoCamera } from "react-icons/gi";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -1095,7 +1096,37 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
 
                 ON A PHONE IT GOES UNDER THE FEED, not beside it. A 150px rail beside a chat column on a
                 375px screen leaves 200px for the conversation, which is the wrong thing to sacrifice. */}
+            {/* A file you cannot see is a file you send twice. It names what is attached and gives it
+                back — changing your mind must not mean sending the message to find out. */}
             <form className="social-global-composer" onSubmit={send}>
+                <div className="social-pic-row">
+                        {/* ── ⚠️ IT HAS TO LOOK LIKE A THING YOU CAN DO ────────────────────────────
+                            Luke: "It needs to be apparent that you can attach images in the tester chat."
+                            The first cut was a 38px square with a camera in it and nothing else — a control whose
+                            entire explanation was an icon, in a room whose whole purpose is the thing that icon
+                            does. Nobody goes hunting for a feature they were never told exists. It says the word
+                            now, and it holds its ground beside Send.
+                            The glyph is from react-icons/gi rather than the emoji it was: this game does not put
+                            emoji in its interface, and I broke that rule writing it the first time.
+                            Still a courtesy and not the lock — the upload route checks the room and the membership
+                            itself. See IMAGE_CHANNELS in town.js. */}
+                        {channel === "testing" ? (
+                            <label className={`social-pic${pic ? " has-pic" : ""}`}>
+                                <GiPhotoCamera aria-hidden="true" />
+                                <span>{pic ? "1 attached" : "Screenshot"}</span>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                                    aria-label="Attach a screenshot to this message"
+                                    onChange={(e) => setPic(e.target.files?.[0] || null)} />
+                            </label>
+                        ) : null}
+                {pic ? (
+                    <div className="social-pic-chip">
+                        <GiPhotoCamera aria-hidden="true" />
+                        <b>{pic.name}</b>
+                        <button type="button" onClick={() => setPic(null)} aria-label="Remove the attachment">Remove</button>
+                    </div>
+                ) : null}
+                </div>
                 <input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -1104,19 +1135,13 @@ export function GlobalChatTab({ open, onRead, channel = "global", onChannels }) 
                         // A bug report needs the screen, what you did and what happened instead — asking for
                         // those three here costs nothing and saves the follow-up question every time.
                         : channel === "bugs" ? "What screen, what you did, what happened…"
+                        // Same three questions as the bug room, plus the one thing this room can do
+                        // that the others cannot. The placeholder is the only instruction anybody reads.
+                        : channel === "testing" ? "What broke, and what you pressed — add a screenshot…"
                         : "Message the whole Den…"}
                     maxLength={channel === "bugs" ? 400 : 200}
                     autoCapitalize="sentences"
                 />
-                {/* Only where the server will accept one — see IMAGE_CHANNELS in town.js. The picker is a
-                    courtesy, not the lock: the upload route checks the room and the membership itself. */}
-                {channel === "testing" ? (
-                    <label className="social-pic" title="Attach a screenshot">
-                        {pic ? "\u2713" : "\uD83D\uDCF7"}
-                        <input type="file" accept="image/png,image/jpeg,image/webp,image/gif"
-                            onChange={(e) => setPic(e.target.files?.[0] || null)} />
-                    </label>
-                ) : null}
                 <button type="submit" className="btn-gold" disabled={sending || !input.trim()}>Send</button>
             </form>
         </div>
