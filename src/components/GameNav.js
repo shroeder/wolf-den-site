@@ -159,6 +159,9 @@ export default function GameNav() {
     const fishingOn = Boolean(hud?.sailing?.fishing);
     const kitchen = Boolean(hud?.kitchen);
     const mine = Boolean(hud?.mine?.unlocked);
+    // The Forest is owner-gated while it is built — same contract as the Kitchen and the Mine: ask the
+    // server, never guess, and a non-owner simply has no Forest in the menu with nothing to see.
+    const forest = Boolean(hud?.forest);
     const mineTrips = Number(hud?.mine?.trips) || 0;
     const minePartsReady = Number(hud?.mine?.partsReady) || 0;
     const arena = Boolean(hud?.arena?.unlocked);
@@ -188,6 +191,7 @@ export default function GameNav() {
         ...(signedIn && fishingOn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
+        ...(forest ? [{ href: "/marketplace/forest", emoji: "🌲", label: "Forest" }] : []),
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
         ...(casino ? [{ href: "/marketplace/casino", label: "Casino" }] : []),
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
@@ -342,6 +346,7 @@ export default function GameNav() {
             // the side of the screen and a new entry appended to the end of it is, in practice, invisible.
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
+            ...(forest ? [{ href: "/marketplace/forest", emoji: "🌲", label: "The Forest", sub: "Chop for wood" }] : []),
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
             ...(casino ? [{ href: "/marketplace/casino", label: "The Casino", sub: "Nine machines" }] : []),

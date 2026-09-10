@@ -16,6 +16,8 @@ import { getFeatureClaimCounts } from "@/lib/marketplace/feature-dailies.js";
 import { getTownTodo } from "@/lib/marketplace/town.js";
 import { farmNav } from "@/lib/marketplace/farm.js";
 import { dailyChipsReady } from "@/lib/marketplace/chips.js";
+import { forestOpenTo } from "@/lib/marketplace/forest.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // ── THE WHOLE NAV BAR, IN ONE REQUEST ────────────────────────────────────────────────────────────────────────
 // GameNav is mounted on every page under /marketplace, and it used to ask FOURTEEN separate endpoints what to
@@ -52,7 +54,7 @@ export async function GET(request) {
         };
         if (!id) {
             return noStore({
-                signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false },
+                signedIn: false, arena: { unlocked: false }, mine: { unlocked: false }, delves: { unlocked: false }, forest: false,
                 jeweller: false, casino: false, kitchen: false, cards: false, chests: 0, spins: 0, bossStrikes: 0, questsReady: 0,
                 sailing: { attention: false, casts: 0, forgeable: 0, fishing: false }, featureClaims: {},
                 townTodo: null, farm: { cropsReady: 0, petNudge: 0 },
@@ -96,6 +98,14 @@ export async function GET(request) {
             // in the menu would keep the door shut for everyone after the page had opened.
             cards: await CARDS_UNLOCKED(id),
             arena: { unlocked: Boolean(arena?.unlocked), fightsLeft: Number(arena?.fightsLeft) || 0 },
+            // The Forest, owner-only while it is built. The gate is IMPORTED for the same reason the cards
+            // gate above is: on launch day FOREST_PUBLIC flips in one file, and a second copy of the rule
+            // written out here as isOwner(id) would keep the door shut after the page had opened.
+            //
+            // ⚠️ A FIELD ON THIS REQUEST, NOT A REQUEST OF ITS OWN. The menu is deliberately one call for the
+            // whole thing (see the note above), and a nav entry that fetches its own feature bills that
+            // feature on every page for every member — which is what check:chrome exists to catch.
+            forest: forestOpenTo(isOwner(id)),
             mine: {
                 unlocked: Boolean(mining?.unlocked),
                 trips: Number(mining?.trips) || 0,
