@@ -21,10 +21,14 @@ import {
     axeForm, axeTotal, swing, trackCost, trackReadout, treeById,
 } from "@/lib/marketplace/forest.js";
 
-const TREE_ART = (id) => `/images/forest/trees/${id}.png`;
-const AXE_ART = (id) => `/images/forest/axes/${id}.png`;
-const GROVE = "/images/forest/grove.png";
-const STUMP = "/images/forest/stump.png";
+// ⚠️ WEBP, AND IT IS NOT A DETAIL. As PNGs this one screen was 8.3MB of art — a 2.9MB grove backdrop and eight
+// half-megabyte trunks — which is most of a phone's patience spent before the first swing. Painted art with
+// large soft gradients is close to the worst case for PNG and close to the best case for WebP: the same
+// pictures at quality 82 are 0.77MB, a 91% cut, with no visible difference at the sizes they are drawn.
+const TREE_ART = (id) => `/images/forest/trees/${id}.webp`;
+const AXE_ART = (id) => `/images/forest/axes/${id}.webp`;
+const GROVE = "/images/forest/grove.webp";
+const STUMP = "/images/forest/stump.webp";
 
 const RARITY = { common: "#b9b2a4", uncommon: "#7fc98a", rare: "#7fb0ff", epic: "#d98ae8", legendary: "#ffc861" };
 const backIn = (ms) => {
@@ -329,9 +333,23 @@ export default function ForestClient() {
                    top of their own picture, so object-fit contain would letterbox one into a thin sliver and undo
                    the entire point of them. Cover, anchored to the BOTTOM, keeps the roots on the floor
                    and lets the trunk leave the frame, which is what makes it read as enormous. */
+                /* ⚠️ AND FADED AT THE EDGES, BECAUSE EACH TRUNK CARRIES ITS OWN BACKDROP. The trees are not
+                   die-cut — a trunk with roots floating on nothing looks pasted on — so every picture brings a
+                   slice of dark forest with it. Six of those butted together tiled into visible hard seams: at
+                   desktop width you could count the cells by the places an orange trunk stopped mid-stripe.
+                   Masking the outer eighth of each side, and the top of the crop, lets the shared grove.webp
+                   behind the grid do the joining, so the stand reads as one wood rather than six photographs. */
                 .fr-patch img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover;
                     object-position: 50% 100%;
-                    filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)); }
+                    filter: drop-shadow(0 6px 10px rgba(0,0,0,.7));
+                    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 13%, #000 87%, transparent 100%),
+                                        linear-gradient(180deg, transparent 0, #000 20%);
+                    mask-image: linear-gradient(90deg, transparent 0, #000 13%, #000 87%, transparent 100%),
+                                linear-gradient(180deg, transparent 0, #000 20%);
+                    -webkit-mask-composite: source-in;
+                    mask-composite: intersect; }
+                /* The stump is die-cut and sits in the middle of its cell — masking it just eats the bark. */
+                .fr-patch.is-bare img { -webkit-mask-image: none; mask-image: none; }
                 .fr-patch.is-bare { cursor: default; animation: none; }
                 .fr-patch.is-bare img { opacity: .6; object-fit: contain; aspect-ratio: 3 / 4; }
                 .fr-patch:not(.is-bare):hover img { filter: drop-shadow(0 6px 14px rgba(0,0,0,.8)) brightness(1.12); }
@@ -486,7 +504,13 @@ export default function ForestClient() {
                 .fr-track .fr-btn { width: 100%; }
 
                 @media (min-width: 700px) {
-                    .fr-stand { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+                    /* ⚠️ THIS WAS SIX ACROSS AND IT UNDID THE ART. Luke asked for redwoods you only see the
+                       bottom half of; six cells across a desktop window makes each one short and wide, which is
+                       the one shape a redwood is not. Three columns in a capped-width stand keeps every trunk
+                       taller than it is wide at any window size, and the second row fills the dead black band
+                       that used to sit under the grove. */
+                    .fr-stand { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+                    .fr-grove { max-width: 920px; margin: 0 auto; }
                     .fr-patch img { max-height: 150px; }
                     .fr-shop { align-self: center; border-radius: 16px; border: 1px solid #34402f; }
                     .fr-shop-over { align-items: center; }

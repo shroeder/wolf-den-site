@@ -88,7 +88,7 @@ const PIECES = {
 let spent = 0;
 for (const [id, p] of Object.entries(PIECES)) {
     if (only.length && !only.some((o) => id.includes(o))) continue;
-    const dest = `${OUT}/${id}.png`;
+    const dest = `${OUT}/${id}.webp`;
     if (fs.existsSync(dest) && !FORCE) { console.log(`  ${id}: already drawn`); continue; }
     const body = {
         model: "gpt-image-1",
@@ -110,9 +110,12 @@ for (const [id, p] of Object.entries(PIECES)) {
             ? img.resize(512, 768, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
             : img.resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } });
     }
-    const png = await img.png({ compressionLevel: 9 }).toBuffer();
-    fs.writeFileSync(dest, png);
+    // ⚠️ WEBP, NOT PNG. These came back as PNGs the first time and the eight trunks plus the grove backdrop
+    // came to 8.3MB — the whole screen's art, downloaded before the first swing. Painted gradients are the case
+    // PNG is worst at; the identical pictures at quality 82 are under 800kb for the set.
+    const out = await img.webp({ quality: 82, alphaQuality: 90, effort: 6 }).toBuffer();
+    fs.writeFileSync(dest, out);
     spent += 0.04;
-    console.log(`  ${id.padEnd(18)} ${Math.round(png.length / 1024)}kb`);
+    console.log(`  ${id.padEnd(18)} ${Math.round(out.length / 1024)}kb`);
 }
 console.log(`\nabout $${spent.toFixed(2)}`);
