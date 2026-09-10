@@ -210,6 +210,31 @@ export const SFX = {
     lose: () => { run([392, 330, 262, 196], { dur: 0.6, type: "sine", gain: 0.11, step: 0.16 }); haptic([80, 120, 200]); },
     rank: () => { run([523, 659, 784, 1047, 1319], { dur: 0.5, type: "sine", gain: 0.13, step: 0.1 }); haptic([25, 40, 25, 40, 25, 40, 120]); },
     unlock: () => { run([440, 554, 659, 880], { dur: 0.44, type: "triangle", gain: 0.12, step: 0.09 }); haptic([20, 35, 20, 35, 90]); },
+
+    // ── THE BRIG ─────────────────────────────────────────────────────────────────────────────────────
+    // Everything down here is IRON, TIMBER or BREATH — no bells, no chimes, nothing bright. The palette
+    // above has plenty of pretty sounds and not one of them belongs in a cell.
+    brigDoor: () => { noise({ dur: 0.5, gain: 0.16, freq: 260, q: 0.7, sweepTo: 90 }); tone({ freq: 88, to: 62, dur: 0.5, type: "square", gain: 0.1 }); haptic([50, 30, 70]); },
+    brigTake: () => { noise({ dur: 0.22, gain: 0.13, freq: 420, q: 1.1, sweepTo: 160 }); tone({ freq: 120, to: 84, dur: 0.3, type: "sawtooth", gain: 0.1, delay: 0.05 }); haptic([30, 40, 60]); },
+    // He gives ground: one link going, and a breath let out under it.
+    brigCrack: () => { noise({ dur: 0.13, gain: 0.15, freq: 1900, q: 2.6, sweepTo: 700 }); tone({ freq: 196, to: 262, dur: 0.26, type: "sine", gain: 0.09, delay: 0.04 }); haptic([18, 26, 18]); },
+    // He sets himself. A door being put back on its latch.
+    brigHarden: () => { tone({ freq: 104, to: 74, dur: 0.34, type: "square", gain: 0.13 }); noise({ dur: 0.2, gain: 0.11, freq: 300, q: 1.6, sweepTo: 120, delay: 0.03 }); haptic([50, 70, 50]); },
+    // Nothing moves. The ship does, though — it always does.
+    brigRead: () => { noise({ dur: 0.42, gain: 0.06, freq: 340, q: 2.2, sweepTo: 220 }); tone({ freq: 147, dur: 0.3, type: "sine", gain: 0.04 }); haptic(10); },
+    // The nerve going down. Deliberately almost nothing: it should be felt more than heard.
+    brigNerve: () => noise({ dur: 0.3, gain: 0.045, freq: 620, q: 1.2, sweepTo: 300 }),
+    // He talks. The one loud thing in the room, and it is still not a fanfare.
+    brigBreak: () => {
+        noise({ dur: 0.36, gain: 0.16, freq: 1500, q: 1.2, sweepTo: 300 });
+        run([147, 196, 233, 294], { dur: 0.9, type: "sine", gain: 0.12, step: 0.13, delay: 0.1 });
+        tone({ freq: 74, to: 58, dur: 1.0, type: "sawtooth", gain: 0.09 });
+        haptic([40, 50, 40, 50, 140]);
+    },
+    // Three confessions laid together and folded into one thing.
+    brigChart: () => { noise({ dur: 0.5, gain: 0.09, freq: 2200, q: 0.8, sweepTo: 900 }); run([233, 294, 349, 466], { dur: 0.7, type: "triangle", gain: 0.11, step: 0.11, delay: 0.08 }); haptic([20, 30, 20, 30, 90]); },
+    // He buys himself back, and it is coins and a key.
+    brigRansom: () => { run([392, 330], { dur: 0.2, type: "triangle", gain: 0.09, step: 0.07 }); noise({ dur: 0.26, gain: 0.1, freq: 1400, q: 2, sweepTo: 500, delay: 0.05 }); haptic([16, 26]); },
 };
 
 /** Play by name, ignoring anything this palette has never heard of. */
@@ -229,6 +254,11 @@ const TRACKS = {
     shop: { root: 220.00, steps: [0, 4, 7, 11, 7, 4], beat: 0.44, type: "sine", drone: false },
     campfire: { root: 164.81, steps: [0, 7, 12, 7], beat: 0.78, type: "sine", drone: true },
     event: { root: 155.56, steps: [0, 2, 3, 7, 3, 2], beat: 0.50, type: "sine", drone: true },
+    // ── BELOW DECKS ──────────────────────────────────────────────────────────────────────────────────
+    // The slowest thing in here on purpose. An interrogation is a room where nothing is happening fast
+    // and both of you know it — so a beat almost twice the campfire's, a minor second in the phrase to
+    // keep it from ever settling, and a sawtooth drone under it for the timber.
+    brig: { root: 123.47, steps: [0, 1, 5, 1, 0, 5], beat: 0.92, type: "sawtooth", drone: true },
 };
 
 let music = null;
