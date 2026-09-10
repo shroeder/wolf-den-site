@@ -99,7 +99,7 @@ export default function ForestClient() {
             ...c.slice(-14),
             // AT THE CUT, NOT OVER THE CROWN. The numbers were scattering across the canopy, which is the
             // one part of the tree the axe is nowhere near — they belong where the blade goes in.
-            { id, hit: res.hit, mult: res.mult, doubled: res.doubled, x: 40 + Math.random() * 20, y: 66 + Math.random() * 10 },
+            { id, hit: res.hit, mult: res.mult, doubled: res.doubled, x: 38 + Math.random() * 24, y: 74 + Math.random() * 12 },
         ]);
         setTimeout(() => setChips((c) => c.filter((x) => x.id !== id)), 620);
         setShake(Math.min(6, 2 + res.streak * 0.22));
@@ -289,8 +289,8 @@ export default function ForestClient() {
                 .fr-grove { position: relative; width: 100%; border-radius: 12px; overflow: hidden;
                     background: #0a1014 center / cover no-repeat; padding: 10px 8px 12px; }
                 .fr-mist { position: absolute; inset: 0; pointer-events: none;
-                    background: radial-gradient(120% 80% at 30% 0%, rgba(150,200,230,.14), transparent 60%),
-                                linear-gradient(180deg, transparent 40%, rgba(4,8,10,.72)); }
+                    background: radial-gradient(120% 80% at 30% 0%, rgba(150,200,230,.12), transparent 60%),
+                                linear-gradient(180deg, transparent 52%, rgba(4,8,10,.55)); }
                 .fr-stand { position: relative; z-index: 1;
                     display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
                 .fr-patch { display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -299,10 +299,15 @@ export default function ForestClient() {
                 .fr-patch:nth-child(2n) { animation-delay: -2.3s; }
                 .fr-patch:nth-child(3n) { animation-delay: -4.6s; }
                 @keyframes frSway { 0%,100% { transform: rotate(-.6deg); } 50% { transform: rotate(.6deg); } }
-                .fr-patch img { display: block; width: 100%; height: auto; max-height: 118px; object-fit: contain;
+                /* ⚠️ CROPPED AT THE TOP, ON PURPOSE. The trunks are drawn as redwoods that run out of the
+                   top of their own picture, so object-fit contain would letterbox one into a thin sliver and undo
+                   the entire point of them. Cover, anchored to the BOTTOM, keeps the roots on the floor
+                   and lets the trunk leave the frame, which is what makes it read as enormous. */
+                .fr-patch img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover;
+                    object-position: 50% 100%;
                     filter: drop-shadow(0 6px 10px rgba(0,0,0,.7)); }
                 .fr-patch.is-bare { cursor: default; animation: none; }
-                .fr-patch.is-bare img { opacity: .55; max-height: 70px; margin-top: 46px; }
+                .fr-patch.is-bare img { opacity: .6; object-fit: contain; aspect-ratio: 3 / 4; }
                 .fr-patch:not(.is-bare):hover img { filter: drop-shadow(0 6px 14px rgba(0,0,0,.8)) brightness(1.12); }
                 .fr-label { font-size: 10.5px; font-weight: 800; color: var(--r);
                     text-shadow: 0 1px 3px #000, 0 0 8px rgba(0,0,0,.9); }
@@ -331,7 +336,10 @@ export default function ForestClient() {
                 .fr-hit { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%;
                     border: 0; background: none; padding: 0; cursor: pointer;
                     -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-                .fr-tree { position: absolute; left: 50%; bottom: 8%; height: 74%; width: auto;
+                /* The tree you are actually swinging at: rooted at the bottom of the scene and running
+                   straight out of the top of it. Deliberately wider than a phone — .fr-scene clips it, and
+                   a trunk that fills the whole width is the difference between a tree and a redwood. */
+                .fr-tree { position: absolute; left: 50%; bottom: 0; height: 112%; width: auto;
                     transform: translateX(-50%);
                     filter: drop-shadow(0 12px 18px rgba(0,0,0,.8)); }
                 .fr-tree.is-struck { animation: frStruck .1s ease; }
@@ -340,10 +348,12 @@ export default function ForestClient() {
                     50% { transform: translateX(-50%) translateX(3px) skewX(-1.2deg); }
                 }
                 .fr-tree.is-down { animation: frTimber .9s cubic-bezier(.5,0,.9,.6) both; }
+                /* A redwood does not tip over inside a phone screen — at this size a rotation is just the
+                   picture leaving sideways. It shudders, drops, and goes. */
                 @keyframes frTimber {
-                    0% { transform: translateX(-50%) rotate(0); opacity: 1; }
-                    70% { transform: translateX(-50%) rotate(-78deg); transform-origin: 50% 100%; opacity: 1; }
-                    100% { transform: translateX(-50%) rotate(-90deg); transform-origin: 50% 100%; opacity: 0; }
+                    0% { transform: translateX(-50%) translateY(0) rotate(0); opacity: 1; }
+                    18% { transform: translateX(-50%) translateY(-6px) rotate(-1.5deg); opacity: 1; }
+                    100% { transform: translateX(-50%) translateY(64px) rotate(-7deg); opacity: 0; }
                 }
 
                 /* The axe rides in from the right on every swing. It is drawn upright, so the swing is a
@@ -351,7 +361,7 @@ export default function ForestClient() {
                 /* ⚠️ IT HAS TO REACH THE TRUNK. At right:6% the axe sat off in the undergrowth swinging at
                    nothing while the tree shook on its own — the two halves of one action, happening in
                    different places. Brought in over the cut, and the swing arcs into it. */
-                .fr-axe { position: absolute; left: 52%; bottom: 12%; width: 30%; max-width: 165px;
+                .fr-axe { position: absolute; left: 54%; bottom: 6%; width: 30%; max-width: 165px;
                     transform-origin: 50% 15%; transform: rotate(46deg);
                     filter: drop-shadow(0 6px 12px rgba(0,0,0,.75)); pointer-events: none; }
                 .fr-axe.is-swing { animation: frSwing .11s ease-out; }

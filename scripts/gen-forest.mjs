@@ -9,7 +9,7 @@
 //   node scripts/gen-forest.mjs --force    redraw everything
 import fs from "node:fs";
 import sharp from "sharp";
-import { housePrompt } from "../src/lib/marketplace/art-style.js";
+import { housePrompt, HOUSE_STYLE, NEGATIVE_STYLE } from "../src/lib/marketplace/art-style.js";
 import "./lib/ai-trace.mjs";
 
 const props = fs.readFileSync("../accounting_app/local.properties", "utf8");
@@ -24,27 +24,39 @@ const FORCE = process.argv.includes("--force");
 // never empty and the "only what was asked for" branch quietly skips EVERYTHING.
 const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 
-// A tree has to read at a glance in a row of six, and it is TAPPED — so silhouette first, and nothing
-// touching the frame edge or it looks cropped rather than die-cut.
-const TREE_EXTRA = "A single whole tree seen from the side, trunk to crown, standing upright and centred with "
-    + "clear space on all four sides. The SILHOUETTE is the whole job: this is looked at small and tapped, so "
-    + "the shape of the crown and the line of the trunk must be readable instantly. No ground, no grass, no "
-    + "shadow, no other trees, no background.";
+// ── ⚠️ THESE ARE REDWOODS, AND DIE_CUT CANNOT DRAW ONE ───────────────────────────────────────────────
+// Luke: "tall trees where we can only see the bottom half because its like a redwood forest semi dark."
+//
+// The house DIE_CUT framing states that no part of the subject may touch any edge — which is exactly right
+// for a hatchet and exactly wrong for a tree whose whole character is that it runs out of the top of the
+// picture. So the trunks compose their own framing from HOUSE_STYLE and NEGATIVE_STYLE and skip DIE_CUT.
+// The same reasoning killed the painted prison bars in the brig; there it ended in a horned ogre.
+//
+// Drawn PORTRAIT (1024x1536) rather than square, because a towering trunk in a square is a thin sliver with
+// wasted air either side, and the crown is not in shot to fill it.
+//
+// ⚠️ AND EACH SPECIES IS DESCRIBED BY ITS BARK. The crown used to be how you told a birch from an oak, and
+// the crown is now above the top of the frame — so the leaves are gone from every prompt and the trunk does
+// all the work: colour, texture, the shape of the roots.
+const TRUNK_FRAMING =
+    "An ENORMOUS ancient tree seen from close to its base, the viewer looking slightly upward. The trunk is "
+    + "so vast it fills most of the width of the frame and runs straight off the TOP edge — the crown is far "
+    + "overhead and completely out of shot. Only the lower trunk and the spreading roots are visible, with a "
+    + "little clear space beneath the roots at the bottom. Nothing else in the picture. Isolated on a FULLY "
+    + "TRANSPARENT background: no ground, no undergrowth, no other trees, no cast shadow, no background.";
+const trunkPrompt = (subject) => [subject, TRUNK_FRAMING, HOUSE_STYLE, NEGATIVE_STYLE].join(" ");
 
 const TREES = {
-    birch: "a slender white-barked birch with black scars along its trunk and a light airy crown of small pale green leaves",
-    pine: "a tall straight dark-green pine with layered downswept boughs and a narrow pointed crown, rough red-brown bark",
-    oak: "a broad heavy old oak with a thick gnarled trunk and a wide dense dark-green canopy, deeply furrowed bark",
-    ash: "an upright grey-barked ash with a high open crown of feathered leaves and smooth pale silver-grey bark",
-    blackthorn: "a low twisted blackthorn, near-black bark, dense vicious thorns along every branch, sparse dark purple-tinged leaves",
-    ironwood: "a massive iron-grey tree with a trunk like riveted metal plate, hard angular branches and stiff blue-grey foliage",
-    heartwood: "an ancient tree with deep red-brown bark split open to show a glowing warm crimson core, sparse copper leaves",
-    moonash: "a pale luminous white tree with silver-blue bark that glows faintly, delicate drooping branches hung with soft blue light",
+    birch: "a colossal birch: chalk-white bark peeling in fine papery curls, ringed with black scars and dark knot-eyes, slender pale roots",
+    pine: "a colossal pine: thick red-brown bark broken into deep jigsaw plates, amber resin bleeding from the seams, a broad flaring base",
+    oak: "a colossal ancient oak: heavily furrowed grey-brown bark in deep vertical ridges, a massive knotted burl low on the trunk, huge buttressed roots",
+    ash: "a colossal ash: smooth pale silver-grey bark with fine dark fissures near the base, clean and upright, roots gripping tight",
+    blackthorn: "a colossal blackthorn: near-black bark, long iron-hard thorns bristling straight out of the trunk itself, twisted and sinewy",
+    ironwood: "a colossal ironwood: blue-grey bark that looks like riveted iron plate, hard angular facets and seams of rust, unnaturally straight",
+    heartwood: "a colossal heartwood: deep red-brown bark split open in a long vertical wound down the trunk, a molten crimson glow pouring out of the crack, embers in the grain",
+    moonash: "a colossal moonash: luminous silver-white bark glowing softly with cold blue light, pale veins running up the trunk, faint motes drifting off it",
 };
 
-// ⚠️ EVERY AXE HANGS THE SAME WAY OR THE SWING ROTATES ONE OF THEM WRONG. The first pass said only "seen
-// from the side" and the Felling Axe came back lying flat while the other five stood upright — which in a
-// swing animation is an axe going through the tree sideways. Stated as an orientation, not a viewpoint.
 const AXE_EXTRA = "Held VERTICALLY, head at the top and haft running straight down to the bottom of the frame, "
     + "blade facing LEFT. Upright like an axe standing against a wall, never lying flat or diagonal.";
 
@@ -58,18 +70,18 @@ const AXES = {
 };
 
 const PIECES = {
-    ...Object.fromEntries(Object.entries(TREES).map(([id, p]) => [`trees/${id}`, { subject: p, extra: TREE_EXTRA, sprite: true }])),
+    ...Object.fromEntries(Object.entries(TREES).map(([id, p]) => [`trees/${id}`, { raw: trunkPrompt(p), sprite: true, size: "1024x1536", tall: true }])),
     ...Object.fromEntries(Object.entries(AXES).map(([id, p]) => [`axes/${id}`, { subject: p, extra: AXE_EXTRA, sprite: true }])),
     stump: { subject: "a freshly cut tree stump, pale raw wood across the cut face with the rings showing, "
         + "bark dark around the rim, a few chips and splinters at its foot", sprite: true },
     // The place itself. Deliberately empty in the middle band, because six trees are about to stand there.
-    grove: { subject: "A dark pine forest at night seen straight on: dense black trunks receding into fog, a "
-        + "faint cold blue mist between them, the ground a bed of dark needles and scattered fallen leaves, a "
-        + "sliver of moonlight coming down from the upper left. Deep, quiet and empty -- no people, no animals, "
-        + "no buildings, no path. The MIDDLE of the frame is open ground with nothing standing in it. "
-        + "⚠️ ONE CONTINUOUS PAINTING edge to edge: no panel, no inset rectangle, no frame, no border, no "
-        + "seam, no straight-edged patch of lighter sky. The first draft came back with a rectangular "
-        + "lighter box around the moon, which reads as a rendering fault rather than as a forest",
+    grove: { subject: "A redwood forest at dusk seen straight on: immense reddish-brown trunks rising out "
+        + "of frame on both sides and receding into a soft blue-grey haze, a bed of dark needles and fallen "
+        + "leaves underfoot, low drifting mist, and pale shafts of light slanting down between the trunks "
+        + "from high above. SEMI-DARK rather than black — the far trunks and the mist stay clearly visible "
+        + "and the ground reads. Quiet and enormous; no people, no animals, no buildings, no path. The "
+        + "MIDDLE of the frame is open ground with nothing standing in it. One continuous painting edge to "
+        + "edge: no panel, no inset rectangle, no frame, no border, no seam",
         sprite: false, size: "1536x1024" },
 };
 
@@ -80,7 +92,7 @@ for (const [id, p] of Object.entries(PIECES)) {
     if (fs.existsSync(dest) && !FORCE) { console.log(`  ${id}: already drawn`); continue; }
     const body = {
         model: "gpt-image-1",
-        prompt: housePrompt(p.subject, { framing: p.sprite ? "sprite" : "scene", extra: p.extra || "" }),
+        prompt: p.raw || housePrompt(p.subject, { framing: p.sprite ? "sprite" : "scene", extra: p.extra || "" }),
         size: p.size || "1024x1024", output_format: "png", quality: "medium", n: 1,
     };
     if (p.sprite) body.background = "transparent";
@@ -92,7 +104,12 @@ for (const [id, p] of Object.entries(PIECES)) {
     const j = await r.json();
     let img = sharp(Buffer.from(j.data[0].b64_json, "base64"));
     // Trees and axes are drawn at a few hundred pixels; 1024 of them is a megabyte of nothing.
-    if (p.sprite) img = img.resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } });
+    // A trunk is stored tall; everything else stays square.
+    if (p.sprite) {
+        img = p.tall
+            ? img.resize(512, 768, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            : img.resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } });
+    }
     const png = await img.png({ compressionLevel: 9 }).toBuffer();
     fs.writeFileSync(dest, png);
     spent += 0.04;
